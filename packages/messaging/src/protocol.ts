@@ -14,6 +14,7 @@ import type {
   WalletSummary,
   Winston,
 } from "@gleam/core";
+import type { ProviderSurfaceMethod } from "./page-protocol";
 
 /**
  * The typed background RPC contract, per ARCHITECTURE.md §4.1 exactly.
@@ -43,6 +44,9 @@ export interface ProtocolMap {
   getConnectedApps(): Grant[];
 
   // actions
+  // `TransferDraft`/`UploadDraft` carry `walletId`/`password` directly
+  // (added by `provider-bridge`, see those models' doc comments) — signing
+  // needs the decrypted JWK, re-derived per call, never persisted.
   estimateTransfer(req: TransferDraft): FeeEstimate;
   submitTransfer(req: TransferDraft): { txId: string };
   reviewUpload(req: UploadDraft): UploadReview; // runs the secret scan
@@ -51,9 +55,44 @@ export interface ProtocolMap {
   // approvals
   getApproval(req: { requestId: string }): ApprovalRequest;
   resolveApproval(req: { requestId: string; approved: boolean }): void;
+  /**
+   * `APPROVAL_METHODS` (`core/models/method-privileges.ts`) names this
+   * method, but no layer before this one had a shape for it. A signing
+   * approval needs a password to actually decrypt the signing key, but
+   * `resolveApproval`'s own shape is locked to exactly `{ requestId,
+   * approved }` (`protocol.messaging.test.ts`'s `toEqualTypeOf`
+   * assertion, outside this layer's ALLOWED SCOPE to change) — so the
+   * approval window calls this first, from the same trusted approval
+   * context, to hand off the password for a pending signing request
+   * before calling `resolveApproval({ requestId, approved: true })`
+   * without one. A `connect` approval never calls this at all — no
+   * signing key is needed to create a Grant.
+   */
+  unlockApprovalWallet(req: { requestId: string; password: string }): void;
 
   // settings
   setNetworkSettings(req: NetworkSettings): void;
   setLockSettings(req: LockSettings): void;
   revokeGrant(req: { origin: string }): void;
+
+  /**
+   * The single relay point for every page-originated provider call
+   * (`PROVIDER_SURFACE_METHODS`, `page-protocol.ts`). The content script
+   * forwards a page's `PageRequestEnvelope` here rather than through any
+   * of this map's other, per-purpose methods — none of which exist for
+   * the 19-method ArConnect-compatible surface, since that surface is
+   * page-facing, not popup/background-facing, and only ever reaches the
+   * background through this one relay. `origin` is attached by the
+   * content script from `location.origin`, never trusted from the page's
+   * own message payload (a page cannot claim to be a different origin).
+   *
+   * This is the dispatcher's actual privilege-tier choke point (this
+   * task's highest-stakes rule): every `providerCall` is checked against
+   * `PROVIDER_METHODS` before being routed anywhere, and nothing else in
+   * this map is reachable this way — `resolveApproval`/`getApproval`
+   * (`APPROVAL_METHODS`) and `createWallet`/`importWallet`/`exportWallet`
+   * (`KEY_METHODS`) are only ever called directly, by their own trusted
+   * senders, never proxied through `providerCall`.
+   */
+  providerCall(req: { origin: string; method: ProviderSurfaceMethod; params: unknown }): unknown;
 }
