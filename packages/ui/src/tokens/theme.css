@@ -143,6 +143,12 @@
  * the 380px frame the type scale above is tuned for (see theme.css's type
  * scale comment); sidepanel/approval intentionally don't get this rule —
  * they size to the browser-provided side panel / window instead.
+ *
+ * 600px is Chrome's own action-popup rendering ceiling, not a value
+ * chosen here — a taller `min-height` doesn't grow the popup window
+ * beyond what Chrome allows, it only pushes content into an internal
+ * scrollbar (confirmed against a real build at 780px). No CSS or
+ * manifest setting raises that ceiling.
  */
 html:has([data-layout="popup"]),
 body:has([data-layout="popup"]) {
@@ -151,7 +157,7 @@ body:has([data-layout="popup"]) {
 
 [data-layout="popup"] {
   width: 380px;
-  min-height: 780px;
+  min-height: 600px;
 }
 
 /*
