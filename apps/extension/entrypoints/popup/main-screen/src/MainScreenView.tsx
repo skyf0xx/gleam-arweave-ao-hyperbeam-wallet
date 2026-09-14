@@ -13,7 +13,6 @@ import type {
 import {
   AccountAvatar,
   ActivityRow,
-  BalanceDisplay,
   EmptyState,
   NetworkErrorBanner,
   PortfolioChart,
@@ -370,13 +369,6 @@ export function MainScreenView({
       </div>
 
       <div className="px-6 pb-1 pt-2.5">
-        <BalanceDisplay
-          amountLabel={state.balance !== null ? `${formatWinstonAsAr(state.balance)} AR` : "—"}
-          loading={state.loading}
-        />
-      </div>
-
-      <div className="px-6 pb-1 pt-3">
         {portfolioHistory.error ? (
           <NetworkErrorBanner onRetry={() => void loadPortfolioHistory(portfolioRange)} />
         ) : (

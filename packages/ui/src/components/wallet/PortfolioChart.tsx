@@ -55,6 +55,24 @@ export interface PortfolioChartProps {
 const CHART_WIDTH = 100;
 const CHART_HEIGHT = 40;
 
+/**
+ * Fed through the same `buildLinePath` used for real data, so the
+ * zero-balance empty state (no history yet) renders via the identical
+ * polyline/area code path as a priced series — a gentle hand-authored
+ * wave rather than a flat line, so the Gleam-shimmer treatment below has
+ * a line worth traveling along. Never shown alongside real values: gated
+ * on `currentUsdValue === 0 && points.every(usdValue === 0)` below.
+ */
+const EMPTY_STATE_POINTS: PortfolioChartPoint[] = [
+  { timestamp: 0, usdValue: 0.3 },
+  { timestamp: 1, usdValue: 0.55 },
+  { timestamp: 2, usdValue: 0.4 },
+  { timestamp: 3, usdValue: 0.7 },
+  { timestamp: 4, usdValue: 0.5 },
+  { timestamp: 5, usdValue: 0.8 },
+  { timestamp: 6, usdValue: 0.65 },
+];
+
 function formatUsd(value: number): string {
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -106,24 +124,27 @@ export function PortfolioChart({
   className,
 }: PortfolioChartProps) {
   const isPositive = usdChange >= 0;
-  const linePoints = buildLinePath(points);
+  const isEmpty = currentUsdValue === 0 && points.every((point) => point.usdValue === 0);
+  const linePoints = buildLinePath(isEmpty ? EMPTY_STATE_POINTS : points);
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className="flex items-baseline gap-2">
-        <span className="text-h3 font-semibold tabular-nums text-foreground">
-          {loading ? "—" : formatUsd(currentUsdValue)}
-        </span>
-        <span
-          className="text-label font-semibold tabular-nums"
-          style={{ color: loading ? undefined : lineColorVar }}
-        >
-          {loading ? "" : formatPercent(usdChange)}
-        </span>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-baseline gap-2.5">
+          <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+            {loading ? "—" : formatUsd(currentUsdValue)}
+          </span>
+          <span
+            className="text-label font-semibold tabular-nums"
+            style={{ color: loading ? undefined : lineColorVar }}
+          >
+            {loading ? "" : formatPercent(usdChange)}
+          </span>
+        </div>
+        <div className="text-caption text-muted">{loading ? "Loading…" : periodLabel}</div>
       </div>
-      <div className="text-caption text-muted">{loading ? "Loading…" : periodLabel}</div>
 
       <div className="h-[80px] w-full">
         {loading ? (
@@ -132,10 +153,45 @@ export function PortfolioChart({
           <div className="flex h-full w-full items-center justify-center text-caption text-faint">
             No chart data
           </div>
-        ) : currentUsdValue === 0 && points.every((point) => point.usdValue === 0) ? (
-          <div className="flex h-full w-full items-center justify-center text-caption text-faint">
-            Nothing to show yet — send yourself some AR to see your portfolio value over time.
-          </div>
+        ) : isEmpty ? (
+          <svg
+            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+            preserveAspectRatio="none"
+            width="100%"
+            height="100%"
+            role="img"
+            aria-label="No portfolio history yet"
+          >
+            <defs>
+              <linearGradient id="portfolio-chart-empty-gradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={CHART_WIDTH} y2="0">
+                <stop offset="0%" stopColor="var(--color-beam-purple)" />
+                <stop offset="35%" stopColor="var(--color-beam-sky)" />
+                <stop offset="70%" stopColor="var(--color-beam-yellow)" />
+                <stop offset="100%" stopColor="var(--color-beam-green)" />
+              </linearGradient>
+            </defs>
+            <polyline
+              points={linePoints}
+              fill="none"
+              stroke="url(#portfolio-chart-empty-gradient)"
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              opacity={0.13}
+            />
+            <polyline
+              className="gleam-chart-empty-shimmer"
+              points={linePoints}
+              fill="none"
+              stroke="url(#portfolio-chart-empty-gradient)"
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              pathLength={100}
+            />
+          </svg>
         ) : (
           <svg
             viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
@@ -158,6 +214,7 @@ export function PortfolioChart({
           </svg>
         )}
       </div>
+      {isEmpty && <div className="text-center text-caption text-faint">Receive some AR to see your portfolio value over time.</div>}
 
       <div role="tablist" aria-label="Chart range" className="flex items-center gap-1">
         {RANGE_TABS.map((range) => (

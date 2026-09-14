@@ -156,7 +156,7 @@
  * width/height, not to a viewport — with no explicit frame, `min-h-full`
  * on the app root resolves against a box that has already shrunk to fit,
  * collapsing the popup to a narrow sliver. `[data-layout="popup"]` fixes
- * the 380px frame the type scale above is tuned for (see theme.css's type
+ * the 400px frame the type scale above is tuned for (see theme.css's type
  * scale comment); sidepanel/approval intentionally don't get this rule —
  * they size to the browser-provided side panel / window instead.
  *
@@ -168,11 +168,11 @@
  */
 html:has([data-layout="popup"]),
 body:has([data-layout="popup"]) {
-  width: 380px;
+  width: 400px;
 }
 
 [data-layout="popup"] {
-  width: 380px;
+  width: 400px;
   min-height: 600px;
 }
 
@@ -300,3 +300,43 @@ select,
  * this theme's own dark value (#1c1c1c) automatically since it's the
  * same custom property, not a hardcoded light-mode literal.
  */
+
+/*
+ * Empty portfolio-chart shimmer — `PortfolioChart`'s zero-balance state
+ * draws its beam-gradient polyline at rest (~13% opacity, see the
+ * component), then overlays this second identical-path, identical-
+ * gradient polyline as a brighter short segment that travels the line's
+ * length, echoing `.gleam-shimmer`'s "thin moving highlight" language for
+ * a stroked path instead of a filled box. Reusing the same
+ * `url(#portfolio-chart-empty-gradient)` stroke (rather than a flat
+ * white one) keeps the highlight theme-safe with no light/dark
+ * override needed here. `pathLength={100}` on the SVG element normalizes
+ * the path to 100 user units regardless of its actual geometry, so a
+ * fixed dasharray/dashoffset pair here always reads as "a short segment,
+ * sweeping the whole line" no matter how the wave points change.
+ * Animates `stroke-dashoffset` alone (a paint-only property for a
+ * non-scaling stroke) rather than `background-position`, since this is
+ * stroked SVG geometry, not a CSS background.
+ */
+.gleam-chart-empty-shimmer {
+  opacity: 0.3;
+  stroke-dasharray: 18 82;
+  stroke-dashoffset: 100;
+  animation: gleam-chart-empty-shimmer-sweep 2.8s ease-in-out infinite;
+}
+
+@keyframes gleam-chart-empty-shimmer-sweep {
+  from {
+    stroke-dashoffset: 118;
+  }
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-chart-empty-shimmer {
+    animation: none;
+    opacity: 0;
+  }
+}
