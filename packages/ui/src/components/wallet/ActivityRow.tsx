@@ -53,7 +53,7 @@ export function ActivityRow({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col gap-2 border-b border-line py-2.5 text-left last:border-b-0",
+        "flex w-full flex-col gap-2 border-b border-line px-3.5 py-3 text-left last:border-b-0",
         onClick && "cursor-pointer hover:bg-mist",
         className,
       )}

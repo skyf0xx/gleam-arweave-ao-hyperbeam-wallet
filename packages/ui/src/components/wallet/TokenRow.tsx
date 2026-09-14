@@ -32,7 +32,7 @@ export function TokenRow({ glyph, name, ticker, amount, usdValue, onClick, class
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2.5 border-b border-line py-2.5 text-left last:border-b-0",
+        "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0",
         onClick && "cursor-pointer hover:bg-mist",
         className,
       )}

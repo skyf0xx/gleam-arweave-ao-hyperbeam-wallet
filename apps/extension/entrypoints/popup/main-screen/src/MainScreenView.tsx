@@ -316,7 +316,7 @@ export function MainScreenView({
         <div className="pb-2.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
           Tokens
         </div>
-        <div className="rounded-xl border border-line px-3">
+        <div className="border-t border-line">
           {state.loading ? (
             <>
               <SkeletonRow />
@@ -346,12 +346,12 @@ export function MainScreenView({
           <button
             type="button"
             onClick={onViewAllActivity}
-            className="text-label font-medium text-foreground underline decoration-faint underline-offset-2"
+            className="text-label font-medium text-muted hover:text-foreground hover:underline"
           >
             View all
           </button>
         </div>
-        <div className="rounded-xl border border-line px-3">
+        <div className="border-t border-line">
           {state.loading ? (
             <>
               <SkeletonRow />
