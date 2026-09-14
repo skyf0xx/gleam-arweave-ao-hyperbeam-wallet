@@ -1,0 +1,5 @@
+{
+  "intent": "design-system-pass",
+  "reason": "already complete and merged to trunk via 0b2e3db; plan's worktree-on-cleared-dependency mechanic keeps re-spinning a phantom re-plan of this finished intent since gleam-wallet cleared, blocking new intents from compiling on trunk -- see friction log",
+  "abandoned_at": "2026-09-14T12:32:45.354Z"
+}
