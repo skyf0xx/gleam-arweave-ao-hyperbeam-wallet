@@ -7,3 +7,9 @@ export * from "./keys/jwk";
 export type { StoragePort } from "./ports/storage";
 export type { RuntimeMessage, RuntimePort } from "./ports/runtime";
 export type { WindowPort } from "./ports/windows";
+export {
+  estimateHistoricalPortfolioValue,
+  type PricedHistoricalToken,
+  type HistoricalRange,
+  type HistoricalPricePoint,
+} from "./pricing/index";
