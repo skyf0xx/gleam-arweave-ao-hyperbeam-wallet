@@ -134,9 +134,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   let content: ReactNode;
 
   if (initError) {
-    content = <div className="p-4 text-sm text-[#737373]">Couldn&apos;t reach the extension background. {initError}</div>;
+    content = <div className="p-4 text-body text-muted">Couldn&apos;t reach the extension background. {initError}</div>;
   } else if (view === "loading" || runtime === null) {
-    content = <div className="p-4 text-sm text-[#737373]">Loading&hellip;</div>;
+    content = <div className="p-4 text-body text-muted">Loading&hellip;</div>;
   } else if (view === "onboarding") {
     content = <OnboardingView runtime={runtime} onComplete={() => void refresh(runtime)} />;
   } else if (view === "unlock") {
@@ -152,7 +152,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     // response the current models can't actually produce (wallets.length
     // > 0 is what got us into this branch), kept as a named fallback
     // rather than crashing, per this task's HONESTY requirement.
-    content = <div className="p-4 text-sm text-[#737373]">No active wallet found.</div>;
+    content = <div className="p-4 text-body text-muted">No active wallet found.</div>;
   } else if (subView.kind === "send") {
     content = (
       <SendView

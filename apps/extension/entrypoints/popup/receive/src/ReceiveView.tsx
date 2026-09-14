@@ -1,6 +1,6 @@
 import type { WalletSummary } from "@gleam/core";
 import { AddressDisplay, QrCode } from "@gleam/ui/src/components/wallet/index.ts";
-import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 /**
  * Receive screen (receive-screen.html / TODO.md 3.1) — QR + full address
@@ -22,18 +22,18 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
         <QrCode value={wallet.address} />
 
         <div className="flex items-center gap-2">
-          <span className="text-[13px]">{wallet.name}</span>
+          <span className="text-label">{wallet.name}</span>
         </div>
 
         <div className="flex w-full flex-col gap-2">
-          <span className="text-center text-xs font-semibold text-[#737373]">Your address</span>
+          <span className="text-center text-label font-semibold text-muted">Your address</span>
           <AddressDisplay
             address={wallet.address}
             onCopy={() => void navigator.clipboard?.writeText(wallet.address)}
           />
         </div>
 
-        <p className="max-w-[280px] text-center text-xs leading-relaxed text-[#a3a3a3]">
+        <p className="max-w-[280px] text-center text-label leading-relaxed text-faint">
           Only send Arweave-compatible assets to this address. Sending anything else may result in
           permanent loss.
         </p>

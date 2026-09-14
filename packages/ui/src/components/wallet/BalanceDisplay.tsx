@@ -21,8 +21,8 @@ export function BalanceDisplay({ amountLabel, subLabel, loading = false, classNa
   if (loading) {
     return (
       <div className={cn("flex flex-col gap-1", className)}>
-        <div className="my-0.5 h-[34px] w-40 animate-pulse rounded-md bg-[#e5e5e5] motion-reduce:animate-none motion-reduce:opacity-70" />
-        <div className="mt-1.5 h-[13px] w-[90px] animate-pulse rounded-md bg-[#e5e5e5] motion-reduce:animate-none motion-reduce:opacity-70" />
+        <div className="my-0.5 h-[34px] w-40 animate-pulse rounded-md bg-line motion-reduce:animate-none motion-reduce:opacity-70" />
+        <div className="mt-1.5 h-[13px] w-[90px] animate-pulse rounded-md bg-line motion-reduce:animate-none motion-reduce:opacity-70" />
       </div>
     );
   }
@@ -30,11 +30,11 @@ export function BalanceDisplay({ amountLabel, subLabel, loading = false, classNa
   return (
     <div className={cn("flex flex-col gap-0.5", className)}>
       <div className="flex items-baseline gap-2.5">
-        <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-[#111111]">
+        <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
           {amountLabel}
         </span>
       </div>
-      {subLabel ? <div className="text-xs text-[#a3a3a3]">{subLabel}</div> : null}
+      {subLabel ? <div className="text-caption text-faint">{subLabel}</div> : null}
     </div>
   );
 }

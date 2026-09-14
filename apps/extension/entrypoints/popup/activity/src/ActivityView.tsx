@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ActivityEntry, ActivityPage, RuntimePort, WalletSummary } from "@gleam/core";
 import { ActivityRow, EmptyState, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
-import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
 import { TransactionDetail } from "./TransactionDetail";
 
@@ -61,17 +61,17 @@ export function ActivityView({ runtime, wallet, onBack }: ActivityViewProps) {
       <ScreenHeader title="Activity" onBack={onBack} />
       <div className="flex-1 px-5 py-4">
         {loading ? (
-          <div className="rounded-[10px] border border-[#e5e5e5] px-3">
+          <div className="rounded-xl border border-line px-3">
             <SkeletonRow />
             <SkeletonRow />
             <SkeletonRow />
           </div>
         ) : error ? (
-          <p className="text-xs text-[#737373]">{error}</p>
+          <p className="text-label text-muted">{error}</p>
         ) : !page || page.entries.length === 0 ? (
           <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
         ) : (
-          <div className="rounded-[10px] border border-[#e5e5e5] px-3">
+          <div className="rounded-xl border border-line px-3">
             {page.entries.map((entry) => (
               <ActivityRow
                 key={entry.txId}

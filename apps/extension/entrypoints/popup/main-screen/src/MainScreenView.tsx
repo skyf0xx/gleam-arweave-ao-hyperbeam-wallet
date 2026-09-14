@@ -9,6 +9,7 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
+import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { formatWinstonAsAr, truncateAddress } from "./formatWinston";
 
 /**
@@ -83,17 +84,16 @@ export function MainScreenView({ runtime, wallet, onSend, onReceive, onViewAllAc
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
       <div className="flex items-center justify-between gap-2.5 px-5 pb-2.5 pt-4">
-        <div className="-ml-3 flex min-w-0 items-center gap-2 rounded-[10px] py-1.5 pl-0 pr-2">
-          <span className="truncate text-[13px]">{wallet.name}</span>
-          <span className="truncate font-mono text-[13px] text-[#737373]">
+        <div className="-ml-3 flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-2">
+          <span className="truncate text-label">{wallet.name}</span>
+          <span className="truncate font-mono text-label text-muted">
             {truncateAddress(wallet.address)}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 px-5 pb-1">
-        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
-        <span className="text-[11px] text-[#737373]">arweave.net</span>
+      <div className="px-5 pb-1">
+        <StatusDot label="arweave.net" />
       </div>
 
       <div className="px-6 pb-1 pt-2.5">
@@ -108,10 +108,10 @@ export function MainScreenView({ runtime, wallet, onSend, onReceive, onViewAllAc
       </div>
 
       <div className="px-6 pb-4">
-        <div className="pb-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-[#737373]">
+        <div className="pb-2.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
           Tokens
         </div>
-        <div className="rounded-[10px] border border-[#e5e5e5] px-3">
+        <div className="rounded-xl border border-line px-3">
           {state.loading ? (
             <>
               <SkeletonRow />
@@ -135,18 +135,18 @@ export function MainScreenView({ runtime, wallet, onSend, onReceive, onViewAllAc
 
       <div className="px-6 pb-6">
         <div className="flex items-center justify-between pb-2.5">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-[#737373]">
+          <span className="text-label font-semibold uppercase tracking-[0.04em] text-muted">
             Activity
           </span>
           <button
             type="button"
             onClick={onViewAllActivity}
-            className="text-xs font-medium text-[#111111] underline decoration-[#a3a3a3] underline-offset-2"
+            className="text-label font-medium text-foreground underline decoration-faint underline-offset-2"
           >
             View all
           </button>
         </div>
-        <div className="rounded-[10px] border border-[#e5e5e5] px-3">
+        <div className="rounded-xl border border-line px-3">
           {state.loading ? (
             <>
               <SkeletonRow />

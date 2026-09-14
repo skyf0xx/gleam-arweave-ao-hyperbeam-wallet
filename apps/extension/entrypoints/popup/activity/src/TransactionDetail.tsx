@@ -1,5 +1,5 @@
 import type { ActivityEntry } from "@gleam/core";
-import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 
 /**
@@ -26,16 +26,16 @@ export function TransactionDetail({ entry, onBack }: TransactionDetailProps) {
             aria-hidden="true"
             className={`h-1.5 w-1.5 rounded-full ${
               entry.status === "confirmed"
-                ? "bg-[#28F02D]"
+                ? "bg-beam-green"
                 : entry.status === "failed"
-                  ? "bg-[#FF1717]"
-                  : "bg-[#FFE45C]"
+                  ? "bg-beam-red"
+                  : "bg-beam-yellow"
             }`}
           />
-          <span className="text-[13px] font-semibold text-[#111111]">{statusLabel(entry.status)}</span>
+          <span className="text-label font-semibold text-foreground">{statusLabel(entry.status)}</span>
         </div>
 
-        <div className="pb-5 text-[26px] font-semibold tracking-[-0.02em] tabular-nums text-[#111111]">
+        <div className="pb-5 text-[26px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
           {entry.amount
             ? `${entry.type === "receive" ? "+" : "-"}${formatWinstonAsAr(entry.amount)} AR`
             : "—"}
@@ -45,13 +45,13 @@ export function TransactionDetail({ entry, onBack }: TransactionDetailProps) {
           <DetailRow label={entry.type === "send" ? "To" : "From"} value={entry.address} mono />
           <DetailRow label="Tx id" value={entry.txId} mono />
           {entry.tags.length > 0 ? (
-            <div className="flex items-start justify-between gap-4 border-b border-[#e5e5e5] py-2.5 last:border-b-0">
-              <span className="flex-shrink-0 pt-px text-xs text-[#737373]">Tags</span>
+            <div className="flex items-start justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
+              <span className="flex-shrink-0 pt-px text-label text-muted">Tags</span>
               <div className="flex flex-wrap justify-end gap-1.5">
                 {entry.tags.map((tag, index) => (
                   <span
                     key={`${tag.name}-${index}`}
-                    className="rounded-[5px] border border-[#e5e5e5] bg-[#f5f5f5] px-1.5 py-0.5 font-mono text-[10px] text-[#737373]"
+                    className="rounded-[5px] border border-line bg-mist px-1.5 py-0.5 font-mono text-[10px] text-muted"
                   >
                     {tag.name}: {tag.value}
                   </span>
@@ -67,10 +67,10 @@ export function TransactionDetail({ entry, onBack }: TransactionDetailProps) {
 
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-[#e5e5e5] py-2.5 last:border-b-0">
-      <span className="flex-shrink-0 pt-px text-xs text-[#737373]">{label}</span>
+    <div className="flex items-start justify-between gap-4 border-b border-line py-2.5 last:border-b-0">
+      <span className="flex-shrink-0 pt-px text-label text-muted">{label}</span>
       <span
-        className={`text-right text-xs font-semibold text-[#111111] ${mono ? "font-mono font-medium leading-relaxed" : ""}`}
+        className={`text-right text-label font-semibold text-foreground ${mono ? "font-mono font-medium leading-relaxed" : ""}`}
         style={mono ? { wordBreak: "break-all" } : undefined}
       >
         {value}
