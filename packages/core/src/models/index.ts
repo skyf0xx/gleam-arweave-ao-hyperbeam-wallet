@@ -20,6 +20,7 @@ export type {
   SigningApprovalPreview,
 } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
+export type { ThemePreference, ThemeSettings } from "./theme";
 export {
   PROVIDER_METHODS,
   APPROVAL_METHODS,

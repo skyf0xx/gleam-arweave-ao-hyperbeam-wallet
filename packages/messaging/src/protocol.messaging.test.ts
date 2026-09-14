@@ -32,9 +32,11 @@ describe("ProtocolMap", () => {
       "resolveApproval",
       "setNetworkSettings",
       "setLockSettings",
+      "getThemePreference",
+      "setThemePreference",
       "revokeGrant",
     ];
-    expect(methodNames.length).toBe(22);
+    expect(methodNames.length).toBe(24);
     expect(new Set(methodNames).size).toBe(methodNames.length);
   });
 
@@ -58,6 +60,15 @@ describe("ProtocolMap", () => {
     expectTypeOf<Parameters<ProtocolMap["resolveApproval"]>[0]>().toEqualTypeOf<{
       requestId: string;
       approved: boolean;
+    }>();
+  });
+
+  it("getThemePreference/setThemePreference are exactly light or dark, never a system/auto value", () => {
+    expectTypeOf<ReturnType<ProtocolMap["getThemePreference"]>>().toEqualTypeOf<{
+      theme: "light" | "dark";
+    }>();
+    expectTypeOf<Parameters<ProtocolMap["setThemePreference"]>[0]>().toEqualTypeOf<{
+      theme: "light" | "dark";
     }>();
   });
 });

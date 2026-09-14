@@ -6,6 +6,7 @@ import type {
   JWKInterface,
   LockSettings,
   NetworkSettings,
+  ThemeSettings,
   TokenBalance,
   TransferDraft,
   UploadDraft,
@@ -44,6 +45,14 @@ export interface ProtocolMap {
   getConnectedApps(): Grant[];
   getLockSettings(): LockSettings;
   getNetworkSettings(): NetworkSettings;
+  /**
+   * Wallet-owner-only local UI setting, same tier as `getLockSettings`/
+   * `getNetworkSettings` — not page-originated, so it is never listed in
+   * `PROVIDER_METHODS`/`APPROVAL_METHODS`/`KEY_METHODS`
+   * (`core/models/method-privileges.ts`) and is only ever called directly
+   * by trusted extension UI, never proxied through `providerCall`.
+   */
+  getThemePreference(): ThemeSettings;
 
   // actions
   // `TransferDraft`/`UploadDraft` carry `walletId`/`password` directly
@@ -75,6 +84,7 @@ export interface ProtocolMap {
   // settings
   setNetworkSettings(req: NetworkSettings): void;
   setLockSettings(req: LockSettings): void;
+  setThemePreference(req: ThemeSettings): void;
   revokeGrant(req: { origin: string }): void;
 
   /**

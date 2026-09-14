@@ -5,6 +5,7 @@ import type { ActivityEntry } from "./activity";
 import type { ApprovalRequest } from "./approval";
 import type { Wallet } from "./wallet";
 import type { TransferDraft } from "./transfer";
+import type { ThemeSettings } from "./theme";
 
 describe("PERMISSION_TYPES", () => {
   it("carries the known ArConnect-compatible permission scopes", () => {
@@ -77,6 +78,13 @@ describe("domain model shapes", () => {
       fee: null,
     };
     expect(draft.fee).toBeNull();
+  });
+
+  it("a ThemeSettings is exactly light or dark, never a system/auto value", () => {
+    const light: ThemeSettings = { theme: "light" };
+    const dark: ThemeSettings = { theme: "dark" };
+    expect(light.theme).toBe("light");
+    expect(dark.theme).toBe("dark");
   });
 
   it("a connect ApprovalRequest carries requested permissions in its preview", () => {
