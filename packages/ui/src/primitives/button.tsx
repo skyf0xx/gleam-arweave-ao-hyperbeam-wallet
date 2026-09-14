@@ -6,27 +6,40 @@ import { cn } from "./cn";
 /**
  * shadcn/ui-derived Button primitive, copied into the tree rather than
  * installed as a package (per core-design.md: no runtime style
- * injection, no CSP nonce problem). Variants are placeholders; real
- * visual spec comes from the sibling ao-wallet repo's brand reference
- * when a later layer's screens need it.
+ * injection, no CSP nonce problem).
+ *
+ * Variants follow brand/guidelines.md Part 2 "Product UI" buttons rule
+ * plus Part 3's risk-tier system:
+ * - `primary` — black/white, the only variant used for a screen's one
+ *   primary action (shared.css `.primary-btn`).
+ * - `secondary` — white background, thin border, black text
+ *   (shared.css `.secondary-link-btn`'s intent, given a bordered
+ *   button shape rather than a bare link).
+ * - `ghost` — icon-button-weight, no border, for low-emphasis actions
+ *   (shared.css `.icon-btn`).
+ * - `destructive` — the single warning-red accent, reserved for the
+ *   Irreversible-tier primary action only (shared.css `.sign-btn.risk`,
+ *   e.g. "Reset wallet", a first-seen-address send). Never the beam —
+ *   see `tokens/theme.css`'s `--color-warning` note.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-foreground text-background hover:opacity-90",
-        outline: "border border-foreground/20 hover:bg-foreground/5",
-        ghost: "hover:bg-foreground/5",
+        primary: "bg-foreground text-background hover:brightness-115",
+        secondary: "border border-line bg-background text-foreground hover:bg-mist",
+        ghost: "rounded-md text-muted hover:bg-mist hover:text-foreground",
+        destructive: "bg-warning text-white hover:brightness-110",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 px-3",
-        lg: "h-10 px-6",
+        default: "h-11 w-full px-4 py-3",
+        sm: "h-8 px-3 text-xs",
+        icon: "h-8 w-8 flex-shrink-0",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "primary",
       size: "default",
     },
   },
