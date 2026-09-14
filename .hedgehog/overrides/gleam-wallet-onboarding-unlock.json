@@ -1,0 +1,12 @@
+{
+  "task": "GLEAM-WALLET-ONBOARDING-UNLOCK",
+  "scope_add": [
+    "apps/extension/entrypoints/popup/onboarding/*",
+    "apps/extension/entrypoints/popup/onboarding/src/*",
+    "apps/extension/entrypoints/popup/unlock/*",
+    "apps/extension/entrypoints/popup/unlock/src/*",
+    "apps/extension/package.json",
+    "pnpm-lock.yaml"
+  ],
+  "reason": "first module through onboarding-unlock also creates the package shell. Separately: runtime.ts is the first file to import @webext-core/messaging directly (an already-locked stack dependency per core-design.md, previously only a transitive dep via @gleam/messaging), so it needs declaring in apps/extension/package.json, which touches the workspace lockfile."
+}

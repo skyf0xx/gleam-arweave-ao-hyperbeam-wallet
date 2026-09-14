@@ -188,6 +188,39 @@ session didn't independently re-derive it.
   above: a shared package-entry file has no single obvious owner among
   per-concern layer scopes, and each layer that first needs a given
   export is where that export gets added.
+- **`apps/extension/package.json` and `pnpm-lock.yaml` widened via a
+  per-task override on `onboarding-unlock`, not added to `core.yaml`'s
+  permanent scope.** `runtime.ts` is the first file to import
+  `@webext-core/messaging` directly (an already-locked stack dependency,
+  previously only a transitive dep via `@gleam/messaging`), so it needed
+  declaring in the extension's `package.json`, which touches the
+  workspace lockfile. Unlike the barrel-file gap above, these two files
+  are genuinely shared indefinitely — any later layer (`wallet-core`,
+  `upload`, `provider-bridge`) may equally need to add its own
+  dependency — so granting them permanently to one layer in `core.yaml`
+  would lock out every later layer's own legitimate need to touch the
+  same files. Handled as a one-time additive override instead
+  (`.hedgehog/overrides/gleam-wallet-onboarding-unlock.json`); a later
+  layer needing the same files gets its own override when it arrives,
+  not a pre-emptive standing grant.
+- **`apps/extension/src/App.tsx` view-switch wiring is an unresolved
+  gap, not yet assigned to any layer.** `onboarding-unlock` built
+  complete, independently-mountable `OnboardingView`/`UnlockView`
+  components, but `App.tsx` itself is `scaffold`'s scope (a locked,
+  completed layer) and no later layer's scope re-lists it either. Until
+  a layer is granted this file, nothing in the graph can wire the actual
+  view-switch that mounts these components from the popup shell. Needs a
+  scope decision before `wallet-core` (which will add its own
+  `main-screen` view and hit the identical problem) — see the "Left
+  unresolved" section below.
+- **No `ProtocolMap` wire-contract method for the destructive
+  "forgot password" reset exists.** `messaging`'s `protocol.ts` is
+  locked/complete and has no `resetAllWallets`-shaped RPC method.
+  `onboarding-unlock` added `WalletLifecycleHandler.resetAllWallets()`
+  or, and wired the `ForgotPassword` UI's confirmation flow, but left the
+  actual RPC call unwired (`onResetComplete` fires optimistically) since
+  adding a method to `protocol.ts` is outside this layer's scope. See
+  "Left unresolved" below.
 
 ## Left unresolved
 
