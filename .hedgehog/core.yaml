@@ -40,3 +40,9 @@ layers:
     verify: "pnpm vitest run provider bridge approval connected-apps content/index background/index && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
     verify_radius: ["apps/extension/**", "packages/messaging/**", "packages/core/**"]
     commit: "feat(gleam): injected provider, connection approval, signing approval"
+  - id: settings-screens-gap
+    depends_on: provider-bridge
+    scope: ["packages/messaging/src/protocol.ts", "apps/extension/src/handlers/reads.ts", "apps/extension/src/handlers/reads.activity.test.ts", "apps/extension/src/handlers/wallet-lifecycle.ts", "apps/extension/src/handlers/wallet-lifecycle.onboarding.test.ts", "apps/extension/entrypoints/popup/wallet-switcher/**", "apps/extension/entrypoints/popup/lock-settings/**", "apps/extension/entrypoints/popup/network-peers/**", "apps/extension/entrypoints/popup/send/**", "apps/extension/entrypoints/popup/receive/**", "apps/extension/entrypoints/popup/upload/**", "apps/extension/entrypoints/popup/connected-apps/**", "apps/extension/entrypoints/popup/main-screen/**", "packages/ui/src/components/wallet/**", "packages/ui/src/components/onboarding/index.ts"]
+    verify: "pnpm vitest run wallet-switcher lock-settings network-peers send receive upload connected-apps main-screen reads onboarding-unlock && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
+    verify_radius: ["packages/messaging/**", "apps/extension/**", "packages/ui/src/components/**"]
+    commit: "feat(gleam): wallet switcher, lock settings, network peers screens + cross-cutting loading/error states"
