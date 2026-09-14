@@ -65,13 +65,13 @@ export function UnlockScreen({
           type="submit"
           disabled={unlocking || password.length === 0}
           aria-busy={unlocking}
-          className="mt-1.5 flex w-full items-center justify-center gap-2 rounded-[10px] py-3"
+          className="mt-1.5"
         >
           {unlocking ? (
             <>
               <span
                 aria-hidden="true"
-                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white motion-reduce:animate-none"
+                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-background/35 border-t-background motion-reduce:animate-none"
               />
               <span>Unlocking&hellip;</span>
             </>
@@ -86,7 +86,7 @@ export function UnlockScreen({
           type="button"
           disabled={unlocking}
           onClick={onForgotPassword}
-          className="p-1 text-xs font-medium text-[#737373] hover:text-[#111111] hover:underline"
+          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
         >
           Forgot password?
         </button>

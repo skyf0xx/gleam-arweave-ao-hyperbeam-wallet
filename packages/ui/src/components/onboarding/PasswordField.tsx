@@ -1,42 +1,42 @@
 import * as React from "react";
+import { TextField, type TextFieldProps } from "../../primitives/text-field";
 import { cn } from "../../primitives/cn";
 
 /**
- * Password input with a reveal toggle and an inline validation message
- * (onboarding.html's `.password-field` + `.field-error`, unlock-screen's
- * identical structure) — brand/voice.md's "inline validation message, not
- * a summary error block" (TODO.md 1.2).
+ * Password input with a reveal toggle and (optionally) a caps-lock hint
+ * (onboarding.html's `.password-field`, unlock-screen.html's identical
+ * structure) — a thin wrapper around the shared `TextField` primitive
+ * rather than a duplicate of its markup, per this task's inherited debt
+ * note. `TextField` owns the border/error-row shape and is reused as-is;
+ * the label is re-rendered here (rather than left to `TextField`) so the
+ * reveal-toggle button can be positioned directly against the `<input>`
+ * regardless of whether a label is present, without measuring layout at
+ * runtime.
  */
-export interface PasswordFieldProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
-  label: string;
-  errorMessage?: string;
+export interface PasswordFieldProps extends Omit<TextFieldProps, "type" | "label"> {
+  label?: string;
   capsLockOn?: boolean;
 }
 
 export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldProps>(
-  ({ label, errorMessage, capsLockOn, id, className, ...props }, ref) => {
+  ({ label, capsLockOn, id, className, ...props }, ref) => {
     const [revealed, setRevealed] = React.useState(false);
     const generatedId = React.useId();
     const inputId = id ?? generatedId;
-    const errorId = errorMessage ? `${inputId}-error` : undefined;
 
     return (
       <div className={cn("flex flex-col gap-2", className)}>
-        <label htmlFor={inputId} className="text-xs font-semibold text-[#737373]">
-          {label}
-        </label>
-        <div className="relative flex items-center">
-          <input
+        {label ? (
+          <label htmlFor={inputId} className="text-caption font-semibold text-muted">
+            {label}
+          </label>
+        ) : null}
+        <div className="relative">
+          <TextField
             ref={ref}
             id={inputId}
             type={revealed ? "text" : "password"}
-            aria-invalid={Boolean(errorMessage)}
-            aria-describedby={errorId}
-            className={cn(
-              "w-full rounded-[9px] border border-[#e5e5e5] bg-white px-[14px] py-[13px] pr-10 text-sm text-[#111111] placeholder:text-[#a3a3a3] focus:border-[#111111] focus:outline-none",
-              errorMessage && "border-[#ff1717]",
-            )}
+            className="pr-10"
             {...props}
           />
           <button
@@ -44,25 +44,17 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             aria-label={revealed ? "Hide password" : "Show password"}
             aria-pressed={revealed}
             onClick={() => setRevealed((value) => !value)}
-            className="absolute right-2 flex h-7 w-7 items-center justify-center rounded-[7px] text-[#a3a3a3] hover:bg-[#f5f5f5] hover:text-[#737373]"
+            className="absolute right-2 top-0 flex h-11 w-7 flex-shrink-0 items-center justify-center text-faint hover:text-muted"
           >
-            <EyeIcon />
+            <span className="flex h-7 w-7 items-center justify-center rounded-xs hover:bg-mist">
+              <EyeIcon />
+            </span>
           </button>
         </div>
         {capsLockOn ? (
-          <div className="flex items-center gap-1.5 text-xs text-[#737373]">
+          <div className="flex items-center gap-1.5 text-caption text-muted">
             <CapsLockIcon />
             <span>Caps Lock is on</span>
-          </div>
-        ) : null}
-        {errorMessage ? (
-          <div
-            id={errorId}
-            role="alert"
-            className="flex items-start gap-1.5 text-xs leading-snug text-[#ff1717]"
-          >
-            <ErrorIcon />
-            <span>{errorMessage}</span>
           </div>
         ) : null}
       </div>
@@ -89,28 +81,7 @@ function EyeIcon() {
 function CapsLockIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 3 4 11h5v10h6V11h5L12 3Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ErrorIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      className="mt-[1px] flex-shrink-0"
-    >
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-      <path d="M12 8v5M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 3 4 11h5v10h6V11h5L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
     </svg>
   );
 }

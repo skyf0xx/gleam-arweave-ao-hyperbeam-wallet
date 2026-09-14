@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
  * 1.5b Forgot password (unlock-screen.html) — explicit, plainly-worded
@@ -7,7 +8,11 @@ import { useState } from "react";
  * own explicit copy — the mockup names one primary action, but the
  * consequence (wiping every locally stored vault) is Irreversible-tier
  * per brand/guidelines.md Part 3, which asks for "explicit acknowledgment
- * of the specific stated risk," not a single click doing it.
+ * of the specific stated risk," not a single click doing it. The reset
+ * action uses the shared `Button variant="destructive"` (the only place
+ * the warning-red accent is allowed to render) rather than a hand-rolled
+ * red button — this screen's own risk-tier framing is exactly what that
+ * variant exists for.
  */
 export interface ForgotPasswordProps {
   onReset: () => void;
@@ -19,33 +24,34 @@ export function ForgotPassword({ onReset, onCancel }: ForgotPasswordProps) {
 
   return (
     <div className="flex min-h-full flex-col items-center gap-4 px-8 pb-6 pt-10 text-center">
-      <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f5f5] text-[#737373]">
+      <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-mist text-muted">
         <LockGlyph />
       </div>
-      <h2 className="text-base font-semibold text-[#111111]">Forgot password?</h2>
-      <p className="text-[13px] leading-relaxed text-[#737373]">
+      <h2 className="text-body font-semibold text-foreground">Forgot password?</h2>
+      <p className="text-body leading-relaxed text-muted">
         Gleam doesn&apos;t store your password and can&apos;t recover it. Resetting removes every
         wallet stored in this browser &mdash; you&apos;ll need each wallet&apos;s backup keyfile
         to bring it back.
       </p>
 
       {confirming ? (
-        <p role="alert" className="text-[13px] font-medium leading-relaxed text-[#ff1717]">
+        <p role="alert" className="text-body font-medium leading-relaxed text-warning">
           This can&apos;t be undone. Any wallet without a backup keyfile is lost permanently.
         </p>
       ) : null}
 
-      <button
+      <Button
         type="button"
+        variant="destructive"
         onClick={() => (confirming ? onReset() : setConfirming(true))}
-        className="mt-8 w-full rounded-[10px] bg-[#ff1717] py-3 text-sm font-semibold text-white hover:brightness-110"
+        className="mt-8"
       >
         {confirming ? "Yes, reset wallet" : "Reset wallet"}
-      </button>
+      </Button>
       <button
         type="button"
         onClick={confirming ? () => setConfirming(false) : onCancel}
-        className="p-1 text-xs font-medium text-[#737373] hover:text-[#111111] hover:underline"
+        className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
       >
         Cancel
       </button>

@@ -20,8 +20,8 @@ export function StepDots({ total, current, className }: StepDotsProps) {
         <span
           key={index}
           className={cn(
-            "h-[5px] w-[5px] rounded-full bg-[#e5e5e5]",
-            index === current - 1 && "bg-[#111111]",
+            "h-[5px] w-[5px] rounded-full bg-line",
+            index === current - 1 && "bg-foreground",
           )}
         />
       ))}

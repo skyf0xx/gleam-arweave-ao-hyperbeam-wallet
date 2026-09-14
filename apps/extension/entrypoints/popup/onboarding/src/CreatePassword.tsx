@@ -1,10 +1,10 @@
 import { useState } from "react";
 import {
-  ScreenHeader,
   StepDots,
   PasswordField,
   PasswordStrengthMeter,
 } from "@gleam/ui/src/components/onboarding/index.ts";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validatePassword } from "@gleam/core/src/vault/password-policy.ts";
 
@@ -69,8 +69,8 @@ export function CreatePassword({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-lg font-semibold tracking-tight text-[#111111]">Set a password</h1>
-          <p className="text-[13px] leading-relaxed text-[#737373]">
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Set a password</h1>
+          <p className="text-body leading-relaxed text-muted">
             This password encrypts your wallet on this device. We can&apos;t reset it for you
             &mdash; if you lose it, you&apos;ll need your backup instead.
           </p>
@@ -100,7 +100,7 @@ export function CreatePassword({
           errorMessage={confirmError}
         />
 
-        <Button type="submit" disabled={!canSubmit} className="mt-8 w-full rounded-[10px] py-3">
+        <Button type="submit" disabled={!canSubmit} className="mt-8">
           {submitting ? "Creating…" : "Continue"}
         </Button>
       </form>

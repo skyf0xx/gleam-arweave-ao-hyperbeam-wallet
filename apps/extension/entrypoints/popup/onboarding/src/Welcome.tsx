@@ -18,16 +18,12 @@ export function Welcome({ onCreate, onImport }: WelcomeProps) {
         <BeamMark tagline="Crypto, without the clutter." />
       </div>
       <div className="mt-auto flex w-full flex-col gap-2.5">
-        <Button type="button" onClick={onCreate} className="w-full rounded-[10px] py-3">
+        <Button type="button" onClick={onCreate}>
           Create a wallet
         </Button>
-        <button
-          type="button"
-          onClick={onImport}
-          className="w-full rounded-[10px] border border-[#e5e5e5] bg-white py-3 text-sm font-semibold text-[#111111] hover:border-[#111111]"
-        >
+        <Button type="button" variant="secondary" onClick={onImport}>
           Import a wallet
-        </button>
+        </Button>
       </div>
     </div>
   );
