@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ActivityPage, RuntimePort, TokenBalance, WalletSummary, Winston } from "@gleam/core";
 import {
   ActivityRow,
@@ -47,7 +47,7 @@ export function MainScreenView({ runtime, wallet, onSend, onReceive, onViewAllAc
     error: null,
   });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const [balance, tokenBalances, activity] = await Promise.all([
@@ -72,11 +72,11 @@ export function MainScreenView({ runtime, wallet, onSend, onReceive, onViewAllAc
         error: error instanceof Error ? error.message : String(error),
       }));
     }
-  };
+  }, [runtime, wallet.address]);
 
   useEffect(() => {
     void load();
-  }, [wallet.address]);
+  }, [load]);
 
   return (
     <div className="flex min-h-full flex-col">

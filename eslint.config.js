@@ -2,6 +2,7 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /**
  * Root ESLint flat config.
@@ -33,8 +34,11 @@ export default tseslint.config(
   {
     plugins: {
       import: importPlugin,
+      "react-hooks": reactHooks,
     },
     rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
       "import/no-restricted-paths": [
         "error",
         {

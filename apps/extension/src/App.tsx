@@ -124,6 +124,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     return () => {
       cancelled = true;
     };
+    // Resolve the runtime once, on mount, regardless of a later `runtimeProp`
+    // identity change — mirrors ApprovalRoot.tsx's same one-time-init shape.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const runtime = resolvedRuntime;
