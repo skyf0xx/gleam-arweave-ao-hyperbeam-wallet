@@ -71,4 +71,22 @@ describe("ProtocolMap", () => {
       theme: "light" | "dark";
     }>();
   });
+
+  it("getPortfolioHistory takes one of the 5 range tabs and returns the series plus its precomputed summary", () => {
+    expectTypeOf<Parameters<ProtocolMap["getPortfolioHistory"]>[0]>().toEqualTypeOf<{
+      range: "24H" | "7D" | "1M" | "1Y" | "ALL";
+    }>();
+    expectTypeOf<
+      ReturnType<ProtocolMap["getPortfolioHistory"]>
+    >().toHaveProperty("series");
+    expectTypeOf<
+      ReturnType<ProtocolMap["getPortfolioHistory"]>
+    >().toHaveProperty("currentUsdValue");
+    expectTypeOf<
+      ReturnType<ProtocolMap["getPortfolioHistory"]>
+    >().toHaveProperty("usdChange");
+    expectTypeOf<
+      ReturnType<ProtocolMap["getPortfolioHistory"]>
+    >().toHaveProperty("periodLabel");
+  });
 });

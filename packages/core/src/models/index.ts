@@ -21,6 +21,11 @@ export type {
 } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
+export type {
+  PortfolioHistoryRange,
+  PortfolioHistoryPoint,
+  PortfolioHistory,
+} from "./portfolio-history";
 export {
   PROVIDER_METHODS,
   APPROVAL_METHODS,

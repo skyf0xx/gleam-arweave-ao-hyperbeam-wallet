@@ -6,6 +6,7 @@ import type { ApprovalRequest } from "./approval";
 import type { Wallet } from "./wallet";
 import type { TransferDraft } from "./transfer";
 import type { ThemeSettings } from "./theme";
+import type { PortfolioHistory } from "./portfolio-history";
 
 describe("PERMISSION_TYPES", () => {
   it("carries the known ArConnect-compatible permission scopes", () => {
@@ -121,5 +122,28 @@ describe("domain model shapes", () => {
     if (request.preview.kind !== "connect") {
       expect(request.preview.payloadHash).toBe("deadbeef");
     }
+  });
+
+  it("a PortfolioHistory with an empty series still carries a range and label", () => {
+    const history: PortfolioHistory = {
+      range: "7D",
+      series: [],
+      currentUsdValue: 0,
+      usdChange: 0,
+      periodLabel: "Last 7 days",
+    };
+    expect(history.series).toEqual([]);
+    expect(history.range).toBe("7D");
+  });
+
+  it("a PortfolioHistory's usdChange is a fraction, not a pre-formatted string", () => {
+    const history: PortfolioHistory = {
+      range: "24H",
+      series: [{ timestamp: 0, usdValue: 100 }],
+      currentUsdValue: 104.21,
+      usdChange: 0.0421,
+      periodLabel: "Last 24 hours",
+    };
+    expect(typeof history.usdChange).toBe("number");
   });
 });

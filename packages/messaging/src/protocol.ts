@@ -6,6 +6,8 @@ import type {
   JWKInterface,
   LockSettings,
   NetworkSettings,
+  PortfolioHistory,
+  PortfolioHistoryRange,
   ThemeSettings,
   TokenBalance,
   TransferDraft,
@@ -43,6 +45,16 @@ export interface ProtocolMap {
   getTokenBalances(req: { address: string }): TokenBalance[];
   getActivity(req: { address: string; cursor?: string }): ActivityPage;
   getConnectedApps(): Grant[];
+  /**
+   * Drives the main screen's total-portfolio-value chart. `range` selects
+   * one of the 5 tabs (24H/7D/1M/1Y/ALL); the response carries both the
+   * series to plot and the summary figures (current value, % change,
+   * period label) already computed, per `PortfolioHistory`'s own doc
+   * comment. An empty `series` means both price sources were unavailable
+   * — the popup falls back to `NetworkErrorBanner`, same as a balance-load
+   * failure, rather than rendering a broken or blank chart.
+   */
+  getPortfolioHistory(req: { range: PortfolioHistoryRange }): PortfolioHistory;
   getLockSettings(): LockSettings;
   getNetworkSettings(): NetworkSettings;
   /**
