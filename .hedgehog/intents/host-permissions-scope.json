@@ -1,0 +1,54 @@
+{
+  "id": "host-permissions-scope",
+  "goal": "Replace the temporary wildcard host_permissions fix (apps/extension/wxt.config.ts) with a scoped MV3 permission model: a static host_permissions allowlist for the three known-at-build-time hosts the background service worker fetches (Arweave gateway, CoinGecko, CoinPaprika), plus optional_host_permissions for arbitrary user-added origins, requested at runtime exactly when a user adds a custom HyperBEAM peer in Network settings.",
+  "outcome": "The extension's manifest declares host_permissions for exactly https://arweave.net/*, https://api.coingecko.com/*, and https://api.coinpaprika.com/* (no wildcard), plus optional_host_permissions: ['https://*/*'] for origins not knowable at build time. When a user adds a peer URL in Network & peers settings, the extension calls chrome.permissions.request() for that peer's origin before the peer is persisted to NetworkSettings; if the user denies the permission prompt, the peer is not added and the existing add-peer error affordance (setAddError) surfaces a specific reason. Every background fetch this project already makes (Arweave gateway reads, CoinGecko/CoinPaprika pricing, and any enabled HyperBEAM peer) continues to succeed online, matching the behavior the wildcard fix unblocked, without granting blanket access to every origin.",
+  "priority": 5,
+  "requirements": [
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-RULE-1",
+      "kind": "rule",
+      "statement": "host_permissions in apps/extension/wxt.config.ts's manifest lists exactly the three known hosts (https://arweave.net/*, https://api.coingecko.com/*, https://api.coinpaprika.com/*) -- the current uncommitted wildcard (['https://*/*', 'http://*/*']) is removed entirely, not widened or left alongside the allowlist."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-RULE-2",
+      "kind": "rule",
+      "statement": "optional_host_permissions: ['https://*/*'] is declared in the same manifest block, so chrome.permissions.request() can ask for an arbitrary user-supplied origin at runtime without a broad grant existing up front. http:// is not included in either list -- a custom peer URL that resolves to a non-https origin is rejected by normalizePeerUrl's existing validation, not accommodated by a broader optional grant."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-RULE-3",
+      "kind": "rule",
+      "statement": "The runtime permission request happens in NetworkPeersView.tsx's handleAddPeer flow, after normalizePeerUrl succeeds and before persist() is called -- chrome.permissions.request({ origins: [<the peer's origin>] }) is awaited, and the peer is only added to state.settings.peers and persisted if the request resolves granted. This is a client-side gate in addition to (not a replacement for) normalizePeerUrl's existing URL validation."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-RULE-4",
+      "kind": "rule",
+      "statement": "A denied or failed permission request surfaces through the existing setAddError affordance with a specific, plainly-worded reason (e.g. distinguishable from the existing 'Enter a valid peer URL.' and 'That peer is already in the list.' messages) -- never a silent no-op and never a generic error swallowing why the peer wasn't added."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-RULE-5",
+      "kind": "rule",
+      "statement": "No change to any other host_permissions consumer: web_accessible_resources for provider.js and every other existing manifest entry in apps/extension/wxt.config.ts are left exactly as they are -- this is a narrowing of host_permissions specifically, not a general manifest revision."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "pnpm wxt build succeeds with the new manifest, and the built manifest.json's host_permissions field lists exactly the three allowlisted origins (no wildcard) with optional_host_permissions present."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "Existing background fetches against the three allowlisted hosts (getBalance/getActivity/getPortfolioHistory against the Arweave gateway, spot and historical pricing against CoinGecko/CoinPaprika) are unaffected -- every existing test in wallet-core, activity, and pricing that exercises these paths still passes unmodified."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "A unit/component test for NetworkPeersView covers: (a) adding a peer whose origin permission is granted succeeds and persists as today, (b) adding a peer whose origin permission is denied does not persist and shows a specific error via setAddError, mocking chrome.permissions.request."
+    },
+    {
+      "id": "HOST-PERMISSIONS-SCOPE-ACCEPTANCE-4",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run network-peers scaffold passes, and pnpm tsc -p packages/core --noEmit continues to pass (no core package involvement expected, but the settings-screens-gap layer's own verify command already runs this check)."
+    }
+  ],
+  "depends_on": []
+}
