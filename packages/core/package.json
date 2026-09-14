@@ -1,0 +1,18 @@
+{
+  "name": "@gleam/core",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "arweave": "^1.15.7",
+    "@dha-team/arbundles": "^1.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

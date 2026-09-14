@@ -2,3 +2,16 @@
 .hedgehog/hedgehog.db
 .hedgehog/hedgehog.db-*
 .hedgehog/commit.lock
+
+# Workspace (pnpm + WXT)
+node_modules/
+.output/
+.wxt/
+dist/
+stats.html
+stats-*.json
+web-ext.config.ts
+*.log
+
+# Editor / OS
+.DS_Store

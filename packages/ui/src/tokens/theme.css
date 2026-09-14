@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/*
+ * Gleam design tokens.
+ *
+ * Tailwind 4 native `@theme` block — no config file, no runtime style
+ * injection (MV3-CSP-safe). Values are placeholders wired at the
+ * scaffold layer; the real palette/typography scale sourced from the
+ * sibling ao-wallet repo's brand reference is filled in by the layer
+ * that first needs it, not here.
+ */
+@theme {
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0 0);
+
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}

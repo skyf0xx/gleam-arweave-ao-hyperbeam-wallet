@@ -1,0 +1,27 @@
+{
+  "name": "gleam-wallet",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "wxt": "pnpm --filter @gleam/extension exec wxt",
+    "wxt:build": "pnpm --filter @gleam/extension exec wxt build",
+    "eslint": "eslint",
+    "vitest": "vitest",
+    "tsc": "tsc"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@testing-library/react": "^16.3.3",
+    "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.37.0",
+    "eslint-plugin-import": "^2.32.0",
+    "jsdom": "^27.0.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@11.25.0"
+}
