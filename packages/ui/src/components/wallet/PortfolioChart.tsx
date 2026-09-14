@@ -132,6 +132,10 @@ export function PortfolioChart({
           <div className="flex h-full w-full items-center justify-center text-caption text-faint">
             No chart data
           </div>
+        ) : currentUsdValue === 0 && points.every((point) => point.usdValue === 0) ? (
+          <div className="flex h-full w-full items-center justify-center text-caption text-faint">
+            Nothing to show yet — send yourself some AR to see your portfolio value over time.
+          </div>
         ) : (
           <svg
             viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}

@@ -29,8 +29,18 @@ export interface HistoricalPricePoint {
  * 6-hourly for 7D (28 points), daily for 1M/1Y, and weekly for ALL (to keep
  * the point count reasonable for a full-history request). These interval
  * choices are this build's own reasonable call, not a spec requirement.
+ *
+ * `ALL` requests 365 days, not a true full-history request: both free-tier
+ * APIs reject anything further back (CoinGecko's `days=max` 401s with
+ * "Public API users are limited to querying historical data within the past
+ * 365 days"; CoinPaprika's epoch `start` 402s as before its plan's history
+ * window) — a real plan limit, not a request-construction bug. Requesting
+ * `max`/epoch here always came back empty, which is what any zero-balance
+ * wallet made look like a chart bug at every range. Capping at 365 days
+ * makes `ALL` behave like `1Y` for both providers, matching what the free
+ * tier can actually serve.
  */
-function rangeToCoinGeckoDays(range: HistoricalRange): number | "max" {
+function rangeToCoinGeckoDays(range: HistoricalRange): number {
   switch (range) {
     case "24H":
       return 1;
@@ -39,9 +49,8 @@ function rangeToCoinGeckoDays(range: HistoricalRange): number | "max" {
     case "1M":
       return 30;
     case "1Y":
-      return 365;
     case "ALL":
-      return "max";
+      return 365;
   }
 }
 
@@ -55,11 +64,8 @@ function rangeToCoinPaprikaParams(range: HistoricalRange): { start: string; inte
     case "1M":
       return { start: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(), interval: "1d" };
     case "1Y":
-      return { start: new Date(now - 365 * 24 * 60 * 60 * 1000).toISOString(), interval: "1d" };
     case "ALL":
-      // CoinPaprika's earliest supported start; older requests are clamped
-      // server-side, which is fine for an "ALL" request.
-      return { start: new Date(0).toISOString(), interval: "7d" };
+      return { start: new Date(now - 365 * 24 * 60 * 60 * 1000).toISOString(), interval: "1d" };
   }
 }
 
