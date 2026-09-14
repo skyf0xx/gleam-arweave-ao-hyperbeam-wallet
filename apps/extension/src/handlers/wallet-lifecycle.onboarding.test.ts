@@ -303,6 +303,26 @@ describe("WalletLifecycleHandler: lockWallet", () => {
   });
 });
 
+describe("WalletLifecycleHandler: getLockSettings", () => {
+  it("defaults to never when nothing is stored", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage());
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "never" });
+  });
+
+  it("reflects a value previously written by setLockSettings", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage());
+    await handler.setLockSettings({ autoLockTimeout: "5min" });
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "5min" });
+  });
+
+  it("drops a malformed stored record back to the default (untrusted storage)", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:lockSettings", { autoLockTimeout: "not-a-real-timeout" });
+    const handler = new WalletLifecycleHandler(storage);
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "never" });
+  });
+});
+
 describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", () => {
   it("drops a malformed wallet record instead of surfacing it", async () => {
     const storage = createFakeStorage();

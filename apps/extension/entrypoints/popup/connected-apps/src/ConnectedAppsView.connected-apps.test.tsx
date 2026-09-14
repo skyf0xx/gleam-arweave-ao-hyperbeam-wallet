@@ -34,6 +34,13 @@ const GRANT_UNLIMITED: Grant = {
 };
 
 describe("ConnectedAppsView (6.3 connected-apps)", () => {
+  it("shows skeleton rows (shared loading primitive) while the Grant list loads", () => {
+    const send = vi.fn(() => new Promise<Grant[]>(() => {}));
+    const { container } = render(<ConnectedAppsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+  });
+
   it("shows the empty state copy from connected-apps.html when no Grants exist", async () => {
     const send = vi.fn().mockResolvedValue([]);
     render(<ConnectedAppsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
@@ -80,11 +87,14 @@ describe("ConnectedAppsView (6.3 connected-apps)", () => {
     expect(screen.getByRole("button", { name: "Revoke" })).toBeTruthy();
   });
 
-  it("surfaces a load failure inline rather than hanging or crashing", async () => {
-    const send = vi.fn().mockRejectedValue(new Error("background unreachable"));
+  it("surfaces a load failure via the shared network error banner rather than hanging or crashing", async () => {
+    const send = vi.fn().mockRejectedValueOnce(new Error("background unreachable")).mockResolvedValueOnce([]);
     render(<ConnectedAppsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText(/background unreachable/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/couldn't reach the network/i)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.getByText(/no apps connected yet/i)).toBeTruthy());
   });
 
   it("calls onBack when the header back button is pressed", async () => {

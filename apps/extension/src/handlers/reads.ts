@@ -97,6 +97,18 @@ export class ReadsHandler {
     return isValidNetworkSettings(raw) ? raw : DEFAULT_NETWORK_SETTINGS;
   }
 
+  /**
+   * `ProtocolMap.getNetworkSettings`'s backing read — same shape as
+   * `loadNetworkSettings` (used internally by `getBalance`/
+   * `getTokenBalances`/`getActivity`), exposed under the exact protocol
+   * method name so the dispatcher (`entrypoints/background/index.ts`,
+   * outside this task's ALLOWED SCOPE — see this task's final report)
+   * has a call site to wire `getNetworkSettings` to.
+   */
+  async getNetworkSettings(): Promise<NetworkSettings> {
+    return this.loadNetworkSettings();
+  }
+
   async loadActivityLog(address: string): Promise<ActivityEntry[]> {
     const raw = await this.storage.get<unknown>(`${ACTIVITY_LOG_KEY_PREFIX}${address}`);
     if (!Array.isArray(raw)) return [];

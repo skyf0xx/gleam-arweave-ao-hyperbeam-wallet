@@ -236,7 +236,9 @@ messenger.onMessage("resolveApproval", (message) => approval.resolveApproval(mes
 messenger.onMessage("unlockApprovalWallet", (message) => approval.stagePassword(message.data));
 
 // settings
+messenger.onMessage("getNetworkSettings", () => reads.getNetworkSettings());
 messenger.onMessage("setNetworkSettings", (message) => storage.set("local:networkSettings", message.data));
+messenger.onMessage("getLockSettings", () => lifecycle.getLockSettings());
 messenger.onMessage("setLockSettings", (message) => lifecycle.setLockSettings(message.data));
 messenger.onMessage("revokeGrant", (message) => approval.revokeGrant(message.data));
 

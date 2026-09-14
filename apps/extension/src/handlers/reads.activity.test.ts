@@ -144,3 +144,38 @@ describe("ReadsHandler: getConnectedApps", () => {
     expect(grants).toEqual([]);
   });
 });
+
+describe("ReadsHandler: getNetworkSettings", () => {
+  it("defaults to arweave.net with no peers when nothing is stored", async () => {
+    const handler = new ReadsHandler(createFakeStorage());
+    expect(await handler.getNetworkSettings()).toEqual({
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: null,
+    });
+  });
+
+  it("reflects previously stored network settings", async () => {
+    const storage = createFakeStorage();
+    const settings = {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    };
+    await storage.set("local:networkSettings", settings);
+
+    const handler = new ReadsHandler(storage);
+    expect(await handler.getNetworkSettings()).toEqual(settings);
+  });
+
+  it("drops a malformed stored record back to the default (untrusted storage)", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", { gatewayUrl: 12345 });
+    const handler = new ReadsHandler(storage);
+    expect(await handler.getNetworkSettings()).toEqual({
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: null,
+    });
+  });
+});

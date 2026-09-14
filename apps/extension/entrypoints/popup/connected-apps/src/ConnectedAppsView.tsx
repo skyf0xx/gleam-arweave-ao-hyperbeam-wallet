@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Grant, RuntimePort } from "@gleam/core";
+import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
@@ -23,6 +24,11 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
  * here directly at the primitive, closing out that migration debt (see
  * this task's final report for the barrel-file deletion itself, which is
  * outside this task's ALLOWED SCOPE).
+ *
+ * settings-screens-gap: the ad hoc "Loading…" text and inline error line
+ * this screen had are replaced by the shared `SkeletonRow`/
+ * `NetworkErrorBanner` (already used by main-screen/activity), per
+ * RELEVANT RULES — no new or parallel loading/error primitive.
  */
 export interface ConnectedAppsViewProps {
   runtime: RuntimePort;
@@ -58,12 +64,12 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
   const [error, setError] = useState<string>();
 
   const load = useCallback(async () => {
+    setError(undefined);
     try {
       const result = await runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined });
       setGrants(result);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError));
-      setGrants([]);
     }
   }, [runtime]);
 
@@ -79,15 +85,13 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Connected apps" onBack={onBack} />
+      {error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
       <div className="flex flex-1 flex-col px-5 py-4">
-        {error ? (
-          <div role="alert" className="mb-3 text-caption leading-snug text-warning">
-            {error}
-          </div>
-        ) : null}
-
         {grants === null ? (
-          <div className="p-4 text-body text-muted">Loading…</div>
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
         ) : grants.length === 0 ? (
           <EmptyState message="No apps connected yet. Grants you approve will show up here." />
         ) : (

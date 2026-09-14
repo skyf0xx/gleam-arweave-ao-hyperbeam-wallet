@@ -433,6 +433,18 @@ export class WalletLifecycleHandler {
   }
 
   /**
+   * `ProtocolMap.getLockSettings`'s backing read — the same
+   * `loadLockSettings` module function `setLockSettings`/`unlockWallet`
+   * already use internally, exposed as a public method so the
+   * dispatcher (`entrypoints/background/index.ts`, outside this task's
+   * ALLOWED SCOPE — see this task's final report) has something to wire
+   * `getLockSettings` to.
+   */
+  async getLockSettings(): Promise<LockSettings> {
+    return loadLockSettings(this.storage);
+  }
+
+  /**
    * Not part of this layer's named scope (`ProtocolMap`'s "settings"
    * group, not "wallet lifecycle") — included here only because
    * `lockWallet`'s "Lock now" screen (TODO.md 1.6) sits directly beside

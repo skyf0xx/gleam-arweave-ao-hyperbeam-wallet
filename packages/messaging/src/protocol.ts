@@ -42,6 +42,8 @@ export interface ProtocolMap {
   getTokenBalances(req: { address: string }): TokenBalance[];
   getActivity(req: { address: string; cursor?: string }): ActivityPage;
   getConnectedApps(): Grant[];
+  getLockSettings(): LockSettings;
+  getNetworkSettings(): NetworkSettings;
 
   // actions
   // `TransferDraft`/`UploadDraft` carry `walletId`/`password` directly
