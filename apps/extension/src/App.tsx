@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
+import type { RuntimePort, ThemeSettings, WalletState, WalletSummary } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
@@ -93,11 +93,37 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [subView, setSubView] = useState<MainSubView>({ kind: "home" });
   const [resolvedRuntime, setResolvedRuntime] = useState<RuntimePort | null>(runtimeProp ?? null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
 
   const refresh = async (runtime: RuntimePort) => {
     const state = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
     setView(resolveTopView(state));
     setWallet(resolveActiveWallet(state));
+  };
+
+  /**
+   * Fetches the stored theme preference and applies it to the shared root
+   * before the first substantive paint — see this task's inherited debt
+   * note (no synchronous pre-paint read exists in MV3) and this file's
+   * `hedgehog decision` record for why "await it alongside `getState` in
+   * the same `init()` gate" was chosen over a flash-accepting default.
+   * Never throws: a read failure (most likely today, since
+   * `getThemePreference`/`setThemePreference` aren't registered against
+   * `background/index.ts`'s dispatcher until `THEME-PREFERENCE-PROVIDER-
+   * BRIDGE` lands) falls back to light — this intent's own default bias —
+   * rather than blocking `init()` or leaving `data-theme` unset from a
+   * throw.
+   */
+  const applyTheme = async (runtime: RuntimePort) => {
+    try {
+      const settings = await runtime.send<void, ThemeSettings>({
+        type: "getThemePreference",
+        payload: undefined,
+      });
+      setTheme(settings.theme);
+    } catch {
+      setTheme("light");
+    }
   };
 
   useEffect(() => {
@@ -118,7 +144,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         const runtime = runtimeProp ?? (await import("./adapters/runtime")).runtimePort;
         if (!isEnvironmentLive()) return;
         setResolvedRuntime(runtime);
-        await refresh(runtime);
+        await Promise.all([refresh(runtime), applyTheme(runtime)]);
       } catch (error) {
         if (!isEnvironmentLive()) return;
         // A resolution/read failure this early (no extension messaging
@@ -212,7 +238,11 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   }
 
   return (
-    <div data-layout={layout} className="min-h-full bg-background text-foreground">
+    <div
+      data-layout={layout}
+      data-theme={theme === "dark" ? "dark" : undefined}
+      className="min-h-full bg-background text-foreground"
+    >
       {content}
     </div>
   );
