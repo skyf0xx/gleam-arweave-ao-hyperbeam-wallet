@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ActivityPage,
+  PortfolioHistory,
+  PortfolioHistoryRange,
   RuntimePort,
   ThemePreference,
   ThemeSettings,
@@ -9,10 +11,12 @@ import type {
   Winston,
 } from "@gleam/core";
 import {
+  AccountAvatar,
   ActivityRow,
   BalanceDisplay,
   EmptyState,
   NetworkErrorBanner,
+  PortfolioChart,
   SendReceiveActions,
   SkeletonRow,
   TokenRow,
@@ -20,23 +24,40 @@ import {
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { formatWinstonAsAr, truncateAddress } from "./formatWinston";
+import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 
 /**
- * Main screen (wallet-main-screen.html) — porting only what's already
- * gettable via this task's `ProtocolMap` reads: AR balance, AO token
- * balances (empty until a "watch a token" flow exists — see
- * `handlers/reads.ts`'s doc comment), and the merged activity feed.
- * wallet-main-screen.html's 7-day USD chart/range-tabs are still omitted
- * here: they need historical price time series, which `core/pricing`
- * (spot price only) doesn't provide — tracked as separate change-work
- * (a new historical-price capability) rather than built here or faked
- * with placeholder data.
+ * Main screen (wallet-main-screen.html) — porting what's gettable via
+ * `ProtocolMap` reads: AR balance, AO token balances (empty until a
+ * "watch a token" flow exists — see `handlers/reads.ts`'s doc comment),
+ * the merged activity feed, the account pill's identity avatar, and the
+ * total-portfolio-value chart with range tabs.
+ *
+ * Avatar: `AccountAvatar` (`packages/ui/src/components/wallet/
+ * AccountAvatar.tsx`) renders SVG markup generated in-process by
+ * `./generateAccountAvatar.ts` (`@dicebear/core` + `@dicebear/styles`,
+ * `identicon` style, seeded from `wallet.address`) — no network call, per
+ * this task's confirmed deviation from the reference (matching
+ * `UnlockScreen.tsx`'s no-per-wallet-identity-on-unlock rule and
+ * `TokenGlyph.tsx`'s existing local-only identicon precedent on this same
+ * screen). Generation is synchronous, so it's computed inline (via
+ * `useMemo`, keyed on the address) rather than through the same
+ * async-load state as the balance/activity fetches below.
+ *
+ * Chart: `PortfolioChart` (same directory) is fed by
+ * `getPortfolioHistory` (`ProtocolMap`, wired to `ReadsHandler` in this
+ * same task) via `@gleam/core`'s `PortfolioHistory`/`PortfolioHistoryRange`
+ * barrel exports. Switching a range tab re-fetches that range's series
+ * and updates the chart, %-change badge, and period label together from
+ * one response, never a stale combination — see `loadPortfolioHistory`
+ * below. An empty `series` (both price sources unavailable) falls back to
+ * `NetworkErrorBanner`, matching the balance/activity failure path,
+ * rather than a broken/blank chart.
  *
  * The `Beam` identity divider (`packages/ui/src/primitives/beam.tsx`,
- * wallet-main-screen.html's `.beam-divider`) is wired in directly above
- * the Send/Receive actions row — the reference places it between the
- * chart's range-tabs and Send/Receive, so this is that same slot with
- * the not-yet-built range-tabs simply absent from it.
+ * wallet-main-screen.html's `.beam-divider`) sits between the chart's
+ * range-tabs and the Send/Receive actions row, matching the reference's
+ * placement now that the chart exists.
  *
  * Navigation entry points (settings-screens-gap): the account pill's
  * chevron (wallet-main-screen.html's `.account-pill`) opens the wallet
@@ -86,6 +107,12 @@ interface LoadState {
   error: string | null;
 }
 
+interface PortfolioHistoryState {
+  history: PortfolioHistory | null;
+  loading: boolean;
+  error: string | null;
+}
+
 export function MainScreenView({
   runtime,
   wallet,
@@ -108,6 +135,14 @@ export function MainScreenView({
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
+  const [portfolioRange, setPortfolioRange] = useState<PortfolioHistoryRange>("7D");
+  const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({
+    history: null,
+    loading: true,
+    error: null,
+  });
+
+  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -139,6 +174,40 @@ export function MainScreenView({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * `getPortfolioHistory` takes only `{ range }` (`ProtocolMap`'s locked
+   * signature — no `address`; `ReadsHandler` resolves the active wallet
+   * itself, see that file's doc comment), so this loader doesn't thread
+   * `wallet.address` through. Re-runs whenever `portfolioRange` changes
+   * (range-tab click), and always replaces the whole `PortfolioHistory`
+   * response atomically — chart points, %-change, and period label come
+   * from the same fetch, so a tab click can never show one range's chart
+   * next to a different range's %-change/period label.
+   */
+  const loadPortfolioHistory = useCallback(
+    async (range: PortfolioHistoryRange) => {
+      setPortfolioHistory((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const history = await runtime.send<{ range: PortfolioHistoryRange }, PortfolioHistory>({
+          type: "getPortfolioHistory",
+          payload: { range },
+        });
+        setPortfolioHistory({ history, loading: false, error: null });
+      } catch (error) {
+        setPortfolioHistory((prev) => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
+    },
+    [runtime],
+  );
+
+  useEffect(() => {
+    void loadPortfolioHistory(portfolioRange);
+  }, [loadPortfolioHistory, portfolioRange]);
 
   /**
    * This screen's own theme read, separate from `App.tsx`'s pre-paint
@@ -221,6 +290,7 @@ export function MainScreenView({
           aria-label={`${wallet.name}, address ${wallet.address}, view account details`}
           className="-ml-3 flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-2 hover:bg-mist"
         >
+          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="truncate text-label">{wallet.name}</span>
           <span className="truncate font-mono text-label text-muted">
             {truncateAddress(wallet.address)}
@@ -304,6 +374,22 @@ export function MainScreenView({
           amountLabel={state.balance !== null ? `${formatWinstonAsAr(state.balance)} AR` : "—"}
           loading={state.loading}
         />
+      </div>
+
+      <div className="px-6 pb-1 pt-3">
+        {portfolioHistory.error ? (
+          <NetworkErrorBanner onRetry={() => void loadPortfolioHistory(portfolioRange)} />
+        ) : (
+          <PortfolioChart
+            points={portfolioHistory.history?.series ?? []}
+            currentUsdValue={portfolioHistory.history?.currentUsdValue ?? 0}
+            usdChange={portfolioHistory.history?.usdChange ?? 0}
+            periodLabel={portfolioHistory.history?.periodLabel ?? ""}
+            activeRange={portfolioRange}
+            onRangeChange={setPortfolioRange}
+            loading={portfolioHistory.loading}
+          />
+        )}
       </div>
 
       <div className="px-6 pb-5 pt-3">

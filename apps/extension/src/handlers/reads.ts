@@ -2,14 +2,22 @@ import { getTokenBalance } from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
+import {
+  buildPriceAtFromSeries,
+  estimateHistoricalPortfolioValue,
+  getHistoricalUsdPricesWithFallback,
+} from "@gleam/core/src/pricing/index.ts";
 import type {
   ActivityEntry,
   ActivityPage,
   Grant,
   HyperBeamPeer,
   NetworkSettings,
+  PortfolioHistory,
+  PortfolioHistoryRange,
   StoragePort,
   TokenBalance,
+  Wallet,
   Winston,
 } from "@gleam/core";
 
@@ -33,6 +41,18 @@ import type {
  *   entries into. Read-only from this handler's side; `transfer.ts` owns
  *   writing it. Keyed per-address since the log is scoped to whichever
  *   wallet's activity is being viewed.
+ * - `local:wallets` / `local:activeWalletId` — owned by
+ *   `handlers/wallet-lifecycle.ts` (`WalletLifecycleHandler`'s own doc
+ *   comment), read-only here. `getPortfolioHistory`'s `ProtocolMap`
+ *   signature (`packages/messaging/src/protocol.ts`, locked, outside this
+ *   task's ALLOWED SCOPE) takes only `{ range }` — no address, unlike
+ *   every other read in this file — so this handler resolves "whose
+ *   balance to price" itself from these two keys rather than inventing an
+ *   address param the locked contract doesn't have. `Wallet.address` is
+ *   plaintext (only `encryptedKeyfile` is encrypted, per the `Wallet`
+ *   model's own doc comment), so this needs no vault/decryption access —
+ *   still only `StoragePort`, the same hexagonal boundary every other
+ *   method in this file already respects.
  *
  * `getTokenBalances`'s AO process list: `TokenBalance` has no
  * "which processIds does this wallet hold" registry anywhere in `core`'s
@@ -49,6 +69,26 @@ const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 const ACTIVITY_PAGE_LIMIT = 50;
+const WALLETS_KEY = "local:wallets";
+const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
+const WINSTON_PER_AR = 1_000_000_000_000;
+
+const PORTFOLIO_HISTORY_RANGES: readonly PortfolioHistoryRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
+
+function periodLabelForRange(range: PortfolioHistoryRange): string {
+  switch (range) {
+    case "24H":
+      return "Last 24 hours";
+    case "7D":
+      return "Last 7 days";
+    case "1M":
+      return "Last 30 days";
+    case "1Y":
+      return "Last 12 months";
+    case "ALL":
+      return "All time";
+  }
+}
 
 const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   gatewayUrl: "https://arweave.net",
@@ -153,6 +193,90 @@ export class ReadsHandler {
     ]);
 
     return mergeActivity(localLog, gatewayEntries, ACTIVITY_PAGE_LIMIT);
+  }
+
+  /**
+   * Resolves the active wallet's plaintext `address` directly from
+   * storage — see this file's doc comment for why `getPortfolioHistory`
+   * needs this and can't just take an `{ address }` request like every
+   * other read here. Returns `null` when there's no active wallet yet
+   * (matches `getState`'s own "no wallets" possibility) rather than
+   * throwing, since an empty/unresolvable portfolio is itself a valid,
+   * reportable state for the caller to handle.
+   */
+  private async resolveActiveWalletAddress(): Promise<string | null> {
+    const rawWallets = await this.storage.get<unknown>(WALLETS_KEY);
+    const wallets = Array.isArray(rawWallets) ? (rawWallets as Wallet[]) : [];
+    if (wallets.length === 0) return null;
+
+    const activeWalletId = await this.storage.get<string | null>(ACTIVE_WALLET_ID_KEY);
+    const active = wallets.find((wallet) => wallet.id === activeWalletId) ?? wallets[0];
+    return active?.address ?? null;
+  }
+
+  /**
+   * Drives the main screen's total-portfolio-value chart
+   * (`ProtocolMap.getPortfolioHistory`). Sources the AR historical USD
+   * price series from `core/pricing`'s
+   * `getHistoricalUsdPricesWithFallback` (CoinGecko, falling back to
+   * CoinPaprika) and reduces it through `estimateHistoricalPortfolioValue`
+   * at each series timestamp against the wallet's *current* AR balance —
+   * this project models only a current/latest-known balance, not
+   * reconstructed historical balances (`estimateHistoricalPortfolioValue`'s
+   * own doc comment states this is out of scope), so the chart shows how
+   * today's holdings would have been valued over time, not a true
+   * historical balance curve.
+   *
+   * Phase 1 prices AR only — `TokenBalance`'s AO holdings have no
+   * CoinGecko/CoinPaprika id mapping anywhere in this codebase yet (no
+   * layer owns a ticker→price-source-id registry), so they're left out of
+   * this estimate rather than guessed at.
+   *
+   * An unrecognized `range` throws a named error (HONESTY: never silently
+   * fall back to a different range than the one requested). An empty
+   * price series (both sources unavailable) reports `series: []` per
+   * `PortfolioHistory`'s own HONESTY contract — the popup shows
+   * `NetworkErrorBanner` for that case rather than this handler
+   * fabricating a flat line.
+   */
+  async getPortfolioHistory(req: { range: PortfolioHistoryRange }): Promise<PortfolioHistory> {
+    if (!PORTFOLIO_HISTORY_RANGES.includes(req.range)) {
+      throw new Error(`Unrecognized portfolio history range "${String(req.range)}".`);
+    }
+
+    const address = await this.resolveActiveWalletAddress();
+    const periodLabel = periodLabelForRange(req.range);
+
+    if (address === null) {
+      return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
+    }
+
+    const settings = await this.loadNetworkSettings();
+    const arBalanceWinston = await getArBalance(address, settings.gatewayUrl);
+    const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
+
+    const priceSeries = await getHistoricalUsdPricesWithFallback(
+      { coinGeckoId: "arweave", coinPaprikaId: "ar-arweave" },
+      req.range,
+    );
+
+    if (priceSeries.length === 0) {
+      return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
+    }
+
+    const priceAt = buildPriceAtFromSeries(priceSeries);
+    const tokens = [{ balance: arBalance, priceAt }];
+
+    const series = priceSeries.map((point) => ({
+      timestamp: point.timestamp,
+      usdValue: estimateHistoricalPortfolioValue(tokens, point.timestamp),
+    }));
+
+    const firstValue = series[0]?.usdValue ?? 0;
+    const currentUsdValue = series[series.length - 1]?.usdValue ?? 0;
+    const usdChange = firstValue !== 0 ? (currentUsdValue - firstValue) / firstValue : 0;
+
+    return { range: req.range, series, currentUsdValue, usdChange, periodLabel };
   }
 
   /**

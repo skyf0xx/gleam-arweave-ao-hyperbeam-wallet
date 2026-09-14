@@ -137,6 +137,88 @@ describe("ReadsHandler: getActivity", () => {
   });
 });
 
+describe("ReadsHandler: getPortfolioHistory", () => {
+  it("throws a named error for an unrecognized range", async () => {
+    const handler = new ReadsHandler(createFakeStorage());
+    await expect(
+      handler.getPortfolioHistory({ range: "3D" as never }),
+    ).rejects.toThrow(/Unrecognized portfolio history range/);
+  });
+
+  it("reports an empty series with no active wallet, rather than throwing or fabricating data", async () => {
+    const handler = new ReadsHandler(createFakeStorage());
+    const history = await handler.getPortfolioHistory({ range: "7D" });
+    expect(history).toEqual({
+      range: "7D",
+      series: [],
+      currentUsdValue: 0,
+      usdChange: 0,
+      periodLabel: "Last 7 days",
+    });
+  });
+
+  it("prices the active wallet's current AR balance across the fetched CoinGecko series", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:wallets", [
+      { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await storage.set("local:activeWalletId", "w1");
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("wallet/addr1/balance")) {
+        return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
+      }
+      if (url.includes("market_chart")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            prices: [
+              [1000, 10],
+              [2000, 20],
+            ],
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch url: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const history = await handler.getPortfolioHistory({ range: "7D" });
+
+    expect(history.range).toBe("7D");
+    expect(history.periodLabel).toBe("Last 7 days");
+    expect(history.series).toEqual([
+      { timestamp: 1000, usdValue: 20 },
+      { timestamp: 2000, usdValue: 40 },
+    ]);
+    expect(history.currentUsdValue).toBe(40);
+    expect(history.usdChange).toBeCloseTo(1); // doubled: (40 - 20) / 20
+  });
+
+  it("falls back to an empty series (not a thrown error) when both price sources fail", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:wallets", [
+      { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await storage.set("local:activeWalletId", "w1");
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("wallet/addr1/balance")) {
+        return { ok: true, status: 200, text: async () => "1000000000000" };
+      }
+      return { ok: false, status: 500, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const history = await handler.getPortfolioHistory({ range: "1M" });
+
+    expect(history.series).toEqual([]);
+    expect(history.currentUsdValue).toBe(0);
+    expect(history.usdChange).toBe(0);
+  });
+});
+
 describe("ReadsHandler: getConnectedApps", () => {
   it("returns an empty array (stub — Grants aren't implemented yet)", async () => {
     const handler = new ReadsHandler(createFakeStorage());

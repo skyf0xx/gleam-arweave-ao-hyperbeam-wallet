@@ -1,4 +1,6 @@
 export { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
+export { AccountAvatar, type AccountAvatarProps } from "./AccountAvatar";
+export { PortfolioChart, type PortfolioChartProps } from "./PortfolioChart";
 export { TokenRow, type TokenRowProps } from "./TokenRow";
 export { ActivityRow, type ActivityRowProps, type ActivityRowType } from "./ActivityRow";
 export { AddressDisplay, type AddressDisplayProps } from "./AddressDisplay";
