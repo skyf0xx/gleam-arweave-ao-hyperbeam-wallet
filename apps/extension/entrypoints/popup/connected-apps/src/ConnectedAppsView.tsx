@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Grant, RuntimePort } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
 
@@ -49,7 +49,7 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
   const [grants, setGrants] = useState<Grant[] | null>(null);
   const [error, setError] = useState<string>();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const result = await runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined });
       setGrants(result);
@@ -57,12 +57,11 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
       setError(loadError instanceof Error ? loadError.message : String(loadError));
       setGrants([]);
     }
-  };
+  }, [runtime]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
   const handleRevoke = async (origin: string) => {
     await runtime.send<{ origin: string }, void>({ type: "revokeGrant", payload: { origin } });

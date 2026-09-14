@@ -17,7 +17,8 @@ export interface PasswordFieldProps
 export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldProps>(
   ({ label, errorMessage, capsLockOn, id, className, ...props }, ref) => {
     const [revealed, setRevealed] = React.useState(false);
-    const inputId = id ?? React.useId();
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
     const errorId = errorMessage ? `${inputId}-error` : undefined;
 
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
@@ -24,10 +24,15 @@ export function UnlockScreen({
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
 
-  useEffect(() => {
-    if (unlocking) return;
+  // Clear the typed password once a fresh unlock failure arrives, without
+  // an effect (react-hooks/set-state-in-effect): adjust state during
+  // render, keyed off the errorMessage identity we last cleared for, per
+  // https://react.dev/learn/you-might-not-need-an-effect.
+  const [clearedFor, setClearedFor] = useState<string | undefined>(undefined);
+  if (!unlocking && errorMessage && errorMessage !== clearedFor) {
+    setClearedFor(errorMessage);
     setPassword("");
-  }, [errorMessage, unlocking]);
+  }
 
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">

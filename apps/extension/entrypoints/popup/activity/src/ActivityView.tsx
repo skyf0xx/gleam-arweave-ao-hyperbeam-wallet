@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ActivityEntry, ActivityPage, RuntimePort, WalletSummary } from "@gleam/core";
 import { ActivityRow, EmptyState, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
@@ -24,28 +24,33 @@ export function ActivityView({ runtime, wallet, onBack }: ActivityViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    runtime
-      .send<{ address: string }, ActivityPage>({
-        type: "getActivity",
-        payload: { address: wallet.address },
-      })
-      .then((result) => {
-        if (!cancelled) setPage(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, wallet.address]);
+  const load = useCallback(
+    (address: string) => {
+      let cancelled = false;
+      setLoading(true);
+      setError(null);
+      runtime
+        .send<{ address: string }, ActivityPage>({
+          type: "getActivity",
+          payload: { address },
+        })
+        .then((result) => {
+          if (!cancelled) setPage(result);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    },
+    [runtime],
+  );
+
+  useEffect(() => load(wallet.address), [load, wallet.address]);
 
   if (step.kind === "detail") {
     return <TransactionDetail entry={step.entry} onBack={() => setStep({ kind: "list" })} />;
