@@ -240,8 +240,9 @@ select,
  * color. Color only ever appears in the moving highlight band via
  * `color-mix` against that base — the base itself must never read as
  * flat beam-sky or beam-purple. The highlight band is kept narrow (a
- * tight 47–53% cluster) so the sweep reads as a thin line of light
- * crossing the element, not a broad colored wash.
+ * tight 49–51% cluster) with low color-mix percentages (7–9%) so the
+ * sweep reads as a thin, mostly-white line of light crossing the
+ * element, not a broad or saturated colored wash.
  *
  * `prefers-reduced-motion` is handled directly inside this class,
  * instead of relying on a consumer's `motion-reduce:` Tailwind variant
@@ -255,11 +256,11 @@ select,
 .gleam-shimmer {
   background: linear-gradient(
     110deg,
-    var(--color-shimmer-base) 40%,
-    color-mix(in srgb, var(--color-beam-sky) 16%, white) 47%,
-    color-mix(in srgb, var(--color-beam-purple) 16%, white) 50%,
-    color-mix(in srgb, var(--color-beam-sky) 12%, white) 53%,
-    var(--color-shimmer-base) 60%
+    var(--color-shimmer-base) 44%,
+    color-mix(in srgb, var(--color-beam-sky) 9%, white) 49%,
+    color-mix(in srgb, var(--color-beam-purple) 9%, white) 50%,
+    color-mix(in srgb, var(--color-beam-sky) 7%, white) 51%,
+    var(--color-shimmer-base) 56%
   );
   background-size: 200% 100%;
   animation: gleam-shimmer-sweep 1.6s linear infinite;
@@ -285,11 +286,11 @@ select,
 [data-theme="dark"] .gleam-shimmer {
   background: linear-gradient(
     110deg,
-    var(--color-shimmer-base) 40%,
-    color-mix(in srgb, var(--color-beam-sky) 16%, #2a2a2a) 47%,
-    color-mix(in srgb, var(--color-beam-purple) 16%, #2a2a2a) 50%,
-    color-mix(in srgb, var(--color-beam-sky) 12%, #2a2a2a) 53%,
-    var(--color-shimmer-base) 60%
+    var(--color-shimmer-base) 44%,
+    color-mix(in srgb, var(--color-beam-sky) 9%, #2a2a2a) 49%,
+    color-mix(in srgb, var(--color-beam-purple) 9%, #2a2a2a) 50%,
+    color-mix(in srgb, var(--color-beam-sky) 7%, #2a2a2a) 51%,
+    var(--color-shimmer-base) 56%
   );
 }
 
