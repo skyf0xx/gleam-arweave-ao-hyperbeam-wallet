@@ -71,6 +71,7 @@ export interface MainScreenViewProps {
   wallet: WalletSummary;
   onSend: () => void;
   onReceive: () => void;
+  onViewAllTokens: () => void;
   onViewAllActivity: () => void;
   onOpenWalletSwitcher: () => void;
   onOpenLockSettings: () => void;
@@ -90,6 +91,7 @@ export function MainScreenView({
   wallet,
   onSend,
   onReceive,
+  onViewAllTokens,
   onViewAllActivity,
   onOpenWalletSwitcher,
   onOpenLockSettings,
@@ -313,8 +315,17 @@ export function MainScreenView({
       </div>
 
       <div className="px-6 pb-4">
-        <div className="pb-2.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
-          Tokens
+        <div className="flex items-center justify-between pb-2.5">
+          <span className="text-label font-semibold uppercase tracking-[0.04em] text-muted">
+            Tokens
+          </span>
+          <button
+            type="button"
+            onClick={onViewAllTokens}
+            className="text-label font-medium text-muted hover:text-foreground hover:underline"
+          >
+            View all
+          </button>
         </div>
         <div className="border-t border-line">
           {state.loading ? (

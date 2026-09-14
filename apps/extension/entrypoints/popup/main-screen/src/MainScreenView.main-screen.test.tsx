@@ -47,6 +47,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
       wallet={WALLET}
       onSend={vi.fn()}
       onReceive={vi.fn()}
+      onViewAllTokens={vi.fn()}
       onViewAllActivity={vi.fn()}
       onOpenWalletSwitcher={vi.fn()}
       onOpenLockSettings={vi.fn()}

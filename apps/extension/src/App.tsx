@@ -248,6 +248,11 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         wallet={wallet}
         onSend={() => setSubView({ kind: "send" })}
         onReceive={() => setSubView({ kind: "receive" })}
+        // No "all tokens" screen exists yet (tracked as separate scope,
+        // matching this file's `activity` sub-view once that screen is
+        // built) — a no-op keeps the header's affordance visually
+        // complete without a destination view to route to yet.
+        onViewAllTokens={() => {}}
         onViewAllActivity={() => setSubView({ kind: "activity" })}
         onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
         onOpenLockSettings={() => setSubView({ kind: "lock-settings" })}
