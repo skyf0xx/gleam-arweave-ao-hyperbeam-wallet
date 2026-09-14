@@ -8,7 +8,7 @@ layers:
     requires: ["pnpm"]
   - id: messaging
     depends_on: scaffold
-    scope: ["packages/messaging/src/**", "packages/core/src/models/**", "packages/core/src/ports/windows.ts", "packages/core/src/ports/runtime.ts", "packages/core/src/index.ts"]
+    scope: ["packages/messaging/src/**", "packages/core/src/models/**", "packages/core/src/ports/windows.ts", "packages/core/src/ports/runtime.ts", "packages/core/src/ports/ports.models.test.ts", "packages/core/src/index.ts"]
     verify: "pnpm vitest run messaging models && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit"
     verify_radius: ["packages/messaging/**", "packages/core/**"]
     commit: "feat(gleam): messaging"

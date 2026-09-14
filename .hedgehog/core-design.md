@@ -170,6 +170,12 @@ session didn't independently re-derive it.
   resolve, and the file is a trivial one-line re-export barrel with no
   behavior of its own — not a layer-boundary or sequencing problem, a
   missing path in one glob.
+- **`packages/core/src/ports/ports.models.test.ts` added to
+  `messaging`'s scope.** `windows.ts` and `runtime.ts` were granted
+  individually (not a `ports/**` glob, to avoid future collision with
+  `vault`'s later `storage.ts`), but their colocated test file wasn't
+  included alongside them. Added the specific test-file path rather than
+  a directory glob, for the same collision-avoidance reason.
 
 ## Left unresolved
 
