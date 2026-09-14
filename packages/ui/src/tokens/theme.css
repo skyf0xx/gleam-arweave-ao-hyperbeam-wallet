@@ -35,6 +35,9 @@
   --color-muted: #737373;
   --color-faint: #a3a3a3;
 
+  /* Shimmer loading-state base — deliberately a touch lighter than --color-mist (see .gleam-shimmer's own comment below for why it isn't reused). */
+  --color-shimmer-base: #f8f8f8;
+
   /*
    * The single warning-red accent, per guidelines.md Part 3: reserved
    * for the Irreversible/high-exposure risk tier only — never a status
@@ -142,6 +145,8 @@
   --color-muted: #a3a3a3;
   --color-faint: #737373;
 
+  --color-shimmer-base: #1c1c1c;
+
   --color-warning-surface: #2a1414;
   --color-warning-border: #4a1f1f;
 }
@@ -227,13 +232,16 @@ select,
  * `animate-pulse bg-line` treatment, kept here as a plain CSS class
  * rather than a Tailwind utility for the same reason as
  * `.gleam-beam-divider` above: this is a fixed 5-stop gradient sweep,
- * not a themeable scale value. `--color-mist` (light: #f5f5f5, dark:
- * #1c1c1c — see the `[data-theme="dark"]` block below) is reused as the
- * near-white/near-dark base rather than introducing a new token, since
- * it already names exactly this "quiet neutral surface" role. Color
- * only ever appears in the moving highlight band via `color-mix`
- * against that base — the base itself must never read as flat beam-sky
- * or beam-purple.
+ * not a themeable scale value. `--color-shimmer-base` is its own token
+ * (light: #f8f8f8, dark: #1c1c1c) rather than reusing `--color-mist`
+ * (#f5f5f5) — `--color-mist` is a shared neutral-surface token used
+ * flat elsewhere (e.g. NetworkErrorBanner's `bg-mist`), and reads
+ * visibly grayer than the near-white this shimmer needs as its resting
+ * color. Color only ever appears in the moving highlight band via
+ * `color-mix` against that base — the base itself must never read as
+ * flat beam-sky or beam-purple. The highlight band is kept narrow (a
+ * tight 47–53% cluster) so the sweep reads as a thin line of light
+ * crossing the element, not a broad colored wash.
  *
  * `prefers-reduced-motion` is handled directly inside this class,
  * instead of relying on a consumer's `motion-reduce:` Tailwind variant
@@ -247,11 +255,11 @@ select,
 .gleam-shimmer {
   background: linear-gradient(
     110deg,
-    var(--color-mist) 30%,
-    color-mix(in srgb, var(--color-beam-sky) 16%, white) 40%,
-    color-mix(in srgb, var(--color-beam-purple) 16%, white) 47%,
-    color-mix(in srgb, var(--color-beam-sky) 12%, white) 54%,
-    var(--color-mist) 65%
+    var(--color-shimmer-base) 40%,
+    color-mix(in srgb, var(--color-beam-sky) 16%, white) 47%,
+    color-mix(in srgb, var(--color-beam-purple) 16%, white) 50%,
+    color-mix(in srgb, var(--color-beam-sky) 12%, white) 53%,
+    var(--color-shimmer-base) 60%
   );
   background-size: 200% 100%;
   animation: gleam-shimmer-sweep 1.6s linear infinite;
@@ -260,7 +268,7 @@ select,
 @media (prefers-reduced-motion: reduce) {
   .gleam-shimmer {
     animation: none;
-    background: var(--color-mist);
+    background: var(--color-shimmer-base);
   }
 }
 
@@ -277,17 +285,17 @@ select,
 [data-theme="dark"] .gleam-shimmer {
   background: linear-gradient(
     110deg,
-    var(--color-mist) 30%,
-    color-mix(in srgb, var(--color-beam-sky) 16%, #2a2a2a) 40%,
-    color-mix(in srgb, var(--color-beam-purple) 16%, #2a2a2a) 47%,
-    color-mix(in srgb, var(--color-beam-sky) 12%, #2a2a2a) 54%,
-    var(--color-mist) 65%
+    var(--color-shimmer-base) 40%,
+    color-mix(in srgb, var(--color-beam-sky) 16%, #2a2a2a) 47%,
+    color-mix(in srgb, var(--color-beam-purple) 16%, #2a2a2a) 50%,
+    color-mix(in srgb, var(--color-beam-sky) 12%, #2a2a2a) 53%,
+    var(--color-shimmer-base) 60%
   );
 }
 
 /*
  * Not re-declared here: the reduced-motion override above already falls
- * back to `background: var(--color-mist)`, which resolves to this
- * theme's own dark value (#1c1c1c) automatically since it's the same
- * custom property, not a hardcoded light-mode literal.
+ * back to `background: var(--color-shimmer-base)`, which resolves to
+ * this theme's own dark value (#1c1c1c) automatically since it's the
+ * same custom property, not a hardcoded light-mode literal.
  */
