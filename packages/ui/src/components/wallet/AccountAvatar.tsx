@@ -26,9 +26,10 @@ export function AccountAvatar({ svgMarkup, label, size = 28, className }: Accoun
       aria-label={label}
       className={cn("inline-flex flex-shrink-0 overflow-hidden rounded-full bg-mist", className)}
       style={{ width: size, height: size }}
-      // eslint-disable-next-line react/no-danger -- `svgMarkup` is generated
-      // locally by dicebear from the account address, never from
-      // untrusted/remote input (see this file's doc comment).
+      // `svgMarkup` is generated locally by dicebear from the account
+      // address, never from untrusted/remote input (see this file's doc
+      // comment) — no `eslint-plugin-react` in this repo to gate this with
+      // `react/no-danger`, so this is a plain code comment, not a directive.
       dangerouslySetInnerHTML={{ __html: svgMarkup }}
     />
   );
