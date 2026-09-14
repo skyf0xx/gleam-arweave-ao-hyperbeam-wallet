@@ -82,11 +82,43 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "getApproval",
       "resolveApproval",
       "unlockApprovalWallet",
+      "getLockSettings",
+      "setLockSettings",
+      "getNetworkSettings",
+      "setNetworkSettings",
+      "getThemePreference",
+      "setThemePreference",
       "revokeGrant",
       "providerCall",
     ]) {
       expect(registeredHandlers.has(method)).toBe(true);
     }
+  });
+
+  /**
+   * Theme preference: dispatcher registration is this task's own debt to
+   * clear (THEME-PREFERENCE-WALLET-CORE's inherited debt note) — drives
+   * the real registered handlers end-to-end through the mocked storage
+   * above, exactly like `getLockSettings`/`setLockSettings` already do,
+   * rather than re-testing `WalletLifecycleHandler`'s own validation
+   * (already covered by its own test file).
+   */
+  it("getThemePreference defaults to light with no stored preference", async () => {
+    const handler = registeredHandlers.get("getThemePreference")!;
+    await expect(handler({ data: undefined })).resolves.toEqual({ theme: "light" });
+  });
+
+  it("setThemePreference persists a preference that a later getThemePreference reflects", async () => {
+    const setHandler = registeredHandlers.get("setThemePreference")!;
+    const getHandler = registeredHandlers.get("getThemePreference")!;
+
+    await setHandler({ data: { theme: "dark" } });
+    await expect(getHandler({ data: undefined })).resolves.toEqual({ theme: "dark" });
+  });
+
+  it("setThemePreference rejects an invalid theme value", async () => {
+    const setHandler = registeredHandlers.get("setThemePreference")!;
+    await expect(setHandler({ data: { theme: "system" } })).rejects.toThrow(/invalid theme/i);
   });
 
   it("rejects a KEY_METHODS name routed through providerCall", () => {

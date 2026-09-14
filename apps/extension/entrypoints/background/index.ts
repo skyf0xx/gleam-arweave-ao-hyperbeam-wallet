@@ -240,6 +240,8 @@ messenger.onMessage("getNetworkSettings", () => reads.getNetworkSettings());
 messenger.onMessage("setNetworkSettings", (message) => storage.set("local:networkSettings", message.data));
 messenger.onMessage("getLockSettings", () => lifecycle.getLockSettings());
 messenger.onMessage("setLockSettings", (message) => lifecycle.setLockSettings(message.data));
+messenger.onMessage("getThemePreference", () => lifecycle.getThemePreference());
+messenger.onMessage("setThemePreference", (message) => lifecycle.setThemePreference(message.data));
 messenger.onMessage("revokeGrant", (message) => approval.revokeGrant(message.data));
 
 // the single provider-surface choke point (this task's debt #1)

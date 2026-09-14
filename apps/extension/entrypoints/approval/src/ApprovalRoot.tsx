@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { ApprovalRequest, RuntimePort, WalletState } from "@gleam/core";
+import { useEffect, useState, type ReactNode } from "react";
+import type { ApprovalRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
@@ -17,6 +17,16 @@ import { SigningApprovalScreen } from "./SigningApprovalScreen";
  * a dynamic `import()` inside `useEffect`, never a static top-level
  * import, since `@webext-core/messaging` throws synchronously outside a
  * real extension context (including this component's own test file).
+ *
+ * Theme: this window never mounts `<App>` (`approval/index.tsx`'s own
+ * doc comment — a genuinely separate root, its own state machine), so
+ * `App.tsx`'s `applyTheme`/`data-theme` wiring never runs here despite
+ * that file's comment describing approval as one of "every surface" —
+ * confirmed false for this window while building this task. Mirrors
+ * `applyTheme` exactly (same fetch, same light fallback on any failure,
+ * including the dispatcher not yet registering the method) so the
+ * two surfaces apply identically instead of reimplementing the read
+ * differently.
  */
 export interface ApprovalRootProps {
   requestId: string | null;
@@ -32,6 +42,19 @@ type LoadState =
 
 export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
+
+  const applyTheme = async (runtime: RuntimePort) => {
+    try {
+      const settings = await runtime.send<void, ThemeSettings>({
+        type: "getThemePreference",
+        payload: undefined,
+      });
+      setTheme(settings.theme);
+    } catch {
+      setTheme("light");
+    }
+  };
 
   const load = async (runtime: RuntimePort, id: string) => {
     try {
@@ -61,7 +84,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
       try {
         const runtime = runtimeProp ?? (await import("@/src/adapters/runtime")).runtimePort;
         if (cancelled) return;
-        await load(runtime, requestId);
+        await Promise.all([load(runtime, requestId), applyTheme(runtime)]);
       } catch (error) {
         if (cancelled) return;
         setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -75,20 +98,16 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId]);
 
+  let content: ReactNode;
+
   if (state.kind === "loading") {
-    return <CenteredMessage text="Loading…" />;
-  }
-
-  if (state.kind === "error") {
-    return <CenteredMessage text={state.message} />;
-  }
-
-  if (state.kind === "done") {
-    return <CenteredMessage text={state.message} />;
-  }
-
-  if (state.kind === "no-wallet") {
-    return (
+    content = <CenteredMessage text="Loading…" />;
+  } else if (state.kind === "error") {
+    content = <CenteredMessage text={state.message} />;
+  } else if (state.kind === "done") {
+    content = <CenteredMessage text={state.message} />;
+  } else if (state.kind === "no-wallet") {
+    content = (
       <OnboardingView
         runtime={state.runtime}
         onComplete={() => {
@@ -96,65 +115,71 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
         }}
       />
     );
-  }
+  } else {
+    const { runtime, request } = state;
 
-  const { runtime, request } = state;
+    const handleReject = async () => {
+      try {
+        await runtime.send<{ requestId: string; approved: boolean }, void>({
+          type: "resolveApproval",
+          payload: { requestId: request.requestId, approved: false },
+        });
+      } finally {
+        setState({ kind: "done", message: "Request rejected." });
+      }
+    };
 
-  const handleReject = async () => {
-    try {
-      await runtime.send<{ requestId: string; approved: boolean }, void>({
-        type: "resolveApproval",
-        payload: { requestId: request.requestId, approved: false },
-      });
-    } finally {
-      setState({ kind: "done", message: "Request rejected." });
+    if (request.preview.kind === "connect") {
+      const preview = request.preview;
+      content = (
+        <ConnectionRequestScreen
+          origin={request.origin}
+          preview={preview}
+          onReject={() => void handleReject()}
+          onGrant={async () => {
+            try {
+              await runtime.send<{ requestId: string; approved: boolean }, void>({
+                type: "resolveApproval",
+                payload: { requestId: request.requestId, approved: true },
+              });
+              setState({ kind: "done", message: "Grant approved." });
+            } catch (error) {
+              setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+            }
+          }}
+        />
+      );
+    } else {
+      const signingPreview = request.preview;
+      content = (
+        <SigningApprovalScreen
+          origin={request.origin}
+          preview={signingPreview}
+          onReject={() => void handleReject()}
+          onSign={async (password) => {
+            try {
+              await runtime.send<{ requestId: string; password: string }, void>({
+                type: "unlockApprovalWallet",
+                payload: { requestId: request.requestId, password },
+              });
+              await runtime.send<{ requestId: string; approved: boolean }, void>({
+                type: "resolveApproval",
+                payload: { requestId: request.requestId, approved: true },
+              });
+              setState({ kind: "done", message: "Signed." });
+            } catch (error) {
+              throw error instanceof Error ? error : new Error(String(error));
+            }
+          }}
+        />
+      );
     }
-  };
-
-  if (request.preview.kind === "connect") {
-    const preview = request.preview;
-    return (
-      <ConnectionRequestScreen
-        origin={request.origin}
-        preview={preview}
-        onReject={() => void handleReject()}
-        onGrant={async () => {
-          try {
-            await runtime.send<{ requestId: string; approved: boolean }, void>({
-              type: "resolveApproval",
-              payload: { requestId: request.requestId, approved: true },
-            });
-            setState({ kind: "done", message: "Grant approved." });
-          } catch (error) {
-            setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
-          }
-        }}
-      />
-    );
   }
 
-  const signingPreview = request.preview;
   return (
-    <SigningApprovalScreen
-      origin={request.origin}
-      preview={signingPreview}
-      onReject={() => void handleReject()}
-      onSign={async (password) => {
-        try {
-          await runtime.send<{ requestId: string; password: string }, void>({
-            type: "unlockApprovalWallet",
-            payload: { requestId: request.requestId, password },
-          });
-          await runtime.send<{ requestId: string; approved: boolean }, void>({
-            type: "resolveApproval",
-            payload: { requestId: request.requestId, approved: true },
-          });
-          setState({ kind: "done", message: "Signed." });
-        } catch (error) {
-          throw error instanceof Error ? error : new Error(String(error));
-        }
-      }}
-    />
+    <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
+      {content}
+    </div>
   );
 }
 
