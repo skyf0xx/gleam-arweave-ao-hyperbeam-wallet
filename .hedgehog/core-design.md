@@ -159,6 +159,19 @@ session didn't independently re-derive it.
 
 ## Correction Protocol log
 
+- **`apps/extension/src/App.tsx` moved from `scaffold`'s original scope
+  into `wallet-core`'s scope.** `scaffold` built the bare shell with a
+  placeholder view and no switch logic; neither `onboarding-unlock` nor
+  `wallet-core` originally had this file in scope, so nothing could wire
+  `OnboardingView`/`UnlockView` (built complete and independently
+  testable by `onboarding-unlock`, see its debt notes) into the actual
+  popup. Assigned to `wallet-core` — confirmed with the user directly —
+  since it's the layer that adds `main-screen`, the third and last view
+  needed before the view-switch is worth wiring once rather than twice;
+  `wallet-core` wires all three views' switch logic together when it
+  builds. Already covered by `wallet-core`'s existing `apps/extension/**`
+  `verify_radius`, no radius change needed.
+
 - **`packages/core/src/index.ts` added to `messaging`'s scope** (was
   missing from every layer's scope entirely). `scaffold`'s
   `packages/core/package.json` declares `main`/`types` as

@@ -25,7 +25,7 @@ layers:
     commit: "feat(gleam): onboarding and unlock"
   - id: wallet-core
     depends_on: onboarding-unlock
-    scope: ["packages/core/src/arweave/**", "packages/core/src/ao/**", "packages/core/src/pricing/**", "packages/core/src/activity/**", "apps/extension/entrypoints/popup/main-screen/**", "apps/extension/entrypoints/popup/send/**", "apps/extension/entrypoints/popup/receive/**", "apps/extension/entrypoints/popup/activity/**", "apps/extension/src/handlers/reads.ts", "apps/extension/src/handlers/transfer.ts", "packages/ui/src/components/wallet/**"]
+    scope: ["packages/core/src/arweave/**", "packages/core/src/ao/**", "packages/core/src/pricing/**", "packages/core/src/activity/**", "apps/extension/entrypoints/popup/main-screen/**", "apps/extension/entrypoints/popup/send/**", "apps/extension/entrypoints/popup/receive/**", "apps/extension/entrypoints/popup/activity/**", "apps/extension/src/handlers/reads.ts", "apps/extension/src/handlers/transfer.ts", "packages/ui/src/components/wallet/**", "apps/extension/src/App.tsx"]
     verify: "pnpm vitest run arweave ao pricing activity send receive && pnpm tsc -p packages/core --noEmit"
     verify_radius: ["packages/core/**", "apps/extension/**", "packages/ui/src/components/wallet/**"]
     commit: "feat(gleam): wallet core (balances, send, receive, activity)"
