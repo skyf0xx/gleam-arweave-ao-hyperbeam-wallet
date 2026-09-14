@@ -11,6 +11,7 @@ import {
   type LockSettings,
   type Session,
   type StoragePort,
+  type ThemeSettings,
   type Wallet,
   type WalletState,
   type WalletSummary,
@@ -32,6 +33,9 @@ import {
  * - `local:activeWalletId` — `string | null`.
  * - `local:lockSettings` — `LockSettings`, default `{ autoLockTimeout:
  *   "never" }`.
+ * - `local:themeSettings` — `ThemeSettings`, default `{ theme: "light" }`
+ *   (theme-preference's RELEVANT RULES: no OS-driven default, light
+ *   always wins when nothing is stored).
  * - `session:unlockedSession` — `Session`, routed to `chrome.storage.session`
  *   (memory-only, cleared on browser close) by the storage adapter's own
  *   `local:`/`session:` area routing — this handler only ever reads/writes
@@ -53,9 +57,13 @@ import {
 const WALLETS_KEY = "local:wallets";
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const LOCK_SETTINGS_KEY = "local:lockSettings";
+const THEME_SETTINGS_KEY = "local:themeSettings";
 const SESSION_KEY = "session:unlockedSession";
 
 const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
+const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
+
+const VALID_THEME_PREFERENCES: readonly ThemeSettings["theme"][] = ["light", "dark"];
 
 const VALID_AUTO_LOCK_TIMEOUTS: readonly AutoLockTimeout[] = [
   "never",
@@ -132,6 +140,18 @@ async function loadLockSettings(storage: StoragePort): Promise<LockSettings> {
     return { autoLockTimeout: (raw as LockSettings).autoLockTimeout };
   }
   return DEFAULT_LOCK_SETTINGS;
+}
+
+async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
+  const raw = await storage.get<unknown>(THEME_SETTINGS_KEY);
+  if (
+    raw !== null &&
+    typeof raw === "object" &&
+    VALID_THEME_PREFERENCES.includes((raw as Record<string, unknown>).theme as ThemeSettings["theme"])
+  ) {
+    return { theme: (raw as ThemeSettings).theme };
+  }
+  return DEFAULT_THEME_SETTINGS;
 }
 
 function isValidSession(value: unknown): value is Session {
@@ -464,5 +484,29 @@ export class WalletLifecycleHandler {
     if (session !== null) {
       await saveSession(this.storage, { ...session, autoLockTimeout: req.autoLockTimeout });
     }
+  }
+
+  /**
+   * `ProtocolMap.getThemePreference`'s backing read — mirrors
+   * `getLockSettings`, exposed as a public method so the dispatcher
+   * (`entrypoints/background/index.ts`, outside this task's ALLOWED
+   * SCOPE — see this task's final report) has something to wire
+   * `getThemePreference` to.
+   */
+  async getThemePreference(): Promise<ThemeSettings> {
+    return loadThemeSettings(this.storage);
+  }
+
+  /**
+   * `ProtocolMap.setThemePreference`'s backing write. Wallet-owner-only
+   * local UI setting (see `protocol.ts`'s doc comment on
+   * `getThemePreference`) — no session or other stored record depends on
+   * the theme value, unlike `setLockSettings`'s session-timeout sync.
+   */
+  async setThemePreference(req: ThemeSettings): Promise<void> {
+    if (!VALID_THEME_PREFERENCES.includes(req.theme)) {
+      throw new Error(`Invalid theme preference "${req.theme}".`);
+    }
+    await this.storage.set(THEME_SETTINGS_KEY, req);
   }
 }

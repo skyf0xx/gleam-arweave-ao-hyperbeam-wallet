@@ -323,6 +323,51 @@ describe("WalletLifecycleHandler: getLockSettings", () => {
   });
 });
 
+describe("WalletLifecycleHandler: getThemePreference", () => {
+  it("defaults to light when nothing is stored", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage());
+    expect(await handler.getThemePreference()).toEqual({ theme: "light" });
+  });
+
+  it("reflects a value previously written by setThemePreference", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage());
+    await handler.setThemePreference({ theme: "dark" });
+    expect(await handler.getThemePreference()).toEqual({ theme: "dark" });
+  });
+
+  it("drops a malformed stored record back to the default (untrusted storage)", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:themeSettings", { theme: "not-a-real-theme" });
+    const handler = new WalletLifecycleHandler(storage);
+    expect(await handler.getThemePreference()).toEqual({ theme: "light" });
+  });
+
+  it("defaults to light for a fresh install with no stored preference at all", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage);
+    expect(await storage.get("local:themeSettings")).toBeNull();
+    expect(await handler.getThemePreference()).toEqual({ theme: "light" });
+  });
+});
+
+describe("WalletLifecycleHandler: setThemePreference", () => {
+  it("rejects a value that isn't exactly light or dark", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage());
+    await expect(
+      handler.setThemePreference({ theme: "system" as never }),
+    ).rejects.toThrow(/invalid theme preference/i);
+  });
+
+  it("persists across a fresh handler instance (popup close/reopen)", async () => {
+    const storage = createFakeStorage();
+    const first = new WalletLifecycleHandler(storage);
+    await first.setThemePreference({ theme: "dark" });
+
+    const second = new WalletLifecycleHandler(storage);
+    expect(await second.getThemePreference()).toEqual({ theme: "dark" });
+  });
+});
+
 describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", () => {
   it("drops a malformed wallet record instead of surfacing it", async () => {
     const storage = createFakeStorage();
