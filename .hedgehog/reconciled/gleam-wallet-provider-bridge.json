@@ -1,0 +1,9 @@
+{
+  "task": "GLEAM-WALLET-PROVIDER-BRIDGE",
+  "reason": "commit 4747b7f feat(gleam): injected provider, connection approval, signing approval already landed on master before this worktree existed; worktree's fresh DB can't credit it due to hedgehog#430",
+  "confirmed_at": "2026-09-14T11:10:45.772Z",
+  "evidence": {
+    "commits": [],
+    "paths": []
+  }
+}
