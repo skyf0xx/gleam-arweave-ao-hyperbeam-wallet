@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { browser } from "wxt/browser";
 import type { HyperBeamPeer, NetworkSettings, RuntimePort } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -53,6 +54,18 @@ function normalizePeerUrl(input: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * MV3 host-permission match pattern for a peer's origin — protocol +
+ * host, wildcarded path (`<scheme>://<host>/*`) per
+ * `chrome.permissions.request`'s documented match-pattern shape. Derived
+ * from the already-normalized peer URL rather than the raw input, so it
+ * always reflects a URL `normalizePeerUrl` has already validated.
+ */
+function peerOriginPattern(normalizedPeerUrl: string): string {
+  const url = new URL(normalizedPeerUrl);
+  return `${url.protocol}//${url.host}/*`;
 }
 
 export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
@@ -129,6 +142,18 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       setAddError("That peer is already in the list.");
       return;
     }
+
+    let granted: boolean;
+    try {
+      granted = await browser.permissions.request({ origins: [peerOriginPattern(normalized)] });
+    } catch {
+      granted = false;
+    }
+    if (!granted) {
+      setAddError("Permission denied for that origin — the peer was not added.");
+      return;
+    }
+
     const peers = [...state.settings.peers, { url: normalized, enabled: true }];
     await persist({ ...state.settings, peers });
     setNewPeerUrl("");

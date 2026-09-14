@@ -3,8 +3,15 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import type { NetworkSettings, RuntimePort } from "@gleam/core";
 import { NetworkPeersView } from "./NetworkPeersView";
 
+const { permissionsRequest } = vi.hoisted(() => ({ permissionsRequest: vi.fn() }));
+
+vi.mock("wxt/browser", () => ({
+  browser: { permissions: { request: permissionsRequest } },
+}));
+
 afterEach(() => {
   cleanup();
+  permissionsRequest.mockReset();
 });
 
 function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
@@ -125,7 +132,8 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     );
   });
 
-  it("adding a peer normalizes the URL and appends it enabled by default", async () => {
+  it("adding a peer requests permission for its origin, and on grant normalizes the URL and appends it enabled by default", async () => {
+    permissionsRequest.mockResolvedValue(true);
     const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
     render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
@@ -137,6 +145,9 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
+      expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://new-peer.example.com/*"] }),
+    );
+    await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
         type: "setNetworkSettings",
         payload: {
@@ -145,6 +156,47 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
         },
       }),
     );
+  });
+
+  it("adding a peer whose origin permission is denied does not persist it and shows a specific error", async () => {
+    permissionsRequest.mockResolvedValue(false);
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Add peer")).toBeTruthy());
+    fireEvent.click(screen.getByText("Add peer"));
+    fireEvent.change(screen.getByPlaceholderText("hyperbeam.example.com"), {
+      target: { value: "denied-peer.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://denied-peer.example.com/*"] }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Permission denied for that origin — the peer was not added.")).toBeTruthy(),
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
+  });
+
+  it("adding a peer whose permission request rejects does not persist it and shows a specific error", async () => {
+    permissionsRequest.mockRejectedValue(new Error("boom"));
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Add peer")).toBeTruthy());
+    fireEvent.click(screen.getByText("Add peer"));
+    fireEvent.change(screen.getByPlaceholderText("hyperbeam.example.com"), {
+      target: { value: "rejects-peer.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Permission denied for that origin — the peer was not added.")).toBeTruthy(),
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
   });
 
   it("rejects an invalid peer URL without calling setNetworkSettings", async () => {
