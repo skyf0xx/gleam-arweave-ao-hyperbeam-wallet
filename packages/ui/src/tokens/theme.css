@@ -93,13 +93,16 @@
 }
 
 /*
- * Dark mode — brand/guidelines.md Part 2 "Dark Mode" table. The
- * extension popup inherits the OS/browser theme (identity.md §03), so
- * this is a default state, not an enhancement layered on later. Applied
- * via `prefers-color-scheme` since there is no in-app theme toggle in
- * this project's scope; a later layer introducing one would replace this
- * media query with a class-based strategy without changing any token
- * name consumers reference.
+ * Dark mode — brand/guidelines.md Part 2 "Dark Mode" table. Theme is an
+ * explicit user preference chosen from a settings screen, not inherited
+ * from the OS/browser — light (the `@theme` block above, unwrapped) is
+ * the default for every fresh install regardless of OS theme. Dark only
+ * applies once `data-theme="dark"` is present on an ancestor element,
+ * mirroring this file's own `[data-layout="popup"]` attribute-selector
+ * mechanic below rather than introducing a second pattern. Setting that
+ * attribute from the stored preference (read before first paint, to
+ * avoid a flash) is a later layer's concern — this file only owns the
+ * selector the attribute drives once present.
  *
  * Only the foundation neutrals invert — the five beam colors and the
  * warning-red carry over unchanged (same hex) per guidelines.md's
@@ -108,7 +111,7 @@
  * not redefined here (redefining its hex would be wrong) but flagged in
  * this file for any component choosing text color from the beam set.
  */
-@media (prefers-color-scheme: dark) {
+[data-theme="dark"] {
   @theme {
     --color-canvas: #111111;
     --color-background: #111111;
