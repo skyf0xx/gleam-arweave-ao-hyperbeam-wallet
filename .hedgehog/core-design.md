@@ -249,6 +249,21 @@ session didn't independently re-derive it.
   adding a method to `protocol.ts` is outside this layer's scope. See
   "Left unresolved" below.
 
+- **Colocated test-file paths pre-emptively added to `wallet-core`,
+  `upload`, and `provider-bridge`'s scope**
+  (`reads.activity.test.ts`, `transfer.send.test.ts`,
+  `upload.upload.test.ts`, `content.provider.test.ts`,
+  `provider.provider.test.ts`, `approval.approval.test.ts`,
+  `windows.provider.test.ts`). Every prior layer that grants individual
+  files rather than a directory glob (to avoid collision in shared
+  `handlers`/`adapters`/`entrypoints` directories) has hit the same gap:
+  its colocated test file wasn't included. Confirmed three times
+  (`messaging`, `onboarding-unlock` ×3, `wallet-core` ×2) as a real,
+  predictable pattern rather than one-off oversights, so the remaining
+  three layers' scopes were corrected up front instead of waiting to hit
+  it again layer by layer. Each new test-file path was checked against
+  its layer's `verify` command's filter tokens for a match before adding.
+
 ## Left unresolved
 
 - **HyperBEAM balance path** (`04-prd.md`'s AO token balances Feature):
