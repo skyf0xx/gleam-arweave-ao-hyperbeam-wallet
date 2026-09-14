@@ -1,5 +1,6 @@
 {
   "id": "settings-screens-gap",
+  "_note": "depends_on design-system-pass removed post-completion: design-system-pass is merged (0b2e3db) and this intent's own tasks are already complete (f362b6a); the edge only remained to satisfy plan's dependency-clearing check and was retriggering hedgehog#431 (phantom re-derivation of an abandoned-but-actually-complete intent) on every db rebuild.",
   "goal": "Close the gap the design-system-pass intent's own INTENT CHECK flagged: build the 3 real reference screens it named (wallet-switcher, lock-settings, network-peers) that have no popup counterpart yet, and apply the already-built shared loading/error primitives to the screens that still lack them, over backend/domain support that already exists end to end.",
   "outcome": "A user can open a wallet switcher from the main screen to see all stored wallets and switch the active one; open lock/auto-lock settings to trigger an immediate lock or pick an auto-lock timeout; open network/peers settings to view the gateway, add/remove HyperBEAM peers, and toggle/activate one. NetworkErrorBanner and SkeletonRow (already built and already used in main-screen and activity) are applied consistently to send, receive, upload, connected-apps, and the 3 new screens, so no screen invents its own one-off loading/error state. The dead ScreenHeader re-export in packages/ui/src/components/onboarding/index.ts, confirmed to have zero remaining importers repo-wide, is deleted along with its stale comment.",
   "priority": 50,
@@ -50,7 +51,5 @@
       "statement": "pnpm wxt build succeeds and every existing layer's own test suite still passes; packages/ui/src/components/onboarding/index.ts no longer exports ScreenHeader."
     }
   ],
-  "depends_on": [
-    "design-system-pass"
-  ]
+  "depends_on": []
 }
