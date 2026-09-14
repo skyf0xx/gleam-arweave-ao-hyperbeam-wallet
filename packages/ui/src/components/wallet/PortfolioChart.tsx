@@ -127,7 +127,7 @@ export function PortfolioChart({
 
       <div className="h-[80px] w-full">
         {loading ? (
-          <div className="h-full w-full animate-pulse rounded-md bg-line motion-reduce:animate-none motion-reduce:opacity-70" />
+          <div className="h-full w-full gleam-shimmer rounded-md" />
         ) : points.length === 0 ? (
           <div className="flex h-full w-full items-center justify-center text-caption text-faint">
             No chart data

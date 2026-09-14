@@ -21,8 +21,8 @@ export function BalanceDisplay({ amountLabel, subLabel, loading = false, classNa
   if (loading) {
     return (
       <div className={cn("flex flex-col gap-1", className)}>
-        <div className="my-0.5 h-[34px] w-40 animate-pulse rounded-md bg-line motion-reduce:animate-none motion-reduce:opacity-70" />
-        <div className="mt-1.5 h-[13px] w-[90px] animate-pulse rounded-md bg-line motion-reduce:animate-none motion-reduce:opacity-70" />
+        <div className="my-0.5 h-[34px] w-40 gleam-shimmer rounded-md" />
+        <div className="mt-1.5 h-[13px] w-[90px] gleam-shimmer rounded-md" />
       </div>
     );
   }
