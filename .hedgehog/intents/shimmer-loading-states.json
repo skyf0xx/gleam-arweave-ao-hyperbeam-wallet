@@ -1,0 +1,49 @@
+{
+  "id": "shimmer-loading-states",
+  "goal": "Replace the grey Tailwind `animate-pulse bg-line` loading treatment used across every skeleton placeholder with an on-brand white/near-white shimmer: a moving diagonal gradient highlight in beam-derived colors sweeping over a near-white base, in place of the flat grey pulse.",
+  "outcome": "packages/ui/src/tokens/theme.css defines the shimmer as reusable design tokens (a base color, a keyframe animation, and a `.gleam-shimmer` utility class) rather than a one-off inline gradient. Every skeleton placeholder in packages/ui/src/components/wallet/ (SkeletonRow.tsx, BalanceDisplay.tsx, PortfolioChart.tsx's loading block) uses `.gleam-shimmer` instead of `animate-pulse bg-line`. The gradient is a 3-stop sweep: near-white base (#f8f8f8) -> a faint beam-sky-tinted highlight -> a faint beam-purple-tinted highlight -> back through the sky tint -> near-white base, at 110deg, using `color-mix(in srgb, var(--color-beam-sky) 16%, white)` / `color-mix(in srgb, var(--color-beam-purple) 16%, white)` style tints so the base stays almost white and color only appears in the moving highlight band. No screen file (ActivityView, LockSettingsView, ConnectedAppsView, WalletSwitcherView, NetworkPeersView, MainScreenView) needs to change, since they all consume the shared wallet/ skeleton components rather than defining their own pulse markup. `prefers-reduced-motion` is respected the same way the current `motion-reduce:animate-none motion-reduce:opacity-70` treatment does today -- reduced motion gets a static near-white fill, not a moving gradient. Dark mode gets its own tuned version of the same tokens (dark base + tints) rather than the light gradient rendering unchanged on a dark canvas.",
+  "priority": 40,
+  "requirements": [
+    {
+      "id": "SHIMMER-LOADING-STATES-RULE-1",
+      "kind": "rule",
+      "statement": "The shimmer is defined once in packages/ui/src/tokens/theme.css as design tokens/utility (a `@keyframes` animation and a `.gleam-shimmer` class, following the file's existing `.gleam-beam-divider` pattern for a fixed non-themeable-scale visual), not duplicated inline in each component."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-RULE-2",
+      "kind": "rule",
+      "statement": "Gradient stops: near-white base -> color-mix(in srgb, var(--color-beam-sky) 16%, white) -> color-mix(in srgb, var(--color-beam-purple) 16%, white) -> color-mix(in srgb, var(--color-beam-sky) 12%, white) -> near-white base, at 110deg, animated via background-position over background-size: 200% 100%. The base must read as almost-white; color appears only in the moving highlight band, never as a flat colored background."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-RULE-3",
+      "kind": "rule",
+      "statement": "Every `animate-pulse bg-line` occurrence in packages/ui/src/components/wallet/SkeletonRow.tsx, BalanceDisplay.tsx, and PortfolioChart.tsx is replaced with the new `.gleam-shimmer` treatment. No other file defines its own skeleton pulse markup (confirmed: all consuming screens use these shared components), so no other file needs a change."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-RULE-4",
+      "kind": "rule",
+      "statement": "`prefers-reduced-motion` continues to be respected: the existing `motion-reduce:` handling (currently `motion-reduce:animate-none motion-reduce:opacity-70`) is preserved in spirit -- under reduced motion the element shows a static near-white fill with no animated gradient sweep, not a frozen mid-gradient frame."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-RULE-5",
+      "kind": "rule",
+      "statement": "Dark mode ([data-theme=\"dark\"]) gets its own shimmer base/tint values consistent with theme.css's existing dark-mode override pattern (redeclaring custom properties under the `[data-theme=\"dark\"]` selector) -- the light-mode near-white gradient must not render unchanged against the dark canvas."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-RULE-6",
+      "kind": "rule",
+      "statement": "Never repurpose --color-beam-red/--color-beam-green/--color-warning literals as the shimmer's colors -- per this project's single-warning-red-accent and identity-only beam rules, the shimmer draws its tint only from --color-beam-sky and --color-beam-purple via color-mix, not from the full 5-color beam set or the warning token."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "Loading any screen that shows a skeleton (main screen balance/chart, activity list, wallet switcher, lock settings, connected apps, network peers) renders the new white/tinted moving shimmer instead of the grey flat pulse, with no visual regression in layout (same placeholder dimensions/positions as today)."
+    },
+    {
+      "id": "SHIMMER-LOADING-STATES-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run ui wallet-core settings-screens-gap main-screen passes; pnpm wxt build succeeds; existing tests asserting on skeleton presence (e.g. wallet.send.test.tsx, MainScreenView.main-screen.test.tsx, ConnectedAppsView.connected-apps.test.tsx) continue to pass without needing to change their assertions beyond the class name if they assert on `animate-pulse` directly."
+    }
+  ],
+  "depends_on": []
+}
