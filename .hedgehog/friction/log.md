@@ -10,3 +10,7 @@ hedgehog debt add writes a local cache mirror to .hedgehog/notes/<task-id>.json 
 
 hedgehog plan re-compiles an already-complete, already-merged intent (design-system-pass, closed via reconciliation) into phantom 'planned' tasks every time its intent_dependencies clear (gleam-wallet complete) -- happens even after 'hedgehog abandon' records the abandonment, since plan doesn't check the abandoned record before re-evaluating dependency-clearing eligibility. Also: the first-eligible-intent worktree mechanism checks out from committed git refs, so a newly-added intent JSON must be committed before 'plan' can see it at all -- an uncommitted intent silently compiles 0 tasks while plan spins up a worktree for an unrelated, already-shipped intent instead. Worked around by abandoning + committing the abandonment record + committing the new intent before replanning; this session bypassed hedgehog claim/verify entirely for the resulting build (settings-screens-gap) and built+verified by hand instead, per explicit user direction to stop fighting the tool.
 
+## 2026-09-14T16:34:37.508Z
+
+reviewed: 2026-09-15, issues: https://github.com/skyf0xx/hedgehog/issues/432, https://github.com/skyf0xx/hedgehog/issues/433, https://github.com/skyf0xx/hedgehog/issues/434
+
