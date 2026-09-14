@@ -103,7 +103,7 @@ export async function decryptFromEnvelope(
   address: string,
 ): Promise<Uint8Array> {
   if (envelope.algorithm !== "AES-GCM" || envelope.kdf !== "PBKDF2-HMAC-SHA256") {
-    throw new Error("Unsupported vault envelope algorithm or KDF.");
+    throw new Error("This wallet was saved in a format this version can't read.");
   }
 
   let salt: Uint8Array<ArrayBuffer>;
@@ -114,7 +114,7 @@ export async function decryptFromEnvelope(
     iv = base64ToBytes(envelope.iv);
     ciphertext = base64ToBytes(envelope.ciphertext);
   } catch {
-    throw new Error("Vault envelope is malformed (invalid base64).");
+    throw new Error("This wallet's saved data is corrupted and can't be read.");
   }
 
   const key = await deriveKey(password, salt);
@@ -126,9 +126,7 @@ export async function decryptFromEnvelope(
       ciphertext,
     );
   } catch {
-    throw new Error(
-      "Failed to unlock vault: wrong password or the vault does not belong to this wallet.",
-    );
+    throw new Error("That password didn't unlock this wallet. Try again, or use your recovery method.");
   } finally {
     zeroize(ciphertext);
   }
