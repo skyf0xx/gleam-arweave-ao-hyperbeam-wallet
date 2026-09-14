@@ -189,20 +189,29 @@ session didn't independently re-derive it.
   per-concern layer scopes, and each layer that first needs a given
   export is where that export gets added.
 - **`apps/extension/package.json` and `pnpm-lock.yaml` widened via a
-  per-task override on `onboarding-unlock`, not added to `core.yaml`'s
-  permanent scope.** `runtime.ts` is the first file to import
-  `@webext-core/messaging` directly (an already-locked stack dependency,
-  previously only a transitive dep via `@gleam/messaging`), so it needed
-  declaring in the extension's `package.json`, which touches the
-  workspace lockfile. Unlike the barrel-file gap above, these two files
-  are genuinely shared indefinitely — any later layer (`wallet-core`,
-  `upload`, `provider-bridge`) may equally need to add its own
-  dependency — so granting them permanently to one layer in `core.yaml`
-  would lock out every later layer's own legitimate need to touch the
-  same files. Handled as a one-time additive override instead
-  (`.hedgehog/overrides/gleam-wallet-onboarding-unlock.json`); a later
-  layer needing the same files gets its own override when it arrives,
-  not a pre-emptive standing grant.
+  per-task override on `onboarding-unlock`, then committed separately as
+  their own `chore(workspace)` commit** (per `hedgehog verify`'s own
+  scope-violation guidance: "shared workspace config — no layer owns it;
+  commit it separately"), and removed from the override once landed.
+  `runtime.ts` is the first file to import `@webext-core/messaging`
+  directly (an already-locked stack dependency, previously only a
+  transitive dep via `@gleam/messaging`), so it needed declaring in the
+  extension's `package.json`, which touches the workspace lockfile.
+  Unlike the barrel-file gap above, these two files are genuinely shared
+  indefinitely — any later layer may equally need to add its own
+  dependency — so neither a permanent `core.yaml` grant nor a persisted
+  override was right; a separate, layer-agnostic commit is. A later
+  layer needing the same files makes its own `chore(workspace)` commit
+  when it arrives.
+- **`apps/extension/src/{adapters,handlers}/*.test.ts` colocated test
+  files added to `onboarding-unlock`'s scope** (three files:
+  `wallet-lifecycle.onboarding.test.ts`, `storage.unlock.test.ts`,
+  `runtime.unlock.test.ts`). `wallet-lifecycle.ts`/`storage.ts`/
+  `runtime.ts` were granted individually (not directory globs, to avoid
+  future collision in the shared `adapters`/`handlers` directories later
+  layers also write into), but their colocated test files weren't
+  included alongside them — the same gap shape as `messaging`'s
+  `ports.models.test.ts` fix above.
 - **`apps/extension/src/App.tsx` view-switch wiring is an unresolved
   gap, not yet assigned to any layer.** `onboarding-unlock` built
   complete, independently-mountable `OnboardingView`/`UnlockView`
