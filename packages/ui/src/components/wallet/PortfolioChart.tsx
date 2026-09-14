@@ -21,19 +21,16 @@ import { cn } from "../../primitives/cn";
  *
  * Color rule (RELEVANT RULES, confirmed): reuses `--color-positive`
  * (already a Tailwind utility, `text-positive`/`border-positive`, per
- * `ActivityRow`/`AddressDisplay`'s existing usage) for gains. No
- * `--color-negative`/decline token exists yet in `packages/ui/src/tokens/
- * theme.css` — that file is outside this task's ALLOWED SCOPE (only
- * `packages/ui/src/components/wallet/**` is granted), so a new token
- * couldn't be added there; see this task's final report. Referenced here
- * as a raw CSS custom property via inline `style`, exactly like
- * `primitives/beam.tsx`'s `BeamMark` already does for
- * `var(--color-beam-*)` when no Tailwind utility exists for a color yet —
- * `--color-negative` needs adding to `theme.css`'s `@theme` block
- * (following `--color-positive`'s own comment style) by whoever owns that
- * file before this reference resolves to a real color; until then it
- * falls back to the browser's `currentColor` default via the `red`
- * fallback below, which is a placeholder, not a design decision.
+ * `ActivityRow`/`AddressDisplay`'s existing usage) for gains, and the
+ * sibling `--color-negative` token (`packages/ui/src/tokens/theme.css`)
+ * for losses — both real `@theme` tokens, never `--color-beam-red`/
+ * `--color-beam-green` (identity-only, brand rule). Referenced here as
+ * raw CSS custom properties via inline `style`/SVG `fill`/`stroke`
+ * attributes rather than the `text-positive`/`text-negative` Tailwind
+ * utilities those tokens also generate, exactly like `primitives/
+ * beam.tsx`'s `BeamMark` already does for `var(--color-beam-*)` —
+ * `isPositive` picks the color dynamically per render, and SVG
+ * `fill`/`stroke` attributes need a color value, not a class name.
  */
 export interface PortfolioChartPoint {
   timestamp: number;
@@ -111,7 +108,7 @@ export function PortfolioChart({
   const isPositive = usdChange >= 0;
   const linePoints = buildLinePath(points);
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
-  const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative, red)";
+  const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>

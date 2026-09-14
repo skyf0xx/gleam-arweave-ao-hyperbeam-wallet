@@ -190,6 +190,10 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
     expect(screen.getByText("+20.00%")).toBeTruthy();
     expect(screen.getByText("$12.00")).toBeTruthy();
+
+    // Gain color must reference the real `--color-positive` token, the
+    // same token `ActivityRow`/`AddressDisplay` already use elsewhere.
+    expect(screen.getByText("+20.00%").style.color).toBe("var(--color-positive)");
   });
 
   it("shows all 5 range tabs with 7D active by default", async () => {
@@ -236,6 +240,12 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     expect(screen.getByText("$80.00")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "1M" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "7D" }).getAttribute("aria-selected")).toBe("false");
+
+    // Decline color must reference the real `--color-negative` token
+    // (theme.css's `@theme` block), never a hardcoded/browser-default
+    // fallback like `red` and never the identity-only `--color-beam-red`.
+    const badge = screen.getByText("-20.00%");
+    expect(badge.style.color).toBe("var(--color-negative)");
   });
 
   it("shows NetworkErrorBanner (not a broken/blank chart) when getPortfolioHistory fails", async () => {

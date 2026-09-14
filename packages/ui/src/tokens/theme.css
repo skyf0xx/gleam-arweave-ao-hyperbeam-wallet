@@ -58,6 +58,17 @@
   /* Positive/confirmed-amount accent (tokens-activity.html's `.amount.positive`) — distinct from both warning and beam, a plain semantic green with no identity meaning. */
   --color-positive: #16a34a;
 
+  /*
+   * Negative/decline accent — the loss-side counterpart to `--color-positive`
+   * above, for the portfolio chart's %-change badge/line/area
+   * (`PortfolioChart.tsx`). Deliberately distinct from `--color-warning`
+   * (Irreversible/high-exposure risk tier only) and from `--color-beam-red`
+   * (identity-only, never a status signal) — this is a plain semantic red
+   * with no identity or risk-tier meaning, matching `--color-positive`'s own
+   * "no identity meaning" framing exactly.
+   */
+  --color-negative: #dc2626;
+
   /* ---- Typography ---- */
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
