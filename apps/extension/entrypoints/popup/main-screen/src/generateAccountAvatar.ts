@@ -1,9 +1,9 @@
 import { Avatar, Style } from "@dicebear/core";
-import identicon from "@dicebear/styles/identicon.json";
+import weave from "@dicebear/styles/weave.json";
 
 /**
  * Generates the account pill's identity avatar SVG entirely in-process via
- * `@dicebear/core` + `@dicebear/styles`'s bundled `identicon` style JSON —
+ * `@dicebear/core` + `@dicebear/styles`'s bundled `weave` style JSON —
  * no `fetch`/network call to `api.dicebear.com` or any other host, ever.
  * This is a deliberate deviation from wallet-main-screen.html's reference
  * (which shows an avatar without specifying its source), confirmed with
@@ -11,7 +11,7 @@ import identicon from "@dicebear/styles/identicon.json";
  * no-per-wallet-identity-on-unlock rule and `TokenGlyph.tsx`'s existing
  * local-only identicon precedent on this same screen.
  *
- * `identicon` (a geometric, faceless pattern keyed by seed) was chosen
+ * `weave` (a geometric, faceless pattern keyed by seed) was chosen
  * over dicebear's avatar-shaped styles (`avataaars`, `micah`, etc.) since
  * a wallet address has no identity to depict a face for — the same
  * reasoning ArConnect/MetaMask-style wallets use their own geometric
@@ -23,9 +23,9 @@ import identicon from "@dicebear/styles/identicon.json";
  * `@dicebear/core`'s own `Style` doc comment: "reuse the instance across
  * avatars") rather than per call.
  */
-const identiconStyle = new Style(identicon);
+const weaveStyle = new Style(weave);
 
 export function generateAccountAvatarSvg(address: string): string {
-  const avatar = new Avatar(identiconStyle, { seed: address });
+  const avatar = new Avatar(weaveStyle, { seed: address });
   return avatar.toString();
 }

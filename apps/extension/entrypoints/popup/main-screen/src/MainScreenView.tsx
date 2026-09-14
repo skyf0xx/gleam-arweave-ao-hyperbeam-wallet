@@ -35,7 +35,7 @@ import { generateAccountAvatarSvg } from "./generateAccountAvatar";
  * Avatar: `AccountAvatar` (`packages/ui/src/components/wallet/
  * AccountAvatar.tsx`) renders SVG markup generated in-process by
  * `./generateAccountAvatar.ts` (`@dicebear/core` + `@dicebear/styles`,
- * `identicon` style, seeded from `wallet.address`) — no network call, per
+ * `weave` style, seeded from `wallet.address`) — no network call, per
  * this task's confirmed deviation from the reference (matching
  * `UnlockScreen.tsx`'s no-per-wallet-identity-on-unlock rule and
  * `TokenGlyph.tsx`'s existing local-only identicon precedent on this same
