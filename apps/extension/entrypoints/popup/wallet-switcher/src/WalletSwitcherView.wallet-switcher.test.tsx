@@ -85,4 +85,19 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
   });
+
+  it("renders each wallet row with its own address-seeded avatar, matching the main screen's account pill", async () => {
+    const send = vi.fn().mockResolvedValue(STATE);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+
+    const walletOneAvatar = screen.getByRole("img", { name: "Wallet One avatar" });
+    const tradingAvatar = screen.getByRole("img", { name: "Trading avatar" });
+    expect(walletOneAvatar.innerHTML).not.toBe("");
+    expect(tradingAvatar.innerHTML).not.toBe("");
+    expect(walletOneAvatar.innerHTML).not.toBe(tradingAvatar.innerHTML);
+    expect(screen.queryByText("W")).toBeNull();
+    expect(screen.queryByText("T")).toBeNull();
+  });
 });

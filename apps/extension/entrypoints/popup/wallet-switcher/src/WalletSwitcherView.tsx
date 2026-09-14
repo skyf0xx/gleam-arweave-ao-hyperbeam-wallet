@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
-import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
 
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
   jwk: "JWK",
@@ -26,6 +27,14 @@ function truncateAddress(address: string): string {
  * `ProtocolMap` method or popup screen for either exists yet. Rendered as
  * visual affordances matching the mockup but inert (no `onClick`) rather
  * than invented behavior; see this task's final report.
+ *
+ * Per-row identity: each wallet's row uses the same dicebear identicon as
+ * the main screen's account pill (`AccountAvatar` +
+ * `./generateAccountAvatar.ts`'s `generateAccountAvatarSvg`, keyed on
+ * `wallet.address`, computed locally with no network call) rather than a
+ * plain letter-initial glyph, so the same wallet shows the same identity
+ * mark on both screens — this is the cross-screen consistency this layer
+ * exists to catch, not a new design decision.
  */
 export interface WalletSwitcherViewProps {
   runtime: RuntimePort;
@@ -102,54 +111,15 @@ export function WalletSwitcherView({ runtime, onSwitched }: WalletSwitcherViewPr
             <SkeletonRow />
           </>
         ) : (
-          state.wallets.map((wallet) => {
-            const active = wallet.id === state.activeWalletId;
-            return (
-              <div
-                key={wallet.id}
-                className={`flex items-center gap-1 rounded-xl border px-2 py-1 ${
-                  active ? "border-line bg-mist" : "border-transparent"
-                }`}
-              >
-                <button
-                  type="button"
-                  disabled={switchingId === wallet.id}
-                  onClick={() => void handleSwitch(wallet.id)}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1.5 text-left hover:bg-mist disabled:opacity-60"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-2xl border border-line bg-mist text-label font-bold text-muted"
-                  >
-                    {wallet.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
-                      <span className="flex-shrink-0 rounded-md border border-line bg-mist px-1.5 py-0.5 text-[10px] font-semibold text-muted">
-                        {WALLET_METHOD_LABEL[wallet.method]}
-                      </span>
-                    </span>
-                    <span className="truncate font-mono text-caption text-faint">
-                      {truncateAddress(wallet.address)}
-                    </span>
-                  </span>
-                  {active ? (
-                    <span aria-hidden="true" className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground">
-                      <CheckIcon />
-                    </span>
-                  ) : null}
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Manage ${wallet.name}`}
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground"
-                >
-                  <KebabIcon />
-                </button>
-              </div>
-            );
-          })
+          state.wallets.map((wallet) => (
+            <WalletSwitcherRow
+              key={wallet.id}
+              wallet={wallet}
+              active={wallet.id === state.activeWalletId}
+              switching={switchingId === wallet.id}
+              onSwitch={() => void handleSwitch(wallet.id)}
+            />
+          ))
         )}
 
         <div className="mx-2 my-1.5 h-px bg-line" />
@@ -167,6 +137,55 @@ export function WalletSwitcherView({ runtime, onSwitched }: WalletSwitcherViewPr
           <span className="text-label font-semibold text-foreground">Add wallet</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+interface WalletSwitcherRowProps {
+  wallet: WalletSummary;
+  active: boolean;
+  switching: boolean;
+  onSwitch: () => void;
+}
+
+function WalletSwitcherRow({ wallet, active, switching, onSwitch }: WalletSwitcherRowProps) {
+  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+
+  return (
+    <div
+      className={`flex items-center gap-1 rounded-xl border px-2 py-1 ${
+        active ? "border-line bg-mist" : "border-transparent"
+      }`}
+    >
+      <button
+        type="button"
+        disabled={switching}
+        onClick={onSwitch}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1.5 text-left hover:bg-mist disabled:opacity-60"
+      >
+        <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} className="rounded-2xl" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
+            <span className="flex-shrink-0 rounded-md border border-line bg-mist px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+              {WALLET_METHOD_LABEL[wallet.method]}
+            </span>
+          </span>
+          <span className="truncate font-mono text-caption text-faint">{truncateAddress(wallet.address)}</span>
+        </span>
+        {active ? (
+          <span aria-hidden="true" className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground">
+            <CheckIcon />
+          </span>
+        ) : null}
+      </button>
+      <button
+        type="button"
+        aria-label={`Manage ${wallet.name}`}
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground"
+      >
+        <KebabIcon />
+      </button>
     </div>
   );
 }
