@@ -2,6 +2,7 @@
 .hedgehog/hedgehog.db
 .hedgehog/hedgehog.db-*
 .hedgehog/commit.lock
+.hedgehog/notes/
 
 # Workspace (pnpm + WXT)
 node_modules/
