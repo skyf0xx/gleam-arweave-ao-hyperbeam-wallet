@@ -3,6 +3,19 @@ import { getUsdPriceFromCoinPaprika, type CoinPaprikaId } from "./coinpaprika";
 
 export { getUsdPrice, type CoinGeckoId } from "./coingecko";
 export { getUsdPriceFromCoinPaprika, type CoinPaprikaId } from "./coinpaprika";
+export {
+  getHistoricalUsdPrices,
+  getHistoricalUsdPricesFromCoinPaprika,
+  getHistoricalUsdPricesWithFallback,
+  buildPriceAtFromSeries,
+  type HistoricalRange,
+  type HistoricalPricePoint,
+  type HistoricalPriceSource,
+} from "./historical";
+export {
+  estimateHistoricalPortfolioValue,
+  type PricedHistoricalToken,
+} from "./portfolio";
 
 export interface PriceSource {
   coinGeckoId: CoinGeckoId;
