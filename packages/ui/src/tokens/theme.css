@@ -206,3 +206,88 @@ select,
     var(--color-beam-green) 80% 100%
   );
 }
+
+/*
+ * Shimmer sweep keyframe — slides the gradient's 200%-wide background
+ * across the element's own box by animating `background-position` alone
+ * (never `background`/`transform`), so the moving highlight stays a
+ * single compositor-friendly property.
+ */
+@keyframes gleam-shimmer-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * The Gleam shimmer — the loading-state replacement for the flat grey
+ * `animate-pulse bg-line` treatment, kept here as a plain CSS class
+ * rather than a Tailwind utility for the same reason as
+ * `.gleam-beam-divider` above: this is a fixed 5-stop gradient sweep,
+ * not a themeable scale value. `--color-mist` (light: #f5f5f5, dark:
+ * #1c1c1c — see the `[data-theme="dark"]` block below) is reused as the
+ * near-white/near-dark base rather than introducing a new token, since
+ * it already names exactly this "quiet neutral surface" role. Color
+ * only ever appears in the moving highlight band via `color-mix`
+ * against that base — the base itself must never read as flat beam-sky
+ * or beam-purple.
+ *
+ * `prefers-reduced-motion` is handled directly inside this class,
+ * instead of relying on a consumer's `motion-reduce:` Tailwind variant
+ * to override `animation` on a plain (non-utility) class — Tailwind's
+ * variant system generates utilities that target Tailwind-authored
+ * classes, not arbitrary custom CSS, so composing `motion-reduce:
+ * animate-none` alongside `.gleam-shimmer` cannot reliably win the
+ * cascade. Reduced motion gets a static near-white fill instead, never
+ * a frozen mid-gradient frame.
+ */
+.gleam-shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--color-mist) 30%,
+    color-mix(in srgb, var(--color-beam-sky) 16%, white) 40%,
+    color-mix(in srgb, var(--color-beam-purple) 16%, white) 47%,
+    color-mix(in srgb, var(--color-beam-sky) 12%, white) 54%,
+    var(--color-mist) 65%
+  );
+  background-size: 200% 100%;
+  animation: gleam-shimmer-sweep 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-shimmer {
+    animation: none;
+    background: var(--color-mist);
+  }
+}
+
+/*
+ * Dark-mode shimmer — redeclares `.gleam-shimmer`'s background under the
+ * same `[data-theme="dark"]` attribute mechanic used for every other
+ * dark override in this file (see the block above for why this is a
+ * plain override, not a nested `@theme`). The light gradient's `white`
+ * mix targets are swapped for a dark-appropriate near-black tone
+ * (`#2a2a2a`, matching `--color-line`'s dark value) so the sky/purple
+ * tints read as a subtle lightening of the dark canvas rather than the
+ * light gradient's pale highlight pasted unchanged onto a dark surface.
+ */
+[data-theme="dark"] .gleam-shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--color-mist) 30%,
+    color-mix(in srgb, var(--color-beam-sky) 16%, #2a2a2a) 40%,
+    color-mix(in srgb, var(--color-beam-purple) 16%, #2a2a2a) 47%,
+    color-mix(in srgb, var(--color-beam-sky) 12%, #2a2a2a) 54%,
+    var(--color-mist) 65%
+  );
+}
+
+/*
+ * Not re-declared here: the reduced-motion override above already falls
+ * back to `background: var(--color-mist)`, which resolves to this
+ * theme's own dark value (#1c1c1c) automatically since it's the same
+ * custom property, not a hardcoded light-mode literal.
+ */
