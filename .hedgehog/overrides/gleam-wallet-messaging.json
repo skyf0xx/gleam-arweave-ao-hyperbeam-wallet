@@ -1,0 +1,7 @@
+{
+  "task": "GLEAM-WALLET-MESSAGING",
+  "scope_add": [
+    "packages/core/src/index.ts"
+  ],
+  "reason": "scaffold's package.json declares main/types as ./src/index.ts but no layer's original core.yaml scope covered creating that barrel file; messaging is the first layer needing @gleam/core to resolve as a package import, so this one-line re-export barrel belongs here. core.yaml corrected for future compiles; this override covers the already-building task."
+}

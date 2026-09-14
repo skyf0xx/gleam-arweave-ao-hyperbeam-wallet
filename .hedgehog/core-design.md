@@ -157,6 +157,20 @@ architecture doc with a phased build order, not just a one-paragraph
 description), so the input is thinner only in the sense that this
 session didn't independently re-derive it.
 
+## Correction Protocol log
+
+- **`packages/core/src/index.ts` added to `messaging`'s scope** (was
+  missing from every layer's scope entirely). `scaffold`'s
+  `packages/core/package.json` declares `main`/`types` as
+  `./src/index.ts`, but no layer's original scope glob covered creating
+  that file — a gap discovered when `messaging`'s build (the first real
+  consumer of `@gleam/core` as a package import) found `@gleam/core`
+  failed to resolve (`TS2307`) with no barrel file present. Assigned to
+  `messaging` since it's the earliest layer that needs the import to
+  resolve, and the file is a trivial one-line re-export barrel with no
+  behavior of its own — not a layer-boundary or sequencing problem, a
+  missing path in one glob.
+
 ## Left unresolved
 
 - **HyperBEAM balance path** (`04-prd.md`'s AO token balances Feature):
