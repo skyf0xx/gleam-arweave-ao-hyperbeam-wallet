@@ -140,13 +140,24 @@ export function MainScreenView({
    */
   useEffect(() => {
     let cancelled = false;
+    const applyDocumentTheme = (value: ThemePreference) => {
+      if (value === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
+    };
     runtime
       .send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined })
       .then((settings) => {
-        if (!cancelled) setTheme(settings.theme);
+        if (cancelled) return;
+        setTheme(settings.theme);
+        applyDocumentTheme(settings.theme);
       })
       .catch(() => {
-        if (!cancelled) setTheme("light");
+        if (cancelled) return;
+        setTheme("light");
+        applyDocumentTheme("light");
       });
     return () => {
       cancelled = true;

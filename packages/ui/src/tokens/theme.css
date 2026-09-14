@@ -104,6 +104,16 @@
  * avoid a flash) is a later layer's concern — this file only owns the
  * selector the attribute drives once present.
  *
+ * Plain custom-property overrides, NOT a second `@theme` block: `@theme`
+ * is a build-time token registry, not a runtime-scoped rule — Tailwind
+ * merges every `@theme` block into one flat `:root` regardless of the
+ * selector it's nested under, so a `[data-theme="dark"] { @theme {...} }`
+ * block silently overwrites the light block's same-named tokens
+ * unconditionally instead of scoping them to the attribute. Redeclaring
+ * the custom properties directly here, under the plain attribute
+ * selector, is what actually makes them apply only when `data-theme`
+ * is present.
+ *
  * Only the foundation neutrals invert — the five beam colors and the
  * warning-red carry over unchanged (same hex) per guidelines.md's
  * explicit rule, with the one stated exception: beam-purple is
@@ -112,19 +122,17 @@
  * this file for any component choosing text color from the beam set.
  */
 [data-theme="dark"] {
-  @theme {
-    --color-canvas: #111111;
-    --color-background: #111111;
-    --color-surface: #1c1c1c;
-    --color-mist: #1c1c1c;
-    --color-line: #2a2a2a;
-    --color-foreground: #ffffff;
-    --color-muted: #a3a3a3;
-    --color-faint: #737373;
+  --color-canvas: #111111;
+  --color-background: #111111;
+  --color-surface: #1c1c1c;
+  --color-mist: #1c1c1c;
+  --color-line: #2a2a2a;
+  --color-foreground: #ffffff;
+  --color-muted: #a3a3a3;
+  --color-faint: #737373;
 
-    --color-warning-surface: #2a1414;
-    --color-warning-border: #4a1f1f;
-  }
+  --color-warning-surface: #2a1414;
+  --color-warning-border: #4a1f1f;
 }
 
 /*

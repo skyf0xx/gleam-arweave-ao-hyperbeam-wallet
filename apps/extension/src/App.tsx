@@ -115,14 +115,33 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
    * throw.
    */
   const applyTheme = async (runtime: RuntimePort) => {
+    // `MainScreenView`'s theme toggle sets `data-theme="dark"` directly on
+    // `document.documentElement` (see that file's doc comment) so the
+    // running surface reflects a change immediately with no storage-change
+    // listener. That write outlives the component that made it — a
+    // sidepanel/approval document that stays alive across view transitions
+    // keeps whatever `documentElement` attribute the last toggle left, and
+    // `[data-theme="dark"]` matches any ancestor, so a stale attribute here
+    // would force dark styling on every view, including this shell's own
+    // onboarding/unlock screens, regardless of the actual stored
+    // preference. Resetting it here, from the same read this component
+    // already uses to drive its own root `data-theme`, keeps the two in
+    // sync instead of trusting whatever the document happened to be left
+    // at.
     try {
       const settings = await runtime.send<void, ThemeSettings>({
         type: "getThemePreference",
         payload: undefined,
       });
       setTheme(settings.theme);
+      if (settings.theme === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
     } catch {
       setTheme("light");
+      document.documentElement.removeAttribute("data-theme");
     }
   };
 
