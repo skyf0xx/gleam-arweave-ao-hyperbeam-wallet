@@ -38,7 +38,7 @@ describe("ConnectedAppsView (6.3 connected-apps)", () => {
     const send = vi.fn(() => new Promise<Grant[]>(() => {}));
     const { container } = render(<ConnectedAppsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
-    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".gleam-shimmer").length).toBeGreaterThan(0);
   });
 
   it("shows the empty state copy from connected-apps.html when no Grants exist", async () => {
