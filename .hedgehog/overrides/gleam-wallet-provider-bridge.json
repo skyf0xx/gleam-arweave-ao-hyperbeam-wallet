@@ -1,0 +1,12 @@
+{
+  "task": "GLEAM-WALLET-PROVIDER-BRIDGE",
+  "scope_add": [
+    "apps/extension/entrypoints/background.ts",
+    "apps/extension/entrypoints/background.provider.test.ts",
+    "packages/messaging/src/protocol.ts",
+    "packages/core/src/models/grant.ts",
+    "packages/core/src/models/transfer.ts",
+    "packages/core/src/models/upload.ts"
+  ],
+  "reason": "grant background dispatcher + protocol/model shape debt closure, confirmed with user, matching core.yaml update in commit fe23132"
+}
