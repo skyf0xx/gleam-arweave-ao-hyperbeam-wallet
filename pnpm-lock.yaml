@@ -53,6 +53,9 @@ importers:
       '@gleam/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@webext-core/messaging':
+        specifier: ^1.4.0
+        version: 1.4.0
       react:
         specifier: ^19.2.4
         version: 19.3.0
