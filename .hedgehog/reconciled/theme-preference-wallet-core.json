@@ -1,0 +1,9 @@
+{
+  "task": "THEME-PREFERENCE-WALLET-CORE",
+  "reason": "Inherited debt (no pre-paint theme read) is resolved: App.tsx's applyTheme() (lines 96,104-127,147) awaits getThemePreference alongside refresh() in the same init() Promise.all gate before first substantive render, falling back to light on any failure (incl. PROVIDER-BRIDGE not yet wired), with a doc comment explaining the tradeoff vs a flash-accepting default. MainScreenView.tsx (gear menu) implements the Light/Dark toggle per RELEVANT RULES: reads theme on mount (own fallback-to-light), optimistic data-theme set with rollback on setThemePreference failure, dedicated test file MainScreenView.main-screen.test.tsx covers default-light-on-fresh-install, toggle persistence, and rollback-on-failure. Verification passes clean: pnpm vitest run arweave ao pricing activity send receive = 65/65 tests pass (9 files); pnpm tsc -p packages/core --noEmit = clean; pnpm wxt build = succeeds.",
+  "confirmed_at": "2026-09-14T16:05:22.936Z",
+  "evidence": {
+    "commits": [],
+    "paths": []
+  }
+}
