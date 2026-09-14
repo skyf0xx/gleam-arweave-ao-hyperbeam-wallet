@@ -1,0 +1,42 @@
+id: gleam-wallet
+pattern: hexagonal
+layers:
+  - id: scaffold
+    scope: ["packages/core/package.json", "packages/core/tsconfig.json", "packages/messaging/package.json", "packages/messaging/tsconfig.json", "packages/ui/src/tokens/**", "packages/ui/src/primitives/**", "packages/ui/package.json", "apps/extension/wxt.config.ts", "apps/extension/tsconfig.json", "apps/extension/package.json", "package.json", "pnpm-workspace.yaml", ".eslintrc.cjs", "apps/extension/entrypoints/popup/index.tsx", "apps/extension/entrypoints/sidepanel/index.tsx", "apps/extension/src/App.tsx"]
+    verify: "pnpm install --frozen-lockfile && pnpm eslint packages apps --max-warnings=0 && pnpm wxt build && pnpm vitest run scaffold ui"
+    commit: "feat(gleam): scaffold"
+    requires: ["pnpm"]
+  - id: messaging
+    depends_on: scaffold
+    scope: ["packages/messaging/src/**", "packages/core/src/models/**", "packages/core/src/ports/windows.ts", "packages/core/src/ports/runtime.ts"]
+    verify: "pnpm vitest run messaging models && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit"
+    verify_radius: ["packages/messaging/**", "packages/core/**"]
+    commit: "feat(gleam): messaging"
+  - id: vault
+    depends_on: messaging
+    scope: ["packages/core/src/vault/**", "packages/core/src/keys/**", "packages/core/src/ports/storage.ts"]
+    verify: "pnpm vitest run vault keys && pnpm tsc -p packages/core --noEmit"
+    commit: "feat(gleam): vault"
+  - id: onboarding-unlock
+    depends_on: vault
+    scope: ["apps/extension/entrypoints/popup/onboarding/**", "apps/extension/entrypoints/popup/unlock/**", "apps/extension/src/handlers/wallet-lifecycle.ts", "apps/extension/src/adapters/storage.ts", "apps/extension/src/adapters/runtime.ts", "packages/ui/src/components/onboarding/**"]
+    verify: "pnpm vitest run onboarding unlock && pnpm wxt build"
+    verify_radius: ["apps/extension/**", "packages/ui/src/components/onboarding/**"]
+    commit: "feat(gleam): onboarding and unlock"
+  - id: wallet-core
+    depends_on: onboarding-unlock
+    scope: ["packages/core/src/arweave/**", "packages/core/src/ao/**", "packages/core/src/pricing/**", "packages/core/src/activity/**", "apps/extension/entrypoints/popup/main-screen/**", "apps/extension/entrypoints/popup/send/**", "apps/extension/entrypoints/popup/receive/**", "apps/extension/entrypoints/popup/activity/**", "apps/extension/src/handlers/reads.ts", "apps/extension/src/handlers/transfer.ts", "packages/ui/src/components/wallet/**"]
+    verify: "pnpm vitest run arweave ao pricing activity send receive && pnpm tsc -p packages/core --noEmit"
+    verify_radius: ["packages/core/**", "apps/extension/**", "packages/ui/src/components/wallet/**"]
+    commit: "feat(gleam): wallet core (balances, send, receive, activity)"
+  - id: upload
+    depends_on: wallet-core
+    scope: ["packages/core/src/policy/**", "apps/extension/entrypoints/popup/upload/**", "apps/extension/src/handlers/upload.ts"]
+    verify: "pnpm vitest run policy upload"
+    commit: "feat(gleam): upload"
+  - id: provider-bridge
+    depends_on: upload
+    scope: ["apps/extension/entrypoints/content.ts", "apps/extension/entrypoints/provider.ts", "apps/extension/entrypoints/approval/**", "apps/extension/src/handlers/approval.ts", "apps/extension/src/adapters/windows.ts", "apps/extension/entrypoints/popup/connected-apps/**"]
+    verify: "pnpm vitest run provider bridge approval connected-apps && pnpm wxt build"
+    verify_radius: ["apps/extension/**"]
+    commit: "feat(gleam): injected provider, connection approval, signing approval"
