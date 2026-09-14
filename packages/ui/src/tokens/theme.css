@@ -161,6 +161,22 @@ body:has([data-layout="popup"]) {
 }
 
 /*
+ * Tailwind Preflight resets `button { cursor: default }` (matching the
+ * plain browser default), which left every button-based control in the
+ * extension showing no pointer cursor on hover — the only elements that
+ * got one were the handful of divs that manually added `cursor-pointer`
+ * (card.tsx, TokenRow.tsx, ActivityRow.tsx). Restoring the pointer here,
+ * once, for every actually-clickable element covers those plus every
+ * button/link/select site-wide without hunting down each call site.
+ */
+button:not(:disabled),
+a,
+select,
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/*
  * The Gleam beam divider — the brand's signature identity element
  * (shared.css's `.beam-divider`), kept here as a plain CSS class rather
  * than a Tailwind utility since it's a fixed five-stop gradient, not a
