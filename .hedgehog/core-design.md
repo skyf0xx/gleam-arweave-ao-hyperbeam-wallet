@@ -264,6 +264,28 @@ session didn't independently re-derive it.
   it again layer by layer. Each new test-file path was checked against
   its layer's `verify` command's filter tokens for a match before adding.
 
+- **`provider-bridge`'s scope widened to reopen `packages/messaging/src/
+  protocol.ts` and three model files (`grant.ts`, `transfer.ts`,
+  `upload.ts`), plus a new `apps/extension/entrypoints/background.ts`.**
+  Confirmed with the user directly. Two accumulated debts needed
+  resolving for the extension to be genuinely runnable end-to-end: (1)
+  `TransferDraft`/`UploadDraft` carry no password/walletId field, so
+  `wallet-core` and `upload` each locally widened their own handler
+  request types as a workaround (debt declared on both tasks) — the real
+  fix is adding those fields to the models/`ProtocolMap` themselves,
+  which only this layer's dispatcher work makes a natural place to do;
+  (2) no background entrypoint exists anywhere that actually registers
+  `WalletLifecycleHandler`/`ReadsHandler`/`TransferHandler`/
+  `UploadHandler` against real `onMessage` listeners — `provider-bridge`
+  is the layer that needs a working dispatcher anyway (to enforce the
+  `PROVIDER_METHODS`/`APPROVAL_METHODS`/`KEY_METHODS` privilege-tier
+  boundary at a single choke point, per messaging's own rule), so it's
+  the natural owner of `background.ts`. `grant.ts` was added so
+  `getConnectedApps()`'s stub (wallet-core's debt) can be replaced with
+  real Grant storage once this layer builds the connection-approval
+  flow that creates Grants. Verify command and radius extended to
+  typecheck `packages/messaging`/`packages/core` accordingly.
+
 ## Left unresolved
 
 - **HyperBEAM balance path** (`04-prd.md`'s AO token balances Feature):
