@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ScreenHeader, StepDots, AddressReveal } from "@gleam/ui/src/components/onboarding/index.ts";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { StepDots, AddressReveal } from "@gleam/ui/src/components/onboarding/index.ts";
 
 /**
  * 1.3 Create wallet — key generated / backup prompt (onboarding.html).
@@ -30,15 +31,15 @@ export function Backup({ onBack, keyfileContents, onDownload, onCopy, onContinue
         {!revealed ? (
           <>
             <div className="flex justify-center pb-1 pt-2">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5f5f5] text-[#111111]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mist text-foreground">
                 <BackupGlyph />
               </div>
             </div>
             <div className="flex flex-col items-center gap-1.5 text-center">
-              <h1 className="text-lg font-semibold tracking-tight text-[#111111]">
+              <h1 className="text-h3 font-semibold tracking-tight text-foreground">
                 Your wallet is ready
               </h1>
-              <p className="text-[13px] leading-relaxed text-[#737373]">
+              <p className="text-body leading-relaxed text-muted">
                 No seed phrase to write down &mdash; back up your keyfile instead, whenever you
                 want.
               </p>
@@ -46,8 +47,8 @@ export function Backup({ onBack, keyfileContents, onDownload, onCopy, onContinue
           </>
         ) : (
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-lg font-semibold tracking-tight text-[#111111]">Your keyfile</h1>
-            <p className="text-[13px] leading-relaxed text-[#737373]">
+            <h1 className="text-h3 font-semibold tracking-tight text-foreground">Your keyfile</h1>
+            <p className="text-body leading-relaxed text-muted">
               Store this somewhere safe. Anyone with this file and your password can access your
               wallet.
             </p>

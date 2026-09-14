@@ -1,21 +1,133 @@
 @import "tailwindcss";
 
 /*
- * Gleam design tokens.
- *
- * Tailwind 4 native `@theme` block — no config file, no runtime style
- * injection (MV3-CSP-safe). Values are placeholders wired at the
- * scaffold layer; the real palette/typography scale sourced from the
- * sibling ao-wallet repo's brand reference is filled in by the layer
- * that first needs it, not here.
+ * Gleam design tokens — sourced from the sibling ao-wallet repo's
+ * brand/identity.md, brand/guidelines.md and screens/shared.css (the
+ * mockups' own token sheet). Defined once here as Tailwind 4's native
+ * `@theme` block (no config file, no runtime style injection —
+ * MV3-CSP-safe) plus a handful of custom properties Tailwind's `@theme`
+ * can't express directly (the five discrete beam-segment colors as a
+ * single referenceable group, dark-mode overrides). Every screen layer
+ * consumes these via Tailwind utilities/arbitrary values referencing the
+ * theme tokens below, or `packages/ui/src/primitives/**` components —
+ * never a hardcoded hex literal repeating a value already named here.
  */
 @theme {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
+  /* ---- Foundation (light) ---- */
+  --color-canvas: #f5f5f5;
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-mist: #f5f5f5;
+  --color-line: #e5e5e5;
+  --color-foreground: #111111;
+  --color-muted: #737373;
+  --color-faint: #a3a3a3;
 
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  /*
+   * The single warning-red accent, per guidelines.md Part 3: reserved
+   * for the Irreversible/high-exposure risk tier only — never a status
+   * default, never decorative. Named distinctly from the beam-red
+   * segment below so a consumer can never reach for "the beam color
+   * that happens to be red" when they mean this semantic warning token,
+   * or vice versa — they are the same hex by brand accident, not by
+   * shared meaning.
+   */
+  --color-warning: #ff1717;
+  --color-warning-surface: #fff5f5;
+  --color-warning-border: #ffd6d6;
 
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  /* ---- Gleam beam — identity only, never a warning/status signal ---- */
+  --color-beam-red: #ff1717;
+  --color-beam-purple: #8b12ff;
+  --color-beam-sky: #73c9e8;
+  --color-beam-yellow: #ffe45c;
+  --color-beam-green: #28f02d;
+
+  /* Positive/confirmed-amount accent (tokens-activity.html's `.amount.positive`) — distinct from both warning and beam, a plain semantic green with no identity meaning. */
+  --color-positive: #16a34a;
+
+  /* ---- Typography ---- */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale — brand/guidelines.md Part 2 hierarchy table, collapsed to the sizes the 440px popup frame actually uses (Display/H1 are marketing-only, not part of this extension's UI). */
+  --text-caption: 0.6875rem; /* 11px */
+  --text-caption--line-height: 1.4;
+  --text-label: 0.75rem; /* 12px */
+  --text-label--line-height: 1.4;
+  --text-body: 0.875rem; /* 14px */
+  --text-body--line-height: 1.5;
+  --text-h3: 1.125rem; /* 18px */
+  --text-h3--line-height: 1.3;
+  --text-h2: 1.5rem; /* 24px */
+  --text-h2--line-height: 1.25;
+
+  /* ---- Spacing scale — the values repeated across shared.css/screens (padding, gaps) ---- */
+  --spacing-3xs: 0.125rem; /* 2px */
+  --spacing-2xs: 0.25rem; /* 4px */
+  --spacing-xs: 0.375rem; /* 6px */
+  --spacing-sm: 0.625rem; /* 10px */
+  --spacing-md: 0.875rem; /* 14px */
+  --spacing-lg: 1.25rem; /* 20px */
+  --spacing-xl: 1.75rem; /* 28px */
+  --spacing-2xl: 2.5rem; /* 40px */
+
+  /* ---- Radii — shared.css's .frame/.primary-btn/.dropzone/.list-card values ---- */
+  --radius-xs: 0.4375rem; /* 7px, icon-btn/eye-toggle scale */
+  --radius-sm: 0.5rem; /* 8px, frame */
+  --radius-md: 0.5625rem; /* 9px, inputs/icon-btn */
+  --radius-lg: 0.625rem; /* 10px, primary button */
+  --radius-xl: 0.75rem; /* 12px, dropzone/cards */
+}
+
+/*
+ * Dark mode — brand/guidelines.md Part 2 "Dark Mode" table. The
+ * extension popup inherits the OS/browser theme (identity.md §03), so
+ * this is a default state, not an enhancement layered on later. Applied
+ * via `prefers-color-scheme` since there is no in-app theme toggle in
+ * this project's scope; a later layer introducing one would replace this
+ * media query with a class-based strategy without changing any token
+ * name consumers reference.
+ *
+ * Only the foundation neutrals invert — the five beam colors and the
+ * warning-red carry over unchanged (same hex) per guidelines.md's
+ * explicit rule, with the one stated exception: beam-purple is
+ * non-text-safe on the dark canvas (3.3:1 against #111111), so it is
+ * not redefined here (redefining its hex would be wrong) but flagged in
+ * this file for any component choosing text color from the beam set.
+ */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-canvas: #111111;
+    --color-background: #111111;
+    --color-surface: #1c1c1c;
+    --color-mist: #1c1c1c;
+    --color-line: #2a2a2a;
+    --color-foreground: #ffffff;
+    --color-muted: #a3a3a3;
+    --color-faint: #737373;
+
+    --color-warning-surface: #2a1414;
+    --color-warning-border: #4a1f1f;
+  }
+}
+
+/*
+ * The Gleam beam divider — the brand's signature identity element
+ * (shared.css's `.beam-divider`), kept here as a plain CSS class rather
+ * than a Tailwind utility since it's a fixed five-stop gradient, not a
+ * themeable scale value. Exposed for `primitives/beam.tsx` to apply;
+ * never to be reached for directly by screen code as a bespoke gradient.
+ */
+.gleam-beam-divider {
+  height: 3px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    to right,
+    var(--color-beam-red) 0% 20%,
+    var(--color-beam-purple) 20% 40%,
+    var(--color-beam-sky) 40% 60%,
+    var(--color-beam-yellow) 60% 80%,
+    var(--color-beam-green) 80% 100%
+  );
 }

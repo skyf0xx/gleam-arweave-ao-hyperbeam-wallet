@@ -34,14 +34,14 @@ export function AddressReveal({
   return (
     <div className={cn("flex flex-col gap-5", className)}>
       {!revealed ? (
-        <div className="overflow-hidden rounded-[10px] border border-[#e5e5e5]">
-          <div className="flex items-center gap-2.5 border-b border-[#e5e5e5] p-3">
-            <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg bg-[#111111] text-white">
+        <div className="overflow-hidden rounded-lg border border-line">
+          <div className="flex items-center gap-2.5 border-b border-line p-3">
+            <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
               <FileIcon />
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <div className="text-[13px] font-semibold text-[#111111]">Wallet keyfile</div>
-              <div className="text-[11px] text-[#737373]">
+              <div className="text-label font-semibold text-foreground">Wallet keyfile</div>
+              <div className="text-caption text-muted">
                 JSON &middot; encrypted with your password
               </div>
             </div>
@@ -49,17 +49,17 @@ export function AddressReveal({
               type="button"
               aria-label="Download keyfile"
               onClick={onDownload}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[9px] text-[#737373] hover:bg-[#f5f5f5] hover:text-[#111111]"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
             >
               <DownloadIcon />
             </button>
           </div>
           <div className="flex items-center justify-between gap-2.5 p-3">
-            <span className="text-xs font-medium text-[#111111]">Show keyfile contents</span>
+            <span className="text-label font-medium text-foreground">Show keyfile contents</span>
             <button
               type="button"
               onClick={onReveal}
-              className="p-1 text-xs font-medium text-[#737373] hover:text-[#111111] hover:underline"
+              className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
             >
               Reveal
             </button>
@@ -68,19 +68,19 @@ export function AddressReveal({
       ) : (
         <>
           <div
-            className="max-h-24 overflow-hidden rounded-[9px] border border-[#e5e5e5] bg-[#f5f5f5] p-3 font-mono text-[11px] leading-relaxed text-[#737373]"
+            className="max-h-24 overflow-hidden rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-muted"
             style={{ wordBreak: "break-all" }}
           >
             {keyfileContents}
           </div>
           <div className="flex items-center justify-between gap-2.5">
-            <span className="text-xs font-medium text-[#737373]">
+            <span className="text-label font-medium text-muted">
               Full contents copied on download
             </span>
             <button
               type="button"
               onClick={onCopy}
-              className="p-1 text-xs font-medium text-[#737373] hover:text-[#111111] hover:underline"
+              className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
             >
               Copy
             </button>
@@ -88,7 +88,7 @@ export function AddressReveal({
         </>
       )}
 
-      <Button type="button" onClick={onContinue} className="w-full">
+      <Button type="button" onClick={onContinue}>
         Continue to wallet
       </Button>
       {!revealed ? (
@@ -96,7 +96,7 @@ export function AddressReveal({
           <button
             type="button"
             onClick={onSkip}
-            className="p-1 text-xs font-medium text-[#737373] hover:text-[#111111] hover:underline"
+            className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
           >
             I&apos;ll back this up later
           </button>

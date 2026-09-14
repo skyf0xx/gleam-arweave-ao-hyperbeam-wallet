@@ -21,8 +21,8 @@ export function PasswordStrengthMeter({ filled, className }: PasswordStrengthMet
         <span
           key={index}
           className={cn(
-            "h-[3px] flex-1 rounded-sm bg-[#e5e5e5]",
-            index < clamped && "bg-[#111111]",
+            "h-[3px] flex-1 rounded-sm bg-line",
+            index < clamped && "bg-foreground",
           )}
         />
       ))}

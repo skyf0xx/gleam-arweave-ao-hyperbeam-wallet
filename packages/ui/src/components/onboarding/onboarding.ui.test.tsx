@@ -6,13 +6,17 @@ import {
   PasswordField,
   PasswordStrengthMeter,
   AddressReveal,
-  KeyfileDropzone,
 } from "./index";
 
 /**
  * Presentational components — lighter tests (render + basic interaction)
  * per the onboarding-unlock packet: the real logic under test lives in
  * `apps/extension/src/handlers/wallet-lifecycle.ts`.
+ *
+ * `KeyfileDropzone`/`ScreenHeader` were retired from this directory by
+ * the design-system-pass onboarding-unlock layer (migrated onto the
+ * shared `packages/ui/src/primitives/{FileDropzone,ScreenHeader}`, which
+ * carry their own primitive-level tests) — no longer tested here.
  *
  * This workspace's `vitest.config.ts` has no global `afterEach(cleanup)`
  * (out of this layer's scope to add), so tests that render more than once
@@ -28,6 +32,11 @@ describe("ui/onboarding: BeamMark", () => {
     render(<BeamMark tagline="Crypto, without the clutter." />);
     expect(screen.getByText("gleam")).toBeTruthy();
     expect(screen.getByText("Crypto, without the clutter.")).toBeTruthy();
+  });
+
+  it("renders the shared Beam primitive as the identity mark, not a bespoke gradient", () => {
+    const { container } = render(<BeamMark tagline="Simple. Fast. Easy." />);
+    expect(container.querySelector(".gleam-beam-divider")).toBeTruthy();
   });
 });
 
@@ -47,9 +56,22 @@ describe("ui/onboarding: PasswordField", () => {
     expect(input.type).toBe("text");
   });
 
-  it("renders an inline error message, not a summary block", () => {
+  it("renders an inline error message, not a summary block, via the shared TextField", () => {
     render(<PasswordField label="Password" errorMessage="That password is too common." />);
     expect(screen.getByRole("alert").textContent).toContain("too common");
+  });
+
+  it("renders without a label (unlock screen usage has no visible label text requirement beyond placeholder)", () => {
+    render(<PasswordField placeholder="Enter your password" />);
+    expect(screen.getByPlaceholderText("Enter your password")).toBeTruthy();
+    expect(screen.queryByText("Password")).toBeNull();
+  });
+
+  it("shows the caps-lock hint only when capsLockOn is true", () => {
+    const { rerender } = render(<PasswordField label="Password" capsLockOn={false} />);
+    expect(screen.queryByText("Caps Lock is on")).toBeNull();
+    rerender(<PasswordField label="Password" capsLockOn={true} />);
+    expect(screen.getByText("Caps Lock is on")).toBeTruthy();
   });
 });
 
@@ -92,34 +114,5 @@ describe("ui/onboarding: AddressReveal", () => {
       />,
     );
     expect(screen.getByText('{"kty":"RSA"}')).toBeTruthy();
-  });
-});
-
-describe("ui/onboarding: KeyfileDropzone", () => {
-  it("calls onPasteChange when the textarea changes", () => {
-    const onPasteChange = vi.fn();
-    render(
-      <KeyfileDropzone
-        pasteValue=""
-        onPasteChange={onPasteChange}
-        onFileRead={vi.fn()}
-      />,
-    );
-    fireEvent.change(screen.getByPlaceholderText(/kty/), {
-      target: { value: '{"kty":"RSA"}' },
-    });
-    expect(onPasteChange).toHaveBeenCalledWith('{"kty":"RSA"}');
-  });
-
-  it("renders the error message when provided", () => {
-    render(
-      <KeyfileDropzone
-        pasteValue=""
-        onPasteChange={vi.fn()}
-        onFileRead={vi.fn()}
-        errorMessage="That file isn't a valid Arweave keyfile."
-      />,
-    );
-    expect(screen.getByRole("alert").textContent).toContain("isn't a valid Arweave keyfile");
   });
 });

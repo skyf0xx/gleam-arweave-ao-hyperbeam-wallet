@@ -12,11 +12,18 @@ export interface TokenGlyphProps {
   className?: string;
 }
 
+/**
+ * Tones 2-4 are a neutral gradient distinct from the foundation `muted`/
+ * `faint` tokens (which are reserved for text) — kept as literals since
+ * `tokens/theme.css` defines no separate glyph-tone scale, per the same
+ * "no mismatched token" judgment call the `BeamMark` wordmark size debt
+ * note (`DESIGN-SYSTEM-PASS-ONBOARDING-UNLOCK`) already made.
+ */
 const TONE_CLASSES: Record<1 | 2 | 3 | 4, string> = {
-  1: "bg-[#111111] text-white",
+  1: "bg-foreground text-background",
   2: "bg-[#52525b] text-white",
   3: "bg-[#8a8a8f] text-white",
-  4: "bg-[#d4d4d8] text-[#111111]",
+  4: "bg-[#d4d4d8] text-foreground",
 };
 
 export function TokenGlyph({ label, tone = 1, className }: TokenGlyphProps) {

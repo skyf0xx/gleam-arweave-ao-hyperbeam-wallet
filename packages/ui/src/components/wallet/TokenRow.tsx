@@ -8,6 +8,12 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * screen — no new visual language introduced just because it's a list
  * page"). Amount/usdValue are pre-formatted strings — this component
  * does no numeric formatting or unit conversion itself.
+ *
+ * Reuses the same row skeleton as `ListRow` (start/title-subtitle/end),
+ * but stays a standalone component rather than composing `ListRow`
+ * directly — `ListRow`'s title/subtitle stack puts the subtitle in
+ * monospace (built for addresses), while a token row's ticker subtitle
+ * and right-aligned two-line amount/usdValue don't fit that shape.
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone">;
@@ -26,19 +32,19 @@ export function TokenRow({ glyph, name, ticker, amount, usdValue, onClick, class
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2.5 border-b border-[#e5e5e5] py-2.5 text-left last:border-b-0",
-        onClick && "cursor-pointer hover:bg-[#f5f5f5]",
+        "flex w-full items-center gap-2.5 border-b border-line py-2.5 text-left last:border-b-0",
+        onClick && "cursor-pointer hover:bg-mist",
         className,
       )}
     >
       <TokenGlyph {...glyph} />
       <div className="flex min-w-0 flex-1 flex-col gap-px">
-        <div className="truncate text-[13px] font-semibold text-[#111111]">{name}</div>
-        <div className="text-[11px] text-[#737373]">{ticker}</div>
+        <div className="truncate text-label font-semibold text-foreground">{name}</div>
+        <div className="text-caption text-muted">{ticker}</div>
       </div>
       <div className="flex flex-shrink-0 flex-col items-end gap-px">
-        <div className="text-[13px] font-semibold tabular-nums text-[#111111]">{amount}</div>
-        {usdValue ? <div className="text-[11px] tabular-nums text-[#a3a3a3]">{usdValue}</div> : null}
+        <div className="text-label font-semibold tabular-nums text-foreground">{amount}</div>
+        {usdValue ? <div className="text-caption tabular-nums text-faint">{usdValue}</div> : null}
       </div>
     </Component>
   );

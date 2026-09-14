@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Grant, RuntimePort } from "@gleam/core";
-import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
+import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 /**
  * Ports `connected-apps.html` (6.3) exactly: per-origin grant list with
@@ -16,6 +17,12 @@ import { ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
  * complete and independently mountable, following the exact shape
  * `OnboardingView`/`SendView`/`UploadView` already established for this
  * same reason.
+ *
+ * This is the last remaining consumer of `ScreenHeader` from the
+ * `components/onboarding` barrel's backward-compat re-export — repointed
+ * here directly at the primitive, closing out that migration debt (see
+ * this task's final report for the barrel-file deletion itself, which is
+ * outside this task's ALLOWED SCOPE).
  */
 export interface ConnectedAppsViewProps {
   runtime: RuntimePort;
@@ -30,11 +37,12 @@ function hostnameOf(origin: string): string {
   }
 }
 
+function canSpendUnlimited(grant: Grant): boolean {
+  return grant.permissions.some((permission) => permission === "SIGN_TRANSACTION" || permission === "DISPATCH");
+}
+
 function scopeSummary(grant: Grant): string {
-  const canSpendUnlimited = grant.permissions.some(
-    (permission) => permission === "SIGN_TRANSACTION" || permission === "DISPATCH",
-  );
-  if (canSpendUnlimited) return "Sees your address, can spend with no limit";
+  if (canSpendUnlimited(grant)) return "Sees your address, can spend with no limit";
   if (grant.permissions.length > 1) return "Sees your address and more";
   return "Sees your address only";
 }
@@ -73,37 +81,41 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
       <ScreenHeader title="Connected apps" onBack={onBack} />
       <div className="flex flex-1 flex-col px-5 py-4">
         {error ? (
-          <div role="alert" className="mb-3 text-xs leading-snug text-[#ff1717]">
+          <div role="alert" className="mb-3 text-caption leading-snug text-warning">
             {error}
           </div>
         ) : null}
 
         {grants === null ? (
-          <div className="p-4 text-sm text-[#737373]">Loading…</div>
+          <div className="p-4 text-body text-muted">Loading…</div>
         ) : grants.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-12 text-center">
-            <div role="presentation" className="h-[3px] w-8 rounded-sm bg-[#e5e5e5]" />
-            <p className="max-w-[260px] text-[13px] text-[#737373]">
-              No apps connected yet. Grants you approve will show up here.
-            </p>
-          </div>
+          <EmptyState message="No apps connected yet. Grants you approve will show up here." />
         ) : (
           <div className="flex flex-col">
             {grants.map((grant) => (
-              <div key={grant.origin} className="flex items-start gap-3 border-b border-[#e5e5e5] py-3.5 last:border-b-0">
-                <div className="mt-px flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] border border-[#e5e5e5] bg-[#f5f5f5] text-xs font-bold text-[#737373]">
+              <div key={grant.origin} className="flex items-start gap-3 border-b border-line py-3.5 last:border-b-0">
+                <div className="mt-px flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-line bg-mist text-label font-bold text-muted">
                   {hostnameOf(grant.origin).charAt(0).toUpperCase()}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-[13px] font-semibold text-[#111111]">{hostnameOf(grant.origin)}</span>
-                  <span className="font-mono text-[11px] text-[#a3a3a3]">{hostnameOf(grant.origin)}</span>
-                  <span className="text-xs leading-snug text-[#737373]">{scopeSummary(grant)}</span>
-                  <span className="text-[11px] text-[#a3a3a3]">{expirySummary(grant)}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-label font-semibold text-foreground">
+                      {hostnameOf(grant.origin)}
+                    </span>
+                    {canSpendUnlimited(grant) ? (
+                      <span className="flex-shrink-0 rounded-md border border-warning-border bg-warning-surface px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-warning">
+                        NO LIMIT
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="font-mono text-caption text-faint">{hostnameOf(grant.origin)}</span>
+                  <span className="text-label leading-snug text-muted">{scopeSummary(grant)}</span>
+                  <span className="text-caption text-faint">{expirySummary(grant)}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleRevoke(grant.origin)}
-                  className="mt-px flex-shrink-0 rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#111111] hover:border-[#ff1717] hover:text-[#ff1717]"
+                  className="mt-px flex-shrink-0 rounded-md border border-line bg-background px-3 py-1.5 text-label font-semibold text-foreground hover:border-warning hover:text-warning"
                 >
                   Revoke
                 </button>

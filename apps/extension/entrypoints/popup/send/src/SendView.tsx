@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { FeeEstimate, RuntimePort, WalletSummary } from "@gleam/core";
-import { PasswordField, ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
@@ -174,34 +176,34 @@ function ComposeStep({
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Send" onBack={onBack} />
       <div className="flex flex-1 flex-col gap-6 px-5 py-5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-[#737373]">From</span>
-          <span className="font-semibold text-[#111111]">{wallet.name}</span>
+        <div className="flex items-center justify-between text-label">
+          <span className="font-semibold text-muted">From</span>
+          <span className="font-semibold text-foreground">{wallet.name}</span>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-[#737373]">To</span>
+          <span className="text-label font-semibold text-muted">To</span>
           <textarea
             rows={2}
             value={step.recipient}
             onChange={(event) => onChange({ recipient: event.target.value })}
             placeholder="Paste an address"
-            className="w-full resize-none rounded-[9px] border border-[#e5e5e5] bg-white px-3.5 py-3 font-mono text-[13px] leading-relaxed text-[#111111] focus:border-[#111111] focus:outline-none"
+            className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
           />
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-[#737373]">Amount</span>
-          <div className="flex items-center gap-2.5 rounded-[9px] border border-[#e5e5e5] bg-white p-3.5 focus-within:border-[#111111]">
+          <span className="text-label font-semibold text-muted">Amount</span>
+          <div className="flex items-center gap-2.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
             <input
               type="text"
               inputMode="decimal"
               placeholder="0.00"
               value={step.amountAr}
               onChange={(event) => onChange({ amountAr: event.target.value })}
-              className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-[#111111] focus:outline-none"
+              className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground focus:outline-none"
             />
-            <span className="flex-shrink-0 rounded-full border border-[#e5e5e5] bg-[#f5f5f5] px-2.5 py-1.5 text-[13px] font-bold text-[#111111]">
+            <span className="flex-shrink-0 rounded-full border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground">
               AR
             </span>
           </div>
@@ -216,18 +218,12 @@ function ComposeStep({
         />
 
         {step.error ? (
-          <div role="alert" className="flex items-start gap-1.5 text-xs leading-snug text-[#ff1717]">
+          <div role="alert" className="flex items-start gap-1.5 text-label leading-snug text-warning">
             <span>{step.error}</span>
           </div>
         ) : null}
 
-        <Button
-          type="button"
-          disabled={!canContinue}
-          aria-busy={step.submitting}
-          onClick={onContinue}
-          className="mt-auto w-full rounded-[10px] py-3"
-        >
+        <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
           {step.submitting ? "Checking…" : "Continue"}
         </Button>
       </div>
@@ -252,36 +248,18 @@ function ReviewStep({
       <ScreenHeader title="Review send" onBack={onBack} />
       <div className="flex flex-1 flex-col gap-6 px-5 py-5">
         <div className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-          <span className="text-[30px] font-semibold tracking-[-0.02em] tabular-nums text-[#111111]">
+          <span className="text-[30px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
             {formatWinstonAsAr(step.amountWinston)} AR
           </span>
         </div>
 
         {irreversible ? (
-          <div className="flex gap-2.5 rounded-[9px] border border-[#ffd6d6] bg-[#fff5f5] p-3.5">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-              className="mt-px flex-shrink-0 text-[#ff1717]"
-            >
-              <path
-                d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="text-xs leading-relaxed text-[#111111]">
-              <strong className="font-bold">You haven&apos;t sent to this address before.</strong> Double-check
-              it&apos;s correct — this can&apos;t be undone once signed.
-            </p>
-          </div>
+          <RiskNotice>
+            <strong className="font-bold">You haven&apos;t sent to this address before.</strong> Double-check
+            it&apos;s correct — this can&apos;t be undone once signed.
+          </RiskNotice>
         ) : (
-          <p className="text-xs leading-relaxed text-[#737373]">
+          <p className="text-label leading-relaxed text-muted">
             You&apos;re sending {formatWinstonAsAr(step.amountWinston)} AR to this address. This can&apos;t be
             undone.
           </p>
@@ -294,17 +272,18 @@ function ReviewStep({
         </div>
 
         {step.error ? (
-          <div role="alert" className="text-xs leading-snug text-[#ff1717]">
+          <div role="alert" className="text-label leading-snug text-warning">
             {step.error}
           </div>
         ) : null}
 
         <Button
           type="button"
+          variant={irreversible ? "destructive" : "primary"}
           disabled={step.submitting}
           aria-busy={step.submitting}
           onClick={onSign}
-          className={`mt-auto w-full rounded-[10px] py-3 ${irreversible ? "bg-[#ff1717] hover:bg-[#ff1717]" : ""}`}
+          className="mt-auto"
         >
           {step.submitting ? "Signing…" : "Sign and send"}
         </Button>
@@ -315,10 +294,10 @@ function ReviewStep({
 
 function ReviewRow({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e5] py-2.5 text-[13px] last:border-b-0 last:border-t last:pt-3">
-      <span className="text-[#737373]">{label}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 last:border-t last:pt-3">
+      <span className="text-muted">{label}</span>
       <span
-        className={`text-right tabular-nums text-[#111111] ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-[11px] font-medium" : ""}`}
+        className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-[11px] font-medium" : ""}`}
       >
         {value}
       </span>
@@ -329,20 +308,20 @@ function ReviewRow({ label, value, mono, strong }: { label: string; value: strin
 function SuccessStep({ step, onDone }: { step: Extract<Step, { kind: "success" }>; onDone: () => void }) {
   return (
     <div className="flex min-h-full flex-col items-center gap-4 px-6 pb-6 pt-12 text-center">
-      <div className="mb-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#f5f5f5] text-[#111111]">
+      <div className="mb-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-mist text-foreground">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
-      <h2 className="text-base text-[#111111]">Signed and sent.</h2>
-      <p className="-mt-2 text-[13px] text-[#737373]">
+      <h2 className="text-body text-foreground">Signed and sent.</h2>
+      <p className="-mt-2 text-label text-muted">
         {formatWinstonAsAr(step.amountWinston)} AR to {step.recipient}
       </p>
-      <div className="mt-2 flex w-full items-center gap-2 border-b border-[#e5e5e5] py-3 text-xs text-[#737373]">
-        <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#FFE45C]" />
+      <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted">
+        <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
         <span>Pending confirmation</span>
       </div>
-      <Button type="button" onClick={onDone} className="mt-auto w-full rounded-[10px] py-3">
+      <Button type="button" onClick={onDone} className="mt-auto">
         Done
       </Button>
     </div>

@@ -32,9 +32,9 @@ export interface ActivityRowProps {
 }
 
 const ICON_TONE_CLASSES: Record<ActivityRowType, string> = {
-  receive: "text-[#16a34a]",
-  send: "text-[#111111]",
-  upload: "text-[#737373]",
+  receive: "text-positive",
+  send: "text-foreground",
+  upload: "text-muted",
 };
 
 export function ActivityRow({
@@ -53,8 +53,8 @@ export function ActivityRow({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col gap-2 border-b border-[#e5e5e5] py-2.5 text-left last:border-b-0",
-        onClick && "cursor-pointer hover:bg-[#f5f5f5]",
+        "flex w-full flex-col gap-2 border-b border-line py-2.5 text-left last:border-b-0",
+        onClick && "cursor-pointer hover:bg-mist",
         className,
       )}
     >
@@ -62,18 +62,18 @@ export function ActivityRow({
         <div
           aria-hidden="true"
           className={cn(
-            "flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full border border-[#e5e5e5] bg-[#f5f5f5]",
+            "flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full border border-line bg-mist",
             ICON_TONE_CLASSES[activityType],
           )}
         >
           <ActivityIcon type={activityType} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-px">
-          <div className="truncate text-[13px] font-semibold text-[#111111]">{title}</div>
-          <div className="text-[11px] text-[#737373]">{subtitle}</div>
+          <div className="truncate text-label font-semibold text-foreground">{title}</div>
+          <div className="text-caption text-muted">{subtitle}</div>
         </div>
-        <div className="flex-shrink-0 text-[13px] font-semibold tabular-nums text-[#111111]">
-          <span className={amountTone === "positive" ? "text-[#16a34a]" : undefined}>
+        <div className="flex-shrink-0 text-label font-semibold tabular-nums text-foreground">
+          <span className={amountTone === "positive" ? "text-positive" : undefined}>
             {amountLabel}
           </span>
         </div>
@@ -82,19 +82,14 @@ export function ActivityRow({
         <div
           role="progressbar"
           aria-label="Pending confirmation"
-          className="relative h-[3px] overflow-hidden rounded-sm bg-[#e5e5e5]"
+          className="relative h-[3px] overflow-hidden rounded-sm bg-line"
         >
-          <div className="absolute inset-0 w-2/5 animate-[beam-sweep_1.4s_ease-in-out_infinite] rounded-sm motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-50" style={BEAM_SWEEP_STYLE} />
+          <div className="gleam-beam-divider absolute inset-0 w-2/5 animate-[beam-sweep_1.4s_ease-in-out_infinite] motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-50" />
         </div>
       ) : null}
     </Component>
   );
 }
-
-const BEAM_SWEEP_STYLE = {
-  background:
-    "linear-gradient(to right, #FF1717 0% 20%, #8B12FF 20% 40%, #73C9E8 40% 60%, #FFE45C 60% 80%, #28F02D 80% 100%)",
-};
 
 function ActivityIcon({ type }: { type: ActivityRowType }) {
   if (type === "receive") {

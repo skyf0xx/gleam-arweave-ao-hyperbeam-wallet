@@ -47,9 +47,9 @@ export function AddressDisplay({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex w-full items-center gap-2 rounded-[10px] border border-[#e5e5e5] bg-[#f5f5f5] py-3 pl-4 pr-3">
+      <div className="flex w-full items-center gap-2 rounded-lg border border-line bg-mist py-3 pl-4 pr-3">
         <span
-          className="min-w-0 flex-1 font-mono text-xs leading-relaxed text-[#111111]"
+          className="min-w-0 flex-1 font-mono text-label leading-relaxed text-foreground"
           style={{ wordBreak: "break-all" }}
         >
           {address}
@@ -59,10 +59,10 @@ export function AddressDisplay({
           onClick={handleCopy}
           aria-label={copied ? "Address copied" : "Copy address"}
           className={cn(
-            "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white",
+            "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-background",
             copied
-              ? "border-[#16a34a] text-[#16a34a]"
-              : "border-[#e5e5e5] text-[#737373] hover:border-[#a3a3a3] hover:text-[#111111]",
+              ? "border-positive text-positive"
+              : "border-line text-muted hover:border-faint hover:text-foreground",
           )}
         >
           {copied ? <CheckIcon /> : <CopyIcon />}
@@ -70,7 +70,7 @@ export function AddressDisplay({
       </div>
       <span
         aria-live="polite"
-        className="h-[14px] text-center text-[11px] font-semibold text-[#16a34a]"
+        className="h-[14px] text-center text-caption font-semibold text-positive"
       >
         {copied ? "Copied to clipboard" : ""}
       </span>

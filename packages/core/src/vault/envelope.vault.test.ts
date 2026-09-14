@@ -122,7 +122,7 @@ describe("envelope encrypt/decrypt round trip", () => {
         WALLET_ID,
         ADDRESS,
       ),
-    ).rejects.toThrow(/malformed/i);
+    ).rejects.toThrow(/corrupted/i);
   });
 
   it("rejects an envelope with an unsupported algorithm/KDF", async () => {
@@ -140,6 +140,6 @@ describe("envelope encrypt/decrypt round trip", () => {
         WALLET_ID,
         ADDRESS,
       ),
-    ).rejects.toThrow(/unsupported/i);
+    ).rejects.toThrow(/can't read/i);
   });
 });

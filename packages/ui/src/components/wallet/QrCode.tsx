@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { cn } from "../../primitives/cn";
 
 /**
  * KNOWN LIMITATION (reported per this task's packet, not silently
@@ -26,16 +27,10 @@ export interface QrCodeProps {
 export function QrCode({ value, size = 176, className }: QrCodeProps) {
   return (
     <div
-      className={className}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-        background: "#ffffff",
-        border: "1px solid #e5e5e5",
-        borderRadius: 14,
-      }}
+      className={cn(
+        "inline-flex items-center justify-center rounded-xl border border-line bg-background p-5",
+        className,
+      )}
     >
       <svg
         viewBox="0 0 33 33"
@@ -45,16 +40,16 @@ export function QrCode({ value, size = 176, className }: QrCodeProps) {
         role="img"
         aria-label={`QR code for wallet address ${value}`}
       >
-        <rect width="33" height="33" fill="#ffffff" />
-        <g fill="#111111">
+        <rect width="33" height="33" className="fill-background" />
+        <g className="fill-foreground">
           <rect x="0" y="0" width="7" height="7" />
-          <rect x="1" y="1" width="5" height="5" fill="#ffffff" />
+          <rect x="1" y="1" width="5" height="5" className="fill-background" />
           <rect x="2" y="2" width="3" height="3" />
           <rect x="26" y="0" width="7" height="7" />
-          <rect x="27" y="1" width="5" height="5" fill="#ffffff" />
+          <rect x="27" y="1" width="5" height="5" className="fill-background" />
           <rect x="28" y="2" width="3" height="3" />
           <rect x="0" y="26" width="7" height="7" />
-          <rect x="1" y="27" width="5" height="5" fill="#ffffff" />
+          <rect x="1" y="27" width="5" height="5" className="fill-background" />
           <rect x="2" y="28" width="3" height="3" />
           {generatePseudoRandomModules(value)}
         </g>

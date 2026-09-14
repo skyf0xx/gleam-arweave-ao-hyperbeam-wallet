@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from "react";
 import type { RuntimePort, UploadReview, UploadTag, WalletSummary } from "@gleam/core";
-import { PasswordField, ScreenHeader } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
+import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 const TAG_BYTES_LIMIT = 4096;
 const GATEWAY_VIEW_URL = "https://arweave.net";
@@ -10,11 +13,20 @@ const VIEWBLOCK_URL = "https://viewblock.io/arweave/tx";
 /**
  * Upload flow (upload-flow.html / TODO.md §5) — compose → review → success,
  * same internal step-state shape (no router) as `SendView`/`OnboardingView`.
+ * Restyled onto shared tokens/primitives (design-system-pass) — see
+ * `packages/ui/src/index.ts` for the primitives consumed here.
  *
  * Password prompt: same shape as `SendView`'s — see `handlers/upload.ts`'s
  * doc comment for why `submitUpload` needs `walletId`/`password` alongside
  * `ProtocolMap`'s `UploadDraft`. Collected once on the review step's
  * "Sign and upload", carried only in `step` state, discarded on unmount.
+ *
+ * Secret-scan trip uses `RiskNotice` (RELEVANT RULES / TODO.md §5.2: "the
+ * one place a scan result overrides the primary action" — the Irreversible
+ * tier `RiskNotice` itself is scoped to). The tag byte-cap warning stays a
+ * plain inline `TextField`-style error row instead — TODO.md §5.1 treats it
+ * as routine/Consequential live validation, not an Irreversible-tier
+ * warning, so it doesn't earn the warning-red `RiskNotice` treatment.
  *
  * UDL license picker: the sibling repo's own material (upload-flow.html,
  * CLAUDE.md item 7, TODO.md §5.1) names only "optional UDL license tag"
@@ -275,14 +287,14 @@ function ComposeStep({
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Upload" onBack={onBack} />
       <div className="flex flex-1 flex-col gap-5 px-5 py-5">
-        <div className="flex rounded-[10px] bg-[#f5f5f5] p-[3px]">
+        <div className="flex rounded-md bg-mist p-[3px]">
           {(["file", "text", "json"] as SourceKind[]).map((source) => (
             <button
               key={source}
               type="button"
               onClick={() => onChange({ source })}
-              className={`flex-1 rounded-[8px] py-2 text-xs font-semibold ${
-                step.source === source ? "bg-white text-[#111111]" : "text-[#737373]"
+              className={`flex-1 rounded-sm py-2 text-label font-semibold ${
+                step.source === source ? "bg-background text-foreground" : "text-muted"
               }`}
             >
               {source === "file" ? "File" : source === "text" ? "Text" : "JSON"}
@@ -298,23 +310,15 @@ function ComposeStep({
               onRemove={() => onChange({ fileName: null, fileSizeBytes: null, dataBase64: "" })}
             />
           ) : (
-            <label className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-[10px] border-[1.5px] border-dashed border-[#e5e5e5] bg-[#f5f5f5] px-4 py-8 text-center">
-              <input
-                type="file"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void handleFilePicked(file);
-                }}
-              />
-              <DropZoneIcon />
-              <span className="text-[13px] font-semibold text-[#111111]">Drop a file, or click to browse</span>
-              <span className="text-[11px] text-[#a3a3a3]">Any file type</span>
-            </label>
+            <FileDropzone
+              label="Drop a file, or click to browse"
+              hint="Any file type"
+              onFile={(file) => void handleFilePicked(file)}
+            />
           )
         ) : (
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-[#737373]">Content</span>
+            <span className="text-label font-semibold text-muted">Content</span>
             <textarea
               rows={5}
               value={step.textValue}
@@ -324,15 +328,15 @@ function ComposeStep({
               placeholder={
                 step.source === "json" ? "Paste JSON to publish…" : "Write or paste text to publish…"
               }
-              className="w-full resize-none rounded-[9px] border border-[#e5e5e5] bg-white px-3.5 py-3 font-mono text-xs leading-relaxed text-[#111111] focus:border-[#111111] focus:outline-none"
+              className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
             />
           </div>
         )}
 
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-semibold text-[#737373]">Tags</span>
-            <span className={`text-[11px] ${overLimit ? "font-semibold text-[#ff1717]" : "text-[#a3a3a3]"}`}>
+            <span className="text-label font-semibold text-muted">Tags</span>
+            <span className={`text-caption ${overLimit ? "font-semibold text-warning" : "text-faint"}`}>
               {totalTagBytes.toLocaleString()} of {TAG_BYTES_LIMIT.toLocaleString()} bytes
             </span>
           </div>
@@ -344,20 +348,20 @@ function ComposeStep({
                   placeholder="Name"
                   value={tag.name}
                   onChange={(event) => updateTag(index, { name: event.target.value })}
-                  className="min-w-0 flex-1 rounded-[8px] border border-[#e5e5e5] bg-white px-2.5 py-2 text-xs text-[#111111] focus:border-[#111111] focus:outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-line bg-background px-2.5 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
                 />
                 <input
                   type="text"
                   placeholder="Value"
                   value={tag.value}
                   onChange={(event) => updateTag(index, { value: event.target.value })}
-                  className="min-w-0 flex-1 rounded-[8px] border border-[#e5e5e5] bg-white px-2.5 py-2 text-xs text-[#111111] focus:border-[#111111] focus:outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-line bg-background px-2.5 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
                 />
                 <button
                   type="button"
                   aria-label="Remove tag"
                   onClick={() => removeTag(index)}
-                  className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-[8px] text-[#a3a3a3] hover:bg-[#f5f5f5] hover:text-[#ff1717]"
+                  className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning"
                 >
                   <RemoveIcon />
                 </button>
@@ -367,13 +371,13 @@ function ComposeStep({
           <button
             type="button"
             onClick={addTag}
-            className="flex items-center gap-1.5 self-start py-1.5 text-xs font-semibold text-[#737373] hover:text-[#111111]"
+            className="flex items-center gap-1.5 self-start py-1.5 text-label font-semibold text-muted hover:text-foreground"
           >
             <PlusIcon />
             Add tag
           </button>
           {overLimit ? (
-            <div role="alert" className="flex items-start gap-1.5 text-xs leading-snug text-[#ff1717]">
+            <div role="alert" className="flex items-start gap-1.5 text-label leading-snug text-warning">
               <span>
                 Tags are {totalTagBytes.toLocaleString()} bytes — the limit is{" "}
                 {TAG_BYTES_LIMIT.toLocaleString()}.
@@ -383,11 +387,11 @@ function ComposeStep({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-[#737373]">License</span>
+          <span className="text-label font-semibold text-muted">License</span>
           <select
             value={step.license}
             onChange={(event) => onChange({ license: event.target.value })}
-            className="w-full rounded-[9px] border border-[#e5e5e5] bg-white px-3.5 py-3 text-[13px] font-semibold text-[#111111] focus:border-[#111111] focus:outline-none"
+            className="w-full rounded-md border border-line bg-background px-3.5 py-3 text-body font-semibold text-foreground focus:border-foreground focus:outline-none"
           >
             {UDL_LICENSE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -406,18 +410,12 @@ function ComposeStep({
         />
 
         {step.error ? (
-          <div role="alert" className="text-xs leading-snug text-[#ff1717]">
+          <div role="alert" className="text-label leading-snug text-warning">
             {step.error}
           </div>
         ) : null}
 
-        <Button
-          type="button"
-          disabled={!canContinue}
-          aria-busy={step.submitting}
-          onClick={onContinue}
-          className="mt-auto w-full rounded-[10px] py-3"
-        >
+        <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
           {step.submitting ? "Checking…" : "Continue"}
         </Button>
       </div>
@@ -427,19 +425,19 @@ function ComposeStep({
 
 function FileRow({ name, size, onRemove }: { name: string; size: number; onRemove: () => void }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-[9px] border border-[#e5e5e5] bg-white p-3.5">
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[8px] bg-[#f5f5f5] text-[#111111]">
+    <div className="flex items-center gap-2.5 rounded-md border border-line bg-background p-3.5">
+      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
         <FileIcon />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-px">
-        <span className="truncate text-[13px] font-semibold text-[#111111]">{name}</span>
-        <span className="text-[11px] text-[#737373]">{formatFileSize(size)}</span>
+        <span className="truncate text-body font-semibold text-foreground">{name}</span>
+        <span className="text-caption text-muted">{formatFileSize(size)}</span>
       </div>
       <button
         type="button"
         aria-label="Remove file"
         onClick={onRemove}
-        className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-[8px] text-[#a3a3a3] hover:bg-[#f5f5f5] hover:text-[#111111]"
+        className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-foreground"
       >
         <RemoveIcon />
       </button>
@@ -469,21 +467,15 @@ function ReviewStep({
         {step.fileName ? <FileRow name={step.fileName} size={0} onRemove={onBack} /> : null}
 
         {tripped ? (
-          <div role="alert" className="flex gap-2.5 rounded-[9px] border border-[#ffd6d6] bg-[#fff5f5] p-3.5">
-            <WarningIcon className="mt-px flex-shrink-0 text-[#ff1717]" />
-            <p className="text-xs leading-relaxed text-[#111111]">
-              <strong className="font-bold">This looks like a {step.review.secretScanMatch}.</strong> Uploads
-              are public and permanent — remove it before continuing.
-            </p>
-          </div>
+          <RiskNotice>
+            <strong className="font-bold">This looks like a {step.review.secretScanMatch}.</strong> Uploads
+            are public and permanent — remove it before continuing.
+          </RiskNotice>
         ) : (
-          <div className="flex gap-2.5 rounded-[9px] bg-[#f5f5f5] p-3.5">
-            <InfoIcon className="mt-px flex-shrink-0 text-[#737373]" />
-            <p className="text-xs leading-relaxed text-[#111111]">
-              This upload is public and permanent once signed. Anyone can view it, and it can&apos;t be
-              edited or removed.
-            </p>
-          </div>
+          <p className="text-label leading-relaxed text-muted">
+            This upload is public and permanent once signed. Anyone can view it, and it can&apos;t be
+            edited or removed.
+          </p>
         )}
 
         <div className="flex flex-col">
@@ -494,7 +486,7 @@ function ReviewStep({
                 {step.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="rounded-[5px] border border-[#e5e5e5] bg-[#f5f5f5] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#737373]"
+                    className="rounded-[5px] border border-line bg-mist px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted"
                   >
                     {tag.name}: {tag.value}
                   </span>
@@ -516,17 +508,18 @@ function ReviewStep({
         ) : null}
 
         {step.error ? (
-          <div role="alert" className="text-xs leading-snug text-[#ff1717]">
+          <div role="alert" className="text-label leading-snug text-warning">
             {step.error}
           </div>
         ) : null}
 
         <Button
           type="button"
+          variant={tripped ? "destructive" : "primary"}
           disabled={tripped || step.password.length === 0 || step.submitting}
           aria-busy={step.submitting}
           onClick={onSign}
-          className="mt-auto w-full rounded-[10px] py-3"
+          className="mt-auto"
         >
           {step.submitting ? "Signing…" : "Sign and upload"}
         </Button>
@@ -538,9 +531,9 @@ function ReviewStep({
 
 function ReviewRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e5] py-2.5 text-[13px] last:border-b-0">
-      <span className="flex-shrink-0 text-[#737373]">{label}</span>
-      <span className="text-right font-semibold text-[#111111]">{value}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-body last:border-b-0">
+      <span className="flex-shrink-0 text-muted">{label}</span>
+      <span className="text-right font-semibold text-foreground">{value}</span>
     </div>
   );
 }
@@ -551,16 +544,16 @@ function SuccessStep({ step, onDone }: { step: SuccessState; onDone: () => void 
 
   return (
     <div className="flex min-h-full flex-col items-center gap-4 px-6 pb-6 pt-12 text-center">
-      <div className="mb-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#f5f5f5] text-[#111111]">
+      <div className="mb-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-mist text-foreground">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
-      <h2 className="text-base text-[#111111]">Signed and uploaded.</h2>
-      {step.fileName ? <p className="-mt-2 text-[13px] text-[#737373]">{step.fileName}</p> : null}
+      <h2 className="text-body text-foreground">Signed and uploaded.</h2>
+      {step.fileName ? <p className="-mt-2 text-label text-muted">{step.fileName}</p> : null}
 
-      <div className="mt-2 flex w-full items-center gap-2 border-b border-[#e5e5e5] py-3 text-xs text-[#737373]">
-        <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#FFE45C]" />
+      <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted">
+        <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
         <span>Pending confirmation</span>
       </div>
 
@@ -569,7 +562,7 @@ function SuccessStep({ step, onDone }: { step: SuccessState; onDone: () => void 
           href={contentUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs font-semibold text-[#737373] underline-offset-2 hover:text-[#111111] hover:underline"
+          className="text-label font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
         >
           View content
         </a>
@@ -577,25 +570,16 @@ function SuccessStep({ step, onDone }: { step: SuccessState; onDone: () => void 
           href={viewblockUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs font-semibold text-[#737373] underline-offset-2 hover:text-[#111111] hover:underline"
+          className="text-label font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
         >
           View on ViewBlock
         </a>
       </div>
 
-      <Button type="button" onClick={onDone} className="mt-auto w-full rounded-[10px] py-3">
+      <Button type="button" onClick={onDone} className="mt-auto">
         Done
       </Button>
     </div>
-  );
-}
-
-function DropZoneIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="text-[#737373]">
-      <path d="M12 16V4M12 4 7 9M12 4l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
@@ -620,29 +604,6 @@ function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function WarningIcon({ className }: { className?: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function InfoIcon({ className }: { className?: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-      <path d="M12 8v5M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
