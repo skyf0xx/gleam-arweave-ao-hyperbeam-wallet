@@ -46,3 +46,14 @@ layers:
     verify: "pnpm vitest run wallet-switcher lock-settings network-peers send receive upload connected-apps main-screen reads onboarding-unlock && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
     verify_radius: ["packages/messaging/**", "apps/extension/**", "packages/ui/src/components/**"]
     commit: "feat(gleam): wallet switcher, lock settings, network peers screens + cross-cutting loading/error states"
+  - id: historical-pricing
+    depends_on: settings-screens-gap
+    scope: ["packages/core/src/pricing/**"]
+    verify: "pnpm vitest run pricing && pnpm tsc -p packages/core --noEmit"
+    commit: "feat(gleam): historical portfolio-value pricing"
+  - id: main-screen-chart
+    depends_on: historical-pricing
+    scope: ["apps/extension/entrypoints/popup/main-screen/**", "packages/ui/src/components/wallet/**", "packages/ui/src/tokens/**", "apps/extension/package.json", "pnpm-lock.yaml"]
+    verify: "pnpm vitest run main-screen pricing && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
+    verify_radius: ["apps/extension/**", "packages/ui/src/components/**", "packages/ui/src/tokens/**", "packages/core/**", "pnpm-lock.yaml"]
+    commit: "feat(gleam): main-screen portfolio chart, range tabs, account avatar"

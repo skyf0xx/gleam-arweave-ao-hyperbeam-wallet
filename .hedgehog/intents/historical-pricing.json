@@ -1,0 +1,44 @@
+{
+  "id": "historical-pricing",
+  "goal": "Extend packages/core/src/pricing (currently spot-price-only, per MainScreenView.tsx's own deferral comment) with a historical price time series and a portfolio-value estimator over that series, so a caller can compute approximate total portfolio value at points in the past without reconstructing historical token balances from on-chain activity.",
+  "outcome": "packages/core/src/pricing exposes a function to fetch a historical USD price series for a coin over a given range (24H/7D/1M/1Y/ALL), sourced the same way spot price already is (CoinGecko direct, CoinPaprika direct as fallback -- CoinGecko's market_chart-shaped endpoint and CoinPaprika's historical-ticker-shaped endpoint are the intended direct sources, but the exact request shape/pagination is this layer's own build-time detail, not fixed here), plus an estimateHistoricalPortfolioValue function matching this exact shape confirmed with the user:\n\nfunction estimateHistoricalPortfolioValue(\n  tokens: { balance: number; priceAt: (timestamp: number) => number }[],\n  timestamp: number\n): number {\n  return tokens.reduce(\n    (total, token) => total + token.balance * token.priceAt(timestamp),\n    0\n  )\n}\n\nNothing in this layer wires the result into any UI -- that is main-screen-chart's job, depending on this layer.",
+  "priority": 40,
+  "requirements": [
+    {
+      "id": "HISTORICAL-PRICING-RULE-1",
+      "kind": "rule",
+      "statement": "Historical portfolio value is estimated as current/latest known balance times historical price at each point in the series (the confirmed approximation) -- never true historical balance reconstruction from on-chain activity. This is a deliberate scope boundary confirmed with the user, not a shortcut to flag as debt."
+    },
+    {
+      "id": "HISTORICAL-PRICING-RULE-2",
+      "kind": "rule",
+      "statement": "If a token has no price data for a given timestamp from the price source (gap in the series, unsupported coin id, fetch failure), priceAt must return 0 for that timestamp so the token contributes 0 to the total at that point -- never skip the token, never throw, and never fabricate a plausible non-zero price. This is an explicit exception to this project's general HONESTY rule (surface unavailable as null/unavailable, never as 0) -- the user confirmed 0-contribution is the intended behavior specifically for this per-timestamp series case, distinct from pricing's existing getUsdPrice/getUsdPriceWithFallback (spot price), which still return null on failure and are unaffected by this rule."
+    },
+    {
+      "id": "HISTORICAL-PRICING-RULE-3",
+      "kind": "rule",
+      "statement": "Historical price fetching follows the same direct-source, fallback-on-failure pattern getUsdPriceWithFallback already establishes (CoinGecko direct first, CoinPaprika direct second, no server of this project's own proxying either) -- reuse or closely mirror that pattern rather than inventing a new one. No new external provider is introduced."
+    },
+    {
+      "id": "HISTORICAL-PRICING-RULE-4",
+      "kind": "rule",
+      "statement": "Ranges to support at minimum: 24H, 7D, 1M, 1Y, ALL (matching wallet-main-screen.html's range tabs) -- the exact granularity returned per range (e.g. hourly vs daily points) is a build-time detail this layer decides, informed by what the underlying price source actually returns at each range, not fixed here."
+    },
+    {
+      "id": "HISTORICAL-PRICING-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "A new exported function (e.g. getHistoricalUsdPrices or equivalent) returns a time-ordered series of {timestamp, usd} points for a supported coin id and range, reusing the existing CoinGeckoId/CoinPaprikaId types where they already fit."
+    },
+    {
+      "id": "HISTORICAL-PRICING-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "estimateHistoricalPortfolioValue exists with exactly the signature and reduce-based body confirmed with the user (tokens: { balance: number; priceAt: (timestamp: number) => number }[], timestamp: number) => number, and is unit-tested for: multiple tokens summing correctly, a token whose priceAt returns 0 for a given timestamp contributing 0 (not erroring, not being excluded), and an empty tokens array returning 0."
+    },
+    {
+      "id": "HISTORICAL-PRICING-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run pricing passes, including new tests for the historical series fetch (mocked fetchImpl, same pattern as pricing.pricing.test.ts's existing tests) and for estimateHistoricalPortfolioValue; pnpm tsc -p packages/core --noEmit passes; no chrome.*/window/document dependency is introduced (pure, injectable fetchImpl, same as the rest of this module)."
+    }
+  ],
+  "depends_on": []
+}
