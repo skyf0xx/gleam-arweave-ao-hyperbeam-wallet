@@ -19,9 +19,9 @@ layers:
     commit: "feat(gleam): vault"
   - id: onboarding-unlock
     depends_on: vault
-    scope: ["apps/extension/entrypoints/popup/onboarding/**", "apps/extension/entrypoints/popup/unlock/**", "apps/extension/src/handlers/wallet-lifecycle.ts", "apps/extension/src/adapters/storage.ts", "apps/extension/src/adapters/runtime.ts", "packages/ui/src/components/onboarding/**"]
-    verify: "pnpm vitest run onboarding unlock && pnpm wxt build"
-    verify_radius: ["apps/extension/**", "packages/ui/src/components/onboarding/**"]
+    scope: ["apps/extension/entrypoints/popup/onboarding/**", "apps/extension/entrypoints/popup/unlock/**", "apps/extension/src/handlers/wallet-lifecycle.ts", "apps/extension/src/adapters/storage.ts", "apps/extension/src/adapters/runtime.ts", "packages/ui/src/components/onboarding/**", "packages/core/src/index.ts"]
+    verify: "pnpm vitest run onboarding unlock && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
+    verify_radius: ["apps/extension/**", "packages/ui/src/components/onboarding/**", "packages/core/**"]
     commit: "feat(gleam): onboarding and unlock"
   - id: wallet-core
     depends_on: onboarding-unlock

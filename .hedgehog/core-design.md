@@ -176,6 +176,18 @@ session didn't independently re-derive it.
   `vault`'s later `storage.ts`), but their colocated test file wasn't
   included alongside them. Added the specific test-file path rather than
   a directory glob, for the same collision-avoidance reason.
+- **`packages/core/src/index.ts` also added to `onboarding-unlock`'s
+  scope**, plus `packages/core --noEmit` added to its verify command and
+  `packages/core/**` to its `verify_radius`. `vault`'s build (correctly)
+  left the barrel untouched since it was outside `vault`'s own scope —
+  the barrel is owned by `messaging`'s scope, not `vault`'s — so it still
+  only exports `models`, not `vault`/`keys`/`ports`. `onboarding-unlock`
+  is the first layer that actually needs those exports (it wires the
+  storage/runtime adapters and the vault to real UI), so it's the
+  layer that updates the barrel. Confirms the same class of gap as
+  above: a shared package-entry file has no single obvious owner among
+  per-concern layer scopes, and each layer that first needs a given
+  export is where that export gets added.
 
 ## Left unresolved
 
