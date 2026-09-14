@@ -89,10 +89,41 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "getThemePreference",
       "setThemePreference",
       "revokeGrant",
+      "getBalance",
+      "getTokenBalances",
+      "getActivity",
+      "getPortfolioHistory",
+      "getConnectedApps",
       "providerCall",
     ]) {
       expect(registeredHandlers.has(method)).toBe(true);
     }
+  });
+
+  /**
+   * MAIN-SCREEN-CHART-WALLET-CORE's inherited debt: `ReadsHandler.
+   * getPortfolioHistory()` (already fully tested on its own) was never
+   * registered against the dispatcher, so the main-screen chart had no
+   * reachable RPC. Drives the real registered handler with no wallets
+   * present — the one branch that returns without any network call (see
+   * `reads.ts`'s own doc comment on `resolveActiveWalletAddress`) — so
+   * this proves the wiring reaches `ReadsHandler` itself, not a
+   * reimplementation of its range validation or pricing logic.
+   */
+  it("getPortfolioHistory is reachable through the dispatcher and delegates to ReadsHandler", async () => {
+    const handler = registeredHandlers.get("getPortfolioHistory")!;
+    await expect(handler({ data: { range: "24H" } })).resolves.toEqual({
+      range: "24H",
+      series: [],
+      currentUsdValue: 0,
+      usdChange: 0,
+      periodLabel: "Last 24 hours",
+    });
+  });
+
+  it("getPortfolioHistory rejects an unrecognized range, same as ReadsHandler itself", async () => {
+    const handler = registeredHandlers.get("getPortfolioHistory")!;
+    await expect(handler({ data: { range: "3Y" } })).rejects.toThrow(/unrecognized portfolio history range/i);
   });
 
   /**
