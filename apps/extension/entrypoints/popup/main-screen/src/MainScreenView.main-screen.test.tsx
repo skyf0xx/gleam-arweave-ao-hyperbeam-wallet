@@ -15,11 +15,13 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
   };
 }
 
-function successfulSend(): ReturnType<typeof vi.fn> {
+function successfulSend(overrides: Record<string, unknown> = {}): ReturnType<typeof vi.fn> {
   return vi.fn(async ({ type }: { type: string }) => {
     if (type === "getBalance") return BALANCE;
     if (type === "getTokenBalances") return NO_TOKENS;
     if (type === "getActivity") return EMPTY_ACTIVITY;
+    if (type === "getThemePreference") return overrides.themePreference ?? { theme: "light" };
+    if (type === "setThemePreference") return undefined;
     throw new Error(`Unexpected message type "${type}"`);
   });
 }
@@ -106,5 +108,88 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText(/couldn't reach the network/i)).toBeTruthy());
+  });
+});
+
+describe("MainScreenView theme toggle (theme-preference)", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+
+  it("shows the toggle unchecked when the stored preference is light", async () => {
+    const send = successfulSend({ themePreference: { theme: "light" } });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
+        "false",
+      ),
+    );
+  });
+
+  it("shows the toggle checked when the stored preference is dark", async () => {
+    const send = successfulSend({ themePreference: { theme: "dark" } });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
+        "true",
+      ),
+    );
+  });
+
+  it("flipping the toggle persists via setThemePreference and applies data-theme immediately", async () => {
+    const send = successfulSend({ themePreference: { theme: "light" } });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
+        "false",
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }));
+
+    await waitFor(() => expect(document.documentElement.getAttribute("data-theme")).toBe("dark"));
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "dark" } }),
+    );
+  });
+
+  it("reverts the toggle and data-theme if setThemePreference fails", async () => {
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return BALANCE;
+      if (type === "getTokenBalances") return NO_TOKENS;
+      if (type === "getActivity") return EMPTY_ACTIVITY;
+      if (type === "getThemePreference") return { theme: "light" };
+      if (type === "setThemePreference") throw new Error("write failed");
+      throw new Error(`Unexpected message type "${type}"`);
+    });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
+        "false",
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
+        "false",
+      ),
+    );
+    expect(document.documentElement.getAttribute("data-theme")).toBeNull();
   });
 });
