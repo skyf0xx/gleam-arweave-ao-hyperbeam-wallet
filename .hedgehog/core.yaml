@@ -36,7 +36,7 @@ layers:
     commit: "feat(gleam): upload"
   - id: provider-bridge
     depends_on: upload
-    scope: ["apps/extension/entrypoints/content.ts", "apps/extension/entrypoints/content.provider.test.ts", "apps/extension/entrypoints/provider.ts", "apps/extension/entrypoints/provider.provider.test.ts", "apps/extension/entrypoints/approval/**", "apps/extension/entrypoints/background.ts", "apps/extension/entrypoints/background.provider.test.ts", "apps/extension/src/handlers/approval.ts", "apps/extension/src/handlers/approval.approval.test.ts", "apps/extension/src/adapters/windows.ts", "apps/extension/src/adapters/windows.provider.test.ts", "apps/extension/entrypoints/popup/connected-apps/**", "packages/messaging/src/protocol.ts", "packages/core/src/models/grant.ts", "packages/core/src/models/transfer.ts", "packages/core/src/models/upload.ts"]
-    verify: "pnpm vitest run provider bridge approval connected-apps && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
+    scope: ["apps/extension/entrypoints/content/**", "apps/extension/entrypoints/provider/**", "apps/extension/entrypoints/approval/**", "apps/extension/entrypoints/background/**", "apps/extension/src/handlers/approval.ts", "apps/extension/src/handlers/approval.approval.test.ts", "apps/extension/src/adapters/windows.ts", "apps/extension/src/adapters/windows.provider.test.ts", "apps/extension/entrypoints/popup/connected-apps/**", "packages/messaging/src/protocol.ts", "packages/core/src/models/grant.ts", "packages/core/src/models/transfer.ts", "packages/core/src/models/upload.ts"]
+    verify: "pnpm vitest run provider bridge approval connected-apps content/index background/index && pnpm tsc -p packages/messaging --noEmit && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
     verify_radius: ["apps/extension/**", "packages/messaging/**", "packages/core/**"]
     commit: "feat(gleam): injected provider, connection approval, signing approval"

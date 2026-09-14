@@ -286,6 +286,55 @@ session didn't independently re-derive it.
   flow that creates Grants. Verify command and radius extended to
   typecheck `packages/messaging`/`packages/core` accordingly.
 
+- **`content.ts`/`provider.ts`/`background.ts` converted from flat files
+  to folders (`content/index.ts`, `provider/index.ts`,
+  `background/index.ts`), each with its test file colocated as
+  `index.test.ts`.** The layer's own scope originally granted flat
+  `background.provider.test.ts`/`content.provider.test.ts`/
+  `provider.provider.test.ts` files sitting directly under
+  `entrypoints/` next to their flat `.ts` counterparts — exactly the
+  naming collision the browser-extension blueprint's own "WXT entrypoint
+  naming" section warns against (WXT derives an entrypoint's name by
+  splitting at the first `.`, so `background.provider.test.ts` and
+  `background.ts` both resolve to entrypoint name `"background"`), and
+  `wxt build` failed outright with "Multiple entrypoints with the same
+  name detected." Restructured into the same folder convention every
+  other multi-file entrypoint in this project already uses (onboarding,
+  unlock, main-screen, send, receive, activity, upload). Filter tokens in
+  `verify` updated (`content/index`, `background/index` added; `provider`
+  already matched `provider/index.test.ts`'s path) since the rename
+  changed which files the original tokens matched — confirmed by hand
+  that all 6 of this layer's test files still run under the corrected
+  command.
+- **`vite-plugin-node-polyfills` added as a dependency of
+  `apps/extension`, wired into `wxt.config.ts`.** `@dha-team/arbundles`'s
+  browser build (`arbundles/web`) still statically imports Node's
+  `crypto`/`stream`/`events` in a few internal files (`deepHash.js`,
+  `DataItem.js`, `Bundle.js`) despite using WebCrypto at runtime. This
+  predates `provider-bridge` — `upload`'s own verify command never ran
+  `wxt build`, so the gap was latent — and only surfaced once
+  `background.ts` became the first entrypoint to transitively bundle
+  `UploadHandler` → `upload-submit.ts` → `arbundles/web`. Confirmed with
+  the user directly to fix properly (a real dependency + config change)
+  rather than deferring as debt, since the extension can't build for real
+  use otherwise.
+- **`web_accessible_resources` for `provider.js` added to
+  `wxt.config.ts`'s manifest.** Required for `content.ts`'s
+  `injectScript("/provider.js", ...)` to resolve at runtime — WXT does
+  not add this automatically (stated directly in its own
+  `inject-script.mjs` doc comment) and nothing in any layer's scope had
+  added it. Discovered and fixed as part of the same pass as the
+  polyfill fix above, since both block the extension from being
+  genuinely loadable in a real browser.
+- **`wxt.config.ts` and `apps/extension/package.json`/`pnpm-lock.yaml`
+  touched directly for these two fixes**, outside every layer's granted
+  scope (`wxt.config.ts` is `scaffold`'s locked scope). Treated the same
+  as the recurring "shared workspace config, no single layer owns it"
+  pattern — not added to `provider-bridge`'s permanent `core.yaml` scope,
+  fixed directly with the user's explicit go-ahead since this blocks the
+  project's core deliverable (a genuinely buildable extension) rather
+  than deferred as debt for a hypothetical future pass.
+
 ## Left unresolved
 
 - **HyperBEAM balance path** (`04-prd.md`'s AO token balances Feature):
