@@ -1,6 +1,18 @@
 @import "tailwindcss";
 
 /*
+ * Tailwind v4's automatic source detection walks from the Vite project
+ * root (apps/extension), so it never reaches sibling workspace package
+ * packages/ui on its own — only files this CSS entry's own directory
+ * happens to be an ancestor of get scanned implicitly. Utility classes
+ * used exclusively inside packages/ui/src (e.g. button.tsx's
+ * `text-background`, `hover:brightness-115`) were silently never
+ * generated as a result — this makes the whole package an explicit
+ * source root regardless of which app imports this file.
+ */
+@source "../../src";
+
+/*
  * Gleam design tokens — sourced from the sibling ao-wallet repo's
  * brand/identity.md, brand/guidelines.md and screens/shared.css (the
  * mockups' own token sheet). Defined once here as Tailwind 4's native
@@ -110,6 +122,25 @@
     --color-warning-surface: #2a1414;
     --color-warning-border: #4a1f1f;
   }
+}
+
+/*
+ * Chrome sizes the extension popup window to its content's natural
+ * width/height, not to a viewport — with no explicit frame, `min-h-full`
+ * on the app root resolves against a box that has already shrunk to fit,
+ * collapsing the popup to a narrow sliver. `[data-layout="popup"]` fixes
+ * the 440px frame the type scale above is tuned for (see theme.css's type
+ * scale comment); sidepanel/approval intentionally don't get this rule —
+ * they size to the browser-provided side panel / window instead.
+ */
+html:has([data-layout="popup"]),
+body:has([data-layout="popup"]) {
+  width: 440px;
+}
+
+[data-layout="popup"] {
+  width: 440px;
+  min-height: 600px;
 }
 
 /*
