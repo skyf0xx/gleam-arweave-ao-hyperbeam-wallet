@@ -1,0 +1,29 @@
+{
+  "task": "GLEAM-WALLET-SCAFFOLD",
+  "reason": "Bootstrap's feat(gleam-wallet): workspace commit (17370ca) covers the full scaffold scope; independently re-ran the layer's exact verify command (pnpm install --frozen-lockfile && pnpm eslint packages apps --max-warnings=0 && pnpm wxt build && pnpm vitest run scaffold ui) and confirmed all four steps pass clean: lint clean, wxt build emits popup+sidepanel+manifest with Tailwind theme compiled, 4/4 vitest tests pass.",
+  "confirmed_at": "2026-09-14T03:01:08.188Z",
+  "evidence": {
+    "commits": [
+      "17370caa45b86f31343e9beeb9e11b5346a6efbd"
+    ],
+    "paths": [
+      "apps/extension/entrypoints/popup/index.tsx",
+      "apps/extension/entrypoints/sidepanel/index.tsx",
+      "apps/extension/package.json",
+      "apps/extension/src/App.tsx",
+      "apps/extension/tsconfig.json",
+      "apps/extension/wxt.config.ts",
+      "package.json",
+      "packages/core/package.json",
+      "packages/core/tsconfig.json",
+      "packages/messaging/package.json",
+      "packages/messaging/tsconfig.json",
+      "packages/ui/package.json",
+      "packages/ui/src/primitives/button.tsx",
+      "packages/ui/src/primitives/button.ui.test.tsx",
+      "packages/ui/src/primitives/cn.ts",
+      "packages/ui/src/tokens/theme.css",
+      "pnpm-workspace.yaml"
+    ]
+  }
+}
