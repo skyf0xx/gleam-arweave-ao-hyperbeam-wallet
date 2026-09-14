@@ -1,0 +1,7 @@
+{
+  "task": "DESIGN-SYSTEM-PASS-SCAFFOLD",
+  "scope_add": [
+    "packages/ui/src/index.ts"
+  ],
+  "reason": "barrel file export for new primitives (Beam, ScreenHeader, Card, ListRow, TextField, FileDropzone, RiskNotice, EmptyState, StatusDot) built in this task's own packages/ui/src/primitives/** scope — additive only, no existing export changed"
+}
