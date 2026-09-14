@@ -170,7 +170,12 @@ session didn't independently re-derive it.
   needed before the view-switch is worth wiring once rather than twice;
   `wallet-core` wires all three views' switch logic together when it
   builds. Already covered by `wallet-core`'s existing `apps/extension/**`
-  `verify_radius`, no radius change needed.
+  `verify_radius`, no radius change needed. `pnpm wxt build` added to its
+  `verify` command (was tsc/tests only) since it now owns an entrypoint
+  file WXT bundles — a broken view-switch could typecheck and unit-test
+  clean while still failing to actually build/mount, per this skill's
+  "a layer whose output a framework compiles must run that build in its
+  verify" rule.
 
 - **`packages/core/src/index.ts` added to `messaging`'s scope** (was
   missing from every layer's scope entirely). `scaffold`'s
