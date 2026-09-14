@@ -1,5 +1,6 @@
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 
 /**
  * Ports `connection-request.html` (6.1) exactly: origin identity, "wants
@@ -61,32 +62,30 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
     <div className="flex min-h-full flex-col">
       <div className="flex flex-1 flex-col gap-5 px-5 py-6">
         <div className="flex flex-col items-center gap-2.5 pb-1 pt-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] text-lg font-bold text-[#737373]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-mist text-lg font-bold text-muted">
             {faviconLetter(origin)}
           </div>
-          <div className="text-base font-bold text-[#111111]">{displayName}</div>
-          <div className="flex items-center gap-1.5 font-mono text-xs text-[#737373]">
-            {hostnameOf(origin)}
-          </div>
+          <div className="text-body font-bold text-foreground">{displayName}</div>
+          <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
         </div>
 
-        <div className="text-center text-xs font-semibold text-[#737373]">{displayName} wants to:</div>
+        <div className="text-center text-caption font-semibold text-muted">{displayName} wants to:</div>
 
         <div className="flex flex-col">
           {requestedPermissions.map((permission) => {
             const copy = SCOPE_COPY[permission];
             return (
-              <div key={permission} className="flex items-start gap-2.5 border-b border-[#e5e5e5] py-3 last:border-b-0">
+              <div key={permission} className="flex items-start gap-2.5 border-b border-line py-3 last:border-b-0">
                 <div
-                  className={`mt-px flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-[7px] ${
-                    copy.risk ? "bg-[#fff5f5] text-[#ff1717]" : "bg-[#f5f5f5] text-[#111111]"
+                  className={`mt-px flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md ${
+                    copy.risk ? "bg-warning-surface text-warning" : "bg-mist text-foreground"
                   }`}
                 >
                   <ScopeIcon />
                 </div>
                 <div className="flex flex-col gap-px">
-                  <span className="text-[13px] font-semibold text-[#111111]">{copy.title}</span>
-                  <span className="text-[11px] text-[#737373]">{copy.detail}</span>
+                  <span className="text-label font-semibold text-foreground">{copy.title}</span>
+                  <span className="text-caption text-muted">{copy.detail}</span>
                 </div>
               </div>
             );
@@ -94,27 +93,21 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
         </div>
 
         {hasUnlimitedSpend ? (
-          <div role="alert" className="flex gap-2.5 rounded-[9px] border border-[#ffd6d6] bg-[#fff5f5] p-3.5">
-            <WarningIcon />
-            <p className="text-xs leading-relaxed text-[#111111]">
-              <strong className="font-bold">This grant has no spending limit.</strong> Most apps don&apos;t
-              need this. Only continue if you trust this app completely.
-            </p>
-          </div>
+          <RiskNotice>
+            <strong className="font-bold">This grant has no spending limit.</strong> Most apps don&apos;t need
+            this. Only continue if you trust this app completely.
+          </RiskNotice>
         ) : null}
 
         <div className="mt-auto flex gap-2.5">
-          <button
-            type="button"
-            onClick={onReject}
-            className="flex-1 rounded-[10px] border border-[#e5e5e5] bg-white py-3 text-sm font-semibold text-[#111111] hover:border-[#a3a3a3]"
-          >
+          <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
             Reject
-          </button>
+          </Button>
           <Button
             type="button"
+            variant={hasUnlimitedSpend ? "destructive" : "primary"}
             onClick={onGrant}
-            className={`flex-1 rounded-[10px] py-3 ${hasUnlimitedSpend ? "bg-[#ff1717] hover:bg-[#ff1717]" : ""}`}
+            className="flex-1"
           >
             Grant
           </Button>
@@ -129,20 +122,6 @@ function ScopeIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
       <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function WarningIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="mt-px flex-shrink-0 text-[#ff1717]">
-      <path
-        d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
