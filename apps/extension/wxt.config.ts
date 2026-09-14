@@ -8,15 +8,19 @@ export default defineConfig({
   manifest: {
     permissions: ['storage', 'sidePanel'],
     // MV3 requires an explicit host permission for every origin the
-    // background service worker fetches. The three hosts fetched
-    // unconditionally (Arweave gateway, CoinGecko, CoinPaprika) are
-    // known at build time and granted statically. A user-added
-    // HyperBEAM peer is an arbitrary origin chosen in Network settings,
-    // not knowable at build time, so it is requested at runtime via
-    // chrome.permissions.request() against optional_host_permissions
-    // instead of being granted broadly up front.
+    // background service worker fetches. The four hosts fetched
+    // unconditionally (Arweave gateway, the up.arweave.net bundler used
+    // for uploads — a distinct host from arweave.net under MV3's exact
+    // match-pattern rules, not covered by 'https://arweave.net/*' —
+    // CoinGecko, CoinPaprika) are known at build time and granted
+    // statically. A user-added HyperBEAM peer is an arbitrary origin
+    // chosen in Network settings, not knowable at build time, so it is
+    // requested at runtime via chrome.permissions.request() against
+    // optional_host_permissions instead of being granted broadly up
+    // front.
     host_permissions: [
       'https://arweave.net/*',
+      'https://up.arweave.net/*',
       'https://api.coingecko.com/*',
       'https://api.coinpaprika.com/*',
     ],
