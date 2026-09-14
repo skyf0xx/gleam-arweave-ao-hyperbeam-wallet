@@ -17,6 +17,7 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
+import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { formatWinstonAsAr, truncateAddress } from "./formatWinston";
 
@@ -25,11 +26,17 @@ import { formatWinstonAsAr, truncateAddress } from "./formatWinston";
  * gettable via this task's `ProtocolMap` reads: AR balance, AO token
  * balances (empty until a "watch a token" flow exists — see
  * `handlers/reads.ts`'s doc comment), and the merged activity feed.
- * wallet-main-screen.html's 7-day USD chart/range-tabs are omitted here:
- * they need historical price time series, which `core/pricing` (spot
- * price only, per this task's scope) doesn't provide, and no layer's
- * ALLOWED SCOPE names a historical-price source — reported as a gap in
- * this task's final report rather than faked with placeholder data.
+ * wallet-main-screen.html's 7-day USD chart/range-tabs are still omitted
+ * here: they need historical price time series, which `core/pricing`
+ * (spot price only) doesn't provide — tracked as separate change-work
+ * (a new historical-price capability) rather than built here or faked
+ * with placeholder data.
+ *
+ * The `Beam` identity divider (`packages/ui/src/primitives/beam.tsx`,
+ * wallet-main-screen.html's `.beam-divider`) is wired in directly above
+ * the Send/Receive actions row — the reference places it between the
+ * chart's range-tabs and Send/Receive, so this is that same slot with
+ * the not-yet-built range-tabs simply absent from it.
  *
  * Navigation entry points (settings-screens-gap): the account pill's
  * chevron (wallet-main-screen.html's `.account-pill`) opens the wallet
@@ -297,7 +304,11 @@ export function MainScreenView({
         />
       </div>
 
-      <div className="px-6 pb-6 pt-3">
+      <div className="px-6 pb-5 pt-3">
+        <Beam />
+      </div>
+
+      <div className="px-6 pb-6">
         <SendReceiveActions onSend={onSend} onReceive={onReceive} />
       </div>
 
