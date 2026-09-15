@@ -50,6 +50,16 @@ export function formatAtomicAsDisplay(atomic: string, denomination: number, maxF
   return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
+/** Same `Intl`-backed USD format as `PortfolioChart`'s own private `formatUsd`. */
+export function formatUsd(value: number): string {
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function truncateAddress(address: string): string {
   if (address.length <= 12) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;

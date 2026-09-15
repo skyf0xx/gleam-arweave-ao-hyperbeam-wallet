@@ -132,6 +132,25 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     );
   });
 
+  it("hides the remove control for the hardcoded default peer and leaves it in the list on a direct remove attempt", async () => {
+    const hardcodedSettings: NetworkSettings = {
+      gatewayUrl: "https://arweave.net",
+      peers: [
+        { url: "https://state.forward.computer", enabled: true },
+        { url: "https://ao-testnet.xyz", enabled: false },
+      ],
+      activePeerUrl: "https://state.forward.computer",
+    };
+    const send = vi.fn().mockResolvedValueOnce(hardcodedSettings);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("state.forward.computer")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Remove state.forward.computer" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove ao-testnet.xyz" })).toBeTruthy();
+    // The enable/disable toggle must stay available for the hardcoded peer.
+    expect(screen.getByRole("switch", { name: "Enable state.forward.computer" })).toBeTruthy();
+  });
+
   it("adding a peer requests permission for its origin, and on grant normalizes the URL and appends it enabled by default", async () => {
     permissionsRequest.mockResolvedValue(true);
     const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);

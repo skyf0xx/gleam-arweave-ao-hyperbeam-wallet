@@ -59,17 +59,14 @@ describe("ReadsHandler: getBalance", () => {
 });
 
 describe("ReadsHandler: getTokenBalances", () => {
-  it("returns an empty array when no processIds are watched", async () => {
-    const handler = new ReadsHandler(createFakeStorage());
-    const balances = await handler.getTokenBalances({ address: "addr1" });
-    expect(balances).toEqual([]);
-  });
-
-  it("throws a named error when watching processIds but no peer is configured", async () => {
+  it("throws a named error when no peer is configured (the default AO token is always watched)", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: null,
+    });
     const handler = new ReadsHandler(storage);
-
     await expect(handler.getTokenBalances({ address: "addr1" })).rejects.toThrow(
       /No HyperBEAM peer configured/,
     );
@@ -93,9 +90,11 @@ describe("ReadsHandler: getTokenBalances", () => {
     const handler = new ReadsHandler(storage);
     const balances = await handler.getTokenBalances({ address: "addr1" });
 
-    expect(balances).toHaveLength(1);
-    expect(balances[0]?.quantity).toBe("42");
-    expect(balances[0]?.processId).toBe("proc1");
+    // "proc1" (explicitly watched) plus the default AO token process,
+    // which getTokenBalances always includes regardless of the watch list.
+    expect(balances).toHaveLength(2);
+    const proc1Balance = balances.find((b) => b.processId === "proc1");
+    expect(proc1Balance?.quantity).toBe("42");
   });
 });
 
@@ -228,12 +227,12 @@ describe("ReadsHandler: getConnectedApps", () => {
 });
 
 describe("ReadsHandler: getNetworkSettings", () => {
-  it("defaults to arweave.net with no peers when nothing is stored", async () => {
+  it("defaults to arweave.net with the default HyperBEAM peer when nothing is stored", async () => {
     const handler = new ReadsHandler(createFakeStorage());
     expect(await handler.getNetworkSettings()).toEqual({
       gatewayUrl: "https://arweave.net",
-      peers: [],
-      activePeerUrl: null,
+      peers: [{ url: "https://state.forward.computer", enabled: true }],
+      activePeerUrl: "https://state.forward.computer",
     });
   });
 
@@ -256,8 +255,8 @@ describe("ReadsHandler: getNetworkSettings", () => {
     const handler = new ReadsHandler(storage);
     expect(await handler.getNetworkSettings()).toEqual({
       gatewayUrl: "https://arweave.net",
-      peers: [],
-      activePeerUrl: null,
+      peers: [{ url: "https://state.forward.computer", enabled: true }],
+      activePeerUrl: "https://state.forward.computer",
     });
   });
 });

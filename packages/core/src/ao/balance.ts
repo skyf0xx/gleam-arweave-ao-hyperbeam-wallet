@@ -45,18 +45,41 @@ export async function getTokenBalance(
  * plausible shapes named in ARCHITECTURE.md's open question (a bare
  * quantity string/number, or an object carrying `balance`/`ticker`/
  * `denomination`) and fails loudly on anything else rather than guessing.
+ *
+ * Live verification against a real HyperBEAM node (state.forward.computer)
+ * confirmed `compute/balances/{address}` returns a bare atomic quantity
+ * string with no denomination field, and that `now/denomination` is not
+ * reachable to look it up separately. The bare-quantity shapes are only
+ * ever returned for the AO token in practice, so they default to AO's
+ * known denomination (12) rather than 0 — defaulting to 0 rendered every
+ * balance as an undivided atomic integer (e.g. "500100000000" instead of
+ * "0.5001").
  */
+const AO_TOKEN_DENOMINATION = 12;
+
 function parseBalanceResponse(
   body: unknown,
   processId: string,
   address: string,
 ): TokenBalance {
   if (typeof body === "string" && /^\d+$/.test(body)) {
-    return { address, processId, ticker: processId, denomination: 0, quantity: body };
+    return {
+      address,
+      processId,
+      ticker: processId,
+      denomination: AO_TOKEN_DENOMINATION,
+      quantity: body,
+    };
   }
 
   if (typeof body === "number" && Number.isInteger(body)) {
-    return { address, processId, ticker: processId, denomination: 0, quantity: String(body) };
+    return {
+      address,
+      processId,
+      ticker: processId,
+      denomination: AO_TOKEN_DENOMINATION,
+      quantity: String(body),
+    };
   }
 
   if (body !== null && typeof body === "object") {
@@ -75,7 +98,9 @@ function parseBalanceResponse(
         processId,
         ticker: typeof candidate.ticker === "string" ? candidate.ticker : processId,
         denomination:
-          typeof candidate.denomination === "number" ? candidate.denomination : 0,
+          typeof candidate.denomination === "number"
+            ? candidate.denomination
+            : AO_TOKEN_DENOMINATION,
         quantity,
       };
     }

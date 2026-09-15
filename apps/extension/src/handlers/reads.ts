@@ -3,10 +3,15 @@ import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
 import {
+  AO_TOKEN,
+  AR_TOKEN,
+  DEFAULT_TOKEN_REGISTRY,
   buildPriceAtFromSeries,
   estimateHistoricalPortfolioValue,
   getHistoricalUsdPricesWithFallback,
+  getUsdPriceWithFallback,
 } from "@gleam/core/src/pricing/index.ts";
+import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
 import type {
   ActivityEntry,
   ActivityPage,
@@ -17,6 +22,7 @@ import type {
   PortfolioHistoryRange,
   StoragePort,
   TokenBalance,
+  TokenPrice,
   Wallet,
   Winston,
 } from "@gleam/core";
@@ -92,9 +98,18 @@ function periodLabelForRange(range: PortfolioHistoryRange): string {
 
 const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   gatewayUrl: "https://arweave.net",
-  peers: [],
-  activePeerUrl: null,
+  peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
+  activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
 };
+
+/**
+ * The AO token (pricing's AO_TOKEN, packages/core's single source of
+ * truth for this id) is always shown on the Tokens tab regardless of
+ * what's in a user's watch list, so its balance must always be read —
+ * `local:watchedProcessIds` has no writer anywhere in the extension yet, so
+ * relying on it alone left AO balance reads permanently empty.
+ */
+const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
 
 function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
   if (value === null || typeof value !== "object") return false;
@@ -168,7 +183,10 @@ export class ReadsHandler {
 
   async getTokenBalances(req: { address: string }): Promise<TokenBalance[]> {
     const settings = await this.loadNetworkSettings();
-    const processIds = await this.loadWatchedProcessIds(req.address);
+    const watchedProcessIds = await this.loadWatchedProcessIds(req.address);
+    const processIds = watchedProcessIds.includes(DEFAULT_AO_PROCESS_ID)
+      ? watchedProcessIds
+      : [DEFAULT_AO_PROCESS_ID, ...watchedProcessIds];
 
     if (processIds.length === 0) return [];
 
@@ -216,24 +234,28 @@ export class ReadsHandler {
 
   /**
    * Drives the main screen's total-portfolio-value chart
-   * (`ProtocolMap.getPortfolioHistory`). Sources the AR historical USD
-   * price series from `core/pricing`'s
-   * `getHistoricalUsdPricesWithFallback` (CoinGecko, falling back to
-   * CoinPaprika) and reduces it through `estimateHistoricalPortfolioValue`
-   * at each series timestamp against the wallet's *current* AR balance —
-   * this project models only a current/latest-known balance, not
-   * reconstructed historical balances (`estimateHistoricalPortfolioValue`'s
-   * own doc comment states this is out of scope), so the chart shows how
-   * today's holdings would have been valued over time, not a true
-   * historical balance curve.
+   * (`ProtocolMap.getPortfolioHistory`). Sources each registered token's
+   * (see `core/pricing`'s `DEFAULT_TOKEN_REGISTRY`) historical USD price
+   * series via `getHistoricalUsdPricesWithFallback` (CoinGecko, falling
+   * back to CoinPaprika) and reduces them through
+   * `estimateHistoricalPortfolioValue` at each AR series timestamp against
+   * the wallet's *current* balance of that token — this project models
+   * only a current/latest-known balance, not reconstructed historical
+   * balances (`estimateHistoricalPortfolioValue`'s own doc comment states
+   * this is out of scope), so the chart shows how today's holdings would
+   * have been valued over time, not a true historical balance curve.
    *
-   * Phase 1 prices AR only — `TokenBalance`'s AO holdings have no
-   * CoinGecko/CoinPaprika id mapping anywhere in this codebase yet (no
-   * layer owns a ticker→price-source-id registry), so they're left out of
-   * this estimate rather than guessed at.
+   * Only tokens in `DEFAULT_TOKEN_REGISTRY` (AR, AO) are priced — any other
+   * watched AO token has no confirmed CoinGecko/CoinPaprika listing, so
+   * it's left out of this estimate rather than guessed at (same HONESTY
+   * contract as `priceSourceForProcessId`). AR's price series is the
+   * timeline the chart is drawn against; if AO's own series fetch fails
+   * independently, AO is silently left out of that run's total rather than
+   * failing the whole chart — a temporary provider hiccup for one token
+   * shouldn't blank the entire portfolio value.
    *
    * An unrecognized `range` throws a named error (HONESTY: never silently
-   * fall back to a different range than the one requested). An empty
+   * fall back to a different range than the one requested). An empty AR
    * price series (both sources unavailable) reports `series: []` per
    * `PortfolioHistory`'s own HONESTY contract — the popup shows
    * `NetworkErrorBanner` for that case rather than this handler
@@ -255,19 +277,30 @@ export class ReadsHandler {
     const arBalanceWinston = await getArBalance(address, settings.gatewayUrl);
     const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
 
-    const priceSeries = await getHistoricalUsdPricesWithFallback(
-      { coinGeckoId: "arweave", coinPaprikaId: "ar-arweave" },
-      req.range,
-    );
+    const arPriceSeries = AR_TOKEN.priceSource
+      ? await getHistoricalUsdPricesWithFallback(AR_TOKEN.priceSource, req.range)
+      : [];
 
-    if (priceSeries.length === 0) {
+    if (arPriceSeries.length === 0) {
       return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
     }
 
-    const priceAt = buildPriceAtFromSeries(priceSeries);
-    const tokens = [{ balance: arBalance, priceAt }];
+    const tokens = [{ balance: arBalance, priceAt: buildPriceAtFromSeries(arPriceSeries) }];
 
-    const series = priceSeries.map((point) => ({
+    if (AO_TOKEN.priceSource && settings.activePeerUrl !== null) {
+      try {
+        const aoBalance = await getTokenBalance(AO_TOKEN.processId as string, address, settings.activePeerUrl);
+        const aoQuantity = Number(aoBalance.quantity) / 10 ** aoBalance.denomination;
+        const aoPriceSeries = await getHistoricalUsdPricesWithFallback(AO_TOKEN.priceSource, req.range);
+        if (aoPriceSeries.length > 0) {
+          tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries) });
+        }
+      } catch {
+        // AO balance/price unavailable this run — AR-only total, not a failed chart.
+      }
+    }
+
+    const series = arPriceSeries.map((point) => ({
       timestamp: point.timestamp,
       usdValue: estimateHistoricalPortfolioValue(tokens, point.timestamp),
     }));
@@ -277,6 +310,24 @@ export class ReadsHandler {
     const usdChange = firstValue !== 0 ? (currentUsdValue - firstValue) / firstValue : 0;
 
     return { range: req.range, series, currentUsdValue, usdChange, periodLabel };
+  }
+
+  /**
+   * Current spot USD price for every token in `DEFAULT_TOKEN_REGISTRY`
+   * (`ProtocolMap.getTokenPrices`) — drives each `TokenRow`'s per-row `$`
+   * value. A token whose price source both fail comes back with
+   * `usd: null` (HONESTY: never a fabricated `0`); a token with no
+   * `priceSource` at all (nothing outside the registry today) is skipped
+   * entirely rather than returning a meaningless entry.
+   */
+  async getTokenPrices(): Promise<TokenPrice[]> {
+    const priced = DEFAULT_TOKEN_REGISTRY.filter((token) => token.priceSource !== null);
+    return Promise.all(
+      priced.map(async (token) => ({
+        processId: token.processId,
+        usd: await getUsdPriceWithFallback(token.priceSource as NonNullable<typeof token.priceSource>),
+      })),
+    );
   }
 
   /**

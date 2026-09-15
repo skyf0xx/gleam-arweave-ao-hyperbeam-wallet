@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { browser } from "wxt/browser";
-import type { HyperBeamPeer, NetworkSettings, RuntimePort } from "@gleam/core";
+import { DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
@@ -21,6 +21,10 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 export interface NetworkPeersViewProps {
   runtime: RuntimePort;
   onBack: () => void;
+}
+
+function isHardcodedPeer(peerUrl: string): boolean {
+  return (DEFAULT_HYPERBEAM_PEER_URLS as readonly string[]).includes(peerUrl);
 }
 
 interface LoadState {
@@ -125,7 +129,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   };
 
   const handleRemovePeer = (peerUrl: string) => {
-    if (!state.settings) return;
+    if (!state.settings || isHardcodedPeer(peerUrl)) return;
     const peers = state.settings.peers.filter((peer) => peer.url !== peerUrl);
     const activePeerUrl = state.settings.activePeerUrl === peerUrl ? null : state.settings.activePeerUrl;
     void persist({ ...state.settings, peers, activePeerUrl });
@@ -240,15 +244,17 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                             }`}
                           />
                         </button>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${peerHostname(peer.url)}`}
-                          disabled={saving}
-                          onClick={() => handleRemovePeer(peer.url)}
-                          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
-                        >
-                          <RemoveIcon />
-                        </button>
+                        {isHardcodedPeer(peer.url) ? null : (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${peerHostname(peer.url)}`}
+                            disabled={saving}
+                            onClick={() => handleRemovePeer(peer.url)}
+                            className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
+                          >
+                            <RemoveIcon />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

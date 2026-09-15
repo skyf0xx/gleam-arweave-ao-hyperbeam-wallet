@@ -33,6 +33,13 @@ describe("getTokenBalance", () => {
     expect(result.processId).toBe(PROCESS_ID);
   });
 
+  it("defaults a bare numeric response to AO's denomination (12), not 0", async () => {
+    const fetchImpl = fakeFetch("500100000000");
+    const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
+
+    expect(result.denomination).toBe(12);
+  });
+
   it("parses an object balance response with ticker/denomination", async () => {
     const fetchImpl = fakeFetch({ balance: "999", ticker: "AO", denomination: 12 });
     const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);

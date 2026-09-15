@@ -10,6 +10,7 @@ import type {
   PortfolioHistoryRange,
   ThemeSettings,
   TokenBalance,
+  TokenPrice,
   TransferDraft,
   UploadDraft,
   UploadReview,
@@ -55,6 +56,18 @@ export interface ProtocolMap {
    * failure, rather than rendering a broken or blank chart.
    */
   getPortfolioHistory(req: { range: PortfolioHistoryRange }): PortfolioHistory;
+  /**
+   * Current spot USD price for every token in `core/pricing`'s
+   * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the per-row `$` value under
+   * each `TokenRow` on the Tokens tab. A token whose price couldn't be
+   * computed (both CoinGecko/CoinPaprika unavailable) comes back with
+   * `usd: null`, never a fabricated `0` — the row simply shows no `$` line,
+   * same HONESTY contract `getPortfolioHistory` already follows. Any
+   * watched token outside the registry has no entry here at all (see
+   * `priceSourceForProcessId`'s own doc comment on why an arbitrary AO
+   * process can't be priced).
+   */
+  getTokenPrices(): TokenPrice[];
   getLockSettings(): LockSettings;
   getNetworkSettings(): NetworkSettings;
   /**

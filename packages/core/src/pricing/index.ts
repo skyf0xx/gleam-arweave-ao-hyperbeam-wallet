@@ -16,6 +16,15 @@ export {
   estimateHistoricalPortfolioValue,
   type PricedHistoricalToken,
 } from "./portfolio";
+export {
+  DEFAULT_TOKEN_REGISTRY,
+  AR_TOKEN,
+  AO_TOKEN,
+  priceSourceForProcessId,
+  type RegisteredToken,
+  type TokenPriceSource,
+  type TokenPrice,
+} from "./token-sources";
 
 export interface PriceSource {
   coinGeckoId: CoinGeckoId;

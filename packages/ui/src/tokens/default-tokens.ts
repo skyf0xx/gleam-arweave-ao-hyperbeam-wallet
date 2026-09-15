@@ -1,3 +1,5 @@
+import { AO_TOKEN } from "@gleam/core";
+
 /**
  * The two tokens the Tokens tab always renders, regardless of what the
  * wallet's actual balance data contains (PRD: "AR and AO are treated as
@@ -6,13 +8,12 @@
  * the Tokens tab's row list — this module owns only the identity/display
  * constants, not the merge logic itself.
  *
- * The AO process ID is fixed per RELEVANT RULES, not inferred or
- * discovered at runtime: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc"
- * is the authoritative default AO token process to match against
- * `TokenBalance.processId` entries.
+ * The AO process ID is sourced from `@gleam/core`'s
+ * `DEFAULT_TOKEN_REGISTRY` (`packages/core/src/pricing/token-sources.ts`)
+ * — the single place that id is defined — rather than redefined here.
  */
 
-export const DEFAULT_AO_PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
+export const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
 
 export type DefaultTokenId = "AR" | "AO";
 

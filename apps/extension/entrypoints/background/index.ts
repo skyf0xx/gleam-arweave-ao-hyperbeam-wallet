@@ -197,6 +197,7 @@ messenger.onMessage("getBalance", (message) => reads.getBalance(message.data));
 messenger.onMessage("getTokenBalances", (message) => reads.getTokenBalances(message.data));
 messenger.onMessage("getActivity", (message) => reads.getActivity(message.data));
 messenger.onMessage("getPortfolioHistory", (message) => reads.getPortfolioHistory(message.data));
+messenger.onMessage("getTokenPrices", () => reads.getTokenPrices());
 messenger.onMessage("getConnectedApps", () => approval.getConnectedApps());
 
 /**

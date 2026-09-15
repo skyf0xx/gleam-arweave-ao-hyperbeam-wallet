@@ -3,6 +3,7 @@ import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { submitTransfer as submitAoTransfer } from "@gleam/core/src/ao/transfer.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import {
+  DEFAULT_HYPERBEAM_PEER_URLS,
   type ActivityEntry,
   type FeeEstimate,
   type JWKInterface,
@@ -46,8 +47,8 @@ const FIRST_SEEN_LOOKUP_LIMIT = 100;
 
 const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   gatewayUrl: "https://arweave.net",
-  peers: [],
-  activePeerUrl: null,
+  peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
+  activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
 };
 
 function isValidNetworkSettings(value: unknown): value is NetworkSettings {

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PortfolioHistoryRange, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
+import type { PortfolioHistoryRange, RuntimePort, TokenBalance, TokenPrice, WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -14,11 +14,12 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
-import { formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "./formatWinston";
+import { formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { usePortfolioHistory } from "./usePortfolioHistory";
+import { useTokenPrices } from "./useTokenPrices";
 
 /**
  * Main screen (wallet-main-screen.html) — porting what's gettable via
@@ -106,7 +107,20 @@ interface DefaultTokenRow {
   ticker: string;
   name: string;
   amount: string;
+  usdValue: string | undefined;
   sendToken: TokenBalance | null;
+}
+
+/**
+ * Looks up a token's price (by AO `processId`, or `null` for AR) from
+ * `useTokenPrices()`'s cache and formats `amount * price` as a USD string —
+ * `undefined` when the price isn't loaded yet or couldn't be computed
+ * (`TokenPrice.usd === null`, per that query's own HONESTY contract), so
+ * `TokenRow` renders no `$` line rather than a fabricated `$0.00`.
+ */
+function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null, amount: number): string | undefined {
+  const price = prices?.find((entry) => entry.processId === processId)?.usd;
+  return typeof price === "number" ? formatUsd(amount * price) : undefined;
 }
 
 /**
@@ -116,8 +130,10 @@ interface DefaultTokenRow {
  * `data` (not yet loaded) or no matching `TokenBalance` entry both fall
  * back to `DEFAULT_TOKENS`' own `"0"` constant, never `null`/`undefined`.
  */
-function buildDefaultTokenRows(data: WalletBalances | undefined): DefaultTokenRow[] {
+function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPrice[] | undefined): DefaultTokenRow[] {
   const aoBalance = data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
+  const arAmount = data?.arBalance !== undefined ? Number(formatWinstonAsAr(data.arBalance, 12)) : 0;
+  const aoAmount = aoBalance ? Number(formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination, aoBalance.denomination)) : 0;
 
   return [
     {
@@ -125,6 +141,7 @@ function buildDefaultTokenRows(data: WalletBalances | undefined): DefaultTokenRo
       ticker: DEFAULT_AR_TOKEN.ticker,
       name: DEFAULT_AR_TOKEN.name,
       amount: data?.arBalance !== undefined ? formatWinstonAsAr(data.arBalance) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
+      usdValue: data?.arBalance !== undefined ? usdValueFor(prices, null, arAmount) : undefined,
       sendToken: null,
     },
     {
@@ -132,6 +149,7 @@ function buildDefaultTokenRows(data: WalletBalances | undefined): DefaultTokenRo
       ticker: DEFAULT_AO_TOKEN.ticker,
       name: DEFAULT_AO_TOKEN.name,
       amount: aoBalance ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination) : DEFAULT_AO_TOKEN.defaultDisplayAmount,
+      usdValue: aoBalance ? usdValueFor(prices, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
       sendToken: aoBalance ?? null,
     },
   ];
@@ -141,7 +159,10 @@ function buildDefaultTokenRows(data: WalletBalances | undefined): DefaultTokenRo
  * The non-default watched tokens rendered below the AR/AO rows — every
  * `TokenBalance` whose `processId` isn't the AO default, unchanged from
  * this screen's pre-existing rendering (RELEVANT RULES: "additional
- * watched AO tokens continue to render below these two defaults").
+ * watched AO tokens continue to render below these two defaults"). These
+ * have no entry in `DEFAULT_TOKEN_REGISTRY`, so `usdValueFor` always
+ * resolves `undefined` for them today — no `$` line until such a token
+ * gets a confirmed price-source mapping.
  */
 function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
   return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
@@ -184,6 +205,7 @@ export function MainScreenView({
   const listDockOffsetRef = useRef(0);
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
+  const tokenPricesQuery = useTokenPrices(runtime);
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
@@ -384,13 +406,14 @@ export function MainScreenView({
               </>
             ) : (
               <>
-                {buildDefaultTokenRows(balancesQuery.data).map((row) => (
+                {buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map((row) => (
                   <TokenRow
                     key={row.key}
                     glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                     name={row.name}
                     ticker={row.ticker}
                     amount={row.amount}
+                    usdValue={row.usdValue}
                     loading={loading}
                     onClick={row.sendToken ? () => onSendToken(row.sendToken as TokenBalance) : undefined}
                   />
