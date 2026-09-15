@@ -31,7 +31,12 @@ export interface TransferDraft {
 }
 
 export interface FeeEstimate {
-  fee: Winston;
+  /**
+   * `null` for an AO token transfer — AO `Transfer` messages have no
+   * sender-side fee quote the way an AR value-transfer does (see
+   * `core/ao/transfer.ts`'s doc comment). Non-null for the AR path.
+   */
+  fee: Winston | null;
   /**
    * `true` when no prior ActivityEntry exists for `recipient` — escalates
    * the review screen to first-seen-address (Irreversible) tier framing
