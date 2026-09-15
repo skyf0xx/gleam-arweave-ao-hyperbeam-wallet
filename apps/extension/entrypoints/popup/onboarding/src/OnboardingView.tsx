@@ -32,7 +32,29 @@ export interface OnboardingViewProps {
   onComplete: () => void;
 }
 
-const DEFAULT_WALLET_NAME = "Wallet 1";
+const DEFAULT_WALLET_NAMES = [
+  "Lumen",
+  "Prism",
+  "Beam",
+  "Spark",
+  "Pearl",
+  "Opal",
+  "Quartz",
+  "Amber",
+  "Jade",
+  "Ruby",
+  "Crystal",
+  "Flint",
+  "Glint",
+  "Glow",
+  "Shimmer",
+  "Ember",
+  "Aurora",
+];
+
+function randomDefaultWalletName(): string {
+  return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
+}
 
 export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
   const [step, setStep] = useState<Step>({ kind: "welcome" });
@@ -45,7 +67,7 @@ export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
     try {
       const summary = await runtime.send<{ name: string; password: string }, WalletSummary>({
         type: "createWallet",
-        payload: { name: DEFAULT_WALLET_NAME, password },
+        payload: { name: randomDefaultWalletName(), password },
       });
       // `exportWallet` re-decrypts the just-created envelope rather than
       // this view module ever holding the plaintext JWK itself — the
@@ -72,7 +94,7 @@ export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
     try {
       await runtime.send({
         type: "importWallet",
-        payload: { jwk, name: DEFAULT_WALLET_NAME, password },
+        payload: { jwk, name: randomDefaultWalletName(), password },
       });
       onComplete();
     } catch (error) {
