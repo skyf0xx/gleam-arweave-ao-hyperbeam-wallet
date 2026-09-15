@@ -2,7 +2,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AO_TRANSFER_HAS_NO_FEE, submitTransfer } from "./transfer";
 
 const messageMock = vi.fn();
-const connectMock = vi.fn(() => ({ message: messageMock }));
+const connectMock = vi.fn<(config: unknown) => { message: typeof messageMock }>(() => ({
+  message: messageMock,
+}));
 const createDataItemSignerMock = vi.fn((jwk: unknown) => ({ __signerFor: jwk }));
 
 vi.mock("@permaweb/aoconnect", () => ({
