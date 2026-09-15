@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "arweave": "^1.15.7",
-    "@dha-team/arbundles": "^1.0.3"
+    "@dha-team/arbundles": "^1.0.3",
+    "@permaweb/aoconnect": "^0.0.98"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
