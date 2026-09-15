@@ -104,29 +104,29 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack }: WalletSwitch
 
       <ScreenHeader title="Wallets" onBack={onBack} />
 
-      <div className="flex flex-col px-3 pb-3 pt-9">
-        {state.loading ? (
-          <>
-            <SkeletonRow />
-            <SkeletonRow />
-          </>
-        ) : (
-          state.wallets.map((wallet) => (
-            <WalletSwitcherRow
-              key={wallet.id}
-              wallet={wallet}
-              active={wallet.id === state.activeWalletId}
-              switching={switchingId === wallet.id}
-              onSwitch={() => void handleSwitch(wallet.id)}
-            />
-          ))
-        )}
-
-        <div className="mx-2 my-1.5 h-px bg-line" />
+      <div className="px-6 pb-3 pt-9">
+        <div>
+          {state.loading ? (
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          ) : (
+            state.wallets.map((wallet) => (
+              <WalletSwitcherRow
+                key={wallet.id}
+                wallet={wallet}
+                active={wallet.id === state.activeWalletId}
+                switching={switchingId === wallet.id}
+                onSwitch={() => void handleSwitch(wallet.id)}
+              />
+            ))
+          )}
+        </div>
 
         <button
           type="button"
-          className="mt-1 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-mist"
+          className="mt-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-mist"
         >
           <span
             aria-hidden="true"
@@ -152,19 +152,15 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch }: WalletSwitch
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
   return (
-    <div
-      className={`flex items-center gap-1 rounded-xl border px-2 py-1 ${
-        active ? "border-line bg-mist" : "border-transparent"
-      }`}
-    >
+    <div className="flex items-center gap-1 border-b border-line last:border-b-0">
       <button
         type="button"
         disabled={switching}
         onClick={onSwitch}
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1.5 text-left hover:bg-mist disabled:opacity-60"
+        className="flex min-w-0 flex-1 items-center gap-2.5 py-3 text-left hover:bg-mist disabled:opacity-60"
       >
         <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} className="rounded-2xl" />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="flex items-center gap-1.5">
             <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
             <span className="flex-shrink-0 rounded-md border border-line bg-mist px-1.5 py-0.5 text-[10px] font-semibold text-muted">
@@ -174,27 +170,19 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch }: WalletSwitch
           <span className="truncate font-mono text-caption text-faint">{truncateAddress(wallet.address)}</span>
         </span>
         {active ? (
-          <span aria-hidden="true" className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground">
-            <CheckIcon />
+          <span className="flex-shrink-0 rounded-md bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+            Selected
           </span>
         ) : null}
       </button>
       <button
         type="button"
         aria-label={`Manage ${wallet.name}`}
-        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground"
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-mist hover:text-foreground"
       >
         <KebabIcon />
       </button>
     </div>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
