@@ -1,14 +1,6 @@
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  ActivityPage,
-  PortfolioHistory,
-  PortfolioHistoryRange,
-  RuntimePort,
-  TokenBalance,
-  WalletSummary,
-  Winston,
-} from "@gleam/core";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { PortfolioHistoryRange, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
 import {
   AccountAvatar,
   ActivityRow,
@@ -23,6 +15,9 @@ import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
+import { useActivity } from "../../activity/src/useActivity";
+import { useBalances } from "../../activity/src/useBalances";
+import { usePortfolioHistory } from "./usePortfolioHistory";
 
 /**
  * Main screen (wallet-main-screen.html) — porting what's gettable via
@@ -42,15 +37,17 @@ import { generateAccountAvatarSvg } from "./generateAccountAvatar";
  * `useMemo`, keyed on the address) rather than through the same
  * async-load state as the balance/activity fetches below.
  *
- * Chart: `PortfolioChart` (same directory) is fed by
- * `getPortfolioHistory` (`ProtocolMap`, wired to `ReadsHandler` in this
- * same task) via `@gleam/core`'s `PortfolioHistory`/`PortfolioHistoryRange`
- * barrel exports. Switching a range tab re-fetches that range's series
- * and updates the chart, %-change badge, and period label together from
- * one response, never a stale combination — see `loadPortfolioHistory`
- * below. An empty `series` (both price sources unavailable) falls back to
- * `NetworkErrorBanner`, matching the balance/activity failure path,
- * rather than a broken/blank chart.
+ * Chart: `PortfolioChart` (same directory) is fed by `usePortfolioHistory`
+ * (`./usePortfolioHistory.ts`), a `useQuery` wrapping the same
+ * `getPortfolioHistory` call (`ProtocolMap`, wired to `ReadsHandler`) via
+ * `@gleam/core`'s `PortfolioHistoryRange` export — the shared-cache
+ * pattern this screen's balances/activity already use
+ * (WALLET-STATE-TANSTACK). Switching a range tab reads/fetches that
+ * range's own cache entry and updates the chart, %-change badge, and
+ * period label together from one query response, never a stale
+ * combination. An empty `series` (both price sources unavailable) falls
+ * back to `NetworkErrorBanner`, matching the balance/activity failure
+ * path, rather than a broken/blank chart.
  *
  * The `Beam` identity divider (`packages/ui/src/primitives/beam.tsx`,
  * wallet-main-screen.html's `.beam-divider`) sits between the chart's
@@ -96,21 +93,6 @@ export interface MainScreenViewProps {
   onOpenSettings: () => void;
 }
 
-interface LoadState {
-  balance: Winston | null;
-  tokenBalances: TokenBalance[];
-  activity: ActivityPage | null;
-  loading: boolean;
-  hasLoadedOnce: boolean;
-  error: string | null;
-}
-
-interface PortfolioHistoryState {
-  history: PortfolioHistory | null;
-  loading: boolean;
-  error: string | null;
-}
-
 /** Scroll distance (px) past which the header collapses to its compact form. */
 const HEADER_COLLAPSE_THRESHOLD_PX = 24;
 
@@ -146,87 +128,15 @@ export function MainScreenView({
   const collapseRafRef = useRef<number | null>(null);
   const listSectionRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
-  const [state, setState] = useState<LoadState>({
-    balance: null,
-    tokenBalances: [],
-    activity: null,
-    loading: true,
-    hasLoadedOnce: false,
-    error: null,
-  });
+  const balancesQuery = useBalances(runtime, wallet.address);
+  const activityQuery = useActivity(runtime, wallet.address);
+  const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
+  const loading = balancesQuery.isLoading || activityQuery.isLoading;
+  const loadError = balancesQuery.error ?? activityQuery.error ?? null;
   const [portfolioRange, setPortfolioRange] = useState<PortfolioHistoryRange>("7D");
-  const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({
-    history: null,
-    loading: true,
-    error: null,
-  });
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, portfolioRange);
 
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
-
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const [balance, tokenBalances, activity] = await Promise.all([
-        runtime.send<{ address: string }, Winston>({
-          type: "getBalance",
-          payload: { address: wallet.address },
-        }),
-        runtime.send<{ address: string }, TokenBalance[]>({
-          type: "getTokenBalances",
-          payload: { address: wallet.address },
-        }),
-        runtime.send<{ address: string }, ActivityPage>({
-          type: "getActivity",
-          payload: { address: wallet.address },
-        }),
-      ]);
-      setState({ balance, tokenBalances, activity, loading: false, hasLoadedOnce: true, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  }, [runtime, wallet.address]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  /**
-   * `getPortfolioHistory` takes only `{ range }` (`ProtocolMap`'s locked
-   * signature — no `address`; `ReadsHandler` resolves the active wallet
-   * itself, see that file's doc comment), so this loader doesn't thread
-   * `wallet.address` through. Re-runs whenever `portfolioRange` changes
-   * (range-tab click), and always replaces the whole `PortfolioHistory`
-   * response atomically — chart points, %-change, and period label come
-   * from the same fetch, so a tab click can never show one range's chart
-   * next to a different range's %-change/period label.
-   */
-  const loadPortfolioHistory = useCallback(
-    async (range: PortfolioHistoryRange) => {
-      setPortfolioHistory((prev) => ({ ...prev, loading: true, error: null }));
-      try {
-        const history = await runtime.send<{ range: PortfolioHistoryRange }, PortfolioHistory>({
-          type: "getPortfolioHistory",
-          payload: { range },
-        });
-        setPortfolioHistory({ history, loading: false, error: null });
-      } catch (error) {
-        setPortfolioHistory((prev) => ({
-          ...prev,
-          loading: false,
-          error: error instanceof Error ? error.message : String(error),
-        }));
-      }
-    },
-    [runtime],
-  );
-
-  useEffect(() => {
-    void loadPortfolioHistory(portfolioRange);
-  }, [loadPortfolioHistory, portfolioRange]);
 
   /**
    * Chrome renders the popup as one continuously-growing box past its
@@ -286,7 +196,14 @@ export function MainScreenView({
 
   return (
     <div className="flex min-h-full flex-col">
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {loadError ? (
+        <NetworkErrorBanner
+          onRetry={() => {
+            void balancesQuery.refetch();
+            void activityQuery.refetch();
+          }}
+        />
+      ) : null}
 
       <div className="sticky top-0 z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
         <button
@@ -330,17 +247,17 @@ export function MainScreenView({
           </div>
 
           <div className="px-6 pb-1 pt-2.5">
-            {portfolioHistory.error ? (
-              <NetworkErrorBanner onRetry={() => void loadPortfolioHistory(portfolioRange)} />
+            {portfolioHistoryQuery.error ? (
+              <NetworkErrorBanner onRetry={() => void portfolioHistoryQuery.refetch()} />
             ) : (
               <PortfolioChart
-                points={portfolioHistory.history?.series ?? []}
-                currentUsdValue={portfolioHistory.history?.currentUsdValue ?? 0}
-                usdChange={portfolioHistory.history?.usdChange ?? 0}
-                periodLabel={portfolioHistory.history?.periodLabel ?? ""}
+                points={portfolioHistoryQuery.data?.series ?? []}
+                currentUsdValue={portfolioHistoryQuery.data?.currentUsdValue ?? 0}
+                usdChange={portfolioHistoryQuery.data?.usdChange ?? 0}
+                periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
                 activeRange={portfolioRange}
                 onRangeChange={setPortfolioRange}
-                loading={portfolioHistory.loading}
+                loading={portfolioHistoryQuery.isLoading}
               />
             )}
           </div>
@@ -406,22 +323,22 @@ export function MainScreenView({
 
         {activeTab === "tokens" ? (
           <div className="min-h-60 border-t border-line">
-            {state.loading && !state.hasLoadedOnce ? (
+            {loading && !hasLoadedOnce ? (
               <>
                 <SkeletonRow />
                 <SkeletonRow />
               </>
-            ) : state.tokenBalances.length === 0 ? (
+            ) : (balancesQuery.data?.tokenBalances.length ?? 0) === 0 ? (
               <EmptyState message="Nothing here yet. Send yourself something to get started." />
             ) : (
-              state.tokenBalances.map((token) => (
+              (balancesQuery.data?.tokenBalances ?? []).map((token) => (
                 <TokenRow
                   key={token.processId}
                   glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                   name={token.ticker}
                   ticker={token.ticker}
                   amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
-                  loading={state.loading}
+                  loading={loading}
                   onClick={() => onSendToken(token)}
                 />
               ))
@@ -430,15 +347,15 @@ export function MainScreenView({
         ) : (
           <>
             <div className="min-h-60 border-t border-line">
-              {state.loading && !state.hasLoadedOnce ? (
+              {loading && !hasLoadedOnce ? (
                 <>
                   <SkeletonRow />
                   <SkeletonRow />
                 </>
-              ) : !state.activity || state.activity.entries.length === 0 ? (
+              ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
                 <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
               ) : (
-                state.activity.entries.slice(0, 10).map((entry) => (
+                activityQuery.data.entries.slice(0, 10).map((entry) => (
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}

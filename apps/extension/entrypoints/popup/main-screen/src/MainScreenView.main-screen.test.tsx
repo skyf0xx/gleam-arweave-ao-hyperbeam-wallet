@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
   ActivityPage,
   PortfolioHistory,
@@ -57,18 +58,30 @@ const PORTFOLIO_HISTORY_7D: PortfolioHistory = {
   periodLabel: "Last 7 days",
 };
 
+/**
+ * `MainScreenView` reads shared balances/activity via `useBalances`/
+ * `useActivity` (TanStack Query), which requires a `QueryClientProvider`
+ * ancestor — mirrors `App.tsx`'s real wiring and `SendView.send.test.tsx`'s
+ * own render helper. A fresh, `retry: false` `QueryClient` per render keeps
+ * each test's cache isolated and makes a mocked `runtime.send` rejection
+ * surface as this query's error state on the first attempt instead of
+ * TanStack's default 3-retry backoff.
+ */
 function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0]> = {}) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MainScreenView
-      runtime={fakeRuntime()}
-      wallet={WALLET}
-      onSend={vi.fn()}
-      onSendToken={vi.fn()}
-      onReceive={vi.fn()}
-      onOpenWalletSwitcher={vi.fn()}
-      onOpenSettings={vi.fn()}
-      {...overrides}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <MainScreenView
+        runtime={fakeRuntime()}
+        wallet={WALLET}
+        onSend={vi.fn()}
+        onSendToken={vi.fn()}
+        onReceive={vi.fn()}
+        onOpenWalletSwitcher={vi.fn()}
+        onOpenSettings={vi.fn()}
+        {...overrides}
+      />
+    </QueryClientProvider>,
   );
 }
 
