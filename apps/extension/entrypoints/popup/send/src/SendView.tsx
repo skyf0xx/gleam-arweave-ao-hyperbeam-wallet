@@ -526,7 +526,6 @@ function TokenPickerStep({
         <TokenRow
           glyph={{ label: DEFAULT_AR_TOKEN.ticker, tone: 1 }}
           name={DEFAULT_AR_TOKEN.name}
-          ticker={DEFAULT_AR_TOKEN.ticker}
           amount={
             balancesQuery.data === undefined
               ? DEFAULT_AR_TOKEN.defaultDisplayAmount
@@ -540,7 +539,6 @@ function TokenPickerStep({
         <TokenRow
           glyph={{ label: DEFAULT_AO_TOKEN.ticker, tone: 2 }}
           name={DEFAULT_AO_TOKEN.name}
-          ticker={DEFAULT_AO_TOKEN.ticker}
           amount={aoBalance ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination) : DEFAULT_AO_TOKEN.defaultDisplayAmount}
           loading={loading}
           onClick={() => onSelect(aoToken)}
@@ -558,7 +556,6 @@ function TokenPickerStep({
               key={candidate.processId}
               glyph={{ label: candidate.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
               name={candidate.ticker}
-              ticker={candidate.ticker}
               amount={formatAtomicAsDisplay(candidate.quantity, candidate.denomination)}
               onClick={() => onSelect(candidate)}
               className={selectedToken?.processId === candidate.processId ? "bg-mist" : undefined}

@@ -411,7 +411,6 @@ export function MainScreenView({
                     key={row.key}
                     glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                     name={row.name}
-                    ticker={row.ticker}
                     amount={row.amount}
                     usdValue={row.usdValue}
                     loading={loading}
@@ -423,7 +422,6 @@ export function MainScreenView({
                     key={token.processId}
                     glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                     name={token.ticker}
-                    ticker={token.ticker}
                     amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
                     loading={loading}
                     onClick={() => onSendToken(token)}

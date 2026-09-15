@@ -42,27 +42,24 @@ describe("BalanceDisplay", () => {
 });
 
 describe("TokenRow", () => {
-  it("renders name, ticker, and amount", () => {
+  it("renders name and amount", () => {
     render(
       <TokenRow
         glyph={{ label: "AR", tone: 1 }}
         name="Arweave"
-        ticker="AR"
         amount="128.4204"
         usdValue="$1,438.09"
       />,
     );
     expect(screen.getByText("Arweave")).toBeTruthy();
-    expect(screen.getAllByText("AR").length).toBeGreaterThan(0);
     expect(screen.getByText("128.4204")).toBeTruthy();
   });
 
-  it("keeps the existing amount visible (dimmed, not hidden) while loading", () => {
+  it("keeps the existing usdValue visible (dimmed, not hidden) while loading", () => {
     render(
       <TokenRow
         glyph={{ label: "AR", tone: 1 }}
         name="Arweave"
-        ticker="AR"
         amount="128.4204"
         usdValue="$1,438.09"
         loading

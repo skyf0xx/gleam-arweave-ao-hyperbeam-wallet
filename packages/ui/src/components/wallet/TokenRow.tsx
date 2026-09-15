@@ -12,20 +12,22 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * Reuses the same row skeleton as `ListRow` (start/title-subtitle/end),
  * but stays a standalone component rather than composing `ListRow`
  * directly — `ListRow`'s title/subtitle stack puts the subtitle in
- * monospace (built for addresses), while a token row's ticker subtitle
- * and right-aligned two-line amount/usdValue don't fit that shape.
+ * monospace (built for addresses), while a token row's amount subtitle
+ * and right-aligned usdValue don't fit that shape.
+ *
+ * Left column is name over holding amount; right column is the
+ * holding's dollar value.
  *
  * `loading` is for a background refresh of an already-rendered row (e.g.
- * a price re-poll) — it dims the existing amount/usdValue in place
- * rather than tearing the row down to a shimmer skeleton, so a value
- * that's already on screen never disappears. First-ever load (nothing to
- * show yet) is still the caller swapping in `SkeletonRow` instead of
- * mounting `TokenRow` at all.
+ * a price re-poll) — it dims the existing usdValue in place rather than
+ * tearing the row down to a shimmer skeleton, so a value that's already
+ * on screen never disappears. First-ever load (nothing to show yet) is
+ * still the caller swapping in `SkeletonRow` instead of mounting
+ * `TokenRow` at all.
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone">;
   name: string;
-  ticker: string;
   amount: string;
   usdValue?: string;
   loading?: boolean;
@@ -33,7 +35,7 @@ export interface TokenRowProps {
   className?: string;
 }
 
-export function TokenRow({ glyph, name, ticker, amount, usdValue, loading = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, name, amount, usdValue, loading = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -48,12 +50,13 @@ export function TokenRow({ glyph, name, ticker, amount, usdValue, loading = fals
       <TokenGlyph {...glyph} />
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
-        <div className="text-caption text-muted">{ticker}</div>
+        <div className="text-caption tabular-nums text-muted">{amount}</div>
       </div>
-      <div className={cn("flex flex-shrink-0 flex-col items-end gap-px", loading && "opacity-50 transition-opacity")}>
-        <div className="text-label font-semibold tabular-nums text-foreground">{amount}</div>
-        {usdValue ? <div className="text-caption tabular-nums text-faint">{usdValue}</div> : null}
-      </div>
+      {usdValue ? (
+        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", loading && "opacity-50 transition-opacity")}>
+          {usdValue}
+        </div>
+      ) : null}
     </Component>
   );
 }
