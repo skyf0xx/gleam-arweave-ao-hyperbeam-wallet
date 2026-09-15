@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 import type { ActivityPage, FeeEstimate, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
+import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
+import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
+import { validateSendAmount } from "../../activity/src/validateSendAmount";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -131,6 +135,16 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   // this state, not the prop, is authoritative; the prop never changes
   // identity across `SendView`'s lifetime (no `useEffect` re-sync needed).
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(token);
+  // Shared cache with `MainScreenView` (`useBalances`, keyed by
+  // `wallet.address`) — the compose step's client-side "insufficient
+  // balance" check (RELEVANT RULES) reads this same query's current data
+  // rather than issuing its own fetch.
+  const balancesQuery = useBalances(runtime, wallet.address);
+  // Invalidates the shared balances/activity cache for `wallet.address`
+  // on success (RELEVANT RULES: both Send and Main Screen reflect the
+  // updated balance without a manual popup reopen), wrapping the same
+  // `submitTransfer` call this view already made directly.
+  const submitTransferMutation = useSubmitTransfer(runtime, wallet.address);
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
@@ -148,6 +162,12 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           : parseDisplayToAtomic(step.amountDisplay, selectedToken.denomination);
       if (amountAtomic === null || amountAtomic === "0") {
         setStep({ ...step, error: "Enter an amount greater than 0." });
+        return;
+      }
+
+      const balanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data);
+      if (balanceError !== null) {
+        setStep({ ...step, error: balanceError });
         return;
       }
 
@@ -195,8 +215,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   if (step.kind === "token-picker") {
     return (
       <TokenPickerStep
-        runtime={runtime}
-        wallet={wallet}
+        balancesQuery={balancesQuery}
         selectedToken={selectedToken}
         onSelect={(nextToken) => {
           setSelectedToken(nextToken);
@@ -222,18 +241,12 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
     const handleSign = async () => {
       setStep({ ...step, submitting: true, error: undefined });
       try {
-        const result = await runtime.send<
-          { walletId: string; recipient: string; token: string | null; amount: string; fee: string | null },
-          { txId: string }
-        >({
-          type: "submitTransfer",
-          payload: {
-            walletId: wallet.id,
-            recipient: step.recipient,
-            token: selectedToken === null ? null : selectedToken.processId,
-            amount: step.amountAtomic,
-            fee: step.estimate.fee,
-          },
+        const result = await submitTransferMutation.mutateAsync({
+          walletId: wallet.id,
+          recipient: step.recipient,
+          token: selectedToken === null ? null : selectedToken.processId,
+          amount: step.amountAtomic,
+          fee: step.estimate.fee,
         });
         setStep({ kind: "success", txId: result.txId, recipient: step.recipient, amountAtomic: step.amountAtomic });
       } catch (error) {
@@ -446,64 +459,30 @@ function ReviewRow({ label, value, mono, strong }: { label: string; value: strin
  * there is no disabled/"coming soon" state, per RELEVANT RULES.
  */
 function TokenPickerStep({
-  runtime,
-  wallet,
+  balancesQuery,
   selectedToken,
   onSelect,
   onBack,
 }: {
-  runtime: RuntimePort;
-  wallet: WalletSummary;
+  balancesQuery: UseQueryResult<WalletBalances>;
   selectedToken: TokenBalance | null;
   onSelect: (token: TokenBalance | null) => void;
   onBack: () => void;
 }) {
-  const [state, setState] = useState<{
-    arBalance: string | null;
-    tokens: TokenBalance[];
-    loading: boolean;
-    error: string | null;
-  }>({
-    arBalance: null,
-    tokens: [],
-    loading: true,
-    error: null,
-  });
-
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const [arBalance, tokens] = await Promise.all([
-        runtime.send<{ address: string }, string>({
-          type: "getBalance",
-          payload: { address: wallet.address },
-        }),
-        runtime.send<{ address: string }, TokenBalance[]>({
-          type: "getTokenBalances",
-          payload: { address: wallet.address },
-        }),
-      ]);
-      setState({ arBalance, tokens, loading: false, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  }, [runtime, wallet.address]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const loading = balancesQuery.isLoading;
+  const errorMessage = balancesQuery.error
+    ? balancesQuery.error instanceof Error
+      ? balancesQuery.error.message
+      : String(balancesQuery.error)
+    : null;
 
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label="Select token">
       <ScreenHeader title="Select token" onBack={onBack} />
       <div className="flex flex-1 flex-col px-1 py-2">
-        {state.error ? (
+        {errorMessage ? (
           <div role="alert" className="px-4 py-3 text-label leading-snug text-warning">
-            {state.error}
+            {errorMessage}
           </div>
         ) : null}
 
@@ -511,19 +490,19 @@ function TokenPickerStep({
           glyph={{ label: "AR", tone: 1 }}
           name="Arweave"
           ticker="AR"
-          amount={state.arBalance === null ? "" : formatWinstonAsAr(state.arBalance)}
-          loading={state.loading}
+          amount={balancesQuery.data === undefined ? "" : formatWinstonAsAr(balancesQuery.data.arBalance)}
+          loading={loading}
           onClick={() => onSelect(null)}
           className={selectedToken === null ? "bg-mist" : undefined}
         />
 
-        {state.loading ? (
+        {loading ? (
           <>
             <SkeletonPickerRow />
             <SkeletonPickerRow />
           </>
         ) : (
-          state.tokens.map((candidate) => (
+          (balancesQuery.data?.tokenBalances ?? []).map((candidate) => (
             <TokenRow
               key={candidate.processId}
               glyph={{ label: candidate.ticker.slice(0, 2).toUpperCase(), tone: 2 }}

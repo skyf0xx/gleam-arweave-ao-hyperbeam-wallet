@@ -1,11 +1,27 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ActivityPage, FeeEstimate, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
-import { SendView } from "./SendView";
+import { SendView, type SendViewProps } from "./SendView";
 
 afterEach(() => {
   cleanup();
 });
+
+/**
+ * `SendView` now reads shared balances via `useBalances` (TanStack Query),
+ * which requires a `QueryClientProvider` ancestor — mirrors `App.tsx`'s
+ * real wiring. A fresh `QueryClient` per render keeps each test's cache
+ * isolated from the others.
+ */
+function renderSendView(props: SendViewProps) {
+  const queryClient = new QueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SendView {...props} />
+    </QueryClientProvider>,
+  );
+}
 
 function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
   return {
@@ -74,12 +90,12 @@ function routedSend(handlers: {
 describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   it("opening the picker lists AR plus every getTokenBalances token, all selectable", async () => {
     const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
-    render(<SendView runtime={fakeRuntime({ send })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
 
     await waitFor(() => expect(screen.getByText("Arweave")).toBeTruthy());
-    expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0));
     expect(send).toHaveBeenCalledWith({ type: "getTokenBalances", payload: { address: WALLET.address } });
 
     // Both rows are real buttons (genuinely clickable, no disabled state).
@@ -96,7 +112,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
       estimateTransfer: () => ({ fee: null, firstSeenRecipient: false }),
       submitTransfer: () => ({ txId: "ao-tx-456" }),
     });
-    render(<SendView runtime={fakeRuntime({ send })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
     await waitFor(() => expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0));
@@ -156,7 +172,7 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
           { txId: "tx-4", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 50 },
         ]),
     });
-    render(<SendView runtime={fakeRuntime({ send })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));
 
@@ -174,7 +190,7 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
 
   it("shows an appropriate empty state, not an error or placeholder address, when there is no prior send activity", async () => {
     const send = routedSend({ getActivity: () => activityPage([]) });
-    render(<SendView runtime={fakeRuntime({ send })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));
 
@@ -187,7 +203,7 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
       if (message.type === "getActivity") throw new Error("unreachable");
       return routedSend({})(message);
     });
-    render(<SendView runtime={fakeRuntime({ send: failingSend })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send: failingSend }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));
 
@@ -202,7 +218,7 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
           { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 100 },
         ]),
     });
-    render(<SendView runtime={fakeRuntime({ send })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));
     await waitFor(() => expect(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6)))).toBeTruthy());
@@ -222,7 +238,7 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
         ]),
       estimateTransfer: () => ({ fee: "100000000", firstSeenRecipient: false }),
     });
-    render(<SendView runtime={fakeRuntime({ send })} wallet={WALLET} token={null} onBack={vi.fn()} onDone={vi.fn()} />);
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));
     await waitFor(() => expect(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6)))).toBeTruthy());

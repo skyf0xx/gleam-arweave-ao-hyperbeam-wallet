@@ -1,13 +1,11 @@
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
-  ActivityPage,
   PortfolioHistory,
   PortfolioHistoryRange,
   RuntimePort,
   TokenBalance,
   WalletSummary,
-  Winston,
 } from "@gleam/core";
 import {
   AccountAvatar,
@@ -23,6 +21,8 @@ import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
+import { useActivity } from "../../activity/src/useActivity";
+import { useBalances } from "../../activity/src/useBalances";
 
 /**
  * Main screen (wallet-main-screen.html) — porting what's gettable via
@@ -96,15 +96,6 @@ export interface MainScreenViewProps {
   onOpenSettings: () => void;
 }
 
-interface LoadState {
-  balance: Winston | null;
-  tokenBalances: TokenBalance[];
-  activity: ActivityPage | null;
-  loading: boolean;
-  hasLoadedOnce: boolean;
-  error: string | null;
-}
-
 interface PortfolioHistoryState {
   history: PortfolioHistory | null;
   loading: boolean;
@@ -146,14 +137,11 @@ export function MainScreenView({
   const collapseRafRef = useRef<number | null>(null);
   const listSectionRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
-  const [state, setState] = useState<LoadState>({
-    balance: null,
-    tokenBalances: [],
-    activity: null,
-    loading: true,
-    hasLoadedOnce: false,
-    error: null,
-  });
+  const balancesQuery = useBalances(runtime, wallet.address);
+  const activityQuery = useActivity(runtime, wallet.address);
+  const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
+  const loading = balancesQuery.isLoading || activityQuery.isLoading;
+  const loadError = balancesQuery.error ?? activityQuery.error ?? null;
   const [portfolioRange, setPortfolioRange] = useState<PortfolioHistoryRange>("7D");
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({
     history: null,
@@ -162,37 +150,6 @@ export function MainScreenView({
   });
 
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
-
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const [balance, tokenBalances, activity] = await Promise.all([
-        runtime.send<{ address: string }, Winston>({
-          type: "getBalance",
-          payload: { address: wallet.address },
-        }),
-        runtime.send<{ address: string }, TokenBalance[]>({
-          type: "getTokenBalances",
-          payload: { address: wallet.address },
-        }),
-        runtime.send<{ address: string }, ActivityPage>({
-          type: "getActivity",
-          payload: { address: wallet.address },
-        }),
-      ]);
-      setState({ balance, tokenBalances, activity, loading: false, hasLoadedOnce: true, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  }, [runtime, wallet.address]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   /**
    * `getPortfolioHistory` takes only `{ range }` (`ProtocolMap`'s locked
@@ -286,7 +243,14 @@ export function MainScreenView({
 
   return (
     <div className="flex min-h-full flex-col">
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {loadError ? (
+        <NetworkErrorBanner
+          onRetry={() => {
+            void balancesQuery.refetch();
+            void activityQuery.refetch();
+          }}
+        />
+      ) : null}
 
       <div className="sticky top-0 z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
         <button
@@ -406,22 +370,22 @@ export function MainScreenView({
 
         {activeTab === "tokens" ? (
           <div className="min-h-60 border-t border-line">
-            {state.loading && !state.hasLoadedOnce ? (
+            {loading && !hasLoadedOnce ? (
               <>
                 <SkeletonRow />
                 <SkeletonRow />
               </>
-            ) : state.tokenBalances.length === 0 ? (
+            ) : (balancesQuery.data?.tokenBalances.length ?? 0) === 0 ? (
               <EmptyState message="Nothing here yet. Send yourself something to get started." />
             ) : (
-              state.tokenBalances.map((token) => (
+              (balancesQuery.data?.tokenBalances ?? []).map((token) => (
                 <TokenRow
                   key={token.processId}
                   glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                   name={token.ticker}
                   ticker={token.ticker}
                   amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
-                  loading={state.loading}
+                  loading={loading}
                   onClick={() => onSendToken(token)}
                 />
               ))
@@ -430,15 +394,15 @@ export function MainScreenView({
         ) : (
           <>
             <div className="min-h-60 border-t border-line">
-              {state.loading && !state.hasLoadedOnce ? (
+              {loading && !hasLoadedOnce ? (
                 <>
                   <SkeletonRow />
                   <SkeletonRow />
                 </>
-              ) : !state.activity || state.activity.entries.length === 0 ? (
+              ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
                 <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
               ) : (
-                state.activity.entries.slice(0, 10).map((entry) => (
+                activityQuery.data.entries.slice(0, 10).map((entry) => (
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}
