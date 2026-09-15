@@ -1,0 +1,41 @@
+{
+  "id": "send-token-picker-default-tokens",
+  "goal": "Fix the same default-token visual gap the default-token-list intent fixed on MainScreenView's Tokens tab, in the send flow's token picker: AR and AO should always render with a defaulted \"0\" balance instead of an empty string or a missing row while the wallet's balance data is unloaded or absent.",
+  "outcome": "SendView's TokenPickerStep (apps/extension/entrypoints/popup/send/src/SendView.tsx) reuses DEFAULT_AR_TOKEN and DEFAULT_AO_TOKEN from packages/ui/src/tokens/default-tokens.ts: the AR row's displayed amount falls back to defaultDisplayAmount (\"0\") instead of an empty string when balancesQuery.data is undefined, and a default AO row (matched by DEFAULT_AO_PROCESS_ID) always renders above any other watched AO tokens, the same way MainScreenView's Tokens tab renders its two default rows.",
+  "priority": 50,
+  "requirements": [
+    {
+      "id": "SEND-TOKEN-PICKER-DEFAULT-TOKENS-RULE-1",
+      "kind": "rule",
+      "statement": "Reuse DEFAULT_AR_TOKEN and DEFAULT_AO_TOKEN (packages/ui/src/tokens/default-tokens.ts) for identity and defaultDisplayAmount rather than reintroducing local literals -- these constants already carry everything the default-token-list intent needed for the equivalent MainScreenView fix."
+    },
+    {
+      "id": "SEND-TOKEN-PICKER-DEFAULT-TOKENS-RULE-2",
+      "kind": "rule",
+      "statement": "Every row in TokenPickerStep must remain genuinely selectable -- no disabled or \"coming soon\" state, per the existing doc comment on TokenPickerStep."
+    },
+    {
+      "id": "SEND-TOKEN-PICKER-DEFAULT-TOKENS-RULE-3",
+      "kind": "rule",
+      "statement": "No change to the transport layer -- reuses the existing balancesQuery (useBalances()) already passed into TokenPickerStep; no new wire method."
+    },
+    {
+      "id": "SEND-TOKEN-PICKER-DEFAULT-TOKENS-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "While balancesQuery.data is undefined (not yet loaded), the AR row in TokenPickerStep shows \"0\", not an empty string."
+    },
+    {
+      "id": "SEND-TOKEN-PICKER-DEFAULT-TOKENS-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "TokenPickerStep always renders a default AO row (ticker AO, matched by DEFAULT_AO_PROCESS_ID) even when balancesQuery.data.tokenBalances has no AO entry, defaulting its displayed amount to \"0\"."
+    },
+    {
+      "id": "SEND-TOKEN-PICKER-DEFAULT-TOKENS-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "Once balancesQuery.data loads with a real AR or AO balance, the corresponding row updates to the real value rather than staying pinned at 0, and any additional watched AO tokens continue to render below the two default rows, unchanged from today."
+    }
+  ],
+  "depends_on": [
+    "default-token-list"
+  ]
+}
