@@ -293,6 +293,82 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
   });
 });
 
+describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-CORE)", () => {
+  const DEFAULT_AO_PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
+
+  function sendWith(overrides: {
+    arBalance?: Winston;
+    tokenBalances?: TokenBalance[];
+  }): ReturnType<typeof vi.fn> {
+    return vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return overrides.arBalance ?? BALANCE;
+      if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
+      if (type === "getActivity") return EMPTY_ACTIVITY;
+      if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      throw new Error(`Unexpected message type "${type}"`);
+    });
+  }
+
+  it("shows an AR row and an AO row reading 0 for a fresh wallet with no balances, never hitting the empty state", async () => {
+    const send = sendWith({ arBalance: "0", tokenBalances: [] });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Arweave")).toBeTruthy());
+    expect(screen.getAllByText("AO").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0").length).toBe(2);
+    expect(screen.queryByText(/Nothing here yet/i)).toBeNull();
+  });
+
+  it("updates the AR and AO rows once balancesQuery.data loads with nonzero amounts", async () => {
+    const aoBalance: TokenBalance = {
+      address: WALLET.address,
+      processId: DEFAULT_AO_PROCESS_ID,
+      ticker: "AO",
+      denomination: 0,
+      quantity: "42",
+    };
+    const send = sendWith({ arBalance: "5000000000000", tokenBalances: [aoBalance] });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("5")).toBeTruthy());
+    expect(screen.getByText("42")).toBeTruthy();
+  });
+
+  it("still renders additional watched tokens below the AR/AO default rows", async () => {
+    const extraToken: TokenBalance = {
+      address: WALLET.address,
+      processId: "processABC",
+      ticker: "PNTS",
+      denomination: 0,
+      quantity: "500",
+    };
+    const send = sendWith({ tokenBalances: [extraToken] });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Arweave")).toBeTruthy());
+    expect(screen.getAllByText("AO").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PNTS").length).toBeGreaterThan(0);
+  });
+
+  it("routes the AO default row's click into onSendToken with the matching TokenBalance", async () => {
+    const aoBalance: TokenBalance = {
+      address: WALLET.address,
+      processId: DEFAULT_AO_PROCESS_ID,
+      ticker: "AO",
+      denomination: 0,
+      quantity: "42",
+    };
+    const send = sendWith({ tokenBalances: [aoBalance] });
+    const onSendToken = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send }), onSendToken });
+
+    await waitFor(() => expect(screen.getByText("42")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /AO/ }));
+
+    expect(onSendToken).toHaveBeenCalledWith(aoBalance);
+  });
+});
+
 describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
   function setScrollY(value: number) {
     Object.defineProperty(window, "scrollY", { value, configurable: true });

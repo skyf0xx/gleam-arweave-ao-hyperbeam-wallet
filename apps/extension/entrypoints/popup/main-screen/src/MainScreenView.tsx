@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PortfolioHistoryRange, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
+import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
   ActivityRow,
@@ -16,7 +17,7 @@ import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
-import { useBalances } from "../../activity/src/useBalances";
+import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 
 /**
@@ -91,6 +92,59 @@ export interface MainScreenViewProps {
   onReceive: () => void;
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
+}
+
+/**
+ * A default (AR/AO) row carries enough to render a `TokenRow` and, for AO,
+ * to be clicked into the send flow the same as any other `TokenBalance` —
+ * `sendToken` is `null` for AR, since the top-level "Send" action (not a
+ * per-row click) is AR's entry point today, matching `TokenRow`'s existing
+ * `onClick` no-op precedent elsewhere on this screen.
+ */
+interface DefaultTokenRow {
+  key: string;
+  ticker: string;
+  name: string;
+  amount: string;
+  sendToken: TokenBalance | null;
+}
+
+/**
+ * Builds the AR/AO default rows always shown at the top of the Tokens tab
+ * (RELEVANT RULES: "AR and AO are treated as two default tokens that
+ * always appear"). Reads straight off `useBalances()`'s cache: `undefined`
+ * `data` (not yet loaded) or no matching `TokenBalance` entry both fall
+ * back to `DEFAULT_TOKENS`' own `"0"` constant, never `null`/`undefined`.
+ */
+function buildDefaultTokenRows(data: WalletBalances | undefined): DefaultTokenRow[] {
+  const aoBalance = data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
+
+  return [
+    {
+      key: "default-ar",
+      ticker: DEFAULT_AR_TOKEN.ticker,
+      name: DEFAULT_AR_TOKEN.name,
+      amount: data?.arBalance !== undefined ? formatWinstonAsAr(data.arBalance) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
+      sendToken: null,
+    },
+    {
+      key: "default-ao",
+      ticker: DEFAULT_AO_TOKEN.ticker,
+      name: DEFAULT_AO_TOKEN.name,
+      amount: aoBalance ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination) : DEFAULT_AO_TOKEN.defaultDisplayAmount,
+      sendToken: aoBalance ?? null,
+    },
+  ];
+}
+
+/**
+ * The non-default watched tokens rendered below the AR/AO rows — every
+ * `TokenBalance` whose `processId` isn't the AO default, unchanged from
+ * this screen's pre-existing rendering (RELEVANT RULES: "additional
+ * watched AO tokens continue to render below these two defaults").
+ */
+function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
+  return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
 }
 
 /** Scroll distance (px) past which the header collapses to its compact form. */
@@ -328,20 +382,31 @@ export function MainScreenView({
                 <SkeletonRow />
                 <SkeletonRow />
               </>
-            ) : (balancesQuery.data?.tokenBalances.length ?? 0) === 0 ? (
-              <EmptyState message="Nothing here yet. Send yourself something to get started." />
             ) : (
-              (balancesQuery.data?.tokenBalances ?? []).map((token) => (
-                <TokenRow
-                  key={token.processId}
-                  glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                  name={token.ticker}
-                  ticker={token.ticker}
-                  amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
-                  loading={loading}
-                  onClick={() => onSendToken(token)}
-                />
-              ))
+              <>
+                {buildDefaultTokenRows(balancesQuery.data).map((row) => (
+                  <TokenRow
+                    key={row.key}
+                    glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                    name={row.name}
+                    ticker={row.ticker}
+                    amount={row.amount}
+                    loading={loading}
+                    onClick={row.sendToken ? () => onSendToken(row.sendToken as TokenBalance) : undefined}
+                  />
+                ))}
+                {nonDefaultTokenBalances(balancesQuery.data).map((token) => (
+                  <TokenRow
+                    key={token.processId}
+                    glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                    name={token.ticker}
+                    ticker={token.ticker}
+                    amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
+                    loading={loading}
+                    onClick={() => onSendToken(token)}
+                  />
+                ))}
+              </>
             )}
           </div>
         ) : (
