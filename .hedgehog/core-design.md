@@ -30,6 +30,11 @@ same stack plus:
 - `arweave-js` (canonical Arweave client, MV3-verified via a passed spike)
   and `@dha-team/arbundles` (ANS-104 signing; upstream `arbundles` is
   stale)
+- `@tanstack/react-query` for shared wallet state (token balances,
+  activity feed) — keyed async server-state with cache invalidation on
+  mutation (send/receive, future bridging), chosen over hand-rolled state
+  because the wallet now has an open-ended set of token balances plus a
+  transaction history feed that both need refetch-on-mutation semantics
 
 These are library choices within the stack the blueprint already
 specifies, not shape-level substitutions, so they're recorded here as
