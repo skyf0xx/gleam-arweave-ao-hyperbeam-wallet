@@ -15,6 +15,11 @@
       "statement": "AR and AO rows render even when balancesQuery.data is undefined (not yet loaded) or tokenBalances has no AO entry -- the defaulted displayed value is the string \"0\", never null/undefined/omitted."
     },
     {
+      "id": "DEFAULT-TOKEN-LIST-RULE-3",
+      "kind": "rule",
+      "statement": "The default AO token is identified by AO process ID 0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc (ticker AO) -- this is the fixed process ID to match against tokenBalances entries and to seed the default row's identity, not an inferred or placeholder value."
+    },
+    {
       "id": "DEFAULT-TOKEN-LIST-ACCEPTANCE-1",
       "kind": "acceptance",
       "statement": "A freshly-created wallet with no on-chain activity shows an AR row and an AO row, both reading 0, instead of an empty Tokens tab."
