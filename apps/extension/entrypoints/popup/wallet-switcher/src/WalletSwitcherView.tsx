@@ -104,7 +104,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack }: WalletSwitch
 
       <ScreenHeader title="Wallets" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col px-3 pb-3">
+      <div className="flex flex-col px-3 pb-3 pt-3">
         {state.loading ? (
           <>
             <SkeletonRow />
