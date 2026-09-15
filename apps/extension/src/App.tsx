@@ -5,7 +5,6 @@ import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
 import { SendView } from "@/entrypoints/popup/send/index.tsx";
 import { ReceiveView } from "@/entrypoints/popup/receive/index.tsx";
-import { ActivityView } from "@/entrypoints/popup/activity/index.tsx";
 import { WalletSwitcherView } from "@/entrypoints/popup/wallet-switcher/index.tsx";
 import { LockSettingsView } from "@/entrypoints/popup/lock-settings/index.tsx";
 import { NetworkPeersView } from "@/entrypoints/popup/network-peers/index.tsx";
@@ -73,7 +72,6 @@ type MainSubView =
   /** `token: null` is the AR path (the top-level Send action); an AO token row's click carries its `TokenBalance`. */
   | { kind: "send"; token: TokenBalance | null }
   | { kind: "receive" }
-  | { kind: "activity" }
   | { kind: "wallet-switcher" }
   | { kind: "settings-home" }
   | { kind: "lock-settings" }
@@ -225,8 +223,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     );
   } else if (subView.kind === "receive") {
     content = <ReceiveView wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
-  } else if (subView.kind === "activity") {
-    content = <ActivityView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "wallet-switcher") {
     content = (
       <WalletSwitcherView
@@ -268,12 +264,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onSend={() => setSubView({ kind: "send", token: null })}
         onSendToken={(token) => setSubView({ kind: "send", token })}
         onReceive={() => setSubView({ kind: "receive" })}
-        // No "all tokens" screen exists yet (tracked as separate scope,
-        // matching this file's `activity` sub-view once that screen is
-        // built) — a no-op keeps the header's affordance visually
-        // complete without a destination view to route to yet.
-        onViewAllTokens={() => {}}
-        onViewAllActivity={() => setSubView({ kind: "activity" })}
         onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
         onOpenSettings={() => setSubView({ kind: "settings-home" })}
       />
