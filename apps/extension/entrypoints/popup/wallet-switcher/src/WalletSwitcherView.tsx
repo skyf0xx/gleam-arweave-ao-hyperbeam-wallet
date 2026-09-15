@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
 
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
@@ -39,6 +40,7 @@ function truncateAddress(address: string): string {
 export interface WalletSwitcherViewProps {
   runtime: RuntimePort;
   onSwitched: (walletId: string) => void;
+  onBack: () => void;
 }
 
 interface LoadState {
@@ -48,7 +50,7 @@ interface LoadState {
   error: string | null;
 }
 
-export function WalletSwitcherView({ runtime, onSwitched }: WalletSwitcherViewProps) {
+export function WalletSwitcherView({ runtime, onSwitched, onBack }: WalletSwitcherViewProps) {
   const [state, setState] = useState<LoadState>({
     wallets: [],
     activeWalletId: null,
@@ -100,9 +102,7 @@ export function WalletSwitcherView({ runtime, onSwitched }: WalletSwitcherViewPr
     <div className="flex min-h-full flex-col" role="dialog" aria-label="Switch wallet">
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
-      <div className="flex items-center justify-between px-5 py-3">
-        <span className="text-body font-bold text-foreground">Wallets</span>
-      </div>
+      <ScreenHeader title="Wallets" onBack={onBack} />
 
       <div className="flex flex-1 flex-col px-3 pb-3">
         {state.loading ? (

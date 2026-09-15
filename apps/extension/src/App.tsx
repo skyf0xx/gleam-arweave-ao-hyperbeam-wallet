@@ -229,6 +229,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
           setSubView({ kind: "home" });
           void refresh(runtime);
         }}
+        onBack={() => setSubView({ kind: "home" })}
       />
     );
   } else if (subView.kind === "lock-settings") {
