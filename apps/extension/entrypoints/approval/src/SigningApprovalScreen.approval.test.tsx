@@ -63,20 +63,17 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("disables signing until a password is entered, then calls onSign with it", async () => {
+  it("calls onSign immediately on click, no password required", async () => {
     const onSign = vi.fn().mockResolvedValue(undefined);
     render(
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={onSign} />,
     );
 
     const signButton = screen.getByRole("button", { name: /sign and send/i });
-    expect(signButton).toHaveProperty("disabled", true);
-
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse" } });
     expect(signButton).toHaveProperty("disabled", false);
 
     fireEvent.click(signButton);
-    expect(onSign).toHaveBeenCalledWith("correct horse");
+    expect(onSign).toHaveBeenCalledWith();
   });
 
   it("surfaces a signing failure inline rather than closing the screen", async () => {
@@ -85,7 +82,6 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={onSign} />,
     );
 
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse" } });
     fireEvent.click(screen.getByRole("button", { name: /sign and send/i }));
 
     await screen.findByText(/signing kind not implemented yet/i);

@@ -16,6 +16,7 @@ import {
   type WalletState,
   type WalletSummary,
 } from "@gleam/core";
+import { cacheKey, clearKeyCache, isSessionExpired, removeCachedKey } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
@@ -41,17 +42,23 @@ import {
  *   `local:`/`session:` area routing — this handler only ever reads/writes
  *   the `session:` prefix for it, never `local:`.
  *
- * Session-state decision (reported per the task packet): a derived
- * `CryptoKey` is not structured-cloneable into `chrome.storage.session` in
- * a usable form (ARCHITECTURE.md §5.1/§7.2), so this handler holds no key
- * material across calls at all — `unlockWallet` decrypts each wallet's
- * envelope once (to prove the password is correct and to read out the
- * address), then discards the derived key, and every subsequent call that
- * needs signing key material (a later layer's concern — `wallet-core`)
- * re-derives from the password, which is never itself persisted anywhere,
- * including session storage. `Session` records only bookkeeping
- * (`unlockedAt`, `lastActivityAt`, `autoLockTimeout`, `unlockedWalletIds`)
- * — exactly the fields the model declares, never a password or key.
+ * Session-state decision (supersedes this file's original one): a derived
+ * `CryptoKey`/JWK is not structured-cloneable into `chrome.storage.session`
+ * in a usable form (ARCHITECTURE.md §5.1/§7.2), so `Session` itself still
+ * records only bookkeeping (`unlockedAt`, `lastActivityAt`,
+ * `autoLockTimeout`, `unlockedWalletIds`) — never a password or key. But
+ * requiring every later signing call to carry a freshly-typed password
+ * made "unlocked" a fiction (every action re-prompted), which is not how
+ * a wallet extension is supposed to behave once the user has entered
+ * their password — see `key-session.ts`: `unlockWallet`, `createWallet`,
+ * and `importWallet` all cache the wallet's JWK in that
+ * background-worker-local, in-memory map (the latter two already have the
+ * plaintext JWK in hand before encrypting it, so no extra decrypt is
+ * needed), so `TransferHandler`/`UploadHandler`/`ApprovalHandler` can sign
+ * without asking for the password again. `lockWallet` and an expired
+ * auto-lock timeout (`loadSession`'s `isSessionExpired` check) both clear
+ * that cache; a restarted service worker starts with an empty one
+ * regardless of what `Session` in storage still claims.
  */
 
 const WALLETS_KEY = "local:wallets";
@@ -166,12 +173,26 @@ function isValidSession(value: unknown): value is Session {
   );
 }
 
+/**
+ * Reads back the unlocked session, treating one whose auto-lock timeout
+ * has elapsed as no different from an explicit `lockWallet()` — same
+ * "stays unlocked until you lock it or this timeout is reached" contract
+ * `LockSettingsView` already advertises. Clears the in-memory key cache
+ * on the same path so an expired session can never be used to sign even
+ * if some caller reached a handler method without going through
+ * `getState` first.
+ */
 async function loadSession(
   storage: StoragePort,
   wallets: Wallet[],
 ): Promise<Session | null> {
   const raw = await storage.get<unknown>(SESSION_KEY);
   if (!isValidSession(raw)) return null;
+  if (isSessionExpired(raw.lastActivityAt, raw.autoLockTimeout)) {
+    clearKeyCache();
+    await saveSession(storage, null);
+    return null;
+  }
   // Filter unlockedWalletIds against the current wallet set, same
   // untrusted-input treatment as activeWalletId.
   const validIds = raw.unlockedWalletIds.filter((id) =>
@@ -263,6 +284,7 @@ export class WalletLifecycleHandler {
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
     await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
+    cacheKey(wallet.id, jwk, address);
 
     return toSummary(wallet);
   }
@@ -309,6 +331,7 @@ export class WalletLifecycleHandler {
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
     await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
+    cacheKey(wallet.id, shapeCheck.jwk, address);
 
     return toSummary(wallet);
   }
@@ -317,6 +340,7 @@ export class WalletLifecycleHandler {
     const wallets = await loadWallets(this.storage);
     const remaining = wallets.filter((wallet) => wallet.id !== req.walletId);
     await saveWallets(this.storage, remaining);
+    removeCachedKey(req.walletId);
 
     const activeWalletId = await loadActiveWalletId(this.storage, remaining);
     if (activeWalletId === null) {
@@ -370,8 +394,9 @@ export class WalletLifecycleHandler {
     }
   }
 
-  /** Immediately clears unlocked-session state, regardless of any auto-lock timeout. */
+  /** Immediately clears unlocked-session state and every cached signing key, regardless of any auto-lock timeout. */
   async lockWallet(): Promise<void> {
+    clearKeyCache();
     await saveSession(this.storage, null);
   }
 
@@ -384,6 +409,7 @@ export class WalletLifecycleHandler {
    * outside this handler can reach this method yet.
    */
   async resetAllWallets(): Promise<void> {
+    clearKeyCache();
     await saveWallets(this.storage, []);
     await this.storage.remove(ACTIVE_WALLET_ID_KEY);
     await saveSession(this.storage, null);
@@ -393,7 +419,10 @@ export class WalletLifecycleHandler {
    * Tries the last-active wallet's password first, then opportunistically
    * the same password against every other stored wallet — each mismatch
    * fails silently (never surfaced as a per-wallet prompt), per the
-   * onboarding-unlock RELEVANT RULES.
+   * onboarding-unlock RELEVANT RULES. Every wallet that unlocks
+   * successfully has its decrypted JWK cached in-memory (`key-session.ts`)
+   * so later signing calls (transfer/upload/approval) don't need the
+   * password again for the rest of this unlocked session.
    */
   async unlockWallet(req: { password: string }): Promise<{ unlockedWalletIds: string[] }> {
     const wallets = await loadWallets(this.storage);
@@ -413,7 +442,12 @@ export class WalletLifecycleHandler {
           wallet.id,
           wallet.address,
         );
-        zeroize(plaintext);
+        try {
+          const jwk = JSON.parse(new TextDecoder().decode(plaintext)) as JWKInterface;
+          cacheKey(wallet.id, jwk, wallet.address);
+        } finally {
+          zeroize(plaintext);
+        }
         unlockedWalletIds.push(wallet.id);
       } catch {
         // Wrong password for this wallet — silent per-wallet fallback,
@@ -440,10 +474,21 @@ export class WalletLifecycleHandler {
     return { unlockedWalletIds };
   }
 
+  /**
+   * `getState` is called on every popup/sidepanel mount (`App.tsx`), which
+   * makes it the natural place to refresh `lastActivityAt` — "opened the
+   * extension and looked at it" counts as activity for auto-lock purposes,
+   * the same way Rabby's timeout resets on interaction rather than only on
+   * unlock. Refreshed only for a session `loadSession` didn't just expire.
+   */
   async getState(): Promise<WalletState> {
     const wallets = await loadWallets(this.storage);
     const activeWalletId = await loadActiveWalletId(this.storage, wallets);
     const session = await loadSession(this.storage, wallets);
+
+    if (session !== null) {
+      await saveSession(this.storage, { ...session, lastActivityAt: Date.now() });
+    }
 
     return {
       wallets: wallets.map(toSummary),

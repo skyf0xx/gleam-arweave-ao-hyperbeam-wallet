@@ -1,6 +1,7 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
+import { getCachedKey, clearKeyCache } from "./key-session";
 
 const GOOD_PASSWORD = "correct horse battery staple";
 const OTHER_PASSWORD = "another very long safe password!";
@@ -422,6 +423,91 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
 
     const session = await storage.get<{ autoLockTimeout: string }>("session:unlockedSession");
     expect(session?.autoLockTimeout).toBe("never");
+  });
+});
+
+describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () => {
+  let storage: StoragePort;
+  let handler: WalletLifecycleHandler;
+
+  beforeEach(() => {
+    storage = createFakeStorage();
+    handler = new WalletLifecycleHandler(storage);
+  });
+
+  afterEach(() => {
+    clearKeyCache();
+  });
+
+  it("unlockWallet caches the wallet's decrypted signing key so later calls don't need the password again", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+    expect(getCachedKey(wallet.id)).toBeNull();
+
+    await handler.unlockWallet({ password: GOOD_PASSWORD });
+
+    expect(getCachedKey(wallet.id)).not.toBeNull();
+  });
+
+  it("lockWallet clears every cached signing key immediately", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    expect(getCachedKey(wallet.id)).not.toBeNull();
+
+    await handler.lockWallet();
+
+    expect(getCachedKey(wallet.id)).toBeNull();
+  });
+
+  it("an elapsed auto-lock timeout clears the session and the cached key on the next getState", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    expect(getCachedKey(wallet.id)).not.toBeNull();
+
+    // Simulate a session whose "immediate" timeout has already elapsed —
+    // the same shape unlockWallet would have written, but with an
+    // activity timestamp far enough in the past.
+    await storage.set("session:unlockedSession", {
+      unlockedAt: Date.now() - 10_000,
+      lastActivityAt: Date.now() - 10_000,
+      autoLockTimeout: "immediate",
+      unlockedWalletIds: [wallet.id],
+    });
+
+    const state = await handler.getState();
+
+    expect(state.session).toBeNull();
+    expect(getCachedKey(wallet.id)).toBeNull();
+  });
+
+  it("a session within its auto-lock timeout stays unlocked and keeps its cached key", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    await storage.set("session:unlockedSession", {
+      unlockedAt: Date.now(),
+      lastActivityAt: Date.now(),
+      autoLockTimeout: "5min",
+      unlockedWalletIds: [wallet.id],
+    });
+
+    const state = await handler.getState();
+
+    expect(state.session).not.toBeNull();
+    expect(getCachedKey(wallet.id)).not.toBeNull();
+  });
+
+  it("getState refreshes lastActivityAt, extending the session on activity", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    const staleTimestamp = Date.now() - 1000;
+    await storage.set("session:unlockedSession", {
+      unlockedAt: staleTimestamp,
+      lastActivityAt: staleTimestamp,
+      autoLockTimeout: "5min",
+      unlockedWalletIds: [wallet.id],
+    });
+
+    await handler.getState();
+
+    const session = await storage.get<{ lastActivityAt: number }>("session:unlockedSession");
+    expect(session!.lastActivityAt).toBeGreaterThan(staleTimestamp);
   });
 });
 

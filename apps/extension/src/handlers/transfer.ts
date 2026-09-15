@@ -2,8 +2,6 @@ import { estimateFee, submitTransfer as submitArweaveTransfer } from "@gleam/cor
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import {
-  decryptFromEnvelope,
-  zeroize,
   type ActivityEntry,
   type FeeEstimate,
   type JWKInterface,
@@ -12,39 +10,23 @@ import {
   type TransferDraft,
   type Wallet,
 } from "@gleam/core";
+import { getCachedKey } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
  * `submitTransfer`. Same constructor-injected-`StoragePort` shape as the
  * other handlers in this directory.
  *
- * Interface-boundary judgment call, reported per this task's packet:
- * signing an AR transfer needs the decrypted JWK, but
- * `WalletLifecycleHandler.unlockWallet` (already built, locked) never
- * persists derived key material anywhere — it decrypts once to verify
- * the password, then discards it, and documents that every later call
- * needing signing material must re-derive from the password. `protocol.ts`
- * (locked, `messaging`'s scope) declares `submitTransfer(req:
- * TransferDraft): { txId: string }` with no password field, and
- * `TransferDraft` itself (`core/models/transfer.ts`, also `messaging`'s
- * scope) has no password field to add one to without editing a file
- * outside this layer's ALLOWED SCOPE.
- *
- * Resolution chosen here: this handler's own `estimateTransfer`/
- * `submitTransfer` methods accept `TransferDraft & { walletId: string;
- * password: string }` — a request shape strictly wider than
- * `ProtocolMap`'s, satisfiable by any caller that already has
- * `ProtocolMap`'s `TransferDraft` in hand plus the two extra fields. This
- * mirrors `WalletLifecycleHandler.exportWallet`'s existing shape
- * (`{ walletId, password }`) rather than inventing a new pattern. It's
- * forward-compatible with the real fix (adding `walletId`/`password` to
- * `TransferDraft` itself, a `messaging`-layer change) without this
- * handler needing to change again — only the type import would tighten.
- * See this task's final report: no `background` entrypoint exists yet to
- * actually wire `ProtocolMap` method names to these handler methods (the
- * same true today of `WalletLifecycleHandler`/`ReadsHandler`), so this
- * mismatch cannot yet manifest as a live wire-contract violation; it will
- * need resolving before `provider-bridge`'s dispatcher wiring lands.
+ * Signing key source: an AR transfer needs the decrypted JWK, which this
+ * handler now reads from `key-session.ts`'s in-memory cache — populated by
+ * `WalletLifecycleHandler.unlockWallet` — instead of requiring a password
+ * on every request (this file's original resolution, superseded: see
+ * `wallet-lifecycle.ts`'s doc comment for why "re-derive from a
+ * freshly-typed password every call" was replaced). `submitTransfer`
+ * throws a specific "wallet is locked" error if no key is cached for
+ * `req.walletId` — the caller (`SendView`) has no password field to fall
+ * back to asking for, so the UI's job is to route the user back to the
+ * unlock screen when it sees that error, not to retry with a prompt here.
  *
  * Storage schema this handler owns:
  * - `local:activityLog:{address}` — see `ReadsHandler`'s doc comment;
@@ -52,7 +34,6 @@ import {
  */
 export interface SubmitTransferRequest extends TransferDraft {
   walletId: string;
-  password: string;
 }
 
 export type EstimateTransferRequest = SubmitTransferRequest;
@@ -115,28 +96,13 @@ export class TransferHandler {
     await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, [entry, ...existing]);
   }
 
-  /**
-   * Decrypts a wallet's JWK for one signing operation. The plaintext is
-   * the caller's responsibility to zeroize once used — this method
-   * itself never retains it.
-   */
-  private async unlockSigningKey(walletId: string, password: string): Promise<{ jwk: JWKInterface; address: string }> {
-    const wallet = await this.loadWallet(walletId);
-    if (!wallet.encryptedKeyfile) {
-      throw new Error(`Wallet "${walletId}" has no key material to sign with.`);
+  /** Reads a wallet's signing key from the unlocked-session cache. Throws if the wallet isn't currently unlocked. */
+  private signingKeyFor(walletId: string): { jwk: JWKInterface; address: string } {
+    const cached = getCachedKey(walletId);
+    if (!cached) {
+      throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
-    const plaintext = await decryptFromEnvelope(
-      wallet.encryptedKeyfile,
-      password,
-      wallet.id,
-      wallet.address,
-    );
-    try {
-      const jwk = JSON.parse(new TextDecoder().decode(plaintext)) as JWKInterface;
-      return { jwk, address: wallet.address };
-    } finally {
-      zeroize(plaintext);
-    }
+    return cached;
   }
 
   /**
@@ -187,7 +153,7 @@ export class TransferHandler {
     }
 
     const settings = await this.loadNetworkSettings();
-    const { jwk, address } = await this.unlockSigningKey(req.walletId, req.password);
+    const { jwk, address } = this.signingKeyFor(req.walletId);
 
     const { txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount);
 

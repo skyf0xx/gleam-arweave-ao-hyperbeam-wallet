@@ -6,22 +6,20 @@ import type { Winston } from "./balance";
  * `estimateTransfer` has run — the review screen shows it, composition
  * does not (PRD §4 — Send AR).
  *
- * `walletId`/`password` (added by `provider-bridge`, closing a debt
- * `wallet-core` declared): signing a transfer needs the decrypted JWK, and
- * `WalletLifecycleHandler.unlockWallet` never persists derived key
- * material — every signing call must re-derive from the password. Both
- * fields were previously bolted on locally by `handlers/transfer.ts` as
- * `TransferDraft & { walletId; password }`; they now live on the model
- * itself so `ProtocolMap`'s wire contract carries them directly.
+ * `walletId` (added by `provider-bridge`, closing a debt `wallet-core`
+ * declared): signing a transfer needs the decrypted JWK, read from the
+ * background's in-memory unlocked-session cache
+ * (`apps/extension/src/handlers/key-session.ts`) rather than re-derived
+ * from a password on every call — see that file's doc comment.
  *
  * Typed optional here (not strictly required) only to stay
  * structurally compatible with `models.models.test.ts`'s existing
  * `TransferDraft` literal (locked outside this task's ALLOWED SCOPE,
  * `messaging`'s scope) — see this task's final report. Every real
- * `estimateTransfer`/`submitTransfer` caller in this layer still always
- * supplies both; `handlers/transfer.ts`'s own `TransferDraft & {
- * walletId: string; password: string }` intersection still narrows them
- * back to required for that handler's own signature.
+ * `estimateTransfer`/`submitTransfer` caller in this layer always
+ * supplies it; `handlers/transfer.ts`'s own `TransferDraft & { walletId:
+ * string }` intersection still narrows it back to required for that
+ * handler's own signature.
  */
 export interface TransferDraft {
   recipient: string;
@@ -30,7 +28,6 @@ export interface TransferDraft {
   amount: Winston;
   fee: Winston | null;
   walletId?: string;
-  password?: string;
 }
 
 export interface FeeEstimate {

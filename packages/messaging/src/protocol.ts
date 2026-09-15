@@ -67,9 +67,12 @@ export interface ProtocolMap {
   getThemePreference(): ThemeSettings;
 
   // actions
-  // `TransferDraft`/`UploadDraft` carry `walletId`/`password` directly
-  // (added by `provider-bridge`, see those models' doc comments) — signing
-  // needs the decrypted JWK, re-derived per call, never persisted.
+  // `TransferDraft`/`UploadDraft` carry `walletId` directly (added by
+  // `provider-bridge`, see those models' doc comments) — signing reads
+  // the decrypted JWK from the background's in-memory unlocked-session
+  // cache (`apps/extension/src/handlers/key-session.ts`), not a password
+  // on the request: once unlocked, no further call needs one until the
+  // session is locked or its auto-lock timeout elapses.
   estimateTransfer(req: TransferDraft): FeeEstimate;
   submitTransfer(req: TransferDraft): { txId: string };
   reviewUpload(req: UploadDraft): UploadReview; // runs the secret scan
@@ -77,21 +80,14 @@ export interface ProtocolMap {
 
   // approvals
   getApproval(req: { requestId: string }): ApprovalRequest;
-  resolveApproval(req: { requestId: string; approved: boolean }): void;
   /**
-   * `APPROVAL_METHODS` (`core/models/method-privileges.ts`) names this
-   * method, but no layer before this one had a shape for it. A signing
-   * approval needs a password to actually decrypt the signing key, but
-   * `resolveApproval`'s own shape is locked to exactly `{ requestId,
-   * approved }` (`protocol.messaging.test.ts`'s `toEqualTypeOf`
-   * assertion, outside this layer's ALLOWED SCOPE to change) — so the
-   * approval window calls this first, from the same trusted approval
-   * context, to hand off the password for a pending signing request
-   * before calling `resolveApproval({ requestId, approved: true })`
-   * without one. A `connect` approval never calls this at all — no
-   * signing key is needed to create a Grant.
+   * A signing approval reads its signing key the same way
+   * `submitTransfer`/`submitUpload` do — from the unlocked-session cache,
+   * keyed by the request's own `walletId` — so `resolveApproval` alone is
+   * enough to finalize either a `connect` or a signing approval; no
+   * separate password hand-off call precedes it any more.
    */
-  unlockApprovalWallet(req: { requestId: string; password: string }): void;
+  resolveApproval(req: { requestId: string; approved: boolean }): void;
 
   // settings
   setNetworkSettings(req: NetworkSettings): void;

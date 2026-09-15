@@ -1,37 +1,19 @@
 import { scanForSecrets, submitUploadToBundler, validateTagBytes } from "@gleam/core/src/policy/index.ts";
-import {
-  base64ToBytes,
-  decryptFromEnvelope,
-  zeroize,
-  type JWKInterface,
-  type StoragePort,
-  type UploadDraft,
-  type UploadReview,
-  type Wallet,
-} from "@gleam/core";
+import { base64ToBytes, type StoragePort, type UploadDraft, type UploadReview } from "@gleam/core";
+import { getCachedKey } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `reviewUpload`/
  * `submitUpload`. Same constructor-injected-`StoragePort` shape as every
  * other handler in this directory.
  *
- * Signing-capability boundary (reported per this task's packet, matching
- * `handlers/transfer.ts`'s own documented resolution rather than
- * inventing a different one): submitting an upload needs the decrypted
- * JWK to sign the ANS-104 DataItem, but `ProtocolMap.submitUpload(req:
- * UploadDraft)` (locked, `messaging`'s scope) and `UploadDraft` itself
- * (`core/models/upload.ts`, also `messaging`'s scope) carry no
- * `walletId`/`password` field — the identical gap `transfer.ts`
- * documents for `TransferDraft`/`submitTransfer`. This handler's
- * `submitUpload` accepts `UploadDraft & { walletId: string; password:
- * string }`, the same widened-request-shape pattern as
- * `SubmitTransferRequest`, for the same forward-compatibility reason:
- * it's satisfiable by any caller that already has `ProtocolMap`'s
- * `UploadDraft` in hand plus the two extra fields, and only the type
- * import would need to tighten if `walletId`/`password` are ever added
- * to `UploadDraft` itself. `reviewUpload` needs no signing key at all
- * (it only scans/validates), so it keeps `ProtocolMap`'s exact
- * `UploadDraft` shape unchanged.
+ * Signing key source: submitting an upload needs the decrypted JWK to
+ * sign the ANS-104 DataItem, read from `key-session.ts`'s in-memory cache
+ * — same resolution as `handlers/transfer.ts`'s `submitTransfer`, see
+ * that file's doc comment for why a password is no longer required on
+ * this request. `reviewUpload` needs no signing key at all (it only
+ * scans/validates), so it keeps `ProtocolMap`'s exact `UploadDraft` shape
+ * unchanged.
  *
  * Bundler endpoint: no `NetworkSettings` field exists for a configurable
  * bundler URL (`packages/core/src/models/network.ts`, outside this
@@ -52,51 +34,15 @@ import {
  */
 export interface SubmitUploadRequest extends UploadDraft {
   walletId: string;
-  password: string;
 }
 
-const WALLETS_KEY = "local:wallets";
 const DEFAULT_BUNDLER_URL = "https://up.arweave.net";
-
-function isValidWallet(value: unknown): value is Wallet {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string" && typeof candidate.address === "string";
-}
 
 export class UploadHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
   ) {}
-
-  private async loadWallet(walletId: string): Promise<Wallet> {
-    const raw = await this.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(raw) ? raw.filter(isValidWallet) : [];
-    const wallet = wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) {
-      throw new Error(`No stored wallet with id "${walletId}".`);
-    }
-    return wallet;
-  }
-
-  /**
-   * Decrypts a wallet's JWK for one signing operation, same shape as
-   * `TransferHandler`'s private `unlockSigningKey` — the plaintext is
-   * the caller's responsibility to zeroize once used.
-   */
-  private async unlockSigningKey(walletId: string, password: string): Promise<JWKInterface> {
-    const wallet = await this.loadWallet(walletId);
-    if (!wallet.encryptedKeyfile) {
-      throw new Error(`Wallet "${walletId}" has no key material to sign with.`);
-    }
-    const plaintext = await decryptFromEnvelope(wallet.encryptedKeyfile, password, wallet.id, wallet.address);
-    try {
-      return JSON.parse(new TextDecoder().decode(plaintext)) as JWKInterface;
-    } finally {
-      zeroize(plaintext);
-    }
-  }
 
   /**
    * Runs the pre-upload secret scan and tag byte-size validation over an
@@ -139,12 +85,15 @@ export class UploadHandler {
       );
     }
 
-    const jwk = await this.unlockSigningKey(req.walletId, req.password);
+    const cached = getCachedKey(req.walletId);
+    if (!cached) {
+      throw new Error(`Wallet "${req.walletId}" is locked. Unlock it to continue.`);
+    }
     const dataBytes = base64ToBytes(req.data);
 
     return submitUploadToBundler(
       this.bundlerUrl,
-      jwk,
+      cached.jwk,
       dataBytes,
       req.contentType,
       req.tags,

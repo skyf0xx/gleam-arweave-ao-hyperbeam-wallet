@@ -1,6 +1,7 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { StoragePort, WindowPort } from "@gleam/core";
 import { ApprovalHandler } from "./approval";
+import { cacheKey, clearKeyCache } from "./key-session";
 
 /**
  * A `StoragePort` fake whose `watch` genuinely fires on every `set`
@@ -265,7 +266,7 @@ describe("ApprovalHandler: revocation ends access", () => {
   });
 });
 
-describe("ApprovalHandler: signing approval preview + password gate", () => {
+describe("ApprovalHandler: signing approval preview + unlocked-session gate", () => {
   let storage: StoragePort;
   let windows: ReturnType<typeof createFakeWindows>;
   let handler: ApprovalHandler;
@@ -275,6 +276,10 @@ describe("ApprovalHandler: signing approval preview + password gate", () => {
     windows = createFakeWindows();
     handler = new ApprovalHandler(storage, windows);
     await seedWallet(storage);
+  });
+
+  afterEach(() => {
+    clearKeyCache();
   });
 
   it("getApproval returns the exact pending ApprovalRequest for a requestId", async () => {
@@ -310,7 +315,7 @@ describe("ApprovalHandler: signing approval preview + password gate", () => {
     await expect(handler.getApproval({ requestId: "does-not-exist" })).rejects.toThrow(/no pending/i);
   });
 
-  it("signing without a staged password is rejected with a specific error", async () => {
+  it("signing when the wallet has no cached key (locked) is rejected with a specific error", async () => {
     const pending = handler.requestApproval({
       kind: "sign",
       origin: "https://bazar.arweave.net",
@@ -321,10 +326,12 @@ describe("ApprovalHandler: signing approval preview + password gate", () => {
     const requestId = extractRequestId(windows.opened[0]!);
 
     await handler.resolveApproval({ requestId, approved: true });
-    await expect(pending).rejects.toThrow(/password is required/i);
+    await expect(pending).rejects.toThrow(/locked/i);
   });
 
-  it("unlockApprovalWallet stages a password consumed by resolveApproval, then a wrong password fails cleanly", async () => {
+  it("signing with a cached key reaches performSigning (not-implemented, not a locked-wallet error)", async () => {
+    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+
     const pending = handler.requestApproval({
       kind: "sign",
       origin: "https://bazar.arweave.net",
@@ -334,19 +341,11 @@ describe("ApprovalHandler: signing approval preview + password gate", () => {
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
     const requestId = extractRequestId(windows.opened[0]!);
 
-    await handler.stagePassword({ requestId, password: "definitely-wrong-password" });
     await handler.resolveApproval({ requestId, approved: true });
 
-    // The seeded wallet's envelope is a placeholder, not a real
-    // ciphertext, so decryption fails regardless of password — this
-    // still proves the staged password reaches performSigning and a
-    // failure surfaces as a named rejection, not a silent success.
-    await expect(pending).rejects.toThrow();
-  });
-
-  it("unlockApprovalWallet throws for an unknown requestId", async () => {
-    await expect(
-      handler.stagePassword({ requestId: "does-not-exist", password: "x" }),
-    ).rejects.toThrow(/no pending/i);
+    // A real signature isn't implemented yet (see performSigning's doc
+    // comment) — this proves the cached key was found (no "locked" error)
+    // and the flow reached the honest not-implemented failure instead.
+    await expect(pending).rejects.toThrow(/not implemented/i);
   });
 });

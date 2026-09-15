@@ -28,7 +28,7 @@ import { ApprovalHandler, decodeBase64Payload } from "@/src/handlers/approval";
  * `providerCall`'s handler validates the requested provider-surface
  * method against `PROVIDER_METHODS` before doing anything else with
  * it — the single choke point. `APPROVAL_METHODS`
- * (`getApproval`/`resolveApproval`/`unlockApprovalWallet`) and
+ * (`getApproval`/`resolveApproval`) and
  * `KEY_METHODS` (`createWallet`/`importWallet`/`exportWallet`) are never
  * routed through `providerCall` at all; they're registered as their own
  * ordinary `onMessage` handlers, reachable only by whichever context
@@ -200,33 +200,28 @@ messenger.onMessage("getPortfolioHistory", (message) => reads.getPortfolioHistor
 messenger.onMessage("getConnectedApps", () => approval.getConnectedApps());
 
 /**
- * `TransferDraft`/`UploadDraft` type `walletId`/`password` as optional
- * (see those models' own doc comments: kept optional only to stay
- * structurally compatible with a locked test file predating the fields,
- * outside this task's ALLOWED SCOPE to change). Every real caller
- * (`SendView`/`UploadView`) always supplies both, but the wire type
- * itself can't promise that — this guard turns a missing field into a
- * named rejection rather than an `undefined` silently reaching
- * `decryptFromEnvelope` as a password.
+ * `TransferDraft`/`UploadDraft` type `walletId` as optional (see those
+ * models' own doc comments: kept optional only to stay structurally
+ * compatible with a locked test file predating the field, outside this
+ * task's ALLOWED SCOPE to change). Every real caller (`SendView`/
+ * `UploadView`) always supplies it, but the wire type itself can't
+ * promise that — this guard turns a missing field into a named rejection
+ * rather than `undefined` silently reaching the key-session lookup as a
+ * wallet id. Signing material itself is no longer carried on the
+ * request at all — see `key-session.ts`.
  */
-function requireWalletCredentials<T extends { walletId?: string; password?: string }>(
-  draft: T,
-): T & { walletId: string; password: string } {
-  if (!draft.walletId || !draft.password) {
-    throw new Error("This action requires a wallet id and password.");
+function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walletId: string } {
+  if (!draft.walletId) {
+    throw new Error("This action requires a wallet id.");
   }
-  return draft as T & { walletId: string; password: string };
+  return draft as T & { walletId: string };
 }
 
 // actions
-messenger.onMessage("estimateTransfer", (message) =>
-  transfer.estimateTransfer(requireWalletCredentials(message.data)),
-);
-messenger.onMessage("submitTransfer", (message) =>
-  transfer.submitTransfer(requireWalletCredentials(message.data)),
-);
+messenger.onMessage("estimateTransfer", (message) => transfer.estimateTransfer(requireWalletId(message.data)));
+messenger.onMessage("submitTransfer", (message) => transfer.submitTransfer(requireWalletId(message.data)));
 messenger.onMessage("reviewUpload", (message) => upload.reviewUpload(message.data));
-messenger.onMessage("submitUpload", (message) => upload.submitUpload(requireWalletCredentials(message.data)));
+messenger.onMessage("submitUpload", (message) => upload.submitUpload(requireWalletId(message.data)));
 
 // approvals — APPROVAL_METHODS, reachable only from the approval window
 // (nothing prevents another trusted extension surface from calling these
@@ -234,7 +229,6 @@ messenger.onMessage("submitUpload", (message) => upload.submitUpload(requireWall
 // primitive; see this task's final report for that residual gap).
 messenger.onMessage("getApproval", (message) => approval.getApproval(message.data));
 messenger.onMessage("resolveApproval", (message) => approval.resolveApproval(message.data));
-messenger.onMessage("unlockApprovalWallet", (message) => approval.stagePassword(message.data));
 
 // settings
 messenger.onMessage("getNetworkSettings", () => reads.getNetworkSettings());

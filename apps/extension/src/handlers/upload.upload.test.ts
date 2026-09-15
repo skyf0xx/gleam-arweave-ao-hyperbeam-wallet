@@ -1,14 +1,15 @@
-import { describe, expect, it, afterEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import {
   bytesToBase64,
   deriveAddress,
-  encryptToEnvelope,
   generateJWK,
+  type JWKInterface,
   type StoragePort,
   type UploadTag,
   type Wallet,
 } from "@gleam/core";
 import { UploadHandler } from "./upload";
+import { cacheKey, clearKeyCache } from "./key-session";
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -28,27 +29,23 @@ function createFakeStorage(): StoragePort {
   };
 }
 
-const PASSWORD = "correct horse battery staple 42";
 const WALLET_ID = "wallet-1";
 
-async function createTestWallet(): Promise<Wallet> {
+async function createTestWallet(): Promise<{ wallet: Wallet; jwk: JWKInterface }> {
   const jwk = await generateJWK();
   const address = await deriveAddress(jwk);
-  const encryptedKeyfile = await encryptToEnvelope(
-    new TextEncoder().encode(JSON.stringify(jwk)) as Uint8Array<ArrayBuffer>,
-    PASSWORD,
-    WALLET_ID,
-    address,
-  );
   return {
-    id: WALLET_ID,
-    address,
-    name: "Test wallet",
-    method: "jwk",
-    publicKey: jwk.n,
-    createdAt: 0,
-    updatedAt: 0,
-    encryptedKeyfile,
+    jwk,
+    wallet: {
+      id: WALLET_ID,
+      address,
+      name: "Test wallet",
+      method: "jwk",
+      publicKey: jwk.n,
+      createdAt: 0,
+      updatedAt: 0,
+      encryptedKeyfile: null,
+    },
   };
 }
 
@@ -63,9 +60,14 @@ function textDraft(text: string, tags: UploadTag[] = [], licenseTag: UploadTag |
 
 const originalFetch = globalThis.fetch;
 
+beforeEach(() => {
+  clearKeyCache();
+});
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
+  clearKeyCache();
 });
 
 function mockBundlerFetch(status = 200) {
@@ -108,25 +110,25 @@ describe("UploadHandler: reviewUpload", () => {
 describe("UploadHandler: submitUpload", () => {
   it("throws when the secret scan trips, without contacting the bundler", async () => {
     const storage = createFakeStorage();
-    const wallet = await createTestWallet();
+    const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
+    cacheKey(WALLET_ID, jwk, wallet.address);
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     const handler = new UploadHandler(storage);
     const pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0B\n-----END PRIVATE KEY-----";
 
-    await expect(
-      handler.submitUpload({ ...textDraft(pem), walletId: WALLET_ID, password: PASSWORD }),
-    ).rejects.toThrow(/PEM block/i);
+    await expect(handler.submitUpload({ ...textDraft(pem), walletId: WALLET_ID })).rejects.toThrow(/PEM block/i);
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("throws when tags exceed the byte cap, without contacting the bundler", async () => {
     const storage = createFakeStorage();
-    const wallet = await createTestWallet();
+    const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
+    cacheKey(WALLET_ID, jwk, wallet.address);
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -137,16 +139,15 @@ describe("UploadHandler: submitUpload", () => {
       handler.submitUpload({
         ...textDraft("hello", oversizedTags),
         walletId: WALLET_ID,
-        password: PASSWORD,
       }),
     ).rejects.toThrow(/4,?096|limit/i);
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("throws when the password is wrong", async () => {
+  it("throws when the wallet isn't unlocked (no cached signing key)", async () => {
     const storage = createFakeStorage();
-    const wallet = await createTestWallet();
+    const { wallet } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
 
     const handler = new UploadHandler(storage);
@@ -155,22 +156,21 @@ describe("UploadHandler: submitUpload", () => {
       handler.submitUpload({
         ...textDraft("hello world"),
         walletId: WALLET_ID,
-        password: "totally wrong password here",
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/locked/);
   });
 
   it("signs and submits a clean upload, returning a txId", async () => {
     const storage = createFakeStorage();
-    const wallet = await createTestWallet();
+    const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
+    cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(200);
 
     const handler = new UploadHandler(storage);
     const result = await handler.submitUpload({
       ...textDraft("hello world", [{ name: "App-Name", value: "Gleam" }]),
       walletId: WALLET_ID,
-      password: PASSWORD,
     });
 
     expect(typeof result.txId).toBe("string");
@@ -179,8 +179,9 @@ describe("UploadHandler: submitUpload", () => {
 
   it("throws a descriptive error when the bundler responds with a non-2xx status", async () => {
     const storage = createFakeStorage();
-    const wallet = await createTestWallet();
+    const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
+    cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(502);
 
     const handler = new UploadHandler(storage);
@@ -189,7 +190,6 @@ describe("UploadHandler: submitUpload", () => {
       handler.submitUpload({
         ...textDraft("hello world"),
         walletId: WALLET_ID,
-        password: PASSWORD,
       }),
     ).rejects.toThrow(/502/);
   });

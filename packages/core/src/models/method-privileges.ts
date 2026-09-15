@@ -36,11 +36,7 @@ export const PROVIDER_METHODS = [
 ] as const;
 
 /** Reachable only from the approval window. */
-export const APPROVAL_METHODS = [
-  "getApproval",
-  "resolveApproval",
-  "unlockApprovalWallet",
-] as const;
+export const APPROVAL_METHODS = ["getApproval", "resolveApproval"] as const;
 
 /** Reachable only from trusted extension UI, never a page. */
 export const KEY_METHODS = [

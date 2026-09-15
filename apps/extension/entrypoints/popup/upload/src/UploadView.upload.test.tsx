@@ -33,18 +33,13 @@ async function typeText(value: string) {
 }
 
 describe("UploadView", () => {
-  it("disables Continue until content and a password are present", async () => {
+  it("disables Continue until content is present", async () => {
     const runtime = fakeRuntime();
     render(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />);
 
     expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
 
     await typeText("Notes from the field trip.");
-    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
-
-    fireEvent.change(screen.getByPlaceholderText("Enter your password to continue"), {
-      target: { value: "correct horse battery staple" },
-    });
     expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -70,9 +65,6 @@ describe("UploadView", () => {
     render(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />);
 
     await typeText("-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----");
-    fireEvent.change(screen.getByPlaceholderText("Enter your password to continue"), {
-      target: { value: "correct horse battery staple" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() =>
@@ -97,16 +89,10 @@ describe("UploadView", () => {
     render(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={onDone} />);
 
     await typeText("Notes from the field trip.");
-    fireEvent.change(screen.getByPlaceholderText("Enter your password to continue"), {
-      target: { value: "correct horse battery staple" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Sign and upload" })).toBeTruthy());
 
-    fireEvent.change(screen.getAllByPlaceholderText("Enter your password to continue")[0]!, {
-      target: { value: "correct horse battery staple" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Sign and upload" }));
 
     await waitFor(() => expect(screen.getByText("Signed and uploaded.")).toBeTruthy());

@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import type { RuntimePort, UploadReview, UploadTag, WalletSummary } from "@gleam/core";
-import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
@@ -16,10 +15,10 @@ const VIEWBLOCK_URL = "https://viewblock.io/arweave/tx";
  * Restyled onto shared tokens/primitives (design-system-pass) — see
  * `packages/ui/src/index.ts` for the primitives consumed here.
  *
- * Password prompt: same shape as `SendView`'s — see `handlers/upload.ts`'s
- * doc comment for why `submitUpload` needs `walletId`/`password` alongside
- * `ProtocolMap`'s `UploadDraft`. Collected once on the review step's
- * "Sign and upload", carried only in `step` state, discarded on unmount.
+ * No password prompt here: same as `SendView`, `submitUpload` reads the
+ * signing key from the background's in-memory unlocked-session cache
+ * (`apps/extension/src/handlers/key-session.ts`), not from this request —
+ * see `handlers/upload.ts`'s doc comment.
  *
  * Secret-scan trip uses `RiskNotice` (RELEVANT RULES / TODO.md §5.2: "the
  * one place a scan result overrides the primary action" — the Irreversible
@@ -62,7 +61,6 @@ interface ComposeState {
   textValue: string;
   tags: UploadTag[];
   license: string;
-  password: string;
   submitting: boolean;
   error?: string;
 }
@@ -76,7 +74,6 @@ interface ReviewState {
   tags: UploadTag[];
   licenseTag: UploadTag | null;
   review: UploadReview;
-  password: string;
   submitting: boolean;
   error?: string;
 }
@@ -125,7 +122,6 @@ const INITIAL_STEP: ComposeState = {
   textValue: "",
   tags: [{ name: "Content-Type", value: "application/octet-stream" }],
   license: "",
-  password: "",
   submitting: false,
 };
 
@@ -159,7 +155,6 @@ export function UploadView({ runtime, wallet, onBack, onDone }: UploadViewProps)
               tags,
               licenseTag,
               review,
-              password: step.password,
               submitting: false,
             });
           } catch (error) {
@@ -190,14 +185,12 @@ export function UploadView({ runtime, wallet, onBack, onDone }: UploadViewProps)
             license: step.licenseTag?.value ?? "",
           })
         }
-        onPasswordChange={(password) => setStep({ ...step, password, error: undefined })}
         onSign={async () => {
           setStep({ ...step, submitting: true, error: undefined });
           try {
             const result = await runtime.send<
               {
                 walletId: string;
-                password: string;
                 contentType: string;
                 data: string;
                 tags: UploadTag[];
@@ -208,7 +201,6 @@ export function UploadView({ runtime, wallet, onBack, onDone }: UploadViewProps)
               type: "submitUpload",
               payload: {
                 walletId: wallet.id,
-                password: step.password,
                 contentType: step.contentType,
                 data: step.dataBase64,
                 tags: step.tags,
@@ -245,7 +237,7 @@ function ComposeStep({
   const totalTagBytes = tagBytes(step.tags);
   const overLimit = totalTagBytes > TAG_BYTES_LIMIT;
   const hasContent = step.source === "file" ? step.dataBase64.length > 0 : step.textValue.trim().length > 0;
-  const canContinue = hasContent && !overLimit && step.password.length > 0 && !step.submitting;
+  const canContinue = hasContent && !overLimit && !step.submitting;
 
   const handleFilePicked = async (file: File) => {
     const buffer = await file.arrayBuffer();
@@ -401,14 +393,6 @@ function ComposeStep({
           </select>
         </div>
 
-        <PasswordField
-          label="Password"
-          placeholder="Enter your password to continue"
-          autoComplete="current-password"
-          value={step.password}
-          onChange={(event) => onChange({ password: event.target.value })}
-        />
-
         {step.error ? (
           <div role="alert" className="text-label leading-snug text-warning">
             {step.error}
@@ -449,13 +433,11 @@ function ReviewStep({
   wallet,
   step,
   onBack,
-  onPasswordChange,
   onSign,
 }: {
   wallet: WalletSummary;
   step: ReviewState;
   onBack: () => void;
-  onPasswordChange: (password: string) => void;
   onSign: () => void;
 }) {
   const tripped = step.review.secretScanMatch !== null;
@@ -497,16 +479,6 @@ function ReviewStep({
           <ReviewRow label="License" value={step.licenseTag ? step.licenseTag.value : "No license"} />
         </div>
 
-        {!tripped ? (
-          <PasswordField
-            label="Password"
-            placeholder="Enter your password to continue"
-            autoComplete="current-password"
-            value={step.password}
-            onChange={(event) => onPasswordChange(event.target.value)}
-          />
-        ) : null}
-
         {step.error ? (
           <div role="alert" className="text-label leading-snug text-warning">
             {step.error}
@@ -516,7 +488,7 @@ function ReviewStep({
         <Button
           type="button"
           variant={tripped ? "destructive" : "primary"}
-          disabled={tripped || step.password.length === 0 || step.submitting}
+          disabled={tripped || step.submitting}
           aria-busy={step.submitting}
           onClick={onSign}
           className="mt-auto"

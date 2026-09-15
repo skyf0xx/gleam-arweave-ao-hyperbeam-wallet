@@ -81,7 +81,6 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "getState",
       "getApproval",
       "resolveApproval",
-      "unlockApprovalWallet",
       "getLockSettings",
       "setLockSettings",
       "getNetworkSettings",

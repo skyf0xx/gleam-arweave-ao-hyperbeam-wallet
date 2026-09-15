@@ -156,12 +156,8 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
           origin={request.origin}
           preview={signingPreview}
           onReject={() => void handleReject()}
-          onSign={async (password) => {
+          onSign={async () => {
             try {
-              await runtime.send<{ requestId: string; password: string }, void>({
-                type: "unlockApprovalWallet",
-                payload: { requestId: request.requestId, password },
-              });
               await runtime.send<{ requestId: string; approved: boolean }, void>({
                 type: "resolveApproval",
                 payload: { requestId: request.requestId, approved: true },

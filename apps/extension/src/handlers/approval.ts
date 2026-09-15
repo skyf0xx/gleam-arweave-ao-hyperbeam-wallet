@@ -1,7 +1,5 @@
 import {
   base64ToBytes,
-  decryptFromEnvelope,
-  zeroize,
   PERMISSION_TYPES,
   type ApprovalKind,
   type ApprovalPreview,
@@ -11,9 +9,9 @@ import {
   type PermissionType,
   type SigningApprovalPreview,
   type StoragePort,
-  type Wallet,
   type WindowPort,
 } from "@gleam/core";
+import { getCachedKey } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -65,7 +63,6 @@ const GRANTS_KEY = "local:grants";
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 const APPROVAL_WINDOW_PATH = "/approval.html";
 const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
-const WALLETS_KEY = "local:wallets";
 
 function isValidPermissionType(value: unknown): value is PermissionType {
   return typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value);
@@ -96,12 +93,6 @@ function isValidApprovalRequest(value: unknown): value is ApprovalRequest {
     candidate.preview !== null &&
     typeof candidate.preview === "object"
   );
-}
-
-function isValidWallet(value: unknown): value is Wallet {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string" && typeof candidate.address === "string";
 }
 
 /** A signing request's decoded intent — the input to `describeIntent`-style preview building. */
@@ -140,17 +131,6 @@ interface PendingApprovalRecord {
   signingInput: SigningRequestInput | null;
   /** Set by `resolveApproval` immediately before the record is removed. */
   outcome?: ApprovalOutcome;
-  /**
-   * Staged by `unlockApprovalWallet` (`ProtocolMap`'s `APPROVAL_METHODS`
-   * entry for exactly this purpose — see `protocol.ts`'s doc comment on
-   * it) ahead of `resolveApproval({ requestId, approved: true })`, whose
-   * own shape is locked to carry no password field. Cleared the instant
-   * it's consumed by `performSigning`, and always cleared (not just on
-   * success) once `resolveApproval` finishes with this record, so it
-   * never lingers in session storage longer than the single resolution
-   * call that needs it.
-   */
-  stagedPassword?: string;
 }
 
 function decodeDataPreview(payload: Uint8Array): string | null {
@@ -216,16 +196,6 @@ export class ApprovalHandler {
 
   private async savePending(pending: PendingApprovalRecord[]): Promise<void> {
     await this.storage.set(PENDING_APPROVALS_KEY, pending);
-  }
-
-  private async loadWallet(walletId: string): Promise<Wallet> {
-    const raw = await this.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(raw) ? raw.filter(isValidWallet) : [];
-    const wallet = wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) {
-      throw new Error(`No stored wallet with id "${walletId}".`);
-    }
-    return wallet;
   }
 
   /**
@@ -329,33 +299,16 @@ export class ApprovalHandler {
   }
 
   /**
-   * `ProtocolMap.unlockApprovalWallet` — stages a password against a
-   * pending signing request, ahead of `resolveApproval`. See
-   * `PendingApprovalRecord.stagedPassword`'s doc comment for why this is
-   * a separate call rather than a field on `resolveApproval` itself.
-   */
-  async stagePassword(req: { requestId: string; password: string }): Promise<void> {
-    const pending = await this.loadPending();
-    if (!pending.some((candidate) => candidate.request.requestId === req.requestId)) {
-      throw new Error(`No pending approval request with id "${req.requestId}".`);
-    }
-    await this.savePending(
-      pending.map((candidate) =>
-        candidate.request.requestId === req.requestId
-          ? { ...candidate, stagedPassword: req.password }
-          : candidate,
-      ),
-    );
-  }
-
-  /**
    * `ProtocolMap.resolveApproval` — called only from the approval window
    * (`APPROVAL_METHODS`, enforced by the dispatcher choke point, not by
    * this handler). On a `connect` approval, creates and persists a real
    * `Grant`. On a signing approval, performs the actual signing operation
-   * using the password staged by `unlockApprovalWallet` and returns the
-   * result to the original caller. Either way, closes the approval
-   * window once resolved so it doesn't linger.
+   * using the signing key `key-session.ts` cached at unlock (no password
+   * staging step needed any more — see this class's doc comment on why
+   * `unlockApprovalWallet` existed and `wallet-lifecycle.ts`'s doc comment
+   * for the superseding session-cache decision) and returns the result to
+   * the original caller. Either way, closes the approval window once
+   * resolved so it doesn't linger.
    */
   async resolveApproval(req: { requestId: string; approved: boolean }): Promise<void> {
     const pending = await this.loadPending();
@@ -375,31 +328,21 @@ export class ApprovalHandler {
       }
     }
 
-    // Written in two steps (outcome attached, staged password cleared,
-    // then removed) so a watcher observing this key sees the outcome at
-    // least once before the record disappears — see this class's doc
-    // comment. `stagedPassword` is cleared here unconditionally, not just
-    // on the success path, so it never lingers past this call.
+    // Written in two steps (outcome attached, then removed) so a watcher
+    // observing this key sees the outcome at least once before the record
+    // disappears — see this class's doc comment.
     await this.savePending(
-      pending.map((candidate) =>
-        candidate.request.requestId === req.requestId
-          ? { ...candidate, outcome, stagedPassword: undefined }
-          : candidate,
-      ),
+      pending.map((candidate) => (candidate.request.requestId === req.requestId ? { ...candidate, outcome } : candidate)),
     );
     await this.dropPending(req.requestId);
     await this.windows.closeApprovalWindow(req.requestId);
   }
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {
-    const password = entry.stagedPassword;
     if (entry.request.kind === "connect") {
       return this.createGrant(entry);
     }
-    if (!password) {
-      throw new Error("A password is required to sign this request.");
-    }
-    return this.performSigning(entry, password);
+    return this.performSigning(entry);
   }
 
   private async createGrant(entry: PendingApprovalRecord): Promise<{ granted: PermissionType[] }> {
@@ -421,11 +364,14 @@ export class ApprovalHandler {
   }
 
   /**
-   * Decrypts the signing key and reports the fully-decoded intent that
-   * was already approved (recipient/amount/payload hash/tags — everything
-   * `buildSigningPreview` computed, which is exactly what the approval
-   * screen showed the user before they signed). This proves the
-   * password/vault/approval plumbing end-to-end.
+   * Reads the already-unlocked signing key and reports the fully-decoded
+   * intent that was already approved (recipient/amount/payload hash/tags
+   * — everything `buildSigningPreview` computed, which is exactly what
+   * the approval screen showed the user before they signed). This proves
+   * the vault/session/approval plumbing end-to-end. Throws if the wallet
+   * isn't currently unlocked (`key-session.ts` has no cached key for it)
+   * — a signing approval can no longer collect its own password, so an
+   * approval on a locked wallet fails here rather than prompting.
    *
    * Scope gap (reported per this task's packet rather than silently
    * worked around): actually producing a valid ANS-104 signature
@@ -449,25 +395,19 @@ export class ApprovalHandler {
    * rather than fabricating a signature or silently returning the
    * plaintext as if it were signed.
    */
-  private async performSigning(entry: PendingApprovalRecord, password: string): Promise<unknown> {
+  private async performSigning(entry: PendingApprovalRecord): Promise<unknown> {
     const input = entry.signingInput;
     if (!input) {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
 
-    const wallet = await this.loadWallet(entry.walletId);
-    if (!wallet.encryptedKeyfile) {
-      throw new Error(`Wallet "${entry.walletId}" has no key material to sign with.`);
+    if (!getCachedKey(entry.walletId)) {
+      throw new Error(`Wallet "${entry.walletId}" is locked. Unlock it to continue.`);
     }
-    // Proves the password actually unlocks this wallet's key material
-    // before reporting anything back — a wrong password must fail here,
-    // not silently produce a bogus "success."
-    const plaintext = await decryptFromEnvelope(wallet.encryptedKeyfile, password, wallet.id, wallet.address);
-    zeroize(plaintext);
 
     throw new Error(
-      `Signing kind "${input.kind}" is not implemented yet — this build verifies the password and ` +
-        "approval flow, but producing a real signature needs arweave-js/@dha-team/arbundles wired " +
+      `Signing kind "${input.kind}" is not implemented yet — this build verifies the unlocked-session ` +
+        "and approval flow, but producing a real signature needs arweave-js/@dha-team/arbundles wired " +
         "into apps/extension, which is outside this task's ALLOWED SCOPE. See this task's final report.",
     );
   }

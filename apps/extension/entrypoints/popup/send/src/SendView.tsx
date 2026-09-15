@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { FeeEstimate, RuntimePort, WalletSummary } from "@gleam/core";
-import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -15,14 +14,12 @@ const WINSTON_PER_AR = 1_000_000_000_000n;
  * are pure render helpers, not independently-mounted steps, matching how
  * `OnboardingView` structures its own switch.
  *
- * Password prompt on the compose step: see `handlers/transfer.ts`'s doc
- * comment for why `estimateTransfer`/`submitTransfer` need a password
- * alongside the `TransferDraft` fields `ProtocolMap` declares. This view
- * collects it once, on Continue, and carries it forward in `step` state
- * (never in a module-level variable) through to the final `submitTransfer`
- * call — it's discarded the moment `SendView` unmounts, same as every
- * other password field in this codebase (`UnlockScreen`, onboarding's
- * `CreatePassword`).
+ * No password prompt here: `estimateTransfer`/`submitTransfer` read the
+ * signing key from the background's in-memory unlocked-session cache
+ * (`apps/extension/src/handlers/key-session.ts`), not from this request —
+ * see that file's doc comment. `App.tsx`'s `resolveTopView` already keeps
+ * an unauthenticated user on the unlock screen, so `SendView` only ever
+ * mounts once a wallet is unlocked.
  */
 export interface SendViewProps {
   runtime: RuntimePort;
@@ -32,13 +29,12 @@ export interface SendViewProps {
 }
 
 type Step =
-  | { kind: "compose"; recipient: string; amountAr: string; password: string; submitting: boolean; error?: string }
+  | { kind: "compose"; recipient: string; amountAr: string; submitting: boolean; error?: string }
   | {
       kind: "review";
       recipient: string;
       amountWinston: string;
       estimate: FeeEstimate;
-      password: string;
       submitting: boolean;
       error?: string;
     }
@@ -56,7 +52,7 @@ function isValidArweaveAddress(address: string): boolean {
   return /^[A-Za-z0-9_-]{43}$/.test(address);
 }
 
-const INITIAL_STEP: Step = { kind: "compose", recipient: "", amountAr: "", password: "", submitting: false };
+const INITIAL_STEP: Step = { kind: "compose", recipient: "", amountAr: "", submitting: false };
 
 export function SendView({ runtime, wallet, onBack, onDone }: SendViewProps) {
   const [step, setStep] = useState<Step>(INITIAL_STEP);
@@ -80,13 +76,12 @@ export function SendView({ runtime, wallet, onBack, onDone }: SendViewProps) {
       setStep({ ...step, submitting: true, error: undefined });
       try {
         const estimate = await runtime.send<
-          { walletId: string; password: string; recipient: string; token: null; amount: string; fee: null },
+          { walletId: string; recipient: string; token: null; amount: string; fee: null },
           FeeEstimate
         >({
           type: "estimateTransfer",
           payload: {
             walletId: wallet.id,
-            password: step.password,
             recipient,
             token: null,
             amount: amountWinston,
@@ -98,7 +93,6 @@ export function SendView({ runtime, wallet, onBack, onDone }: SendViewProps) {
           recipient,
           amountWinston,
           estimate,
-          password: step.password,
           submitting: false,
         });
       } catch (error) {
@@ -122,13 +116,12 @@ export function SendView({ runtime, wallet, onBack, onDone }: SendViewProps) {
       setStep({ ...step, submitting: true, error: undefined });
       try {
         const result = await runtime.send<
-          { walletId: string; password: string; recipient: string; token: null; amount: string; fee: string | null },
+          { walletId: string; recipient: string; token: null; amount: string; fee: string | null },
           { txId: string }
         >({
           type: "submitTransfer",
           payload: {
             walletId: wallet.id,
-            password: step.password,
             recipient: step.recipient,
             token: null,
             amount: step.amountWinston,
@@ -166,11 +159,7 @@ function ComposeStep({
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
   onContinue: () => void;
 }) {
-  const canContinue =
-    step.recipient.trim().length > 0 &&
-    step.amountAr.trim().length > 0 &&
-    step.password.length > 0 &&
-    !step.submitting;
+  const canContinue = step.recipient.trim().length > 0 && step.amountAr.trim().length > 0 && !step.submitting;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -208,14 +197,6 @@ function ComposeStep({
             </span>
           </div>
         </div>
-
-        <PasswordField
-          label="Password"
-          placeholder="Enter your password to continue"
-          autoComplete="current-password"
-          value={step.password}
-          onChange={(event) => onChange({ password: event.target.value })}
-        />
 
         {step.error ? (
           <div role="alert" className="flex items-start gap-1.5 text-label leading-snug text-warning">

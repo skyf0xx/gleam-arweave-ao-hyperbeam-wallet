@@ -1,12 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import {
-  deriveAddress,
-  encryptToEnvelope,
-  generateJWK,
-  type StoragePort,
-  type Wallet,
-} from "@gleam/core";
+import { deriveAddress, generateJWK, type JWKInterface, type StoragePort, type Wallet } from "@gleam/core";
 import { TransferHandler } from "./transfer";
+import { cacheKey, clearKeyCache } from "./key-session";
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -26,27 +21,23 @@ function createFakeStorage(): StoragePort {
   };
 }
 
-const PASSWORD = "correct horse battery staple 42";
 const WALLET_ID = "wallet-1";
 
-async function createTestWallet(): Promise<Wallet> {
+async function createTestWallet(): Promise<{ wallet: Wallet; jwk: JWKInterface }> {
   const jwk = await generateJWK();
   const address = await deriveAddress(jwk);
-  const encryptedKeyfile = await encryptToEnvelope(
-    new TextEncoder().encode(JSON.stringify(jwk)) as Uint8Array<ArrayBuffer>,
-    PASSWORD,
-    WALLET_ID,
-    address,
-  );
   return {
-    id: WALLET_ID,
-    address,
-    name: "Test wallet",
-    method: "jwk",
-    publicKey: jwk.n,
-    createdAt: 0,
-    updatedAt: 0,
-    encryptedKeyfile,
+    jwk,
+    wallet: {
+      id: WALLET_ID,
+      address,
+      name: "Test wallet",
+      method: "jwk",
+      publicKey: jwk.n,
+      createdAt: 0,
+      updatedAt: 0,
+      encryptedKeyfile: null,
+    },
   };
 }
 
@@ -55,6 +46,7 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
+  clearKeyCache();
 });
 
 /**
@@ -86,8 +78,10 @@ describe("TransferHandler: estimateTransfer", () => {
 
   beforeEach(async () => {
     storage = createFakeStorage();
-    wallet = await createTestWallet();
+    const created = await createTestWallet();
+    wallet = created.wallet;
     await storage.set("local:wallets", [wallet]);
+    cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
   it("rejects AO token transfers as not yet implemented", async () => {
@@ -95,7 +89,6 @@ describe("TransferHandler: estimateTransfer", () => {
     await expect(
       handler.estimateTransfer({
         walletId: WALLET_ID,
-        password: PASSWORD,
         recipient: "someAddr",
         token: "someProcessId",
         amount: "1",
@@ -110,7 +103,6 @@ describe("TransferHandler: estimateTransfer", () => {
 
     const estimate = await handler.estimateTransfer({
       walletId: WALLET_ID,
-      password: PASSWORD,
       recipient: "brandNewAddr",
       token: null,
       amount: "1000",
@@ -138,7 +130,6 @@ describe("TransferHandler: estimateTransfer", () => {
 
     const estimate = await handler.estimateTransfer({
       walletId: WALLET_ID,
-      password: PASSWORD,
       recipient: "knownAddr",
       token: null,
       amount: "1000",
@@ -155,8 +146,10 @@ describe("TransferHandler: submitTransfer", () => {
 
   beforeEach(async () => {
     storage = createFakeStorage();
-    wallet = await createTestWallet();
+    const created = await createTestWallet();
+    wallet = created.wallet;
     await storage.set("local:wallets", [wallet]);
+    cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
   it("rejects AO token transfers as not yet implemented", async () => {
@@ -164,7 +157,6 @@ describe("TransferHandler: submitTransfer", () => {
     await expect(
       handler.submitTransfer({
         walletId: WALLET_ID,
-        password: PASSWORD,
         recipient: "someAddr",
         token: "someProcessId",
         amount: "1",
@@ -173,18 +165,18 @@ describe("TransferHandler: submitTransfer", () => {
     ).rejects.toThrow(/AO tokens/);
   });
 
-  it("throws when the password is wrong", async () => {
+  it("throws when the wallet isn't unlocked (no cached signing key)", async () => {
+    clearKeyCache();
     const handler = new TransferHandler(storage);
     await expect(
       handler.submitTransfer({
         walletId: WALLET_ID,
-        password: "totally wrong password here",
         recipient: "someAddr",
         token: null,
         amount: "1",
         fee: null,
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/locked/);
   });
 
   it("submits the transfer and writes an optimistic pending activity entry immediately", async () => {
@@ -197,7 +189,6 @@ describe("TransferHandler: submitTransfer", () => {
     const handler = new TransferHandler(storage);
     const result = await handler.submitTransfer({
       walletId: WALLET_ID,
-      password: PASSWORD,
       recipient: "recipientAddr",
       token: null,
       amount: "1000000000000",

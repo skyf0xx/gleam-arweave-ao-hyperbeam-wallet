@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { SigningApprovalPreview } from "@gleam/core";
-import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 
@@ -22,8 +21,8 @@ export interface SigningApprovalScreenProps {
   origin: string;
   preview: SigningApprovalPreview;
   onReject: () => void;
-  /** Rejects (surfacing its message inline) if signing fails after the password is submitted. */
-  onSign: (password: string) => Promise<void>;
+  /** Rejects (surfacing its message inline) if signing fails — e.g. the wallet's unlocked session has since expired. */
+  onSign: () => Promise<void>;
 }
 
 const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
@@ -53,7 +52,6 @@ async function copyToClipboard(value: string): Promise<void> {
 }
 
 export function SigningApprovalScreen({ origin, preview, onReject, onSign }: SigningApprovalScreenProps) {
-  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const isTransfer = preview.recipient !== null;
@@ -63,7 +61,7 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
     setSubmitting(true);
     setError(undefined);
     try {
-      await onSign(password);
+      await onSign();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : String(submitError));
       setSubmitting(false);
@@ -132,14 +130,6 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
 
         <AddrBlock label="Signing payload (SHA-256)" value={preview.payloadHash} />
 
-        <PasswordField
-          label="Password"
-          placeholder="Enter your password to sign"
-          autoComplete="current-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-
         {error ? (
           <div role="alert" className="text-caption leading-snug text-warning">
             {error}
@@ -153,7 +143,7 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
           <Button
             type="button"
             variant={irreversible ? "destructive" : "primary"}
-            disabled={password.length === 0 || submitting}
+            disabled={submitting}
             aria-busy={submitting}
             onClick={() => void handleSign()}
             className="flex-1"
