@@ -259,4 +259,25 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
 
     expect(onSendToken).toHaveBeenCalledWith(AO_TOKEN);
   });
+
+  it("formats a token's balance in its own denomination, not as a raw atomic-unit integer", async () => {
+    const SCALED_TOKEN: TokenBalance = {
+      address: WALLET.address,
+      processId: "processXYZ",
+      ticker: "USDC",
+      denomination: 6,
+      quantity: "1500000",
+    };
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return BALANCE;
+      if (type === "getTokenBalances") return [SCALED_TOKEN];
+      if (type === "getActivity") return EMPTY_ACTIVITY;
+      if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      throw new Error(`Unexpected message type "${type}"`);
+    });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("1.5")).toBeTruthy());
+    expect(screen.queryByText("1500000")).toBeNull();
+  });
 });

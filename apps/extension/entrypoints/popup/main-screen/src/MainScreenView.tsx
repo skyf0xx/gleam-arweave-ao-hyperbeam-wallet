@@ -20,7 +20,7 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
-import { formatWinstonAsAr, truncateAddress } from "./formatWinston";
+import { formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 
 /**
@@ -279,7 +279,7 @@ export function MainScreenView({
                 glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                 name={token.ticker}
                 ticker={token.ticker}
-                amount={token.quantity}
+                amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
                 loading={state.loading}
                 onClick={() => onSendToken(token)}
               />

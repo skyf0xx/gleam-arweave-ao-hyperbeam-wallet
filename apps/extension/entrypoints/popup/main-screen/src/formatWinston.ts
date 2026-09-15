@@ -26,6 +26,30 @@ export function formatWinstonAsAr(winston: string, maxFractionDigits = 4): strin
   return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
+/**
+ * The AO-token equivalent of `formatWinstonAsAr`, generalized over an
+ * arbitrary decimal-places `denomination` instead of AR's fixed 12 —
+ * mirrors `SendView.tsx`'s private `formatAtomicAsDisplay` (same
+ * BigInt-only algorithm) so a token's own smallest-unit quantity never
+ * renders as a raw, unscaled integer.
+ */
+export function formatAtomicAsDisplay(atomic: string, denomination: number, maxFractionDigits = 4): string {
+  if (!/^\d+$/.test(atomic)) return "—";
+  if (denomination === 0) return atomic;
+
+  const unit = 10n ** BigInt(denomination);
+  const amount = BigInt(atomic);
+  const whole = amount / unit;
+  const remainder = amount % unit;
+
+  if (remainder === 0n) return whole.toString();
+
+  const fractionStr = remainder.toString().padStart(denomination, "0");
+  const trimmed = fractionStr.slice(0, Math.min(maxFractionDigits, denomination)).replace(/0+$/, "");
+
+  return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
+}
+
 export function truncateAddress(address: string): string {
   if (address.length <= 12) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
