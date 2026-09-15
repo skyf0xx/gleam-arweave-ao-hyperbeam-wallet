@@ -29,9 +29,9 @@ afterEach(() => {
 
 describe("ui/onboarding: BeamMark", () => {
   it("renders the wordmark and tagline", () => {
-    render(<BeamMark tagline="Crypto, without the clutter." />);
+    render(<BeamMark tagline="crypto, without the clutter." />);
     expect(screen.getByText("gleam")).toBeTruthy();
-    expect(screen.getByText("Crypto, without the clutter.")).toBeTruthy();
+    expect(screen.getByText("crypto, without the clutter.")).toBeTruthy();
   });
 
   it("renders the shared Beam primitive as the identity mark, not a bespoke gradient", () => {
