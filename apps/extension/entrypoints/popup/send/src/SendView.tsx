@@ -1,9 +1,10 @@
-import { useState } from "react";
-import type { FeeEstimate, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
+import { useCallback, useEffect, useState } from "react";
+import type { ActivityPage, FeeEstimate, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
+import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -12,7 +13,12 @@ const WINSTON_PER_AR = 1_000_000_000_000n;
  * internal step state only (same "no router" pattern as
  * Onboarding/UnlockView). `ComposeStep`/`ReviewStep`/`SuccessStep` below
  * are pure render helpers, not independently-mounted steps, matching how
- * `OnboardingView` structures its own switch.
+ * `OnboardingView` structures its own switch. `TokenPickerStep`/
+ * `RecentRecipientsStep` (added by AO-SEND-UI-WALLET-CORE) are two more
+ * pushed screens in the same internal `Step` union, following this
+ * codebase's established "pushed screen with ScreenHeader + rows" pattern
+ * (`WalletSwitcherView.tsx`) rather than a dropdown/modal primitive — none
+ * exists in this project and none is needed here either.
  *
  * No password prompt here: `estimateTransfer`/`submitTransfer` read the
  * signing key from the background's in-memory unlocked-session cache
@@ -21,11 +27,17 @@ const WINSTON_PER_AR = 1_000_000_000_000n;
  * an unauthenticated user on the unlock screen, so `SendView` only ever
  * mounts once a wallet is unlocked.
  *
- * `token` (added by AO-TOKEN-SEND-WALLET-CORE): `null` is the pre-existing
- * AR path (`App.tsx`'s top-level "Send" action, unchanged behavior); a
- * `TokenBalance` is an AO token, entered by clicking that token's row on
- * `MainScreenView`. Every listed token — AR or AO — is genuinely sendable
- * through this one flow; there is no disabled/"coming soon" branch.
+ * `token` (added by AO-TOKEN-SEND-WALLET-CORE, now mutable in-flow by
+ * AO-SEND-UI-WALLET-CORE): the initial value is still `App.tsx`'s
+ * entry-point context (`null` for the top-level "Send" action, a
+ * `TokenBalance` for a per-token row click on `MainScreenView`), but the
+ * compose step's own token picker can change it before continuing —
+ * `selectedToken` local state (not the `token` prop) is what
+ * `handleContinue`/the compose/review/success steps actually read from
+ * this point on. `null` is always the AR path; every entry from
+ * `getTokenBalances` is an AO token. Every listed token — AR or AO — is
+ * genuinely sendable through this one flow; there is no disabled/"coming
+ * soon" branch.
  */
 export interface SendViewProps {
   runtime: RuntimePort;
@@ -37,6 +49,8 @@ export interface SendViewProps {
 
 type Step =
   | { kind: "compose"; recipient: string; amountDisplay: string; submitting: boolean; error?: string }
+  | { kind: "token-picker" }
+  | { kind: "recent-recipients" }
   | {
       kind: "review";
       recipient: string;
@@ -93,7 +107,12 @@ function isValidArweaveAddress(address: string): boolean {
   return /^[A-Za-z0-9_-]{43}$/.test(address);
 }
 
-const INITIAL_STEP: Step = { kind: "compose", recipient: "", amountDisplay: "", submitting: false };
+const INITIAL_STEP: Extract<Step, { kind: "compose" }> = {
+  kind: "compose",
+  recipient: "",
+  amountDisplay: "",
+  submitting: false,
+};
 
 /** `token.ticker` for an AO token, `"AR"` for the native token (`token === null`). */
 function tickerFor(token: TokenBalance | null): string {
@@ -106,6 +125,12 @@ function formatAmount(atomic: string, token: TokenBalance | null): string {
 
 export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewProps) {
   const [step, setStep] = useState<Step>(INITIAL_STEP);
+  // The in-flow-selectable token (task 1/4: compose step's own token
+  // picker can change this before continuing). Initialized from the
+  // `token` prop — `App.tsx`'s entry-point context — but from here on
+  // this state, not the prop, is authoritative; the prop never changes
+  // identity across `SendView`'s lifetime (no `useEffect` re-sync needed).
+  const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(token);
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
@@ -118,9 +143,9 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         return;
       }
       const amountAtomic =
-        token === null
+        selectedToken === null
           ? parseArToWinston(step.amountDisplay)
-          : parseDisplayToAtomic(step.amountDisplay, token.denomination);
+          : parseDisplayToAtomic(step.amountDisplay, selectedToken.denomination);
       if (amountAtomic === null || amountAtomic === "0") {
         setStep({ ...step, error: "Enter an amount greater than 0." });
         return;
@@ -136,7 +161,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           payload: {
             walletId: wallet.id,
             recipient,
-            token: token === null ? null : token.processId,
+            token: selectedToken === null ? null : selectedToken.processId,
             amount: amountAtomic,
             fee: null,
           },
@@ -156,11 +181,39 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
     return (
       <ComposeStep
         wallet={wallet}
-        token={token}
+        token={selectedToken}
         step={step}
         onBack={onBack}
         onChange={(patch) => setStep({ ...step, ...patch, error: undefined })}
         onContinue={() => void handleContinue()}
+        onOpenTokenPicker={() => setStep({ kind: "token-picker" })}
+        onOpenRecentRecipients={() => setStep({ kind: "recent-recipients" })}
+      />
+    );
+  }
+
+  if (step.kind === "token-picker") {
+    return (
+      <TokenPickerStep
+        runtime={runtime}
+        wallet={wallet}
+        selectedToken={selectedToken}
+        onSelect={(nextToken) => {
+          setSelectedToken(nextToken);
+          setStep((prev) => (prev.kind === "token-picker" ? INITIAL_STEP : prev));
+        }}
+        onBack={() => setStep(INITIAL_STEP)}
+      />
+    );
+  }
+
+  if (step.kind === "recent-recipients") {
+    return (
+      <RecentRecipientsStep
+        runtime={runtime}
+        wallet={wallet}
+        onSelect={(recipient) => setStep({ ...INITIAL_STEP, recipient })}
+        onBack={() => setStep(INITIAL_STEP)}
       />
     );
   }
@@ -177,7 +230,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           payload: {
             walletId: wallet.id,
             recipient: step.recipient,
-            token: token === null ? null : token.processId,
+            token: selectedToken === null ? null : selectedToken.processId,
             amount: step.amountAtomic,
             fee: step.estimate.fee,
           },
@@ -190,7 +243,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
 
     return (
       <ReviewStep
-        token={token}
+        token={selectedToken}
         step={step}
         onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient })}
         onSign={() => void handleSign()}
@@ -198,7 +251,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
     );
   }
 
-  return <SuccessStep token={token} step={step} onDone={onDone} />;
+  return <SuccessStep token={selectedToken} step={step} onDone={onDone} />;
 }
 
 function ComposeStep({
@@ -208,6 +261,8 @@ function ComposeStep({
   onBack,
   onChange,
   onContinue,
+  onOpenTokenPicker,
+  onOpenRecentRecipients,
 }: {
   wallet: WalletSummary;
   token: TokenBalance | null;
@@ -215,6 +270,8 @@ function ComposeStep({
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
   onContinue: () => void;
+  onOpenTokenPicker: () => void;
+  onOpenRecentRecipients: () => void;
 }) {
   const canContinue = step.recipient.trim().length > 0 && step.amountDisplay.trim().length > 0 && !step.submitting;
   const ticker = tickerFor(token);
@@ -229,7 +286,16 @@ function ComposeStep({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-label font-semibold text-muted">To</span>
+          <div className="flex items-center justify-between">
+            <span className="text-label font-semibold text-muted">To</span>
+            <button
+              type="button"
+              onClick={onOpenRecentRecipients}
+              className="text-label font-medium text-muted hover:text-foreground hover:underline"
+            >
+              Recent
+            </button>
+          </div>
           <textarea
             rows={2}
             value={step.recipient}
@@ -250,9 +316,15 @@ function ComposeStep({
               onChange={(event) => onChange({ amountDisplay: event.target.value })}
               className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground focus:outline-none"
             />
-            <span className="flex-shrink-0 rounded-full border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground">
+            <button
+              type="button"
+              onClick={onOpenTokenPicker}
+              aria-haspopup="dialog"
+              className="flex flex-shrink-0 items-center gap-1 rounded-full border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line"
+            >
               {ticker}
-            </span>
+              <ChevronDownIcon />
+            </button>
           </div>
         </div>
 
@@ -267,6 +339,14 @@ function ComposeStep({
         </Button>
       </div>
     </div>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -355,6 +435,230 @@ function ReviewRow({ label, value, mono, strong }: { label: string; value: strin
       </span>
     </div>
   );
+}
+
+/**
+ * Task 1: token picker — a pushed screen (`WalletSwitcherView.tsx`'s
+ * established "ScreenHeader + rows" pattern, not a dropdown/modal — none
+ * exists in this project). AR is a synthetic first row (`token: null`);
+ * every other row comes from `getTokenBalances`, reusing `TokenRow`
+ * exactly as `MainScreenView` does. Every row is genuinely selectable —
+ * there is no disabled/"coming soon" state, per RELEVANT RULES.
+ */
+function TokenPickerStep({
+  runtime,
+  wallet,
+  selectedToken,
+  onSelect,
+  onBack,
+}: {
+  runtime: RuntimePort;
+  wallet: WalletSummary;
+  selectedToken: TokenBalance | null;
+  onSelect: (token: TokenBalance | null) => void;
+  onBack: () => void;
+}) {
+  const [state, setState] = useState<{
+    arBalance: string | null;
+    tokens: TokenBalance[];
+    loading: boolean;
+    error: string | null;
+  }>({
+    arBalance: null,
+    tokens: [],
+    loading: true,
+    error: null,
+  });
+
+  const load = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const [arBalance, tokens] = await Promise.all([
+        runtime.send<{ address: string }, string>({
+          type: "getBalance",
+          payload: { address: wallet.address },
+        }),
+        runtime.send<{ address: string }, TokenBalance[]>({
+          type: "getTokenBalances",
+          payload: { address: wallet.address },
+        }),
+      ]);
+      setState({ arBalance, tokens, loading: false, error: null });
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }, [runtime, wallet.address]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <div className="flex min-h-full flex-col" role="dialog" aria-label="Select token">
+      <ScreenHeader title="Select token" onBack={onBack} />
+      <div className="flex flex-1 flex-col px-1 py-2">
+        {state.error ? (
+          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning">
+            {state.error}
+          </div>
+        ) : null}
+
+        <TokenRow
+          glyph={{ label: "AR", tone: 1 }}
+          name="Arweave"
+          ticker="AR"
+          amount={state.arBalance === null ? "" : formatWinstonAsAr(state.arBalance)}
+          loading={state.loading}
+          onClick={() => onSelect(null)}
+          className={selectedToken === null ? "bg-mist" : undefined}
+        />
+
+        {state.loading ? (
+          <>
+            <SkeletonPickerRow />
+            <SkeletonPickerRow />
+          </>
+        ) : (
+          state.tokens.map((candidate) => (
+            <TokenRow
+              key={candidate.processId}
+              glyph={{ label: candidate.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+              name={candidate.ticker}
+              ticker={candidate.ticker}
+              amount={formatAtomicAsDisplay(candidate.quantity, candidate.denomination)}
+              onClick={() => onSelect(candidate)}
+              className={selectedToken?.processId === candidate.processId ? "bg-mist" : undefined}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SkeletonPickerRow() {
+  return (
+    <div className="flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 last:border-b-0">
+      <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-full bg-mist" aria-hidden="true" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="h-3 w-20 animate-pulse rounded bg-mist" />
+        <div className="h-2.5 w-10 animate-pulse rounded bg-mist" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Task 2: recent-recipients picker — derived live, in-process, every time
+ * this step mounts, from `getActivity`'s merged `ActivityPage` (RELEVANT
+ * RULES: no new storage/`ProtocolMap` method). Filters to `type: 'send'`
+ * entries, maps to `address`, dedupes (first occurrence wins — entries
+ * already arrive most-recent-first from `mergeActivity`), and renders the
+ * distinct addresses in that same most-recent-first order. Truncated
+ * display here only (per RELEVANT RULES); the full address is what gets
+ * passed to `onSelect`.
+ */
+function RecentRecipientsStep({
+  runtime,
+  wallet,
+  onSelect,
+  onBack,
+}: {
+  runtime: RuntimePort;
+  wallet: WalletSummary;
+  onSelect: (recipient: string) => void;
+  onBack: () => void;
+}) {
+  const [state, setState] = useState<{ recipients: string[]; loading: boolean; error: string | null }>({
+    recipients: [],
+    loading: true,
+    error: null,
+  });
+
+  const load = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const activity = await runtime.send<{ address: string }, ActivityPage>({
+        type: "getActivity",
+        payload: { address: wallet.address },
+      });
+      setState({ recipients: recentSendRecipients(activity), loading: false, error: null });
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    }
+  }, [runtime, wallet.address]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <div className="flex min-h-full flex-col" role="dialog" aria-label="Recent recipients">
+      <ScreenHeader title="Recent recipients" onBack={onBack} />
+      <div className="flex flex-1 flex-col px-1 py-2">
+        {state.error ? (
+          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning">
+            {state.error}
+          </div>
+        ) : state.loading ? (
+          <>
+            <SkeletonPickerRow />
+            <SkeletonPickerRow />
+          </>
+        ) : state.recipients.length === 0 ? (
+          <EmptyState message="No recent recipients yet. Addresses you've sent to will show up here." />
+        ) : (
+          state.recipients.map((address) => (
+            <button
+              key={address}
+              type="button"
+              onClick={() => onSelect(address)}
+              className="flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 hover:bg-mist"
+            >
+              <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-mist text-caption font-semibold text-muted">
+                {address.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-mono text-label text-foreground">
+                {truncateAddress(address)}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pure extraction — separated from `RecentRecipientsStep` so it's testable
+ * without mounting the component. `mergeActivity` (`core/activity/merge.ts`)
+ * already returns entries most-recent-first (its own doc contract), so
+ * this only needs to filter/map/dedupe, not re-sort — but sorts
+ * defensively by `timestamp` descending anyway rather than assuming the
+ * caller's ordering contract silently holds forever.
+ */
+function recentSendRecipients(activity: ActivityPage): string[] {
+  const sendEntries = activity.entries
+    .filter((entry) => entry.type === "send")
+    .slice()
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  const seen = new Set<string>();
+  const recipients: string[] = [];
+  for (const entry of sendEntries) {
+    if (seen.has(entry.address)) continue;
+    seen.add(entry.address);
+    recipients.push(entry.address);
+  }
+  return recipients;
 }
 
 function SuccessStep({
