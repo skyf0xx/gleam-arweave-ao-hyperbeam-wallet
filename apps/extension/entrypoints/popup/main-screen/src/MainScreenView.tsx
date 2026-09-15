@@ -263,7 +263,7 @@ export function MainScreenView({
               <SkeletonRow />
             </>
           ) : state.tokenBalances.length === 0 ? (
-            <EmptyState message="Nothing here yet. Send yourself something to test the waters." />
+            <EmptyState message="Nothing here yet. Send yourself something to get started." />
           ) : (
             state.tokenBalances.map((token) => (
               <TokenRow

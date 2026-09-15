@@ -211,7 +211,7 @@ export function PortfolioChart({
           </svg>
         )}
       </div>
-      {isEmpty && <div className="text-center text-caption text-faint">Receive some AR to see your portfolio value over time.</div>}
+      {isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
 
       <div role="tablist" aria-label="Chart range" className="flex items-center gap-1">
         {RANGE_TABS.map((range) => (
