@@ -1,5 +1,5 @@
 import { Avatar, Style } from "@dicebear/core";
-import weave from "@dicebear/styles/weave.json";
+import waves from "@dicebear/styles/waves.json"
 
 /**
  * Generates the account pill's identity avatar SVG entirely in-process via
@@ -23,9 +23,9 @@ import weave from "@dicebear/styles/weave.json";
  * `@dicebear/core`'s own `Style` doc comment: "reuse the instance across
  * avatars") rather than per call.
  */
-const weaveStyle = new Style(weave);
+const waveStyle = new Style(waves);
 
 export function generateAccountAvatarSvg(address: string): string {
-  const avatar = new Avatar(weaveStyle, { seed: address });
+  const avatar = new Avatar(waveStyle, { seed: address });
   return avatar.toString();
 }

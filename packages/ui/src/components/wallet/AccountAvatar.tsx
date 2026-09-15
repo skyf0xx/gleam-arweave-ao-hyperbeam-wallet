@@ -24,8 +24,8 @@ export function AccountAvatar({ svgMarkup, label, size = 28, className }: Accoun
     <span
       role="img"
       aria-label={label}
-      className={cn("inline-flex flex-shrink-0 overflow-hidden rounded-full bg-mist", className)}
-      style={{ width: size, height: size }}
+      className={cn("inline-flex flex-shrink-0 overflow-hidden rounded- bg-mist opacity-30", className)}
+      style={{ width: size, height: size, clipPath:  "polygon(50% 0%, 79% 10%, 95% 35%, 95% 65%, 79% 90%, 50% 100%, 21% 90%, 5% 65%, 5% 35%, 21% 10%)" }}
       // `svgMarkup` is generated locally by dicebear from the account
       // address, never from untrusted/remote input (see this file's doc
       // comment) — no `eslint-plugin-react` in this repo to gate this with
