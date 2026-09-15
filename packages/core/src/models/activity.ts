@@ -15,6 +15,17 @@ export interface ActivityEntry {
   amount: string | null;
   tags: Array<{ name: string; value: string }>;
   timestamp: number;
+  /**
+   * Same convention as `TransferDraft.token`: `null` (or omitted, for the
+   * AR-only entries every gateway/`arweave`-path producer already writes
+   * before this field existed) denotes the native AR token; otherwise an
+   * AO token processId. Added so an AO token send/receive entry can't be
+   * conflated with an AR entry, or with a different token's entry, once a
+   * later layer starts writing AO entries alongside the existing AR ones
+   * — `mergeActivity`'s txId-keyed dedup is unaffected, since AO message
+   * IDs and AR transaction IDs are drawn from disjoint id spaces.
+   */
+  token?: string | null;
 }
 
 export interface ActivityPage {

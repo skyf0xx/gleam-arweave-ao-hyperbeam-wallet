@@ -71,6 +71,51 @@ describe("domain model shapes", () => {
     expect(typeof entry.amount).toBe("string");
   });
 
+  it("an ActivityEntry with no token field is representable (AR, pre-existing producers)", () => {
+    const entry: ActivityEntry = {
+      txId: "tx-1",
+      type: "send",
+      status: "pending",
+      address: "abc",
+      amount: "1000000000000",
+      tags: [],
+      timestamp: 0,
+    };
+    expect(entry.token).toBeUndefined();
+  });
+
+  it("an ActivityEntry's token distinguishes an AO transfer from an AR one and from another token", () => {
+    const arEntry: ActivityEntry = {
+      txId: "tx-ar",
+      type: "send",
+      status: "pending",
+      address: "abc",
+      amount: "1000",
+      tags: [],
+      timestamp: 0,
+      token: null,
+    };
+    const aoEntryA: ActivityEntry = {
+      txId: "tx-ao-a",
+      type: "send",
+      status: "pending",
+      address: "abc",
+      amount: "1000",
+      tags: [],
+      timestamp: 0,
+      token: "process-a",
+    };
+    const aoEntryB: ActivityEntry = {
+      ...aoEntryA,
+      txId: "tx-ao-b",
+      token: "process-b",
+    };
+
+    expect(arEntry.token).toBeNull();
+    expect(aoEntryA.token).not.toBe(aoEntryB.token);
+    expect(aoEntryA.token).not.toBe(arEntry.token);
+  });
+
   it("a TransferDraft has no fee until estimateTransfer runs", () => {
     const draft: TransferDraft = {
       recipient: "abc",
