@@ -49,5 +49,13 @@ export default defineConfig({
       // what actually lets it bundle for a service worker/browser target.
       nodePolyfills({ include: ['crypto', 'stream', 'events'] }),
     ],
+    build: {
+      // Extension pages are same-origin and load in milliseconds; Vite's
+      // <link modulepreload> injection for shared chunks (App.js,
+      // risk-notice.js) trips Chrome's "preload not used within a few
+      // seconds" warning in these short-lived popup/approval windows even
+      // though the chunks are consumed synchronously on load.
+      modulePreload: false,
+    },
   }),
 });
