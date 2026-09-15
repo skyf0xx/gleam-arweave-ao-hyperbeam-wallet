@@ -36,7 +36,7 @@
   --color-faint: #a3a3a3;
 
   /* Shimmer loading-state base — deliberately a touch lighter than --color-mist (see .gleam-shimmer's own comment below for why it isn't reused). */
-  --color-shimmer-base: #f8f8f8;
+  --color-shimmer-base: #fdfdfd;
 
   /*
    * The single warning-red accent, per guidelines.md Part 3: reserved
