@@ -9,13 +9,17 @@ afterEach(() => {
 });
 
 /**
- * `SendView` now reads shared balances via `useBalances` (TanStack Query),
- * which requires a `QueryClientProvider` ancestor — mirrors `App.tsx`'s
- * real wiring. A fresh `QueryClient` per render keeps each test's cache
- * isolated from the others.
+ * `SendView` now reads shared balances/activity via `useBalances`/
+ * `useActivity` (TanStack Query), which requires a `QueryClientProvider`
+ * ancestor — mirrors `App.tsx`'s real wiring. A fresh `QueryClient` per
+ * render keeps each test's cache isolated from the others. `retry: false`
+ * (unlike the app's own default-config client) so a mocked `runtime.send`
+ * rejection surfaces as this query's error state on the first attempt
+ * instead of TanStack's default 3-retry backoff dragging error-path tests
+ * past `waitFor`'s timeout.
  */
 function renderSendView(props: SendViewProps) {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <SendView {...props} />

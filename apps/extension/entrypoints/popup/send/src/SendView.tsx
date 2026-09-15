@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { ActivityPage, FeeEstimate, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -6,6 +6,7 @@ import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
+import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
@@ -532,9 +533,15 @@ function SkeletonPickerRow() {
 }
 
 /**
- * Task 2: recent-recipients picker — derived live, in-process, every time
- * this step mounts, from `getActivity`'s merged `ActivityPage` (RELEVANT
- * RULES: no new storage/`ProtocolMap` method). Filters to `type: 'send'`
+ * Task 2: recent-recipients picker — derived from the shared `useActivity`
+ * cache (`wallet.address`-keyed, same query `MainScreenView` and this
+ * view's own review step read) rather than this step's own independent
+ * `getActivity` fetch. `useActivity` was already built for exactly this
+ * (see its own doc comment), but this step had kept a local
+ * `useState`/`useEffect` fetch that duplicated it and raced its own
+ * request against `MainScreenView`'s — this closes that gap so mounting
+ * this step reuses whatever's already cached (or shares the one in-flight
+ * request) instead of issuing a second one. Filters to `type: 'send'`
  * entries, maps to `address`, dedupes (first occurrence wins — entries
  * already arrive most-recent-first from `mergeActivity`), and renders the
  * distinct addresses in that same most-recent-first order. Truncated
@@ -552,50 +559,26 @@ function RecentRecipientsStep({
   onSelect: (recipient: string) => void;
   onBack: () => void;
 }) {
-  const [state, setState] = useState<{ recipients: string[]; loading: boolean; error: string | null }>({
-    recipients: [],
-    loading: true,
-    error: null,
-  });
-
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const activity = await runtime.send<{ address: string }, ActivityPage>({
-        type: "getActivity",
-        payload: { address: wallet.address },
-      });
-      setState({ recipients: recentSendRecipients(activity), loading: false, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    }
-  }, [runtime, wallet.address]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const activityQuery = useActivity(runtime, wallet.address);
+  const recipients = activityQuery.data ? recentSendRecipients(activityQuery.data) : [];
 
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label="Recent recipients">
       <ScreenHeader title="Recent recipients" onBack={onBack} />
       <div className="flex flex-1 flex-col px-1 py-2">
-        {state.error ? (
+        {activityQuery.isError ? (
           <div role="alert" className="px-4 py-3 text-label leading-snug text-warning">
-            {state.error}
+            {activityQuery.error instanceof Error ? activityQuery.error.message : String(activityQuery.error)}
           </div>
-        ) : state.loading ? (
+        ) : activityQuery.isLoading ? (
           <>
             <SkeletonPickerRow />
             <SkeletonPickerRow />
           </>
-        ) : state.recipients.length === 0 ? (
+        ) : recipients.length === 0 ? (
           <EmptyState message="No recent recipients yet. Addresses you've sent to will show up here." />
         ) : (
-          state.recipients.map((address) => (
+          recipients.map((address) => (
             <button
               key={address}
               type="button"
