@@ -1,12 +1,6 @@
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  PortfolioHistory,
-  PortfolioHistoryRange,
-  RuntimePort,
-  TokenBalance,
-  WalletSummary,
-} from "@gleam/core";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { PortfolioHistoryRange, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
 import {
   AccountAvatar,
   ActivityRow,
@@ -23,6 +17,7 @@ import { formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "./for
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances } from "../../activity/src/useBalances";
+import { usePortfolioHistory } from "./usePortfolioHistory";
 
 /**
  * Main screen (wallet-main-screen.html) — porting what's gettable via
@@ -42,15 +37,17 @@ import { useBalances } from "../../activity/src/useBalances";
  * `useMemo`, keyed on the address) rather than through the same
  * async-load state as the balance/activity fetches below.
  *
- * Chart: `PortfolioChart` (same directory) is fed by
- * `getPortfolioHistory` (`ProtocolMap`, wired to `ReadsHandler` in this
- * same task) via `@gleam/core`'s `PortfolioHistory`/`PortfolioHistoryRange`
- * barrel exports. Switching a range tab re-fetches that range's series
- * and updates the chart, %-change badge, and period label together from
- * one response, never a stale combination — see `loadPortfolioHistory`
- * below. An empty `series` (both price sources unavailable) falls back to
- * `NetworkErrorBanner`, matching the balance/activity failure path,
- * rather than a broken/blank chart.
+ * Chart: `PortfolioChart` (same directory) is fed by `usePortfolioHistory`
+ * (`./usePortfolioHistory.ts`), a `useQuery` wrapping the same
+ * `getPortfolioHistory` call (`ProtocolMap`, wired to `ReadsHandler`) via
+ * `@gleam/core`'s `PortfolioHistoryRange` export — the shared-cache
+ * pattern this screen's balances/activity already use
+ * (WALLET-STATE-TANSTACK). Switching a range tab reads/fetches that
+ * range's own cache entry and updates the chart, %-change badge, and
+ * period label together from one query response, never a stale
+ * combination. An empty `series` (both price sources unavailable) falls
+ * back to `NetworkErrorBanner`, matching the balance/activity failure
+ * path, rather than a broken/blank chart.
  *
  * The `Beam` identity divider (`packages/ui/src/primitives/beam.tsx`,
  * wallet-main-screen.html's `.beam-divider`) sits between the chart's
@@ -96,12 +93,6 @@ export interface MainScreenViewProps {
   onOpenSettings: () => void;
 }
 
-interface PortfolioHistoryState {
-  history: PortfolioHistory | null;
-  loading: boolean;
-  error: string | null;
-}
-
 /** Scroll distance (px) past which the header collapses to its compact form. */
 const HEADER_COLLAPSE_THRESHOLD_PX = 24;
 
@@ -143,47 +134,9 @@ export function MainScreenView({
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
   const [portfolioRange, setPortfolioRange] = useState<PortfolioHistoryRange>("7D");
-  const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({
-    history: null,
-    loading: true,
-    error: null,
-  });
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, portfolioRange);
 
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
-
-  /**
-   * `getPortfolioHistory` takes only `{ range }` (`ProtocolMap`'s locked
-   * signature — no `address`; `ReadsHandler` resolves the active wallet
-   * itself, see that file's doc comment), so this loader doesn't thread
-   * `wallet.address` through. Re-runs whenever `portfolioRange` changes
-   * (range-tab click), and always replaces the whole `PortfolioHistory`
-   * response atomically — chart points, %-change, and period label come
-   * from the same fetch, so a tab click can never show one range's chart
-   * next to a different range's %-change/period label.
-   */
-  const loadPortfolioHistory = useCallback(
-    async (range: PortfolioHistoryRange) => {
-      setPortfolioHistory((prev) => ({ ...prev, loading: true, error: null }));
-      try {
-        const history = await runtime.send<{ range: PortfolioHistoryRange }, PortfolioHistory>({
-          type: "getPortfolioHistory",
-          payload: { range },
-        });
-        setPortfolioHistory({ history, loading: false, error: null });
-      } catch (error) {
-        setPortfolioHistory((prev) => ({
-          ...prev,
-          loading: false,
-          error: error instanceof Error ? error.message : String(error),
-        }));
-      }
-    },
-    [runtime],
-  );
-
-  useEffect(() => {
-    void loadPortfolioHistory(portfolioRange);
-  }, [loadPortfolioHistory, portfolioRange]);
 
   /**
    * Chrome renders the popup as one continuously-growing box past its
@@ -294,17 +247,17 @@ export function MainScreenView({
           </div>
 
           <div className="px-6 pb-1 pt-2.5">
-            {portfolioHistory.error ? (
-              <NetworkErrorBanner onRetry={() => void loadPortfolioHistory(portfolioRange)} />
+            {portfolioHistoryQuery.error ? (
+              <NetworkErrorBanner onRetry={() => void portfolioHistoryQuery.refetch()} />
             ) : (
               <PortfolioChart
-                points={portfolioHistory.history?.series ?? []}
-                currentUsdValue={portfolioHistory.history?.currentUsdValue ?? 0}
-                usdChange={portfolioHistory.history?.usdChange ?? 0}
-                periodLabel={portfolioHistory.history?.periodLabel ?? ""}
+                points={portfolioHistoryQuery.data?.series ?? []}
+                currentUsdValue={portfolioHistoryQuery.data?.currentUsdValue ?? 0}
+                usdChange={portfolioHistoryQuery.data?.usdChange ?? 0}
+                periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
                 activeRange={portfolioRange}
                 onRangeChange={setPortfolioRange}
-                loading={portfolioHistory.loading}
+                loading={portfolioHistoryQuery.isLoading}
               />
             )}
           </div>
