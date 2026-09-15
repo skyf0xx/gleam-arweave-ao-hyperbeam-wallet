@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ActivityPage,
   PortfolioHistory,
@@ -110,6 +111,26 @@ interface PortfolioHistoryState {
   error: string | null;
 }
 
+/** Scroll distance (px) past which the header collapses to its compact form. */
+const HEADER_COLLAPSE_THRESHOLD_PX = 24;
+
+/**
+ * Header fade duration (ms) — also drives how long the tokens/activity
+ * section waits before it detaches and floats to the top, so the two
+ * motions read as sequential (fade, then float) rather than overlapping.
+ * Kept as one constant so the JS delay and the CSS `duration-300` on the
+ * header's opacity transition can't drift out of sync.
+ */
+const HEADER_FADE_DURATION_MS = 300;
+
+/**
+ * Resting `top` (px) for the docked tokens/activity section — matches the
+ * pinned account-pill/settings row's rendered height (`top-16` below),
+ * kept as one constant so the Tailwind class and the slide-in offset math
+ * can't drift out of sync.
+ */
+const LIST_DOCK_TOP_PX = 64;
+
 export function MainScreenView({
   runtime,
   wallet,
@@ -120,6 +141,11 @@ export function MainScreenView({
   onOpenSettings,
 }: MainScreenViewProps) {
   const [activeTab, setActiveTab] = useState<"tokens" | "activity">("tokens");
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const [listDocked, setListDocked] = useState(false);
+  const collapseRafRef = useRef<number | null>(null);
+  const listSectionRef = useRef<HTMLDivElement>(null);
+  const listDockOffsetRef = useRef(0);
   const [state, setState] = useState<LoadState>({
     balance: null,
     tokenBalances: [],
@@ -202,11 +228,67 @@ export function MainScreenView({
     void loadPortfolioHistory(portfolioRange);
   }, [loadPortfolioHistory, portfolioRange]);
 
+  /**
+   * Chrome renders the popup as one continuously-growing box past its
+   * 600px ceiling (see theme.css's `[data-layout="popup"]` comment) —
+   * there's no inner scroll container, so `window.scrollY` is the only
+   * scroll position that exists here. Fades the header (status dot, chart,
+   * actions) once scrolled down past it, and un-fades on scrolling back up
+   * to the top rather than on scroll direction generally — matching the
+   * reference apps this is feature-matched against, where the compact
+   * header state tracks "am I still at the top", not "did the last
+   * gesture go up or down". The boolean flip itself is deferred to a
+   * `requestAnimationFrame` (via a ref, not state) so a burst of scroll
+   * events triggers at most one state update per frame instead of one per
+   * event.
+   */
+  useEffect(() => {
+    const handleScroll = () => {
+      if (collapseRafRef.current !== null) return;
+      collapseRafRef.current = requestAnimationFrame(() => {
+        collapseRafRef.current = null;
+        setHeaderCollapsed(window.scrollY > HEADER_COLLAPSE_THRESHOLD_PX);
+      });
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (collapseRafRef.current !== null) cancelAnimationFrame(collapseRafRef.current);
+    };
+  }, []);
+
+  /**
+   * Once the header has fully faded out, the tokens/activity section
+   * detaches from document flow (`position: fixed`) and slides up to sit
+   * flush under the account-pill/settings row — "floating" over the
+   * now-invisible header rather than the header itself shrinking. Docking
+   * is deferred until the fade transition ends (`HEADER_FADE_DURATION_MS`)
+   * so the two motions read as sequential instead of overlapping, and
+   * un-docks immediately on scrolling back up so the section returns to
+   * flow before the header starts fading back in. The measured offset is
+   * relative to the docked resting position (`LIST_DOCK_TOP_PX`, where
+   * `top` lands once fixed), not the viewport top, so the slide covers
+   * exactly the remaining distance instead of overshooting by however
+   * tall the pinned header row is.
+   */
+  useEffect(() => {
+    if (!headerCollapsed) {
+      setListDocked(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const rect = listSectionRef.current?.getBoundingClientRect();
+      listDockOffsetRef.current = rect ? rect.top - LIST_DOCK_TOP_PX : 0;
+      setListDocked(true);
+    }, HEADER_FADE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [headerCollapsed]);
+
   return (
     <div className="flex min-h-full flex-col">
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
-      <div className="flex items-center justify-between gap-2.5 px-5 pb-2.5 pt-4">
+      <div className="sticky top-0 z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
         <button
           type="button"
           onClick={onOpenWalletSwitcher}
@@ -234,45 +316,77 @@ export function MainScreenView({
         </button>
       </div>
 
-      <div className="px-5 pb-1">
-        <StatusDot label="arweave.net" />
+      {/*
+        Fades the status dot + chart block toward invisible on scroll. Its
+        space stays reserved in the layout at all times — only opacity
+        transitions — and the chart's own fetch/range state stays alive
+        underneath, so re-expanding never re-fetches or resets the range
+        tab.
+      */}
+      <div className="transition-opacity duration-300 ease-out" style={{ opacity: headerCollapsed ? 0 : 1 }}>
+        <div inert={headerCollapsed}>
+          <div className="px-5 pb-1">
+            <StatusDot label="arweave.net" />
+          </div>
+
+          <div className="px-6 pb-1 pt-2.5">
+            {portfolioHistory.error ? (
+              <NetworkErrorBanner onRetry={() => void loadPortfolioHistory(portfolioRange)} />
+            ) : (
+              <PortfolioChart
+                points={portfolioHistory.history?.series ?? []}
+                currentUsdValue={portfolioHistory.history?.currentUsdValue ?? 0}
+                usdChange={portfolioHistory.history?.usdChange ?? 0}
+                periodLabel={portfolioHistory.history?.periodLabel ?? ""}
+                activeRange={portfolioRange}
+                onRangeChange={setPortfolioRange}
+                loading={portfolioHistory.loading}
+              />
+            )}
+          </div>
+
+          <div className="px-6 pb-5 pt-3">
+            <Beam />
+          </div>
+
+          <div className="px-6 pb-6">
+            <SendReceiveActions onSend={onSend} onReceive={onReceive} />
+          </div>
+        </div>
       </div>
 
-      <div className="px-6 pb-1 pt-2.5">
-        {portfolioHistory.error ? (
-          <NetworkErrorBanner onRetry={() => void loadPortfolioHistory(portfolioRange)} />
-        ) : (
-          <PortfolioChart
-            points={portfolioHistory.history?.series ?? []}
-            currentUsdValue={portfolioHistory.history?.currentUsdValue ?? 0}
-            usdChange={portfolioHistory.history?.usdChange ?? 0}
-            periodLabel={portfolioHistory.history?.periodLabel ?? ""}
-            activeRange={portfolioRange}
-            onRangeChange={setPortfolioRange}
-            loading={portfolioHistory.loading}
-          />
-        )}
-      </div>
-
-      <div className="px-6 pb-5 pt-3">
-        <Beam />
-      </div>
-
-      <div className="px-6 pb-6">
-        <SendReceiveActions onSend={onSend} onReceive={onReceive} />
-      </div>
-
-      <div className="px-6 pb-6">
-        <div role="tablist" aria-label="Tokens and activity" className="flex items-center gap-1 pb-2.5">
+      {/*
+        Once docked (see the effect above), this section leaves document
+        flow and floats fixed just beneath the pinned account-pill/settings
+        row (`top-16`/`LIST_DOCK_TOP_PX`, not the literal viewport top),
+        sliding up from its natural scroll position via `transform` rather
+        than animating `top` — transform/opacity are what the compositor
+        can animate without triggering layout on every frame. A same-sized
+        placeholder takes its place in flow so nothing below it (there is
+        nothing below it today, but this keeps the section self-contained)
+        jumps when it detaches. `--dock-offset` carries the measured
+        distance still remaining to that resting `top` at the moment of
+        detaching, so the transform can start exactly where the section
+        already was and animate down to 0 instead of snapping.
+      */}
+      {listDocked ? <div style={{ height: listSectionRef.current?.offsetHeight }} /> : null}
+      <div
+        ref={listSectionRef}
+        className={`px-6 pb-6 ${listDocked ? "gleam-dock-in fixed inset-x-0 top-16 z-20" : ""}`}
+        style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
+      >
+        <div
+          role="tablist"
+          aria-label="Tokens and activity"
+          className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-2"
+        >
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "tokens"}
             onClick={() => setActiveTab("tokens")}
-            className={`rounded-md px-2.5 py-1 text-label font-semibold ${
-              activeTab === "tokens"
-                ? "bg-foreground text-background"
-                : "text-muted hover:bg-mist hover:text-foreground"
+            className={`rounded-md px-2.5 py-1 text-label ${
+              activeTab === "tokens" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
             Tokens
@@ -282,10 +396,8 @@ export function MainScreenView({
             role="tab"
             aria-selected={activeTab === "activity"}
             onClick={() => setActiveTab("activity")}
-            className={`rounded-md px-2.5 py-1 text-label font-semibold ${
-              activeTab === "activity"
-                ? "bg-foreground text-background"
-                : "text-muted hover:bg-mist hover:text-foreground"
+            className={`rounded-md px-2.5 py-1 text-label ${
+              activeTab === "activity" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
             Activity
@@ -293,7 +405,7 @@ export function MainScreenView({
         </div>
 
         {activeTab === "tokens" ? (
-          <div className="border-t border-line">
+          <div className="min-h-60 border-t border-line">
             {state.loading && !state.hasLoadedOnce ? (
               <>
                 <SkeletonRow />
@@ -317,7 +429,7 @@ export function MainScreenView({
           </div>
         ) : (
           <>
-            <div className="border-t border-line">
+            <div className="min-h-60 border-t border-line">
               {state.loading && !state.hasLoadedOnce ? (
                 <>
                   <SkeletonRow />

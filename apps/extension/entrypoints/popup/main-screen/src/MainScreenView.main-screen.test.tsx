@@ -280,6 +280,50 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
   });
 });
 
+describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
+  function setScrollY(value: number) {
+    Object.defineProperty(window, "scrollY", { value, configurable: true });
+    fireEvent.scroll(window);
+  }
+
+  afterEach(() => {
+    setScrollY(0);
+  });
+
+  it("fades out and makes the chart/actions block inert once scrolled past the threshold, keeping the avatar's size fixed", async () => {
+    const send = successfulSend();
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    const pill = screen.getByRole("button", { name: /Wallet One, address/i });
+    expect(within(pill).getByRole("img", { name: /avatar/i }).style.width).toBe("24px");
+
+    setScrollY(200);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Send" }).closest("[inert]")).toBeTruthy(),
+    );
+    expect(within(pill).getByRole("img", { name: /avatar/i }).style.width).toBe("24px");
+  });
+
+  it("fades the header back in and makes it interactive again once scrolled back near the top", async () => {
+    const send = successfulSend();
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    setScrollY(200);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Send" }).closest("[inert]")).toBeTruthy(),
+    );
+
+    setScrollY(0);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Send" }).closest("[inert]")).toBeFalsy(),
+    );
+  });
+});
+
 describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
   const AO_TOKEN: TokenBalance = {
     address: WALLET.address,

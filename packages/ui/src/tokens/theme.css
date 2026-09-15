@@ -340,3 +340,34 @@ select,
     opacity: 0;
   }
 }
+
+/*
+ * Main-screen tokens/activity dock-in — once that section detaches from
+ * document flow to float fixed at the top (see MainScreenView.tsx's
+ * scroll-docking effect), it plays this one-shot slide from its last
+ * in-flow position down to `translateY(0)`. `--dock-offset` is set inline
+ * per-render to the measured distance, so the same keyframe animates a
+ * different distance without needing a new declaration each time.
+ * Transform-only (never `top`) so the browser can composite the slide
+ * instead of running layout on every frame — `top`/height-based
+ * animations on this same screen were the source of visible jank this
+ * was built to avoid.
+ */
+@keyframes gleam-dock-in {
+  from {
+    transform: translateY(var(--dock-offset, 0px));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.gleam-dock-in {
+  animation: gleam-dock-in var(--dock-duration, 220ms) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-dock-in {
+    animation: none;
+  }
+}
