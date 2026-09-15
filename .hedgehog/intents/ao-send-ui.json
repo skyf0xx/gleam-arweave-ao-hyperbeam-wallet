@@ -1,0 +1,56 @@
+{
+  "id": "ao-send-ui",
+  "goal": "Extend the Send screen (SendView.tsx) so a user can pick which token to send (AR or any listed AO token, all genuinely sendable via ao-token-send's new capability) and pick a recipient from live recent-recipient history, instead of today's AR-only, free-text-address-only compose step.",
+  "outcome": "SendView's compose step gains a token picker listing AR plus every AO token the popup already lists (main-screen's token list / getTokenBalances), and a recent-recipients affordance above or beside the recipient input, derived live each time the picker opens by reading the same merged activity history mergeActivity already produces (via getActivity, the existing ReadsHandler/ProtocolMap method) and extracting the distinct 'send'-type entries' addresses, most-recent-first -- no new persisted storage, no new ProtocolMap method, no new storage key. Selecting a recent recipient fills the recipient field; selecting a token sets TransferDraft.token accordingly and the fee-estimate/review/success steps carry the selected token's identity through instead of assuming AR.",
+  "priority": 43,
+  "requirements": [
+    {
+      "id": "AO-SEND-UI-RULE-1",
+      "kind": "rule",
+      "statement": "Recent recipients are derived live, in-process, each time the picker opens -- from getActivity's existing merged local+gateway ActivityPage (the same mergeActivity output the activity feed already renders), filtered to type: 'send' entries and mapped to their address field, deduplicated, most-recent-first. No new persisted storage key, no new ProtocolMap method, and no change to mergeActivity/ActivityEntry's existing shape."
+    },
+    {
+      "id": "AO-SEND-UI-RULE-2",
+      "kind": "rule",
+      "statement": "The token picker lists AR plus every token getTokenBalances currently returns for the active wallet -- every listed entry must be genuinely selectable and sendable (consuming ao-token-send's real AO-transfer capability), never rendered disabled or marked 'coming soon'. This task does not alter getTokenBalances/watchedProcessIds token-discovery behavior (a separate, pre-existing gap, GLEAM-WALLET-WALLET-CORE debt #9) -- it only guarantees that whatever the picker already lists is sendable."
+    },
+    {
+      "id": "AO-SEND-UI-RULE-3",
+      "kind": "rule",
+      "statement": "Full, untruncated addresses are shown on the send-review screen for the selected recipient regardless of whether it came from the recent-recipients list or free-text entry (GLEAM-WALLET-RULE-6, unchanged); truncation is only acceptable inside the recent-recipients list UI itself, matching the existing activity-list truncation precedent."
+    },
+    {
+      "id": "AO-SEND-UI-RULE-4",
+      "kind": "rule",
+      "statement": "Depends on ao-token-send: this intent's review/success steps assume estimateTransfer/submitTransfer already succeed for a non-null token, and must not re-implement or bypass that capability."
+    },
+    {
+      "id": "AO-SEND-UI-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "Opening the Send compose step shows a token picker (AR plus every currently-listed AO token) and a recent-recipients affordance populated from real recent 'send' activity, with no hardcoded or placeholder addresses."
+    },
+    {
+      "id": "AO-SEND-UI-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "Selecting a token other than AR and completing the compose -> review -> submit flow succeeds end-to-end (no 'coming soon' state, no disabled control) and produces a real txId."
+    },
+    {
+      "id": "AO-SEND-UI-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "Selecting a recent recipient fills the recipient field with the full address; the review screen still shows the full, untruncated address regardless of selection method."
+    },
+    {
+      "id": "AO-SEND-UI-ACCEPTANCE-4",
+      "kind": "acceptance",
+      "statement": "When there is no prior 'send' activity, the recent-recipients affordance shows an empty/appropriate state rather than an error or a placeholder address."
+    },
+    {
+      "id": "AO-SEND-UI-ACCEPTANCE-5",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run arweave ao pricing activity send receive passes; pnpm tsc -p packages/core --noEmit passes; pnpm wxt build succeeds."
+    }
+  ],
+  "depends_on": [
+    "ao-token-send"
+  ]
+}
