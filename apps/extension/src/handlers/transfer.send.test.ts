@@ -16,6 +16,10 @@ import { cacheKey, clearKeyCache } from "./key-session";
  * resolution — see this task's final report for the scope note.
  */
 const { aoMessageMock, aoconnectResolvedPath } = vi.hoisted(() => {
+  // vi.hoisted runs before ESM imports are initialized, so a static `import`
+  // of createRequire isn't available yet at this point; require() is the
+  // only way to reach it here.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createRequire } = require("node:module") as typeof import("node:module");
   const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
   // Vite's ESM resolver follows the package's "import" export condition
@@ -29,7 +33,7 @@ const { aoMessageMock, aoconnectResolvedPath } = vi.hoisted(() => {
   };
 });
 vi.mock(aoconnectResolvedPath, () => ({
-  connect: (_config: unknown) => ({ message: aoMessageMock }),
+  connect: () => ({ message: aoMessageMock }),
   createDataItemSigner: (jwk: unknown) => ({ __signerFor: jwk }),
 }));
 
