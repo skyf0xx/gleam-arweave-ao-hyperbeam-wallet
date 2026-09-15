@@ -1,0 +1,7 @@
+{
+  "task": "DEFAULT-TOKEN-LIST-SCAFFOLD",
+  "scope_add": [
+    "packages/ui/src/index.ts"
+  ],
+  "reason": "barrel export needed for new default-tokens module"
+}
