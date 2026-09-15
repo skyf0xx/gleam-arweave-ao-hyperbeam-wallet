@@ -131,19 +131,16 @@ export function PortfolioChart({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className="flex flex-col gap-0.5">
+      <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
         <div className="flex items-baseline gap-2.5">
           <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-            {loading ? "—" : formatUsd(currentUsdValue)}
+            {formatUsd(currentUsdValue)}
           </span>
-          <span
-            className="text-label font-semibold tabular-nums"
-            style={{ color: loading ? undefined : lineColorVar }}
-          >
-            {loading ? "" : formatPercent(usdChange)}
+          <span className="text-label font-semibold tabular-nums" style={{ color: lineColorVar }}>
+            {formatPercent(usdChange)}
           </span>
         </div>
-        <div className="text-caption text-muted">{loading ? "Loading…" : periodLabel}</div>
+        <div className="text-caption text-muted">{periodLabel || " "}</div>
       </div>
 
       <div className="h-[80px] w-full">

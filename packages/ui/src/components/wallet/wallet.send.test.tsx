@@ -56,6 +56,21 @@ describe("TokenRow", () => {
     expect(screen.getAllByText("AR").length).toBeGreaterThan(0);
     expect(screen.getByText("128.4204")).toBeTruthy();
   });
+
+  it("keeps the existing amount visible (dimmed, not hidden) while loading", () => {
+    render(
+      <TokenRow
+        glyph={{ label: "AR", tone: 1 }}
+        name="Arweave"
+        ticker="AR"
+        amount="128.4204"
+        usdValue="$1,438.09"
+        loading
+      />,
+    );
+    expect(screen.getByText("128.4204")).toBeTruthy();
+    expect(screen.getByText("$1,438.09")).toBeTruthy();
+  });
 });
 
 describe("ActivityRow", () => {

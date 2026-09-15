@@ -103,6 +103,7 @@ interface LoadState {
   tokenBalances: TokenBalance[];
   activity: ActivityPage | null;
   loading: boolean;
+  hasLoadedOnce: boolean;
   error: string | null;
 }
 
@@ -128,6 +129,7 @@ export function MainScreenView({
     tokenBalances: [],
     activity: null,
     loading: true,
+    hasLoadedOnce: false,
     error: null,
   });
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
@@ -160,7 +162,7 @@ export function MainScreenView({
           payload: { address: wallet.address },
         }),
       ]);
-      setState({ balance, tokenBalances, activity, loading: false, error: null });
+      setState({ balance, tokenBalances, activity, loading: false, hasLoadedOnce: true, error: null });
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -406,7 +408,7 @@ export function MainScreenView({
           </button>
         </div>
         <div className="border-t border-line">
-          {state.loading ? (
+          {state.loading && !state.hasLoadedOnce ? (
             <>
               <SkeletonRow />
               <SkeletonRow />
@@ -421,6 +423,7 @@ export function MainScreenView({
                 name={token.ticker}
                 ticker={token.ticker}
                 amount={token.quantity}
+                loading={state.loading}
               />
             ))
           )}
@@ -441,7 +444,7 @@ export function MainScreenView({
           </button>
         </div>
         <div className="border-t border-line">
-          {state.loading ? (
+          {state.loading && !state.hasLoadedOnce ? (
             <>
               <SkeletonRow />
               <SkeletonRow />

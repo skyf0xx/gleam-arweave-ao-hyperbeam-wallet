@@ -14,6 +14,13 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * directly — `ListRow`'s title/subtitle stack puts the subtitle in
  * monospace (built for addresses), while a token row's ticker subtitle
  * and right-aligned two-line amount/usdValue don't fit that shape.
+ *
+ * `loading` is for a background refresh of an already-rendered row (e.g.
+ * a price re-poll) — it dims the existing amount/usdValue in place
+ * rather than tearing the row down to a shimmer skeleton, so a value
+ * that's already on screen never disappears. First-ever load (nothing to
+ * show yet) is still the caller swapping in `SkeletonRow` instead of
+ * mounting `TokenRow` at all.
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone">;
@@ -21,11 +28,12 @@ export interface TokenRowProps {
   ticker: string;
   amount: string;
   usdValue?: string;
+  loading?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
-export function TokenRow({ glyph, name, ticker, amount, usdValue, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, name, ticker, amount, usdValue, loading = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -42,7 +50,7 @@ export function TokenRow({ glyph, name, ticker, amount, usdValue, onClick, class
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
         <div className="text-caption text-muted">{ticker}</div>
       </div>
-      <div className="flex flex-shrink-0 flex-col items-end gap-px">
+      <div className={cn("flex flex-shrink-0 flex-col items-end gap-px", loading && "opacity-50 transition-opacity")}>
         <div className="text-label font-semibold tabular-nums text-foreground">{amount}</div>
         {usdValue ? <div className="text-caption tabular-nums text-faint">{usdValue}</div> : null}
       </div>
