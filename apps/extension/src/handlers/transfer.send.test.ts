@@ -3,6 +3,36 @@ import { deriveAddress, generateJWK, type JWKInterface, type StoragePort, type W
 import { TransferHandler } from "./transfer";
 import { cacheKey, clearKeyCache } from "./key-session";
 
+/**
+ * `@permaweb/aoconnect` is a direct dependency of `packages/core` only
+ * (per this task's INHERITED DECISIONS), not of `apps/extension` — so a
+ * bare-specifier `vi.mock("@permaweb/aoconnect", ...)` here resolves
+ * against *this* package's own module graph, which pnpm's strict
+ * `node_modules` never even has that package in, and silently fails to
+ * intercept the copy `core/ao/transfer.ts` actually imports (resolved
+ * through `packages/core`'s own `node_modules`). Mocking by the same
+ * absolute resolved path both import sites resolve to works around that
+ * without adding a duplicate workspace dependency purely for test
+ * resolution — see this task's final report for the scope note.
+ */
+const { aoMessageMock, aoconnectResolvedPath } = vi.hoisted(() => {
+  const { createRequire } = require("node:module") as typeof import("node:module");
+  const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
+  // Vite's ESM resolver follows the package's "import" export condition
+  // (`dist/index.js`), not Node's CJS `require.resolve` default
+  // (`dist/index.cjs`) — mock the exact id Vite's module graph loads, or
+  // the mock silently misses and the real network-calling module runs.
+  const cjsEntry = requireFromCore.resolve("@permaweb/aoconnect");
+  return {
+    aoMessageMock: vi.fn(),
+    aoconnectResolvedPath: cjsEntry.replace(/index\.cjs$/, "index.js"),
+  };
+});
+vi.mock(aoconnectResolvedPath, () => ({
+  connect: (_config: unknown) => ({ message: aoMessageMock }),
+  createDataItemSigner: (jwk: unknown) => ({ __signerFor: jwk }),
+}));
+
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
   return {
@@ -46,8 +76,11 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
+  aoMessageMock.mockReset();
   clearKeyCache();
 });
+
+const AO_PROCESS_ID = "aoProcess123";
 
 /**
  * Real `Response` objects (not plain-object stand-ins) — `arweave-js`'s
@@ -84,17 +117,54 @@ describe("TransferHandler: estimateTransfer", () => {
     cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
-  it("rejects AO token transfers as not yet implemented", async () => {
+  it("returns fee: null for an AO token transfer — no sender-side fee quote exists for AO", async () => {
+    mockFetchSequence([]);
     const handler = new TransferHandler(storage);
-    await expect(
-      handler.estimateTransfer({
-        walletId: WALLET_ID,
-        recipient: "someAddr",
-        token: "someProcessId",
+
+    const estimate = await handler.estimateTransfer({
+      walletId: WALLET_ID,
+      recipient: "someAoRecipient",
+      token: AO_PROCESS_ID,
+      amount: "1",
+      fee: null,
+    });
+
+    expect(estimate.fee).toBeNull();
+  });
+
+  it("computes firstSeenRecipient for an AO transfer against the same merged AR activity history the AR path uses", async () => {
+    await storage.set(`local:activityLog:${wallet.address}`, [
+      {
+        txId: "prior-tx",
+        type: "send",
+        status: "confirmed",
+        address: "knownAoAddr",
         amount: "1",
-        fee: null,
-      }),
-    ).rejects.toThrow(/AO tokens/);
+        tags: [],
+        timestamp: 1,
+        token: AO_PROCESS_ID,
+      },
+    ]);
+    mockFetchSequence([]);
+    const handler = new TransferHandler(storage);
+
+    const seen = await handler.estimateTransfer({
+      walletId: WALLET_ID,
+      recipient: "knownAoAddr",
+      token: AO_PROCESS_ID,
+      amount: "1000",
+      fee: null,
+    });
+    expect(seen.firstSeenRecipient).toBe(false);
+
+    const unseen = await handler.estimateTransfer({
+      walletId: WALLET_ID,
+      recipient: "brandNewAoAddr",
+      token: AO_PROCESS_ID,
+      amount: "1000",
+      fee: null,
+    });
+    expect(unseen.firstSeenRecipient).toBe(true);
   });
 
   it("returns a fee and firstSeenRecipient=true for a never-seen address", async () => {
@@ -152,17 +222,80 @@ describe("TransferHandler: submitTransfer", () => {
     cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
-  it("rejects AO token transfers as not yet implemented", async () => {
+  it("throws a named error when no active HyperBEAM peer is configured for an AO transfer", async () => {
     const handler = new TransferHandler(storage);
     await expect(
       handler.submitTransfer({
         walletId: WALLET_ID,
-        recipient: "someAddr",
-        token: "someProcessId",
+        recipient: "someAoRecipient",
+        token: AO_PROCESS_ID,
         amount: "1",
         fee: null,
       }),
-    ).rejects.toThrow(/AO tokens/);
+    ).rejects.toThrow(/active HyperBEAM peer/);
+  });
+
+  it("submits an AO transfer via aoconnect and writes an optimistic pending activity entry tagged with the token processId", async () => {
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    aoMessageMock.mockResolvedValue("ao-msg-id-1");
+
+    const handler = new TransferHandler(storage);
+    const result = await handler.submitTransfer({
+      walletId: WALLET_ID,
+      recipient: "recipientAoAddr",
+      token: AO_PROCESS_ID,
+      amount: "42",
+      fee: null,
+    });
+
+    expect(result.txId).toBe("ao-msg-id-1");
+    expect(aoMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        process: AO_PROCESS_ID,
+        tags: [
+          { name: "Action", value: "Transfer" },
+          { name: "Recipient", value: "recipientAoAddr" },
+          { name: "Quantity", value: "42" },
+        ],
+      }),
+    );
+
+    const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
+    expect(log).toHaveLength(1);
+    const [entry] = log as Array<Record<string, unknown>>;
+    expect(entry?.txId).toBe("ao-msg-id-1");
+    expect(entry?.status).toBe("pending");
+    expect(entry?.address).toBe("recipientAoAddr");
+    expect(entry?.amount).toBe("42");
+    expect(entry?.token).toBe(AO_PROCESS_ID);
+  });
+
+  it("keeps AO amounts as atomic-integer strings end to end, never a float", async () => {
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    aoMessageMock.mockResolvedValue("ao-msg-id-2");
+    const huge = "90071992547409930000";
+
+    const handler = new TransferHandler(storage);
+    await handler.submitTransfer({
+      walletId: WALLET_ID,
+      recipient: "recipientAoAddr",
+      token: AO_PROCESS_ID,
+      amount: huge,
+      fee: null,
+    });
+
+    const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
+    const [entry] = log as Array<Record<string, unknown>>;
+    expect(entry?.amount).toBe(huge);
+    expect(typeof entry?.amount).toBe("string");
   });
 
   it("throws when the wallet isn't unlocked (no cached signing key)", async () => {

@@ -1,5 +1,6 @@
 import { estimateFee, submitTransfer as submitArweaveTransfer } from "@gleam/core/src/arweave/transfer.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
+import { submitTransfer as submitAoTransfer } from "@gleam/core/src/ao/transfer.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import {
   type ActivityEntry,
@@ -106,56 +107,72 @@ export class TransferHandler {
   }
 
   /**
-   * Only AR transfers (`token: null`) are implemented — an AO token
-   * transfer requires dispatching a message to the token's process
-   * rather than a plain value-transfer transaction, which is a different
-   * request shape `core/ao` doesn't build yet (out of this task's
-   * ALLOWED SCOPE: `core/ao` was scoped for balance reads only). Throws a
-   * named, specific error rather than silently treating an AO transfer
-   * like an AR one — see this task's final report.
+   * `token: null` is the AR path (unchanged). `token: <processId>` is an
+   * AO token transfer: `firstSeenRecipient` is still computed against the
+   * same merged local+gateway AR activity history the AR path uses (per
+   * this task's packet — there is no separate AO-only recipient-history
+   * source), but `fee` has no AO equivalent — see `core/ao/transfer.ts`'s
+   * `AO_TRANSFER_HAS_NO_FEE` doc comment for why an AO `Transfer` message
+   * has no sender-side fee quote the way an AR value-transfer does.
+   * Returned as `fee: null` rather than a fabricated `0`, matching
+   * `TransferDraft.fee`'s `Winston | null` shape.
    */
   async estimateTransfer(req: EstimateTransferRequest): Promise<FeeEstimate> {
-    if (req.token !== null) {
-      throw new Error(
-        "Sending AO tokens isn't implemented yet — only AR transfers are supported.",
-      );
-    }
-
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
 
-    const [{ fee }, localLog, gatewayEntries] = await Promise.all([
-      estimateFee(settings.gatewayUrl, req.recipient),
+    const [localLog, gatewayEntries] = await Promise.all([
       this.loadActivityLog(wallet.address),
       queryActivityTransactions(wallet.address, settings.gatewayUrl, FIRST_SEEN_LOOKUP_LIMIT).catch(
         () => [],
       ),
     ]);
+    const firstSeenRecipient = isFirstSeenRecipient(req.recipient, localLog, gatewayEntries);
 
-    return {
-      fee,
-      firstSeenRecipient: isFirstSeenRecipient(req.recipient, localLog, gatewayEntries),
-    };
+    if (req.token !== null) {
+      return { fee: null, firstSeenRecipient };
+    }
+
+    const { fee } = await estimateFee(settings.gatewayUrl, req.recipient);
+    return { fee, firstSeenRecipient };
   }
 
   /**
    * Writes an optimistic `ActivityEntry` immediately after a successful
-   * submit, before gateway confirmation (PRD "Send submission writes an
-   * optimistic activity entry immediately, before gateway confirmation")
-   * — the entry is written here, synchronously with the response, not
-   * fire-and-forgotten after it.
+   * submit, before gateway/network confirmation (PRD "Send submission
+   * writes an optimistic activity entry immediately, before gateway
+   * confirmation") — the entry is written here, synchronously with the
+   * response, not fire-and-forgotten after it.
+   *
+   * AO path (`req.token !== null`): "submitted" here means aoconnect's
+   * `message()` resolved with a message id — the Messenger Unit accepted
+   * and scheduled the signed data item, not that the token process has
+   * executed the `Transfer` handler or that the recipient's balance has
+   * updated yet. The entry is written `status: "pending"` on that
+   * acceptance, same tier of certainty the AR path already commits to for
+   * its own gateway-accepted-but-not-yet-mined case — see
+   * `core/ao/transfer.ts`'s doc comment for the full distinction.
    */
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
-    if (req.token !== null) {
-      throw new Error(
-        "Sending AO tokens isn't implemented yet — only AR transfers are supported.",
-      );
-    }
-
     const settings = await this.loadNetworkSettings();
     const { jwk, address } = this.signingKeyFor(req.walletId);
 
-    const { txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount);
+    let txId: string;
+    if (req.token === null) {
+      ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount));
+    } else {
+      if (settings.activePeerUrl === null) {
+        throw new Error("No active HyperBEAM peer is configured — set one in Network & Peers to send AO tokens.");
+      }
+      const { messageId } = await submitAoTransfer(
+        settings.activePeerUrl,
+        jwk,
+        req.token,
+        req.recipient,
+        req.amount,
+      );
+      txId = messageId;
+    }
 
     await this.appendActivityLog(address, {
       txId,
@@ -165,6 +182,7 @@ export class TransferHandler {
       amount: req.amount,
       tags: [],
       timestamp: Date.now(),
+      token: req.token,
     });
 
     return { txId };

@@ -63,6 +63,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
       runtime={fakeRuntime()}
       wallet={WALLET}
       onSend={vi.fn()}
+      onSendToken={vi.fn()}
       onReceive={vi.fn()}
       onViewAllTokens={vi.fn()}
       onViewAllActivity={vi.fn()}
@@ -230,5 +231,32 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
+  });
+});
+
+describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
+  const AO_TOKEN: TokenBalance = {
+    address: WALLET.address,
+    processId: "processABC",
+    ticker: "PNTS",
+    denomination: 0,
+    quantity: "500",
+  };
+
+  it("calls onSendToken with the token when its row is clicked — every listed token is genuinely sendable", async () => {
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return BALANCE;
+      if (type === "getTokenBalances") return [AO_TOKEN];
+      if (type === "getActivity") return EMPTY_ACTIVITY;
+      if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      throw new Error(`Unexpected message type "${type}"`);
+    });
+    const onSendToken = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send }), onSendToken });
+
+    await waitFor(() => expect(screen.getAllByText("PNTS").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: /PNTS/ }));
+
+    expect(onSendToken).toHaveBeenCalledWith(AO_TOKEN);
   });
 });

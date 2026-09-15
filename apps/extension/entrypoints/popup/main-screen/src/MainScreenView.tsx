@@ -69,6 +69,13 @@ export interface MainScreenViewProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
   onSend: () => void;
+  /**
+   * Per-row entry point into the send flow for a specific AO token (the
+   * top-level "Send" action in `SendReceiveActions` above stays AR-only —
+   * it carries no token context to send with). Wired by `App.tsx` to open
+   * `SendView` pre-selected for `token`, same sub-view kind as `onSend`.
+   */
+  onSendToken: (token: TokenBalance) => void;
   onReceive: () => void;
   onViewAllTokens: () => void;
   onViewAllActivity: () => void;
@@ -95,6 +102,7 @@ export function MainScreenView({
   runtime,
   wallet,
   onSend,
+  onSendToken,
   onReceive,
   onViewAllTokens,
   onViewAllActivity,
@@ -273,6 +281,7 @@ export function MainScreenView({
                 ticker={token.ticker}
                 amount={token.quantity}
                 loading={state.loading}
+                onClick={() => onSendToken(token)}
               />
             ))
           )}

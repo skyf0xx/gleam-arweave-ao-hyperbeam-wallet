@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { RuntimePort, ThemeSettings, WalletState, WalletSummary } from "@gleam/core";
+import type { RuntimePort, ThemeSettings, TokenBalance, WalletState, WalletSummary } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
@@ -70,7 +70,8 @@ export interface AppProps {
 type TopView = "loading" | "onboarding" | "unlock" | "main-screen";
 type MainSubView =
   | { kind: "home" }
-  | { kind: "send" }
+  /** `token: null` is the AR path (the top-level Send action); an AO token row's click carries its `TokenBalance`. */
+  | { kind: "send"; token: TokenBalance | null }
   | { kind: "receive" }
   | { kind: "activity" }
   | { kind: "wallet-switcher" }
@@ -217,6 +218,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <SendView
         runtime={runtime}
         wallet={wallet}
+        token={subView.token}
         onBack={() => setSubView({ kind: "home" })}
         onDone={() => setSubView({ kind: "home" })}
       />
@@ -263,7 +265,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <MainScreenView
         runtime={runtime}
         wallet={wallet}
-        onSend={() => setSubView({ kind: "send" })}
+        onSend={() => setSubView({ kind: "send", token: null })}
+        onSendToken={(token) => setSubView({ kind: "send", token })}
         onReceive={() => setSubView({ kind: "receive" })}
         // No "all tokens" screen exists yet (tracked as separate scope,
         // matching this file's `activity` sub-view once that screen is
