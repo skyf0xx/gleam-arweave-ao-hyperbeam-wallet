@@ -110,6 +110,84 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     expect(ardriveButton.getAttribute("disabled")).toBeNull();
   });
 
+  it("shows AR and a default AO row at '0', both selectable, while balances are still loading", async () => {
+    const send = vi.fn(() => new Promise(() => {})); // never resolves -- stays in the loading state.
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    const arweaveRow = (await screen.findByText("Arweave")).closest("button");
+    expect(arweaveRow).not.toBeNull();
+    expect(arweaveRow?.textContent).toContain("0");
+    expect(arweaveRow?.disabled).toBeFalsy();
+
+    const aoRow = screen.getAllByText("AO")[0].closest("button");
+    expect(aoRow).not.toBeNull();
+    expect(aoRow?.textContent).toContain("0");
+    expect(aoRow?.getAttribute("disabled")).toBeNull();
+  });
+
+  it("always renders a default AO row above other watched AO tokens, even with no AO balance entry", async () => {
+    const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    await waitFor(() => expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0));
+
+    const dialog = screen.getByRole("dialog", { name: "Select token" });
+    const rowNames = within(dialog)
+      .getAllByRole("button")
+      .filter((row) => row.getAttribute("aria-label") !== "Back")
+      .map((row) => row.textContent ?? "");
+
+    const arIndex = rowNames.findIndex((text) => text.includes("Arweave"));
+    const aoIndex = rowNames.findIndex((text) => text.includes("AO") && !text.includes("ARDRIVE"));
+    const ardriveIndex = rowNames.findIndex((text) => text.includes("ARDRIVE"));
+
+    expect(arIndex).toBe(0);
+    expect(aoIndex).toBe(1);
+    expect(ardriveIndex).toBe(2);
+
+    // No live AO balance was returned, so the default AO row still reads "0".
+    expect(rowNames[aoIndex]).toContain("0");
+
+    // The default AO row is genuinely selectable even without a real balance.
+    fireEvent.click(
+      within(dialog)
+        .getAllByRole("button")
+        .filter((row) => row.getAttribute("aria-label") !== "Back")[1],
+    );
+    await waitFor(() => expect(screen.getByText(/^Send AO$/)).toBeTruthy());
+  });
+
+  it("updates the AR and AO default rows to real balances once they load, without disturbing other watched tokens", async () => {
+    const AO_DEFAULT_TOKEN: TokenBalance = {
+      address: WALLET.address,
+      processId: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc",
+      ticker: "AO",
+      denomination: 12,
+      quantity: "3000000000000",
+    };
+    const send = routedSend({
+      getBalance: () => "2000000000000",
+      getTokenBalances: () => [AO_DEFAULT_TOKEN, AO_TOKEN],
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    const arweaveRow = await screen.findByText("Arweave");
+    await waitFor(() => expect(arweaveRow.closest("button")?.textContent).toContain("2"));
+
+    await waitFor(() => {
+      const aoRow = screen.getAllByText("AO")[0].closest("button");
+      expect(aoRow?.textContent).toContain("3");
+    });
+
+    expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0);
+  });
+
   it("selecting a non-AR token sets the compose ticker and carries it through estimate/submit", async () => {
     const send = routedSend({
       getTokenBalances: () => [AO_TOKEN],

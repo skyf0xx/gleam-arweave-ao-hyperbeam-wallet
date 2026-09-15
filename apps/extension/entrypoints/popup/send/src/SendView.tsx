@@ -5,6 +5,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
@@ -216,6 +217,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   if (step.kind === "token-picker") {
     return (
       <TokenPickerStep
+        walletAddress={wallet.address}
         balancesQuery={balancesQuery}
         selectedToken={selectedToken}
         onSelect={(nextToken) => {
@@ -452,19 +454,45 @@ function ReviewRow({ label, value, mono, strong }: { label: string; value: strin
 }
 
 /**
+ * Synthetic `TokenBalance` for the AO default row when `balancesQuery.data`
+ * has no matching AO entry yet (unloaded, or a wallet that genuinely holds
+ * none). Gives the row a real, selectable `token: null`-equivalent — every
+ * row here must stay clickable (RELEVANT RULES), so a `div`-only "coming
+ * soon" row (what `TokenRow` renders when `onClick` is `undefined`) isn't an
+ * option. `address` mirrors the connected wallet since nothing downstream of
+ * `selectedToken` reads anything but `processId`/`ticker`/`denomination`/
+ * `quantity` (see `handleContinue`/`handleSign` above).
+ */
+function defaultAoTokenBalance(walletAddress: string): TokenBalance {
+  return {
+    address: walletAddress,
+    processId: DEFAULT_AO_TOKEN.processId as string,
+    ticker: DEFAULT_AO_TOKEN.ticker,
+    denomination: 0,
+    quantity: "0",
+  };
+}
+
+/**
  * Task 1: token picker — a pushed screen (`WalletSwitcherView.tsx`'s
  * established "ScreenHeader + rows" pattern, not a dropdown/modal — none
- * exists in this project). AR is a synthetic first row (`token: null`);
- * every other row comes from `getTokenBalances`, reusing `TokenRow`
- * exactly as `MainScreenView` does. Every row is genuinely selectable —
+ * exists in this project). AR and AO are synthetic default rows (mirroring
+ * `MainScreenView`'s Tokens tab — see `buildDefaultTokenRows`/
+ * `nonDefaultTokenBalances` there): AR is `token: null`, and AO is always
+ * rendered above any other watched AO tokens, falling back to
+ * `DEFAULT_AR_TOKEN`/`DEFAULT_AO_TOKEN`'s `"0"` `defaultDisplayAmount`
+ * while `balancesQuery.data` is unloaded or has no AO entry, and updating to
+ * the real balance once it resolves. Every row is genuinely selectable —
  * there is no disabled/"coming soon" state, per RELEVANT RULES.
  */
 function TokenPickerStep({
+  walletAddress,
   balancesQuery,
   selectedToken,
   onSelect,
   onBack,
 }: {
+  walletAddress: string;
   balancesQuery: UseQueryResult<WalletBalances>;
   selectedToken: TokenBalance | null;
   onSelect: (token: TokenBalance | null) => void;
@@ -477,6 +505,14 @@ function TokenPickerStep({
       : String(balancesQuery.error)
     : null;
 
+  const aoBalance = balancesQuery.data?.tokenBalances.find(
+    (candidate) => candidate.processId === DEFAULT_AO_TOKEN.processId,
+  );
+  const aoToken = aoBalance ?? defaultAoTokenBalance(walletAddress);
+  const otherTokenBalances = (balancesQuery.data?.tokenBalances ?? []).filter(
+    (candidate) => candidate.processId !== DEFAULT_AO_TOKEN.processId,
+  );
+
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label="Select token">
       <ScreenHeader title="Select token" onBack={onBack} />
@@ -488,13 +524,27 @@ function TokenPickerStep({
         ) : null}
 
         <TokenRow
-          glyph={{ label: "AR", tone: 1 }}
-          name="Arweave"
-          ticker="AR"
-          amount={balancesQuery.data === undefined ? "" : formatWinstonAsAr(balancesQuery.data.arBalance)}
+          glyph={{ label: DEFAULT_AR_TOKEN.ticker, tone: 1 }}
+          name={DEFAULT_AR_TOKEN.name}
+          ticker={DEFAULT_AR_TOKEN.ticker}
+          amount={
+            balancesQuery.data === undefined
+              ? DEFAULT_AR_TOKEN.defaultDisplayAmount
+              : formatWinstonAsAr(balancesQuery.data.arBalance)
+          }
           loading={loading}
           onClick={() => onSelect(null)}
           className={selectedToken === null ? "bg-mist" : undefined}
+        />
+
+        <TokenRow
+          glyph={{ label: DEFAULT_AO_TOKEN.ticker, tone: 2 }}
+          name={DEFAULT_AO_TOKEN.name}
+          ticker={DEFAULT_AO_TOKEN.ticker}
+          amount={aoBalance ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination) : DEFAULT_AO_TOKEN.defaultDisplayAmount}
+          loading={loading}
+          onClick={() => onSelect(aoToken)}
+          className={selectedToken?.processId === DEFAULT_AO_TOKEN.processId ? "bg-mist" : undefined}
         />
 
         {loading ? (
@@ -503,7 +553,7 @@ function TokenPickerStep({
             <SkeletonPickerRow />
           </>
         ) : (
-          (balancesQuery.data?.tokenBalances ?? []).map((candidate) => (
+          otherTokenBalances.map((candidate) => (
             <TokenRow
               key={candidate.processId}
               glyph={{ label: candidate.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
