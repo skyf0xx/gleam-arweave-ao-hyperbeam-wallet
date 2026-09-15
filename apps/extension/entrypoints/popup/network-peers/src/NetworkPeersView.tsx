@@ -168,12 +168,14 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
       <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
         <div className="pb-10">
-          <div className="pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">Gateway</div>
-          <div className="rounded-xl border border-line">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+            Gateway
+          </div>
+          <div>
             {state.loading ? (
               <SkeletonRow />
             ) : (
-              <div className="flex items-center gap-2.5 px-3.5 py-3.5">
+              <div className="flex items-center gap-2.5 py-3.5">
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-label font-semibold text-foreground">
                     {state.settings ? gatewayHostname(state.settings.gatewayUrl) : "—"}
@@ -187,8 +189,10 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         </div>
 
         <div>
-          <div className="pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">AO peers</div>
-          <div className="rounded-xl border border-line px-3.5">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+            AO peers
+          </div>
+          <div>
             {state.loading ? (
               <>
                 <SkeletonRow />
@@ -199,10 +203,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                 {(state.settings?.peers ?? []).map((peer) => {
                   const isActive = state.settings?.activePeerUrl === peer.url;
                   return (
-                    <div
-                      key={peer.url}
-                      className="flex items-center gap-2.5 border-b border-line py-3.5 last:border-b-0"
-                    >
+                    <div key={peer.url} className="flex items-center gap-2.5 py-3.5">
                       <button
                         type="button"
                         disabled={saving || !peer.enabled}

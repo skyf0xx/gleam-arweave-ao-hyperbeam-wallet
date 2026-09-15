@@ -9,6 +9,8 @@ import { ActivityView } from "@/entrypoints/popup/activity/index.tsx";
 import { WalletSwitcherView } from "@/entrypoints/popup/wallet-switcher/index.tsx";
 import { LockSettingsView } from "@/entrypoints/popup/lock-settings/index.tsx";
 import { NetworkPeersView } from "@/entrypoints/popup/network-peers/index.tsx";
+import { SettingsHomeView } from "@/entrypoints/popup/settings-home/index.tsx";
+import { ConnectedAppsView } from "@/entrypoints/popup/connected-apps/index.tsx";
 
 /**
  * The one shared shell mounted from every surface (popup, sidepanel,
@@ -72,8 +74,10 @@ type MainSubView =
   | { kind: "receive" }
   | { kind: "activity" }
   | { kind: "wallet-switcher" }
+  | { kind: "settings-home" }
   | { kind: "lock-settings" }
-  | { kind: "network-peers" };
+  | { kind: "network-peers" }
+  | { kind: "connected-apps" };
 
 function resolveTopView(state: WalletState): TopView {
   if (state.wallets.length === 0) return "onboarding";
@@ -232,16 +236,28 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onBack={() => setSubView({ kind: "home" })}
       />
     );
+  } else if (subView.kind === "settings-home") {
+    content = (
+      <SettingsHomeView
+        runtime={runtime}
+        onBack={() => setSubView({ kind: "home" })}
+        onOpenLockSettings={() => setSubView({ kind: "lock-settings" })}
+        onOpenConnectedApps={() => setSubView({ kind: "connected-apps" })}
+        onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
+      />
+    );
   } else if (subView.kind === "lock-settings") {
     content = (
       <LockSettingsView
         runtime={runtime}
-        onBack={() => setSubView({ kind: "home" })}
+        onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
       />
     );
   } else if (subView.kind === "network-peers") {
-    content = <NetworkPeersView runtime={runtime} onBack={() => setSubView({ kind: "home" })} />;
+    content = <NetworkPeersView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+  } else if (subView.kind === "connected-apps") {
+    content = <ConnectedAppsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else {
     content = (
       <MainScreenView
@@ -256,8 +272,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onViewAllTokens={() => {}}
         onViewAllActivity={() => setSubView({ kind: "activity" })}
         onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
-        onOpenLockSettings={() => setSubView({ kind: "lock-settings" })}
-        onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
+        onOpenSettings={() => setSubView({ kind: "settings-home" })}
       />
     );
   }

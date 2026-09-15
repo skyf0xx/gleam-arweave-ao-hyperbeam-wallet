@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   ActivityPage,
   PortfolioHistory,
   PortfolioHistoryRange,
   RuntimePort,
-  ThemePreference,
-  ThemeSettings,
   TokenBalance,
   WalletSummary,
   Winston,
@@ -58,33 +56,14 @@ import { generateAccountAvatarSvg } from "./generateAccountAvatar";
  * range-tabs and the Send/Receive actions row, matching the reference's
  * placement now that the chart exists.
  *
- * Navigation entry points (settings-screens-gap): the account pill's
- * chevron (wallet-main-screen.html's `.account-pill`) opens the wallet
- * switcher via `onOpenWalletSwitcher`; the header's gear icon
- * (`.icon-btn[aria-label="Settings"]`) opens a small inline menu listing
- * "Lock & auto-lock" and "Network & peers" — the only two settings
- * screens this intent builds. A full settings-home screen (TODO.md
- * §7.2, every other settings category) is explicitly out of this
- * intent's scope, so the gear opens this minimal two-item menu directly
- * rather than a dedicated settings-home screen that doesn't exist yet;
- * see this task's final report.
- *
- * The gear menu's third item (this task, settings-screens-gap) is a
- * Light/Dark toggle rather than a navigation entry, since there is no
- * separate theme screen — it reads/writes `ThemeSettings` via
- * `getThemePreference`/`setThemePreference` directly (own mount-time
- * fetch, matching this component's existing pattern of fetching its own
- * data rather than threading it from `App.tsx`, which is out of this
- * layer's scope) and, per wallet-core's inherited decision, re-applies
- * `data-theme` immediately by setting it on `document.documentElement`
- * rather than only on `App.tsx`'s root div — there is no storage-change
- * listener anywhere in this codebase, so without this the flipped
- * surface would not reflect the change until closed and reopened. The
- * dark-mode token block in `theme.css` matches `[data-theme="dark"]` on
- * *any* ancestor, so setting it on `documentElement` (an ancestor of
- * `App.tsx`'s own root div) is equivalent for styling purposes and
- * doesn't require touching `App.tsx`, which is wallet-core's locked
- * scope.
+ * Navigation entry points: the account pill's chevron
+ * (wallet-main-screen.html's `.account-pill`) opens the wallet switcher
+ * via `onOpenWalletSwitcher`; the header's gear icon
+ * (`.icon-btn[aria-label="Settings"]`) opens the dedicated settings-home
+ * screen via `onOpenSettings`, which owns navigation to every settings
+ * category (lock/auto-lock, connected apps, network & peers, dark mode,
+ * and so on) — this component no longer renders an inline settings menu
+ * or reads/writes theme preference itself.
  */
 export interface MainScreenViewProps {
   runtime: RuntimePort;
@@ -94,8 +73,7 @@ export interface MainScreenViewProps {
   onViewAllTokens: () => void;
   onViewAllActivity: () => void;
   onOpenWalletSwitcher: () => void;
-  onOpenLockSettings: () => void;
-  onOpenNetworkPeers: () => void;
+  onOpenSettings: () => void;
 }
 
 interface LoadState {
@@ -121,8 +99,7 @@ export function MainScreenView({
   onViewAllTokens,
   onViewAllActivity,
   onOpenWalletSwitcher,
-  onOpenLockSettings,
-  onOpenNetworkPeers,
+  onOpenSettings,
 }: MainScreenViewProps) {
   const [state, setState] = useState<LoadState>({
     balance: null,
@@ -132,10 +109,6 @@ export function MainScreenView({
     hasLoadedOnce: false,
     error: null,
   });
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const settingsMenuRef = useRef<HTMLDivElement>(null);
-  const [theme, setTheme] = useState<ThemePreference>("light");
-  const [savingTheme, setSavingTheme] = useState(false);
   const [portfolioRange, setPortfolioRange] = useState<PortfolioHistoryRange>("7D");
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryState>({
     history: null,
@@ -210,75 +183,6 @@ export function MainScreenView({
     void loadPortfolioHistory(portfolioRange);
   }, [loadPortfolioHistory, portfolioRange]);
 
-  /**
-   * This screen's own theme read, separate from `App.tsx`'s pre-paint
-   * `applyTheme` gate — `App.tsx` is out of this layer's scope, so its
-   * fetched value can't be threaded down as a prop without editing it.
-   * A failed read (e.g. background dispatcher unreachable) falls back to
-   * light, matching every other fallback in this codebase's theme wiring.
-   */
-  useEffect(() => {
-    let cancelled = false;
-    const applyDocumentTheme = (value: ThemePreference) => {
-      if (value === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
-    };
-    runtime
-      .send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined })
-      .then((settings) => {
-        if (cancelled) return;
-        setTheme(settings.theme);
-        applyDocumentTheme(settings.theme);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setTheme("light");
-        applyDocumentTheme("light");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime]);
-
-  useEffect(() => {
-    if (!settingsMenuOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
-        setSettingsMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [settingsMenuOpen]);
-
-  const handleToggleTheme = async () => {
-    const next: ThemePreference = theme === "dark" ? "light" : "dark";
-    const previous = theme;
-    setTheme(next);
-    if (next === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
-    setSavingTheme(true);
-    try {
-      await runtime.send<ThemeSettings, void>({ type: "setThemePreference", payload: { theme: next } });
-    } catch (error) {
-      setTheme(previous);
-      if (previous === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
-      setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : String(error) }));
-    } finally {
-      setSavingTheme(false);
-    }
-  };
-
   return (
     <div className="flex min-h-full flex-col">
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
@@ -301,69 +205,14 @@ export function MainScreenView({
           </span>
         </button>
 
-        <div ref={settingsMenuRef} className="relative flex-shrink-0">
-          <button
-            type="button"
-            aria-label="Settings"
-            aria-haspopup="menu"
-            aria-expanded={settingsMenuOpen}
-            onClick={() => setSettingsMenuOpen((open) => !open)}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
-          >
-            <SettingsIcon />
-          </button>
-          {settingsMenuOpen ? (
-            <div
-              role="menu"
-              className="absolute right-0 top-[calc(100%+4px)] z-10 w-48 rounded-xl border border-line bg-background py-1.5 shadow-lg"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setSettingsMenuOpen(false);
-                  onOpenLockSettings();
-                }}
-                className="flex w-full items-center px-3.5 py-2.5 text-left text-label font-semibold text-foreground hover:bg-mist"
-              >
-                Lock &amp; auto-lock
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setSettingsMenuOpen(false);
-                  onOpenNetworkPeers();
-                }}
-                className="flex w-full items-center px-3.5 py-2.5 text-left text-label font-semibold text-foreground hover:bg-mist"
-              >
-                Network &amp; peers
-              </button>
-              <button
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={theme === "dark"}
-                disabled={savingTheme}
-                onClick={() => void handleToggleTheme()}
-                className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-label font-semibold text-foreground hover:bg-mist disabled:opacity-60"
-              >
-                <span>Dark mode</span>
-                <span
-                  aria-hidden="true"
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
-                    theme === "dark" ? "bg-foreground" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-                      theme === "dark" ? "translate-x-[18px]" : "translate-x-[2px]"
-                    }`}
-                  />
-                </span>
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <button
+          type="button"
+          aria-label="Settings"
+          onClick={onOpenSettings}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
+        >
+          <SettingsIcon />
+        </button>
       </div>
 
       <div className="px-5 pb-1">

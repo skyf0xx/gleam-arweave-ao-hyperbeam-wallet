@@ -84,31 +84,31 @@ export function LockSettingsView({ runtime, onBack, onLocked }: LockSettingsView
 
       <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
         <div className="pb-10">
-          <div className="rounded-xl border border-line">
-            <button
-              type="button"
-              disabled={locking}
-              onClick={() => void handleLockNow()}
-              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3.5 text-left hover:bg-mist disabled:opacity-60"
-            >
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-                <LockIcon />
+          <button
+            type="button"
+            disabled={locking}
+            onClick={() => void handleLockNow()}
+            className="flex w-full items-center gap-3 py-3.5 text-left hover:bg-mist disabled:opacity-60"
+          >
+            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
+              <LockIcon />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-label font-semibold text-foreground">
+                {locking ? "Locking…" : "Lock now"}
               </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-label font-semibold text-foreground">
-                  {locking ? "Locking…" : "Lock now"}
-                </span>
-                <span className="text-caption text-muted">
-                  Immediately clears this session, regardless of timeout
-                </span>
+              <span className="text-caption text-muted">
+                Immediately clears this session, regardless of timeout
               </span>
-            </button>
-          </div>
+            </span>
+          </button>
         </div>
 
         <div>
-          <div className="pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">Auto-lock</div>
-          <div className="rounded-xl border border-line px-3.5">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+            Auto-lock
+          </div>
+          <div>
             {state.loading ? (
               <>
                 <SkeletonRow />
@@ -123,7 +123,7 @@ export function LockSettingsView({ runtime, onBack, onLocked }: LockSettingsView
                     type="button"
                     disabled={savingTimeout !== null}
                     onClick={() => void handleSelectTimeout(option.value)}
-                    className="flex w-full items-center gap-2.5 border-b border-line py-3.5 text-left last:border-b-0 hover:bg-mist disabled:opacity-60"
+                    className="flex w-full items-center gap-2.5 py-3.5 text-left hover:bg-mist disabled:opacity-60"
                   >
                     <span className="flex-1 text-label font-semibold text-foreground">{option.label}</span>
                     {selected ? (

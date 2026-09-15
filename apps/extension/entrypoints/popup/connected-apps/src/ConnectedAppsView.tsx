@@ -97,7 +97,7 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
         ) : (
           <div className="flex flex-col">
             {grants.map((grant) => (
-              <div key={grant.origin} className="flex items-start gap-3 border-b border-line py-3.5 last:border-b-0">
+              <div key={grant.origin} className="flex items-start gap-3 py-3.5">
                 <div className="mt-px flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-line bg-mist text-label font-bold text-muted">
                   {hostnameOf(grant.origin).charAt(0).toUpperCase()}
                 </div>
