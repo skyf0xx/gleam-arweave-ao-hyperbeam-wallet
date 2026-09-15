@@ -40,9 +40,12 @@ describe("OnboardingView: create flow", () => {
 
     await waitFor(() => expect(screen.getByText("Your wallet is ready")).toBeTruthy());
 
+    // The wallet's display name is a randomly chosen default
+    // (`randomDefaultWalletName()`), not a value this test controls —
+    // asserted as "some non-empty string", not a specific literal.
     expect(send).toHaveBeenNthCalledWith(1, {
       type: "createWallet",
-      payload: { name: "Wallet 1", password: GOOD_PASSWORD },
+      payload: { name: expect.any(String), password: GOOD_PASSWORD },
     });
     expect(send).toHaveBeenNthCalledWith(2, {
       type: "exportWallet",
