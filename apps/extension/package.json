@@ -20,6 +20,7 @@
     "@gleam/core": "workspace:*",
     "@gleam/messaging": "workspace:*",
     "@gleam/ui": "workspace:*",
+    "@tanstack/react-query": "^5.62.7",
     "@webext-core/messaging": "^1.4.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

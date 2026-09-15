@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RuntimePort, ThemeSettings, TokenBalance, WalletState, WalletSummary } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
@@ -65,6 +66,17 @@ export interface AppProps {
   layout: AppLayout;
   runtime?: RuntimePort;
 }
+
+/**
+ * One `QueryClient` per extension document (popup, sidepanel, approval each
+ * get their own JS runtime, so this is intentionally not a cross-context
+ * singleton) — module-scoped so remounts within the same document (e.g. a
+ * test that renders `<App />` more than once) share one cache rather than
+ * each constructing their own. `useBalances`/`useActivity` and their query
+ * keys are wallet-core's scope, not this layer's — this only wires the
+ * provider every later hook will read from.
+ */
+const queryClient = new QueryClient();
 
 type TopView = "loading" | "onboarding" | "unlock" | "main-screen";
 type MainSubView =
@@ -271,13 +283,15 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   }
 
   return (
-    <div
-      data-layout={layout}
-      data-theme={theme === "dark" ? "dark" : undefined}
-      className="min-h-full bg-background text-foreground"
-    >
-      {content}
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <div
+        data-layout={layout}
+        data-theme={theme === "dark" ? "dark" : undefined}
+        className="min-h-full bg-background text-foreground"
+      >
+        {content}
+      </div>
+    </QueryClientProvider>
   );
 }
 
