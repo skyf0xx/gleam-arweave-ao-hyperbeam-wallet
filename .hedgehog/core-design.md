@@ -334,6 +334,27 @@ session didn't independently re-derive it.
   fixed directly with the user's explicit go-ahead since this blocks the
   project's core deliverable (a genuinely buildable extension) rather
   than deferred as debt for a hypothetical future pass.
+- **2026-09-15 — Debt #7 (`GLEAM-WALLET-WALLET-CORE`) ratified, no wire-
+  contract change needed.** Debt #7 flagged that `handlers/transfer.ts`
+  had widened its own request shape to `TransferDraft & { walletId;
+  password }` as a workaround, and asked whether `TransferDraft` itself
+  needed `walletId`/`password` added at the messaging layer before the
+  `ao-token-send` intent's dispatcher wiring landed. By the time
+  `ao-token-send` reached its `vault` layer, this was already moot:
+  `provider-bridge`'s own earlier Correction Protocol entry (above) had
+  already added `walletId` to the locked `TransferDraft` model as part of
+  its `protocol.ts`/model-widening pass. No `password` field was ever
+  added or is needed — signing resolves the JWK via
+  `apps/extension/src/handlers/key-session.ts`'s in-memory unlocked-
+  session cache (`getCachedKey(walletId)`), the same mechanism the AR
+  path already used, never by re-deriving key material from a password.
+  `ao-token-send`'s own `messaging` and `vault` layers independently
+  confirmed `TransferDraft.walletId` is sufficient and correct as-is and
+  made no further changes to it. **Ratified: `TransferDraft.walletId` is
+  the authoritative wire shape for signing-key resolution on both the AR
+  and AO transfer paths. No code change to the wire contract was needed
+  for `ao-token-send` — only building the AO transfer path itself
+  against the shape that was already there.**
 
 ## Left unresolved
 
