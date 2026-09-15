@@ -269,7 +269,7 @@ export function MainScreenView({
         >
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="truncate text-label">{wallet.name}</span>
-          <span className="truncate font-mono text-label text-muted">
+          <span className="truncate font-mono text-label text-faint">
             {truncateAddress(wallet.address)}
           </span>
           <span aria-hidden="true" className="flex-shrink-0 text-faint">
