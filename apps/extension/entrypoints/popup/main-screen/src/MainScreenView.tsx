@@ -56,6 +56,20 @@ import { generateAccountAvatarSvg } from "./generateAccountAvatar";
  * range-tabs and the Send/Receive actions row, matching the reference's
  * placement now that the chart exists.
  *
+ * Tokens/Activity: a single tab control (local `activeTab` state, no
+ * routing) replaces the old stacked "Tokens" and "Activity" sections that
+ * each had their own "View all" button into a full-list screen — see
+ * `main-screen-tabs`'s intent. The tab-button visual/interaction pattern
+ * (`role="tablist"`/`"tab"`, `aria-selected`, `bg-foreground text-background`
+ * for the active tab) is copied from `PortfolioChart`'s existing range
+ * tabs above, on this same screen, rather than inventing a second tab
+ * visual language. The Tokens tab renders the full, untruncated
+ * `state.tokenBalances` list; the Activity tab caps at the 10 most recent
+ * entries and its "View all" action, along with each row's click, opens
+ * lunar.arweave.net's block explorer in a new tab rather than an in-app
+ * full-list screen — there is no in-app activity list/detail screen left
+ * to navigate to.
+ *
  * Navigation entry points: the account pill's chevron
  * (wallet-main-screen.html's `.account-pill`) opens the wallet switcher
  * via `onOpenWalletSwitcher`; the header's gear icon
@@ -77,8 +91,6 @@ export interface MainScreenViewProps {
    */
   onSendToken: (token: TokenBalance) => void;
   onReceive: () => void;
-  onViewAllTokens: () => void;
-  onViewAllActivity: () => void;
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
 }
@@ -104,11 +116,10 @@ export function MainScreenView({
   onSend,
   onSendToken,
   onReceive,
-  onViewAllTokens,
-  onViewAllActivity,
   onOpenWalletSwitcher,
   onOpenSettings,
 }: MainScreenViewProps) {
+  const [activeTab, setActiveTab] = useState<"tokens" | "activity">("tokens");
   const [state, setState] = useState<LoadState>({
     balance: null,
     tokenBalances: [],
@@ -251,78 +262,95 @@ export function MainScreenView({
         <SendReceiveActions onSend={onSend} onReceive={onReceive} />
       </div>
 
-      <div className="px-6 pb-4">
-        <div className="flex items-center justify-between pb-2.5">
-          <span className="text-label font-semibold uppercase tracking-[0.04em] text-muted">
-            Tokens
-          </span>
-          <button
-            type="button"
-            onClick={onViewAllTokens}
-            className="text-label font-medium text-muted hover:text-foreground hover:underline"
-          >
-            View all
-          </button>
-        </div>
-        <div className="border-t border-line">
-          {state.loading && !state.hasLoadedOnce ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : state.tokenBalances.length === 0 ? (
-            <EmptyState message="Nothing here yet. Send yourself something to get started." />
-          ) : (
-            state.tokenBalances.map((token) => (
-              <TokenRow
-                key={token.processId}
-                glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                name={token.ticker}
-                ticker={token.ticker}
-                amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
-                loading={state.loading}
-                onClick={() => onSendToken(token)}
-              />
-            ))
-          )}
-        </div>
-      </div>
-
       <div className="px-6 pb-6">
-        <div className="flex items-center justify-between pb-2.5">
-          <span className="text-label font-semibold uppercase tracking-[0.04em] text-muted">
-            Activity
-          </span>
+        <div role="tablist" aria-label="Tokens and activity" className="flex items-center gap-1 pb-2.5">
           <button
             type="button"
-            onClick={onViewAllActivity}
-            className="text-label font-medium text-muted hover:text-foreground hover:underline"
+            role="tab"
+            aria-selected={activeTab === "tokens"}
+            onClick={() => setActiveTab("tokens")}
+            className={`rounded-md px-2.5 py-1 text-label font-semibold ${
+              activeTab === "tokens"
+                ? "bg-foreground text-background"
+                : "text-muted hover:bg-mist hover:text-foreground"
+            }`}
           >
-            View all
+            Tokens
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "activity"}
+            onClick={() => setActiveTab("activity")}
+            className={`rounded-md px-2.5 py-1 text-label font-semibold ${
+              activeTab === "activity"
+                ? "bg-foreground text-background"
+                : "text-muted hover:bg-mist hover:text-foreground"
+            }`}
+          >
+            Activity
           </button>
         </div>
-        <div className="border-t border-line">
-          {state.loading && !state.hasLoadedOnce ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : !state.activity || state.activity.entries.length === 0 ? (
-            <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
-          ) : (
-            state.activity.entries.slice(0, 5).map((entry) => (
-              <ActivityRow
-                key={entry.txId}
-                activityType={entry.type}
-                title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address)}`}
-                subtitle={entry.status === "pending" ? "Pending confirmation" : relativeTime(entry.timestamp)}
-                amountLabel={entry.amount ? `${entry.type === "receive" ? "+" : "-"}${formatWinstonAsAr(entry.amount)} AR` : "—"}
-                amountTone={entry.type === "receive" ? "positive" : "neutral"}
-                pending={entry.status === "pending"}
-              />
-            ))
-          )}
-        </div>
+
+        {activeTab === "tokens" ? (
+          <div className="border-t border-line">
+            {state.loading && !state.hasLoadedOnce ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : state.tokenBalances.length === 0 ? (
+              <EmptyState message="Nothing here yet. Send yourself something to get started." />
+            ) : (
+              state.tokenBalances.map((token) => (
+                <TokenRow
+                  key={token.processId}
+                  glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                  name={token.ticker}
+                  ticker={token.ticker}
+                  amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
+                  loading={state.loading}
+                  onClick={() => onSendToken(token)}
+                />
+              ))
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="border-t border-line">
+              {state.loading && !state.hasLoadedOnce ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : !state.activity || state.activity.entries.length === 0 ? (
+                <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
+              ) : (
+                state.activity.entries.slice(0, 10).map((entry) => (
+                  <ActivityRow
+                    key={entry.txId}
+                    activityType={entry.type}
+                    title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address)}`}
+                    subtitle={entry.status === "pending" ? "Pending confirmation" : relativeTime(entry.timestamp)}
+                    amountLabel={entry.amount ? `${entry.type === "receive" ? "+" : "-"}${formatWinstonAsAr(entry.amount)} AR` : "—"}
+                    amountTone={entry.type === "receive" ? "positive" : "neutral"}
+                    pending={entry.status === "pending"}
+                    onClick={() => openInExplorer(entry.txId)}
+                  />
+                ))
+              )}
+            </div>
+            <div className="pt-2.5 text-center">
+              <button
+                type="button"
+                onClick={() => openInExplorer(wallet.address)}
+                className="text-label font-medium text-muted hover:text-foreground hover:underline"
+              >
+                View all
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -349,6 +377,17 @@ function SettingsIcon() {
       />
     </svg>
   );
+}
+
+/**
+ * Opens lunar.arweave.net's block explorer in a new tab — the in-app
+ * activity list/detail screen this replaced is gone entirely (see this
+ * component's doc comment), so both the Activity tab's "View all" action
+ * (wallet address) and each row's click (that entry's tx id) route
+ * straight to the external explorer instead.
+ */
+function openInExplorer(path: string): void {
+  window.open(`https://lunar.arweave.net/#/explorer/${path}`, "_blank", "noopener,noreferrer");
 }
 
 function activityVerb(type: "send" | "receive" | "upload"): string {

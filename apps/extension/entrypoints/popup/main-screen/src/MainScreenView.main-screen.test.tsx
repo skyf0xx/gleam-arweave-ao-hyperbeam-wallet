@@ -65,8 +65,6 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
       onSend={vi.fn()}
       onSendToken={vi.fn()}
       onReceive={vi.fn()}
-      onViewAllTokens={vi.fn()}
-      onViewAllActivity={vi.fn()}
       onOpenWalletSwitcher={vi.fn()}
       onOpenSettings={vi.fn()}
       {...overrides}
@@ -279,5 +277,135 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
 
     await waitFor(() => expect(screen.getByText("1.5")).toBeTruthy());
     expect(screen.queryByText("1500000")).toBeNull();
+  });
+});
+
+describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
+  const AO_TOKEN: TokenBalance = {
+    address: WALLET.address,
+    processId: "processABC",
+    ticker: "PNTS",
+    denomination: 0,
+    quantity: "500",
+  };
+
+  function manyEntries(count: number): ActivityPage {
+    return {
+      entries: Array.from({ length: count }, (_, index) => ({
+        txId: `tx-${index}`,
+        type: index % 2 === 0 ? "receive" : "send",
+        address: WALLET.address,
+        amount: "1000000000000",
+        status: "confirmed",
+        tags: [],
+        timestamp: Date.now() - index * 60_000,
+      })),
+      cursor: null,
+    };
+  }
+
+  function sendWith(overrides: {
+    tokenBalances?: TokenBalance[];
+    activity?: ActivityPage;
+  }): ReturnType<typeof vi.fn> {
+    return vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return BALANCE;
+      if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
+      if (type === "getActivity") return overrides.activity ?? EMPTY_ACTIVITY;
+      if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      throw new Error(`Unexpected message type "${type}"`);
+    });
+  }
+
+  it("shows the Tokens tab by default with both Tokens and Activity tab controls", async () => {
+    const send = sendWith({ tokenBalances: [AO_TOKEN] });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getAllByText("PNTS").length).toBeGreaterThan(0));
+    expect(screen.getByRole("tab", { name: "Tokens" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Activity" }).getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("switching to the Activity tab shows activity content and hides token rows", async () => {
+    const send = sendWith({ tokenBalances: [AO_TOKEN], activity: manyEntries(2) });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getAllByText("PNTS").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    expect(screen.getByRole("tab", { name: "Activity" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByText("PNTS")).toBeNull();
+    await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBeGreaterThan(0));
+  });
+
+  it("shows the complete, untruncated token list on the Tokens tab", async () => {
+    const tokens: TokenBalance[] = Array.from({ length: 12 }, (_, index) => ({
+      address: WALLET.address,
+      processId: `process-${index}`,
+      ticker: `TK${index}`,
+      denomination: 0,
+      quantity: "1",
+    }));
+    const send = sendWith({ tokenBalances: tokens });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getAllByText("TK0").length).toBeGreaterThan(0));
+    for (const token of tokens) {
+      expect(screen.getAllByText(token.ticker).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("caps the Activity tab at the 10 most recent entries even when more exist", async () => {
+    const send = sendWith({ activity: manyEntries(15) });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBe(10));
+  });
+
+  it("clicking the Activity tab's View all action opens lunar.arweave.net for the wallet address", async () => {
+    const send = sendWith({ activity: manyEntries(2) });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    try {
+      await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+      fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+      await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBeGreaterThan(0));
+
+      fireEvent.click(screen.getByRole("button", { name: "View all" }));
+
+      expect(openSpy).toHaveBeenCalledWith(
+        `https://lunar.arweave.net/#/explorer/${WALLET.address}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
+  it("clicking an ActivityRow opens lunar.arweave.net for that entry's tx id", async () => {
+    const send = sendWith({ activity: manyEntries(1) });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    try {
+      await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+      fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+      await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBeGreaterThan(0));
+      fireEvent.click(screen.getAllByText(/Received|Sent/)[0]!.closest("button")!);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://lunar.arweave.net/#/explorer/tx-0",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } finally {
+      openSpy.mockRestore();
+    }
   });
 });
