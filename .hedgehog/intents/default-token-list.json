@@ -1,0 +1,37 @@
+{
+  "id": "default-token-list",
+  "goal": "AR and AO are treated as two default tokens that always appear in the wallet's token list with a displayed balance, defaulting to \"0\" instead of being omitted or showing null/undefined while unloaded or absent from the wallet's actual balance data.",
+  "outcome": "MainScreenView's Tokens tab always renders an AR row and an AO row (ticker AO) at the top of the token list, sourced from the shared useBalances() TanStack Query cache when loaded, defaulting each row's displayed amount to \"0\" when the query hasn't resolved yet or the wallet has no recorded balance for that token. Any additional watched AO tokens continue to render below these two defaults exactly as today. A wallet with zero non-default balances no longer falls into the Tokens tab's empty state, since the list is never actually empty.",
+  "priority": 50,
+  "requirements": [
+    {
+      "id": "DEFAULT-TOKEN-LIST-RULE-1",
+      "kind": "rule",
+      "statement": "No change to the transport layer -- reuses the existing getBalance/getTokenBalances runtime.send calls surfaced via useBalances(); no new wire method."
+    },
+    {
+      "id": "DEFAULT-TOKEN-LIST-RULE-2",
+      "kind": "rule",
+      "statement": "AR and AO rows render even when balancesQuery.data is undefined (not yet loaded) or tokenBalances has no AO entry -- the defaulted displayed value is the string \"0\", never null/undefined/omitted."
+    },
+    {
+      "id": "DEFAULT-TOKEN-LIST-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "A freshly-created wallet with no on-chain activity shows an AR row and an AO row, both reading 0, instead of an empty Tokens tab."
+    },
+    {
+      "id": "DEFAULT-TOKEN-LIST-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "Once balancesQuery.data loads with a nonzero AR or AO balance, the corresponding row updates to the real value rather than staying pinned at 0."
+    },
+    {
+      "id": "DEFAULT-TOKEN-LIST-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "A wallet with additional (non-AR/AO) watched token balances still shows those below the two default rows, unchanged from today's rendering."
+    }
+  ],
+  "depends_on": [
+    "wallet-state-tanstack",
+    "gleam-wallet"
+  ]
+}
