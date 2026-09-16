@@ -43,7 +43,9 @@ export function usePortfolioHistory(runtime: RuntimePort, address: string, range
     // Bounds how long a rate-limited/offline range spends retrying before
     // `NetworkErrorBanner`'s retry button takes over, rather than the
     // default `retry: 3` exponential backoff stalling one range for
-    // several seconds.
+    // several seconds. `retryDelay: 0` skips TanStack's default ~1s
+    // backoff so the single retry fires immediately.
     retry: 1,
+    retryDelay: 0,
   });
 }
