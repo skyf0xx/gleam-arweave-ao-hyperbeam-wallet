@@ -19,11 +19,11 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
       <ScreenHeader title="Receive" onBack={onBack} />
 
       <div className="flex flex-1 flex-col items-center gap-5 px-6 pb-6 pt-7">
-        <QrCode value={wallet.address} />
-
         <div className="flex items-center gap-2">
           <span className="text-label">{wallet.name}</span>
         </div>
+
+        <QrCode value={wallet.address} />
 
         <div className="flex w-full flex-col gap-2">
           <span className="text-center text-label font-semibold text-muted">Your address</span>
@@ -34,7 +34,7 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
         </div>
 
         <p className="max-w-[280px] text-center text-label leading-relaxed text-faint">
-          Only send Arweave-compatible assets to this address. Sending anything else may result in
+          Only send AO and Arweave-compatible assets to this address. Sending anything else may result in
           permanent loss.
         </p>
       </div>

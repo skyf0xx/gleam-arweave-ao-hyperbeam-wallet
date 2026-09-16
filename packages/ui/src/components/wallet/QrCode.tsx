@@ -8,9 +8,10 @@ export interface QrCodeProps {
   className?: string;
 }
 
-// Mirrors theme.css's --color-foreground/--color-background; qr-code-styling paints its own SVG outside Tailwind's pipeline, so these can't be read live from CSS custom properties.
+// Mirrors theme.css's --color-foreground/--color-background/--color-beam-purple; qr-code-styling paints its own SVG outside Tailwind's pipeline, so these can't be read live from CSS custom properties.
 const QR_FOREGROUND = "#111111";
 const QR_BACKGROUND = "#ffffff";
+const QR_ACCENT = "#8b12ff";
 
 const LOGO_SRC = "/icon/128.png";
 
@@ -33,21 +34,21 @@ export function QrCode({ value, size = 176, className }: QrCodeProps) {
       },
       image: LOGO_SRC,
       imageOptions: {
-        imageSize: 0.3,
+        imageSize: 0.16,
         margin: 4,
         hideBackgroundDots: true,
       },
       dotsOptions: {
-        type: "square",
+        type: "rounded",
         color: QR_FOREGROUND,
       },
       cornersSquareOptions: {
-        type: "square",
-        color: QR_FOREGROUND,
+        type: "extra-rounded",
+        color: QR_ACCENT,
       },
       cornersDotOptions: {
-        type: "square",
-        color: QR_FOREGROUND,
+        type: "dot",
+        color: QR_ACCENT,
       },
       backgroundOptions: {
         color: QR_BACKGROUND,
@@ -67,7 +68,7 @@ export function QrCode({ value, size = 176, className }: QrCodeProps) {
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center rounded-xl border border-line bg-background p-5",
+        "inline-flex items-center justify-center rounded-xl border border-line/50 bg-background p-3",
         className,
       )}
     >
