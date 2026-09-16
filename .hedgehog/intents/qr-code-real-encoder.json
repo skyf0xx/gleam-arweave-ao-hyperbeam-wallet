@@ -1,0 +1,34 @@
+{
+  "id": "qr-code-real-encoder",
+  "goal": "Replace QrCode.tsx's decorative, non-scannable SVG grid with a real QR-code encoding of its `value` prop, so the receive screen renders an actual scannable QR code instead of illustrative filler -- resolves debt declared on GLEAM-WALLET-WALLET-CORE.",
+  "outcome": "packages/ui/src/components/wallet/QrCode.tsx renders a genuine, scannable QR code encoding `value` at the requested `size`, using a new dependency-light QR-generation library added to the workspace (a new stack dependency this task adds and declares, following this project's established 'shared config, no single owner' pattern for a workspace-wide dependency -- see @webext-core/messaging's own chore(workspace) precedent in onboarding-unlock). The component's existing props (value/size/className) are unchanged; only its internal rendering swaps from the decorative filler pattern to the real encoder's output. Any real device or QR-reading library can scan the rendered code and recover the exact `value` string.",
+  "priority": 8,
+  "requirements": [
+    {
+      "id": "QR-CODE-REAL-ENCODER-RULE-1",
+      "kind": "rule",
+      "statement": "QrCode.tsx's public interface (the value/size/className props) is unchanged -- every existing caller (the receive screen) continues to compile and render unmodified against the new implementation."
+    },
+    {
+      "id": "QR-CODE-REAL-ENCODER-RULE-2",
+      "kind": "rule",
+      "statement": "The QR-generation library chosen is dependency-light and MV3-CSP-safe (no runtime eval, no dynamic script injection), consistent with every other stack dependency choice recorded in core-design.md. Declare the chosen library and why via 'hedgehog decision add' on this intent's own task."
+    },
+    {
+      "id": "QR-CODE-REAL-ENCODER-RULE-3",
+      "kind": "rule",
+      "statement": "The new dependency is added to the workspace and declared in packages/ui/package.json and pnpm-lock.yaml via its own chore(workspace) commit, separate from this intent's own feature commit -- mirroring the precedent set for @webext-core/messaging in onboarding-unlock's Correction Protocol entry (core-design.md)."
+    },
+    {
+      "id": "QR-CODE-REAL-ENCODER-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "A unit test decodes the rendered QR code's structure (or exercises the encoder's own output directly) and confirms it encodes the exact `value` passed to the component -- not a visual/snapshot-only assertion."
+    },
+    {
+      "id": "QR-CODE-REAL-ENCODER-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run wallet-core arweave ao pricing activity send receive passes (this component's existing test suite), pnpm tsc -p packages/core --noEmit passes, and pnpm wxt build succeeds with the new dependency bundled."
+    }
+  ],
+  "depends_on": []
+}
