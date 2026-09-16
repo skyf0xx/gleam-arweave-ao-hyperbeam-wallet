@@ -1,0 +1,36 @@
+{
+  "id": "session-key-persistence",
+  "goal": "Move the unlocked-session signing-key cache in apps/extension/src/handlers/key-session.ts off a plain in-memory Map, which Chrome can silently empty by idle-killing and restarting the MV3 service worker independent of the user's chosen auto-lock timeout, onto chrome.storage.session, which survives that restart the same way Session.unlockedWalletIds already does.",
+  "outcome": "key-session.ts's store (cacheKey, getCachedKey, hasCachedKey, removeCachedKey, clearKeyCache) is backed by chrome.storage.session instead of a module-level Map, with an async signature; wallet-lifecycle.ts, transfer.ts, upload.ts, and approval.ts (its only callers) await the new async calls. A wallet that chrome.storage.session and the auto-lock timeout both still consider unlocked never throws \"Wallet is locked\" merely because the service worker restarted; it only locks when the user's auto-lock timeout elapses or they explicitly lock.",
+  "priority": 60,
+  "requirements": [
+    {
+      "id": "SESSION-KEY-PERSISTENCE-RULE-1",
+      "kind": "rule",
+      "statement": "No in-memory fallback path: chrome.storage.session is the only store for cached signing keys; no legacy Map remains alongside it."
+    },
+    {
+      "id": "SESSION-KEY-PERSISTENCE-RULE-2",
+      "kind": "rule",
+      "statement": "Key material is never written to chrome.storage.local or any disk-backed store -- chrome.storage.session only, matching Session.unlockedWalletIds's existing guarantee."
+    },
+    {
+      "id": "SESSION-KEY-PERSISTENCE-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "Simulating a service-worker restart (clearing module state without clearing chrome.storage.session) leaves a previously unlocked wallet's cached key readable and signing calls succeed without a re-prompt."
+    },
+    {
+      "id": "SESSION-KEY-PERSISTENCE-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "clearKeyCache() and the auto-lock-expiry path both still remove all cached keys from chrome.storage.session, so an expired or explicitly locked session can never be used to sign."
+    },
+    {
+      "id": "SESSION-KEY-PERSISTENCE-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "deleteWallet still removes only that wallet's cached key, not the whole session store."
+    }
+  ],
+  "depends_on": [
+    "main-screen-chart"
+  ]
+}

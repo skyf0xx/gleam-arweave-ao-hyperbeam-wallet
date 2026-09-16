@@ -57,3 +57,9 @@ layers:
     verify: "pnpm vitest run main-screen pricing && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
     verify_radius: ["apps/extension/**", "packages/ui/src/components/**", "packages/ui/src/tokens/**", "packages/core/**", "pnpm-lock.yaml"]
     commit: "feat(gleam): main-screen portfolio chart, range tabs, account avatar"
+  - id: session-key-persistence
+    depends_on: main-screen-chart
+    scope: ["apps/extension/src/handlers/key-session.ts", "apps/extension/src/handlers/key-session.session.test.ts", "apps/extension/src/handlers/wallet-lifecycle.ts", "apps/extension/src/handlers/wallet-lifecycle.onboarding.test.ts", "apps/extension/src/handlers/transfer.ts", "apps/extension/src/handlers/transfer.send.test.ts", "apps/extension/src/handlers/upload.ts", "apps/extension/src/handlers/upload.upload.test.ts", "apps/extension/src/handlers/approval.ts", "apps/extension/src/handlers/approval.approval.test.ts"]
+    verify: "pnpm vitest run key-session onboarding-unlock send upload approval && pnpm tsc -p packages/core --noEmit && pnpm wxt build"
+    verify_radius: ["apps/extension/**"]
+    commit: "fix(gleam): persist unlocked signing keys across service-worker restarts"

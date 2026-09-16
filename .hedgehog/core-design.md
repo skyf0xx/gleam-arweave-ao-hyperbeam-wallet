@@ -106,6 +106,13 @@ track the sibling repo's own phased build order
    and connected-apps management. Built last: it depends on vault and
    wallet-core both being solid before exposing them to untrusted page
    content, and it's the sibling repo's own "Phase 1b" grouping.
+8. **session-key-persistence** — owns the unlocked-session signing-key
+   store (`apps/extension/src/handlers/key-session.ts`) and its callers
+   (`wallet-lifecycle`, `transfer`, `upload`, `approval`): the store's
+   home was never given an explicit scope at Phase 0 despite being
+   introduced alongside those handlers, addressed here rather than left
+   ownerless. See "Session-key persistence" below for the resolved
+   design.
 
 No cross-cutting `once: true` layer: this is a linear chain (see below),
 so Step 4's cross-cutting-infrastructure question doesn't apply — there
@@ -361,6 +368,28 @@ session didn't independently re-derive it.
   for `ao-token-send` — only building the AO transfer path itself
   against the shape that was already there.**
 
+## Session-key persistence
+
+An unlocked wallet's decrypted signing key is held in
+`chrome.storage.session` (in-memory only, never written to disk, cleared
+on browser close), keyed by wallet id, not in a plain module-level `Map`.
+`chrome.storage.session` already backs `Session.unlockedWalletIds`
+elsewhere in this codebase, so this uses an existing mechanism rather
+than introducing a new one. All accessors in `key-session.ts`
+(`cacheKey`, `getCachedKey`, `hasCachedKey`, `removeCachedKey`,
+`clearKeyCache`) are async; every call site already runs inside an
+`async` handler method, so this is a signature change, not a new control
+flow. There is no in-memory fallback path — `chrome.storage.session` is
+the only store.
+
+This makes an unlocked session's key material survive an MV3
+service-worker restart the same way `Session.unlockedWalletIds` already
+does, so the two can never disagree about whether a wallet is unlocked.
+The auto-lock timeout (`isSessionExpired`, checked against
+`Session.lastActivityAt`) is the only thing that ends a session; a
+service-worker restart on its own never does. Owned by the
+`session-key-persistence` layer (see Layers above).
+
 ## Left unresolved
 
 - **HyperBEAM balance path** (`04-prd.md`'s AO token balances Feature):
@@ -369,8 +398,3 @@ session didn't independently re-derive it.
   `ARCHITECTURE.md §0.2/§7.3` — to be resolved when the `wallet-core`
   layer's task actually builds that feature, not a planning-time
   blocker.
-- **Unlocked-session persistence across MV3 service-worker restarts**
-  (`ARCHITECTURE.md §5.1/§7.2`): re-derive-on-demand vs. holding key
-  material in the service worker is an open design question to resolve
-  during the `vault` or `onboarding-unlock` layer's build, not fixed by
-  this core design.
