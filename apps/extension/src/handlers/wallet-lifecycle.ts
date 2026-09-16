@@ -403,10 +403,9 @@ export class WalletLifecycleHandler {
   /**
    * The "forgot password" destructive reset (TODO.md 1.5b): wipes every
    * locally stored wallet, the active-wallet pointer, and the unlocked
-   * session. Not a `ProtocolMap` method — see this task's final report:
-   * `packages/messaging/src/protocol.ts` (locked, out of this layer's
-   * scope) has no wire-contract entry for a bulk-wipe today, so nothing
-   * outside this handler can reach this method yet.
+   * session. `ProtocolMap.resetAllWallets` now pins the wire shape for
+   * this method; registering it against the background dispatcher is
+   * `provider-bridge`'s layer (out of this layer's scope).
    */
   async resetAllWallets(): Promise<void> {
     clearKeyCache();

@@ -13,12 +13,7 @@ type Step = { kind: "unlock" } | { kind: "forgot-password" };
 export interface UnlockViewProps {
   runtime: RuntimePort;
   onUnlocked: () => void;
-  /**
-   * Called once `resetAllWallets` has run and the reset flow should
-   * return to onboarding. Wiring this call through `RuntimePort` requires
-   * a `ProtocolMap` entry that doesn't exist yet — see the handler-level
-   * `resetAllWallets` doc comment and this task's final report.
-   */
+  /** Called once the real `resetAllWallets` RPC call has resolved successfully. */
   onResetComplete: () => void;
 }
 
@@ -26,6 +21,8 @@ export function UnlockView({ runtime, onUnlocked, onResetComplete }: UnlockViewP
   const [step, setStep] = useState<Step>({ kind: "unlock" });
   const [unlocking, setUnlocking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [resetting, setResetting] = useState(false);
+  const [resetErrorMessage, setResetErrorMessage] = useState<string>();
 
   const handleUnlock = async (password: string) => {
     setUnlocking(true);
@@ -48,16 +45,27 @@ export function UnlockView({ runtime, onUnlocked, onResetComplete }: UnlockViewP
   };
 
   if (step.kind === "forgot-password") {
+    const handleReset = async () => {
+      setResetting(true);
+      setResetErrorMessage(undefined);
+      try {
+        await runtime.send<void, void>({ type: "resetAllWallets", payload: undefined });
+        onResetComplete();
+      } catch (error) {
+        setResetErrorMessage(
+          error instanceof Error ? error.message : "Couldn't reset the wallet. Try again.",
+        );
+      } finally {
+        setResetting(false);
+      }
+    };
+
     return (
       <ForgotPassword
-        onReset={() => {
-          // `resetAllWallets` has no `ProtocolMap` entry yet (see this
-          // view's doc comment) — `onResetComplete` is called
-          // optimistically so the flow is demonstrable end-to-end once
-          // that wire-contract gap is closed by a later change.
-          onResetComplete();
-        }}
+        onReset={handleReset}
         onCancel={() => setStep({ kind: "unlock" })}
+        resetting={resetting}
+        errorMessage={resetErrorMessage}
       />
     );
   }

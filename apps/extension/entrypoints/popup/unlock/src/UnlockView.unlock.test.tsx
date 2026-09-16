@@ -70,9 +70,10 @@ describe("UnlockView", () => {
     expect(screen.getByRole("button", { name: "Reset wallet" })).toBeTruthy();
   });
 
-  it("requires a second confirmation tap before the reset actually fires", () => {
+  it("requires a second confirmation tap before the reset actually fires", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
     const onResetComplete = vi.fn();
-    const runtime = fakeRuntime();
+    const runtime = fakeRuntime({ send });
     render(
       <UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={onResetComplete} />,
     );
@@ -80,9 +81,44 @@ describe("UnlockView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     fireEvent.click(screen.getByRole("button", { name: "Reset wallet" }));
     expect(onResetComplete).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Yes, reset wallet" }));
-    expect(onResetComplete).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onResetComplete).toHaveBeenCalledOnce());
+  });
+
+  it("resetting a wallet calls the real resetAllWallets RPC and only completes once it resolves", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const onResetComplete = vi.fn();
+    const runtime = fakeRuntime({ send });
+    render(
+      <UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={onResetComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, reset wallet" }));
+
+    expect(send).toHaveBeenCalledWith({ type: "resetAllWallets", payload: undefined });
+    await waitFor(() => expect(onResetComplete).toHaveBeenCalledOnce());
+  });
+
+  it("shows a real error and never completes the reset when the RPC call is rejected", async () => {
+    const send = vi.fn().mockRejectedValue(new Error("Couldn't reach the background service."));
+    const onResetComplete = vi.fn();
+    const runtime = fakeRuntime({ send });
+    render(
+      <UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={onResetComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, reset wallet" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Couldn't reach the background service.")).toBeTruthy(),
+    );
+    expect(onResetComplete).not.toHaveBeenCalled();
   });
 
   it("cancel from forgot-password returns to the unlock screen", () => {

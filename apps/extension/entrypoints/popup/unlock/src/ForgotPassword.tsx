@@ -17,9 +17,16 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 export interface ForgotPasswordProps {
   onReset: () => void;
   onCancel: () => void;
+  resetting?: boolean;
+  errorMessage?: string;
 }
 
-export function ForgotPassword({ onReset, onCancel }: ForgotPasswordProps) {
+export function ForgotPassword({
+  onReset,
+  onCancel,
+  resetting = false,
+  errorMessage,
+}: ForgotPasswordProps) {
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -40,17 +47,25 @@ export function ForgotPassword({ onReset, onCancel }: ForgotPasswordProps) {
         </p>
       ) : null}
 
+      {errorMessage ? (
+        <p role="alert" className="text-body font-medium leading-relaxed text-warning">
+          {errorMessage}
+        </p>
+      ) : null}
+
       <Button
         type="button"
         variant="destructive"
         onClick={() => (confirming ? onReset() : setConfirming(true))}
+        disabled={resetting}
         className="mt-8"
       >
-        {confirming ? "Yes, reset wallet" : "Reset wallet"}
+        {resetting ? "Resetting…" : confirming ? "Yes, reset wallet" : "Reset wallet"}
       </Button>
       <button
         type="button"
         onClick={confirming ? () => setConfirming(false) : onCancel}
+        disabled={resetting}
         className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
       >
         Cancel
