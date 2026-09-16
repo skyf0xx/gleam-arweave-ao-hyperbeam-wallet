@@ -208,6 +208,7 @@ messenger.onMessage("switchWallet", (message) => lifecycle.switchWallet(message.
 messenger.onMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
 messenger.onMessage("lockWallet", () => lifecycle.lockWallet());
 messenger.onMessage("unlockWallet", (message) => lifecycle.unlockWallet(message.data));
+messenger.onMessage("resetAllWallets", () => lifecycle.resetAllWallets());
 
 // reads
 messenger.onMessage("getState", () => lifecycle.getState());

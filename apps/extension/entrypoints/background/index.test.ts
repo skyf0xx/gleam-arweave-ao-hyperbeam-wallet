@@ -104,6 +104,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "importWallet",
       "exportWallet",
       "getState",
+      "resetAllWallets",
       "getApproval",
       "resolveApproval",
       "getLockSettings",
@@ -174,6 +175,29 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   it("setThemePreference rejects an invalid theme value", async () => {
     const setHandler = registeredHandlers.get("setThemePreference")!;
     await expect(setHandler({ data: { theme: "system" } })).rejects.toThrow(/invalid theme/i);
+  });
+
+  /**
+   * forgot-password-wire-contract: `resetAllWallets` previously had no
+   * `ProtocolMap` entry, so the popup's ForgotPassword flow fired
+   * `onResetComplete` optimistically with no backing call. Drives the
+   * real registered dispatcher handler end-to-end through
+   * `WalletLifecycleHandler.resetAllWallets()` (already unit-tested on
+   * its own) — this proves the wire-up reaches it, not a
+   * reimplementation of its wipe logic.
+   */
+  it("resetAllWallets is reachable through the dispatcher and wipes every stored wallet", async () => {
+    const createHandler = registeredHandlers.get("createWallet")!;
+    const resetHandler = registeredHandlers.get("resetAllWallets")!;
+    const getStateHandler = registeredHandlers.get("getState")!;
+
+    await createHandler({ data: { name: "Wallet 1", password: "correct horse battery staple" } });
+    await expect(getStateHandler({ data: undefined })).resolves.toMatchObject({
+      wallets: [expect.objectContaining({ name: "Wallet 1" })],
+    });
+
+    await expect(resetHandler({ data: undefined })).resolves.toBeUndefined();
+    await expect(getStateHandler({ data: undefined })).resolves.toMatchObject({ wallets: [] });
   });
 
   it("rejects a KEY_METHODS name routed through providerCall", () => {
