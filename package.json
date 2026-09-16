@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prepare": "lefthook install",
     "wxt": "pnpm --filter @gleam/extension exec wxt",
     "wxt:build": "pnpm --filter @gleam/extension exec wxt build",
     "eslint": "eslint",
@@ -19,6 +20,7 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^27.0.0",
+    "lefthook": "^2.1.14",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
     "vite-tsconfig-paths": "^5.1.4",

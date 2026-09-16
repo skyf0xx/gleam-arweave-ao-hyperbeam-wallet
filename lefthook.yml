@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: eslint
+      glob: "*.{js,jsx,ts,tsx}"
+      run: pnpm eslint --max-warnings=0 {staged_files}
+
+    - name: tsc
+      glob: "*.{ts,tsx}"
+      run: >
+        pnpm tsc -p packages/core --noEmit &&
+        pnpm tsc -p packages/messaging --noEmit &&
+        pnpm tsc -p packages/ui --noEmit &&
+        pnpm tsc -p apps/extension --noEmit
