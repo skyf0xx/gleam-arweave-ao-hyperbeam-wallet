@@ -92,10 +92,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await import("./index");
   });
 
-  function providerCall(data: unknown) {
+  function providerCall(data: unknown): Promise<unknown> {
     const handler = registeredHandlers.get("providerCall");
     if (!handler) throw new Error("providerCall was never registered.");
-    return handler({ data });
+    return handler({ data }) as Promise<unknown>;
   }
 
   it("registers a handler for every ProtocolMap method this layer owns", () => {

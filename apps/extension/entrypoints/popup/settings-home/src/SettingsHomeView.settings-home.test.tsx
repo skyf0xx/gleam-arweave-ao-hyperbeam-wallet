@@ -19,14 +19,14 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 const LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const NETWORK_SETTINGS: NetworkSettings = { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
 
-function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): ReturnType<typeof vi.fn> {
+function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
     if (type === "getLockSettings") return LOCK_SETTINGS;
     if (type === "getNetworkSettings") return NETWORK_SETTINGS;
     if (type === "getThemePreference") return { theme: overrides.theme ?? "light" } satisfies ThemeSettings;
     if (type === "setThemePreference") return undefined;
     throw new Error(`Unexpected message type "${type}"`);
-  });
+  }) as RuntimePort["send"];
 }
 
 function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeView>[0]> = {}) {
@@ -115,7 +115,7 @@ describe("SettingsHomeView", () => {
       if (type === "getThemePreference") return { theme: "light" } satisfies ThemeSettings;
       if (type === "setThemePreference") throw new Error("write failed");
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
     renderSettingsHome({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>

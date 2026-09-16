@@ -35,7 +35,7 @@ const GRANT_UNLIMITED: Grant = {
 
 describe("ConnectedAppsView (6.3 connected-apps)", () => {
   it("shows skeleton rows (shared loading primitive) while the Grant list loads", () => {
-    const send = vi.fn(() => new Promise<Grant[]>(() => {}));
+    const send = vi.fn(() => new Promise<Grant[]>(() => {})) as unknown as RuntimePort["send"];
     const { container } = render(<ConnectedAppsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
     expect(container.querySelectorAll(".gleam-shimmer").length).toBeGreaterThan(0);

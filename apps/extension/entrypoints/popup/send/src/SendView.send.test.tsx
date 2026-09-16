@@ -67,7 +67,7 @@ function routedSend(handlers: {
   getActivity?: (payload: { address: string }) => ActivityPage;
   estimateTransfer?: () => FeeEstimate;
   submitTransfer?: () => { txId: string };
-}) {
+}): RuntimePort["send"] {
   return vi.fn(async (message: { type: string; payload: unknown }) => {
     switch (message.type) {
       case "getBalance":
@@ -88,7 +88,7 @@ function routedSend(handlers: {
       default:
         throw new Error(`unhandled message type in test: ${message.type}`);
     }
-  });
+  }) as RuntimePort["send"];
 }
 
 describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
@@ -111,7 +111,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   });
 
   it("shows AR and a default AO row at '0', both selectable, while balances are still loading", async () => {
-    const send = vi.fn(() => new Promise(() => {})); // never resolves -- stays in the loading state.
+    const send = vi.fn(() => new Promise(() => {})) as unknown as RuntimePort["send"]; // never resolves -- stays in the loading state.
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
@@ -121,7 +121,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     expect(arweaveRow?.textContent).toContain("0");
     expect(arweaveRow?.disabled).toBeFalsy();
 
-    const aoRow = screen.getAllByText("AO")[0].closest("button");
+    const aoRow = screen.getAllByText("AO")[0]!.closest("button");
     expect(aoRow).not.toBeNull();
     expect(aoRow?.textContent).toContain("0");
     expect(aoRow?.getAttribute("disabled")).toBeNull();
@@ -156,7 +156,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     fireEvent.click(
       within(dialog)
         .getAllByRole("button")
-        .filter((row) => row.getAttribute("aria-label") !== "Back")[1],
+        .filter((row) => row.getAttribute("aria-label") !== "Back")[1]!,
     );
     await waitFor(() => expect(screen.getByText(/^Send AO$/)).toBeTruthy());
   });
@@ -181,7 +181,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     await waitFor(() => expect(arweaveRow.closest("button")?.textContent).toContain("2"));
 
     await waitFor(() => {
-      const aoRow = screen.getAllByText("AO")[0].closest("button");
+      const aoRow = screen.getAllByText("AO")[0]!.closest("button");
       expect(aoRow?.textContent).toContain("3");
     });
 
@@ -266,8 +266,8 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
     // the recipient rows are the remaining ones, most-recent-first, deduped.
     const recipientRows = rows.filter((row) => row.getAttribute("aria-label") !== "Back");
     expect(recipientRows).toHaveLength(2);
-    expect(recipientRows[0].textContent).toContain(RECENT_RECIPIENT_B.slice(0, 6));
-    expect(recipientRows[1].textContent).toContain(RECENT_RECIPIENT_A.slice(0, 6));
+    expect(recipientRows[0]!.textContent).toContain(RECENT_RECIPIENT_B.slice(0, 6));
+    expect(recipientRows[1]!.textContent).toContain(RECENT_RECIPIENT_A.slice(0, 6));
   });
 
   it("shows an appropriate empty state, not an error or placeholder address, when there is no prior send activity", async () => {
@@ -283,8 +283,8 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
   it("shows the error state (not an empty state) when getActivity itself fails", async () => {
     const failingSend = vi.fn(async (message: { type: string; payload: unknown }) => {
       if (message.type === "getActivity") throw new Error("unreachable");
-      return routedSend({})(message);
-    });
+      return routedSend({})(message, undefined);
+    }) as RuntimePort["send"];
     renderSendView({ runtime: fakeRuntime({ send: failingSend }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Recent" }));

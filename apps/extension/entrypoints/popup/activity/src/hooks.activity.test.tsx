@@ -163,11 +163,11 @@ describe("validateSendAmount", () => {
   });
 
   it("returns null for an AO token amount within balance", () => {
-    expect(validateSendAmount("500000", TOKENS[0], balances)).toBeNull();
+    expect(validateSendAmount("500000", TOKENS[0]!, balances)).toBeNull();
   });
 
   it("returns an inline error for an AO token amount over balance", () => {
-    expect(validateSendAmount("500001", TOKENS[0], balances)).toBe("That's more than your current balance.");
+    expect(validateSendAmount("500001", TOKENS[0]!, balances)).toBe("That's more than your current balance.");
   });
 
   it("returns null for a token with no matching balance entry (can't yet judge affordability)", () => {

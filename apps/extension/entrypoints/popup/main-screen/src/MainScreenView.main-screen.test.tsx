@@ -23,14 +23,14 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
   };
 }
 
-function successfulSend(overrides: Record<string, unknown> = {}): ReturnType<typeof vi.fn> {
+function successfulSend(overrides: Record<string, unknown> = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
     if (type === "getBalance") return BALANCE;
     if (type === "getTokenBalances") return NO_TOKENS;
     if (type === "getActivity") return EMPTY_ACTIVITY;
     if (type === "getPortfolioHistory") return overrides.portfolioHistory ?? PORTFOLIO_HISTORY_7D;
     throw new Error(`Unexpected message type "${type}"`);
-  });
+  }) as RuntimePort["send"];
 }
 
 const WALLET: WalletSummary = {
@@ -43,7 +43,7 @@ const WALLET: WalletSummary = {
   updatedAt: 0,
 };
 
-const EMPTY_ACTIVITY: ActivityPage = { entries: [], nextCursor: null };
+const EMPTY_ACTIVITY: ActivityPage = { entries: [], cursor: null };
 const NO_TOKENS: TokenBalance[] = [];
 const BALANCE: Winston = "1000000000000";
 
@@ -212,7 +212,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
         return range === "1M" ? oneMonthHistory : PORTFOLIO_HISTORY_7D;
       }
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
@@ -238,7 +238,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") throw new Error("unreachable");
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
@@ -261,7 +261,7 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
     const onSendToken = vi.fn();
     renderMainScreen({ runtime: fakeRuntime({ send }), onSendToken });
 
@@ -285,7 +285,7 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("1.5")).toBeTruthy());
