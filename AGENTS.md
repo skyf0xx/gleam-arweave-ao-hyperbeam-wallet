@@ -72,6 +72,7 @@ situation applies.
 
 | Skill | Use when | File |
 | --- | --- | --- |
+| `code-comment-discipline` | Apply whenever writing or editing source code in any core's build agent (backend-eng, ui-builder, or equivalent). | `code-comment-discipline/SKILL.md` |
 | `conventional-commits` | Use when uncommitted changes need to be split into atomic, conventional commits ordered for review. | `conventional-commits/SKILL.md` |
 | `filing-issues` | Use when filing one or more GitHub issues for planned work — "file an issue for this", "turn this plan into issues", "open a tracking issue". | `filing-issues/SKILL.md` |
 | `hedgehog-contributing` | Use when the user wants to contribute a fix or roadmap item back to the Hedgehog project itself (skyf0xx/hedgehog) rather than their own project. | `hedgehog-contributing/SKILL.md` |
