@@ -19,6 +19,18 @@ import type { PortfolioHistory, PortfolioHistoryRange, RuntimePort } from "@glea
  * its own cached response and clicking back to a previously-loaded range
  * shows it instantly rather than re-fetching.
  */
+/**
+ * Set well above the app's `QueryClient` default of `staleTime: 0` so
+ * switching range tabs doesn't refire `getHistoricalUsdPricesWithFallback`
+ * for a range already fetched this session — CoinGecko's free tier
+ * rate-limits aggressively, and a quick tour of all 5 tabs previously fired
+ * 5 fresh requests back-to-back, tripping the limit partway through
+ * (typically on "ALL", the tab usually tried last) and then failing every
+ * *other* range too, cache or not, since `staleTime: 0` sent them all back
+ * to the network regardless of a prior successful fetch.
+ */
+const PORTFOLIO_HISTORY_STALE_TIME_MS = 5 * 60 * 1000;
+
 export function usePortfolioHistory(runtime: RuntimePort, address: string, range: PortfolioHistoryRange) {
   return useQuery({
     queryKey: [address, "portfolioHistory", range] as const,
@@ -27,5 +39,11 @@ export function usePortfolioHistory(runtime: RuntimePort, address: string, range
         type: "getPortfolioHistory",
         payload: { range },
       }),
+    staleTime: PORTFOLIO_HISTORY_STALE_TIME_MS,
+    // Bounds how long a rate-limited/offline range spends retrying before
+    // `NetworkErrorBanner`'s retry button takes over, rather than the
+    // default `retry: 3` exponential backoff stalling one range for
+    // several seconds.
+    retry: 1,
   });
 }

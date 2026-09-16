@@ -23,7 +23,7 @@ export function NetworkErrorBanner({ onRetry }: NetworkErrorBannerProps) {
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
       </svg>
       <p className="flex-1 text-caption leading-snug text-foreground">
-        Couldn&apos;t reach the network. Retrying &mdash; or check your connection and try again.
+        Couldn&apos;t reach the network. Check your connection and try again.
       </p>
       <button
         type="button"

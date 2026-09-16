@@ -120,9 +120,19 @@ const INITIAL_STEP: Extract<Step, { kind: "compose" }> = {
   submitting: false,
 };
 
+/**
+ * A `ticker` that is really an Arweave/AO process id (unregistered
+ * tokens have no other source for a symbol — see `ao/balance.ts`)
+ * shortens to a `abcd…wxyz` display form rather than showing the full
+ * 43-char address as if it were the token's name.
+ */
+function displayTicker(ticker: string): string {
+  return isValidArweaveAddress(ticker) ? `${ticker.slice(0, 4)}…${ticker.slice(-4)}` : ticker;
+}
+
 /** `token.ticker` for an AO token, `"AR"` for the native token (`token === null`). */
 function tickerFor(token: TokenBalance | null): string {
-  return token?.ticker ?? "AR";
+  return token === null ? "AR" : displayTicker(token.ticker);
 }
 
 function formatAmount(atomic: string, token: TokenBalance | null): string {
@@ -554,8 +564,8 @@ function TokenPickerStep({
           otherTokenBalances.map((candidate) => (
             <TokenRow
               key={candidate.processId}
-              glyph={{ label: candidate.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-              name={candidate.ticker}
+              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2 }}
+              name={displayTicker(candidate.ticker)}
               amount={formatAtomicAsDisplay(candidate.quantity, candidate.denomination)}
               onClick={() => onSelect(candidate)}
               className={selectedToken?.processId === candidate.processId ? "bg-mist" : undefined}

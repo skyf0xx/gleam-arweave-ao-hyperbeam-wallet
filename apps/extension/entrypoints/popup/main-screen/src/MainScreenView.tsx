@@ -168,6 +168,19 @@ function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance
   return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
 }
 
+/**
+ * How long a range-tab click waits, quiet, before the chart actually
+ * fetches that range — a debounce, not a cooldown: each click resets the
+ * timer rather than being dropped, so a rapid 7D→1M→ALL→7D tour never
+ * fires more than one `getPortfolioHistory` call (for whichever range the
+ * user was still on once they stopped clicking) instead of one per tab.
+ * This is what keeps a quick tab tour from tripping CoinGecko's free-tier
+ * rate limit the way clicking through all 5 tabs previously could (see
+ * `usePortfolioHistory`'s `staleTime` comment for the caching half of that
+ * fix — this is the request-shaping half).
+ */
+const PORTFOLIO_RANGE_DEBOUNCE_MS = 400;
+
 /** Scroll distance (px) past which the header collapses to its compact form. */
 const HEADER_COLLAPSE_THRESHOLD_PX = 24;
 
@@ -209,8 +222,22 @@ export function MainScreenView({
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
-  const [portfolioRange, setPortfolioRange] = useState<PortfolioHistoryRange>("7D");
-  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, portfolioRange);
+  /**
+   * `selectedRange` drives the tab highlight and updates the instant a
+   * tab is clicked, so the UI never feels unresponsive to the click
+   * itself. `debouncedRange` drives the actual query and lags behind by
+   * `PORTFOLIO_RANGE_DEBOUNCE_MS` of quiet — every click restarts the
+   * timer, so a fast tour through several tabs shows the chart's loading
+   * state (via `debouncedRange !== selectedRange`, below) the whole time
+   * but only fetches once, for the range the user actually settled on.
+   */
+  const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>("7D");
+  const [debouncedRange, setDebouncedRange] = useState<PortfolioHistoryRange>("7D");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedRange(selectedRange), PORTFOLIO_RANGE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [selectedRange]);
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, debouncedRange);
 
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
@@ -323,19 +350,60 @@ export function MainScreenView({
           </div>
 
           <div className="px-6 pb-1 pt-2.5">
-            {portfolioHistoryQuery.error ? (
-              <NetworkErrorBanner onRetry={() => void portfolioHistoryQuery.refetch()} />
-            ) : (
-              <PortfolioChart
-                points={portfolioHistoryQuery.data?.series ?? []}
-                currentUsdValue={portfolioHistoryQuery.data?.currentUsdValue ?? 0}
-                usdChange={portfolioHistoryQuery.data?.usdChange ?? 0}
-                periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
-                activeRange={portfolioRange}
-                onRangeChange={setPortfolioRange}
-                loading={portfolioHistoryQuery.isLoading}
-              />
-            )}
+            <PortfolioChart
+              points={portfolioHistoryQuery.data?.series ?? []}
+              currentUsdValue={portfolioHistoryQuery.data?.currentUsdValue ?? 0}
+              usdChange={portfolioHistoryQuery.data?.usdChange ?? 0}
+              periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
+              activeRange={selectedRange}
+              onRangeChange={setSelectedRange}
+              /**
+               * True for the whole debounce window too (not just while
+               * the query itself is in flight) — `selectedRange` moves
+               * the instant a tab is clicked, but `debouncedRange` (and
+               * so `portfolioHistoryQuery`) hasn't caught up yet, and
+               * `portfolioHistoryQuery` is still holding the *previous*
+               * range's data/error during that window. Showing loading
+               * here avoids flashing the old range's chart, %-change, or
+               * (see `onRetry` below) its stale error state under a tab
+               * that no longer matches it. `isFetching` rather than
+               * `isLoading`: `isLoading` is only true for a range's very
+               * first fetch (no cached data yet) — clicking the error
+               * banner's Retry re-runs an already-errored query, which
+               * `isLoading` never reflects, so it was leaving the banner
+               * on screen through the whole retry with no visible change.
+               */
+              loading={debouncedRange !== selectedRange || portfolioHistoryQuery.isFetching}
+              /**
+               * `series: []` on a *resolved* response (no thrown query
+               * error) is `getPortfolioHistory`'s own signal that both AR
+               * price sources failed (`reads.ts`'s doc comment) — a real
+               * zero-balance wallet still gets a non-empty series (AR/USD
+               * prices exist independent of the user's balance, just
+               * every point's `usdValue` is 0), so an empty series here
+               * only ever means the fetch effectively failed. Passed
+               * through as `onRetry` rather than swapping `PortfolioChart`
+               * out for `NetworkErrorBanner` at this level, so the range
+               * tabs (rendered inside `PortfolioChart`) stay visible and
+               * clickable even while the active range is failed — a
+               * failed "ALL" no longer strands the user without a way
+               * back to a previously-cached "7D". Gated on
+               * `debouncedRange === selectedRange` for the same
+               * stale-data reason as `loading` above: never surface the
+               * error banner for a range the user has already clicked
+               * away from. Also gated on `!isFetching` so clicking Retry
+               * hides the banner immediately (`loading` above turns
+               * true from the same `isFetching` flip) instead of leaving
+               * it on screen, inert, for the duration of the refetch.
+               */
+              onRetry={
+                debouncedRange === selectedRange &&
+                !portfolioHistoryQuery.isFetching &&
+                (portfolioHistoryQuery.error || (portfolioHistoryQuery.isSuccess && portfolioHistoryQuery.data.series.length === 0))
+                  ? () => void portfolioHistoryQuery.refetch()
+                  : undefined
+              }
+            />
           </div>
 
           <div className="px-6 pb-5 pt-3">

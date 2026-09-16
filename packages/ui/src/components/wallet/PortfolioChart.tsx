@@ -1,4 +1,5 @@
 import { cn } from "../../primitives/cn";
+import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
 /**
  * The main screen's total-portfolio-value chart (wallet-main-screen.html's
@@ -18,6 +19,12 @@ import { cn } from "../../primitives/cn";
  * clicks via `onRangeChange`, so range/chart/%-change/period-label always
  * update together from one fetch rather than this component and its
  * caller disagreeing about which range is "current."
+ *
+ * `onRetry` (set by the caller when the active range's fetch failed)
+ * swaps just the value/chart area for `NetworkErrorBanner` — the range
+ * tabs always render regardless, so a failed range (e.g. hitting a
+ * rate-limited "ALL") never strands the user without a way to click back
+ * to a previously-cached range.
  *
  * Color rule (RELEVANT RULES, confirmed): reuses `--color-positive`
  * (already a Tailwind utility, `text-positive`/`border-positive`, per
@@ -49,6 +56,15 @@ export interface PortfolioChartProps {
   activeRange: PortfolioChartRange;
   onRangeChange: (range: PortfolioChartRange) => void;
   loading?: boolean;
+  /**
+   * Set when the active range's fetch failed (thrown query error, or a
+   * resolved-but-empty series — see `MainScreenView`'s caller-side
+   * comment). Replaces just the value/chart area with
+   * `NetworkErrorBanner`; the range tabs below stay rendered regardless,
+   * so a failed range never strands the user without a way back to a
+   * previously-cached one.
+   */
+  onRetry?: () => void;
   className?: string;
 }
 
@@ -121,6 +137,7 @@ export function PortfolioChart({
   activeRange,
   onRangeChange,
   loading = false,
+  onRetry,
   className,
 }: PortfolioChartProps) {
   const isPositive = usdChange >= 0;
@@ -131,87 +148,93 @@ export function PortfolioChart({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-            {formatUsd(currentUsdValue)}
-          </span>
-          <span className="text-label font-semibold tabular-nums" style={{ color: lineColorVar }}>
-            {formatPercent(usdChange)}
-          </span>
-        </div>
-        <div className="text-caption text-muted">{periodLabel || " "}</div>
-      </div>
-
-      <div className="h-[80px] w-full">
-        {loading ? (
-          <div className="h-full w-full gleam-shimmer rounded-md" />
-        ) : points.length === 0 ? (
-          <div className="flex h-full w-full items-center justify-center text-caption text-faint">
-            No chart data
+      {onRetry ? (
+        <NetworkErrorBanner onRetry={onRetry} />
+      ) : (
+        <>
+          <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+                {formatUsd(currentUsdValue)}
+              </span>
+              <span className="text-label font-semibold tabular-nums" style={{ color: lineColorVar }}>
+                {formatPercent(usdChange)}
+              </span>
+            </div>
+            <div className="text-caption text-muted">{periodLabel || " "}</div>
           </div>
-        ) : isEmpty ? (
-          <svg
-            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-            preserveAspectRatio="none"
-            width="100%"
-            height="100%"
-            role="img"
-            aria-label="No portfolio history yet"
-          >
-            <defs>
-              <linearGradient id="portfolio-chart-empty-gradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={CHART_WIDTH} y2="0">
-                <stop offset="0%" stopColor="var(--color-beam-purple)" />
-                <stop offset="35%" stopColor="var(--color-beam-sky)" />
-                <stop offset="70%" stopColor="var(--color-beam-yellow)" />
-                <stop offset="100%" stopColor="var(--color-beam-green)" />
-              </linearGradient>
-            </defs>
-            <polyline
-              points={linePoints}
-              fill="none"
-              stroke="url(#portfolio-chart-empty-gradient)"
-              strokeWidth={1.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              opacity={0.13}
-            />
-            <polyline
-              className="gleam-chart-empty-shimmer"
-              points={linePoints}
-              fill="none"
-              stroke="url(#portfolio-chart-empty-gradient)"
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              pathLength={100}
-            />
-          </svg>
-        ) : (
-          <svg
-            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-            preserveAspectRatio="none"
-            width="100%"
-            height="100%"
-            role="img"
-            aria-label={`Portfolio value ${formatUsd(currentUsdValue)}, ${formatPercent(usdChange)} for ${periodLabel}`}
-          >
-            <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />
-            <polyline
-              points={linePoints}
-              fill="none"
-              stroke={lineColorVar}
-              strokeWidth={1.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-        )}
-      </div>
-      {isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
+
+          <div className="h-[80px] w-full">
+            {loading ? (
+              <div className="h-full w-full gleam-shimmer rounded-md" />
+            ) : points.length === 0 ? (
+              <div className="flex h-full w-full items-center justify-center text-caption text-faint">
+                No chart data
+              </div>
+            ) : isEmpty ? (
+              <svg
+                viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+                preserveAspectRatio="none"
+                width="100%"
+                height="100%"
+                role="img"
+                aria-label="No portfolio history yet"
+              >
+                <defs>
+                  <linearGradient id="portfolio-chart-empty-gradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={CHART_WIDTH} y2="0">
+                    <stop offset="0%" stopColor="var(--color-beam-purple)" />
+                    <stop offset="35%" stopColor="var(--color-beam-sky)" />
+                    <stop offset="70%" stopColor="var(--color-beam-yellow)" />
+                    <stop offset="100%" stopColor="var(--color-beam-green)" />
+                  </linearGradient>
+                </defs>
+                <polyline
+                  points={linePoints}
+                  fill="none"
+                  stroke="url(#portfolio-chart-empty-gradient)"
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                  opacity={0.13}
+                />
+                <polyline
+                  className="gleam-chart-empty-shimmer"
+                  points={linePoints}
+                  fill="none"
+                  stroke="url(#portfolio-chart-empty-gradient)"
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                  pathLength={100}
+                />
+              </svg>
+            ) : (
+              <svg
+                viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+                preserveAspectRatio="none"
+                width="100%"
+                height="100%"
+                role="img"
+                aria-label={`Portfolio value ${formatUsd(currentUsdValue)}, ${formatPercent(usdChange)} for ${periodLabel}`}
+              >
+                <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />
+                <polyline
+                  points={linePoints}
+                  fill="none"
+                  stroke={lineColorVar}
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            )}
+          </div>
+          {isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
+        </>
+      )}
 
       <div role="tablist" aria-label="Chart range" className="flex items-center gap-1">
         {RANGE_TABS.map((range) => (

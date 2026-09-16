@@ -111,6 +111,19 @@ const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
  */
 const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
 
+/**
+ * `getTokenBalance` echoes the process id as `ticker` when a HyperBEAM
+ * balance response carries no ticker field (see `ao/balance.ts`'s
+ * `parseBalanceResponse`). For any process with a manually-verified
+ * ticker in `DEFAULT_TOKEN_REGISTRY` (e.g. AO), that known identity takes
+ * precedence over the fallback.
+ */
+function withRegisteredTicker(balance: TokenBalance): TokenBalance {
+  if (balance.ticker !== balance.processId) return balance;
+  const registered = DEFAULT_TOKEN_REGISTRY.find((token) => token.processId === balance.processId);
+  return registered ? { ...balance, ticker: registered.ticker } : balance;
+}
+
 function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
   if (value === null || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
@@ -197,9 +210,10 @@ export class ReadsHandler {
     }
 
     const activePeerUrl = settings.activePeerUrl;
-    return Promise.all(
+    const balances = await Promise.all(
       processIds.map((processId) => getTokenBalance(processId, req.address, activePeerUrl)),
     );
+    return balances.map((balance) => withRegisteredTicker(balance));
   }
 
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
@@ -294,9 +308,22 @@ export class ReadsHandler {
         const aoPriceSeries = await getHistoricalUsdPricesWithFallback(AO_TOKEN.priceSource, req.range);
         if (aoPriceSeries.length > 0) {
           tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries) });
+        } else if (aoQuantity > 0) {
+          // A held (nonzero) AO balance whose price series is unavailable would
+          // otherwise silently drop out of the total, making an AR-empty/AO-only
+          // wallet's chart render as if the whole portfolio were worth $0 — an
+          // AR-only total is honest, but a total that's missing a token the
+          // wallet actually holds is not. Reported as a failed range like AR's
+          // own empty-price-series case, rather than a fabricated AR-only total.
+          return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
         }
       } catch {
-        // AO balance/price unavailable this run — AR-only total, not a failed chart.
+        // Balance read itself failed — see the aoQuantity > 0 branch above for
+        // why a *held* AO balance can't just be silently dropped here either,
+        // but the balance read failing means aoQuantity was never resolved, so
+        // there's no way to tell whether this wallet even holds AO. Falls back
+        // to AR-only, matching this catch's original intent, rather than
+        // failing every chart for every wallet whenever a peer hiccups.
       }
     }
 
