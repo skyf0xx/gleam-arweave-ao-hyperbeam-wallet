@@ -39,6 +39,14 @@ export interface ProtocolMap {
   exportWallet(req: { walletId: string; password: string }): JWKInterface;
   lockWallet(): void;
   unlockWallet(req: { password: string }): { unlockedWalletIds: string[] };
+  /**
+   * The "forgot password" destructive full-vault reset: wipes every
+   * locally stored wallet, the active-wallet pointer, and the unlocked
+   * session. Registered against the already-tested
+   * `WalletLifecycleHandler.resetAllWallets()` — this entry only pins the
+   * wire shape, per this file's own doc comment.
+   */
+  resetAllWallets(): void;
 
   // reads
   getState(): WalletState;

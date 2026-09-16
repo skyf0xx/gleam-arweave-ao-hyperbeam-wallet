@@ -45,6 +45,7 @@ export const KEY_METHODS = [
   "importWallet",
   "exportWallet",
   "addLedgerWallet",
+  "resetAllWallets",
 ] as const;
 
 export type ProviderMethod = (typeof PROVIDER_METHODS)[number];
