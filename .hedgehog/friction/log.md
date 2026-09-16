@@ -14,3 +14,11 @@ hedgehog plan re-compiles an already-complete, already-merged intent (design-sys
 
 reviewed: 2026-09-15, issues: https://github.com/skyf0xx/hedgehog/issues/432, https://github.com/skyf0xx/hedgehog/issues/433, https://github.com/skyf0xx/hedgehog/issues/434
 
+## 2026-09-16T01:18:29.616Z QR-CODE-REAL-ENCODER-WALLET-CORE
+
+QR-CODE-REAL-ENCODER-WALLET-CORE's verify command (pnpm vitest run ... send ...) fails on a pre-existing, unrelated test: transfer.send.test.ts 'throws a named error when no active HyperBEAM peer is configured for an AO transfer'. Root cause: DEFAULT_NETWORK_SETTINGS.activePeerUrl defaults to DEFAULT_HYPERBEAM_PEER_URLS[0] (a real URL), so empty storage never produces settings.activePeerUrl === null -- the test's premise (empty storage implies no active peer) doesn't hold against the handler's own default-fallback behavior, introduced together in the original wallet-core commit (a3e41b8). Confirmed pre-existing and unrelated to qr-code-real-encoder by stashing this intent's QrCode.tsx changes and re-running 'pnpm vitest run send' against a clean wallet-core tree -- same failure. Needs a planner/Correction-Protocol decision: either the test's premise is wrong (should mock/force activePeerUrl to null explicitly rather than relying on empty-storage defaults), or the handler needs an explicit 'no peer usable' state distinct from 'falling back to public default peer'. Blocks QR-CODE-REAL-ENCODER-WALLET-CORE's own verify command from passing as-is.
+
+## 2026-09-16T01:21:32.361Z QR-CODE-REAL-ENCODER-SETTINGS-SCREENS-GAP
+
+QR-CODE-REAL-ENCODER-SETTINGS-SCREENS-GAP's verify command fails on a pre-existing, unrelated test: MainScreenView.main-screen.test.tsx 'shows NetworkErrorBanner (not a broken/blank chart) when getPortfolioHistory fails' -- times out waiting for /couldn't reach the network/i text. Confirmed pre-existing (reproduces on a clean stash of this intent's work, unrelated to qr-code-real-encoder). Looks like a real product-behavior gap (chart error state not rendering as expected), not a test-fixture bug like the earlier HyperBEAM-peer one -- needs actual investigation into MainScreenView/portfolio-chart error handling, not a task for this intent to absorb. Blocks QR-CODE-REAL-ENCODER-SETTINGS-SCREENS-GAP's own verify from passing as-is.
+
