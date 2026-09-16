@@ -11,6 +11,7 @@ import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
+import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -54,7 +55,14 @@ export interface SendViewProps {
 }
 
 type Step =
-  | { kind: "compose"; recipient: string; amountDisplay: string; submitting: boolean; error?: string }
+  | {
+      kind: "compose";
+      recipient: string;
+      amountDisplay: string;
+      submitting: boolean;
+      recipientError?: string;
+      amountError?: string;
+    }
   | { kind: "token-picker" }
   | { kind: "recent-recipients" }
   | {
@@ -109,6 +117,19 @@ function formatAtomicAsDisplay(atomic: string, denomination: number, maxFraction
   return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
+/**
+ * Strips the amount input to digits and at most one decimal point as the
+ * user types — commas, letters, and extra `.`s never land in the field,
+ * rather than being accepted and only rejected later by `amountSchema` on
+ * Continue.
+ */
+function sanitizeAmountInput(raw: string): string {
+  const digitsAndDots = raw.replace(/[^0-9.]/g, "");
+  const firstDot = digitsAndDots.indexOf(".");
+  if (firstDot === -1) return digitsAndDots;
+  return digitsAndDots.slice(0, firstDot + 1) + digitsAndDots.slice(firstDot + 1).replace(/\./g, "");
+}
+
 function isValidArweaveAddress(address: string): boolean {
   return /^[A-Za-z0-9_-]{43}$/.test(address);
 }
@@ -160,30 +181,43 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
-      const recipient = step.recipient.trim();
-      if (!isValidArweaveAddress(recipient)) {
+      const recipientResult = recipientSchema.safeParse(step.recipient);
+      if (!recipientResult.success) {
         setStep({
           ...step,
-          error: "That doesn't look like a full Arweave address — check for a missing character.",
+          recipientError: firstIssueMessage(recipientResult.error, "That doesn't look like a valid address."),
+          amountError: undefined,
+        });
+        return;
+      }
+      const recipient = recipientResult.data;
+
+      const denomination = selectedToken === null ? 12 : selectedToken.denomination;
+      const amountResult = amountSchema(denomination).safeParse(step.amountDisplay);
+      if (!amountResult.success) {
+        setStep({
+          ...step,
+          recipientError: undefined,
+          amountError: firstIssueMessage(amountResult.error, "Enter a valid amount."),
         });
         return;
       }
       const amountAtomic =
         selectedToken === null
-          ? parseArToWinston(step.amountDisplay)
-          : parseDisplayToAtomic(step.amountDisplay, selectedToken.denomination);
-      if (amountAtomic === null || amountAtomic === "0") {
-        setStep({ ...step, error: "Enter an amount greater than 0." });
+          ? parseArToWinston(amountResult.data)
+          : parseDisplayToAtomic(amountResult.data, selectedToken.denomination);
+      if (amountAtomic === null) {
+        setStep({ ...step, recipientError: undefined, amountError: "Enter a valid amount." });
         return;
       }
 
       const balanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data);
       if (balanceError !== null) {
-        setStep({ ...step, error: balanceError });
+        setStep({ ...step, recipientError: undefined, amountError: balanceError });
         return;
       }
 
-      setStep({ ...step, submitting: true, error: undefined });
+      setStep({ ...step, submitting: true, recipientError: undefined, amountError: undefined });
       try {
         const estimate = await runtime.send<
           { walletId: string; recipient: string; token: string | null; amount: string; fee: null },
@@ -206,7 +240,11 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           submitting: false,
         });
       } catch (error) {
-        setStep({ ...step, submitting: false, error: error instanceof Error ? error.message : String(error) });
+        setStep({
+          ...step,
+          submitting: false,
+          amountError: error instanceof Error ? error.message : String(error),
+        });
       }
     };
 
@@ -214,9 +252,36 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
       <ComposeStep
         wallet={wallet}
         token={selectedToken}
+        balancesQuery={balancesQuery}
         step={step}
         onBack={onBack}
-        onChange={(patch) => setStep({ ...step, ...patch, error: undefined })}
+        onChange={(patch) =>
+          setStep({
+            ...step,
+            ...patch,
+            recipientError: "recipient" in patch ? undefined : step.recipientError,
+            amountError: "amountDisplay" in patch ? undefined : step.amountError,
+          })
+        }
+        onBlurRecipient={() => {
+          if (step.recipient.trim().length === 0) return;
+          const result = recipientSchema.safeParse(step.recipient);
+          setStep({
+            ...step,
+            recipientError: result.success
+              ? undefined
+              : firstIssueMessage(result.error, "That doesn't look like a valid address."),
+          });
+        }}
+        onBlurAmount={() => {
+          if (step.amountDisplay.trim().length === 0) return;
+          const denomination = selectedToken === null ? 12 : selectedToken.denomination;
+          const result = amountSchema(denomination).safeParse(step.amountDisplay);
+          setStep({
+            ...step,
+            amountError: result.success ? undefined : firstIssueMessage(result.error, "Enter a valid amount."),
+          });
+        }}
         onContinue={() => void handleContinue()}
         onOpenTokenPicker={() => setStep({ kind: "token-picker" })}
         onOpenRecentRecipients={() => setStep({ kind: "recent-recipients" })}
@@ -283,24 +348,43 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
 function ComposeStep({
   wallet,
   token,
+  balancesQuery,
   step,
   onBack,
   onChange,
+  onBlurRecipient,
+  onBlurAmount,
   onContinue,
   onOpenTokenPicker,
   onOpenRecentRecipients,
 }: {
   wallet: WalletSummary;
   token: TokenBalance | null;
+  balancesQuery: UseQueryResult<WalletBalances>;
   step: Extract<Step, { kind: "compose" }>;
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
+  onBlurRecipient: () => void;
+  onBlurAmount: () => void;
   onContinue: () => void;
   onOpenTokenPicker: () => void;
   onOpenRecentRecipients: () => void;
 }) {
-  const canContinue = step.recipient.trim().length > 0 && step.amountDisplay.trim().length > 0 && !step.submitting;
+  const denomination = token === null ? 12 : token.denomination;
+  const canContinue =
+    !step.submitting &&
+    recipientSchema.safeParse(step.recipient).success &&
+    amountSchema(denomination).safeParse(step.amountDisplay).success;
   const ticker = tickerFor(token);
+  // "Max" affordance next to the amount field: the current token's spendable
+  // balance, formatted the same way the compose/review amounts already are.
+  // `undefined` while `balancesQuery` hasn't resolved yet — the pill hides
+  // rather than showing a stale/zero balance a click could act on.
+  const maxAtomic =
+    token === null
+      ? balancesQuery.data?.arBalance
+      : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
+  const maxDisplay = maxAtomic === undefined ? undefined : formatAtomicAsDisplay(maxAtomic, denomination);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -326,20 +410,38 @@ function ComposeStep({
             rows={2}
             value={step.recipient}
             onChange={(event) => onChange({ recipient: event.target.value })}
+            onBlur={onBlurRecipient}
             placeholder="Paste an address"
             className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
           />
+          {step.recipientError ? (
+            <div role="alert" className="text-label leading-snug text-warning">
+              {step.recipientError}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-label font-semibold text-muted">Amount</span>
+          <div className="flex items-center justify-between">
+            <span className="text-label font-semibold text-muted">Amount</span>
+            {maxDisplay !== undefined ? (
+              <button
+                type="button"
+                onClick={() => onChange({ amountDisplay: maxDisplay })}
+                className="text-label font-medium text-muted hover:text-foreground hover:underline"
+              >
+                Max: {maxDisplay}
+              </button>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
             <input
               type="text"
               inputMode="decimal"
               placeholder="0.00"
               value={step.amountDisplay}
-              onChange={(event) => onChange({ amountDisplay: event.target.value })}
+              onChange={(event) => onChange({ amountDisplay: sanitizeAmountInput(event.target.value) })}
+              onBlur={onBlurAmount}
               className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground focus:outline-none"
             />
             <button
@@ -352,13 +454,12 @@ function ComposeStep({
               <ChevronDownIcon />
             </button>
           </div>
+          {step.amountError ? (
+            <div role="alert" className="text-label leading-snug text-warning">
+              {step.amountError}
+            </div>
+          ) : null}
         </div>
-
-        {step.error ? (
-          <div role="alert" className="flex items-start gap-1.5 text-label leading-snug text-warning">
-            <span>{step.error}</span>
-          </div>
-        ) : null}
 
         <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
           {step.submitting ? "Checking…" : "Continue"}
