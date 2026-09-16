@@ -1,30 +1,69 @@
-import type * as React from "react";
+import { useEffect, useRef } from "react";
+import QRCodeStyling from "qr-code-styling";
 import { cn } from "../../primitives/cn";
 
-/**
- * KNOWN LIMITATION (reported per this task's packet, not silently
- * shipped): this renders a QR-*shaped* decorative SVG matching
- * receive-screen.html's `.qr-card` pixel-for-pixel — including that
- * mockup's own module pattern, which is itself a static illustrative
- * grid, not a real encoder's output — rather than an actual QR encoding
- * of `value`. No QR-generation library exists anywhere in this
- * workspace's dependency tree (checked: no `qrcode`/`qrcode-generator`/
- * similar in `pnpm-lock.yaml` or any `node_modules`), and adding one is a
- * new dependency the stack in `core-design.md` doesn't already name —
- * the same "shared config, no single owner" gap class `onboarding-unlock`
- * flagged for `@webext-core/messaging` (a `package.json`/lockfile change,
- * requiring its own `chore(workspace)` commit + an override, not a quiet
- * addition here). `value` is accepted and rendered as the visually
- * hidden accessible label so the component's contract is already
- * correct for a future real encoder to drop in behind the same props.
- */
 export interface QrCodeProps {
   value: string;
   size?: number;
   className?: string;
 }
 
+// Mirrors theme.css's --color-foreground/--color-background; qr-code-styling paints its own SVG outside Tailwind's pipeline, so these can't be read live from CSS custom properties.
+const QR_FOREGROUND = "#111111";
+const QR_BACKGROUND = "#ffffff";
+
+const LOGO_SRC = "/icon/128.png";
+
 export function QrCode({ value, size = 176, className }: QrCodeProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const qrRef = useRef<QRCodeStyling | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const qr = new QRCodeStyling({
+      type: "svg",
+      width: size,
+      height: size,
+      data: value,
+      margin: 0,
+      qrOptions: {
+        errorCorrectionLevel: "H", // highest tier, needed so the embedded logo doesn't break decoding
+      },
+      image: LOGO_SRC,
+      imageOptions: {
+        imageSize: 0.3,
+        margin: 4,
+        hideBackgroundDots: true,
+      },
+      dotsOptions: {
+        type: "square",
+        color: QR_FOREGROUND,
+      },
+      cornersSquareOptions: {
+        type: "square",
+        color: QR_FOREGROUND,
+      },
+      cornersDotOptions: {
+        type: "square",
+        color: QR_FOREGROUND,
+      },
+      backgroundOptions: {
+        color: QR_BACKGROUND,
+      },
+    });
+
+    qrRef.current = qr;
+    container.replaceChildren();
+    qr.append(container);
+
+    return () => {
+      container.replaceChildren();
+      qrRef.current = null;
+    };
+  }, [value, size]);
+
   return (
     <div
       className={cn(
@@ -32,59 +71,12 @@ export function QrCode({ value, size = 176, className }: QrCodeProps) {
         className,
       )}
     >
-      <svg
-        viewBox="0 0 33 33"
-        width={size}
-        height={size}
-        fill="none"
+      <div
+        ref={containerRef}
         role="img"
         aria-label={`QR code for wallet address ${value}`}
-      >
-        <rect width="33" height="33" className="fill-background" />
-        <g className="fill-foreground">
-          <rect x="0" y="0" width="7" height="7" />
-          <rect x="1" y="1" width="5" height="5" className="fill-background" />
-          <rect x="2" y="2" width="3" height="3" />
-          <rect x="26" y="0" width="7" height="7" />
-          <rect x="27" y="1" width="5" height="5" className="fill-background" />
-          <rect x="28" y="2" width="3" height="3" />
-          <rect x="0" y="26" width="7" height="7" />
-          <rect x="1" y="27" width="5" height="5" className="fill-background" />
-          <rect x="2" y="28" width="3" height="3" />
-          {generatePseudoRandomModules(value)}
-        </g>
-      </svg>
+        style={{ width: size, height: size }}
+      />
     </div>
   );
-}
-
-/**
- * Deterministic (seeded by `value`) filler pattern for the QR-shaped
- * placeholder's data area — varies visually per address so it doesn't
- * look like the exact same static image on every screen, without
- * pretending to encode anything decodable. Pure cosmetic filler, per this
- * component's doc comment.
- */
-function generatePseudoRandomModules(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-
-  const rects: React.ReactNode[] = [];
-  let state = hash || 1;
-  const next = () => {
-    state = (state * 1103515245 + 12345) >>> 0;
-    return state / 0xffffffff;
-  };
-
-  for (let y = 9; y < 24; y += 1) {
-    for (let x = 9; x < 24; x += 1) {
-      // Skip the finder-pattern quiet zones' immediate neighbors.
-      if (next() > 0.55) {
-        rects.push(<rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" />);
-      }
-    }
-  }
-  return rects;
 }

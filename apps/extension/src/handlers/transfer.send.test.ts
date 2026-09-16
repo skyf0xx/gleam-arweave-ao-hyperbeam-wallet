@@ -227,6 +227,11 @@ describe("TransferHandler: submitTransfer", () => {
   });
 
   it("throws a named error when no active HyperBEAM peer is configured for an AO transfer", async () => {
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: null,
+    });
     const handler = new TransferHandler(storage);
     await expect(
       handler.submitTransfer({
