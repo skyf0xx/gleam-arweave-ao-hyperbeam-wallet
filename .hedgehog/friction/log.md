@@ -22,3 +22,7 @@ QR-CODE-REAL-ENCODER-WALLET-CORE's verify command (pnpm vitest run ... send ...)
 
 QR-CODE-REAL-ENCODER-SETTINGS-SCREENS-GAP's verify command fails on a pre-existing, unrelated test: MainScreenView.main-screen.test.tsx 'shows NetworkErrorBanner (not a broken/blank chart) when getPortfolioHistory fails' -- times out waiting for /couldn't reach the network/i text. Confirmed pre-existing (reproduces on a clean stash of this intent's work, unrelated to qr-code-real-encoder). Looks like a real product-behavior gap (chart error state not rendering as expected), not a test-fixture bug like the earlier HyperBEAM-peer one -- needs actual investigation into MainScreenView/portfolio-chart error handling, not a task for this intent to absorb. Blocks QR-CODE-REAL-ENCODER-SETTINGS-SCREENS-GAP's own verify from passing as-is.
 
+## 2026-09-16T02:19:32.883Z
+
+This session repeatedly hand-verified/no-op'd layers where the messaging/provider-bridge scaffolding was clearly irrelevant (vault, onboarding-unlock, wallet-core, upload, settings-screens-gap, historical-pricing, main-screen-chart all no-op'd for both ao-provider-transfer-surface and forgot-password-wire-contract intents), and for upload-submit-relocation the user explicitly said it was fine to hand-fix the SQLite state directly rather than force 9 more no-op commits through claim/verify. Filed as github.com/skyf0xx/hedgehog issue for agent discretion over per-layer ceremony.
+
