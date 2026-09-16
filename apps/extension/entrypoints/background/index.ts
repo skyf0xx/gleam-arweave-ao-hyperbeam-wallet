@@ -55,7 +55,7 @@ const lifecycle = new WalletLifecycleHandler(storage);
 const reads = new ReadsHandler(storage);
 const transfer = new TransferHandler(storage);
 const upload = new UploadHandler(storage);
-const approval = new ApprovalHandler(storage, windows);
+const approval = new ApprovalHandler(storage, windows, transfer);
 
 /**
  * Maps a `PROVIDER_SURFACE_METHODS` name + already-origin-checked params
@@ -156,6 +156,24 @@ async function handleProviderCall(
         origin,
         walletId: grant.walletId,
         payload,
+      });
+    }
+
+    case "transferAoTokens": {
+      const transferParams = params as { token?: string; recipient?: string; amount?: string };
+      if (!transferParams.token || !transferParams.recipient || !transferParams.amount) {
+        throw new Error("transferAoTokens requires token, recipient, and amount.");
+      }
+      return approval.requestApproval({
+        kind: "transferAoTokens",
+        origin,
+        walletId: grant.walletId,
+        recipient: transferParams.recipient,
+        amount: transferParams.amount,
+        fee: null,
+        token: transferParams.token,
+        payload: new Uint8Array(),
+        tags: [],
       });
     }
 

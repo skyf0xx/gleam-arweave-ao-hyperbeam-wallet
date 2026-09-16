@@ -88,6 +88,20 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     await expect(callPromise).resolves.toBe("some-address");
   });
 
+  it("transferAoTokens posts a REQUEST envelope carrying token/recipient/amount, resolving with the relayed result", async () => {
+    const callPromise = provider.transferAoTokens({
+      token: "ao-process-id",
+      recipient: "recipient-addr",
+      amount: "1000",
+    });
+    const envelope = lastRequestEnvelope();
+    expect(envelope.method).toBe("transferAoTokens");
+    expect(envelope.params).toEqual({ token: "ao-process-id", recipient: "recipient-addr", amount: "1000" });
+
+    postResponse({ type: RESPONSE, id: envelope.id, result: { id: "ao-message-id-123" } });
+    await expect(callPromise).resolves.toEqual({ id: "ao-message-id-123" });
+  });
+
   it("ignores a RESPONSE whose event.source is not window (point 1)", async () => {
     const callPromise = provider.getActiveAddress();
     const envelope = lastRequestEnvelope();

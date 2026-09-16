@@ -349,3 +349,132 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await expect(pending).rejects.toThrow(/not implemented/i);
   });
 });
+
+describe("ApprovalHandler: transferAoTokens signing approval", () => {
+  let storage: StoragePort;
+  let windows: ReturnType<typeof createFakeWindows>;
+
+  afterEach(() => {
+    clearKeyCache();
+  });
+
+  it("finalizes an approved transferAoTokens request via the injected AoTransferSubmitter, returning { id }", async () => {
+    storage = createWatchableStorage();
+    windows = createFakeWindows();
+    const submitTransfer = vi.fn().mockResolvedValue({ txId: "ao-message-id-123" });
+    const handler = new ApprovalHandler(storage, windows, { submitTransfer });
+    await seedWallet(storage);
+    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: "recipient-addr",
+      amount: "1000",
+      fee: null,
+      token: "ao-process-id",
+      payload: new Uint8Array(),
+      tags: [],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    const request = await handler.getApproval({ requestId });
+    expect(request.preview).toMatchObject({
+      kind: "transferAoTokens",
+      recipient: "recipient-addr",
+      amount: "1000",
+      token: "ao-process-id",
+    });
+
+    await handler.resolveApproval({ requestId, approved: true });
+
+    await expect(pending).resolves.toEqual({ id: "ao-message-id-123" });
+    expect(submitTransfer).toHaveBeenCalledWith({
+      token: "ao-process-id",
+      recipient: "recipient-addr",
+      amount: "1000",
+      fee: null,
+      walletId: WALLET_ID,
+    });
+  });
+
+  it("rejecting a transferAoTokens request never calls the submitter", async () => {
+    storage = createWatchableStorage();
+    windows = createFakeWindows();
+    const submitTransfer = vi.fn().mockResolvedValue({ txId: "should-not-be-called" });
+    const handler = new ApprovalHandler(storage, windows, { submitTransfer });
+    await seedWallet(storage);
+    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: "recipient-addr",
+      amount: "1000",
+      fee: null,
+      token: "ao-process-id",
+      payload: new Uint8Array(),
+      tags: [],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    await handler.resolveApproval({ requestId, approved: false });
+    await expect(pending).rejects.toThrow(/rejected/i);
+    expect(submitTransfer).not.toHaveBeenCalled();
+  });
+
+  it("a locked wallet is rejected before the submitter is ever reached", async () => {
+    storage = createWatchableStorage();
+    windows = createFakeWindows();
+    const submitTransfer = vi.fn();
+    const handler = new ApprovalHandler(storage, windows, { submitTransfer });
+    await seedWallet(storage);
+
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: "recipient-addr",
+      amount: "1000",
+      fee: null,
+      token: "ao-process-id",
+      payload: new Uint8Array(),
+      tags: [],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    await handler.resolveApproval({ requestId, approved: true });
+    await expect(pending).rejects.toThrow(/locked/i);
+    expect(submitTransfer).not.toHaveBeenCalled();
+  });
+
+  it("without an injected AoTransferSubmitter, throws a named wiring error rather than silently succeeding", async () => {
+    storage = createWatchableStorage();
+    windows = createFakeWindows();
+    const handler = new ApprovalHandler(storage, windows);
+    await seedWallet(storage);
+    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: "recipient-addr",
+      amount: "1000",
+      fee: null,
+      token: "ao-process-id",
+      payload: new Uint8Array(),
+      tags: [],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    await handler.resolveApproval({ requestId, approved: true });
+    await expect(pending).rejects.toThrow(/not wired to a transfer submitter/i);
+  });
+});

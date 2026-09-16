@@ -32,7 +32,21 @@ const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
   batchSignDataItem: "Sign messages",
   encrypt: "Encrypt data",
   decrypt: "Decrypt data",
+  transferAoTokens: "Send",
 };
+
+/**
+ * Token identity shown alongside the amount for a `transferAoTokens`
+ * preview. Judgment call (RELEVANT RULES don't specify exact copy/layout):
+ * no token-symbol lookup exists in this layer's scope, so this renders the
+ * raw AO processId truncated to a short recognizable form rather than
+ * fabricating a symbol — closest existing pattern to follow was
+ * `sign`/`dispatch`'s plain amount display, extended with one extra line
+ * identifying the token, per `SigningApprovalPreview.token`'s intent.
+ */
+function shortenProcessId(processId: string): string {
+  return processId.length > 12 ? `${processId.slice(0, 6)}…${processId.slice(-4)}` : processId;
+}
 
 function hostnameOf(origin: string): string {
   try {
@@ -88,6 +102,11 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
               <span className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
                 {preview.amount ?? "—"}
               </span>
+              {preview.token != null ? (
+                <span className="text-caption font-semibold uppercase tracking-wide text-muted">
+                  {shortenProcessId(preview.token)}
+                </span>
+              ) : null}
             </div>
 
             {irreversible ? (
@@ -106,7 +125,7 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
           </>
         ) : null}
 
-        {preview.decodedData !== null ? (
+        {preview.decodedData !== null && preview.decodedData !== "" ? (
           <div className="flex flex-col gap-1.5">
             <span className="text-caption font-semibold uppercase tracking-wide text-muted">Decoded data</span>
             <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">

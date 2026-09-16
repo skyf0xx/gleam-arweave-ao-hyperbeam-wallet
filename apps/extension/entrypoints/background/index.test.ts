@@ -1,5 +1,30 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+/**
+ * Same resolved-path mocking approach `transfer.send.test.ts` uses:
+ * `@permaweb/aoconnect` is a `packages/core`-only dependency, so mocking
+ * it by bare specifier from this package's test file would silently miss
+ * the copy `core/ao/transfer.ts` actually resolves. Needed here because
+ * this file's `transferAoTokens` integration test drives the real
+ * dispatcher -> ApprovalHandler -> TransferHandler -> `core/ao/transfer.ts`
+ * chain end-to-end, and that last hop would otherwise make a real network
+ * call.
+ */
+const { aoMessageMock, aoconnectResolvedPath } = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createRequire } = require("node:module") as typeof import("node:module");
+  const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
+  const cjsEntry = requireFromCore.resolve("@permaweb/aoconnect");
+  return {
+    aoMessageMock: vi.fn(),
+    aoconnectResolvedPath: cjsEntry.replace(/index\.cjs$/, "index.js"),
+  };
+});
+vi.mock(aoconnectResolvedPath, () => ({
+  connect: () => ({ message: aoMessageMock }),
+  createDataItemSigner: (jwk: unknown) => ({ __signerFor: jwk }),
+}));
+
 type Handler = (message: { data: unknown }) => unknown;
 
 const registeredHandlers = new Map<string, Handler>();
@@ -209,5 +234,115 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await resolveApproval({ data: { requestId, approved: true } });
 
     await expect(resultPromise).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+  });
+
+  /**
+   * `transferAoTokens` end-to-end, per this task's RELEVANT RULES: exercised
+   * through the real dispatcher (`providerCall`) -> `ApprovalHandler`
+   * (approval window preview + resolution) -> `TransferHandler.
+   * submitTransfer` -> `core/ao/transfer.ts` (mocked at the aoconnect
+   * boundary above, never at any layer this task owns) -> the connected
+   * dApp's resolved result. Proves the same approval-gated path every other
+   * signing method already goes through, not a trusted-RPC shortcut, and
+   * that the approval preview carries `token` for the connected origin's
+   * request.
+   */
+  it("transferAoTokens routes through connect -> approval window -> signing, never auto-approved", async () => {
+    aoMessageMock.mockResolvedValue("ao-message-id-123");
+
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("session:unlockedSession", {
+      unlockedAt: 0,
+      lastActivityAt: 0,
+      autoLockTimeout: "never",
+      unlockedWalletIds: ["wallet-1"],
+    });
+    await setItem("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example",
+    });
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    // The unlocked-session key cache (`key-session.ts`) — populated in a
+    // real run by `unlockWallet`, seeded directly here since this test
+    // drives the dispatcher module fresh per `beforeEach`'s `resetModules`.
+    const { cacheKey } = await import("@/src/handlers/key-session");
+    cacheKey("wallet-1", { kty: "RSA", n: "n", e: "e" } as never, "addr-1");
+
+    const resultPromise = providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "transferAoTokens",
+      params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+    });
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+
+    const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+      request: { requestId: string; kind: string; preview: Record<string, unknown> };
+    }>;
+    expect(pendingRaw).toHaveLength(1);
+    const { request } = pendingRaw[0]!;
+    expect(request.kind).toBe("transferAoTokens");
+    expect(request.preview).toMatchObject({
+      kind: "transferAoTokens",
+      recipient: "recipient-addr",
+      amount: "1000",
+      token: "ao-process-id",
+    });
+
+    // Not auto-approved: the dApp's call must still be pending at this point.
+    let settled = false;
+    void resultPromise.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    const resolveApproval = registeredHandlers.get("resolveApproval")!;
+    await resolveApproval({ data: { requestId: request.requestId, approved: true } });
+
+    await expect(resultPromise).resolves.toEqual({ id: "ao-message-id-123" });
+    expect(aoMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("transferAoTokens for an unconnected origin is rejected before any approval window opens", async () => {
+    await expect(
+      providerCall({
+        origin: "https://not-connected.example",
+        method: "transferAoTokens",
+        params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+      }),
+    ).rejects.toThrow(/not connected/i);
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
+  it("transferAoTokens rejects when the request is missing required fields", async () => {
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    await expect(
+      providerCall({ origin: "https://bazar.arweave.net", method: "transferAoTokens", params: { token: "ao-process-id" } }),
+    ).rejects.toThrow(/requires token, recipient, and amount/i);
   });
 });

@@ -262,6 +262,17 @@ class GleamProvider {
     return this.call("signDataItem", { dataItem });
   }
 
+  /**
+   * AO token transfer, per `AoTokenTransferRequest`/`AoTokenTransferResult`
+   * (`@gleam/core`'s `transfer.ts` models) — not part of ArConnect's own
+   * surface, so no `options`/`signal` parameter to stay parallel with
+   * `sign`/`dispatch`; the connection-approval/signing-approval flow is
+   * identical either way.
+   */
+  transferAoTokens(request: { token: string; recipient: string; amount: string }): Promise<unknown> {
+    return this.call("transferAoTokens", request);
+  }
+
   batchSignDataItem(dataItems?: unknown): Promise<unknown> {
     return this.call("batchSignDataItem", { dataItems });
   }

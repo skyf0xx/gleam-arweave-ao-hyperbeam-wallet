@@ -98,15 +98,49 @@ function isValidApprovalRequest(value: unknown): value is ApprovalRequest {
 /** A signing request's decoded intent — the input to `describeIntent`-style preview building. */
 export interface SigningRequestInput {
   kind: Exclude<ApprovalKind, "connect">;
-  /** Present for value-transfer-shaped calls (`sign` a transfer, `dispatch`). */
+  /** Present for value-transfer-shaped calls (`sign` a transfer, `dispatch`, `transferAoTokens`). */
   recipient?: string | null;
   amount?: string | null;
   fee?: string | null;
+  /**
+   * Identifies which token `amount`/`fee` are denominated in — `null` for the
+   * native AR token, an AO processId otherwise. Only ever set for
+   * `transferAoTokens` today (see `SigningApprovalPreview.token`'s own doc
+   * comment); every other signing kind carries no token.
+   */
+  token?: string | null;
   /** Raw bytes this request will sign/encrypt/decrypt, for the payload hash and decoded preview. */
   payload: Uint8Array;
   tags?: Array<{ name: string; value: string }>;
   /** `true` when the review screen must escalate to Irreversible-tier framing. */
   firstSeenOrHighRisk?: boolean;
+}
+
+/**
+ * The `AoTokenTransferRequest` shape a `transferAoTokens` signing approval
+ * carries through to `performSigning`, so it can call
+ * `TransferHandler.submitTransfer` with exactly the fields that handler
+ * needs (`token`/`recipient`/`amount`/`fee: null`/`walletId`) once the user
+ * approves — never re-derived from the decoded preview payload, which is
+ * display-only.
+ */
+export interface AoTransferSigningInput {
+  token: string;
+  recipient: string;
+  amount: string;
+}
+
+/**
+ * The subset of `TransferHandler` this handler needs to finalize an
+ * approved `transferAoTokens` request — injected rather than imported
+ * directly, so `ApprovalHandler` doesn't need to know how a transfer is
+ * actually submitted (mirrors the existing `StoragePort`/`WindowPort`
+ * ports-style injection this class already uses). Optional constructor
+ * param: every existing call site/test that never exercises
+ * `transferAoTokens` is unaffected.
+ */
+export interface AoTransferSubmitter {
+  submitTransfer(req: { token: string; recipient: string; amount: string; fee: null; walletId: string }): Promise<{ txId: string }>;
 }
 
 export interface ConnectRequestInput {
@@ -160,6 +194,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     recipient: input.recipient ?? null,
     amount: input.amount ?? null,
     fee: input.fee ?? null,
+    token: input.token ?? null,
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
@@ -170,6 +205,7 @@ export class ApprovalHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly windows: WindowPort,
+    private readonly transfers?: AoTransferSubmitter,
   ) {}
 
   private async loadGrants(): Promise<Grant[]> {
@@ -405,11 +441,45 @@ export class ApprovalHandler {
       throw new Error(`Wallet "${entry.walletId}" is locked. Unlock it to continue.`);
     }
 
+    if (input.kind === "transferAoTokens") {
+      return this.performAoTransfer(entry.walletId, input);
+    }
+
     throw new Error(
       `Signing kind "${input.kind}" is not implemented yet — this build verifies the unlocked-session ` +
         "and approval flow, but producing a real signature needs arweave-js/@dha-team/arbundles wired " +
         "into apps/extension, which is outside this task's ALLOWED SCOPE. See this task's final report.",
     );
+  }
+
+  /**
+   * Finalizes an approved `transferAoTokens` request by reusing the exact
+   * same `TransferHandler.submitTransfer` path the popup's `SendView`
+   * already goes through (`token`/`recipient`/`amount`/`fee: null`, plus
+   * the `walletId` this Grant resolved) — no new signing path, no
+   * duplicate AO-messaging client wiring. Returns `AoTokenTransferResult`
+   * shape (`{ id }`), mirroring `submitTransfer`'s `{ txId }` under the
+   * ArConnect-compatible `dispatch()`-style field name the dApp expects.
+   */
+  private async performAoTransfer(walletId: string, input: SigningRequestInput): Promise<{ id: string }> {
+    if (!this.transfers) {
+      throw new Error(
+        "transferAoTokens is not wired to a transfer submitter — ApprovalHandler was constructed " +
+          "without an AoTransferSubmitter.",
+      );
+    }
+    if (input.token == null || input.recipient == null || input.amount == null) {
+      throw new Error("A transferAoTokens approval is missing token/recipient/amount.");
+    }
+
+    const { txId } = await this.transfers.submitTransfer({
+      token: input.token,
+      recipient: input.recipient,
+      amount: input.amount,
+      fee: null,
+      walletId,
+    });
+    return { id: txId };
   }
 
   /** Revokes a Grant — ends all access it covered immediately. */
