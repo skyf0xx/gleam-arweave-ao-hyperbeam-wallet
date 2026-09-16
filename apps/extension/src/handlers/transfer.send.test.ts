@@ -37,6 +37,31 @@ vi.mock(aoconnectResolvedPath, () => ({
   createDataItemSigner: (jwk: unknown) => ({ __signerFor: jwk }),
 }));
 
+/**
+ * Real key/value store standing in for `adapters/storage.ts`'s
+ * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * cache, so tests exercise the same "read fresh from storage" behavior
+ * `key-session.ts` relies on.
+ */
+const keySessionStore = new Map<string, unknown>();
+
+vi.mock("../adapters/storage", () => ({
+  storagePort: {
+    async get(key: string) {
+      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+    },
+    async set(key: string, value: unknown) {
+      keySessionStore.set(key, value);
+    },
+    async remove(key: string) {
+      keySessionStore.delete(key);
+    },
+    watch() {
+      return () => {};
+    },
+  },
+}));
+
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
   return {
@@ -77,11 +102,15 @@ async function createTestWallet(): Promise<{ wallet: Wallet; jwk: JWKInterface }
 
 const originalFetch = globalThis.fetch;
 
-afterEach(() => {
+beforeEach(() => {
+  keySessionStore.clear();
+});
+
+afterEach(async () => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
   aoMessageMock.mockReset();
-  clearKeyCache();
+  await clearKeyCache();
 });
 
 const AO_PROCESS_ID = "aoProcess123";
@@ -118,7 +147,7 @@ describe("TransferHandler: estimateTransfer", () => {
     const created = await createTestWallet();
     wallet = created.wallet;
     await storage.set("local:wallets", [wallet]);
-    cacheKey(WALLET_ID, created.jwk, wallet.address);
+    await cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
   it("returns fee: null for an AO token transfer — no sender-side fee quote exists for AO", async () => {
@@ -223,7 +252,7 @@ describe("TransferHandler: submitTransfer", () => {
     const created = await createTestWallet();
     wallet = created.wallet;
     await storage.set("local:wallets", [wallet]);
-    cacheKey(WALLET_ID, created.jwk, wallet.address);
+    await cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
   it("throws a named error when no active HyperBEAM peer is configured for an AO transfer", async () => {
@@ -308,7 +337,7 @@ describe("TransferHandler: submitTransfer", () => {
   });
 
   it("throws when the wallet isn't unlocked (no cached signing key)", async () => {
-    clearKeyCache();
+    await clearKeyCache();
     const handler = new TransferHandler(storage);
     await expect(
       handler.submitTransfer({

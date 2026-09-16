@@ -4,6 +4,35 @@ import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 
 /**
+ * Real key/value store standing in for `adapters/storage.ts`'s
+ * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * cache, so tests exercise the same "read fresh from storage" behavior
+ * `key-session.ts` relies on.
+ */
+const keySessionStore = new Map<string, unknown>();
+
+vi.mock("../adapters/storage", () => ({
+  storagePort: {
+    async get(key: string) {
+      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+    },
+    async set(key: string, value: unknown) {
+      keySessionStore.set(key, value);
+    },
+    async remove(key: string) {
+      keySessionStore.delete(key);
+    },
+    watch() {
+      return () => {};
+    },
+  },
+}));
+
+beforeEach(() => {
+  keySessionStore.clear();
+});
+
+/**
  * A `StoragePort` fake whose `watch` genuinely fires on every `set`
  * (unlike the pass-through stub other handlers' test files use) —
  * required here since `ApprovalHandler.requestApproval`'s resolution is
@@ -278,8 +307,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await seedWallet(storage);
   });
 
-  afterEach(() => {
-    clearKeyCache();
+  afterEach(async () => {
+    await clearKeyCache();
   });
 
   it("getApproval returns the exact pending ApprovalRequest for a requestId", async () => {
@@ -330,7 +359,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
   });
 
   it("signing with a cached key reaches performSigning (not-implemented, not a locked-wallet error)", async () => {
-    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
 
     const pending = handler.requestApproval({
       kind: "sign",
@@ -354,8 +383,8 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
   let storage: StoragePort;
   let windows: ReturnType<typeof createFakeWindows>;
 
-  afterEach(() => {
-    clearKeyCache();
+  afterEach(async () => {
+    await clearKeyCache();
   });
 
   it("finalizes an approved transferAoTokens request via the injected AoTransferSubmitter, returning { id }", async () => {
@@ -364,7 +393,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "ao-message-id-123" });
     const handler = new ApprovalHandler(storage, windows, { submitTransfer });
     await seedWallet(storage);
-    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -406,7 +435,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "should-not-be-called" });
     const handler = new ApprovalHandler(storage, windows, { submitTransfer });
     await seedWallet(storage);
-    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -458,7 +487,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     windows = createFakeWindows();
     const handler = new ApprovalHandler(storage, windows);
     await seedWallet(storage);
-    cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",

@@ -11,6 +11,31 @@ import {
 import { UploadHandler } from "./upload";
 import { cacheKey, clearKeyCache } from "./key-session";
 
+/**
+ * Real key/value store standing in for `adapters/storage.ts`'s
+ * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * cache, so tests exercise the same "read fresh from storage" behavior
+ * `key-session.ts` relies on.
+ */
+const keySessionStore = new Map<string, unknown>();
+
+vi.mock("../adapters/storage", () => ({
+  storagePort: {
+    async get(key: string) {
+      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+    },
+    async set(key: string, value: unknown) {
+      keySessionStore.set(key, value);
+    },
+    async remove(key: string) {
+      keySessionStore.delete(key);
+    },
+    watch() {
+      return () => {};
+    },
+  },
+}));
+
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
   return {
@@ -60,14 +85,15 @@ function textDraft(text: string, tags: UploadTag[] = [], licenseTag: UploadTag |
 
 const originalFetch = globalThis.fetch;
 
-beforeEach(() => {
-  clearKeyCache();
+beforeEach(async () => {
+  keySessionStore.clear();
+  await clearKeyCache();
 });
 
-afterEach(() => {
+afterEach(async () => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
-  clearKeyCache();
+  await clearKeyCache();
 });
 
 function mockBundlerFetch(status = 200) {
@@ -112,7 +138,7 @@ describe("UploadHandler: submitUpload", () => {
     const storage = createFakeStorage();
     const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
-    cacheKey(WALLET_ID, jwk, wallet.address);
+    await cacheKey(WALLET_ID, jwk, wallet.address);
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -128,7 +154,7 @@ describe("UploadHandler: submitUpload", () => {
     const storage = createFakeStorage();
     const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
-    cacheKey(WALLET_ID, jwk, wallet.address);
+    await cacheKey(WALLET_ID, jwk, wallet.address);
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -164,7 +190,7 @@ describe("UploadHandler: submitUpload", () => {
     const storage = createFakeStorage();
     const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
-    cacheKey(WALLET_ID, jwk, wallet.address);
+    await cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(200);
 
     const handler = new UploadHandler(storage);
@@ -181,7 +207,7 @@ describe("UploadHandler: submitUpload", () => {
     const storage = createFakeStorage();
     const { wallet, jwk } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
-    cacheKey(WALLET_ID, jwk, wallet.address);
+    await cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(502);
 
     const handler = new UploadHandler(storage);

@@ -437,7 +437,7 @@ export class ApprovalHandler {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
 
-    if (!getCachedKey(entry.walletId)) {
+    if (!(await getCachedKey(entry.walletId))) {
       throw new Error(`Wallet "${entry.walletId}" is locked. Unlock it to continue.`);
     }
 

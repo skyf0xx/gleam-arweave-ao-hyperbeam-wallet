@@ -1,7 +1,36 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 import { getCachedKey, clearKeyCache } from "./key-session";
+
+/**
+ * Real key/value store standing in for `adapters/storage.ts`'s
+ * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * cache, so tests exercise the same "read fresh from storage" behavior
+ * `key-session.ts` relies on.
+ */
+const keySessionStore = new Map<string, unknown>();
+
+vi.mock("../adapters/storage", () => ({
+  storagePort: {
+    async get(key: string) {
+      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+    },
+    async set(key: string, value: unknown) {
+      keySessionStore.set(key, value);
+    },
+    async remove(key: string) {
+      keySessionStore.delete(key);
+    },
+    watch() {
+      return () => {};
+    },
+  },
+}));
+
+beforeEach(() => {
+  keySessionStore.clear();
+});
 
 const GOOD_PASSWORD = "correct horse battery staple";
 const OTHER_PASSWORD = "another very long safe password!";
@@ -435,32 +464,32 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     handler = new WalletLifecycleHandler(storage);
   });
 
-  afterEach(() => {
-    clearKeyCache();
+  afterEach(async () => {
+    await clearKeyCache();
   });
 
   it("unlockWallet caches the wallet's decrypted signing key so later calls don't need the password again", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.lockWallet();
-    expect(getCachedKey(wallet.id)).toBeNull();
+    expect(await getCachedKey(wallet.id)).toBeNull();
 
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
-    expect(getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getCachedKey(wallet.id)).not.toBeNull();
   });
 
   it("lockWallet clears every cached signing key immediately", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-    expect(getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getCachedKey(wallet.id)).not.toBeNull();
 
     await handler.lockWallet();
 
-    expect(getCachedKey(wallet.id)).toBeNull();
+    expect(await getCachedKey(wallet.id)).toBeNull();
   });
 
   it("an elapsed auto-lock timeout clears the session and the cached key on the next getState", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-    expect(getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getCachedKey(wallet.id)).not.toBeNull();
 
     // Simulate a session whose "immediate" timeout has already elapsed —
     // the same shape unlockWallet would have written, but with an
@@ -475,7 +504,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     const state = await handler.getState();
 
     expect(state.session).toBeNull();
-    expect(getCachedKey(wallet.id)).toBeNull();
+    expect(await getCachedKey(wallet.id)).toBeNull();
   });
 
   it("a session within its auto-lock timeout stays unlocked and keeps its cached key", async () => {
@@ -491,7 +520,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     const state = await handler.getState();
 
     expect(state.session).not.toBeNull();
-    expect(getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getCachedKey(wallet.id)).not.toBeNull();
   });
 
   it("getState refreshes lastActivityAt, extending the session on activity", async () => {

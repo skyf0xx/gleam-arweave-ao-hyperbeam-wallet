@@ -189,7 +189,7 @@ async function loadSession(
   const raw = await storage.get<unknown>(SESSION_KEY);
   if (!isValidSession(raw)) return null;
   if (isSessionExpired(raw.lastActivityAt, raw.autoLockTimeout)) {
-    clearKeyCache();
+    await clearKeyCache();
     await saveSession(storage, null);
     return null;
   }
@@ -284,7 +284,7 @@ export class WalletLifecycleHandler {
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
     await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
-    cacheKey(wallet.id, jwk, address);
+    await cacheKey(wallet.id, jwk, address);
 
     return toSummary(wallet);
   }
@@ -331,7 +331,7 @@ export class WalletLifecycleHandler {
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
     await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
-    cacheKey(wallet.id, shapeCheck.jwk, address);
+    await cacheKey(wallet.id, shapeCheck.jwk, address);
 
     return toSummary(wallet);
   }
@@ -340,7 +340,7 @@ export class WalletLifecycleHandler {
     const wallets = await loadWallets(this.storage);
     const remaining = wallets.filter((wallet) => wallet.id !== req.walletId);
     await saveWallets(this.storage, remaining);
-    removeCachedKey(req.walletId);
+    await removeCachedKey(req.walletId);
 
     const activeWalletId = await loadActiveWalletId(this.storage, remaining);
     if (activeWalletId === null) {
@@ -396,7 +396,7 @@ export class WalletLifecycleHandler {
 
   /** Immediately clears unlocked-session state and every cached signing key, regardless of any auto-lock timeout. */
   async lockWallet(): Promise<void> {
-    clearKeyCache();
+    await clearKeyCache();
     await saveSession(this.storage, null);
   }
 
@@ -408,7 +408,7 @@ export class WalletLifecycleHandler {
    * `provider-bridge`'s layer (out of this layer's scope).
    */
   async resetAllWallets(): Promise<void> {
-    clearKeyCache();
+    await clearKeyCache();
     await saveWallets(this.storage, []);
     await this.storage.remove(ACTIVE_WALLET_ID_KEY);
     await saveSession(this.storage, null);
@@ -443,7 +443,7 @@ export class WalletLifecycleHandler {
         );
         try {
           const jwk = JSON.parse(new TextDecoder().decode(plaintext)) as JWKInterface;
-          cacheKey(wallet.id, jwk, wallet.address);
+          await cacheKey(wallet.id, jwk, wallet.address);
         } finally {
           zeroize(plaintext);
         }

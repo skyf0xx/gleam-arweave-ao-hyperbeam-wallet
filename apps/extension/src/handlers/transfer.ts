@@ -99,8 +99,8 @@ export class TransferHandler {
   }
 
   /** Reads a wallet's signing key from the unlocked-session cache. Throws if the wallet isn't currently unlocked. */
-  private signingKeyFor(walletId: string): { jwk: JWKInterface; address: string } {
-    const cached = getCachedKey(walletId);
+  private async signingKeyFor(walletId: string): Promise<{ jwk: JWKInterface; address: string }> {
+    const cached = await getCachedKey(walletId);
     if (!cached) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
@@ -156,7 +156,7 @@ export class TransferHandler {
    */
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
     const settings = await this.loadNetworkSettings();
-    const { jwk, address } = this.signingKeyFor(req.walletId);
+    const { jwk, address } = await this.signingKeyFor(req.walletId);
 
     let txId: string;
     if (req.token === null) {

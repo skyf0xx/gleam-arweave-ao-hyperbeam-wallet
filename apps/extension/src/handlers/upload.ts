@@ -81,7 +81,7 @@ export class UploadHandler {
       );
     }
 
-    const cached = getCachedKey(req.walletId);
+    const cached = await getCachedKey(req.walletId);
     if (!cached) {
       throw new Error(`Wallet "${req.walletId}" is locked. Unlock it to continue.`);
     }

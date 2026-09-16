@@ -1,30 +1,25 @@
 import type { AutoLockTimeout, JWKInterface } from "@gleam/core";
+import { storagePort } from "../adapters/storage";
 
 /**
- * In-memory, background-worker-local cache of decrypted signing key
- * material for currently-unlocked wallets. This is the piece
- * `wallet-lifecycle.ts` originally decided not to build (its doc comment's
- * "Session-state decision": a derived key isn't structured-cloneable into
- * `chrome.storage.session`, so it held no key material across calls at
- * all). That made every signing call require a freshly-typed password,
- * which is the thing this rework removes: once unlocked, Gleam stays
- * unlocked — no further password prompts — until `clear()` (explicit
- * "Lock now") or `isExpired()` (the user's chosen auto-lock timeout, same
- * shape as Rabby's) says otherwise. Lives here, not in `packages/core`,
- * because it's process-lifetime state tied to this one service-worker
- * instance, never serialized or ported anywhere.
+ * Background-worker-local cache of decrypted signing key material for
+ * currently-unlocked wallets, backed by the same memory-only,
+ * never-written-to-disk, cleared-on-browser-close storage area
+ * `wallet-lifecycle.ts`'s `Session.unlockedWalletIds` already uses (routed
+ * to `chrome.storage.session` by `adapters/storage.ts`'s `session:` prefix).
+ * A plain module-level `Map` here would not survive Chrome idle-evicting and
+ * restarting the MV3 service worker, which happens independently of the
+ * user's chosen auto-lock timeout; this storage area does survive that
+ * restart, so this cache and `Session.unlockedWalletIds` can never disagree
+ * about whether a wallet is unlocked. No plaintext key material is ever
+ * written to `local:`/disk-backed storage — only to this session area.
  *
- * A service-worker restart empties this map — nothing here survives that
- * (the JWK plaintext never touches storage). `Session.unlockedWalletIds`
- * (in `chrome.storage.session`) surviving a restart while this cache is
- * empty is exactly the "looks unlocked but has no key" gap the original
- * doc comment flagged; callers that find a wallet id missing from this
- * cache despite an unlocked `Session` should surface a "re-enter your
- * password" prompt rather than fail silently — the same experience a
- * killed-and-restarted MV3 worker forces on every wallet extension, not a
- * regression introduced here.
+ * Every entry is read fresh from storage on each call: there is no
+ * in-process cache layered on top, so a service-worker restart changes
+ * nothing about what a caller observes.
  */
-const keyCache = new Map<string, { jwk: JWKInterface; address: string }>();
+const KEY_PREFIX = "session:key:";
+const CACHED_WALLET_IDS_KEY = "session:cachedWalletIds";
 
 const AUTO_LOCK_TIMEOUT_MS: Record<AutoLockTimeout, number | null> = {
   never: null,
@@ -34,34 +29,52 @@ const AUTO_LOCK_TIMEOUT_MS: Record<AutoLockTimeout, number | null> = {
   "4hr": 4 * 60 * 60 * 1000,
 };
 
+interface CachedKey {
+  jwk: JWKInterface;
+  address: string;
+}
+
+async function trackWalletId(walletId: string): Promise<void> {
+  const ids = (await storagePort.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
+  if (!ids.includes(walletId)) {
+    await storagePort.set(CACHED_WALLET_IDS_KEY, [...ids, walletId]);
+  }
+}
+
+async function untrackWalletId(walletId: string): Promise<void> {
+  const ids = (await storagePort.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
+  await storagePort.set(
+    CACHED_WALLET_IDS_KEY,
+    ids.filter((id) => id !== walletId),
+  );
+}
+
 /** Stores a wallet's decrypted signing key for the duration of the unlocked session. */
-export function cacheKey(walletId: string, jwk: JWKInterface, address: string): void {
-  keyCache.set(walletId, { jwk, address });
+export async function cacheKey(walletId: string, jwk: JWKInterface, address: string): Promise<void> {
+  await storagePort.set(`${KEY_PREFIX}${walletId}`, { jwk, address } satisfies CachedKey);
+  await trackWalletId(walletId);
 }
 
 /** Returns a cached wallet's decrypted key, or `null` if it isn't (or is no longer) cached. */
-export function getCachedKey(walletId: string): { jwk: JWKInterface; address: string } | null {
-  return keyCache.get(walletId) ?? null;
+export async function getCachedKey(walletId: string): Promise<CachedKey | null> {
+  return storagePort.get<CachedKey>(`${KEY_PREFIX}${walletId}`);
 }
 
-export function hasCachedKey(walletId: string): boolean {
-  return keyCache.has(walletId);
+export async function hasCachedKey(walletId: string): Promise<boolean> {
+  return (await getCachedKey(walletId)) !== null;
 }
 
 /** Drops one wallet's cached key — e.g. `deleteWallet` removing a wallet that was cached. */
-export function removeCachedKey(walletId: string): void {
-  keyCache.delete(walletId);
+export async function removeCachedKey(walletId: string): Promise<void> {
+  await storagePort.remove(`${KEY_PREFIX}${walletId}`);
+  await untrackWalletId(walletId);
 }
 
-/**
- * Wipes every cached key. `JWKInterface`'s private-exponent field is a
- * string, not a byte buffer — unlike `decryptFromEnvelope`'s raw plaintext,
- * a JS string can't be overwritten in place, so this can only drop every
- * reference and let GC reclaim the memory, same as every password string
- * already held in component state elsewhere in this codebase.
- */
-export function clearKeyCache(): void {
-  keyCache.clear();
+/** Wipes every cached key — every tracked wallet's key, not the rest of session storage. */
+export async function clearKeyCache(): Promise<void> {
+  const ids = (await storagePort.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
+  await Promise.all(ids.map((id) => storagePort.remove(`${KEY_PREFIX}${id}`)));
+  await storagePort.remove(CACHED_WALLET_IDS_KEY);
 }
 
 /**
