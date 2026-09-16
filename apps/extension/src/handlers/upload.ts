@@ -1,4 +1,5 @@
-import { scanForSecrets, submitUploadToBundler, validateTagBytes } from "@gleam/core/src/policy/index.ts";
+import { scanForSecrets, validateTagBytes } from "@gleam/core/src/policy/index.ts";
+import { submitUploadToBundler } from "@gleam/core/src/arweave/index.ts";
 import { base64ToBytes, type StoragePort, type UploadDraft, type UploadReview } from "@gleam/core";
 import { getCachedKey } from "./key-session";
 
@@ -25,12 +26,7 @@ import { getCachedKey } from "./key-session";
  * this task's ALLOWED SCOPE.
  *
  * ANS-104 build/sign/submit logic itself lives in `@gleam/core/src/
- * policy/upload-submit.ts` — see that file's own doc comment for why a
- * `core/policy`-scoped file ended up housing arbundles-dependent logic
- * that isn't really "policy" shaped, a scope gap reported in this task's
- * final report rather than silently resolved by widening
- * `apps/extension/package.json` (which has no `@dha-team/arbundles`
- * dependency and is outside this layer's ALLOWED SCOPE to add one to).
+ * arweave/upload.ts`, alongside `transfer.ts`.
  */
 export interface SubmitUploadRequest extends UploadDraft {
   walletId: string;

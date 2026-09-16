@@ -3,21 +3,10 @@ import type { JWKInterface } from "../models/wallet";
 import type { UploadTag } from "../models/upload";
 
 /**
- * Scope note (reported per this task's packet): this file builds and
- * submits an ANS-104 `DataItem` via `@dha-team/arbundles`, which is
- * genuinely `core/arweave`-shaped work, not "policy" — but this task's
- * ALLOWED SCOPE only grants `packages/core/src/policy/**`, with no
- * `core/arweave/**`-style grant or new core submodule glob for it, and
- * `@dha-team/arbundles` (like `arweave-js` for `core/arweave/transfer.ts`)
- * only resolves from inside `packages/core` — `apps/extension` has no
- * dependency on it and `apps/extension/package.json` is outside this
- * layer's ALLOWED SCOPE to widen (the same "shared workspace config, no
- * layer owns it" class of gap `onboarding-unlock` hit with
- * `@webext-core/messaging`, per the Correction Protocol log). Housing it
- * here — the one core-scoped directory this task has — was the least-bad
- * option short of silently widening scope; a later pass should relocate
- * this to a proper `core/arweave/upload.ts` (mirroring `transfer.ts`)
- * once that scope exists. Flagged as debt.
+ * Builds and submits an ANS-104 `DataItem` via `@dha-team/arbundles`,
+ * relocated here from `core/policy/upload-submit.ts` (see
+ * upload-submit-relocation) to sit alongside `transfer.ts`, since this is
+ * genuinely `core/arweave`-shaped work rather than policy.
  *
  * Signing-capability boundary: mirrors `core/arweave/transfer.ts` and
  * `handlers/transfer.ts` exactly. This module never decrypts anything
