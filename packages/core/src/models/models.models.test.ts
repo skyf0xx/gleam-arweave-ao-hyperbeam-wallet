@@ -4,7 +4,7 @@ import type { Grant } from "./grant";
 import type { ActivityEntry } from "./activity";
 import type { ApprovalRequest } from "./approval";
 import type { Wallet } from "./wallet";
-import type { TransferDraft } from "./transfer";
+import type { AoTokenTransferRequest, AoTokenTransferResult, TransferDraft } from "./transfer";
 import type { ThemeSettings } from "./theme";
 import type { PortfolioHistory } from "./portfolio-history";
 
@@ -126,6 +126,21 @@ describe("domain model shapes", () => {
     expect(draft.fee).toBeNull();
   });
 
+  it("an AoTokenTransferRequest carries the token processId, recipient, and atomic-string amount", () => {
+    const request: AoTokenTransferRequest = {
+      token: "ao-process-id",
+      recipient: "abc",
+      amount: "1000",
+    };
+    expect(typeof request.amount).toBe("string");
+    expect(request.token).toBe("ao-process-id");
+  });
+
+  it("an AoTokenTransferResult carries the submitted message id under `id`, mirroring dispatch()'s response shape", () => {
+    const result: AoTokenTransferResult = { id: "message-id-1" };
+    expect(result.id).toBe("message-id-1");
+  });
+
   it("a ThemeSettings is exactly light or dark, never a system/auto value", () => {
     const light: ThemeSettings = { theme: "light" };
     const dark: ThemeSettings = { theme: "dark" };
@@ -158,6 +173,7 @@ describe("domain model shapes", () => {
         recipient: "abc",
         amount: "1000",
         fee: "10",
+        token: null,
         decodedData: null,
         tags: [],
         payloadHash: "deadbeef",
@@ -166,6 +182,29 @@ describe("domain model shapes", () => {
     expect(request.preview.kind).toBe("sign");
     if (request.preview.kind !== "connect") {
       expect(request.preview.payloadHash).toBe("deadbeef");
+    }
+  });
+
+  it("a transferAoTokens ApprovalRequest preview identifies the token being sent", () => {
+    const request: ApprovalRequest = {
+      requestId: "req-3",
+      kind: "transferAoTokens",
+      origin: "https://example.com",
+      createdAt: 0,
+      preview: {
+        kind: "transferAoTokens",
+        recipient: "abc",
+        amount: "1000",
+        fee: null,
+        token: "ao-process-id",
+        decodedData: null,
+        tags: [],
+        payloadHash: "deadbeef",
+      },
+    };
+    expect(request.preview.kind).toBe("transferAoTokens");
+    if (request.preview.kind !== "connect") {
+      expect(request.preview.token).toBe("ao-process-id");
     }
   });
 

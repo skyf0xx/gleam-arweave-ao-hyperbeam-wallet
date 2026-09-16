@@ -51,6 +51,7 @@ describe("method privilege tiers", () => {
         "verifyMessage",
         "signDataItem",
         "batchSignDataItem",
+        "transferAoTokens",
       ].sort(),
     );
   });

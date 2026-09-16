@@ -30,6 +30,40 @@ export interface TransferDraft {
   walletId?: string;
 }
 
+/**
+ * The `params` shape a dApp sends when calling `window.arweaveWallet`'s
+ * `transferAoTokens` provider-surface method (`messaging/page-protocol.ts`'s
+ * `PROVIDER_SURFACE_METHODS`). Mirrors `TransferDraft`'s AO-relevant fields
+ * exactly (`token` as the AO processId — never `null` here, since this
+ * method exists specifically for the AO path; an AR send has no
+ * provider-surface method of its own yet) so the later `provider-bridge`
+ * dispatcher can build a `TransferDraft` from this without re-deriving
+ * field names. `amount` is an atomic-integer string in the token's own
+ * smallest unit, matching `TransferDraft.amount`/`TokenBalance.quantity`.
+ *
+ * This layer only pins the request/response shape — resolving `walletId`
+ * from the connected Grant, routing through `ApprovalHandler`, and actually
+ * signing/submitting via `core/ao/transfer.ts`'s `submitTransfer` are all
+ * `provider-bridge` layer's job.
+ */
+export interface AoTokenTransferRequest {
+  /** The AO token's process id. */
+  token: string;
+  recipient: string;
+  amount: Winston;
+}
+
+/**
+ * What the dApp receives back once the transfer is approved and submitted.
+ * Mirrors `core/ao/transfer.ts`'s `SubmittedAoTransfer.messageId` under the
+ * name `id` for parity with ArConnect's own `dispatch()` response shape
+ * (`{ id, type }`), which existing dApp integrations already expect from a
+ * dispatch-shaped call.
+ */
+export interface AoTokenTransferResult {
+  id: string;
+}
+
 export interface FeeEstimate {
   /**
    * `null` for an AO token transfer — AO `Transfer` messages have no

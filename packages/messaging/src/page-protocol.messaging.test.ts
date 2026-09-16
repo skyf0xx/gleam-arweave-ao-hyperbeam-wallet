@@ -46,6 +46,26 @@ describe("PageMessageEnvelope", () => {
     expect(envelope.type).toBe(REQUEST);
   });
 
+  it("a transferAoTokens request envelope carries the AO transfer params, following the same envelope shape as every other provider method", () => {
+    const envelope: PageMessageEnvelope = {
+      type: REQUEST,
+      id: "11111111-1111-1111-1111-111111111111",
+      method: "transferAoTokens",
+      params: { token: "ao-process-id", recipient: "abc", amount: "1000" },
+    };
+    expect(envelope.type).toBe(REQUEST);
+    expect(envelope.method).toBe("transferAoTokens");
+  });
+
+  it("a transferAoTokens response envelope carries an id, mirroring dispatch()'s response shape", () => {
+    const success: PageMessageEnvelope = {
+      type: RESPONSE,
+      id: "11111111-1111-1111-1111-111111111111",
+      result: { id: "message-id-1" },
+    };
+    expect(success.type).toBe(RESPONSE);
+  });
+
   it("a response envelope matches by id and carries either a result or an error", () => {
     const success: PageMessageEnvelope = {
       type: RESPONSE,

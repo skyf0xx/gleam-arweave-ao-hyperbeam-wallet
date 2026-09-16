@@ -10,7 +10,12 @@ export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
 export type { ActivityEntry, ActivityType, ActivityStatus, ActivityPage } from "./activity";
 export type { Winston, Balance, TokenBalance } from "./balance";
-export type { TransferDraft, FeeEstimate } from "./transfer";
+export type {
+  TransferDraft,
+  FeeEstimate,
+  AoTokenTransferRequest,
+  AoTokenTransferResult,
+} from "./transfer";
 export type { UploadTag, UploadDraft, UploadReview } from "./upload";
 export type {
   ApprovalKind,
