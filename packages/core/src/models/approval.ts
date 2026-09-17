@@ -8,7 +8,10 @@ export type ApprovalKind =
   | "batchSignDataItem"
   | "encrypt"
   | "decrypt"
-  | "transferAoTokens";
+  | "transferAoTokens"
+  | "signature"
+  | "signMessage"
+  | "privateHash";
 
 export interface ConnectApprovalPreview {
   kind: "connect";
@@ -39,7 +42,10 @@ export interface SigningApprovalPreview {
     | "batchSignDataItem"
     | "encrypt"
     | "decrypt"
-    | "transferAoTokens";
+    | "transferAoTokens"
+    | "signature"
+    | "signMessage"
+    | "privateHash";
   recipient: string | null;
   amount: string | null;
   fee: string | null;

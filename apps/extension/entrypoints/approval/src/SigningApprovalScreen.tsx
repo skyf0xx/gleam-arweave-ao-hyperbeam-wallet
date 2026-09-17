@@ -33,6 +33,9 @@ const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
   encrypt: "Encrypt data",
   decrypt: "Decrypt data",
   transferAoTokens: "Send",
+  signature: "Sign data",
+  signMessage: "Sign message",
+  privateHash: "Generate hash",
 };
 
 /**

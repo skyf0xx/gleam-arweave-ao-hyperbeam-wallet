@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import type { StoragePort, WindowPort } from "@gleam/core";
+import { generateJWK, type StoragePort, type WindowPort } from "@gleam/core";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 
@@ -358,7 +358,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await expect(pending).rejects.toThrow(/locked/i);
   });
 
-  it("signing with a cached key reaches performSigning (not-implemented, not a locked-wallet error)", async () => {
+  it("signing with a cached key but no gatewayUrl fails with a named gateway error (not a locked-wallet error)", async () => {
     await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
 
     const pending = handler.requestApproval({
@@ -372,10 +372,35 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
 
     await handler.resolveApproval({ requestId, approved: true });
 
-    // A real signature isn't implemented yet (see performSigning's doc
-    // comment) — this proves the cached key was found (no "locked" error)
-    // and the flow reached the honest not-implemented failure instead.
-    await expect(pending).rejects.toThrow(/not implemented/i);
+    // Proves the cached key was found (no "locked" error) and the flow
+    // reached real signing logic, which then fails honestly because this
+    // request carries no gatewayUrl (the dispatcher always supplies one
+    // via ReadsHandler.getNetworkSettings() in the real extension).
+    await expect(pending).rejects.toThrow(/gateway url/i);
+  });
+
+  it("signMessage with a cached key produces a real signature", async () => {
+    const jwk = await generateJWK();
+    await cacheKey(WALLET_ID, jwk, "abc-address");
+
+    const pending = handler.requestApproval({
+      kind: "signMessage",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      payload: new TextEncoder().encode("hello"),
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    await handler.resolveApproval({ requestId, approved: true });
+
+    const result = (await pending) as { signature: ArrayBuffer };
+    // Duck-typed rather than `toBeInstanceOf(ArrayBuffer)`: this test
+    // environment's ArrayBuffer global can differ in realm/identity from
+    // the one the vault crypto executed against, the same cross-realm
+    // gotcha `core/vault/zeroize.ts`'s own doc comment documents.
+    expect(typeof result.signature.byteLength).toBe("number");
+    expect(result.signature.byteLength).toBeGreaterThan(0);
   });
 });
 

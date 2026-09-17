@@ -1,7 +1,7 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
-import { PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
+import { PERMISSION_TYPES, PROVIDER_METHODS, verifyMessage, type PermissionType } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
@@ -19,7 +19,7 @@ import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/rea
 import { handleServiceWorkerSuspend } from "@/src/handlers/key-session";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
-import { ApprovalHandler, decodeBase64Payload } from "@/src/handlers/approval";
+import { ApprovalHandler, decodeBase64Payload, type SigningRequestInput } from "@/src/handlers/approval";
 
 /**
  * The background service-worker entrypoint (this task's debt #1, and the
@@ -235,37 +235,99 @@ async function handleProviderCall(
       return { ar: await reads.getBalance({ address: wallet.address }) };
 
     case "sign":
-    case "dispatch":
-    case "signDataItem":
-    case "batchSignDataItem": {
+    case "dispatch": {
       const signingParams = params as {
-        recipient?: string | null;
-        amount?: string | null;
+        target?: string;
+        quantity?: string;
+        reward?: string;
+        last_tx?: string;
         data?: string;
         tags?: Array<{ name: string; value: string }>;
+      };
+      const payload = signingParams.data ? decodeBase64Payload(signingParams.data) : new Uint8Array();
+      const { gatewayUrl } = await reads.getNetworkSettings();
+      return approval.requestApproval({
+        kind: method,
+        origin,
+        walletId: grant.walletId,
+        recipient: signingParams.target ?? null,
+        amount: signingParams.quantity ?? null,
+        fee: null,
+        payload,
+        tags: signingParams.tags ?? [],
+        gatewayUrl,
+        target: signingParams.target,
+        quantity: signingParams.quantity,
+        reward: signingParams.reward,
+        last_tx: signingParams.last_tx,
+      });
+    }
+
+    case "signDataItem": {
+      const signingParams = params as {
+        data?: string;
+        tags?: Array<{ name: string; value: string }>;
+        target?: string;
+        anchor?: string;
       };
       const payload = signingParams.data ? decodeBase64Payload(signingParams.data) : new Uint8Array();
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: grant.walletId,
-        recipient: signingParams.recipient ?? null,
-        amount: signingParams.amount ?? null,
-        fee: null,
         payload,
         tags: signingParams.tags ?? [],
+        dataItems: [
+          {
+            data: signingParams.data ?? "",
+            tags: signingParams.tags,
+            target: signingParams.target,
+            anchor: signingParams.anchor,
+          },
+        ],
+        target: signingParams.target,
+        anchor: signingParams.anchor,
       });
     }
 
-    case "encrypt":
-    case "decrypt": {
-      const cryptoParams = params as { data?: string };
-      const payload = cryptoParams.data ? decodeBase64Payload(cryptoParams.data) : new Uint8Array();
+    case "batchSignDataItem": {
+      const signingParams = params as {
+        dataItems?: Array<{
+          data?: string;
+          tags?: Array<{ name: string; value: string }>;
+          target?: string;
+          anchor?: string;
+        }>;
+      };
+      const dataItems = (signingParams.dataItems ?? []).map((item) => ({
+        data: item.data ?? "",
+        tags: item.tags,
+        target: item.target,
+        anchor: item.anchor,
+      }));
+      const payload = dataItems[0]?.data ? decodeBase64Payload(dataItems[0].data) : new Uint8Array();
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: grant.walletId,
         payload,
+        dataItems,
+      });
+    }
+
+    case "encrypt":
+    case "decrypt": {
+      const cryptoParams = params as { data?: string; algorithm?: unknown };
+      const payload = cryptoParams.data ? decodeBase64Payload(cryptoParams.data) : new Uint8Array();
+      if (!cryptoParams.algorithm || typeof cryptoParams.algorithm !== "object") {
+        throw new Error(`${method} requires an algorithm.`);
+      }
+      return approval.requestApproval({
+        kind: method,
+        origin,
+        walletId: grant.walletId,
+        payload,
+        encryptAlgorithm: cryptoParams.algorithm as SigningRequestInput["encryptAlgorithm"],
       });
     }
 
@@ -289,16 +351,57 @@ async function handleProviderCall(
 
     case "signature":
     case "signMessage":
-    case "privateHash":
-    case "verifyMessage":
-      // `ApprovalKind` (`core/models/approval.ts`, locked outside this
-      // task's ALLOWED SCOPE) has no case for these four
-      // `PROVIDER_SURFACE_METHODS` — only `sign`/`dispatch`/
-      // `signDataItem`/`batchSignDataItem`/`encrypt`/`decrypt` are
-      // representable as an approval preview today. Named, honest
-      // failure rather than force-fitting one of those kinds onto a
-      // request it doesn't describe. See this task's final report.
-      throw new Error(`Provider method "${method}" is not implemented yet.`);
+    case "privateHash": {
+      const messageParams = params as { data?: string; options?: { hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512" } };
+      const payload = messageParams.data ? decodeBase64Payload(messageParams.data) : new Uint8Array();
+      return approval.requestApproval({
+        kind: method,
+        origin,
+        walletId: grant.walletId,
+        payload,
+        hashAlgorithm: messageParams.options?.hashAlgorithm,
+      });
+    }
+
+    case "verifyMessage": {
+      // Pure verification against a caller-supplied public key — no
+      // wallet key material is used, so this needs no approval window,
+      // matching `tokenBalance`/`userTokens`'s read-only precedent.
+      const verifyParams = params as {
+        publicKey?: string;
+        data?: string;
+        signature?: string;
+        options?: { hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512" };
+      };
+      if (!verifyParams.publicKey || !verifyParams.data || !verifyParams.signature) {
+        throw new Error("verifyMessage requires publicKey, data, and signature.");
+      }
+      const dataBytes = decodeBase64Payload(verifyParams.data);
+      const signatureBytes = decodeBase64Payload(verifyParams.signature);
+      const valid = await verifyMessage(
+        verifyParams.publicKey,
+        dataBytes.buffer.slice(dataBytes.byteOffset, dataBytes.byteOffset + dataBytes.byteLength) as ArrayBuffer,
+        signatureBytes.buffer.slice(
+          signatureBytes.byteOffset,
+          signatureBytes.byteOffset + signatureBytes.byteLength,
+        ) as ArrayBuffer,
+        verifyParams.options?.hashAlgorithm,
+      );
+      return { valid };
+    }
+
+    case "tokenBalance": {
+      if (!wallet) throw new Error("No active wallet to read a token balance for.");
+      const tokenParams = params as { id?: string };
+      if (!tokenParams.id) throw new Error("tokenBalance requires an id.");
+      return reads.tokenBalance({ address: wallet.address, id: tokenParams.id });
+    }
+
+    case "userTokens": {
+      if (!wallet) throw new Error("No active wallet to read tokens for.");
+      const tokenParams = params as { options?: { cursor?: string; limit?: number } };
+      return reads.userTokens({ address: wallet.address, options: tokenParams.options });
+    }
 
     default:
       // Not a `never`-exhaustive check: `ProviderSurfaceMethod` (messaging

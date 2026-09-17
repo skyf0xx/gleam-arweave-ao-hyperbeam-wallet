@@ -1,12 +1,25 @@
 import {
   base64ToBytes,
+  bytesToBase64,
+  batchSignDataItem,
+  decrypt,
+  dispatchTransaction,
+  encrypt,
+  privateHash as vaultPrivateHash,
+  signDataItem,
+  signMessage as vaultSignMessage,
+  signTransaction,
+  signature as vaultSignature,
   PERMISSION_TYPES,
   type ApprovalKind,
   type ApprovalPreview,
   type ApprovalRequest,
   type ConnectApprovalPreview,
+  type DataItemInput,
+  type EncryptAlgorithm,
   type Grant,
   type PermissionType,
+  type SignTransactionInput,
   type SigningApprovalPreview,
   type StoragePort,
   type WindowPort,
@@ -114,6 +127,26 @@ export interface SigningRequestInput {
   tags?: Array<{ name: string; value: string }>;
   /** `true` when the review screen must escalate to Irreversible-tier framing. */
   firstSeenOrHighRisk?: boolean;
+  /**
+   * Gateway URL `sign`/`dispatch` need to construct an arweave-js client
+   * (for `last_tx`/reward defaults and, for `dispatch`, posting a `BASE`
+   * transaction) — resolved by the dispatcher from `ReadsHandler.
+   * getNetworkSettings()` at call time, since `ApprovalHandler` itself has
+   * no network-settings storage access of its own.
+   */
+  gatewayUrl?: string;
+  /** `sign`/`dispatch`'s transaction-shaped fields beyond `payload`/`tags` — `target`/`quantity`/`reward`/`last_tx`. */
+  target?: string;
+  quantity?: string;
+  reward?: string;
+  last_tx?: string;
+  /** `signDataItem`/`batchSignDataItem`'s per-item inputs — `payload` above carries only the first item's data for preview/hash purposes when this is set. */
+  dataItems?: DataItemInput[];
+  anchor?: string;
+  /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
+  encryptAlgorithm?: EncryptAlgorithm;
+  /** `signMessage`/`signature`/`privateHash`'s hash digest selection. */
+  hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512";
 }
 
 /**
@@ -165,6 +198,10 @@ interface PendingApprovalRecord {
   signingInput: SigningRequestInput | null;
   /** Set by `resolveApproval` immediately before the record is removed. */
   outcome?: ApprovalOutcome;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 function decodeDataPreview(payload: Uint8Array): string | null {
@@ -400,36 +437,15 @@ export class ApprovalHandler {
   }
 
   /**
-   * Reads the already-unlocked signing key and reports the fully-decoded
-   * intent that was already approved (recipient/amount/payload hash/tags
-   * — everything `buildSigningPreview` computed, which is exactly what
-   * the approval screen showed the user before they signed). This proves
-   * the vault/session/approval plumbing end-to-end. Throws if the wallet
-   * isn't currently unlocked (`key-session.ts` has no cached key for it)
-   * — a signing approval can no longer collect its own password, so an
-   * approval on a locked wallet fails here rather than prompting.
-   *
-   * Scope gap (reported per this task's packet rather than silently
-   * worked around): actually producing a valid ANS-104 signature
-   * (`sign`/`dispatch`/`signDataItem`/`batchSignDataItem`) needs
-   * `@dha-team/arbundles`, and `signature`/`encrypt`/`decrypt` need
-   * `arweave-js`'s `crypto` driver — both already `packages/core`
-   * dependencies (`handlers/upload.ts` already uses the former via
-   * `core/policy/upload-submit.ts`), but neither is resolvable from
-   * `apps/extension` (`apps/extension/package.json` declares neither, and
-   * is outside this task's ALLOWED SCOPE to widen — the same "shared
-   * workspace config, no layer owns it" class of gap `onboarding-unlock`
-   * hit with `@webext-core/messaging`, and `upload`'s own task hit with
-   * this identical pair of packages, per its own debt note on
-   * `core/policy/upload-submit.ts`). Building the actual signature
-   * requires either (a) a `chore(workspace)` commit adding
-   * `arweave`/`@dha-team/arbundles` to `apps/extension/package.json`, or
-   * (b) a new `core/signing/**`-shaped scope grant so this logic can live
-   * in `packages/core` instead and be called through `@gleam/core`'s
-   * barrel, mirroring `submitUploadToBundler`. Per this task's HONESTY
-   * requirement, this throws a specific, named "not implemented" error
-   * rather than fabricating a signature or silently returning the
-   * plaintext as if it were signed.
+   * Reads the already-unlocked signing key and performs the real
+   * cryptographic operation the approved preview described — everything
+   * `buildSigningPreview` computed (recipient/amount/payload hash/tags)
+   * is display-only; the actual operation is re-derived here from
+   * `signingInput`'s typed fields, never from the decoded preview.
+   * Throws if the wallet isn't currently unlocked (`key-session.ts` has
+   * no cached key for it) — a signing approval can no longer collect its
+   * own password, so an approval on a locked wallet fails here rather
+   * than prompting.
    */
   private async performSigning(entry: PendingApprovalRecord): Promise<unknown> {
     const input = entry.signingInput;
@@ -437,19 +453,103 @@ export class ApprovalHandler {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
 
-    if (!(await getCachedKey(entry.walletId))) {
+    const cached = await getCachedKey(entry.walletId);
+    if (!cached) {
       throw new Error(`Wallet "${entry.walletId}" is locked. Unlock it to continue.`);
     }
+    const { jwk } = cached;
 
     if (input.kind === "transferAoTokens") {
       return this.performAoTransfer(entry.walletId, input);
     }
 
-    throw new Error(
-      `Signing kind "${input.kind}" is not implemented yet — this build verifies the unlocked-session ` +
-        "and approval flow, but producing a real signature needs arweave-js/@dha-team/arbundles wired " +
-        "into apps/extension, which is outside this task's ALLOWED SCOPE. See this task's final report.",
-    );
+    const transaction: SignTransactionInput = {
+      data: bytesToBase64(input.payload),
+      target: input.target,
+      quantity: input.quantity,
+      tags: input.tags,
+      reward: input.reward,
+      last_tx: input.last_tx,
+    };
+
+    switch (input.kind) {
+      case "sign": {
+        const signed = await signTransaction(this.requireGatewayUrl(input), jwk, transaction);
+        return { signedTransaction: signed };
+      }
+
+      case "dispatch": {
+        return dispatchTransaction(this.requireGatewayUrl(input), jwk, transaction);
+      }
+
+      case "signDataItem": {
+        const dataItem = input.dataItems?.[0] ?? {
+          data: bytesToBase64(input.payload),
+          tags: input.tags,
+          target: input.target,
+          anchor: input.anchor,
+        };
+        const signedDataItem = await signDataItem(jwk, dataItem);
+        return { signedDataItem };
+      }
+
+      case "batchSignDataItem": {
+        const dataItems = input.dataItems ?? [];
+        const signedDataItems = await batchSignDataItem(jwk, dataItems);
+        return { signedDataItems };
+      }
+
+      case "encrypt": {
+        if (!input.encryptAlgorithm) {
+          throw new Error("encrypt requires an algorithm.");
+        }
+        const ciphertext = await encrypt(
+          jwk,
+          input.payload as Uint8Array<ArrayBuffer>,
+          input.encryptAlgorithm,
+        );
+        return { data: bytesToBase64(ciphertext) };
+      }
+
+      case "decrypt": {
+        if (!input.encryptAlgorithm) {
+          throw new Error("decrypt requires an algorithm.");
+        }
+        const plaintext = await decrypt(
+          jwk,
+          input.payload as Uint8Array<ArrayBuffer>,
+          input.encryptAlgorithm,
+        );
+        return { data: bytesToBase64(plaintext) };
+      }
+
+      case "signature": {
+        const signature = await vaultSignature(jwk, toArrayBuffer(input.payload));
+        return { signature: bytesToBase64(new Uint8Array(signature)) };
+      }
+
+      case "signMessage": {
+        const signature = await vaultSignMessage(jwk, toArrayBuffer(input.payload), input.hashAlgorithm);
+        return { signature };
+      }
+
+      case "privateHash": {
+        const hash = await vaultPrivateHash(jwk, toArrayBuffer(input.payload), input.hashAlgorithm);
+        return { hash };
+      }
+
+      default: {
+        const exhaustiveCheck: never = input.kind;
+        throw new Error(`Unhandled signing kind "${String(exhaustiveCheck)}".`);
+      }
+    }
+  }
+
+  private requireGatewayUrl(input: SigningRequestInput): string {
+    if (!input.gatewayUrl) {
+      throw new Error(`"${input.kind}" requires a gateway URL to construct the transaction.`);
+    }
+    return input.gatewayUrl;
   }
 
   /**
