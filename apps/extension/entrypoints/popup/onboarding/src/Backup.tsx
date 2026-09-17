@@ -40,7 +40,7 @@ export function Backup({ onBack, keyfileContents, onDownload, onCopy, onContinue
                 Your wallet is ready
               </h1>
               <p className="text-body leading-relaxed text-muted">
-                No seed phrase to write down &mdash; back up your keyfile instead, whenever you
+                No seed phrase to write down. Back up your keyfile instead, whenever you
                 want.
               </p>
             </div>

@@ -71,8 +71,8 @@ export function CreatePassword({
         <div className="flex flex-col gap-1.5">
           <h1 className="text-h3 font-semibold tracking-tight text-foreground">Set a password</h1>
           <p className="text-body leading-relaxed text-muted">
-            This password encrypts your wallet on this device. We can&apos;t reset it for you
-            &mdash; if you lose it, you&apos;ll need your backup instead.
+            This password encrypts your wallet on this device. We can&apos;t reset it for you. 
+            If you lose it, you&apos;ll need your backup instead.
           </p>
         </div>
 

@@ -37,7 +37,7 @@ export function ForgotPassword({
       <h2 className="text-body font-semibold text-foreground">Forgot password?</h2>
       <p className="text-body leading-relaxed text-muted">
         Gleam doesn&apos;t store your password and can&apos;t recover it. Resetting removes every
-        wallet stored in this browser &mdash; you&apos;ll need each wallet&apos;s backup keyfile
+        wallet stored in this browser. You&apos;ll need each wallet&apos;s backup keyfile
         to bring it back.
       </p>
 
