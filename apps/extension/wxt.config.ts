@@ -10,8 +10,10 @@ export default defineConfig({
     // 'tabs' lets the background worker resolve tab.url/origin for
     // provider-event delivery (background/index.ts's findTabsForOrigin)
     // without needing a granted host_permission per origin — MV3's
-    // tab-info privacy gate accepts either.
-    permissions: ['storage', 'sidePanel', 'tabs'],
+    // tab-info privacy gate accepts either. 'alarms' backs the
+    // background interval check that promotes pending activity entries
+    // to confirmed once the gateway indexes them.
+    permissions: ['storage', 'sidePanel', 'tabs', 'alarms'],
     // MV3 requires an explicit host permission for every origin the
     // background service worker fetches. The hosts fetched
     // unconditionally (Arweave gateway, the up.arweave.net bundler used
