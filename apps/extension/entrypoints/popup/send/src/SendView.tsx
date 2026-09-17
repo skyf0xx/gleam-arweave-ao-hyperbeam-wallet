@@ -512,7 +512,7 @@ function ReviewStep({
         {irreversible ? (
           <RiskNotice>
             <strong className="font-bold">You haven&apos;t sent to this address before.</strong> Double-check
-            it&apos;s correct — this can&apos;t be undone once signed.
+            it&apos;s correct. This can&apos;t be undone once signed.
           </RiskNotice>
         ) : (
           <p className="text-label leading-relaxed text-muted">
