@@ -1,0 +1,52 @@
+{
+  "id": "ao-activity-feed",
+  "goal": "Close three confirmed activity-feed gaps: no AO transfer history source (feed only covers AR transactions), no gateway failover (single AR gateway with no fallback), no failed-AO-transfer detection, and no background polling to promote a pending entry to confirmed once the gateway indexes it.",
+  "outcome": "packages/core/src/arweave/graphql.ts gains a second GraphQL query filtered by AO-convention tags ({name: \"action\", values: [\"transfer\"]} + {name: \"recipient\", values: [address]}) against the same /graphql endpoint -- no separate indexer -- parsed into ActivityEntry and merged via the existing mergeActivity, with quantity's denomination resolved through ao-balance-token-metadata's lookup (quantity is a plain integer string, not {winston}). graphql.ts also gains gateway failover: an ordered list of gateways queried in order, falling through on failure. merge.ts gains failed-AO-transfer detection via Data-Protocol: ao tag matching, rendering failures distinctly rather than as gaps. A chrome.alarms-based (or equivalent interval) background check in reads.ts actively promotes a locally-pending entry to confirmed once the gateway indexes it, rather than only on the next getActivity() call.",
+  "priority": 58,
+  "requirements": [
+    {
+      "id": "AO-ACTIVITY-FEED-RULE-1",
+      "kind": "rule",
+      "statement": "AO transfer history is read via the same gateway /graphql endpoint as the AR path, filtered by action/recipient tags -- no separate indexer or new external dependency is introduced."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-RULE-2",
+      "kind": "rule",
+      "statement": "AO transfer quantity is denominated using ao-balance-token-metadata's resolved denomination -- it is parsed as a plain integer string, never assumed to be a {winston}-shaped AR value."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-RULE-3",
+      "kind": "rule",
+      "statement": "Gateway failover queries an ordered list of gateways and falls through to the next on failure -- it does not change the existing single-gateway configuration surface for the happy path."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-RULE-4",
+      "kind": "rule",
+      "statement": "The background pending-to-confirmed promotion check runs on an interval (chrome.alarms or equivalent) independent of any popup being open, and reuses the existing mergeActivity promotion logic rather than duplicating it."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "A real AO transfer (e.g. against the verified arweave.net/graphql result carrying action/recipient/quantity tags) appears in the merged activity feed with correct token identity and denomination."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "A failed AO transfer (Data-Protocol: ao tag present, transfer did not succeed) renders as a distinct failed state in the feed rather than as a missing entry."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "A pending local entry is promoted to confirmed by the background interval check within one polling cycle of the gateway indexing it, without requiring the user to reopen or refresh the activity view."
+    },
+    {
+      "id": "AO-ACTIVITY-FEED-ACCEPTANCE-4",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run arweave ao pricing activity send receive passes; pnpm tsc -p packages/core --noEmit passes; pnpm wxt build succeeds."
+    }
+  ],
+  "depends_on": [
+    "ao-balance-token-metadata",
+    "provider-signing-crypto"
+  ]
+}

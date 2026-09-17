@@ -1,0 +1,39 @@
+{
+  "id": "signing-key-zeroization",
+  "goal": "Fix a real, shipped-code security gap: decrypted JWKs cached in chrome.storage.session (apps/extension/src/handlers/key-session.ts) to survive service-worker restarts are never zeroized before removal, so plaintext private-key material can persist in memory/storage after an explicit lock, an auto-lock timeout, or service-worker suspension.",
+  "outcome": "clearKeyCache() and the auto-lock-timeout path both zeroize a cached JWK's string fields (overwrite before removal from chrome.storage.session) rather than merely deleting the storage entry, matching the zeroize() discipline already used elsewhere in this codebase (e.g. envelope.ts). An onSuspend handler is added so a service-worker suspension while wallets are unlocked also zeroizes and clears the session store, closing the no-cleanup-on-suspend gap. No backward-compatible fallback: the old delete-without-zeroizing behavior is replaced outright, not kept alongside a flag.",
+  "priority": 70,
+  "requirements": [
+    {
+      "id": "SIGNING-KEY-ZEROIZATION-RULE-1",
+      "kind": "rule",
+      "statement": "Every code path that removes a cached key from chrome.storage.session (clearKeyCache, auto-lock timeout, removeCachedKey, deleteWallet) zeroizes the JWK's string fields (overwrite with zeros, e.g. via the same zeroize() helper envelope.ts already uses, adapted for string content) before the storage entry is removed. No path is left calling storage removal alone."
+    },
+    {
+      "id": "SIGNING-KEY-ZEROIZATION-RULE-2",
+      "kind": "rule",
+      "statement": "An onSuspend (or equivalent MV3 service-worker teardown) handler is registered that zeroizes and clears all cached keys in chrome.storage.session -- the untenanted case the current code has no cleanup for at all."
+    },
+    {
+      "id": "SIGNING-KEY-ZEROIZATION-RULE-3",
+      "kind": "rule",
+      "statement": "No shim, feature flag, or compatibility path preserves the old zeroize-free removal behavior -- it is replaced outright in key-session.ts and every caller (wallet-lifecycle.ts, transfer.ts, upload.ts, approval.ts)."
+    },
+    {
+      "id": "SIGNING-KEY-ZEROIZATION-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "A test simulating clearKeyCache() and the auto-lock-expiry path confirms the JWK's private fields are overwritten (not merely absent from storage) before the storage entry is removed."
+    },
+    {
+      "id": "SIGNING-KEY-ZEROIZATION-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "A test simulating service-worker suspension while a wallet is unlocked confirms the onSuspend handler zeroizes and clears the cached key."
+    },
+    {
+      "id": "SIGNING-KEY-ZEROIZATION-ACCEPTANCE-3",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run key-session onboarding-unlock send upload approval passes; pnpm tsc -p packages/core --noEmit passes; pnpm wxt build succeeds."
+    }
+  ],
+  "depends_on": []
+}

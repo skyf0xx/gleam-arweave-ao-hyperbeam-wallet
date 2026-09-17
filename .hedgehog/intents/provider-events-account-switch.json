@@ -1,0 +1,29 @@
+{
+  "id": "provider-events-account-switch",
+  "goal": "Close two confirmed dApp-facing gaps: postProviderEvent (defined in apps/extension/entrypoints/content/index.ts, never called) never actually notifies a connected page of connect/disconnect/active-wallet-change events, and switchWallet(walletId) is only callable from trusted extension UI with no provider method or event exposing an active-account change to a connected dApp.",
+  "outcome": "postProviderEvent is called on connect, disconnect, and active-wallet change, reaching the page-side handleEvent() listener in apps/extension/entrypoints/provider/index.ts that already exists idle. Connected dApps receive a walletSwitch-equivalent event when the active account changes underneath them, matching the arweaveWalletLoaded/walletSwitch convention Wander's docs establish. No new password-based or trust-bypassing surface is added -- this only wires already-defined plumbing (postProviderEvent, handleEvent) and adds the missing event-emission call sites.",
+  "priority": 66,
+  "requirements": [
+    {
+      "id": "PROVIDER-EVENTS-ACCOUNT-SWITCH-RULE-1",
+      "kind": "rule",
+      "statement": "postProviderEvent is called from the existing connect, disconnect, and switchWallet code paths in wallet-lifecycle.ts / background dispatch -- it is not reimplemented, only invoked at the correct call sites."
+    },
+    {
+      "id": "PROVIDER-EVENTS-ACCOUNT-SWITCH-RULE-2",
+      "kind": "rule",
+      "statement": "Only a connected dApp (one holding an active Grant for the current origin) receives these events -- an origin with no connection approval never receives account or connection state changes, preserving the existing connection-approval boundary."
+    },
+    {
+      "id": "PROVIDER-EVENTS-ACCOUNT-SWITCH-ACCEPTANCE-1",
+      "kind": "acceptance",
+      "statement": "A connected page's handleEvent() listener receives a connect event on approval, a disconnect event on disconnection, and a walletSwitch-equivalent event when switchWallet changes the active wallet."
+    },
+    {
+      "id": "PROVIDER-EVENTS-ACCOUNT-SWITCH-ACCEPTANCE-2",
+      "kind": "acceptance",
+      "statement": "pnpm vitest run provider bridge approval connected-apps content/index background/index passes; pnpm tsc -p packages/messaging --noEmit and pnpm tsc -p packages/core --noEmit pass; pnpm wxt build succeeds."
+    }
+  ],
+  "depends_on": []
+}
