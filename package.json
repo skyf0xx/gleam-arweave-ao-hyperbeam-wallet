@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "prepare": "lefthook install",
-    "wxt": "pnpm --filter @gleam/extension exec wxt",
+    "dev": "pnpm --filter @gleam/extension exec wxt",
     "wxt:build": "pnpm --filter @gleam/extension exec wxt build",
     "eslint": "eslint",
     "vitest": "vitest",
