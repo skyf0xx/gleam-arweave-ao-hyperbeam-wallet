@@ -1,8 +1,17 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
+import { browser } from "wxt/browser";
 import { PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
-import { PROVIDER_SURFACE_METHODS, type ProviderSurfaceMethod } from "@gleam/messaging/src/page-protocol.ts";
+import {
+  PROVIDER_EVENT,
+  PROVIDER_SURFACE_METHODS,
+  type ConnectEventPayload,
+  type DisconnectEventPayload,
+  type ProviderEventName,
+  type ProviderSurfaceMethod,
+  type WalletSwitchEventPayload,
+} from "@gleam/messaging/src/page-protocol.ts";
 import { WxtStoragePort } from "@/src/adapters/storage";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
@@ -58,6 +67,79 @@ const upload = new UploadHandler(storage);
 const approval = new ApprovalHandler(storage, windows, transfer);
 
 /**
+ * Finds every open tab whose URL origin matches `origin` exactly — the
+ * only way this task's access-control rule ("only a connected dApp...
+ * receives these events") can be enforced for a *push*, since nothing
+ * about `providerEvent`'s wire shape itself carries an origin check (see
+ * `protocol.ts`'s doc comment on that method). `browser.tabs.query`'s own
+ * `url` match pattern can't express "exact origin, any path" directly, so
+ * this filters candidate tabs (queried broadly by scheme) down to an exact
+ * `new URL(tab.url).origin === origin` match by hand.
+ */
+async function findTabsForOrigin(origin: string): Promise<number[]> {
+  const tabs = await browser.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  const ids: number[] = [];
+  for (const tab of tabs) {
+    if (typeof tab.id !== "number" || !tab.url) continue;
+    try {
+      if (new URL(tab.url).origin === origin) ids.push(tab.id);
+    } catch {
+      // Not a parseable URL — never a candidate.
+    }
+  }
+  return ids;
+}
+
+/**
+ * Sends a `providerEvent` push to every tab currently showing `origin` —
+ * never a broadcast to every open tab. Each `sendMessage` targets one
+ * `tabId` at a time (`@webext-core/messaging`'s targeted-send overload);
+ * a tab with no content script listening (e.g. mid-navigation) simply
+ * rejects that one send, which is swallowed here rather than failing the
+ * caller — a missed push is not itself an error the connect/disconnect/
+ * switchWallet flow should surface.
+ */
+async function emitProviderEventToOrigin<TName extends ProviderEventName>(
+  origin: string,
+  event: TName,
+  data: TName extends typeof PROVIDER_EVENT.CONNECT
+    ? ConnectEventPayload
+    : TName extends typeof PROVIDER_EVENT.DISCONNECT
+      ? DisconnectEventPayload
+      : WalletSwitchEventPayload,
+): Promise<void> {
+  const tabIds = await findTabsForOrigin(origin);
+  await Promise.all(
+    tabIds.map((tabId) =>
+      messenger.sendMessage("providerEvent", { event, data }, tabId).catch(() => undefined),
+    ),
+  );
+}
+
+/**
+ * `walletSwitch` broadcast for an active-account change: unlike
+ * connect/disconnect (inherently one-origin actions), a wallet switch
+ * affects the whole extension, so every origin currently holding an
+ * active `Grant` gets the push — never every open tab, per this task's
+ * access-control rule. Origins with no Grant, or an expired one
+ * (`findActiveGrant`'s own expiry check applies per-origin via
+ * `getConnectedApps`, which is unfiltered by expiry — filtered here by
+ * re-checking `findActiveGrant` per origin so an expired Grant is
+ * silently excluded rather than pushed to).
+ */
+async function broadcastWalletSwitch(address: string): Promise<void> {
+  const grants = await approval.getConnectedApps();
+  const origins = [...new Set(grants.map((grant) => grant.origin))];
+  await Promise.all(
+    origins.map(async (origin) => {
+      const activeGrant = await approval.findActiveGrant(origin);
+      if (!activeGrant) return;
+      await emitProviderEventToOrigin(origin, PROVIDER_EVENT.WALLET_SWITCH, { address });
+    }),
+  );
+}
+
+/**
  * Maps a `PROVIDER_SURFACE_METHODS` name + already-origin-checked params
  * into the actual read/approval-flow work — the "business logic" side of
  * the provider surface, as distinct from `providerCall`'s own job (which
@@ -91,11 +173,25 @@ async function handleProviderCall(
       walletId,
       requestedPermissions: requested.length > 0 ? requested : ["ACCESS_ADDRESS"],
     });
+
+    // Fires only once the user actually approved (a rejected/timed-out
+    // `requestApproval` call throws, so this line is unreached for those
+    // cases) — matches ArConnect's own "connect event fires once connect()
+    // resolves" convention, per this task's INTENT.
+    const connectedState = await lifecycle.getState();
+    const connectedWallet = connectedState.wallets.find((candidate) => candidate.id === walletId);
+    if (connectedWallet) {
+      void emitProviderEventToOrigin(origin, PROVIDER_EVENT.CONNECT, {
+        activeAddress: connectedWallet.address,
+      });
+    }
+
     return result;
   }
 
   if (method === "disconnect") {
     await approval.revokeGrant({ origin });
+    void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
     return undefined;
   }
 
@@ -204,7 +300,17 @@ messenger.onMessage("createWallet", (message) => lifecycle.createWallet(message.
 messenger.onMessage("importWallet", (message) => lifecycle.importWallet(message.data));
 messenger.onMessage("deleteWallet", (message) => lifecycle.deleteWallet(message.data));
 messenger.onMessage("renameWallet", (message) => lifecycle.renameWallet(message.data));
-messenger.onMessage("switchWallet", (message) => lifecycle.switchWallet(message.data));
+messenger.onMessage("switchWallet", async (message) => {
+  await lifecycle.switchWallet(message.data);
+  // `switchWallet`'s locked signature returns `void`, so the resulting
+  // active address is derived here from `getState()` after the call
+  // resolves, per this task's INHERITED DECISIONS note.
+  const state = await lifecycle.getState();
+  const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
+  if (active) {
+    void broadcastWalletSwitch(active.address);
+  }
+});
 messenger.onMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
 messenger.onMessage("lockWallet", () => lifecycle.lockWallet());
 messenger.onMessage("unlockWallet", (message) => lifecycle.unlockWallet(message.data));
@@ -257,7 +363,10 @@ messenger.onMessage("getLockSettings", () => lifecycle.getLockSettings());
 messenger.onMessage("setLockSettings", (message) => lifecycle.setLockSettings(message.data));
 messenger.onMessage("getThemePreference", () => lifecycle.getThemePreference());
 messenger.onMessage("setThemePreference", (message) => lifecycle.setThemePreference(message.data));
-messenger.onMessage("revokeGrant", (message) => approval.revokeGrant(message.data));
+messenger.onMessage("revokeGrant", async (message) => {
+  await approval.revokeGrant(message.data);
+  void emitProviderEventToOrigin(message.data.origin, PROVIDER_EVENT.DISCONNECT, {});
+});
 
 // the single provider-surface choke point (this task's debt #1)
 messenger.onMessage("providerCall", (message) => {

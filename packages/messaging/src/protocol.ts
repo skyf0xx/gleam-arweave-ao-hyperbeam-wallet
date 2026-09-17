@@ -136,4 +136,18 @@ export interface ProtocolMap {
    * senders, never proxied through `providerCall`.
    */
   providerCall(req: { origin: string; method: ProviderSurfaceMethod; params: unknown }): unknown;
+
+  /**
+   * The background → content-script push counterpart of `providerCall`:
+   * background sends this directly to a specific tab (via
+   * `@webext-core/messaging`'s `sendMessage(type, data, tabId)`, never
+   * broadcast to every tab), and `content/index.ts` relays `event`/`data`
+   * straight into `postProviderEvent`, which the page-side provider's
+   * already-idle `handleEvent()` picks up. Access control (only a tab
+   * whose origin holds an active `Grant` is ever targeted) is enforced by
+   * the caller choosing which tabIds to send to, not by this method
+   * itself — see `provider-bridge`'s broadcast helper in
+   * `background/index.ts`.
+   */
+  providerEvent(req: { event: string; data: unknown }): void;
 }

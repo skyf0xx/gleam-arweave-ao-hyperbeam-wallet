@@ -1,11 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { REQUEST, RESPONSE } from "@gleam/messaging/src/page-protocol.ts";
+import { EVENT, REQUEST, RESPONSE } from "@gleam/messaging/src/page-protocol.ts";
 
+type Handler = (message: { data: unknown }) => unknown;
+const registeredHandlers = new Map<string, Handler>();
 const sendMessage = vi.fn();
+const onMessage = vi.fn((type: string, handler: Handler) => {
+  registeredHandlers.set(type, handler);
+  return () => registeredHandlers.delete(type);
+});
 const injectScript = vi.fn().mockResolvedValue({ script: document.createElement("script") });
 
 vi.mock("@webext-core/messaging", () => ({
-  defineExtensionMessaging: () => ({ sendMessage, onMessage: vi.fn() }),
+  defineExtensionMessaging: () => ({ sendMessage, onMessage }),
 }));
 vi.mock("wxt/utils/inject-script", () => ({ injectScript }));
 
@@ -33,6 +39,8 @@ describe("content.ts: page <-> background relay (ARCHITECTURE.md §4.3/§4.4)", 
     vi.resetModules();
     sendMessage.mockReset();
     injectScript.mockClear();
+    registeredHandlers.clear();
+    onMessage.mockClear();
   });
 
   it("injects provider.js at document_start, top frame only, keepInDom: false", async () => {
@@ -108,5 +116,33 @@ describe("content.ts: page <-> background relay (ARCHITECTURE.md §4.3/§4.4)", 
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  /**
+   * PROVIDER-EVENTS-ACCOUNT-SWITCH-PROVIDER-BRIDGE: the background ->
+   * content half of `ProtocolMap.providerEvent`. Access control (only a
+   * connected origin's tab is ever targeted) is enforced by the background
+   * sender choosing which tabId to push to, not by this content script —
+   * receiving the message at all already means this tab was targeted, so
+   * relaying straight into `postProviderEvent` is correct here.
+   */
+  it("registers a providerEvent handler that relays event/data into postProviderEvent", async () => {
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    expect(onMessage).toHaveBeenCalledWith("providerEvent", expect.any(Function));
+
+    const eventSpy = vi.fn();
+    window.addEventListener("message", (event) => {
+      if ((event.data as { type?: string })?.type === EVENT) eventSpy(event.data);
+    });
+
+    const handler = registeredHandlers.get("providerEvent")!;
+    handler({ data: { event: "walletSwitch", data: { address: "addr-1" } } });
+
+    await vi.waitFor(() => expect(eventSpy).toHaveBeenCalled());
+    expect(eventSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: EVENT, event: "walletSwitch", data: { address: "addr-1" } }),
+    );
   });
 });

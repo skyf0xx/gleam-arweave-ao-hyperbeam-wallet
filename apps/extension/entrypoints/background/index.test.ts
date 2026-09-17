@@ -32,7 +32,7 @@ const onMessage = vi.fn((type: string, handler: Handler) => {
   registeredHandlers.set(type, handler);
   return () => registeredHandlers.delete(type);
 });
-const sendMessage = vi.fn();
+const sendMessage = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@webext-core/messaging", () => ({
   defineExtensionMessaging: () => ({ onMessage, sendMessage }),
@@ -61,10 +61,12 @@ vi.mock("wxt/utils/storage", () => ({
 }));
 
 const windowsCreate = vi.fn().mockResolvedValue({ id: 1 });
+const tabsQuery = vi.fn().mockResolvedValue([]);
 vi.mock("wxt/browser", () => ({
   browser: {
     windows: { create: windowsCreate, remove: vi.fn(), update: vi.fn() },
     runtime: { getURL: (path: string) => `chrome-extension://test${path}` },
+    tabs: { query: tabsQuery },
   },
 }));
 
@@ -89,6 +91,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     onMessage.mockClear();
     sendMessage.mockClear();
     windowsCreate.mockClear();
+    tabsQuery.mockClear();
+    tabsQuery.mockResolvedValue([]);
     await import("./index");
   });
 
@@ -368,5 +372,142 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await expect(
       providerCall({ origin: "https://bazar.arweave.net", method: "transferAoTokens", params: { token: "ao-process-id" } }),
     ).rejects.toThrow(/requires token, recipient, and amount/i);
+  });
+
+  /**
+   * PROVIDER-EVENTS-ACCOUNT-SWITCH-PROVIDER-BRIDGE: `postProviderEvent`
+   * wiring at the real connect/disconnect/switchWallet call sites, and the
+   * access-control boundary (only a tab whose origin holds an active Grant
+   * is ever targeted — never a broadcast to every open tab).
+   */
+  describe("provider events: connect/disconnect/walletSwitch pushed only to connected origins", () => {
+    async function seedUnlockedWallet(walletId: string, address: string): Promise<void> {
+      await setItem("local:wallets", [
+        { id: walletId, address, name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: [walletId],
+      });
+    }
+
+    it("connect() pushes a CONNECT event only to the tab that just connected", async () => {
+      await seedUnlockedWallet("wallet-1", "addr-1");
+      tabsQuery.mockResolvedValue([
+        { id: 42, url: "https://bazar.arweave.net/app" },
+        { id: 99, url: "https://not-connected.example/" },
+      ]);
+
+      const resultPromise = providerCall({
+        origin: "https://bazar.arweave.net",
+        method: "connect",
+        params: { permissions: ["ACCESS_ADDRESS"] },
+      });
+
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{ request: { requestId: string } }>;
+      const requestId = pendingRaw[0]!.request.requestId;
+      const resolveApproval = registeredHandlers.get("resolveApproval")!;
+      await resolveApproval({ data: { requestId, approved: true } });
+      await resultPromise;
+
+      await vi.waitFor(() =>
+        expect(sendMessage).toHaveBeenCalledWith(
+          "providerEvent",
+          { event: "connect", data: { activeAddress: "addr-1" } },
+          42,
+        ),
+      );
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), 99);
+    });
+
+    it("disconnect() pushes a DISCONNECT event only to the disconnecting origin's tab", async () => {
+      await setItem("local:grants", [
+        { origin: "https://bazar.arweave.net", walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+      tabsQuery.mockResolvedValue([
+        { id: 42, url: "https://bazar.arweave.net/app" },
+        { id: 99, url: "https://not-connected.example/" },
+      ]);
+
+      await providerCall({ origin: "https://bazar.arweave.net", method: "disconnect", params: {} });
+
+      await vi.waitFor(() =>
+        expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 42),
+      );
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), 99);
+    });
+
+    it("revokeGrant (connected-apps UI revoke) also pushes a DISCONNECT event to that origin's tab", async () => {
+      await setItem("local:grants", [
+        { origin: "https://bazar.arweave.net", walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+      tabsQuery.mockResolvedValue([{ id: 7, url: "https://bazar.arweave.net/" }]);
+
+      const revokeHandler = registeredHandlers.get("revokeGrant")!;
+      await revokeHandler({ data: { origin: "https://bazar.arweave.net" } });
+
+      await vi.waitFor(() =>
+        expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 7),
+      );
+    });
+
+    it("switchWallet broadcasts a WALLET_SWITCH event to every origin with an active Grant, never every open tab", async () => {
+      await seedUnlockedWallet("wallet-2", "addr-2");
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+        { id: "wallet-2", address: "addr-2", name: "Two", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-2");
+      await setItem("local:grants", [
+        { origin: "https://connected-a.example", walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+        { origin: "https://connected-b.example", walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+      tabsQuery.mockResolvedValue([
+        { id: 1, url: "https://connected-a.example/" },
+        { id: 2, url: "https://connected-b.example/" },
+        { id: 3, url: "https://unconnected.example/" },
+      ]);
+
+      const switchHandler = registeredHandlers.get("switchWallet")!;
+      await switchHandler({ data: { walletId: "wallet-2" } });
+
+      await vi.waitFor(() =>
+        expect(sendMessage).toHaveBeenCalledWith(
+          "providerEvent",
+          { event: "walletSwitch", data: { address: "addr-2" } },
+          1,
+        ),
+      );
+      expect(sendMessage).toHaveBeenCalledWith(
+        "providerEvent",
+        { event: "walletSwitch", data: { address: "addr-2" } },
+        2,
+      );
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), 3);
+    });
+
+    it("switchWallet never pushes to a tab whose origin has no Grant at all, even when it's open", async () => {
+      await seedUnlockedWallet("wallet-2", "addr-2");
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+        { id: "wallet-2", address: "addr-2", name: "Two", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-2");
+      // No `local:grants` entries at all — nothing is connected.
+      tabsQuery.mockResolvedValue([{ id: 55, url: "https://never-connected.example/" }]);
+
+      const switchHandler = registeredHandlers.get("switchWallet")!;
+      await switchHandler({ data: { walletId: "wallet-2" } });
+
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), 55);
+      // No Grant exists, so `findTabsForOrigin` is never even reached for
+      // that origin — `browser.tabs.query` itself is never called on this
+      // path, confirming the broadcast is scoped to Grant-holding origins,
+      // not "every open tab".
+      expect(tabsQuery).not.toHaveBeenCalled();
+    });
   });
 });
