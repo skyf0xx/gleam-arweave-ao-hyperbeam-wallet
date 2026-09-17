@@ -413,6 +413,19 @@ async function handleProviderCall(
   }
 }
 
+async function setLockedIcon(locked: boolean) {
+  const suffix = locked ? '-locked' : ''
+
+  await browser.action.setIcon({
+    path: {
+      16: `/icon/16${suffix}.png`,
+      32: `/icon/32${suffix}.png`,
+      48: `/icon/48${suffix}.png`,
+      128: `/icon/128${suffix}.png`,
+    },
+  })
+}
+
 // wallet lifecycle — KEY_METHODS among these (createWallet/importWallet/
 // exportWallet) are never reachable through `providerCall`; see this
 // file's own doc comment for why gating `providerCall` alone suffices.
@@ -432,8 +445,15 @@ messenger.onMessage("switchWallet", async (message) => {
   }
 });
 messenger.onMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
-messenger.onMessage("lockWallet", () => lifecycle.lockWallet());
-messenger.onMessage("unlockWallet", (message) => lifecycle.unlockWallet(message.data));
+messenger.onMessage("lockWallet", async () => {
+  await lifecycle.lockWallet();
+  void setLockedIcon(true);
+});
+messenger.onMessage("unlockWallet", async (message) => {
+  const result = await lifecycle.unlockWallet(message.data);
+  void setLockedIcon(false);
+  return result;
+});
 messenger.onMessage("resetAllWallets", () => lifecycle.resetAllWallets());
 
 // reads
