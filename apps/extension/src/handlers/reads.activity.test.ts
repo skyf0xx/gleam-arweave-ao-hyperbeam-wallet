@@ -96,6 +96,76 @@ describe("ReadsHandler: getTokenBalances", () => {
     const proc1Balance = balances.find((b) => b.processId === "proc1");
     expect(proc1Balance?.quantity).toBe("42");
   });
+
+  it("resolves ticker/denomination for an unregistered watched token from its spawn tags", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+                      tags: [
+                        { name: "ticker", value: "wUSDC" },
+                        { name: "denomination", value: "6" },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      // HyperBEAM compute path for the watched process (and the always-included AO token).
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    const unregistered = balances.find(
+      (b) => b.processId === "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+    );
+    expect(unregistered?.ticker).toBe("wUSDC");
+    expect(unregistered?.denomination).toBe(6);
+  });
+
+  it("leaves an unregistered token's balance untouched when the metadata lookup fails (one bad lookup shouldn't fail the read)", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["unknownProc"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return { ok: false, status: 500, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    const unregistered = balances.find((b) => b.processId === "unknownProc");
+    expect(unregistered?.ticker).toBe("unknownProc");
+  });
 });
 
 describe("ReadsHandler: getActivity", () => {

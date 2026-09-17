@@ -21,6 +21,8 @@ export {
   AR_TOKEN,
   AO_TOKEN,
   priceSourceForProcessId,
+  isRegisteredProcessId,
+  resolveUnregisteredTokenMetadata,
   type RegisteredToken,
   type TokenPriceSource,
   type TokenPrice,

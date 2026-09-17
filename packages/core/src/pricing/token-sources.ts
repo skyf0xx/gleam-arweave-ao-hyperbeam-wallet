@@ -1,5 +1,7 @@
 import type { CoinGeckoId } from "./coingecko";
 import type { CoinPaprikaId } from "./coinpaprika";
+import { queryTokenMetadata } from "../arweave/token-metadata";
+import type { TokenMetadata } from "../models/token-metadata";
 
 /**
  * The single source of truth for every token this wallet knows how to
@@ -51,6 +53,41 @@ export const AO_TOKEN = DEFAULT_TOKEN_REGISTRY[1] as RegisteredToken;
 /** Looks up a registered token's price source by AO `processId`, or `null` if unmapped. */
 export function priceSourceForProcessId(processId: string): TokenPriceSource | null {
   return DEFAULT_TOKEN_REGISTRY.find((token) => token.processId === processId)?.priceSource ?? null;
+}
+
+/** `true` if `processId` has a hardcoded entry in `DEFAULT_TOKEN_REGISTRY`. */
+export function isRegisteredProcessId(processId: string): boolean {
+  return DEFAULT_TOKEN_REGISTRY.some((token) => token.processId === processId);
+}
+
+/**
+ * Identifies an AO token not present in `DEFAULT_TOKEN_REGISTRY` by
+ * reading its process-spawn tags via the gateway's GraphQL endpoint
+ * (`queryTokenMetadata`) — additive to, and never a replacement for, the
+ * hardcoded-registry/HyperBEAM-only balance path: this is purely an
+ * identification fallback for tokens the registry doesn't know about, and
+ * introduces no dryrun/CU round-trip of its own.
+ *
+ * A registered `processId` is never looked up this way — callers should
+ * check `isRegisteredProcessId`/`priceSourceForProcessId` first, per the
+ * existing registry-first decision this function doesn't change. On any
+ * lookup failure (unreachable gateway, unspawned/unindexed process id),
+ * returns `null` rather than throwing, mirroring `getUsdPriceWithFallback`'s
+ * "surface unavailability, don't propagate a hard failure" shape for a
+ * caller that's just trying to label an unknown token — a caller that
+ * needs to distinguish "no metadata" from "gateway error" should call
+ * `queryTokenMetadata` directly instead.
+ */
+export async function resolveUnregisteredTokenMetadata(
+  processId: string,
+  gatewayUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TokenMetadata | null> {
+  try {
+    return await queryTokenMetadata(processId, gatewayUrl, fetchImpl);
+  } catch {
+    return null;
+  }
 }
 
 /**

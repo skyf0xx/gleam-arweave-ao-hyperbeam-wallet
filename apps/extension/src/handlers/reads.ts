@@ -10,6 +10,8 @@ import {
   estimateHistoricalPortfolioValue,
   getHistoricalUsdPricesWithFallback,
   getUsdPriceWithFallback,
+  isRegisteredProcessId,
+  resolveUnregisteredTokenMetadata,
 } from "@gleam/core/src/pricing/index.ts";
 import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
 import type {
@@ -124,6 +126,41 @@ function withRegisteredTicker(balance: TokenBalance): TokenBalance {
   return registered ? { ...balance, ticker: registered.ticker } : balance;
 }
 
+/**
+ * For a `TokenBalance` whose process isn't in `DEFAULT_TOKEN_REGISTRY`
+ * (so `withRegisteredTicker` had nothing to apply), resolves ticker and
+ * denomination directly from the process's spawn tags via the gateway's
+ * GraphQL endpoint (`resolveUnregisteredTokenMetadata` —
+ * `core/pricing/token-sources.ts`) rather than leaving the balance
+ * identified only by its raw process id. This is purely additive
+ * identification for watched-but-unregistered tokens: the balance
+ * quantity itself still comes only from the existing HyperBEAM
+ * `~process@1.0` compute path (`getTokenBalance`), and a registered
+ * token's identity (checked first) is never overridden by this lookup.
+ *
+ * A metadata lookup failure (`resolveUnregisteredTokenMetadata` returning
+ * `null` — unreachable gateway, unspawned/unindexed process id) leaves
+ * the balance exactly as `getTokenBalance` returned it (process id as
+ * ticker, HyperBEAM's own denomination guess) rather than throwing —
+ * one unresolvable token's identity shouldn't fail every other token's
+ * balance read in the same `getTokenBalances` call.
+ */
+async function withUnregisteredMetadata(
+  balance: TokenBalance,
+  gatewayUrl: string,
+): Promise<TokenBalance> {
+  if (isRegisteredProcessId(balance.processId)) return balance;
+
+  const metadata = await resolveUnregisteredTokenMetadata(balance.processId, gatewayUrl);
+  if (metadata === null) return balance;
+
+  return {
+    ...balance,
+    ticker: metadata.ticker ?? balance.ticker,
+    denomination: metadata.denomination ?? balance.denomination,
+  };
+}
+
 function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
   if (value === null || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
@@ -213,7 +250,10 @@ export class ReadsHandler {
     const balances = await Promise.all(
       processIds.map((processId) => getTokenBalance(processId, req.address, activePeerUrl)),
     );
-    return balances.map((balance) => withRegisteredTicker(balance));
+    const withTickers = balances.map((balance) => withRegisteredTicker(balance));
+    return Promise.all(
+      withTickers.map((balance) => withUnregisteredMetadata(balance, settings.gatewayUrl)),
+    );
   }
 
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
