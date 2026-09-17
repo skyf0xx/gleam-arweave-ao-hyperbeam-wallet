@@ -30,7 +30,7 @@ export function mergeActivity(
   }
   for (const entry of gatewayEntries) {
     // Gateway entries win on conflict — see doc comment.
-    byTxId.set(entry.txId, entry);
+    byTxId.set(entry.txId, withFailedAoTransferDetection(entry));
   }
 
   const merged = [...byTxId.values()].sort((a, b) => b.timestamp - a.timestamp);
@@ -40,6 +40,38 @@ export function mergeActivity(
     entries,
     cursor: merged.length > limit ? entries[entries.length - 1]?.txId ?? null : null,
   };
+}
+
+/**
+ * Detects a failed AO transfer among gateway-sourced entries and
+ * re-tags its `status` as `"failed"` rather than leaving it reported as
+ * the default gateway-index-implies-`"confirmed"` (`graphql.ts`'s
+ * `toAoActivityEntry`/`toActivityEntry` — a gateway-indexed transaction
+ * has definitely reached the network, but that says nothing about
+ * whether the AO process's own message handler accepted the transfer).
+ *
+ * Detection reads the tags every AO Data Item carries per its own
+ * `Data-Protocol: ao` convention (matched case-insensitively, the same
+ * way `token-metadata.ts`'s `toTokenMetadata` already handles observed
+ * lower-cased gateway tag casing): an entry is only a candidate for this
+ * check at all if it carries `Data-Protocol: ao` (an AR-native send/
+ * receive never does, so this never touches non-AO entries), and is
+ * marked `"failed"` when it also carries an explicit AO-error signal —
+ * an `Error` tag, per AO's own convention for a message a process
+ * rejected or a handler threw on. A `Data-Protocol: ao` entry with no
+ * `Error` tag is left exactly as `graphql.ts` reported it
+ * (`"confirmed"`) — this never invents a failure the tags don't state.
+ */
+function withFailedAoTransferDetection(entry: ActivityEntry): ActivityEntry {
+  const isAoProtocol = entry.tags.some(
+    (tag) => tag.name.toLowerCase() === "data-protocol" && tag.value.toLowerCase() === "ao",
+  );
+  if (!isAoProtocol) return entry;
+
+  const hasErrorTag = entry.tags.some((tag) => tag.name.toLowerCase() === "error");
+  if (!hasErrorTag) return entry;
+
+  return { ...entry, status: "failed" };
 }
 
 /**

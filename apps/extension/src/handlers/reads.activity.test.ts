@@ -1,6 +1,22 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { StoragePort } from "@gleam/core";
-import { ReadsHandler } from "./reads";
+
+const alarmsCreate = vi.fn();
+let onAlarmListener: ((alarm: { name: string }) => void) | undefined;
+const alarmsAddListener = vi.fn((listener: (alarm: { name: string }) => void) => {
+  onAlarmListener = listener;
+});
+
+vi.mock("wxt/browser", () => ({
+  browser: {
+    alarms: {
+      create: alarmsCreate,
+      onAlarm: { addListener: alarmsAddListener },
+    },
+  },
+}));
+
+const { ReadsHandler, ACTIVITY_PROMOTION_ALARM_NAME, registerActivityPromotionAlarm } = await import("./reads");
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -400,6 +416,129 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     expect(history.series).toEqual([]);
     expect(history.currentUsdValue).toBe(0);
     expect(history.usdChange).toBe(0);
+  });
+});
+
+describe("ReadsHandler: promotePendingActivity", () => {
+  it("promotes a locally-pending entry to confirmed once the gateway indexes it", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "tx-pending", type: "send", status: "pending", address: "addr2", amount: "1", tags: [], timestamp: 500 },
+    ]);
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          transactions: {
+            edges: [
+              {
+                cursor: "tx-pending",
+                node: {
+                  id: "tx-pending",
+                  owner: { address: "addr1" },
+                  recipient: "addr2",
+                  quantity: { winston: "1" },
+                  tags: [],
+                  block: { timestamp: 500 },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.promotePendingActivity("addr1");
+
+    const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    expect(updatedLog?.find((e) => e.txId === "tx-pending")?.status).toBe("confirmed");
+  });
+
+  it("leaves a still-genuinely-pending entry untouched when the gateway hasn't indexed it yet", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "tx-still-pending", type: "send", status: "pending", address: "addr2", amount: "1", tags: [], timestamp: 500 },
+    ]);
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { transactions: { edges: [] } } }),
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.promotePendingActivity("addr1");
+
+    const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    expect(updatedLog?.find((e) => e.txId === "tx-still-pending")?.status).toBe("pending");
+  });
+
+  it("does nothing (no network call) when the address has no pending entries", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "tx-1", type: "send", status: "confirmed", address: "addr2", amount: "1", tags: [], timestamp: 500 },
+    ]);
+
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.promotePendingActivity("addr1");
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("registerActivityPromotionAlarm", () => {
+  it("creates the named alarm and advances a pending entry to confirmed when it fires", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:wallets", [
+      { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await storage.set("local:activityLog:addr1", [
+      { txId: "tx-pending", type: "send", status: "pending", address: "addr2", amount: "1", tags: [], timestamp: 500 },
+    ]);
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          transactions: {
+            edges: [
+              {
+                cursor: "tx-pending",
+                node: {
+                  id: "tx-pending",
+                  owner: { address: "addr1" },
+                  recipient: "addr2",
+                  quantity: { winston: "1" },
+                  tags: [],
+                  block: { timestamp: 500 },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    registerActivityPromotionAlarm(handler);
+
+    expect(alarmsCreate).toHaveBeenCalledWith(
+      ACTIVITY_PROMOTION_ALARM_NAME,
+      expect.objectContaining({ periodInMinutes: expect.any(Number) }),
+    );
+
+    onAlarmListener?.({ name: ACTIVITY_PROMOTION_ALARM_NAME });
+    await vi.waitFor(async () => {
+      const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+      expect(updatedLog?.find((e) => e.txId === "tx-pending")?.status).toBe("confirmed");
+    });
   });
 });
 

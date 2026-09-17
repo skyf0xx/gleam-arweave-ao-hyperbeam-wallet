@@ -1,6 +1,7 @@
+import { browser } from "wxt/browser";
 import { getTokenBalance } from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
-import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
+import { queryActivityTransactions, queryAoTransferActivity } from "@gleam/core/src/arweave/graphql.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
 import {
   AO_TOKEN,
@@ -347,12 +348,60 @@ export class ReadsHandler {
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
     void req.cursor; // most-recent-N only in this phase — no deeper pagination cursor is implemented yet, see final report.
     const settings = await this.loadNetworkSettings();
-    const [localLog, gatewayEntries] = await Promise.all([
+    const [localLog, arEntries, aoEntries] = await Promise.all([
       this.loadActivityLog(req.address),
       queryActivityTransactions(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
+      queryAoTransferActivity(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
     ]);
 
-    return mergeActivity(localLog, gatewayEntries, ACTIVITY_PAGE_LIMIT);
+    return mergeActivity(localLog, [...arEntries, ...aoEntries], ACTIVITY_PAGE_LIMIT);
+  }
+
+  /**
+   * Background pending→confirmed promotion check
+   * (`registerActivityPromotionAlarm` below): re-runs `getActivity` for
+   * every address with a locally-pending entry and persists the result
+   * back into the per-address activity log, so a pending entry the
+   * gateway has since indexed is written back as confirmed even with no
+   * popup open to trigger a read. Reuses `getActivity`'s existing
+   * `mergeActivity`-based promotion logic rather than duplicating it —
+   * this method only adds "run it on a timer and persist the outcome."
+   *
+   * Only entries `mergeActivity` actually resolved as no-longer-pending
+   * are written back (a local entry `mergeActivity` still reports
+   * `"pending"` is left as-is, since the gateway hasn't caught up to it
+   * yet) — this never overwrites a still-genuinely-pending entry, and
+   * never removes a local entry the gateway hasn't indexed at all.
+   */
+  async promotePendingActivity(address: string): Promise<void> {
+    const localLog = await this.loadActivityLog(address);
+    const hasPending = localLog.some((entry) => entry.status === "pending");
+    if (!hasPending) return;
+
+    const page = await this.getActivity({ address });
+    const promoted = page.entries.filter((entry) => entry.status !== "pending");
+    const promotedIds = new Set(promoted.map((entry) => entry.txId));
+
+    const nextLog = localLog.map((entry) => {
+      if (!promotedIds.has(entry.txId)) return entry;
+      return promoted.find((candidate) => candidate.txId === entry.txId) ?? entry;
+    });
+
+    await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, nextLog);
+  }
+
+  /**
+   * Every address currently holding at least one local activity-log entry
+   * — the set `promotePendingActivity` needs to check on each alarm tick.
+   * `local:activityLog:{address}` keys have no separate index anywhere
+   * (each is written directly by `handlers/transfer.ts`), so this derives
+   * the address set from the one place this handler already knows
+   * addresses live: the wallets list.
+   */
+  async loadTrackedAddresses(): Promise<string[]> {
+    const rawWallets = await this.storage.get<unknown>(WALLETS_KEY);
+    const wallets = Array.isArray(rawWallets) ? (rawWallets as Wallet[]) : [];
+    return wallets.map((wallet) => wallet.address).filter((address): address is string => typeof address === "string");
   }
 
   /**
@@ -499,4 +548,71 @@ export class ReadsHandler {
   async getConnectedApps(): Promise<Grant[]> {
     return [];
   }
+}
+
+/**
+ * Name of the `chrome.alarms` alarm this module registers — namespaced
+ * with the extension's own prefix convention (matches
+ * `key-session.ts`/`wallet-lifecycle.ts`'s storage-key prefixes) so it
+ * can't collide with an alarm another handler might register later.
+ */
+export const ACTIVITY_PROMOTION_ALARM_NAME = "gleam:activityPromotion";
+
+/**
+ * Every minute — frequent enough that a pending send/receive promotes to
+ * confirmed within about the same window a user re-opening the popup
+ * would already observe it (`getActivity` is called fresh on every popup
+ * open), infrequent enough not to hammer the configured gateway on a
+ * wallet with no pending activity (`promotePendingActivity` itself
+ * short-circuits to a single storage read and no network call when there's
+ * nothing pending, so most ticks cost nothing per tracked address anyway).
+ * No existing interval convention elsewhere in this codebase to match, so
+ * this is this task's own choice, not a documented product requirement —
+ * flagged as such in this task's final report; a tighter or looser
+ * interval is trivial to change here as a single constant.
+ */
+const ACTIVITY_PROMOTION_INTERVAL_MINUTES = 1;
+
+/**
+ * Registers the `chrome.alarms`-based interval that actively promotes a
+ * locally-pending activity entry to confirmed once the gateway indexes
+ * it — independent of any popup being open. Only the alarm registration
+ * and the `chrome.alarms.onAlarm` wiring live here (both are `chrome.*`
+ * APIs, which `apps/extension/**` is allowed to use, unlike
+ * `packages/core`, which must stay pure); all the actual
+ * promotion/merge logic is `ReadsHandler.promotePendingActivity`, reusing
+ * the existing `mergeActivity`-backed `getActivity` path rather than
+ * duplicating it.
+ *
+ * Call once from the background entrypoint (`entrypoints/background/
+ * index.ts`, outside this task's ALLOWED SCOPE — same "no dispatcher in
+ * this task's scope" situation `wallet-core`'s original build already hit
+ * for `getNetworkSettings`) with a `ReadsHandler` instance, e.g.:
+ * `registerActivityPromotionAlarm(new ReadsHandler(storage))`. Errors
+ * from an individual address's promotion check are caught and logged
+ * per-address so one failing gateway/address never blocks promotion for
+ * the wallet's other tracked addresses on the same tick.
+ */
+export function registerActivityPromotionAlarm(handler: ReadsHandler): void {
+  browser.alarms.create(ACTIVITY_PROMOTION_ALARM_NAME, {
+    periodInMinutes: ACTIVITY_PROMOTION_INTERVAL_MINUTES,
+  });
+
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== ACTIVITY_PROMOTION_ALARM_NAME) return;
+    void runActivityPromotionTick(handler);
+  });
+}
+
+async function runActivityPromotionTick(handler: ReadsHandler): Promise<void> {
+  const addresses = await handler.loadTrackedAddresses();
+  await Promise.all(
+    addresses.map(async (address) => {
+      try {
+        await handler.promotePendingActivity(address);
+      } catch (error) {
+        console.error(`Activity promotion check failed for "${address}":`, error);
+      }
+    }),
+  );
 }

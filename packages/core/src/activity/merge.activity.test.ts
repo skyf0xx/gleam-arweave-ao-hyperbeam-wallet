@@ -79,6 +79,47 @@ describe("mergeActivity", () => {
     expect(page.entries).toEqual([]);
     expect(page.cursor).toBeNull();
   });
+
+  it("marks a gateway AO transfer carrying Data-Protocol: ao and an Error tag as failed", () => {
+    const gateway = [
+      entry({
+        txId: "ao-failed",
+        timestamp: 100,
+        status: "confirmed",
+        tags: [
+          { name: "Data-Protocol", value: "ao" },
+          { name: "Error", value: "Insufficient Balance" },
+        ],
+      }),
+    ];
+
+    const page = mergeActivity([], gateway, 10);
+
+    expect(page.entries[0]?.status).toBe("failed");
+  });
+
+  it("leaves a successful AO transfer (Data-Protocol: ao, no Error tag) confirmed", () => {
+    const gateway = [
+      entry({
+        txId: "ao-ok",
+        timestamp: 100,
+        status: "confirmed",
+        tags: [{ name: "Data-Protocol", value: "ao" }],
+      }),
+    ];
+
+    const page = mergeActivity([], gateway, 10);
+
+    expect(page.entries[0]?.status).toBe("confirmed");
+  });
+
+  it("never marks a non-AO (AR-native) entry as failed even without a Data-Protocol tag", () => {
+    const gateway = [entry({ txId: "ar-tx", timestamp: 100, status: "confirmed", tags: [] })];
+
+    const page = mergeActivity([], gateway, 10);
+
+    expect(page.entries[0]?.status).toBe("confirmed");
+  });
 });
 
 describe("isFirstSeenRecipient", () => {
