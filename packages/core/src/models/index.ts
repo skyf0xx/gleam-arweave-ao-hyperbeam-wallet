@@ -10,7 +10,14 @@ export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
 export type { ActivityEntry, ActivityType, ActivityStatus, ActivityPage } from "./activity";
 export type { Winston, Balance, TokenBalance } from "./balance";
-export type { TokenMetadata } from "./token-metadata";
+export type {
+  TokenMetadata,
+  TokenBalanceRequest,
+  TokenBalanceResult,
+  UserTokensOptions,
+  UserToken,
+  UserTokensResult,
+} from "./token-metadata";
 export type {
   TransferDraft,
   FeeEstimate,

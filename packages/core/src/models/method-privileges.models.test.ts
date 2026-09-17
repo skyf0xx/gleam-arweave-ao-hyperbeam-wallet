@@ -52,6 +52,8 @@ describe("method privilege tiers", () => {
         "signDataItem",
         "batchSignDataItem",
         "transferAoTokens",
+        "tokenBalance",
+        "userTokens",
       ].sort(),
     );
   });

@@ -34,6 +34,8 @@ export const PROVIDER_METHODS = [
   "signDataItem",
   "batchSignDataItem",
   "transferAoTokens",
+  "tokenBalance",
+  "userTokens",
 ] as const;
 
 /** Reachable only from the approval window. */

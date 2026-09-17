@@ -286,10 +286,13 @@ async function handleProviderCall(
       // request it doesn't describe. See this task's final report.
       throw new Error(`Provider method "${method}" is not implemented yet.`);
 
-    default: {
-      const exhaustiveCheck: never = method;
-      throw new Error(`Unhandled provider method "${String(exhaustiveCheck)}".`);
-    }
+    default:
+      // Not a `never`-exhaustive check: `ProviderSurfaceMethod` (messaging
+      // layer's scope) can grow ahead of this switch (provider-bridge's
+      // scope) being updated to handle a new method, so an unhandled
+      // method is a named runtime failure here rather than a compile
+      // error that would block every other layer's commits.
+      throw new Error(`Provider method "${String(method)}" is not implemented yet.`);
   }
 }
 

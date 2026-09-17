@@ -37,6 +37,8 @@ export const PROVIDER_SURFACE_METHODS = [
   "signDataItem",
   "batchSignDataItem",
   "transferAoTokens",
+  "tokenBalance",
+  "userTokens",
 ] as const;
 
 export type ProviderSurfaceMethod = (typeof PROVIDER_SURFACE_METHODS)[number];
