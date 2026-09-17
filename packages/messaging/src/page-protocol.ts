@@ -14,6 +14,7 @@ export const EVENT = "GLEAM_EVENT";
  * `PROVIDER_METHODS`). A page-originated message can only ever reach this
  * set — never `KEY_METHODS`/`APPROVAL_METHODS` — enforced at the
  * dispatcher choke point built in a later layer.
+ * See https://github.com/wanderwallet/wander-docs/tree/main/api for details
  */
 export const PROVIDER_SURFACE_METHODS = [
   "connect",
