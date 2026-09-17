@@ -168,6 +168,121 @@ describe("ReadsHandler: getTokenBalances", () => {
   });
 });
 
+describe("ReadsHandler: tokenBalance", () => {
+  it("throws a named error when no peer is configured", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: null,
+    });
+    const handler = new ReadsHandler(storage);
+    await expect(handler.tokenBalance({ address: "addr1", id: "proc1" })).rejects.toThrow(
+      /No HyperBEAM peer configured/,
+    );
+  });
+
+  it("resolves a single process id's balance via the active peer", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => "123",
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const result = await handler.tokenBalance({ address: "addr1", id: "proc1" });
+
+    expect(result).toBe("123");
+    expect(typeof result).toBe("string");
+  });
+});
+
+describe("ReadsHandler: userTokens", () => {
+  it("returns registered tokens (AR-registry-backed name/ticker) in Wander's capitalized shape", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => "42",
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const tokens = await handler.userTokens({ address: "addr1" });
+
+    const ao = tokens.find((t) => t.Ticker === "AO");
+    expect(ao).toBeDefined();
+    expect(ao?.Name).toBe("AO");
+    expect(typeof ao?.Denomination).toBe("string");
+  });
+
+  it("omits an unregistered token whose spawn-tag metadata never resolved a name", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["unknownProc"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return { ok: false, status: 500, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const tokens = await handler.userTokens({ address: "addr1" });
+
+    expect(tokens.find((t) => t.processId === "unknownProc")).toBeUndefined();
+    // AO is still present — always registered/named regardless of the watch list.
+    expect(tokens.find((t) => t.Ticker === "AO")).toBeDefined();
+  });
+
+  it("honors cursor/limit as a slice-based offset over the resolved list", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => "42",
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const all = await handler.userTokens({ address: "addr1" });
+    const limited = await handler.userTokens({ address: "addr1", options: { limit: 1 } });
+
+    expect(limited).toHaveLength(1);
+    expect(limited[0]).toEqual(all[0]);
+
+    if (all.length > 1) {
+      const nextPage = await handler.userTokens({
+        address: "addr1",
+        options: { cursor: "1", limit: 1 },
+      });
+      expect(nextPage[0]).toEqual(all[1]);
+    }
+  });
+});
+
 describe("ReadsHandler: getActivity", () => {
   it("merges the local activity log with the gateway query result", async () => {
     const storage = createFakeStorage();

@@ -24,7 +24,12 @@ import type {
   PortfolioHistoryRange,
   StoragePort,
   TokenBalance,
+  TokenBalanceRequest,
+  TokenBalanceResult,
   TokenPrice,
+  UserToken,
+  UserTokensOptions,
+  UserTokensResult,
   Wallet,
   Winston,
 } from "@gleam/core";
@@ -254,6 +259,89 @@ export class ReadsHandler {
     return Promise.all(
       withTickers.map((balance) => withUnregisteredMetadata(balance, settings.gatewayUrl)),
     );
+  }
+
+  /**
+   * `ProtocolMap`'s per-token balance read (`window.arweaveWallet`'s
+   * `tokenBalance(id)`, Wander-shaped) — resolves a single AO process's
+   * balance for the given wallet address via the same HyperBEAM
+   * `~process@1.0` path `getTokenBalances` uses, rather than fetching every
+   * watched token and filtering, since only one process id was asked for.
+   * Read-only: no signing-approval window needed (`provider-bridge` only
+   * needs to gate this behind a connection-approval Grant check, per this
+   * task's RELEVANT RULES).
+   *
+   * Same "no HyperBEAM peer configured" HONESTY failure as
+   * `getTokenBalances` — a balance this handler can't compute is a thrown,
+   * named error, never a fabricated `"0"`.
+   */
+  async tokenBalance(
+    req: { address: string } & TokenBalanceRequest,
+  ): Promise<TokenBalanceResult> {
+    const settings = await this.loadNetworkSettings();
+    if (settings.activePeerUrl === null) {
+      throw new Error(
+        "No HyperBEAM peer configured. Add one in Network settings to read AO token balances.",
+      );
+    }
+
+    const balance = await getTokenBalance(req.id, req.address, settings.activePeerUrl);
+    return balance.quantity;
+  }
+
+  /**
+   * `ProtocolMap`'s token-discovery read (`window.arweaveWallet`'s
+   * `userTokens(options?)`, Wander-shaped) — reuses `getTokenBalances`'s
+   * exact registry-plus-spawn-tag-discovered resolution (per this task's
+   * RELEVANT RULES: no separate token-listing source) and reshapes each
+   * resolved `TokenBalance` into `UserToken`'s Wander-cased fields.
+   *
+   * Null-metadata decision: `UserToken.Ticker`/`Name`/`Denomination` have
+   * no nullable variant (see `token-metadata.ts`'s own doc comment flagging
+   * this gap), while `TokenBalance.ticker`/`denomination` here are always
+   * populated (either from `DEFAULT_TOKEN_REGISTRY`, resolved spawn tags,
+   * or `getTokenBalance`'s own raw-process-id/HyperBEAM-denomination
+   * fallback — see `withRegisteredTicker`/`withUnregisteredMetadata`), so
+   * `Ticker`/`Denomination` are never actually null at this point. `Name`
+   * has no fallback anywhere in the existing `TokenBalance` shape, so a
+   * balance with an unregistered, spawn-tag-unresolved process id has no
+   * name to show — that entry is omitted from the result entirely (a
+   * dApp can't usefully display an unnamed token), rather than inventing a
+   * placeholder name. This never drops AR/AO (both always named via the
+   * registry) or any token whose spawn tags resolved a name.
+   *
+   * Pagination: `UserTokensOptions.cursor`/`limit` have no existing
+   * convention elsewhere in this handler (`getActivity`'s own `cursor` is
+   * explicitly unimplemented, see its comment above) to follow, so this
+   * applies a simple slice-based cursor: `cursor` is the stringified
+   * offset into the resolved (and name-filtered) list to resume from, and
+   * `limit` caps how many entries come back. `UserTokensResult` itself
+   * (locked, `token-metadata.ts`) carries no next-cursor field, so there's
+   * nothing for a caller to page with beyond re-deriving the next offset
+   * from `options.cursor + result.length` — acceptable since Wander's own
+   * `userTokens()` shape is the same bare array.
+   */
+  async userTokens(req: { address: string; options?: UserTokensOptions }): Promise<UserTokensResult> {
+    const balances = await this.getTokenBalances({ address: req.address });
+
+    const tokens: UserToken[] = [];
+    for (const balance of balances) {
+      const registered = DEFAULT_TOKEN_REGISTRY.find((token) => token.processId === balance.processId);
+      const name = registered?.name ?? null;
+      if (name === null) continue;
+
+      tokens.push({
+        processId: balance.processId,
+        Ticker: balance.ticker,
+        Name: name,
+        Denomination: String(balance.denomination),
+      });
+    }
+
+    const cursor = req.options?.cursor;
+    const offset = cursor !== undefined && /^\d+$/.test(cursor) ? Number(cursor) : 0;
+    const limit = req.options?.limit;
+    return limit !== undefined ? tokens.slice(offset, offset + limit) : tokens.slice(offset);
   }
 
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
