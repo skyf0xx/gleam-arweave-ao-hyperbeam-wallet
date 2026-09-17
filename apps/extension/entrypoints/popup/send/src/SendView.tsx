@@ -162,6 +162,8 @@ function formatAmount(atomic: string, token: TokenBalance | null): string {
 
 export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewProps) {
   const [step, setStep] = useState<Step>(INITIAL_STEP);
+  // Store the compose step state when opening the token picker so we can restore it
+  const [savedComposeStep, setSavedComposeStep] = useState<Extract<Step, { kind: "compose" }> | null>(null);
   // The in-flow-selectable token (task 1/4: compose step's own token
   // picker can change this before continuing). Initialized from the
   // `token` prop — `App.tsx`'s entry-point context — but from here on
@@ -283,7 +285,10 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           });
         }}
         onContinue={() => void handleContinue()}
-        onOpenTokenPicker={() => setStep({ kind: "token-picker" })}
+        onOpenTokenPicker={() => {
+          setSavedComposeStep(step);
+          setStep({ kind: "token-picker" });
+        }}
         onOpenRecentRecipients={() => setStep({ kind: "recent-recipients" })}
       />
     );
@@ -297,9 +302,13 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         selectedToken={selectedToken}
         onSelect={(nextToken) => {
           setSelectedToken(nextToken);
-          setStep((prev) => (prev.kind === "token-picker" ? INITIAL_STEP : prev));
+          setStep(savedComposeStep || INITIAL_STEP);
+          setSavedComposeStep(null);
         }}
-        onBack={() => setStep(INITIAL_STEP)}
+        onBack={() => {
+          setStep(savedComposeStep || INITIAL_STEP);
+          setSavedComposeStep(null);
+        }}
       />
     );
   }
