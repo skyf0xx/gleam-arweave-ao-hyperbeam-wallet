@@ -11,7 +11,14 @@ export interface ActivityEntry {
   type: ActivityType;
   status: ActivityStatus;
   address: string;
-  /** Winston atomic-integer string; never a floating-point number. */
+  /**
+   * Atomic-integer string; never a floating-point number. Winston units
+   * when `token` is `null` (the native AR path); otherwise an atomic
+   * integer string in the AO token's own smallest unit, per its resolved
+   * denomination — same convention as `TokenBalance.quantity` and
+   * `TransferDraft.amount`'s AO-token case, never Winston-shaped for an
+   * AO entry.
+   */
   amount: string | null;
   tags: Array<{ name: string; value: string }>;
   timestamp: number;
