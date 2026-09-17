@@ -1,0 +1,5 @@
+{
+  "task": "SIGNING-KEY-ZEROIZATION-WALLET-CORE",
+  "commit_message": "feat(gleam): wallet core (balances, send, receive, activity)",
+  "verified_at": "2026-09-17T03:57:18.860Z"
+}

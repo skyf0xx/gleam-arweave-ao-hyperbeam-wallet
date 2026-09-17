@@ -1,0 +1,5 @@
+{
+  "task": "AO-BALANCE-TOKEN-METADATA-SESSION-KEY-PERSISTENCE",
+  "commit_message": "fix(gleam): persist unlocked signing keys across service-worker restarts",
+  "verified_at": "2026-09-17T02:34:48.561Z"
+}
