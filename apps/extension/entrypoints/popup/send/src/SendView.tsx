@@ -449,7 +449,15 @@ function ComposeStep({
               inputMode="decimal"
               placeholder="0.00"
               value={step.amountDisplay}
-              onChange={(event) => onChange({ amountDisplay: sanitizeAmountInput(event.target.value) })}
+              onChange={(event) => {
+                const sanitized = sanitizeAmountInput(event.target.value);
+                const denomination = token === null ? 12 : token.denomination;
+                const atomic = parseDisplayToAtomic(sanitized, denomination);
+                if (atomic !== null && maxAtomic !== undefined && BigInt(atomic) > BigInt(maxAtomic)) {
+                  return;
+                }
+                onChange({ amountDisplay: sanitized });
+              }}
               onBlur={onBlurAmount}
               className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground focus:outline-none"
             />
