@@ -78,7 +78,7 @@ describe("ui/onboarding: PasswordField", () => {
 describe("ui/onboarding: PasswordStrengthMeter", () => {
   it("renders exactly 4 bars regardless of filled count", () => {
     const { container } = render(<PasswordStrengthMeter filled={2} />);
-    expect(container.querySelectorAll("span").length).toBe(4);
+    expect(container.querySelectorAll("[aria-hidden='true'] > span").length).toBe(4);
   });
 });
 
