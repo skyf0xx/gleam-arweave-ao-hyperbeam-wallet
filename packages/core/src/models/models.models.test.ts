@@ -7,6 +7,7 @@ import type { Wallet } from "./wallet";
 import type { AoTokenTransferRequest, AoTokenTransferResult, TransferDraft } from "./transfer";
 import type { ThemeSettings } from "./theme";
 import type { PortfolioHistory } from "./portfolio-history";
+import type { TokenMetadata } from "./token-metadata";
 
 describe("PERMISSION_TYPES", () => {
   it("carries the known ArConnect-compatible permission scopes", () => {
@@ -229,5 +230,33 @@ describe("domain model shapes", () => {
       periodLabel: "Last 24 hours",
     };
     expect(typeof history.usdChange).toBe("number");
+  });
+
+  it("a TokenMetadata carries every spawn-tag-derived field for an unregistered AO token", () => {
+    const metadata: TokenMetadata = {
+      processId: "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+      denomination: 6,
+      ticker: "wUSDC",
+      name: "Legacy wUSDC",
+      description: "Wrapped USDC",
+      logo: "some-arweave-tx-id",
+      totalSupply: "1000000000000",
+    };
+    expect(metadata.processId).toBe("hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY");
+    expect(typeof metadata.denomination).toBe("number");
+  });
+
+  it("a TokenMetadata field the spawn tags didn't carry is null, never a fabricated default", () => {
+    const metadata: TokenMetadata = {
+      processId: "some-process-id",
+      denomination: null,
+      ticker: null,
+      name: null,
+      description: null,
+      logo: null,
+      totalSupply: null,
+    };
+    expect(metadata.denomination).toBeNull();
+    expect(metadata.totalSupply).toBeNull();
   });
 });
