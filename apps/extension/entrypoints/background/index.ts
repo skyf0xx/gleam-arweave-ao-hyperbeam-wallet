@@ -16,6 +16,7 @@ import { WxtStoragePort } from "@/src/adapters/storage";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
 import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/reads";
+import { handleServiceWorkerSuspend } from "@/src/handlers/key-session";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler, decodeBase64Payload } from "@/src/handlers/approval";
@@ -70,6 +71,14 @@ const approval = new ApprovalHandler(storage, windows, transfer);
 // interval, independent of any popup being open — see reads.ts's own
 // doc comment on registerActivityPromotionAlarm.
 registerActivityPromotionAlarm(reads);
+
+// MV3 can suspend this service worker at any point; onSuspend is the
+// only signal a teardown is imminent, so every cached signing key is
+// zeroized and cleared here rather than left in chrome.storage.session
+// for a future worker instance to inherit unprompted.
+browser.runtime.onSuspend.addListener(() => {
+  void handleServiceWorkerSuspend();
+});
 
 /**
  * Finds every open tab whose URL origin matches `origin` exactly — the

@@ -34,6 +34,31 @@ interface CachedKey {
   address: string;
 }
 
+/**
+ * `zeroize()` (core/vault/zeroize.ts) operates on byte buffers; a
+ * `CachedKey` holds its key material as base64url strings (arweave-js's
+ * `JWKInterface` shape), and `StoragePort` has no in-place overwrite —
+ * only `set`/`remove`. So "zeroize before removal" here means: overwrite
+ * the stored record with an all-zero same-shape record via `set`, then
+ * `remove` it, rather than deleting straight away and leaving whatever
+ * plaintext the underlying storage backend hasn't yet reclaimed.
+ */
+function zeroizedCachedKey(entry: CachedKey): CachedKey {
+  const zeroedJwk = Object.fromEntries(
+    Object.entries(entry.jwk).map(([field, value]) => [field, "0".repeat(value.length)]),
+  ) as unknown as JWKInterface;
+  return { jwk: zeroedJwk, address: "0".repeat(entry.address.length) };
+}
+
+async function zeroizeAndRemove(walletId: string): Promise<void> {
+  const key = `${KEY_PREFIX}${walletId}`;
+  const entry = await storagePort.get<CachedKey>(key);
+  if (entry) {
+    await storagePort.set(key, zeroizedCachedKey(entry));
+  }
+  await storagePort.remove(key);
+}
+
 async function trackWalletId(walletId: string): Promise<void> {
   const ids = (await storagePort.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
   if (!ids.includes(walletId)) {
@@ -64,17 +89,37 @@ export async function hasCachedKey(walletId: string): Promise<boolean> {
   return (await getCachedKey(walletId)) !== null;
 }
 
-/** Drops one wallet's cached key — e.g. `deleteWallet` removing a wallet that was cached. */
+/**
+ * Drops one wallet's cached key — e.g. `deleteWallet` removing a wallet
+ * that was cached. Zeroizes the stored JWK's string fields before
+ * removing the entry (SIGNING-KEY-ZEROIZATION-RULE-1) rather than
+ * deleting it outright.
+ */
 export async function removeCachedKey(walletId: string): Promise<void> {
-  await storagePort.remove(`${KEY_PREFIX}${walletId}`);
+  await zeroizeAndRemove(walletId);
   await untrackWalletId(walletId);
 }
 
-/** Wipes every cached key — every tracked wallet's key, not the rest of session storage. */
+/**
+ * Wipes every cached key — every tracked wallet's key, not the rest of
+ * session storage. Zeroizes each entry's JWK string fields before
+ * removal (SIGNING-KEY-ZEROIZATION-RULE-1), same as `removeCachedKey`.
+ */
 export async function clearKeyCache(): Promise<void> {
   const ids = (await storagePort.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
-  await Promise.all(ids.map((id) => storagePort.remove(`${KEY_PREFIX}${id}`)));
+  await Promise.all(ids.map((id) => zeroizeAndRemove(id)));
   await storagePort.remove(CACHED_WALLET_IDS_KEY);
+}
+
+/**
+ * MV3 service-worker suspension has no timeout to wait out — the worker
+ * is about to be torn down outright, so every currently-cached key is
+ * zeroized and cleared unconditionally (SIGNING-KEY-ZEROIZATION-RULE-2),
+ * regardless of each wallet's individual auto-lock timeout. Registered
+ * against `browser.runtime.onSuspend` by the background entrypoint.
+ */
+export async function handleServiceWorkerSuspend(): Promise<void> {
+  await clearKeyCache();
 }
 
 /**

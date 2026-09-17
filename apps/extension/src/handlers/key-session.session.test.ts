@@ -27,9 +27,15 @@ vi.mock("../adapters/storage", () => ({
   },
 }));
 
-const { cacheKey, clearKeyCache, getCachedKey, hasCachedKey, isSessionExpired, removeCachedKey } = await import(
-  "./key-session"
-);
+const {
+  cacheKey,
+  clearKeyCache,
+  getCachedKey,
+  handleServiceWorkerSuspend,
+  hasCachedKey,
+  isSessionExpired,
+  removeCachedKey,
+} = await import("./key-session");
 
 const jwkA = { kty: "RSA", n: "wallet-a-n", e: "AQAB" } as unknown as JWKInterface;
 const jwkB = { kty: "RSA", n: "wallet-b-n", e: "AQAB" } as unknown as JWKInterface;
@@ -91,6 +97,54 @@ describe("key-session", () => {
     await clearKeyCache();
 
     expect(store.get("session:unlockedSession")).toEqual({ unlockedWalletIds: ["wallet-a"] });
+  });
+
+  it("removeCachedKey overwrites the JWK's string fields with zeros before removing the entry", async () => {
+    const jwk = { kty: "RSA", n: "secret-n", e: "AQAB", d: "secret-d" } as unknown as JWKInterface;
+    await cacheKey("wallet-a", jwk, "address-a");
+
+    const setSpy = vi.spyOn(await import("../adapters/storage").then((m) => m.storagePort), "set");
+
+    await removeCachedKey("wallet-a");
+
+    const zeroizedCall = setSpy.mock.calls.find(([key]) => key === "session:key:wallet-a");
+    expect(zeroizedCall).toBeDefined();
+    const [, zeroizedValue] = zeroizedCall as [string, { jwk: JWKInterface; address: string }];
+    expect(zeroizedValue.jwk.n).toBe("0".repeat("secret-n".length));
+    expect((zeroizedValue.jwk as unknown as { d: string }).d).toBe("0".repeat("secret-d".length));
+    expect(zeroizedValue.address).toBe("0".repeat("address-a".length));
+
+    // and the entry is actually gone afterward, not just overwritten
+    expect(await getCachedKey("wallet-a")).toBeNull();
+    setSpy.mockRestore();
+  });
+
+  it("clearKeyCache overwrites every cached JWK's string fields with zeros before removing them", async () => {
+    await cacheKey("wallet-a", jwkA, "address-a");
+    await cacheKey("wallet-b", jwkB, "address-b");
+
+    const setSpy = vi.spyOn(await import("../adapters/storage").then((m) => m.storagePort), "set");
+
+    await clearKeyCache();
+
+    const zeroizedKeys = setSpy.mock.calls
+      .filter(([key]) => key.startsWith("session:key:"))
+      .map(([key]) => key);
+    expect(zeroizedKeys.sort()).toEqual(["session:key:wallet-a", "session:key:wallet-b"]);
+
+    expect(await getCachedKey("wallet-a")).toBeNull();
+    expect(await getCachedKey("wallet-b")).toBeNull();
+    setSpy.mockRestore();
+  });
+
+  it("handleServiceWorkerSuspend zeroizes and clears every cached key, unconditional of auto-lock timeout", async () => {
+    await cacheKey("wallet-a", jwkA, "address-a");
+    await cacheKey("wallet-b", jwkB, "address-b");
+
+    await handleServiceWorkerSuspend();
+
+    expect(await getCachedKey("wallet-a")).toBeNull();
+    expect(await getCachedKey("wallet-b")).toBeNull();
   });
 
   describe("isSessionExpired", () => {
