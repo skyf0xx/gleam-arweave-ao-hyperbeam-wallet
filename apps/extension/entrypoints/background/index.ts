@@ -15,7 +15,7 @@ import {
 import { WxtStoragePort } from "@/src/adapters/storage";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
-import { ReadsHandler } from "@/src/handlers/reads";
+import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/reads";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler, decodeBase64Payload } from "@/src/handlers/approval";
@@ -65,6 +65,11 @@ const reads = new ReadsHandler(storage);
 const transfer = new TransferHandler(storage);
 const upload = new UploadHandler(storage);
 const approval = new ApprovalHandler(storage, windows, transfer);
+
+// Advances locally-pending activity entries to confirmed on a background
+// interval, independent of any popup being open — see reads.ts's own
+// doc comment on registerActivityPromotionAlarm.
+registerActivityPromotionAlarm(reads);
 
 /**
  * Finds every open tab whose URL origin matches `origin` exactly — the
