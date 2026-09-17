@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   EVENT,
+  PROVIDER_EVENT,
   PROVIDER_SURFACE_METHODS,
   REQUEST,
   RESPONSE,
+  type ConnectEventPayload,
+  type DisconnectEventPayload,
+  type PageEventEnvelope,
   type PageMessageEnvelope,
+  type ProviderEventMap,
+  type ProviderEventName,
+  type WalletSwitchEventPayload,
 } from "./page-protocol";
 import { KEY_METHODS, PROVIDER_METHODS } from "@gleam/core";
 
@@ -88,5 +95,61 @@ describe("PageMessageEnvelope", () => {
       data: { address: "abc" },
     };
     expect(envelope.type).toBe(EVENT);
+  });
+});
+
+describe("PROVIDER_EVENT", () => {
+  it("matches Wander's arweaveWalletLoaded/walletSwitch naming convention for connect/disconnect/walletSwitch", () => {
+    expect(PROVIDER_EVENT.CONNECT).toBe("connect");
+    expect(PROVIDER_EVENT.DISCONNECT).toBe("disconnect");
+    expect(PROVIDER_EVENT.WALLET_SWITCH).toBe("walletSwitch");
+  });
+
+  it("every PROVIDER_EVENT value is a distinct ProviderEventName", () => {
+    const names: ProviderEventName[] = [
+      PROVIDER_EVENT.CONNECT,
+      PROVIDER_EVENT.DISCONNECT,
+      PROVIDER_EVENT.WALLET_SWITCH,
+    ];
+    expect(new Set(names).size).toBe(3);
+  });
+});
+
+describe("ProviderEventMap payload shapes", () => {
+  it("a connect event carries the newly active address", () => {
+    const payload: ProviderEventMap[typeof PROVIDER_EVENT.CONNECT] = {
+      activeAddress: "abc",
+    };
+    const asConnectEventPayload: ConnectEventPayload = payload;
+    expect(asConnectEventPayload.activeAddress).toBe("abc");
+  });
+
+  it("a disconnect event carries no payload fields", () => {
+    const payload: ProviderEventMap[typeof PROVIDER_EVENT.DISCONNECT] = {};
+    const asDisconnectEventPayload: DisconnectEventPayload = payload;
+    expect(Object.keys(asDisconnectEventPayload)).toHaveLength(0);
+  });
+
+  it("a walletSwitch event carries the newly active address, matching Wander's { address } shape", () => {
+    const payload: ProviderEventMap[typeof PROVIDER_EVENT.WALLET_SWITCH] = {
+      address: "xyz",
+    };
+    const asWalletSwitchEventPayload: WalletSwitchEventPayload = payload;
+    expect(asWalletSwitchEventPayload.address).toBe("xyz");
+  });
+
+  it("a real PageEventEnvelope can carry any ProviderEventMap payload for its named event", () => {
+    const connectEnvelope: PageEventEnvelope = {
+      type: EVENT,
+      event: PROVIDER_EVENT.CONNECT,
+      data: { activeAddress: "abc" } satisfies ProviderEventMap[typeof PROVIDER_EVENT.CONNECT],
+    };
+    const walletSwitchEnvelope: PageEventEnvelope = {
+      type: EVENT,
+      event: PROVIDER_EVENT.WALLET_SWITCH,
+      data: { address: "xyz" } satisfies ProviderEventMap[typeof PROVIDER_EVENT.WALLET_SWITCH],
+    };
+    expect(connectEnvelope.event).toBe("connect");
+    expect(walletSwitchEnvelope.event).toBe("walletSwitch");
   });
 });
