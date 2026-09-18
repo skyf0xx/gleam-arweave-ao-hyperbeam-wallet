@@ -18,7 +18,7 @@ import type { JWKInterface } from "../models/wallet";
  * peer `getTokenBalance` reads from, so both paths target one peer, not two
  * independently-configured ones.
  *
- * `@permaweb/aoconnect` is imported dynamically inside `buildClient`, not
+ * `@permaweb/aoconnect` is imported dynamically inside `submitTransfer`, not
  * as a static top-level import: its Node build (`dist/index.js`, the
  * `import` condition Vite resolves) transitively pulls in `axios`, whose
  * browser-env-detection module (`axios/lib/platform/common/utils.js`)
@@ -64,6 +64,15 @@ export const AO_TRANSFER_HAS_NO_FEE = true;
  * token's own smallest unit (matching `TokenBalance.quantity`'s shape) —
  * never a floating-point number.
  *
+ * In `MODE: "mainnet"` aoconnect signs both the ANS-104 data item and the
+ * HTTP-signed request that carries it from the signer registered on
+ * `connect`, so the signer is passed there; it is also passed to
+ * `message()`, matching aoconnect's documented
+ * `message({ process, signer, tags })` call shape. `returnMessageId: true`
+ * is required for the same reason: mainnet `message()` resolves with the
+ * assigned *slot* by default, and `SubmittedAoTransfer` (like the activity
+ * log's `txId`) is a message id, not a slot.
+ *
  * What "submitted" means here: aoconnect's `message()` resolves once the
  * Messenger Unit has accepted and scheduled the signed data item, returning
  * its id — it is not a guarantee the token process has executed the
@@ -84,16 +93,23 @@ export async function submitTransfer(
   recipient: string,
   amount: string,
 ): Promise<SubmittedAoTransfer> {
-  const { message, createDataItemSigner } = await buildClient(peerUrl, jwk);
+  const { connect, createDataItemSigner } = await import("@permaweb/aoconnect");
+  const signer = createDataItemSigner(jwk);
 
-  const messageId = await message({
+  const messageId = await connect({
+    MODE: "mainnet",
+    URL: peerUrl,
+    device: "process@1.0",
+    signer,
+  }).message({
     process: processId,
-    signer: createDataItemSigner(jwk),
+    signer,
     tags: [
       { name: "Action", value: "Transfer" },
       { name: "Recipient", value: recipient },
       { name: "Quantity", value: amount },
     ],
+    returnMessageId: true,
   });
 
   if (typeof messageId !== "string") {
@@ -103,17 +119,4 @@ export async function submitTransfer(
   }
 
   return { messageId };
-}
-
-async function buildClient(peerUrl: string, jwk: JWKInterface) {
-  const { connect, createDataItemSigner } = await import("@permaweb/aoconnect");
-  return {
-    message: connect({
-      MODE: "mainnet",
-      URL: peerUrl,
-      device: "process@1.0",
-      signer: createDataItemSigner(jwk),
-    }).message,
-    createDataItemSigner,
-  };
 }

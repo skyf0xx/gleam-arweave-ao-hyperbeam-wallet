@@ -40,6 +40,24 @@ describe("AO submitTransfer", () => {
     expect(createDataItemSignerMock).toHaveBeenCalledWith(JWK);
   });
 
+  it("registers that signer on the mainnet client, which is what aoconnect signs the data item and request with", async () => {
+    messageMock.mockResolvedValue("msg-id-1");
+    await submitTransfer(PEER, JWK, PROCESS_ID, RECIPIENT, "1000000000000");
+
+    expect(connectMock).toHaveBeenCalledWith(
+      expect.objectContaining({ signer: { __signerFor: JWK } }),
+    );
+  });
+
+  it("requests the message id explicitly, because mainnet message() resolves with the slot by default", async () => {
+    messageMock.mockResolvedValue("msg-id-1");
+    await submitTransfer(PEER, JWK, PROCESS_ID, RECIPIENT, "1000000000000");
+
+    expect(messageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ returnMessageId: true }),
+    );
+  });
+
   it("posts a Transfer message with Action/Recipient/Quantity tags to the token process", async () => {
     messageMock.mockResolvedValue("msg-id-1");
     await submitTransfer(PEER, JWK, PROCESS_ID, RECIPIENT, "42");
