@@ -4,37 +4,42 @@ import { TransferHandler } from "./transfer";
 import { cacheKey, clearKeyCache } from "./key-session";
 
 /**
- * `@permaweb/aoconnect` is a direct dependency of `packages/core` only
- * (per this task's INHERITED DECISIONS), not of `apps/extension` — so a
- * bare-specifier `vi.mock("@permaweb/aoconnect", ...)` here resolves
- * against *this* package's own module graph, which pnpm's strict
- * `node_modules` never even has that package in, and silently fails to
- * intercept the copy `core/ao/transfer.ts` actually imports (resolved
- * through `packages/core`'s own `node_modules`). Mocking by the same
- * absolute resolved path both import sites resolve to works around that
- * without adding a duplicate workspace dependency purely for test
- * resolution — see this task's final report for the scope note.
+ * `@permaweb/aoconnect` and `@dha-team/arbundles` are direct dependencies
+ * of `packages/core` only, not of `apps/extension` — so a bare-specifier
+ * `vi.mock(...)` here resolves against *this* package's own module graph,
+ * which pnpm's strict `node_modules` never even has those packages in,
+ * and silently fails to intercept the copies `core/ao/transfer.ts`
+ * actually imports (resolved through `packages/core`'s own
+ * `node_modules`). Mocking by the same absolute resolved path both import
+ * sites resolve to works around that without adding a duplicate workspace
+ * dependency purely for test resolution.
  */
-const { aoMessageMock, aoconnectResolvedPath } = vi.hoisted(() => {
+const { aoMessageMock, aoconnectBrowserPath, arbundlesWebPath } = vi.hoisted(() => {
   // vi.hoisted runs before ESM imports are initialized, so a static `import`
   // of createRequire isn't available yet at this point; require() is the
   // only way to reach it here.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createRequire } = require("node:module") as typeof import("node:module");
   const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
-  // Vite's ESM resolver follows the package's "import" export condition
-  // (`dist/index.js`), not Node's CJS `require.resolve` default
-  // (`dist/index.cjs`) — mock the exact id Vite's module graph loads, or
-  // the mock silently misses and the real network-calling module runs.
-  const cjsEntry = requireFromCore.resolve("@permaweb/aoconnect");
+  // arbundles' "web" export splits on the "require"/"import" condition the
+  // same way aoconnect's default export does — resolve() follows Node's
+  // CJS default, so the ESM path Vite's module graph actually loads is
+  // derived the same way.
+  const arbundlesCjsEntry = requireFromCore.resolve("@dha-team/arbundles/web");
   return {
     aoMessageMock: vi.fn(),
-    aoconnectResolvedPath: cjsEntry.replace(/index\.cjs$/, "index.js"),
+    aoconnectBrowserPath: requireFromCore.resolve("@permaweb/aoconnect/browser"),
+    arbundlesWebPath: arbundlesCjsEntry.replace("/cjs/", "/esm/"),
   };
 });
-vi.mock(aoconnectResolvedPath, () => ({
+vi.mock(aoconnectBrowserPath, () => ({
   connect: () => ({ message: aoMessageMock }),
-  createDataItemSigner: (jwk: unknown) => ({ __signerFor: jwk }),
+}));
+vi.mock(arbundlesWebPath, () => ({
+  ArweaveSigner: vi.fn().mockImplementation(() => ({
+    publicKey: new Uint8Array(32),
+    sign: vi.fn().mockResolvedValue(new Uint8Array(64)),
+  })),
 }));
 
 /**
@@ -255,24 +260,6 @@ describe("TransferHandler: submitTransfer", () => {
     await cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
-  it("throws a named error when no active HyperBEAM peer is configured for an AO transfer", async () => {
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [],
-      activePeerUrl: null,
-    });
-    const handler = new TransferHandler(storage);
-    await expect(
-      handler.submitTransfer({
-        walletId: WALLET_ID,
-        recipient: "someAoRecipient",
-        token: AO_PROCESS_ID,
-        amount: "1",
-        fee: null,
-      }),
-    ).rejects.toThrow(/active HyperBEAM peer/);
-  });
-
   it("submits an AO transfer via aoconnect and writes an optimistic pending activity entry tagged with the token processId", async () => {
     await storage.set("local:networkSettings", {
       gatewayUrl: "https://arweave.net",
@@ -295,6 +282,9 @@ describe("TransferHandler: submitTransfer", () => {
       expect.objectContaining({
         process: AO_PROCESS_ID,
         tags: [
+          { name: "Data-Protocol", value: "ao" },
+          { name: "Variant", value: "ao.TN.1" },
+          { name: "Type", value: "Message" },
           { name: "Action", value: "Transfer" },
           { name: "Recipient", value: "recipientAoAddr" },
           { name: "Quantity", value: "42" },

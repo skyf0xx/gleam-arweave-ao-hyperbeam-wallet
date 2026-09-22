@@ -1,28 +1,33 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 /**
- * Same resolved-path mocking approach `transfer.send.test.ts` uses:
- * `@permaweb/aoconnect` is a `packages/core`-only dependency, so mocking
- * it by bare specifier from this package's test file would silently miss
- * the copy `core/ao/transfer.ts` actually resolves. Needed here because
- * this file's `transferAoTokens` integration test drives the real
- * dispatcher -> ApprovalHandler -> TransferHandler -> `core/ao/transfer.ts`
- * chain end-to-end, and that last hop would otherwise make a real network
- * call.
+ * `@permaweb/aoconnect` and `@dha-team/arbundles` are `packages/core`-only
+ * dependencies, so mocking them by bare specifier from this package's test
+ * file would silently miss the copies `core/ao/transfer.ts` actually
+ * resolves. Needed here because this file's `transferAoTokens` integration
+ * test drives the real dispatcher -> ApprovalHandler -> TransferHandler ->
+ * `core/ao/transfer.ts` chain end-to-end, and that last hop would
+ * otherwise make a real network call.
  */
-const { aoMessageMock, aoconnectResolvedPath } = vi.hoisted(() => {
+const { aoMessageMock, aoconnectBrowserPath, arbundlesWebPath } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createRequire } = require("node:module") as typeof import("node:module");
   const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
-  const cjsEntry = requireFromCore.resolve("@permaweb/aoconnect");
+  const arbundlesCjsEntry = requireFromCore.resolve("@dha-team/arbundles/web");
   return {
     aoMessageMock: vi.fn(),
-    aoconnectResolvedPath: cjsEntry.replace(/index\.cjs$/, "index.js"),
+    aoconnectBrowserPath: requireFromCore.resolve("@permaweb/aoconnect/browser"),
+    arbundlesWebPath: arbundlesCjsEntry.replace("/cjs/", "/esm/"),
   };
 });
-vi.mock(aoconnectResolvedPath, () => ({
+vi.mock(aoconnectBrowserPath, () => ({
   connect: () => ({ message: aoMessageMock }),
-  createDataItemSigner: (jwk: unknown) => ({ __signerFor: jwk }),
+}));
+vi.mock(arbundlesWebPath, () => ({
+  ArweaveSigner: vi.fn().mockImplementation(() => ({
+    publicKey: new Uint8Array(32),
+    sign: vi.fn().mockResolvedValue(new Uint8Array(64)),
+  })),
 }));
 
 type Handler = (message: { data: unknown }) => unknown;
@@ -86,6 +91,8 @@ vi.mock("wxt/utils/define-background", () => ({
  * above — this is the actual dispatcher code running, not a
  * reimplementation of its logic.
  */
+const originalFetch = globalThis.fetch;
+
 describe("background.ts: providerCall privilege-tier choke point", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -98,6 +105,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     tabsQuery.mockClear();
     tabsQuery.mockResolvedValue([]);
     await import("./index");
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   function providerCall(data: unknown): Promise<unknown> {

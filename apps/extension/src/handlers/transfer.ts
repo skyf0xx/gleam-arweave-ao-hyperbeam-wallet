@@ -159,20 +159,21 @@ export class TransferHandler {
     const { jwk, address } = await this.signingKeyFor(req.walletId);
 
     let txId: string;
-    if (req.token === null) {
-      ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount));
-    } else {
-      if (settings.activePeerUrl === null) {
-        throw new Error("No active HyperBEAM peer is configured — set one in Network & Peers to send AO tokens.");
+    try {
+      if (req.token === null) {
+        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount));
+      } else {
+        const { messageId } = await submitAoTransfer(jwk, req.token, req.recipient, req.amount);
+        txId = messageId;
       }
-      const { messageId } = await submitAoTransfer(
-        settings.activePeerUrl,
-        jwk,
-        req.token,
-        req.recipient,
-        req.amount,
-      );
-      txId = messageId;
+    } catch (error) {
+      // Logged here, not just re-thrown: this runs in the background
+      // service worker, a separate console from wherever the caller
+      // (popup, or a connected dApp's approval flow) surfaces the error
+      // message — without this, the full error/stack is only ever visible
+      // by opening this worker's own devtools at the moment of failure.
+      console.error(`submitTransfer failed (token=${req.token ?? "AR"}):`, error);
+      throw error;
     }
 
     await this.appendActivityLog(address, {

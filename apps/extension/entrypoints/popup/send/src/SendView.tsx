@@ -337,6 +337,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         });
         setStep({ kind: "success", txId: result.txId, recipient: step.recipient, amountAtomic: step.amountAtomic });
       } catch (error) {
+        console.error("submitTransfer failed:", error);
         setStep({ ...step, submitting: false, error: error instanceof Error ? error.message : String(error) });
       }
     };
