@@ -1,34 +1,13 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 /**
- * `@permaweb/aoconnect` and `@dha-team/arbundles` are `packages/core`-only
- * dependencies, so mocking them by bare specifier from this package's test
- * file would silently miss the copies `core/ao/transfer.ts` actually
- * resolves. Needed here because this file's `transferAoTokens` integration
- * test drives the real dispatcher -> ApprovalHandler -> TransferHandler ->
- * `core/ao/transfer.ts` chain end-to-end, and that last hop would
- * otherwise make a real network call.
+ * Needed because this file's `transferAoTokens` integration test drives the
+ * real dispatcher -> ApprovalHandler -> TransferHandler ->
+ * `core/ao/transfer.ts` chain end-to-end, and that last hop would otherwise
+ * sign and post to the real Messenger Unit.
  */
-const { aoMessageMock, aoconnectBrowserPath, arbundlesWebPath } = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createRequire } = require("node:module") as typeof import("node:module");
-  const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
-  const arbundlesCjsEntry = requireFromCore.resolve("@dha-team/arbundles/web");
-  return {
-    aoMessageMock: vi.fn(),
-    aoconnectBrowserPath: requireFromCore.resolve("@permaweb/aoconnect/browser"),
-    arbundlesWebPath: arbundlesCjsEntry.replace("/cjs/", "/esm/"),
-  };
-});
-vi.mock(aoconnectBrowserPath, () => ({
-  connect: () => ({ message: aoMessageMock }),
-}));
-vi.mock(arbundlesWebPath, () => ({
-  ArweaveSigner: vi.fn().mockImplementation(() => ({
-    publicKey: new Uint8Array(32),
-    sign: vi.fn().mockResolvedValue(new Uint8Array(64)),
-  })),
-}));
+const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
+vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
 
 type Handler = (message: { data: unknown }) => unknown;
 
@@ -283,7 +262,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
    * `transferAoTokens` end-to-end, per this task's RELEVANT RULES: exercised
    * through the real dispatcher (`providerCall`) -> `ApprovalHandler`
    * (approval window preview + resolution) -> `TransferHandler.
-   * submitTransfer` -> `core/ao/transfer.ts` (mocked at the aoconnect
+   * submitTransfer` -> `core/ao/transfer.ts` (mocked at its module
    * boundary above, never at any layer this task owns) -> the connected
    * dApp's resolved result. Proves the same approval-gated path every other
    * signing method already goes through, not a trusted-RPC shortcut, and
@@ -291,7 +270,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
    * request.
    */
   it("transferAoTokens routes through connect -> approval window -> signing, never auto-approved", async () => {
-    aoMessageMock.mockResolvedValue("ao-message-id-123");
+    aoSubmitMock.mockResolvedValue({ messageId: "ao-message-id-123" });
 
     await setItem("local:wallets", [
       { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
@@ -358,7 +337,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await resolveApproval({ data: { requestId: request.requestId, approved: true } });
 
     await expect(resultPromise).resolves.toEqual({ id: "ao-message-id-123" });
-    expect(aoMessageMock).toHaveBeenCalledTimes(1);
+    expect(aoSubmitMock).toHaveBeenCalledTimes(1);
   });
 
   it("transferAoTokens for an unconnected origin is rejected before any approval window opens", async () => {

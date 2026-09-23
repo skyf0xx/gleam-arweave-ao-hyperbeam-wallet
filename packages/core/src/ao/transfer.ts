@@ -1,42 +1,29 @@
-import { ArweaveSigner } from "@dha-team/arbundles/web";
 import type { JWKInterface } from "../models/wallet";
 
 /**
- * An AO `Transfer` is a signed ANS-104 data item posted to a legacynet
- * Messenger Unit via `@permaweb/aoconnect`'s `connect()`/`message()`.
- * `connect({ MODE: "legacy" })` resolves aoconnect's own default MU
- * (`https://mu.ao-testnet.xyz`) with no URL to configure — legacynet
- * MU/CU routing is independent of `NetworkSettings.activePeerUrl`, which
- * selects a HyperBEAM peer for `ao/balance.ts`'s `~process@1.0` reads,
- * an unrelated piece of infrastructure.
+ * An AO `Transfer` is a signed ANS-104 data item posted to the legacynet
+ * Messenger Unit. The MU/CU routing here is independent of
+ * `NetworkSettings.activePeerUrl`, which selects a HyperBEAM peer for
+ * `ao/balance.ts`'s `~process@1.0` reads, an unrelated piece of
+ * infrastructure.
  *
  * Tags follow the `ao.TN.1` message protocol
  * (`Data-Protocol`/`Variant`/`Type`/`Action`/`Recipient`/`Quantity`,
  * capitalized) that AO token processes' `Transfer` handler matches on.
  *
- * `@permaweb/aoconnect` is imported dynamically inside `submitTransfer`,
- * not as a static top-level import: its Node build transitively pulls in
- * `axios`, whose browser-env-detection module unconditionally reads
- * `window.location.href` at module-evaluation time, which crashes WXT's
- * background-entrypoint discovery pass (a Node-side module runner where
- * `window` has no `location`). A dynamic `import()` defers evaluation to
- * genuine runtime, where `window.location` exists.
- *
- * Signing does not go through aoconnect's `createDataItemSigner`: its
- * `browser` export condition's signer only accepts an injected wallet
- * (`window.arweaveWallet`), not a raw JWK, and forcing its Node build
- * instead runs `@permaweb/ao-core-libs`'s JWK validation on top of this
- * extension's polyfilled `Buffer`, whose `buffer` package has never
- * implemented the `"base64url"` encoding under real Node — it throws
- * "Invalid base64url encoding in JWK modulus" for a perfectly valid key.
- * `buildJwkSigner` instead matches aoconnect's own `(create, format) => ...`
- * signer contract directly (see its doc comment below), letting aoconnect's
- * `browser` build assemble the ANS-104 item itself and using
- * `@dha-team/arbundles/web`'s `ArweaveSigner` only for the RSA-PSS signing
- * operation, backed by `arweave/web`'s WebCrypto driver.
+ * The data item is built, signed, and posted here with plain `Uint8Array`s
+ * and WebCrypto rather than through `@permaweb/aoconnect`: aoconnect's
+ * browser build re-verifies every signed item through its bundled
+ * arbundles `ArweaveSigner.verify`, which hands the owner's raw bytes to
+ * `crypto.subtle.importKey("jwk", { n: <Uint8Array> })` instead of a
+ * base64url string, so Chrome rejects every signature ("The JWK member 'n'
+ * could not be base64url decoded"). Owning the ~100 lines of ANS-104
+ * encoding also keeps Node polyfills (`Buffer`, `crypto`) out of this path.
  */
+export const AO_LEGACY_MU_URL = "https://mu.ao-testnet.xyz";
+
 export interface SubmittedAoTransfer {
-  /** The data item id aoconnect returns once the Messenger Unit accepts the message. */
+  /** The data item id — base64url SHA-256 of its signature — once the Messenger Unit accepts it. */
   messageId: string;
 }
 
@@ -54,84 +41,172 @@ export interface SubmittedAoTransfer {
  */
 export const AO_TRANSFER_HAS_NO_FEE = true;
 
-/**
- * Builds an aoconnect-compatible signer — `(create, format) => ...` — from
- * a raw JWK, bypassing `createDataItemSigner` (see this module's doc
- * comment). Only the `"ans104"` format is implemented, which is what
- * `message()` requests when posting to the legacynet MU.
- *
- * Mirrors aoconnect's own built-in (Node-only) JWK signer contract: `create`
- * is called with `{ publicKey, type, alg }` and returns the ANS-104 deep
- * hash to sign as a `Uint8Array` — not the full unsigned item — and this
- * returns `{ signature, address }` for aoconnect to embed into the item it
- * assembles itself. Signing the deep hash directly through
- * `ArweaveSigner.sign` (backed by `arweave/web`'s WebCrypto driver) avoids
- * needing `@dha-team/arbundles/web` to build/serialize the item ourselves.
- */
-type AoSignerCreate = (args: {
-  publicKey: Uint8Array;
-  type: number;
-  alg: string;
-}) => Promise<Uint8Array>;
+interface Tag {
+  name: string;
+  value: string;
+}
 
-/**
- * Chrome's WebCrypto `importKey("jwk", ...)` enforces RFC 7518's base64url
- * strictly — no `=` padding, and `-`/`_` in place of `+`/`/` — and rejects
- * the key outright ("The JWK member ... could not be base64url decoded or
- * contained padding") if a field doesn't already comply. Re-encoding every
- * string field defensively here guards against any padded/standard-base64
- * value reaching `ArweaveSigner`, regardless of where in storage/decryption
- * it was introduced.
- */
-function normalizeJwkBase64Url(jwk: JWKInterface): JWKInterface {
-  const toBase64Url = (value: string) => value.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const normalized: Record<string, unknown> = { ...jwk };
-  for (const key of ["n", "e", "d", "p", "q", "dp", "dq", "qi"]) {
-    const value = normalized[key];
-    if (typeof value === "string") {
-      normalized[key] = toBase64Url(value);
+/** ANS-104 signature type 1: Arweave RSA-PSS 4096. */
+const SIGNATURE_TYPE = 1;
+const SIGNATURE_LENGTH = 512;
+const OWNER_LENGTH = 512;
+const MAX_TAG_BYTES = 4096;
+
+type Bytes = Uint8Array<ArrayBuffer>;
+
+const encoder = new TextEncoder();
+
+function base64UrlToBytes(value: string): Bytes {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function concat(...parts: Bytes[]): Bytes {
+  const out = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.byteLength;
+  }
+  return out;
+}
+
+/** Unsigned little-endian integer of `width` bytes, as ANS-104's header fields are encoded. */
+function littleEndian(value: number, width: number): Bytes {
+  const out = new Uint8Array(width);
+  let remaining = value;
+  for (let i = 0; i < width; i += 1) {
+    out[i] = remaining % 256;
+    remaining = Math.floor(remaining / 256);
+  }
+  return out;
+}
+
+/** Avro zigzag-varint `long`, the length prefix ANS-104's tag encoding uses. */
+function avroLong(value: number): number[] {
+  let zigzag = value * 2;
+  const out: number[] = [];
+  do {
+    let byte = zigzag % 128;
+    zigzag = Math.floor(zigzag / 128);
+    if (zigzag > 0) byte |= 128;
+    out.push(byte);
+  } while (zigzag > 0);
+  return out;
+}
+
+/** Avro array-of-`{name, value}`-bytes encoding of `tags`, per ANS-104. */
+function encodeTags(tags: Tag[]): Bytes {
+  if (tags.length === 0) return new Uint8Array();
+  const out = avroLong(tags.length);
+  for (const { name, value } of tags) {
+    for (const field of [encoder.encode(name), encoder.encode(value)]) {
+      out.push(...avroLong(field.byteLength), ...field);
     }
   }
-  return normalized as unknown as JWKInterface;
+  out.push(...avroLong(0));
+  if (out.length > MAX_TAG_BYTES) {
+    throw new Error(`AO message tags encode to ${out.length} bytes, over ANS-104's ${MAX_TAG_BYTES}-byte limit.`);
+  }
+  return new Uint8Array(out);
 }
 
-function buildJwkSigner(rawJwk: JWKInterface) {
-  const jwk = normalizeJwkBase64Url(rawJwk);
-  const arweaveSigner = new ArweaveSigner(jwk);
-  const publicKey = new Uint8Array(arweaveSigner.publicKey);
+async function sha384(data: Bytes): Promise<Bytes> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-384", data));
+}
 
-  return async (create: unknown, format: unknown) => {
-    if (format !== "ans104") {
-      throw new Error(`buildJwkSigner only supports the "ans104" signer format, got "${JSON.stringify(format)}".`);
-    }
+/** Arweave's deep hash over a list of blobs (no nested lists — ANS-104 never needs them). */
+async function deepHash(chunks: Bytes[]): Promise<Bytes> {
+  let accumulator = await sha384(encoder.encode(`list${chunks.length}`));
+  for (const chunk of chunks) {
+    const blobHash = await sha384(concat(await sha384(encoder.encode(`blob${chunk.byteLength}`)), await sha384(chunk)));
+    accumulator = await sha384(concat(accumulator, blobHash));
+  }
+  return accumulator;
+}
 
-    const deepHash = await (create as AoSignerCreate)({ publicKey, type: 1, alg: "rsa-v1_5-sha256" });
-    const signature = await arweaveSigner.sign(deepHash);
-    // The Arweave wallet address is the SHA-256 digest of the raw public
-    // key (the RSA modulus), not the public key itself.
-    const address = new Uint8Array(await crypto.subtle.digest("SHA-256", publicKey));
-
-    return { signature, address };
-  };
+async function signRsaPss(jwk: JWKInterface, message: Bytes): Promise<Bytes> {
+  const { kty, n, e, d, p, q, dp, dq, qi } = jwk;
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    { kty, n, e, d, p, q, dp, dq, qi, ext: true },
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return new Uint8Array(await crypto.subtle.sign({ name: "RSA-PSS", saltLength: 32 }, key, message));
 }
 
 /**
- * Builds, signs, and posts an AO `Transfer` message to `processId` via
- * aoconnect's `message()`, targeting aoconnect's own default legacynet
- * Messenger Unit. `amount` is an atomic-integer string in the token's own
- * smallest unit (matching `TokenBalance.quantity`'s shape) — never a
- * floating-point number. `processId` and `recipient` must be valid
- * 43-character base64url Arweave addresses (32 raw bytes) — aoconnect
- * rejects anything else when building the data item's `target`/`Recipient`
- * tag.
+ * Builds and signs an ANS-104 data item with signature type 1 (Arweave
+ * RSA-PSS), no anchor. Returns the raw item bytes and its id.
+ */
+export async function createSignedDataItem(
+  jwk: JWKInterface,
+  { data, target, tags }: { data: Bytes; target: string; tags: Tag[] },
+): Promise<{ id: string; raw: Bytes }> {
+  const owner = base64UrlToBytes(jwk.n);
+  if (owner.byteLength !== OWNER_LENGTH) {
+    throw new Error(`Expected a ${OWNER_LENGTH}-byte RSA modulus for the signing key, got ${owner.byteLength} bytes.`);
+  }
+  if (!/^[A-Za-z0-9_-]{43}$/.test(target)) {
+    throw new Error(`AO message target must be a 32-byte Arweave id (43 base64url characters), got "${target}".`);
+  }
+  const targetBytes = base64UrlToBytes(target);
+  const anchor = new Uint8Array();
+  const tagBytes = encodeTags(tags);
+
+  const signatureData = await deepHash([
+    encoder.encode("dataitem"),
+    encoder.encode("1"),
+    encoder.encode(String(SIGNATURE_TYPE)),
+    owner,
+    targetBytes,
+    anchor,
+    tagBytes,
+    data,
+  ]);
+  const signature = await signRsaPss(jwk, signatureData);
+  if (signature.byteLength !== SIGNATURE_LENGTH) {
+    throw new Error(`Expected a ${SIGNATURE_LENGTH}-byte RSA-PSS signature, got ${signature.byteLength} bytes.`);
+  }
+
+  const raw = concat(
+    littleEndian(SIGNATURE_TYPE, 2),
+    signature,
+    owner,
+    new Uint8Array([1]),
+    targetBytes,
+    new Uint8Array([0]),
+    littleEndian(tags.length, 8),
+    littleEndian(tagBytes.byteLength, 8),
+    tagBytes,
+    data,
+  );
+  const id = bytesToBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", signature)));
+  return { id, raw };
+}
+
+/**
+ * Builds, signs, and posts an AO `Transfer` message to `processId` via the
+ * legacynet Messenger Unit. `amount` is an atomic-integer string in the
+ * token's own smallest unit (matching `TokenBalance.quantity`'s shape) —
+ * never a floating-point number. `processId` must be a valid 43-character
+ * base64url Arweave id (32 raw bytes) — it becomes the data item's
+ * `target`.
  *
- * What "submitted" means here: aoconnect's `message()` resolves once the
- * Messenger Unit has accepted and scheduled the signed data item,
- * returning its id — it is not a guarantee the token process has
- * executed the `Transfer` handler yet, nor that the recipient's balance
- * has updated. Callers writing an optimistic activity entry from this
- * result should treat status as "message accepted by the MU", not
- * "transfer confirmed".
+ * What "submitted" means here: the MU has accepted and scheduled the
+ * signed data item — not that the token process has executed the
+ * `Transfer` handler yet, nor that the recipient's balance has updated.
+ * Callers writing an optimistic activity entry from this result should
+ * treat status as "message accepted by the MU", not "transfer confirmed".
  */
 export async function submitTransfer(
   jwk: JWKInterface,
@@ -139,18 +214,11 @@ export async function submitTransfer(
   recipient: string,
   amount: string,
 ): Promise<SubmittedAoTransfer> {
-  // "@permaweb/aoconnect/browser" ships no types for its subpath export
-  // (only the package root's `.d.ts` is published); the root export's
-  // `connect` signature is otherwise identical, so it's reused here purely
-  // for typing.
-  // @ts-expect-error -- see comment above; no declaration file for this subpath
-  const { connect }: typeof import("@permaweb/aoconnect") = await import("@permaweb/aoconnect/browser");
-  const signer = buildJwkSigner(jwk);
-  const ao = connect({ MODE: "legacy" });
-
-  const messageId = await ao.message({
-    process: processId,
-    signer,
+  const { id, raw } = await createSignedDataItem(jwk, {
+    // A tag-only message still carries a non-empty body, as other AO
+    // wallets send it, rather than relying on the MU accepting empty data.
+    data: encoder.encode(" "),
+    target: processId,
     tags: [
       { name: "Data-Protocol", value: "ao" },
       { name: "Variant", value: "ao.TN.1" },
@@ -158,14 +226,19 @@ export async function submitTransfer(
       { name: "Action", value: "Transfer" },
       { name: "Recipient", value: recipient },
       { name: "Quantity", value: amount },
+      { name: "Content-Type", value: "text/plain" },
     ],
   });
 
-  if (typeof messageId !== "string") {
-    throw new Error(
-      `Unexpected aoconnect message() result for process "${processId}": expected a message id string, got ${JSON.stringify(messageId)}.`,
-    );
+  const response = await fetch(AO_LEGACY_MU_URL, {
+    method: "POST",
+    headers: { "content-type": "application/octet-stream", accept: "application/json" },
+    body: raw,
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`AO message submission to ${AO_LEGACY_MU_URL} failed (${response.status})${detail ? `: ${detail}` : ""}.`);
   }
 
-  return { messageId };
+  return { messageId: id };
 }

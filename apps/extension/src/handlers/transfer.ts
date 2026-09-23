@@ -145,9 +145,8 @@ export class TransferHandler {
    * confirmation") — the entry is written here, synchronously with the
    * response, not fire-and-forgotten after it.
    *
-   * AO path (`req.token !== null`): "submitted" here means aoconnect's
-   * `message()` resolved with a message id — the Messenger Unit accepted
-   * and scheduled the signed data item, not that the token process has
+   * AO path (`req.token !== null`): "submitted" here means the
+   * Messenger Unit accepted and scheduled the signed data item, not that the token process has
    * executed the `Transfer` handler or that the recipient's balance has
    * updated yet. The entry is written `status: "pending"` on that
    * acceptance, same tier of certainty the AR path already commits to for

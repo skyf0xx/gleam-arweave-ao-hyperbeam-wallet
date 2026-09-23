@@ -3,44 +3,8 @@ import { deriveAddress, generateJWK, type JWKInterface, type StoragePort, type W
 import { TransferHandler } from "./transfer";
 import { cacheKey, clearKeyCache } from "./key-session";
 
-/**
- * `@permaweb/aoconnect` and `@dha-team/arbundles` are direct dependencies
- * of `packages/core` only, not of `apps/extension` — so a bare-specifier
- * `vi.mock(...)` here resolves against *this* package's own module graph,
- * which pnpm's strict `node_modules` never even has those packages in,
- * and silently fails to intercept the copies `core/ao/transfer.ts`
- * actually imports (resolved through `packages/core`'s own
- * `node_modules`). Mocking by the same absolute resolved path both import
- * sites resolve to works around that without adding a duplicate workspace
- * dependency purely for test resolution.
- */
-const { aoMessageMock, aoconnectBrowserPath, arbundlesWebPath } = vi.hoisted(() => {
-  // vi.hoisted runs before ESM imports are initialized, so a static `import`
-  // of createRequire isn't available yet at this point; require() is the
-  // only way to reach it here.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createRequire } = require("node:module") as typeof import("node:module");
-  const requireFromCore = createRequire(`${process.cwd()}/packages/core/package.json`);
-  // arbundles' "web" export splits on the "require"/"import" condition the
-  // same way aoconnect's default export does — resolve() follows Node's
-  // CJS default, so the ESM path Vite's module graph actually loads is
-  // derived the same way.
-  const arbundlesCjsEntry = requireFromCore.resolve("@dha-team/arbundles/web");
-  return {
-    aoMessageMock: vi.fn(),
-    aoconnectBrowserPath: requireFromCore.resolve("@permaweb/aoconnect/browser"),
-    arbundlesWebPath: arbundlesCjsEntry.replace("/cjs/", "/esm/"),
-  };
-});
-vi.mock(aoconnectBrowserPath, () => ({
-  connect: () => ({ message: aoMessageMock }),
-}));
-vi.mock(arbundlesWebPath, () => ({
-  ArweaveSigner: vi.fn().mockImplementation(() => ({
-    publicKey: new Uint8Array(32),
-    sign: vi.fn().mockResolvedValue(new Uint8Array(64)),
-  })),
-}));
+const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
+vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
 
 /**
  * Real key/value store standing in for `adapters/storage.ts`'s
@@ -114,7 +78,7 @@ beforeEach(() => {
 afterEach(async () => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
-  aoMessageMock.mockReset();
+  aoSubmitMock.mockReset();
   await clearKeyCache();
 });
 
@@ -260,13 +224,13 @@ describe("TransferHandler: submitTransfer", () => {
     await cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
-  it("submits an AO transfer via aoconnect and writes an optimistic pending activity entry tagged with the token processId", async () => {
+  it("submits an AO transfer via core/ao/transfer.ts and writes an optimistic pending activity entry tagged with the token processId", async () => {
     await storage.set("local:networkSettings", {
       gatewayUrl: "https://arweave.net",
       peers: [],
       activePeerUrl: "https://hyperbeam.example.com",
     });
-    aoMessageMock.mockResolvedValue("ao-msg-id-1");
+    aoSubmitMock.mockResolvedValue({ messageId: "ao-msg-id-1" });
 
     const handler = new TransferHandler(storage);
     const result = await handler.submitTransfer({
@@ -278,19 +242,7 @@ describe("TransferHandler: submitTransfer", () => {
     });
 
     expect(result.txId).toBe("ao-msg-id-1");
-    expect(aoMessageMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        process: AO_PROCESS_ID,
-        tags: [
-          { name: "Data-Protocol", value: "ao" },
-          { name: "Variant", value: "ao.TN.1" },
-          { name: "Type", value: "Message" },
-          { name: "Action", value: "Transfer" },
-          { name: "Recipient", value: "recipientAoAddr" },
-          { name: "Quantity", value: "42" },
-        ],
-      }),
-    );
+    expect(aoSubmitMock).toHaveBeenCalledWith(expect.objectContaining({ kty: "RSA" }), AO_PROCESS_ID, "recipientAoAddr", "42");
 
     const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
     expect(log).toHaveLength(1);
@@ -308,7 +260,7 @@ describe("TransferHandler: submitTransfer", () => {
       peers: [],
       activePeerUrl: "https://hyperbeam.example.com",
     });
-    aoMessageMock.mockResolvedValue("ao-msg-id-2");
+    aoSubmitMock.mockResolvedValue({ messageId: "ao-msg-id-2" });
     const huge = "90071992547409930000";
 
     const handler = new TransferHandler(storage);
