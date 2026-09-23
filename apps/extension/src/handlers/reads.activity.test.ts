@@ -476,6 +476,86 @@ describe("ReadsHandler: promotePendingActivity", () => {
     expect(updatedLog?.find((e) => e.txId === "tx-still-pending")?.status).toBe("pending");
   });
 
+  it("settles a pending AO send as failed from the CU's Transfer-Error, even once the gateway indexes it", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "ao-msg", type: "send", status: "pending", address: "addr2", amount: "5", tags: [], timestamp: 500, token: "ao-process" },
+    ]);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/result/ao-msg?process-id=ao-process")) {
+        return new Response(
+          JSON.stringify({
+            Messages: [{ Tags: [{ name: "Action", value: "Transfer-Error" }, { name: "Error", value: "Insufficient Balance!" }] }],
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            transactions: {
+              edges: [
+                {
+                  cursor: "ao-msg",
+                  node: { id: "ao-msg", owner: { address: "addr1" }, recipient: "", quantity: { winston: "0" }, tags: [], block: { timestamp: 500 } },
+                },
+              ],
+            },
+          },
+        }),
+      );
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.promotePendingActivity("addr1");
+
+    const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    expect(updatedLog?.find((e) => e.txId === "ao-msg")?.status).toBe("failed");
+    const page = await handler.getActivity({ address: "addr1" });
+    expect(page.entries.find((e) => e.txId === "ao-msg")?.status).toBe("failed");
+  });
+
+  it("settles a pending AO send as confirmed once the CU has evaluated it without error", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "ao-msg", type: "send", status: "pending", address: "addr2", amount: "5", tags: [], timestamp: 500, token: "ao-process" },
+    ]);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes("/result/")
+        ? new Response(JSON.stringify({ Messages: [{ Tags: [{ name: "Action", value: "Debit-Notice" }] }] }))
+        : new Response(JSON.stringify({ data: { transactions: { edges: [] } } })),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.promotePendingActivity("addr1");
+
+    const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    expect(updatedLog?.find((e) => e.txId === "ao-msg")?.status).toBe("confirmed");
+  });
+
+  it("leaves a pending AO send pending while the CU hasn't evaluated it", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "ao-msg", type: "send", status: "pending", address: "addr2", amount: "5", tags: [], timestamp: 500, token: "ao-process" },
+    ]);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes("/result/")
+        ? new Response("not found", { status: 404 })
+        : new Response(JSON.stringify({ data: { transactions: { edges: [] } } })),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.promotePendingActivity("addr1");
+
+    const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    expect(updatedLog?.find((e) => e.txId === "ao-msg")?.status).toBe("pending");
+  });
+
   it("does nothing (no network call) when the address has no pending entries", async () => {
     const storage = createFakeStorage();
     await storage.set("local:activityLog:addr1", [

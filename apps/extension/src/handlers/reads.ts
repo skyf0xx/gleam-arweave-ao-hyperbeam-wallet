@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import { getTokenBalance } from "@gleam/core/src/ao/index.ts";
+import { getTokenBalance, getTransferOutcome } from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import { queryActivityTransactions, queryAoTransferActivity } from "@gleam/core/src/arweave/graphql.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
@@ -374,9 +374,11 @@ export class ReadsHandler {
    * never removes a local entry the gateway hasn't indexed at all.
    */
   async promotePendingActivity(address: string): Promise<void> {
-    const localLog = await this.loadActivityLog(address);
-    const hasPending = localLog.some((entry) => entry.status === "pending");
-    if (!hasPending) return;
+    const storedLog = await this.loadActivityLog(address);
+    if (!storedLog.some((entry) => entry.status === "pending")) return;
+
+    const localLog = await this.resolvePendingAoTransfers(address, storedLog);
+    if (!localLog.some((entry) => entry.status === "pending")) return;
 
     const page = await this.getActivity({ address });
     const promoted = page.entries.filter((entry) => entry.status !== "pending");
@@ -388,6 +390,29 @@ export class ReadsHandler {
     });
 
     await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, nextLog);
+  }
+
+  /**
+   * Settles pending AO sends from the token process's own evaluated result
+   * (`core/ao/result.ts`) rather than the gateway index, which marks an
+   * indexed AO message `"confirmed"` even when the process rejected the
+   * transfer. Entries the CU hasn't evaluated yet stay pending for the
+   * next tick. Persists and returns the updated log.
+   */
+  private async resolvePendingAoTransfers(address: string, localLog: ActivityEntry[]): Promise<ActivityEntry[]> {
+    let changed = false;
+    const resolved = await Promise.all(
+      localLog.map(async (entry) => {
+        if (entry.status !== "pending" || !entry.token) return entry;
+        const outcome = await getTransferOutcome(entry.txId, entry.token);
+        if (outcome.status === "pending") return entry;
+        changed = true;
+        return { ...entry, status: outcome.status };
+      }),
+    );
+
+    if (changed) await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, resolved);
+    return resolved;
   }
 
   /**

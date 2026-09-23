@@ -15,6 +15,11 @@ import type { ActivityEntry, ActivityPage } from "../models/activity";
  * gateway hasn't indexed yet (still genuinely pending, or the gateway
  * hasn't caught up).
  *
+ * Exception: a local entry already settled as `"failed"` stays failed. The
+ * gateway indexing a message only proves it reached the network; a local
+ * failure comes from the AO process's own evaluated result
+ * (`ao/result.ts`), which is the authority on whether a transfer executed.
+ *
  * Pure: no `chrome.*`/window/document/network dependency — the caller
  * (a handler) is responsible for producing both input arrays.
  */
@@ -30,7 +35,9 @@ export function mergeActivity(
   }
   for (const entry of gatewayEntries) {
     // Gateway entries win on conflict — see doc comment.
-    byTxId.set(entry.txId, withFailedAoTransferDetection(entry));
+    const settled = withFailedAoTransferDetection(entry);
+    const local = byTxId.get(entry.txId);
+    byTxId.set(entry.txId, local?.status === "failed" ? { ...settled, status: "failed" } : settled);
   }
 
   const merged = [...byTxId.values()].sort((a, b) => b.timestamp - a.timestamp);

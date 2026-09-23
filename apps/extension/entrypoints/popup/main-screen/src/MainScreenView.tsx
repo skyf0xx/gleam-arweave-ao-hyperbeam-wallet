@@ -514,7 +514,13 @@ export function MainScreenView({
                     key={entry.txId}
                     activityType={entry.type}
                     title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address)}`}
-                    subtitle={entry.status === "pending" ? "Pending confirmation" : relativeTime(entry.timestamp)}
+                    subtitle={
+                      entry.status === "pending"
+                        ? "Pending confirmation"
+                        : entry.status === "failed"
+                          ? "Failed"
+                          : relativeTime(entry.timestamp)
+                    }
                     amountLabel={entry.amount ? `${entry.type === "receive" ? "+" : "-"}${formatWinstonAsAr(entry.amount)} AR` : "—"}
                     amountTone={entry.type === "receive" ? "positive" : "neutral"}
                     pending={entry.status === "pending"}

@@ -33,6 +33,16 @@ describe("mergeActivity", () => {
     expect(page.entries[0]?.status).toBe("confirmed");
   });
 
+  it("keeps a local entry settled as failed even when the gateway reports it confirmed", () => {
+    const local = [entry({ txId: "tx-1", timestamp: 100, status: "failed" })];
+    const gateway = [entry({ txId: "tx-1", timestamp: 100, status: "confirmed" })];
+
+    const page = mergeActivity(local, gateway, 10);
+
+    expect(page.entries).toHaveLength(1);
+    expect(page.entries[0]?.status).toBe("failed");
+  });
+
   it("keeps a local-only pending entry the gateway hasn't indexed yet", () => {
     const local = [entry({ txId: "still-pending", timestamp: 300, status: "pending" })];
     const gateway: ActivityEntry[] = [];
