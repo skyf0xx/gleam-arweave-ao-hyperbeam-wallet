@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeAll, afterEach } from "vitest";
-import { DataItem } from "@dha-team/arbundles";
+import { DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import { AO_LEGACY_MU_URL, AO_TRANSFER_HAS_NO_FEE, createSignedDataItem, submitTransfer } from "./transfer";
@@ -25,13 +25,36 @@ function stubMu(response: Response = new Response("{}", { status: 200 })) {
   return fetchMock;
 }
 
+/**
+ * Independent check of the signature over arbundles' own parse and deep
+ * hash of the item. Not `DataItem.verify`: arbundles' web build hands the
+ * owner's raw bytes to WebCrypto as the JWK `n` (the bug `transfer.ts`
+ * exists to avoid), and its Node build needs `axios`, which this package
+ * doesn't depend on.
+ */
+async function verifies(item: DataItem): Promise<boolean> {
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    { kty: "RSA", e: "AQAB", n: item.owner },
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+  return crypto.subtle.verify(
+    { name: "RSA-PSS", saltLength: 32 },
+    key,
+    new Uint8Array(item.rawSignature),
+    new Uint8Array(await item.getSignatureData()),
+  );
+}
+
 function postedItem(fetchMock: ReturnType<typeof stubMu>): DataItem {
   const [, init] = fetchMock.mock.calls[0]!;
   return new DataItem(Buffer.from(init!.body as Uint8Array));
 }
 
 describe("createSignedDataItem", () => {
-  it("produces an ANS-104 item that arbundles independently verifies, with the id derived from its signature", async () => {
+  it("produces an ANS-104 item whose signature verifies over arbundles' own parse, with the id derived from its signature", async () => {
     const { id, raw } = await createSignedDataItem(jwk, {
       data: new TextEncoder().encode("hello"),
       target: PROCESS_ID,
@@ -39,12 +62,18 @@ describe("createSignedDataItem", () => {
     });
 
     const item = new DataItem(Buffer.from(raw));
-    expect(await DataItem.verify(Buffer.from(raw))).toBe(true);
+    expect(await verifies(item)).toBe(true);
     expect(item.id).toBe(id);
     expect(item.owner).toBe(jwk.n);
     expect(item.target).toBe(PROCESS_ID);
     expect(item.tags).toEqual([{ name: "Action", value: "Transfer" }]);
     expect(Buffer.from(item.rawData).toString()).toBe("hello");
+  });
+
+  it("fails verification once a signed field is tampered with", async () => {
+    const { raw } = await createSignedDataItem(jwk, { data: new TextEncoder().encode("hello"), target: PROCESS_ID, tags: [] });
+    raw[raw.byteLength - 1]! ^= 1;
+    expect(await verifies(new DataItem(Buffer.from(raw)))).toBe(false);
   });
 
   it("rejects a target that isn't a 32-byte Arweave id", async () => {
@@ -66,7 +95,7 @@ describe("AO submitTransfer", () => {
         headers: expect.objectContaining({ "content-type": "application/octet-stream" }),
       }),
     );
-    expect(await DataItem.verify(postedItem(fetchMock).getRaw())).toBe(true);
+    expect(await verifies(postedItem(fetchMock))).toBe(true);
   }, 20_000);
 
   it("sends an ao.TN.1 Transfer message targeting the process, with capitalized tags", async () => {
