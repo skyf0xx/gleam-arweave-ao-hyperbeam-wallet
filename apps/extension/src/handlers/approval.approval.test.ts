@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { generateJWK, type StoragePort, type WindowPort } from "@gleam/core";
+import { generateJWK, verifyMessage, type StoragePort, type WindowPort } from "@gleam/core";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 
@@ -48,8 +48,11 @@ function createWatchableStorage(): StoragePort {
       return store.has(key) ? (store.get(key) as T) : null;
     },
     async set<T>(key: string, value: T) {
-      store.set(key, value);
-      for (const cb of watchers.get(key) ?? []) cb(value);
+      // chrome.storage keeps only JSON-shaped data: a Uint8Array comes
+      // back as a plain object, so the fake must lose it the same way.
+      const stored: unknown = JSON.parse(JSON.stringify(value));
+      store.set(key, stored);
+      for (const cb of watchers.get(key) ?? []) cb(stored);
     },
     async remove(key: string) {
       store.delete(key);
@@ -379,28 +382,55 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await expect(pending).rejects.toThrow(/gateway url/i);
   });
 
-  it("signMessage with a cached key produces a real signature", async () => {
+  it("signMessage returns the signature bytes, which verify against the wallet's public key", async () => {
     const jwk = await generateJWK();
     await cacheKey(WALLET_ID, jwk, "abc-address");
+    const message = new TextEncoder().encode("hello");
 
     const pending = handler.requestApproval({
       kind: "signMessage",
       origin: "https://bazar.arweave.net",
       walletId: WALLET_ID,
-      payload: new TextEncoder().encode("hello"),
+      payload: message,
+      hashAlgorithm: "SHA-384",
     });
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
     const requestId = extractRequestId(windows.opened[0]!);
 
     await handler.resolveApproval({ requestId, approved: true });
 
-    const result = (await pending) as { signature: ArrayBuffer };
-    // Duck-typed rather than `toBeInstanceOf(ArrayBuffer)`: this test
-    // environment's ArrayBuffer global can differ in realm/identity from
-    // the one the vault crypto executed against, the same cross-realm
-    // gotcha `core/vault/zeroize.ts`'s own doc comment documents.
-    expect(typeof result.signature.byteLength).toBe("number");
-    expect(result.signature.byteLength).toBeGreaterThan(0);
+    const signature = (await pending) as Uint8Array;
+    expect(ArrayBuffer.isView(signature)).toBe(true);
+    expect(signature.byteLength).toBe(512);
+    await expect(
+      verifyMessage(jwk.n, message.buffer, signature.slice().buffer, "SHA-384"),
+    ).resolves.toBe(true);
+  });
+
+  it("encrypt and decrypt survive the storage round trip, including an AES IV", async () => {
+    const jwk = await generateJWK();
+    await cacheKey(WALLET_ID, jwk, "abc-address");
+    const plaintext = new TextEncoder().encode("secret");
+    const iv = new Uint8Array(12).fill(7);
+
+    async function approve(kind: "encrypt" | "decrypt", payload: Uint8Array): Promise<Uint8Array> {
+      const pending = handler.requestApproval({
+        kind,
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload,
+        encryptAlgorithm: { name: "AES-GCM", iv: iv.buffer },
+      });
+      await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
+      const requestId = extractRequestId(windows.opened.pop()!);
+      await handler.resolveApproval({ requestId, approved: true });
+      return (await pending) as Uint8Array;
+    }
+
+    const ciphertext = await approve("encrypt", plaintext);
+    expect(ArrayBuffer.isView(ciphertext)).toBe(true);
+    const decrypted = await approve("decrypt", ciphertext);
+    expect(new TextDecoder().decode(decrypted)).toBe("secret");
   });
 });
 

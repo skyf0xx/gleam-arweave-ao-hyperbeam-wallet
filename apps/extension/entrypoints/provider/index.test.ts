@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { REQUEST, RESPONSE } from "@gleam/messaging/src/page-protocol.ts";
-import { encodeBinary, decodeBinary, GleamProvider, install } from "./index";
+import { GleamProvider, install } from "./index";
 
 /**
  * Unit-tests the injected provider script's pure bridge logic directly
@@ -26,37 +26,6 @@ import { encodeBinary, decodeBinary, GleamProvider, install } from "./index";
 function postResponse(data: unknown): void {
   window.dispatchEvent(new MessageEvent("message", { data, source: window }));
 }
-
-describe("provider.ts: binary tagging (ARCHITECTURE.md §4.3 point 6)", () => {
-  it("encodes a Uint8Array as a tagged object", () => {
-    const bytes = new Uint8Array([1, 2, 3]);
-    expect(encodeBinary(bytes)).toEqual({ __gleamType: "Uint8Array", data: [1, 2, 3] });
-  });
-
-  it("encodes an ArrayBuffer as a tagged object", () => {
-    const buffer = new Uint8Array([9, 8, 7]).buffer;
-    expect(encodeBinary(buffer)).toEqual({ __gleamType: "ArrayBuffer", data: [9, 8, 7] });
-  });
-
-  it("round-trips a Uint8Array through encode then decode", () => {
-    const bytes = new Uint8Array([5, 6, 7, 8]);
-    const decoded = decodeBinary(encodeBinary(bytes)) as Uint8Array;
-    expect(Array.from(decoded)).toEqual([5, 6, 7, 8]);
-  });
-
-  it("round-trips nested binary values inside plain objects/arrays", () => {
-    const input = { tags: [{ value: new Uint8Array([1]) }], plain: "hello" };
-    const decoded = decodeBinary(encodeBinary(input)) as typeof input;
-    expect(Array.from(decoded.tags[0]!.value as Uint8Array)).toEqual([1]);
-    expect(decoded.plain).toBe("hello");
-  });
-
-  it("leaves non-binary values untouched", () => {
-    expect(encodeBinary("hello")).toBe("hello");
-    expect(encodeBinary(42)).toBe(42);
-    expect(encodeBinary(null)).toBe(null);
-  });
-});
 
 describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
   let provider: GleamProvider;
@@ -100,6 +69,16 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
 
     postResponse({ type: RESPONSE, id: envelope.id, result: { id: "ao-message-id-123" } });
     await expect(callPromise).resolves.toEqual({ id: "ao-message-id-123" });
+  });
+
+  it("verifyMessage forwards Wander's four arguments with binary tagged", () => {
+    void provider.verifyMessage(new Uint8Array([1]), "c2ln", "pubkey", { hashAlgorithm: "SHA-512" });
+    expect(lastRequestEnvelope().params).toEqual({
+      data: { __gleamType: "Uint8Array", data: [1] },
+      signature: "c2ln",
+      publicKey: "pubkey",
+      options: { hashAlgorithm: "SHA-512" },
+    });
   });
 
   it("ignores a RESPONSE whose event.source is not window (point 1)", async () => {

@@ -1,5 +1,4 @@
 import {
-  base64ToBytes,
   bytesToBase64,
   batchSignDataItem,
   decrypt,
@@ -24,6 +23,7 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
+import { decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 import { getCachedKey } from "./key-session";
 
 /**
@@ -185,8 +185,14 @@ export type CreateApprovalInput =
   | ({ origin: string; walletId: string } & ConnectRequestInput)
   | ({ origin: string; walletId: string } & SigningRequestInput);
 
+/**
+ * `result` and `signingInput` hold bytes (payloads, AES IVs, signatures),
+ * and `chrome.storage` serializes a `Uint8Array` as a plain object. Both
+ * are stored through the tagged-binary codec and decoded when read.
+ */
 interface ApprovalOutcome {
   approved: boolean;
+  /** Tagged-binary encoded. */
   result?: unknown;
   error?: string;
 }
@@ -194,8 +200,8 @@ interface ApprovalOutcome {
 interface PendingApprovalRecord {
   request: ApprovalRequest;
   walletId: string;
-  /** Only set for signing requests — never persisted for a `connect` request past this point. */
-  signingInput: SigningRequestInput | null;
+  /** A tagged-binary encoded `SigningRequestInput`; `null` for a `connect` request. */
+  signingInput: unknown;
   /** Set by `resolveApproval` immediately before the record is removed. */
   outcome?: ApprovalOutcome;
 }
@@ -312,7 +318,7 @@ export class ApprovalHandler {
     pending.push({
       request,
       walletId: input.walletId,
-      signingInput: input.kind === "connect" ? null : input,
+      signingInput: input.kind === "connect" ? null : encodeTaggedBinary(input),
     });
     await this.savePending(pending);
 
@@ -350,7 +356,7 @@ export class ApprovalHandler {
         } else if (outcome.error) {
           reject(new Error(outcome.error));
         } else {
-          resolve(outcome.result);
+          resolve(decodeTaggedBinary(outcome.result));
         }
       });
     });
@@ -395,7 +401,7 @@ export class ApprovalHandler {
       outcome = { approved: false };
     } else {
       try {
-        outcome = { approved: true, result: await this.finalizeApproval(entry) };
+        outcome = { approved: true, result: encodeTaggedBinary(await this.finalizeApproval(entry)) };
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
@@ -448,7 +454,7 @@ export class ApprovalHandler {
    * than prompting.
    */
   private async performSigning(entry: PendingApprovalRecord): Promise<unknown> {
-    const input = entry.signingInput;
+    const input = decodeTaggedBinary(entry.signingInput) as SigningRequestInput | null;
     if (!input) {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
@@ -503,39 +509,26 @@ export class ApprovalHandler {
         if (!input.encryptAlgorithm) {
           throw new Error("encrypt requires an algorithm.");
         }
-        const ciphertext = await encrypt(
-          jwk,
-          input.payload as Uint8Array<ArrayBuffer>,
-          input.encryptAlgorithm,
-        );
-        return { data: bytesToBase64(ciphertext) };
+        return encrypt(jwk, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
       }
 
       case "decrypt": {
         if (!input.encryptAlgorithm) {
           throw new Error("decrypt requires an algorithm.");
         }
-        const plaintext = await decrypt(
-          jwk,
-          input.payload as Uint8Array<ArrayBuffer>,
-          input.encryptAlgorithm,
-        );
-        return { data: bytesToBase64(plaintext) };
+        return decrypt(jwk, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
       }
 
       case "signature": {
-        const signature = await vaultSignature(jwk, toArrayBuffer(input.payload));
-        return { signature: bytesToBase64(new Uint8Array(signature)) };
+        return new Uint8Array(await vaultSignature(jwk, toArrayBuffer(input.payload)));
       }
 
       case "signMessage": {
-        const signature = await vaultSignMessage(jwk, toArrayBuffer(input.payload), input.hashAlgorithm);
-        return { signature };
+        return new Uint8Array(await vaultSignMessage(jwk, toArrayBuffer(input.payload), input.hashAlgorithm));
       }
 
       case "privateHash": {
-        const hash = await vaultPrivateHash(jwk, toArrayBuffer(input.payload), input.hashAlgorithm);
-        return { hash };
+        return new Uint8Array(await vaultPrivateHash(jwk, toArrayBuffer(input.payload), input.hashAlgorithm));
       }
 
       default: {
@@ -592,8 +585,4 @@ export class ApprovalHandler {
   async getConnectedApps(): Promise<Grant[]> {
     return this.loadGrants();
   }
-}
-
-export function decodeBase64Payload(data: string): Uint8Array {
-  return base64ToBytes(data);
 }

@@ -1,7 +1,7 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
-import { PERMISSION_TYPES, PROVIDER_METHODS, verifyMessage, type PermissionType } from "@gleam/core";
+import { PERMISSION_TYPES, PROVIDER_METHODS, base64ToBytes, verifyMessage, type PermissionType } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
@@ -19,7 +19,15 @@ import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/rea
 import { handleServiceWorkerSuspend } from "@/src/handlers/key-session";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
-import { ApprovalHandler, decodeBase64Payload, type SigningRequestInput } from "@/src/handlers/approval";
+import { ApprovalHandler } from "@/src/handlers/approval";
+import {
+  decodeProviderParams,
+  encodeProviderResult,
+  readBytes,
+  readEncryptAlgorithm,
+  readHashAlgorithm,
+  type ProviderArgs,
+} from "@/src/handlers/provider-params";
 
 /**
  * The background service-worker entrypoint (this task's debt #1, and the
@@ -165,7 +173,7 @@ async function broadcastWalletSwitch(address: string): Promise<void> {
 async function handleProviderCall(
   origin: string,
   method: ProviderSurfaceMethod,
-  params: unknown,
+  params: ProviderArgs,
 ): Promise<unknown> {
   if (method === "connect") {
     const requested = Array.isArray((params as { permissions?: unknown } | undefined)?.permissions)
@@ -244,7 +252,7 @@ async function handleProviderCall(
         data?: string;
         tags?: Array<{ name: string; value: string }>;
       };
-      const payload = signingParams.data ? decodeBase64Payload(signingParams.data) : new Uint8Array();
+      const payload = signingParams.data ? base64ToBytes(signingParams.data) : new Uint8Array();
       const { gatewayUrl } = await reads.getNetworkSettings();
       return approval.requestApproval({
         kind: method,
@@ -270,7 +278,7 @@ async function handleProviderCall(
         target?: string;
         anchor?: string;
       };
-      const payload = signingParams.data ? decodeBase64Payload(signingParams.data) : new Uint8Array();
+      const payload = signingParams.data ? base64ToBytes(signingParams.data) : new Uint8Array();
       return approval.requestApproval({
         kind: method,
         origin,
@@ -305,7 +313,7 @@ async function handleProviderCall(
         target: item.target,
         anchor: item.anchor,
       }));
-      const payload = dataItems[0]?.data ? decodeBase64Payload(dataItems[0].data) : new Uint8Array();
+      const payload = dataItems[0]?.data ? base64ToBytes(dataItems[0].data) : new Uint8Array();
       return approval.requestApproval({
         kind: method,
         origin,
@@ -316,20 +324,14 @@ async function handleProviderCall(
     }
 
     case "encrypt":
-    case "decrypt": {
-      const cryptoParams = params as { data?: string; algorithm?: unknown };
-      const payload = cryptoParams.data ? decodeBase64Payload(cryptoParams.data) : new Uint8Array();
-      if (!cryptoParams.algorithm || typeof cryptoParams.algorithm !== "object") {
-        throw new Error(`${method} requires an algorithm.`);
-      }
+    case "decrypt":
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: grant.walletId,
-        payload,
-        encryptAlgorithm: cryptoParams.algorithm as SigningRequestInput["encryptAlgorithm"],
+        payload: readBytes(params.data, "data", method === "encrypt" ? "utf8" : "reject"),
+        encryptAlgorithm: readEncryptAlgorithm(params.options, method),
       });
-    }
 
     case "transferAoTokens": {
       const transferParams = params as { token?: string; recipient?: string; amount?: string };
@@ -351,43 +353,30 @@ async function handleProviderCall(
 
     case "signature":
     case "signMessage":
-    case "privateHash": {
-      const messageParams = params as { data?: string; options?: { hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512" } };
-      const payload = messageParams.data ? decodeBase64Payload(messageParams.data) : new Uint8Array();
+    case "privateHash":
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: grant.walletId,
-        payload,
-        hashAlgorithm: messageParams.options?.hashAlgorithm,
+        payload: readBytes(params.data, "data"),
+        hashAlgorithm: method === "signature" ? undefined : readHashAlgorithm(params.options, method),
       });
-    }
 
     case "verifyMessage": {
-      // Pure verification against a caller-supplied public key — no
-      // wallet key material is used, so this needs no approval window,
-      // matching `tokenBalance`/`userTokens`'s read-only precedent.
-      const verifyParams = params as {
-        publicKey?: string;
-        data?: string;
-        signature?: string;
-        options?: { hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512" };
-      };
-      if (!verifyParams.publicKey || !verifyParams.data || !verifyParams.signature) {
-        throw new Error("verifyMessage requires publicKey, data, and signature.");
+      // Verification uses only public material, so it needs no approval.
+      // Wander defaults `publicKey` to the active wallet's key.
+      const data = readBytes(params.data, "data");
+      const signature = readBytes(params.signature, "signature", "base64url");
+      const publicKey = params.publicKey ?? wallet?.publicKey;
+      if (typeof publicKey !== "string" || publicKey.length === 0) {
+        throw new Error("verifyMessage needs a publicKey when no wallet is active.");
       }
-      const dataBytes = decodeBase64Payload(verifyParams.data);
-      const signatureBytes = decodeBase64Payload(verifyParams.signature);
-      const valid = await verifyMessage(
-        verifyParams.publicKey,
-        dataBytes.buffer.slice(dataBytes.byteOffset, dataBytes.byteOffset + dataBytes.byteLength) as ArrayBuffer,
-        signatureBytes.buffer.slice(
-          signatureBytes.byteOffset,
-          signatureBytes.byteOffset + signatureBytes.byteLength,
-        ) as ArrayBuffer,
-        verifyParams.options?.hashAlgorithm,
+      return verifyMessage(
+        publicKey,
+        data.buffer,
+        signature.buffer,
+        readHashAlgorithm(params.options, "verifyMessage"),
       );
-      return { valid };
     }
 
     case "tokenBalance": {
@@ -518,7 +507,9 @@ messenger.onMessage("providerCall", (message) => {
   if (!PROVIDER_SURFACE_METHODS.includes(message.data.method)) {
     throw new Error(`Unknown provider method "${message.data.method}".`);
   }
-  return handleProviderCall(message.data.origin, message.data.method, message.data.params);
+  const { origin, method, params } = message.data;
+  return (async () =>
+    encodeProviderResult(await handleProviderCall(origin, method, decodeProviderParams(params))))();
 });
 
 export default defineBackground(() => {

@@ -11,27 +11,14 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Provider message calls never reach the background in a usable shape (M, 🧪, opus)**
-  `entrypoints/provider/index.ts`, `entrypoints/background/index.ts`,
-  `src/handlers/approval.ts`. The provider posts `{ data, options }` with
-  `data` as a tagged binary (`{__gleamType, data: number[]}`), but the
-  background calls `decodeBase64Payload(params.data)` and reads
-  `params.options.hashAlgorithm` / `params.algorithm`. So `signMessage`,
-  `signature`, `privateHash`, `encrypt`, `decrypt` and `verifyMessage` fail
-  on any real dApp call (`encrypt`/`decrypt` always throw "requires an
-  algorithm"). Done: one shared decoder for provider params in the
-  background; these six methods accept Wander's argument shapes
-  (`verifyMessage(data, signature, publicKey?, options?)` with `publicKey`
-  defaulting to the active key); results match Wander (`Uint8Array` for
-  signatures, hashes and ciphertext, `boolean` for `verifyMessage`, not
-  `{signature}` / `{hash}` / `{data: base64}` / `{valid}`). Tests drive a
-  request through the provider, the content relay and the background.
 - [ ] **`sign` and `dispatch` ignore the dApp's transaction (M, 🧪, opus)**
-  Same files, plus `core/vault/signing.ts`. The provider sends
+  `entrypoints/background/index.ts`, `src/handlers/approval.ts`,
+  `core/vault/signing.ts`. The provider sends
   `{ transaction, options }`, but the background reads
   `target` / `data` / `tags` from the top level, so the approval preview and
-  the signed transaction are empty. arweave-js tags arrive base64url-encoded
-  and `addTag` would encode them again. Done: unwrap `transaction`, decode
+  the signed transaction are empty. Read the arguments through
+  `src/handlers/provider-params.ts` like the message methods do. arweave-js
+  tags arrive base64url-encoded and `addTag` would encode them again. Done: unwrap `transaction`, decode
   its data and tags, and return what `arweave.transactions.sign(tx)` expects
   from `window.arweaveWallet.sign` (`id`, `owner`, `signature`, `reward`,
   `tags`). `dispatch` returns `{ id, type }`. Test with arweave-js
@@ -291,3 +278,15 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- **`signMessage` / `verifyMessage` / `signature` don't use Wander's construction (opus)**
+  `core/vault/message-signing.ts`. Wander (and permawebOS) sign the
+  `hashAlgorithm` digest of the data with RSA-PSS, salt length 32, and
+  verify the same way. Gleam signs the raw data with salt length equal to
+  the digest size, so its signatures only verify against Gleam's own
+  `verifyMessage`. `signature()` also ignores Wander's `saltLength` option.
+- **Large approval payloads may exceed `chrome.storage.session`'s quota (sonnet)**
+  `src/handlers/approval.ts`. Pending approvals store the payload as a
+  tagged byte array (a JSON number per byte) so it survives storage. A
+  payload of a few MB can pass the 10 MB session quota. Relevant to the
+  `sign`/`dispatch` item: consider base64 in storage, or a size limit.

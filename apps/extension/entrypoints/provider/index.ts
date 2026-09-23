@@ -4,12 +4,13 @@ import {
   REQUEST,
   RESPONSE,
   PROVIDER_SURFACE_METHODS,
+  decodeTaggedBinary,
+  encodeTaggedBinary,
   type PageEventEnvelope,
   type PageMessageEnvelope,
   type PageRequestEnvelope,
   type PageResponseEnvelope,
   type ProviderSurfaceMethod,
-  type TaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
@@ -49,47 +50,6 @@ interface PendingCall {
   timeoutId: ReturnType<typeof setTimeout>;
 }
 
-function isTaggedBinary(value: unknown): value is TaggedBinary {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    ((value as TaggedBinary).__gleamType === "ArrayBuffer" ||
-      (value as TaggedBinary).__gleamType === "Uint8Array")
-  );
-}
-
-/** Recursively encodes `ArrayBuffer`/`Uint8Array` values before they cross `postMessage`. */
-function encodeBinary(value: unknown): unknown {
-  if (value instanceof Uint8Array) {
-    return { __gleamType: "Uint8Array", data: Array.from(value) } satisfies TaggedBinary;
-  }
-  if (value instanceof ArrayBuffer) {
-    return { __gleamType: "ArrayBuffer", data: Array.from(new Uint8Array(value)) } satisfies TaggedBinary;
-  }
-  if (Array.isArray(value)) {
-    return value.map(encodeBinary);
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, encodeBinary(entry)]));
-  }
-  return value;
-}
-
-/** The inverse of `encodeBinary`, applied to an incoming response's `result`. */
-function decodeBinary(value: unknown): unknown {
-  if (isTaggedBinary(value)) {
-    const bytes = Uint8Array.from(value.data);
-    return value.__gleamType === "ArrayBuffer" ? bytes.buffer : bytes;
-  }
-  if (Array.isArray(value)) {
-    return value.map(decodeBinary);
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, decodeBinary(entry)]));
-  }
-  return value;
-}
-
 class GleamProvider {
   readonly walletName = WALLET_NAME;
   private readonly pending = new Map<string, PendingCall>();
@@ -125,7 +85,7 @@ class GleamProvider {
     if (envelope.error) {
       pending.reject(new Error(envelope.error.message));
     } else {
-      pending.resolve(decodeBinary(envelope.result));
+      pending.resolve(decodeTaggedBinary(envelope.result));
     }
   }
 
@@ -169,7 +129,7 @@ class GleamProvider {
         type: REQUEST,
         id,
         method,
-        params: encodeBinary(params),
+        params: encodeTaggedBinary(params),
       };
       window.postMessage(request, "*");
     });
@@ -254,8 +214,8 @@ class GleamProvider {
     return this.call("privateHash", { data, options: rest }, signal);
   }
 
-  verifyMessage(data?: unknown, signature?: unknown, publicKey?: unknown): Promise<unknown> {
-    return this.call("verifyMessage", { data, signature, publicKey });
+  verifyMessage(data?: unknown, signature?: unknown, publicKey?: unknown, options?: unknown): Promise<unknown> {
+    return this.call("verifyMessage", { data, signature, publicKey, options });
   }
 
   signDataItem(dataItem?: unknown): Promise<unknown> {
@@ -310,4 +270,4 @@ export default defineUnlistedScript(() => {
 // Exports for `provider.provider.test.ts`, which exercises the real
 // `window.postMessage`/`addEventListener` round trip against jsdom's
 // `window` directly (no extension context needed for any of it).
-export { encodeBinary, decodeBinary, GleamProvider, install, PROVIDER_SURFACE_METHODS };
+export { GleamProvider, install, PROVIDER_SURFACE_METHODS };

@@ -5,6 +5,8 @@ import {
   PROVIDER_SURFACE_METHODS,
   REQUEST,
   RESPONSE,
+  decodeTaggedBinary,
+  encodeTaggedBinary,
   type ConnectEventPayload,
   type DisconnectEventPayload,
   type PageEventEnvelope,
@@ -151,5 +153,44 @@ describe("ProviderEventMap payload shapes", () => {
     };
     expect(connectEnvelope.event).toBe("connect");
     expect(walletSwitchEnvelope.event).toBe("walletSwitch");
+  });
+});
+
+describe("tagged binary codec", () => {
+  it("encodes a Uint8Array as a tagged object", () => {
+    expect(encodeTaggedBinary(new Uint8Array([1, 2, 3]))).toEqual({ __gleamType: "Uint8Array", data: [1, 2, 3] });
+  });
+
+  it("encodes an ArrayBuffer as a tagged object", () => {
+    expect(encodeTaggedBinary(new Uint8Array([9, 8, 7]).buffer)).toEqual({ __gleamType: "ArrayBuffer", data: [9, 8, 7] });
+  });
+
+  it("encodes only the viewed bytes of a subarray", () => {
+    const view = new Uint8Array([0, 1, 2, 3]).subarray(1, 3);
+    expect(encodeTaggedBinary(view)).toEqual({ __gleamType: "Uint8Array", data: [1, 2] });
+  });
+
+  it("round-trips a Uint8Array and an ArrayBuffer to their own types", () => {
+    const bytes = decodeTaggedBinary(encodeTaggedBinary(new Uint8Array([5, 6]))) as Uint8Array;
+    expect(ArrayBuffer.isView(bytes)).toBe(true);
+    expect(Array.from(bytes)).toEqual([5, 6]);
+
+    const buffer = decodeTaggedBinary(encodeTaggedBinary(new Uint8Array([7]).buffer)) as ArrayBuffer;
+    expect(ArrayBuffer.isView(buffer)).toBe(false);
+    expect(Array.from(new Uint8Array(buffer))).toEqual([7]);
+  });
+
+  it("round-trips nested binary values through JSON", () => {
+    const input = { tags: [{ value: new Uint8Array([1]) }], plain: "hello" };
+    const decoded = decodeTaggedBinary(JSON.parse(JSON.stringify(encodeTaggedBinary(input)))) as typeof input;
+    expect(Array.from(decoded.tags[0]!.value)).toEqual([1]);
+    expect(decoded.plain).toBe("hello");
+  });
+
+  it("leaves non-binary values untouched", () => {
+    expect(encodeTaggedBinary("hello")).toBe("hello");
+    expect(encodeTaggedBinary(42)).toBe(42);
+    expect(encodeTaggedBinary(null)).toBe(null);
+    expect(decodeTaggedBinary({ __gleamType: "Uint8Array" })).toEqual({ __gleamType: "Uint8Array" });
   });
 });

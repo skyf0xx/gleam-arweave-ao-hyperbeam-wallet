@@ -1,4 +1,5 @@
 import type { JWKInterface } from "../models/wallet";
+import { base64UrlToBytes } from "./base64";
 
 /**
  * `signMessage()`/`signature()`/`privateHash()`/`verifyMessage()`,
@@ -32,17 +33,6 @@ import type { JWKInterface } from "../models/wallet";
  *   dApp expecting bit-for-bit ArConnect parity should treat this as
  *   provisional.
  */
-
-function base64UrlToBytes(value: string): Uint8Array {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (padded.length % 4)) % 4);
-  const binary = atob(padded + padding);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
 
 const HASH_ALGORITHM_BITS: Record<"SHA-256" | "SHA-384" | "SHA-512", number> = {
   "SHA-256": 256,

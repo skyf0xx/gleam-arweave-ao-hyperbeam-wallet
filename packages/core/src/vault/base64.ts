@@ -19,3 +19,9 @@ export function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
   }
   return bytes;
 }
+
+/** Accepts base64url with or without padding, as Arweave encodes keys and signatures. */
+export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
+  const standard = value.replace(/-/g, "+").replace(/_/g, "/");
+  return base64ToBytes(standard + "=".repeat((4 - (standard.length % 4)) % 4));
+}

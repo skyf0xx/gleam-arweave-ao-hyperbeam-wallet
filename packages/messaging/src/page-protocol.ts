@@ -59,6 +59,62 @@ export interface TaggedUint8Array {
 
 export type TaggedBinary = TaggedArrayBuffer | TaggedUint8Array;
 
+export function isTaggedBinary(value: unknown): value is TaggedBinary {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Partial<TaggedBinary>;
+  return (
+    (candidate.__gleamType === "ArrayBuffer" || candidate.__gleamType === "Uint8Array") &&
+    Array.isArray(candidate.data)
+  );
+}
+
+// `instanceof` is avoided on purpose: WebCrypto results, page values and
+// test globals can each come from a different realm.
+function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Replaces every `ArrayBuffer` and typed-array view with a `TaggedBinary`.
+ * Needed on both hops: `postMessage` between page and content script, and
+ * the JSON serialization of extension messaging and `chrome.storage`.
+ */
+export function encodeTaggedBinary(value: unknown): unknown {
+  if (isArrayBuffer(value)) {
+    return { __gleamType: "ArrayBuffer", data: Array.from(new Uint8Array(value)) } satisfies TaggedArrayBuffer;
+  }
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return { __gleamType: "Uint8Array", data: Array.from(bytes) } satisfies TaggedUint8Array;
+  }
+  if (Array.isArray(value)) {
+    return value.map(encodeTaggedBinary);
+  }
+  if (isPlainRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, encodeTaggedBinary(entry)]));
+  }
+  return value;
+}
+
+/** The inverse of `encodeTaggedBinary`. */
+export function decodeTaggedBinary(value: unknown): unknown {
+  if (isTaggedBinary(value)) {
+    const bytes = Uint8Array.from(value.data);
+    return value.__gleamType === "ArrayBuffer" ? bytes.buffer : bytes;
+  }
+  if (Array.isArray(value)) {
+    return value.map(decodeTaggedBinary);
+  }
+  if (isPlainRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, decodeTaggedBinary(entry)]));
+  }
+  return value;
+}
+
 /**
  * A page → content script request envelope. `id` is generated with
  * `crypto.randomUUID()` per request and matched on the response
