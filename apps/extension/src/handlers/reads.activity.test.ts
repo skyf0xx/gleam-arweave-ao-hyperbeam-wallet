@@ -510,10 +510,14 @@ describe("ReadsHandler: promotePendingActivity", () => {
     const handler = new ReadsHandler(storage);
     await handler.promotePendingActivity("addr1");
 
-    const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    const updatedLog = await storage.get<Array<{ txId: string; status: string; error?: string | null }>>(
+      "local:activityLog:addr1",
+    );
     expect(updatedLog?.find((e) => e.txId === "ao-msg")?.status).toBe("failed");
+    expect(updatedLog?.find((e) => e.txId === "ao-msg")?.error).toBe("Insufficient Balance!");
     const page = await handler.getActivity({ address: "addr1" });
     expect(page.entries.find((e) => e.txId === "ao-msg")?.status).toBe("failed");
+    expect(page.entries.find((e) => e.txId === "ao-msg")?.error).toBe("Insufficient Balance!");
   });
 
   it("settles a pending AO send as confirmed once the CU has evaluated it without error", async () => {

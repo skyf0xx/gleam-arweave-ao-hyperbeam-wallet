@@ -33,6 +33,14 @@ export interface ActivityEntry {
    * IDs and AR transaction IDs are drawn from disjoint id spaces.
    */
   token?: string | null;
+  /**
+   * Why a `"failed"` entry failed — the AO token process's own rejection
+   * reason (`ao/result.ts`'s `Transfer-Error`/thrown-handler `Error`, or
+   * the gateway-indexed `Error` tag `mergeActivity` detects), shown
+   * verbatim in the activity row. `null`/omitted for a non-AO failure or
+   * one whose reason wasn't captured.
+   */
+  error?: string | null;
 }
 
 export interface ActivityPage {

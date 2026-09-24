@@ -108,6 +108,36 @@ describe("mergeActivity", () => {
     expect(page.entries[0]?.status).toBe("failed");
   });
 
+  it("carries the Error tag's value onto the failed entry's error field", () => {
+    const gateway = [
+      entry({
+        txId: "ao-failed",
+        timestamp: 100,
+        status: "confirmed",
+        tags: [
+          { name: "Data-Protocol", value: "ao" },
+          { name: "Error", value: "Insufficient Balance" },
+        ],
+      }),
+    ];
+
+    const page = mergeActivity([], gateway, 10);
+
+    expect(page.entries[0]?.error).toBe("Insufficient Balance");
+  });
+
+  it("keeps the local entry's error reason when it already settled as failed", () => {
+    const local = [
+      entry({ txId: "tx-1", timestamp: 100, status: "failed", error: "Insufficient Balance!" }),
+    ];
+    const gateway = [entry({ txId: "tx-1", timestamp: 100, status: "confirmed" })];
+
+    const page = mergeActivity(local, gateway, 10);
+
+    expect(page.entries[0]?.status).toBe("failed");
+    expect(page.entries[0]?.error).toBe("Insufficient Balance!");
+  });
+
   it("leaves a successful AO transfer (Data-Protocol: ao, no Error tag) confirmed", () => {
     const gateway = [
       entry({

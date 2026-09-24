@@ -37,7 +37,10 @@ export function mergeActivity(
     // Gateway entries win on conflict — see doc comment.
     const settled = withFailedAoTransferDetection(entry);
     const local = byTxId.get(entry.txId);
-    byTxId.set(entry.txId, local?.status === "failed" ? { ...settled, status: "failed" } : settled);
+    byTxId.set(
+      entry.txId,
+      local?.status === "failed" ? { ...settled, status: "failed", error: local.error ?? settled.error } : settled,
+    );
   }
 
   const merged = [...byTxId.values()].sort((a, b) => b.timestamp - a.timestamp);
@@ -75,10 +78,10 @@ function withFailedAoTransferDetection(entry: ActivityEntry): ActivityEntry {
   );
   if (!isAoProtocol) return entry;
 
-  const hasErrorTag = entry.tags.some((tag) => tag.name.toLowerCase() === "error");
-  if (!hasErrorTag) return entry;
+  const errorTag = entry.tags.find((tag) => tag.name.toLowerCase() === "error");
+  if (!errorTag) return entry;
 
-  return { ...entry, status: "failed" };
+  return { ...entry, status: "failed", error: errorTag.value };
 }
 
 /**

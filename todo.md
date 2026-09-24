@@ -13,11 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Store and show why an AO send failed (S, sonnet)**
-  `core/ao/result.ts` returns `{ status: "failed", error }`, but
-  `ReadsHandler.resolvePendingAoTransfers` (`src/handlers/reads.ts`) saves
-  only the status. Done: the reason is persisted on the entry and shown in
-  the activity row.
 - [ ] **AO amounts in the activity list are labelled "AR" (S, sonnet)**
   `popup/main-screen/src/MainScreenView.tsx:524` formats every entry with
   `formatWinstonAsAr(...) AR`. Done: token entries use the token's

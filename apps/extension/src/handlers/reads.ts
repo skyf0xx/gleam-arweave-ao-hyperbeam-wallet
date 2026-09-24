@@ -196,7 +196,8 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
     typeof candidate.address === "string" &&
     (candidate.amount === null || typeof candidate.amount === "string") &&
     Array.isArray(candidate.tags) &&
-    typeof candidate.timestamp === "number"
+    typeof candidate.timestamp === "number" &&
+    (candidate.error === undefined || candidate.error === null || typeof candidate.error === "string")
   );
 }
 
@@ -397,7 +398,9 @@ export class ReadsHandler {
    * (`core/ao/result.ts`) rather than the gateway index, which marks an
    * indexed AO message `"confirmed"` even when the process rejected the
    * transfer. Entries the CU hasn't evaluated yet stay pending for the
-   * next tick. Persists and returns the updated log.
+   * next tick. A `"failed"` outcome's reason is persisted on the entry's
+   * `error` field for the activity row to show. Persists and returns the
+   * updated log.
    */
   private async resolvePendingAoTransfers(address: string, localLog: ActivityEntry[]): Promise<ActivityEntry[]> {
     let changed = false;
@@ -407,7 +410,11 @@ export class ReadsHandler {
         const outcome = await getTransferOutcome(entry.txId, entry.token);
         if (outcome.status === "pending") return entry;
         changed = true;
-        return { ...entry, status: outcome.status };
+        return {
+          ...entry,
+          status: outcome.status,
+          error: outcome.status === "failed" ? outcome.error : entry.error,
+        };
       }),
     );
 

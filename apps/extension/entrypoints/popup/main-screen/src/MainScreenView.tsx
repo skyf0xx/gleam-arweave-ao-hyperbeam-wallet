@@ -518,7 +518,9 @@ export function MainScreenView({
                       entry.status === "pending"
                         ? "Pending confirmation"
                         : entry.status === "failed"
-                          ? "Failed"
+                          ? entry.error
+                            ? `Failed · ${entry.error}`
+                            : "Failed"
                           : relativeTime(entry.timestamp)
                     }
                     amountLabel={entry.amount ? `${entry.type === "receive" ? "+" : "-"}${formatWinstonAsAr(entry.amount)} AR` : "—"}
