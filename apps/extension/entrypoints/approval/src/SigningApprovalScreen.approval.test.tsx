@@ -7,11 +7,13 @@ afterEach(() => {
   cleanup();
 });
 
+// Winston atomic-integer strings, matching what `background/index.ts`
+// actually puts on the wire: 50 AR and an 0.0008 AR fee.
 const TRANSFER_PREVIEW: SigningApprovalPreview = {
   kind: "dispatch",
   recipient: "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kLp",
-  amount: "50.00 AO",
-  fee: "0.0008 AR",
+  amount: "50000000000000",
+  fee: "800000000",
   token: null,
   decodedData: null,
   tags: [],
@@ -174,5 +176,24 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     );
 
     expect(screen.queryByText(/…/)).toBeNull();
+  });
+
+  it("formats a sign/dispatch preview's raw Winston amount and fee as AR, and totals them", () => {
+    render(
+      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
+    );
+
+    // amount: 50000000000000 Winston -> "50", fee: 800000000 Winston -> "0.0008"
+    expect(screen.getByText("50")).toBeTruthy();
+    expect(screen.getByText("0.0008")).toBeTruthy();
+    // Total = 50 + 0.0008 = 50.0008 AR
+    expect(screen.getByText("50.0008")).toBeTruthy();
+  });
+
+  it("shows a placeholder rather than a raw Winston string when fee is unknown", () => {
+    const preview: SigningApprovalPreview = { ...TRANSFER_PREVIEW, fee: null };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getByText("—")).toBeTruthy();
   });
 });

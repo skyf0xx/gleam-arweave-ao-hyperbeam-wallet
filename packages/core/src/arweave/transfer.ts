@@ -21,17 +21,23 @@ export interface FeeQuote {
 }
 
 /**
- * Reads a fee quote for a plain AR value transfer, via the gateway's
- * `price` endpoint (byte size 0 — the transaction carries no data). Pure
- * network read, no signing.
+ * Reads a fee quote via the gateway's `price` endpoint. Pure network read,
+ * no signing.
  *
  * `recipient` is optional, but omitting it underquotes: the gateway adds
  * a new-wallet fee once a target is known and isn't yet in the wallet
  * list, so a recipient-less quote can be lower than the real one.
+ *
+ * `byteSize` defaults to 0 (a plain AR value transfer with no data). A
+ * caller quoting a data transaction (e.g. a dApp's `sign`/`dispatch`
+ * request with no `reward` of its own) must pass the actual payload size —
+ * arweave-js prices a transaction by its real `data.byteLength` when it
+ * signs, so a 0-byte quote for a non-empty payload underquotes the fee
+ * that will actually be charged.
  */
-export async function estimateFee(gatewayUrl: string, recipient?: string): Promise<FeeQuote> {
+export async function estimateFee(gatewayUrl: string, recipient?: string, byteSize = 0): Promise<FeeQuote> {
   const client = buildClient(gatewayUrl);
-  const fee = await client.transactions.getPrice(0, recipient);
+  const fee = await client.transactions.getPrice(byteSize, recipient);
   return { fee };
 }
 

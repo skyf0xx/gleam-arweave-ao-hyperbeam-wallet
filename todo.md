@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 3. dApp provider gaps
 
-- [ ] **`sign`/`dispatch` preview shows raw Winston and no fee (S, sonnet)**
-  `entrypoints/approval/src/SigningApprovalScreen.tsx`,
-  `entrypoints/background/index.ts`. Done: the amount is formatted as AR,
-  and Fee shows the dApp's `reward` (or the fetched price when it's
-  missing) and is included in Total.
 - [ ] **`addToken`, `isTokenAdded` and `walletVersion` are missing (M, opus)**
   `packages/messaging/src/page-protocol.ts`, `core/models/method-privileges.ts`,
   `entrypoints/provider/index.ts`, `entrypoints/background/index.ts`. Done:
@@ -83,3 +78,12 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- **`transferAoTokens`'s signing-approval preview shows the raw atomic amount, undenominated (S)**
+  `entrypoints/approval/src/SigningApprovalScreen.tsx`'s `formatAmount`,
+  `entrypoints/background/index.ts`'s `transferAoTokens` case. Unlike
+  `sign`/`dispatch` (AR, 12 decimals, now formatted), an AO transfer's
+  approval preview has no token denomination available at that layer, so
+  its amount still renders as a raw smallest-unit integer. Wiring in the
+  token's `denomination` (already read for balances) would let it use
+  `formatAtomicAsDisplay` for real instead of a no-op.

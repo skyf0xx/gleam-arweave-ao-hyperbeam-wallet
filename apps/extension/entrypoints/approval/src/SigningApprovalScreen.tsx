@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SigningApprovalPreview } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
+import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
 /**
  * The highest-stakes screen in the product: recipient, amount, fee, a
@@ -51,6 +52,38 @@ function actionCopy(preview: SigningApprovalPreview): string {
  */
 function shortenProcessId(processId: string): string {
   return processId.length > 12 ? `${processId.slice(0, 6)}…${processId.slice(-4)}` : processId;
+}
+
+/**
+ * `preview.amount`/`preview.fee` are atomic-integer strings (Winston for
+ * the native AR token, `preview.token`'s own smallest unit otherwise —
+ * see `SigningApprovalPreview.token`'s doc comment). `fee` is always AR
+ * (an AO transfer has no sender-side fee — `core/ao/transfer.ts`'s
+ * `AO_TRANSFER_HAS_NO_FEE`), so it's formatted with `formatWinstonAsAr`
+ * regardless of what `token` the amount itself is denominated in.
+ */
+function formatAmount(atomic: string | null, token: string | null): string {
+  if (atomic === null) return "—";
+  return token === null ? formatWinstonAsAr(atomic) : formatAtomicAsDisplay(atomic, 0);
+}
+
+function formatFee(fee: string | null): string {
+  return fee === null ? "—" : formatWinstonAsAr(fee);
+}
+
+/**
+ * AR-denominated Total (amount + fee), shown next to the raw amount for a
+ * `sign`/`dispatch` preview so the review screen never implies the fee is
+ * separate from what leaves the wallet. `null` for anything not
+ * AR-denominated (`transferAoTokens`'s fee is always `null`).
+ */
+function formatTotal(amount: string | null, fee: string | null, token: string | null): string {
+  if (token !== null || amount === null || fee === null) return formatAmount(amount, token);
+  try {
+    return formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString());
+  } catch {
+    return "—";
+  }
 }
 
 function hostnameOf(origin: string): string {
@@ -105,7 +138,7 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
           <>
             <div className="flex flex-col items-center gap-1 py-1 text-center">
               <span className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-                {preview.amount ?? "—"}
+                {formatAmount(preview.amount, preview.token)}
               </span>
               {preview.token != null ? (
                 <span className="text-caption font-semibold uppercase tracking-wide text-muted">
@@ -124,8 +157,8 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
             <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
-              <ReviewRow label="Fee" value={preview.fee ?? "—"} />
-              <ReviewRow label="Total" value={preview.amount ?? "—"} strong />
+              <ReviewRow label="Fee" value={formatFee(preview.fee)} />
+              <ReviewRow label="Total" value={formatTotal(preview.amount, preview.fee, preview.token)} strong />
             </div>
           </>
         ) : null}

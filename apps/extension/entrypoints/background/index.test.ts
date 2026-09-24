@@ -420,6 +420,148 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   });
 
   /**
+   * The `sign`/`dispatch` preview's fee is what will actually be charged.
+   * When the dApp's transaction leaves `reward` out, the dispatcher must
+   * quote one from the gateway (mirroring `signTransaction`/
+   * `dispatchTransaction`'s own arweave-js default) rather than showing
+   * `null`/raw Winston with no fee at all.
+   */
+  it("sign quotes a fee from the gateway when the dApp's transaction omits reward", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    const fetchMock = vi.fn().mockResolvedValue(new Response("654321", { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const resultPromise = providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "sign",
+      params: { transaction: { target: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", quantity: "1000" } },
+    });
+    resultPromise.catch(() => {});
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+
+    const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+      request: { requestId: string; preview: Record<string, unknown> };
+    }>;
+    expect(pendingRaw).toHaveLength(1);
+    expect(pendingRaw[0]!.request.preview).toMatchObject({ fee: "654321" });
+
+    const resolveApproval = registeredHandlers.get("resolveApproval")!;
+    await resolveApproval({ data: { requestId: pendingRaw[0]!.request.requestId, approved: false } });
+  });
+
+  /**
+   * arweave-js prices a transaction by its real `data.byteLength` when it
+   * signs (see `signTransaction`/`dispatchTransaction`'s `buildTransaction`
+   * passing the actual payload through). A quote fixed at 0 bytes would
+   * underquote any non-empty payload — this proves the quote request's
+   * URL carries the dApp's real data size, not a hardcoded 0.
+   */
+  it("sign's fee quote for a data-carrying transaction prices the actual payload size, not 0 bytes", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    const fetchMock = vi.fn().mockResolvedValue(new Response("999999999", { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    // 1000 bytes of payload, base64url-encoded (readTransaction decodes a
+    // string `data` field the same way a real dApp's dispatch() call does).
+    const payload = new Uint8Array(1000).fill(65);
+    const base64Url = Buffer.from(payload).toString("base64url");
+
+    const resultPromise = providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "sign",
+      params: {
+        transaction: {
+          target: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          quantity: "1000",
+          data: base64Url,
+        },
+      },
+    });
+    resultPromise.catch(() => {});
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+
+    const priceUrl = fetchMock.mock.calls.map((call) => String(call[0])).find((url) => url.includes("/price/"));
+    expect(priceUrl).toContain("/price/1000/");
+
+    const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+      request: { requestId: string; preview: Record<string, unknown> };
+    }>;
+    expect(pendingRaw[0]!.request.preview).toMatchObject({ fee: "999999999" });
+
+    const resolveApproval = registeredHandlers.get("resolveApproval")!;
+    await resolveApproval({ data: { requestId: pendingRaw[0]!.request.requestId, approved: false } });
+  });
+
+  it("sign uses the dApp's own reward as the fee, without quoting one from the gateway", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const resultPromise = providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "sign",
+      params: { transaction: { target: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", quantity: "1000", reward: "999999" } },
+    });
+    resultPromise.catch(() => {});
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+
+    const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+      request: { requestId: string; preview: Record<string, unknown> };
+    }>;
+    expect(pendingRaw).toHaveLength(1);
+    expect(pendingRaw[0]!.request.preview).toMatchObject({ fee: "999999" });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const resolveApproval = registeredHandlers.get("resolveApproval")!;
+    await resolveApproval({ data: { requestId: pendingRaw[0]!.request.requestId, approved: false } });
+  });
+
+  /**
    * PROVIDER-EVENTS-ACCOUNT-SWITCH-PROVIDER-BRIDGE: `postProviderEvent`
    * wiring at the real connect/disconnect/switchWallet call sites, and the
    * access-control boundary (only a tab whose origin holds an active Grant

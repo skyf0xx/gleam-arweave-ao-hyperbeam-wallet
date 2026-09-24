@@ -41,6 +41,7 @@ import {
   type ProviderArgs,
 } from "@/src/handlers/provider-params";
 import { contentScriptOrigin, isExtensionPageSender } from "@/src/sender";
+import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
 
 /**
  * The background service worker: builds the adapters and handlers and
@@ -276,13 +277,19 @@ async function handleProviderCall(
     case "dispatch": {
       const transaction = readTransaction(params.transaction, method);
       const { gatewayUrl } = await reads.getNetworkSettings();
+      // The dApp's reward is the fee actually charged; only fall back to a
+      // fresh quote (matching `signTransaction`/`dispatchTransaction`'s own
+      // arweave-js default) when it left the field out, so the preview
+      // never shows a fee different from what gets signed.
+      const fee =
+        transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: activeWalletId(),
         recipient: transaction.target ?? null,
         amount: transaction.target ? (transaction.quantity ?? "0") : null,
-        fee: null,
+        fee,
         payload: transaction.data,
         tags: transaction.tags,
         gatewayUrl,
