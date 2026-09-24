@@ -11,6 +11,22 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
+- [ ] **"Immediately" auto-lock uses a 1-minute grace (S, sonnet)**
+  `src/handlers/key-session.ts` (`AUTO_LOCK_TIMEOUT_MS`: `immediate` is
+  0 ms), `popup/lock-settings/src/LockSettingsView.tsx`. A 0 ms timeout
+  locks the wallet the moment it's unlocked, so nothing can ever sign.
+  Done: `immediate` means 1 minute after the last activity, and the
+  option's label or hint says so. Tests.
+- [ ] **Deleting a wallet keeps site grants and announces the new active wallet (S, opus)**
+  `entrypoints/background/index.ts` (`deleteWallet`),
+  `src/handlers/approval.ts` (`revokeWalletAccess`). Grants belong to the
+  site and follow the active wallet (decided), but deleting a wallet still
+  revokes by `grant.walletId`, and deleting the active wallet moves
+  `activeWalletId` without a `walletSwitch` push. Done: deleting a wallet
+  revokes no grants unless it was the last wallet (then all are revoked,
+  as on reset). Pending approvals for the deleted wallet are still
+  rejected. When the active wallet changes, connected sites get
+  `walletSwitch` with the new address. Tests.
 
 ## 2. Core wallet flows
 
@@ -252,15 +268,6 @@ vault, crypto and provider security; `sonnet` for everything else.
   reverse: it bundles only small, zero-quantity transactions and posts the
   rest as base transactions. Confirm Wander's rule. At minimum, never
   bundle when `quantity` isn't zero.
-- **"Immediately" auto-lock locks before the user can do anything (❓, opus)**
-  `src/handlers/key-session.ts` (`isSessionExpired`: `"immediate"` is
-  0 ms), `wallet-lifecycle.ts` (`getState`). The session expires on any
-  read 1 ms after the last activity, so the popup's own `getState` after
-  unlock locks it, and every key read now fails too. Only `getState`
-  refreshes `lastActivityAt`, so a popup left open past the timeout also
-  fails its next send with "locked" and no unlock prompt. Decide what
-  "Immediately" means (likely "when the popup closes") and whether a
-  user-initiated send or approval counts as activity.
 - **The signing-key-zeroization intent still requires an onSuspend wipe (sonnet)**
   `.hedgehog/intents/signing-key-zeroization.json` (RULE-2 and its test
   rule). The background no longer clears keys on `runtime.onSuspend`
@@ -279,12 +286,3 @@ vault, crypto and provider security; `sonnet` for everything else.
   but a profile reset before that change keeps grants whose `walletId` no
   longer exists, and `getAllAddresses` still answers them. Treat a grant
   whose wallet is gone as inactive and drop it.
-- **Deleting a wallet disconnects by the wallet that approved, and never announces the new active wallet (S, opus)**
-  `entrypoints/background/index.ts` (`deleteWallet`),
-  `src/handlers/approval.ts` (`revokeWalletAccess`). Provider calls follow
-  the active wallet, but revocation still matches `grant.walletId`, the
-  wallet that approved `connect`. Deleting that wallet disconnects dApps
-  that now see another one, and deleting the active wallet moves
-  `activeWalletId` to another wallet without a `walletSwitch` push. Decide
-  what `grant.walletId` means now, and emit `walletSwitch` when a delete
-  changes the active wallet.
