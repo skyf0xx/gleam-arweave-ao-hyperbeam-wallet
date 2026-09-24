@@ -8,6 +8,7 @@ import {
   bytesToBase64,
   missingPermissions,
   verifyMessage,
+  type ConnectAppInfo,
   type PermissionType,
   type WalletSummary,
 } from "@gleam/core";
@@ -170,6 +171,39 @@ async function broadcastWalletSwitch(address: string): Promise<void> {
 }
 
 /**
+ * The dApp's own claim of who it is, passed to `connect(permissions,
+ * appInfo)` per ArConnect's `AppInfo` shape. Untrusted input — only the
+ * two display fields are kept, and only when they're strings, so a
+ * malformed or hostile payload degrades to `null` (the approval screen's
+ * origin-derived fallback) instead of throwing or storing garbage.
+ */
+/** Caps `appInfo.name` so an unbounded dApp-supplied string can't break the approval screen's layout. */
+const APP_INFO_NAME_MAX_LENGTH = 64;
+
+function readAppInfo(value: unknown): ConnectAppInfo | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as { name?: unknown; logo?: unknown };
+  const trimmedName = typeof candidate.name === "string" ? candidate.name.trim() : "";
+  const name = trimmedName.length > 0 ? trimmedName.slice(0, APP_INFO_NAME_MAX_LENGTH) : null;
+  const logo = typeof candidate.logo === "string" ? candidate.logo : null;
+  if (name === null && logo === null) return null;
+  return { name, logo };
+}
+
+/**
+ * ArConnect's `getArweaveConfig()` shape, derived from the wallet's own
+ * `NetworkSettings.gatewayUrl` rather than a dApp-supplied `connect(...,
+ * gateway)` hint — a dApp doesn't get to redirect a connected wallet's
+ * reads to a gateway of its choosing.
+ */
+function arweaveConfigFromGatewayUrl(gatewayUrl: string): { protocol: string; host: string; port: number } {
+  const url = new URL(gatewayUrl);
+  const protocol = url.protocol.replace(":", "");
+  const port = url.port ? Number(url.port) : protocol === "https" ? 443 : 80;
+  return { protocol, host: url.hostname, port };
+}
+
+/**
  * Maps a `PROVIDER_SURFACE_METHODS` name + already-origin-checked params
  * into the actual read/approval-flow work, distinct from `providerCall`'s
  * own job (the privilege-tier gate). No `WalletState` read here ever
@@ -191,6 +225,7 @@ async function handleProviderCall(
       : [];
 
     const wanted: PermissionType[] = requested.length > 0 ? requested : ["ACCESS_ADDRESS"];
+    const appInfo = readAppInfo((params as { appInfo?: unknown } | undefined)?.appInfo);
     const state = await lifecycle.getState();
 
     // Many dApps call connect() on every page load. An origin whose grant
@@ -214,6 +249,7 @@ async function handleProviderCall(
       origin,
       walletId: state.activeWalletId,
       requestedPermissions: newPermissions,
+      appInfo,
     });
 
     // Reached only once the user approved: a rejected or timed-out request
@@ -269,8 +305,10 @@ async function handleProviderCall(
       return wallet?.publicKey ?? null;
     case "getWalletNames":
       return Object.fromEntries(state.wallets.map((candidate) => [candidate.address, candidate.name]));
-    case "getArweaveConfig":
-      return { protocol: "https", host: "arweave.net", port: 443 };
+    case "getArweaveConfig": {
+      const { gatewayUrl } = await reads.getNetworkSettings();
+      return arweaveConfigFromGatewayUrl(gatewayUrl);
+    }
     case "getBalances":
       if (!wallet) throw new Error("No active wallet to read balances for.");
       return { ar: await reads.getBalance({ address: wallet.address }) };

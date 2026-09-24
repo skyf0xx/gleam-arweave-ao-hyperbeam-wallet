@@ -11,7 +11,7 @@ const CONNECT_REQUEST: ApprovalRequest = {
   requestId: "req-1",
   origin: "https://bazar.arweave.net",
   kind: "connect",
-  preview: { kind: "connect", requestedPermissions: ["ACCESS_ADDRESS"] },
+  preview: { kind: "connect", requestedPermissions: ["ACCESS_ADDRESS"], appInfo: null },
   createdAt: 0,
 };
 

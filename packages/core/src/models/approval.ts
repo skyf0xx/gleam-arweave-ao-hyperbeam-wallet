@@ -14,9 +14,21 @@ export type ApprovalKind =
   | "privateHash"
   | "addToken";
 
+/**
+ * A dApp's self-reported identity, passed to `connect()` per the ArConnect
+ * `AppInfo` shape. Untrusted — shown to the user alongside the origin
+ * (which is authoritative), never in place of it. `null` fields render as
+ * the origin-derived fallback `ConnectionRequestScreen` already used.
+ */
+export interface ConnectAppInfo {
+  name: string | null;
+  logo: string | null;
+}
+
 export interface ConnectApprovalPreview {
   kind: "connect";
   requestedPermissions: PermissionType[];
+  appInfo: ConnectAppInfo | null;
 }
 
 /**

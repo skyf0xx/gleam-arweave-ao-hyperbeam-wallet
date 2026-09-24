@@ -159,6 +159,7 @@ describe("domain model shapes", () => {
       preview: {
         kind: "connect",
         requestedPermissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        appInfo: null,
       },
     };
     expect(request.preview.kind).toBe("connect");

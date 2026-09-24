@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
@@ -51,20 +52,33 @@ function hostnameOf(origin: string): string {
 }
 
 export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: ConnectionRequestScreenProps) {
-  const { requestedPermissions } = preview;
+  const { requestedPermissions, appInfo } = preview;
   const hasUnlimitedSpend = requestedPermissions.some(
     (permission) => permission === "SIGN_TRANSACTION" || permission === "DISPATCH",
   );
-  const appName = hostnameOf(origin).split(".")[0] ?? origin;
-  const displayName = appName.charAt(0).toUpperCase() + appName.slice(1);
+  const fallbackName = hostnameOf(origin).split(".")[0] ?? origin;
+  const displayName = appInfo?.name?.trim() || fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const logoUrl = !logoFailed ? (appInfo?.logo ?? null) : null;
 
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex flex-1 flex-col gap-5 px-5 py-6">
         <div className="flex flex-col items-center gap-2.5 pb-1 pt-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-mist text-lg font-bold text-muted">
-            {faviconLetter(origin)}
-          </div>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt=""
+              className="h-12 w-12 rounded-lg border border-line object-cover"
+              // A dApp-supplied URL that fails to load falls back to the
+              // origin-derived letter tile rather than a broken image icon.
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-mist text-lg font-bold text-muted">
+              {faviconLetter(origin)}
+            </div>
+          )}
           <div className="text-body font-bold text-foreground">{displayName}</div>
           <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
         </div>

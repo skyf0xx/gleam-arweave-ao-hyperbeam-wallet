@@ -16,6 +16,7 @@ import {
   type ApprovalKind,
   type ApprovalPreview,
   type ApprovalRequest,
+  type ConnectAppInfo,
   type ConnectApprovalPreview,
   type DataItemInput,
   type EncryptAlgorithm,
@@ -195,6 +196,8 @@ export interface AddTokenRequestInput {
 export interface ConnectRequestInput {
   kind: "connect";
   requestedPermissions: PermissionType[];
+  /** Omitted by callers (tests, internal re-grants) that have no dApp-supplied identity. */
+  appInfo?: ConnectAppInfo | null;
 }
 
 /**
@@ -262,8 +265,11 @@ function buildAddTokenPreview(input: AddTokenRequestInput): AddTokenApprovalPrev
   };
 }
 
-function buildConnectPreview(requestedPermissions: PermissionType[]): ConnectApprovalPreview {
-  return { kind: "connect", requestedPermissions };
+function buildConnectPreview(
+  requestedPermissions: PermissionType[],
+  appInfo: ConnectAppInfo | null,
+): ConnectApprovalPreview {
+  return { kind: "connect", requestedPermissions, appInfo };
 }
 
 /**
@@ -394,7 +400,7 @@ export class ApprovalHandler {
     const requestId = crypto.randomUUID();
     const preview: ApprovalPreview =
       input.kind === "connect"
-        ? buildConnectPreview(input.requestedPermissions)
+        ? buildConnectPreview(input.requestedPermissions, input.appInfo ?? null)
         : input.kind === "addToken"
           ? buildAddTokenPreview(input)
           : await buildSigningPreview(input);

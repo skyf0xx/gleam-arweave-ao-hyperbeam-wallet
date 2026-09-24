@@ -30,6 +30,7 @@ export type {
   ApprovalKind,
   ApprovalPreview,
   ApprovalRequest,
+  ConnectAppInfo,
   ConnectApprovalPreview,
   SigningApprovalPreview,
 } from "./approval";

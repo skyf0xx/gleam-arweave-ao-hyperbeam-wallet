@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 3. dApp provider gaps
 
-- [ ] **`getArweaveConfig` ignores the gateway setting; `connect` drops `appInfo` and `gateway` (S, sonnet)**
-  `entrypoints/background/index.ts`. Config is hard-coded to arweave.net.
-  `appInfo` (name, logo) never reaches the connect approval screen. Done:
-  config comes from network settings, and `appInfo` is shown in
-  `ConnectionRequestScreen`.
 - [ ] **Check `privateHash` and non-RSA-OAEP encrypt/decrypt against Wander (M, 🧪, opus)**
   `core/vault/message-signing.ts`, `core/vault/encryption.ts` (the legacy
   AES path says in its own comment that it was not taken from ArConnect).

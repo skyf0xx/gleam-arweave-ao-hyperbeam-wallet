@@ -277,6 +277,115 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     expect(pending.map((entry) => entry.walletId)).toEqual(["wallet-1"]);
   });
 
+  it("connect() carries the dApp's appInfo through to the approval preview", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+
+    void providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "connect",
+      params: { permissions: ["ACCESS_ADDRESS"], appInfo: { name: "Bazar", logo: "https://bazar.arweave.net/logo.png" } },
+    }).catch(() => undefined);
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pending = (await getItem("session:pendingApprovals")) as Array<{
+      request: { preview: { appInfo: unknown } };
+    }>;
+    expect(pending[0]!.request.preview.appInfo).toEqual({ name: "Bazar", logo: "https://bazar.arweave.net/logo.png" });
+  });
+
+  it("connect() drops a malformed appInfo (non-string fields) rather than storing it", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+
+    void providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "connect",
+      params: { permissions: ["ACCESS_ADDRESS"], appInfo: { name: 123, logo: null } },
+    }).catch(() => undefined);
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pending = (await getItem("session:pendingApprovals")) as Array<{
+      request: { preview: { appInfo: unknown } };
+    }>;
+    expect(pending[0]!.request.preview.appInfo).toBeNull();
+  });
+
+  it("connect() trims appInfo.name, drops an empty result to null, and caps its length at 64", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+
+    void providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "connect",
+      params: { permissions: ["ACCESS_ADDRESS"], appInfo: { name: `  ${"A".repeat(80)}  `, logo: null } },
+    }).catch(() => undefined);
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pending = (await getItem("session:pendingApprovals")) as Array<{
+      request: { preview: { appInfo: { name: string | null; logo: string | null } | null } };
+    }>;
+    expect(pending[0]!.request.preview.appInfo).toEqual({ name: "A".repeat(64), logo: null });
+  });
+
+  it("connect() drops an all-whitespace appInfo.name to null instead of storing empty text", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+
+    void providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "connect",
+      params: { permissions: ["ACCESS_ADDRESS"], appInfo: { name: "   ", logo: "https://bazar.arweave.net/logo.png" } },
+    }).catch(() => undefined);
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pending = (await getItem("session:pendingApprovals")) as Array<{
+      request: { preview: { appInfo: { name: string | null; logo: string | null } | null } };
+    }>;
+    expect(pending[0]!.request.preview.appInfo).toEqual({ name: null, logo: "https://bazar.arweave.net/logo.png" });
+  });
+
+  it("getArweaveConfig reflects the configured gateway instead of a hard-coded arweave.net", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+    await setItem("session:unlockedSession", {
+      unlockedAt: 0,
+      lastActivityAt: 0,
+      autoLockTimeout: "never",
+      unlockedWalletIds: ["wallet-1"],
+    });
+    await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+    await setItem("local:networkSettings", {
+      gatewayUrl: "https://ar-io.dev",
+      peers: [],
+      activePeerUrl: null,
+    });
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ARWEAVE_CONFIG"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    await expect(
+      providerCall({ origin: "https://bazar.arweave.net", method: "getArweaveConfig", params: {} }),
+    ).resolves.toEqual({ protocol: "https", host: "ar-io.dev", port: 443 });
+  });
+
   it("connect() opens an approval window rather than granting inline", async () => {
     await setItem("local:wallets", [
       { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
