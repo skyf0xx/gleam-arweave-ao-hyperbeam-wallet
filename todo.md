@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **"Immediately" auto-lock uses a 1-minute grace (S, sonnet)**
-  `src/handlers/key-session.ts` (`AUTO_LOCK_TIMEOUT_MS`: `immediate` is
-  0 ms), `popup/lock-settings/src/LockSettingsView.tsx`. A 0 ms timeout
-  locks the wallet the moment it's unlocked, so nothing can ever sign.
-  Done: `immediate` means 1 minute after the last activity, and the
-  option's label or hint says so. Tests.
 - [ ] **Deleting a wallet keeps site grants and announces the new active wallet (S, opus)**
   `entrypoints/background/index.ts` (`deleteWallet`),
   `src/handlers/approval.ts` (`revokeWalletAccess`). Grants belong to the

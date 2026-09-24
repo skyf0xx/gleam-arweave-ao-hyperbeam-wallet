@@ -198,6 +198,26 @@ describe("key-session", () => {
       expect(await getCachedKey("wallet-a")).not.toBeNull();
     });
 
+    it("'immediate' keeps the key for a 1-minute grace after the last activity", async () => {
+      setSession("immediate");
+      await cacheKey("wallet-a", jwkA, "address-a");
+
+      vi.advanceTimersByTime(60 * 1000);
+
+      expect(await getCachedKey("wallet-a")).toEqual({ jwk: jwkA, address: "address-a" });
+    });
+
+    it("'immediate' expires once the 1-minute grace has passed", async () => {
+      setSession("immediate");
+      await cacheKey("wallet-a", jwkA, "address-a");
+
+      vi.advanceTimersByTime(60 * 1000 + 1);
+
+      expect(await getCachedKey("wallet-a")).toBeNull();
+      expect(store.has("session:key:wallet-a")).toBe(false);
+      expect(store.has("session:unlockedSession")).toBe(false);
+    });
+
     it("returns null when there is no session, even if a key is stored", async () => {
       await cacheKey("wallet-a", jwkA, "address-a");
       store.delete("session:unlockedSession");
@@ -222,6 +242,12 @@ describe("key-session", () => {
       const lastActivityAt = Date.now() - 10 * 60 * 1000;
       expect(isSessionExpired(lastActivityAt, "5min")).toBe(true);
       expect(isSessionExpired(Date.now(), "5min")).toBe(false);
+    });
+
+    it("'immediate' allows a 1-minute grace rather than expiring at 0ms", () => {
+      expect(isSessionExpired(Date.now(), "immediate")).toBe(false);
+      expect(isSessionExpired(Date.now() - 60 * 1000, "immediate")).toBe(false);
+      expect(isSessionExpired(Date.now() - (60 * 1000 + 1), "immediate")).toBe(true);
     });
   });
 });

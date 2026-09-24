@@ -25,7 +25,7 @@ export const SESSION_KEY = "session:unlockedSession";
 
 const AUTO_LOCK_TIMEOUT_MS: Record<AutoLockTimeout, number | null> = {
   never: null,
-  immediate: 0,
+  immediate: 60 * 1000,
   "5min": 5 * 60 * 1000,
   "1hr": 60 * 60 * 1000,
   "4hr": 4 * 60 * 60 * 1000,
@@ -155,9 +155,9 @@ export async function isKeyStored(walletId: string): Promise<boolean> {
  * service worker can be idle-killed and restarted at any point, silently
  * dropping any pending timer; a persisted `Session` timestamp checked on
  * the next real access survives that restart and still enforces the
- * user's chosen timeout, just not to-the-millisecond. `"immediate"` (0ms)
- * still allows the single call that just unlocked to proceed, since
- * `lastActivityAt` is refreshed at the moment of unlock/activity.
+ * user's chosen timeout, just not to-the-millisecond. `"immediate"` locks one minute after the
+ * last activity rather than at 0ms — a literal 0ms timeout would lock the
+ * wallet the moment it's unlocked, before anything can ever sign with it.
  */
 export function isSessionExpired(lastActivityAt: number, autoLockTimeout: AutoLockTimeout): boolean {
   const timeoutMs = AUTO_LOCK_TIMEOUT_MS[autoLockTimeout];

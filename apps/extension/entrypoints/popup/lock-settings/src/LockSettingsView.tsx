@@ -5,7 +5,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
   { value: "never", label: "Never" },
-  { value: "immediate", label: "Immediately" },
+  { value: "immediate", label: "After 1 minute" },
   { value: "5min", label: "5 minutes" },
   { value: "1hr", label: "1 hour" },
   { value: "4hr", label: "4 hours" },

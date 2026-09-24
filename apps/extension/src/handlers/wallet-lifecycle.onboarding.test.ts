@@ -495,12 +495,12 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     expect(await getCachedKey(wallet.id)).not.toBeNull();
 
-    // Simulate a session whose "immediate" timeout has already elapsed —
-    // the same shape unlockWallet would have written, but with an
-    // activity timestamp far enough in the past.
+    // Simulate a session whose "immediate" timeout (1-minute grace) has
+    // already elapsed — the same shape unlockWallet would have written,
+    // but with an activity timestamp far enough in the past.
     await storage.set("session:unlockedSession", {
-      unlockedAt: Date.now() - 10_000,
-      lastActivityAt: Date.now() - 10_000,
+      unlockedAt: Date.now() - 120_000,
+      lastActivityAt: Date.now() - 120_000,
       autoLockTimeout: "immediate",
       unlockedWalletIds: [wallet.id],
     });

@@ -4,7 +4,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
   never: "Never",
-  immediate: "Immediately",
+  immediate: "After 1 minute",
   "5min": "5 minutes",
   "1hr": "1 hour",
   "4hr": "4 hours",
