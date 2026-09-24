@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **dApps keep seeing the old wallet after a switch (M, opus)**
-  `entrypoints/background/index.ts` (`getActiveAddress` uses
-  `grant.walletId`; `connect` uses `session.unlockedWalletIds[0]`).
-  `walletSwitch` announces the new address, but the next
-  `getActiveAddress()` returns the old one. Done: provider reads use the
-  active wallet, and `connect` binds to the active wallet. Tests.
 - [ ] **The approval window reports success when signing failed (S, opus)**
   `entrypoints/approval/src/ApprovalRoot.tsx`,
   `approval.ts` (`resolveApproval` stores `outcome.error` and returns
@@ -291,3 +285,12 @@ vault, crypto and provider security; `sonnet` for everything else.
   but a profile reset before that change keeps grants whose `walletId` no
   longer exists, and `getAllAddresses` still answers them. Treat a grant
   whose wallet is gone as inactive and drop it.
+- **Deleting a wallet disconnects by the wallet that approved, and never announces the new active wallet (S, opus)**
+  `entrypoints/background/index.ts` (`deleteWallet`),
+  `src/handlers/approval.ts` (`revokeWalletAccess`). Provider calls follow
+  the active wallet, but revocation still matches `grant.walletId`, the
+  wallet that approved `connect`. Deleting that wallet disconnects dApps
+  that now see another one, and deleting the active wallet moves
+  `activeWalletId` to another wallet without a `walletSwitch` push. Decide
+  what `grant.walletId` means now, and emit `walletSwitch` when a delete
+  changes the active wallet.

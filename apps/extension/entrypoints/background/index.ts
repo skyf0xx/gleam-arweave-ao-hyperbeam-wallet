@@ -185,9 +185,9 @@ async function handleProviderCall(
       : [];
 
     const state = await lifecycle.getState();
-    const walletId = state.session?.unlockedWalletIds[0] ?? state.activeWalletId;
+    const walletId = state.activeWalletId;
     if (!walletId) {
-      throw new Error("No unlocked wallet is available to connect this app to.");
+      throw new Error("No active wallet is available to connect this app to.");
     }
 
     const result = await approval.requestApproval({
@@ -228,8 +228,16 @@ async function handleProviderCall(
     throw new Error(`Missing permission(s) for "${method}": ${missing.join(", ")}`);
   }
 
+  // A grant belongs to the origin, not to one wallet: every read and
+  // signing request follows the wallet the user has switched to, which is
+  // the address the `walletSwitch` event already announced.
+  // `grant.walletId` only records which wallet approved the connection.
   const state = await lifecycle.getState();
-  const wallet = state.wallets.find((candidate) => candidate.id === grant.walletId) ?? null;
+  const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId) ?? null;
+  const activeWalletId = (): string => {
+    if (!wallet) throw new Error("No active wallet to sign with.");
+    return wallet.id;
+  };
 
   switch (method) {
     case "getPermissions":
@@ -255,7 +263,7 @@ async function handleProviderCall(
       return approval.requestApproval({
         kind: method,
         origin,
-        walletId: grant.walletId,
+        walletId: activeWalletId(),
         recipient: transaction.target ?? null,
         amount: transaction.target ? (transaction.quantity ?? "0") : null,
         fee: null,
@@ -279,7 +287,7 @@ async function handleProviderCall(
       return approval.requestApproval({
         kind: method,
         origin,
-        walletId: grant.walletId,
+        walletId: activeWalletId(),
         payload: first!.data,
         tags: first!.tags,
         dataItems: items.map((item) => ({
@@ -296,7 +304,7 @@ async function handleProviderCall(
       return approval.requestApproval({
         kind: method,
         origin,
-        walletId: grant.walletId,
+        walletId: activeWalletId(),
         payload: readBytes(params.data, "data", method === "encrypt" ? "utf8" : "reject"),
         encryptAlgorithm: readEncryptAlgorithm(params.options, method),
       });
@@ -309,7 +317,7 @@ async function handleProviderCall(
       return approval.requestApproval({
         kind: "transferAoTokens",
         origin,
-        walletId: grant.walletId,
+        walletId: activeWalletId(),
         recipient: transferParams.recipient,
         amount: transferParams.amount,
         fee: null,
@@ -323,7 +331,7 @@ async function handleProviderCall(
       return approval.requestApproval({
         kind: method,
         origin,
-        walletId: grant.walletId,
+        walletId: activeWalletId(),
         payload: readBytes(params.data, "data"),
         saltLength: readSaltLength(params.options, method),
       });
@@ -333,7 +341,7 @@ async function handleProviderCall(
       return approval.requestApproval({
         kind: method,
         origin,
-        walletId: grant.walletId,
+        walletId: activeWalletId(),
         payload: readBytes(params.data, "data"),
         hashAlgorithm: readHashAlgorithm(params.options, method),
       });

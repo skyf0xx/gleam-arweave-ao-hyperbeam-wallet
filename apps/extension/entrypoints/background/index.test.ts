@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
+import { encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
  * Needed because this file's `transferAoTokens` integration test drives the
@@ -236,9 +237,9 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     expect(onSuspendAddListener).not.toHaveBeenCalled();
   });
 
-  it("connect() with no unlocked wallet fails with a named error, not a silent grant", async () => {
+  it("connect() with no wallet fails with a named error, not a silent grant", async () => {
     await expect(providerCall({ origin: "https://bazar.arweave.net", method: "connect", params: {} })).rejects.toThrow(
-      /no unlocked wallet/i,
+      /no active wallet/i,
     );
   });
 
@@ -246,6 +247,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await setItem("local:wallets", [
       { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
     ]);
+    await setItem("local:activeWalletId", "wallet-1");
     await setItem("session:unlockedSession", {
       unlockedAt: 0,
       lastActivityAt: 0,
@@ -291,6 +293,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await setItem("local:wallets", [
       { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
     ]);
+    await setItem("local:activeWalletId", "wallet-1");
     await setItem("session:unlockedSession", {
       unlockedAt: 0,
       lastActivityAt: 0,
@@ -395,6 +398,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await setItem("local:wallets", [
         { id: walletId, address, name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
       ]);
+      await setItem("local:activeWalletId", walletId);
       await setItem("session:unlockedSession", {
         unlockedAt: 0,
         lastActivityAt: 0,
@@ -521,6 +525,81 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       expect(tabsQuery).not.toHaveBeenCalled();
     });
   });
+
+  describe("provider calls follow the active wallet, not the one that connected", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+
+    async function seedTwoWallets(): Promise<void> {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "One", method: "jwk", publicKey: "pub-1", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+        { id: "wallet-2", address: "addr-2", name: "Two", method: "jwk", publicKey: "pub-2", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      // Unlock puts the then-active wallet first, so after a switch the
+      // first unlocked id is no longer the active one.
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: ["wallet-1", "wallet-2"],
+      });
+      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await setItem("session:key:wallet-2", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-2" });
+    }
+
+    async function grant(): Promise<void> {
+      await setItem("local:grants", [
+        {
+          origin: ORIGIN,
+          walletId: "wallet-1",
+          permissions: ["ACCESS_ADDRESS", "ACCESS_PUBLIC_KEY", "SIGNATURE"],
+          createdAt: 0,
+          expiresAt: null,
+          budget: null,
+        },
+      ]);
+    }
+
+    it("getActiveAddress and getActivePublicKey return the wallet switched to", async () => {
+      await seedTwoWallets();
+      await grant();
+      await expect(providerCall({ origin: ORIGIN, method: "getActiveAddress", params: {} })).resolves.toBe("addr-1");
+
+      await registeredHandlers.get("switchWallet")!({ data: { walletId: "wallet-2" } });
+
+      await expect(providerCall({ origin: ORIGIN, method: "getActiveAddress", params: {} })).resolves.toBe("addr-2");
+      await expect(providerCall({ origin: ORIGIN, method: "getActivePublicKey", params: {} })).resolves.toBe("pub-2");
+    });
+
+    it("a signing request after a switch is made for the active wallet", async () => {
+      await seedTwoWallets();
+      await grant();
+      await registeredHandlers.get("switchWallet")!({ data: { walletId: "wallet-2" } });
+
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+      void providerCall({ origin: ORIGIN, method: "signature", params }).catch(() => undefined);
+
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      const pending = (await getItem("session:pendingApprovals")) as Array<{ walletId: string }>;
+      expect(pending.map((entry) => entry.walletId)).toEqual(["wallet-2"]);
+    });
+
+    it("connect() binds to the active wallet, not the first unlocked one", async () => {
+      await seedTwoWallets();
+      await setItem("local:activeWalletId", "wallet-2");
+
+      const resultPromise = providerCall({ origin: ORIGIN, method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } });
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      const pending = (await getItem("session:pendingApprovals")) as Array<{ walletId: string; request: { requestId: string } }>;
+      expect(pending[0]!.walletId).toBe("wallet-2");
+      await registeredHandlers.get("resolveApproval")!({ data: { requestId: pending[0]!.request.requestId, approved: true } });
+      await resultPromise;
+
+      expect(await getItem("local:grants")).toEqual([expect.objectContaining({ origin: ORIGIN, walletId: "wallet-2" })]);
+      await expect(providerCall({ origin: ORIGIN, method: "getActiveAddress", params: {} })).resolves.toBe("addr-2");
+    });
+  });
+
   describe("granted permissions gate every provider method", () => {
     const ORIGIN = "https://bazar.arweave.net";
     const GATED = PROVIDER_METHODS.filter((method) => METHOD_PERMISSIONS[method].length > 0);
