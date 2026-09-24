@@ -1,8 +1,7 @@
 # Experience spec — flows and behavior
 
 Compressed intake (authored core). Mined from the `ao-wallet` sibling
-repo's `screens/TODO.md` (per-screen functionality/UX notes) and
-`ARCHITECTURE.md §3` (surface behavior). No `DESIGN.md` — visual identity
+repo's `screens/TODO.md` (per-screen functionality/UX notes) and visual identity
 (brand palette, typography, spacing) lives in the sibling repo's `brand/`
 folder and its 16 built HTML mockups under `screens/`, consulted directly
 by the ui layer rather than re-derived into a BMAD design doc.
@@ -21,6 +20,7 @@ shell is shared.
 ## Risk-tiered confirmation (applies across every flow below)
 
 Three tiers drive how much friction a screen imposes:
+
 - **Routine** — no or light confirmation (composing a send, browsing
   activity).
 - **Consequential** — one clear review screen, full address, neutral

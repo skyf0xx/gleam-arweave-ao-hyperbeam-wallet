@@ -34,7 +34,7 @@ function postPageRequest(data: unknown): void {
   window.dispatchEvent(new MessageEvent("message", { data, source: window }));
 }
 
-describe("content.ts: page <-> background relay (ARCHITECTURE.md §4.3/§4.4)", () => {
+describe("content.ts: page <-> background relay", () => {
   beforeEach(() => {
     vi.resetModules();
     sendMessage.mockReset();

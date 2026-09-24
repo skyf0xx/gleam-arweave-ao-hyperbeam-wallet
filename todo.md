@@ -87,15 +87,4 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## Unsorted
 
-- `apps/extension/entrypoints/provider/index.test.ts:28`,
-  `apps/extension/entrypoints/content/index.test.ts:37`: `describe()` names
-  cite "ARCHITECTURE.md §4.3", a doc that doesn't exist in this repo.
-- `packages/core/src/vault/signing.ts` (`dispatchTransaction`): an
-  AR-sending dispatch posts its data inline, so one over the gateway's
-  inline limit fails and would need chunked upload.
-- `apps/extension/src/handlers/approval.ts` (`createGrant`, `revokeGrant`):
-  `local:grants` has the same unserialized read-await-write, so two
-  `connect()` approvals from different origins finishing together can drop
-  one grant.
-
 <!-- New findings go here until they're placed in the list above. -->

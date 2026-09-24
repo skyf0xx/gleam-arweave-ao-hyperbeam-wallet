@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { APPROVAL_TIMEOUT_MS, REQUEST, RESPONSE } from "@gleam/messaging/src/page-protocol.ts";
+import {
+  APPROVAL_TIMEOUT_MS,
+  REQUEST,
+  RESPONSE,
+} from "@gleam/messaging/src/page-protocol.ts";
 import { GleamProvider, install } from "./index";
 
 /**
@@ -25,7 +29,7 @@ function postResponse(data: unknown): void {
   window.dispatchEvent(new MessageEvent("message", { data, source: window }));
 }
 
-describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
+describe("provider.ts: GleamProvider bridge", () => {
   let provider: GleamProvider;
   let postMessageSpy: ReturnType<typeof vi.spyOn>;
 
@@ -40,7 +44,9 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
   });
 
   function lastRequestEnvelope() {
-    const call = postMessageSpy.mock.calls.find(([message]) => (message as { type?: string })?.type === REQUEST);
+    const call = postMessageSpy.mock.calls.find(
+      ([message]) => (message as { type?: string })?.type === REQUEST,
+    );
     if (!call) throw new Error("No REQUEST envelope was posted.");
     return call[0] as { id: string; method: string; params: unknown };
   }
@@ -63,9 +69,17 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     });
     const envelope = lastRequestEnvelope();
     expect(envelope.method).toBe("transferAoTokens");
-    expect(envelope.params).toEqual({ token: "ao-process-id", recipient: "recipient-addr", amount: "1000" });
+    expect(envelope.params).toEqual({
+      token: "ao-process-id",
+      recipient: "recipient-addr",
+      amount: "1000",
+    });
 
-    postResponse({ type: RESPONSE, id: envelope.id, result: { id: "ao-message-id-123" } });
+    postResponse({
+      type: RESPONSE,
+      id: envelope.id,
+      result: { id: "ao-message-id-123" },
+    });
     await expect(callPromise).resolves.toEqual({ id: "ao-message-id-123" });
   });
 
@@ -76,11 +90,17 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
       toJSON: () => ({ data: "AQID", tags: [] }),
     };
     void provider.sign(transaction);
-    expect(lastRequestEnvelope().params).toEqual({ transaction: { data: "AQID", tags: [] }, options: undefined });
+    expect(lastRequestEnvelope().params).toEqual({
+      transaction: { data: "AQID", tags: [] },
+      options: undefined,
+    });
 
     postMessageSpy.mockClear();
     void provider.dispatch(transaction);
-    expect(lastRequestEnvelope()).toMatchObject({ method: "dispatch", params: { transaction: { data: "AQID", tags: [] } } });
+    expect(lastRequestEnvelope()).toMatchObject({
+      method: "dispatch",
+      params: { transaction: { data: "AQID", tags: [] } },
+    });
   });
 
   it("sign hands back the caller's own tag objects when the signed tags match", async () => {
@@ -94,13 +114,22 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
       }
     }
     const callerTags = [new Tag("QXBw", "R2xlYW0")];
-    const callPromise = provider.sign({ tags: callerTags, toJSON: () => ({ tags: [{ name: "QXBw", value: "R2xlYW0" }] }) });
+    const callPromise = provider.sign({
+      tags: callerTags,
+      toJSON: () => ({ tags: [{ name: "QXBw", value: "R2xlYW0" }] }),
+    });
     const envelope = lastRequestEnvelope();
 
     postResponse({
       type: RESPONSE,
       id: envelope.id,
-      result: { id: "tx-id", owner: "owner", signature: "sig", reward: "5000", tags: [{ name: "QXBw", value: "R2xlYW0" }] },
+      result: {
+        id: "tx-id",
+        owner: "owner",
+        signature: "sig",
+        reward: "5000",
+        tags: [{ name: "QXBw", value: "R2xlYW0" }],
+      },
     });
 
     const signed = (await callPromise) as { id: string; tags: unknown[] };
@@ -109,23 +138,41 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
   });
 
   it("signDataItem sends the item under dataItem and resolves to the signed ArrayBuffer", async () => {
-    const callPromise = provider.signDataItem({ data: new Uint8Array([7]), tags: [{ name: "Action", value: "Eval" }] });
+    const callPromise = provider.signDataItem({
+      data: new Uint8Array([7]),
+      tags: [{ name: "Action", value: "Eval" }],
+    });
     const envelope = lastRequestEnvelope();
     expect(envelope).toMatchObject({
       method: "signDataItem",
-      params: { dataItem: { data: { __gleamType: "Uint8Array", data: [7] }, tags: [{ name: "Action", value: "Eval" }] } },
+      params: {
+        dataItem: {
+          data: { __gleamType: "Uint8Array", data: [7] },
+          tags: [{ name: "Action", value: "Eval" }],
+        },
+      },
     });
 
-    postResponse({ type: RESPONSE, id: envelope.id, result: { __gleamType: "ArrayBuffer", data: [1, 0, 9] } });
+    postResponse({
+      type: RESPONSE,
+      id: envelope.id,
+      result: { __gleamType: "ArrayBuffer", data: [1, 0, 9] },
+    });
     const raw = await callPromise;
     expect(Object.prototype.toString.call(raw)).toBe("[object ArrayBuffer]");
     expect(Array.from(new Uint8Array(raw as ArrayBuffer))).toEqual([1, 0, 9]);
   });
 
   it("batchSignDataItem sends the items under dataItems and resolves to an ArrayBuffer per item", async () => {
-    const callPromise = provider.batchSignDataItem([{ data: "a" }, { data: "b" }]);
+    const callPromise = provider.batchSignDataItem([
+      { data: "a" },
+      { data: "b" },
+    ]);
     const envelope = lastRequestEnvelope();
-    expect(envelope).toMatchObject({ method: "batchSignDataItem", params: { dataItems: [{ data: "a" }, { data: "b" }] } });
+    expect(envelope).toMatchObject({
+      method: "batchSignDataItem",
+      params: { dataItems: [{ data: "a" }, { data: "b" }] },
+    });
 
     postResponse({
       type: RESPONSE,
@@ -136,11 +183,16 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
       ],
     });
     const raws = (await callPromise) as ArrayBuffer[];
-    expect(raws.map((raw) => Array.from(new Uint8Array(raw)))).toEqual([[1], [2]]);
+    expect(raws.map((raw) => Array.from(new Uint8Array(raw)))).toEqual([
+      [1],
+      [2],
+    ]);
   });
 
   it("verifyMessage forwards Wander's four arguments with binary tagged", () => {
-    void provider.verifyMessage(new Uint8Array([1]), "c2ln", "pubkey", { hashAlgorithm: "SHA-512" });
+    void provider.verifyMessage(new Uint8Array([1]), "c2ln", "pubkey", {
+      hashAlgorithm: "SHA-512",
+    });
     expect(lastRequestEnvelope().params).toEqual({
       data: { __gleamType: "Uint8Array", data: [1] },
       signature: "c2ln",
@@ -156,7 +208,10 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     // `source: null` simulates a forged message that didn't actually
     // originate from this window's own postMessage.
     window.dispatchEvent(
-      new MessageEvent("message", { data: { type: RESPONSE, id: envelope.id, result: "forged" }, source: null }),
+      new MessageEvent("message", {
+        data: { type: RESPONSE, id: envelope.id, result: "forged" },
+        source: null,
+      }),
     );
 
     // Still pending — the forged message must not have resolved it.
@@ -180,7 +235,9 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
 
     // A second response for the same id must not throw or double-resolve
     // anything observable — nothing to await here, just that it's silently ignored.
-    expect(() => postResponse({ type: RESPONSE, id: envelope.id, result: "second" })).not.toThrow();
+    expect(() =>
+      postResponse({ type: RESPONSE, id: envelope.id, result: "second" }),
+    ).not.toThrow();
   });
 
   it("rejects with a named timeout error if no response ever arrives (point 4)", async () => {
@@ -215,7 +272,9 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
 
   it("rejects immediately on abort without posting any further request (point 5)", async () => {
     const controller = new AbortController();
-    const callPromise = provider.sign({ some: "tx" }, { signal: controller.signal } as never);
+    const callPromise = provider.sign({ some: "tx" }, {
+      signal: controller.signal,
+    } as never);
     const signEnvelope = lastRequestEnvelope();
     postMessageSpy.mockClear();
 
@@ -227,7 +286,9 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     expect(postMessageSpy).not.toHaveBeenCalled();
 
     // A late response for the aborted call is dropped.
-    expect(() => postResponse({ type: RESPONSE, id: signEnvelope.id, result: "late" })).not.toThrow();
+    expect(() =>
+      postResponse({ type: RESPONSE, id: signEnvelope.id, result: "late" }),
+    ).not.toThrow();
   });
 
   it("rejects immediately for an already-aborted signal, without posting a request", async () => {
@@ -235,7 +296,9 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     controller.abort();
 
     const callPromise = (
-      provider as unknown as { call: (m: string, p: unknown, s?: AbortSignal) => Promise<unknown> }
+      provider as unknown as {
+        call: (m: string, p: unknown, s?: AbortSignal) => Promise<unknown>;
+      }
     ).call("getActiveAddress", {}, controller.signal);
 
     postMessageSpy.mockClear();
@@ -261,7 +324,11 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     const callPromise = provider.getActiveAddress();
     const envelope = lastRequestEnvelope();
 
-    postResponse({ type: RESPONSE, id: envelope.id, error: { message: "not connected" } });
+    postResponse({
+      type: RESPONSE,
+      id: envelope.id,
+      error: { message: "not connected" },
+    });
     await expect(callPromise).rejects.toThrow("not connected");
   });
 });
@@ -274,17 +341,24 @@ describe("provider.ts: install() never clobbers an existing provider (point 7)",
 
   it("installs window.arweaveWallet with walletName 'Gleam' when none exists", () => {
     install();
-    expect((window as unknown as { arweaveWallet: { walletName: string } }).arweaveWallet.walletName).toBe(
-      "Gleam",
-    );
+    expect(
+      (window as unknown as { arweaveWallet: { walletName: string } })
+        .arweaveWallet.walletName,
+    ).toBe("Gleam");
   });
 
   it("does not overwrite an already-installed provider", () => {
     const existing = { walletName: "SomeoneElse" };
-    Object.defineProperty(window, "arweaveWallet", { value: existing, configurable: true, writable: true });
+    Object.defineProperty(window, "arweaveWallet", {
+      value: existing,
+      configurable: true,
+      writable: true,
+    });
 
     install();
 
-    expect((window as unknown as { arweaveWallet: unknown }).arweaveWallet).toBe(existing);
+    expect(
+      (window as unknown as { arweaveWallet: unknown }).arweaveWallet,
+    ).toBe(existing);
   });
 });

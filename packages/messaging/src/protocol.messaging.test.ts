@@ -9,7 +9,7 @@ import type { ProtocolMap } from "./protocol";
  * §4.1, which is the actual risk this file guards against.
  */
 describe("ProtocolMap", () => {
-  it("declares every method named in ARCHITECTURE.md §4.1", () => {
+  it("declares wallet methods", () => {
     const methodNames: Array<keyof ProtocolMap> = [
       "createWallet",
       "importWallet",

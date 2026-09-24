@@ -1,7 +1,7 @@
 # PRD — §3 Glossary and §4 Features only
 
 Compressed intake (authored core). Mined from the `ao-wallet` sibling
-repo's `GLEAM.md`, `CLAUDE.md`, and `ARCHITECTURE.md`. Sections beyond
+repo's `GLEAM.md`, `CLAUDE.md`. Sections beyond
 §3/§4 are out of scope for this file per compressed-intake's authored-core
 rule — Phase 1 mining reads only these two.
 

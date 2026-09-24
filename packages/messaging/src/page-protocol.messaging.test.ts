@@ -23,7 +23,7 @@ describe("page ↔ content envelope constants", () => {
     expect(new Set(tags).size).toBe(3);
   });
 
-  it("match the exact strings ARCHITECTURE.md §4.3 specifies", () => {
+  it("match the exact strings", () => {
     expect(REQUEST).toBe("GLEAM_API_CALL");
     expect(RESPONSE).toBe("GLEAM_API_RESPONSE");
     expect(EVENT).toBe("GLEAM_EVENT");

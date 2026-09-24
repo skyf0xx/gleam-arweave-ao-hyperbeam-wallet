@@ -14,7 +14,7 @@ const ADDRESS = "addr456";
 const PEER = "https://hyperbeam.example.com";
 
 describe("getTokenBalance", () => {
-  it("hits the compute/ path per ARCHITECTURE.md §0.2", async () => {
+  it("hits the compute/ path per", async () => {
     const fetchImpl = fakeFetch("100");
     await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
 
