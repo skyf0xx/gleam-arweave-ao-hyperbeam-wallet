@@ -7,6 +7,7 @@ import {
   readDataItems,
   readEncryptAlgorithm,
   readHashAlgorithm,
+  readSaltLength,
   readTransaction,
 } from "./provider-params";
 
@@ -54,6 +55,19 @@ describe("readHashAlgorithm", () => {
     expect(readHashAlgorithm({ hashAlgorithm: "SHA-384" }, "signMessage")).toBe("SHA-384");
     expect(readHashAlgorithm(undefined, "signMessage")).toBeUndefined();
     expect(() => readHashAlgorithm({ hashAlgorithm: "SHA-1" }, "signMessage")).toThrow(/SHA-1/);
+  });
+});
+
+describe("readSaltLength", () => {
+  it("reads saltLength from RSA-PSS params and rejects anything else", () => {
+    expect(readSaltLength({ name: "RSA-PSS", saltLength: 0 }, "signature")).toBe(0);
+    expect(readSaltLength({ saltLength: 64 }, "signature")).toBe(64);
+    expect(readSaltLength(undefined, "signature")).toBeUndefined();
+    expect(readSaltLength({ name: "RSA-PSS" }, "signature")).toBeUndefined();
+    expect(() => readSaltLength({ name: "RSASSA-PKCS1-v1_5" }, "signature")).toThrow(/RSA-PSS/);
+    expect(() => readSaltLength({ saltLength: -1 }, "signature")).toThrow(/non-negative integer/);
+    expect(() => readSaltLength({ saltLength: 1.5 }, "signature")).toThrow(/non-negative integer/);
+    expect(() => readSaltLength({ saltLength: "32" }, "signature")).toThrow(/non-negative integer/);
   });
 });
 

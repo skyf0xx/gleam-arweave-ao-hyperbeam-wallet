@@ -28,6 +28,7 @@ import {
   readDataItems,
   readEncryptAlgorithm,
   readHashAlgorithm,
+  readSaltLength,
   readTransaction,
   type ProviderArgs,
 } from "@/src/handlers/provider-params";
@@ -317,6 +318,14 @@ async function handleProviderCall(
     }
 
     case "signature":
+      return approval.requestApproval({
+        kind: method,
+        origin,
+        walletId: grant.walletId,
+        payload: readBytes(params.data, "data"),
+        saltLength: readSaltLength(params.options, method),
+      });
+
     case "signMessage":
     case "privateHash":
       return approval.requestApproval({
@@ -324,7 +333,7 @@ async function handleProviderCall(
         origin,
         walletId: grant.walletId,
         payload: readBytes(params.data, "data"),
-        hashAlgorithm: method === "signature" ? undefined : readHashAlgorithm(params.options, method),
+        hashAlgorithm: readHashAlgorithm(params.options, method),
       });
 
     case "verifyMessage": {

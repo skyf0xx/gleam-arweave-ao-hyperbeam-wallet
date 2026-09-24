@@ -184,6 +184,26 @@ describe("provider message methods, end to end", () => {
     expect(result.byteLength).toBe(512);
   });
 
+  it("signature carries saltLength through to the signer", async () => {
+    const data = new Uint8Array([4, 5, 6]);
+    const { result } = await approved<Uint8Array>(wallet.signature(data, { name: "RSA-PSS", saltLength: 0 }));
+
+    const key = await crypto.subtle.importKey(
+      "jwk",
+      { kty: "RSA", e: "AQAB", n: jwk.n },
+      { name: "RSA-PSS", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    await expect(crypto.subtle.verify({ name: "RSA-PSS", saltLength: 0 }, key, new Uint8Array(result), data)).resolves.toBe(true);
+    await expect(crypto.subtle.verify({ name: "RSA-PSS", saltLength: 32 }, key, new Uint8Array(result), data)).resolves.toBe(false);
+  });
+
+  it("signature refuses options that aren't RSA-PSS before asking for approval", async () => {
+    await expect(wallet.signature(new Uint8Array([1]), { name: "RSASSA-PKCS1-v1_5" })).rejects.toThrow(/RSA-PSS/);
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
   it("privateHash returns a Uint8Array digest of the requested size", async () => {
     const { result } = await approved<Uint8Array>(wallet.privateHash(new Uint8Array([1, 2, 3]), { hashAlgorithm: "SHA-512" }));
     expect(ArrayBuffer.isView(result)).toBe(true);

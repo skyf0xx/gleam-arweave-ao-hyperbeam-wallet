@@ -146,6 +146,8 @@ export interface SigningRequestInput {
   encryptAlgorithm?: EncryptAlgorithm;
   /** `signMessage`/`signature`/`privateHash`'s hash digest selection. */
   hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512";
+  /** `signature`'s RSA-PSS salt length. */
+  saltLength?: number;
 }
 
 /**
@@ -514,7 +516,7 @@ export class ApprovalHandler {
       }
 
       case "signature": {
-        return new Uint8Array(await vaultSignature(jwk, toArrayBuffer(input.payload)));
+        return new Uint8Array(await vaultSignature(jwk, toArrayBuffer(input.payload), { saltLength: input.saltLength }));
       }
 
       case "signMessage": {

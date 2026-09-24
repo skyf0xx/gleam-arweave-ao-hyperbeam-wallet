@@ -11,18 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **`signMessage` / `verifyMessage` / `signature` don't use Wander's construction (M, 🧪, opus)**
-  `core/vault/message-signing.ts`. Wander (and permawebOS) sign the
-  `hashAlgorithm` digest of the data with RSA-PSS, salt length 32, and
-  verify the same way. Gleam signs the raw data with salt length equal to
-  the digest size, so its signatures only verify against Gleam's own
-  `verifyMessage`. `signature()` also ignores Wander's `saltLength` option.
-  Done: `signMessage`/`verifyMessage` match Wander byte for byte in
-  construction (a Gleam signature verifies with Wander's algorithm and
-  vice versa, tested against a fixture made the way permawebOS does it),
-  and `signature()` honours `saltLength`. Check in Chrome that a
-  `signMessage` result verifies with `arweave.crypto.verify`-style
-  server code.
 - [ ] **`batchSignDataItem` approval shows only the first item (S, 🧪, sonnet)**
   `entrypoints/background/index.ts`, `src/handlers/approval.ts`,
   `entrypoints/approval/src/`. The preview's data, tags and payload hash
@@ -308,3 +296,12 @@ vault, crypto and provider security; `sonnet` for everything else.
   `entrypoints/background/index.ts`, `core/vault/signing.ts`. Wander takes
   `SignatureOptions` (`saltLength`) as the second argument. Gleam forwards
   it from the page but signs with arbundles' fixed salt length 32.
+- **`privateHash` doesn't match permawebOS's construction (opus)**
+  `core/vault/message-signing.ts`. Gleam hashes `data || d` with `d`
+  decoded from base64url. permawebOS hashes `data || UTF-8(d)` (the
+  base64url string's bytes), so the two give different hashes. Confirm
+  Wander's construction before changing it.
+- **`signMessage` preview's payload hash isn't what gets signed (sonnet)**
+  `src/handlers/approval.ts` (`payloadHash`). The approval shows SHA-256 of
+  the raw message. The signed payload is the `hashAlgorithm` digest, and
+  permawebOS shows the SHA-256 of that digest.

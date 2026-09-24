@@ -76,6 +76,23 @@ export function readHashAlgorithm(options: unknown, method: string): HashAlgorit
 }
 
 /**
+ * `signature()`'s options are WebCrypto RSA-PSS params. Only `saltLength`
+ * changes the result; any other algorithm name is refused, as Wander does.
+ */
+export function readSaltLength(options: unknown, method: string): number | undefined {
+  const params = readOptions(options, method);
+  if (params?.name !== undefined && params.name !== "RSA-PSS") {
+    throw new Error(`${method} only supports RSA-PSS, not "${String(params.name)}".`);
+  }
+  const saltLength = params?.saltLength;
+  if (saltLength === undefined) return undefined;
+  if (typeof saltLength !== "number" || !Number.isSafeInteger(saltLength) || saltLength < 0) {
+    throw new Error(`${method} saltLength must be a non-negative integer.`);
+  }
+  return saltLength;
+}
+
+/**
  * Accepts the WebCrypto params object Wander takes (`{ name: "RSA-OAEP" }`
  * and the AES variants), rebuilt with only the fields that are set so a
  * `null` or `{}` from the page is dropped or rejected before an approval
