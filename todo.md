@@ -13,11 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Wallet "Manage" menu does nothing: rename and back up (M, sonnet)**
-  `WalletSwitcherView.tsx:176-184`. `renameWallet` and `exportWallet` are
-  wired in the background but have no UI after onboarding. Done: a wallet
-  detail screen with rename and a password-gated keyfile download. Record
-  that a backup was confirmed (needed by the next item).
 - [ ] **Remove a wallet, with the spec's backup warning (M, sonnet)**
   Same screen, `wallet-lifecycle.ts` (`deleteWallet`). PRD: "Removing a
   Wallet with no confirmed backup warns explicitly that access will be lost

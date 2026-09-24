@@ -24,7 +24,8 @@ function truncateAddress(address: string): string {
  * already implemented and wired.
  *
  * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
- * per-row "manage" kebab has no screen behind it yet and stays inert.
+ * per-row "manage" kebab opens the wallet detail screen (rename/back up)
+ * through `onManage`.
  *
  * Per-row identity: each wallet's row uses the same dicebear identicon as
  * the main screen's account pill (`AccountAvatar` +
@@ -39,6 +40,7 @@ export interface WalletSwitcherViewProps {
   onSwitched: (walletId: string) => void;
   onBack: () => void;
   onAddWallet: () => void;
+  onManage: (walletId: string) => void;
 }
 
 interface LoadState {
@@ -48,7 +50,7 @@ interface LoadState {
   error: string | null;
 }
 
-export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet }: WalletSwitcherViewProps) {
+export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
   const [state, setState] = useState<LoadState>({
     wallets: [],
     activeWalletId: null,
@@ -117,6 +119,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet }:
                 active={wallet.id === state.activeWalletId}
                 switching={switchingId === wallet.id}
                 onSwitch={() => void handleSwitch(wallet.id)}
+                onManage={() => onManage(wallet.id)}
               />
             ))
           )}
@@ -145,9 +148,10 @@ interface WalletSwitcherRowProps {
   active: boolean;
   switching: boolean;
   onSwitch: () => void;
+  onManage: () => void;
 }
 
-function WalletSwitcherRow({ wallet, active, switching, onSwitch }: WalletSwitcherRowProps) {
+function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: WalletSwitcherRowProps) {
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
   return (
@@ -177,6 +181,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch }: WalletSwitch
       <button
         type="button"
         aria-label={`Manage ${wallet.name}`}
+        onClick={onManage}
         className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-mist hover:text-foreground"
       >
         <KebabIcon />

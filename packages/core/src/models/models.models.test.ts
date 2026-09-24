@@ -42,6 +42,7 @@ describe("domain model shapes", () => {
       publicKey: "pub",
       createdAt: 0,
       updatedAt: 0,
+      backupConfirmedAt: null,
       encryptedKeyfile: null,
     };
     expect(wallet.encryptedKeyfile).toBeNull();

@@ -7,6 +7,7 @@ import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
 import { SendView } from "@/entrypoints/popup/send/index.tsx";
 import { ReceiveView } from "@/entrypoints/popup/receive/index.tsx";
 import { WalletSwitcherView } from "@/entrypoints/popup/wallet-switcher/index.tsx";
+import { WalletDetailView } from "@/entrypoints/popup/wallet-detail/index.tsx";
 import { LockSettingsView } from "@/entrypoints/popup/lock-settings/index.tsx";
 import { NetworkPeersView } from "@/entrypoints/popup/network-peers/index.tsx";
 import { SettingsHomeView } from "@/entrypoints/popup/settings-home/index.tsx";
@@ -85,6 +86,7 @@ type MainSubView =
   | { kind: "send"; token: TokenBalance | null }
   | { kind: "receive" }
   | { kind: "wallet-switcher" }
+  | { kind: "wallet-detail"; walletId: string }
   | { kind: "add-wallet" }
   | { kind: "settings-home" }
   | { kind: "lock-settings" }
@@ -106,6 +108,7 @@ function resolveActiveWallet(state: WalletState): WalletSummary | null {
 export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [view, setView] = useState<TopView>("loading");
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [wallets, setWallets] = useState<WalletSummary[]>([]);
   const [subView, setSubView] = useState<MainSubView>({ kind: "home" });
   const [resolvedRuntime, setResolvedRuntime] = useState<RuntimePort | null>(runtimeProp ?? null);
   const [initError, setInitError] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     const state = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
     setView(resolveTopView(state));
     setWallet(resolveActiveWallet(state));
+    setWallets(state.wallets);
   };
 
   /**
@@ -246,7 +250,23 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         }}
         onBack={() => setSubView({ kind: "home" })}
         onAddWallet={() => setSubView({ kind: "add-wallet" })}
+        onManage={(walletId) => setSubView({ kind: "wallet-detail", walletId })}
       />
+    );
+  } else if (subView.kind === "wallet-detail") {
+    const detailWallet = wallets.find((candidate) => candidate.id === subView.walletId) ?? null;
+    content = detailWallet ? (
+      <WalletDetailView
+        runtime={runtime}
+        wallet={detailWallet}
+        onBack={() => setSubView({ kind: "wallet-switcher" })}
+        onRenamed={() => {
+          setSubView({ kind: "wallet-switcher" });
+          void refresh(runtime);
+        }}
+      />
+    ) : (
+      <div className="p-4 text-body text-muted">Wallet not found.</div>
     );
   } else if (subView.kind === "add-wallet") {
     content = (

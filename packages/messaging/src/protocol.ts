@@ -37,6 +37,8 @@ export interface ProtocolMap {
   renameWallet(req: { walletId: string; name: string }): void;
   switchWallet(req: { walletId: string }): void;
   exportWallet(req: { walletId: string; password: string }): JWKInterface;
+  /** Set only after a keyfile download or clipboard copy actually succeeds, not merely offered. */
+  confirmWalletBackup(req: { walletId: string }): void;
   lockWallet(): void;
   unlockWallet(req: { password: string }): { unlockedWalletIds: string[] };
   /**

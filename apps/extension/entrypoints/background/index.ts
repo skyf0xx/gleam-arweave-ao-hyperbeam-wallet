@@ -447,6 +447,7 @@ onExtensionMessage("switchWallet", async (message) => {
   }
 });
 onExtensionMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
+onExtensionMessage("confirmWalletBackup", (message) => lifecycle.confirmWalletBackup(message.data));
 onExtensionMessage("lockWallet", async () => {
   await lifecycle.lockWallet();
   void setLockedIcon(true);

@@ -782,3 +782,58 @@ describe("WalletLifecycleHandler: exportWallet", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("WalletLifecycleHandler: confirmWalletBackup", () => {
+  it("a new wallet starts with no confirmed backup", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage);
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    expect(wallet.backupConfirmedAt).toBeNull();
+    const state = await handler.getState();
+    expect(state.wallets[0]!.backupConfirmedAt).toBeNull();
+  });
+
+  it("records a timestamp once confirmed, surfaced through getState", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage);
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    const before = Date.now();
+    await handler.confirmWalletBackup({ walletId: wallet.id });
+    const after = Date.now();
+
+    const state = await handler.getState();
+    const confirmedAt = state.wallets[0]!.backupConfirmedAt;
+    expect(confirmedAt).not.toBeNull();
+    expect(confirmedAt).toBeGreaterThanOrEqual(before);
+    expect(confirmedAt).toBeLessThanOrEqual(after);
+  });
+
+  it("throws for an unknown wallet id rather than silently no-op-ing", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage);
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    await expect(handler.confirmWalletBackup({ walletId: "no-such-wallet" })).rejects.toThrow();
+  });
+
+  it("does not affect other wallets' backup status", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage);
+    const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    const second = await handler.importWallet({
+      jwk: validJWK(),
+      name: "Second",
+      password: GOOD_PASSWORD,
+    });
+
+    await handler.confirmWalletBackup({ walletId: first.id });
+
+    const state = await handler.getState();
+    const firstState = state.wallets.find((w) => w.id === first.id)!;
+    const secondState = state.wallets.find((w) => w.id === second.id)!;
+    expect(firstState.backupConfirmedAt).not.toBeNull();
+    expect(secondState.backupConfirmedAt).toBeNull();
+  });
+});

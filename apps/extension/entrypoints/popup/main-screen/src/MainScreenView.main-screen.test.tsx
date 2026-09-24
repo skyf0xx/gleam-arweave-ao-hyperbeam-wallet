@@ -41,6 +41,7 @@ const WALLET: WalletSummary = {
   publicKey: "pub1",
   createdAt: 0,
   updatedAt: 0,
+  backupConfirmedAt: null,
 };
 
 const EMPTY_ACTIVITY: ActivityPage = { entries: [], cursor: null };

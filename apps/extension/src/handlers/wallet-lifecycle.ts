@@ -99,6 +99,7 @@ function toSummary(wallet: Wallet): WalletSummary {
     publicKey: wallet.publicKey,
     createdAt: wallet.createdAt,
     updatedAt: wallet.updatedAt,
+    backupConfirmedAt: wallet.backupConfirmedAt,
   };
 }
 
@@ -122,14 +123,22 @@ function isValidWallet(value: unknown): value is Wallet {
     typeof candidate.createdAt === "number" &&
     typeof candidate.updatedAt === "number" &&
     (candidate.encryptedKeyfile === null ||
-      (typeof candidate.encryptedKeyfile === "object" && candidate.encryptedKeyfile !== null))
+      (typeof candidate.encryptedKeyfile === "object" && candidate.encryptedKeyfile !== null)) &&
+    // Older stored records predate this field — treated as "never
+    // confirmed" (normalized below), not as a reason to drop the wallet.
+    (candidate.backupConfirmedAt === undefined ||
+      candidate.backupConfirmedAt === null ||
+      typeof candidate.backupConfirmedAt === "number")
   );
 }
 
 async function loadWallets(storage: StoragePort): Promise<Wallet[]> {
   const raw = await storage.get<unknown>(WALLETS_KEY);
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isValidWallet);
+  return raw.filter(isValidWallet).map((wallet) => ({
+    ...wallet,
+    backupConfirmedAt: wallet.backupConfirmedAt ?? null,
+  }));
 }
 
 async function saveWallets(storage: StoragePort, wallets: Wallet[]): Promise<void> {
@@ -327,6 +336,7 @@ export class WalletLifecycleHandler {
       createdAt: now,
       updatedAt: now,
       encryptedKeyfile,
+      backupConfirmedAt: null,
     };
 
     const wallets = await loadWallets(this.storage);
@@ -373,6 +383,7 @@ export class WalletLifecycleHandler {
       createdAt: now,
       updatedAt: now,
       encryptedKeyfile,
+      backupConfirmedAt: null,
     };
 
     const wallets = await loadWallets(this.storage);
@@ -415,6 +426,21 @@ export class WalletLifecycleHandler {
       throw new Error(`No stored wallet with id "${req.walletId}".`);
     }
     wallets[index] = { ...wallets[index]!, name: req.name, updatedAt: Date.now() };
+    await saveWallets(this.storage, wallets);
+  }
+
+  /**
+   * Records that the user confirmed they backed up this wallet's keyfile.
+   * Called by the UI only after a download or clipboard copy of the
+   * exported keyfile actually succeeds, not merely offered.
+   */
+  async confirmWalletBackup(req: { walletId: string }): Promise<void> {
+    const wallets = await loadWallets(this.storage);
+    const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
+    if (index === -1) {
+      throw new Error(`No stored wallet with id "${req.walletId}".`);
+    }
+    wallets[index] = { ...wallets[index]!, backupConfirmedAt: Date.now() };
     await saveWallets(this.storage, wallets);
   }
 

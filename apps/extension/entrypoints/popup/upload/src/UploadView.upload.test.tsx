@@ -23,6 +23,7 @@ const WALLET: WalletSummary = {
   publicKey: "pubkey",
   createdAt: 0,
   updatedAt: 0,
+  backupConfirmedAt: null,
 };
 
 async function typeText(value: string) {

@@ -21,6 +21,12 @@ export interface Wallet {
    * Absent for `ledger` wallets, which store no key material at all.
    */
   encryptedKeyfile: VaultEnvelope | null;
+  /**
+   * Set only once a keyfile download or clipboard copy actually succeeds,
+   * not merely offered. `null` for a wallet never backed up, including
+   * every record stored before this field existed.
+   */
+  backupConfirmedAt: number | null;
 }
 
 /**
@@ -36,6 +42,7 @@ export interface WalletSummary {
   publicKey: string;
   createdAt: number;
   updatedAt: number;
+  backupConfirmedAt: number | null;
 }
 
 /**

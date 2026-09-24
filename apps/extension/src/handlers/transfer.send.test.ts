@@ -64,6 +64,7 @@ async function createTestWallet(): Promise<{ wallet: Wallet; jwk: JWKInterface }
       publicKey: jwk.n,
       createdAt: 0,
       updatedAt: 0,
+      backupConfirmedAt: null,
       encryptedKeyfile: null,
     },
   };
