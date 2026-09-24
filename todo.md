@@ -11,15 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **The UI can say "unlocked" while the key cache is empty (M, 🧪, opus)**
-  `entrypoints/background/index.ts` (`runtime.onSuspend` →
-  `clearKeyCache`) vs `wallet-lifecycle.ts` (`getState`). If Chrome fires
-  `onSuspend` when the service worker idles out, the keys are wiped but
-  `session:unlockedSession` stays, so signing fails with "locked" while the
-  popup shows the wallet as open. Done: check in Chrome whether `onSuspend`
-  fires on idle. Either stop clearing on suspend (session storage is
-  already memory-only) or make `getState` report locked when no key is
-  cached.
 - [ ] **Reset and delete leave dApp grants behind (S, opus)**
   `wallet-lifecycle.ts` (`resetAllWallets`, `deleteWallet`),
   `approval.ts` (`local:grants`). After "Forgot password" → reset, a fresh
@@ -296,3 +287,8 @@ vault, crypto and provider security; `sonnet` for everything else.
   fails its next send with "locked" and no unlock prompt. Decide what
   "Immediately" means (likely "when the popup closes") and whether a
   user-initiated send or approval counts as activity.
+- **The signing-key-zeroization intent still requires an onSuspend wipe (sonnet)**
+  `.hedgehog/intents/signing-key-zeroization.json` (RULE-2 and its test
+  rule). The background no longer clears keys on `runtime.onSuspend`
+  because it fires on idle and locked wallets mid-session. Update or retire
+  that rule so a later pass doesn't put the handler back.

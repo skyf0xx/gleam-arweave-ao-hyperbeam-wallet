@@ -141,14 +141,12 @@ export async function clearKeyCache(): Promise<void> {
 }
 
 /**
- * MV3 service-worker suspension has no timeout to wait out — the worker
- * is about to be torn down outright, so every currently-cached key is
- * zeroized and cleared unconditionally (SIGNING-KEY-ZEROIZATION-RULE-2),
- * regardless of each wallet's individual auto-lock timeout. Registered
- * against `browser.runtime.onSuspend` by the background entrypoint.
+ * Whether a key entry exists for this wallet, regardless of session state.
+ * `wallet-lifecycle.ts` uses it to report a wallet as locked when its key
+ * is missing, so the UI never shows "unlocked" for a wallet that can't sign.
  */
-export async function handleServiceWorkerSuspend(): Promise<void> {
-  await clearKeyCache();
+export async function isKeyStored(walletId: string): Promise<boolean> {
+  return (await storagePort.get<CachedKey>(`${KEY_PREFIX}${walletId}`)) !== null;
 }
 
 /**

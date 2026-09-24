@@ -20,6 +20,7 @@ import {
   cacheKey,
   clearKeyCache,
   isSessionExpired,
+  isKeyStored,
   isValidSession,
   removeCachedKey,
   SESSION_KEY,
@@ -189,9 +190,22 @@ async function loadSession(
   }
   // Filter unlockedWalletIds against the current wallet set, same
   // untrusted-input treatment as activeWalletId.
-  const validIds = raw.unlockedWalletIds.filter((id) =>
+  const knownIds = raw.unlockedWalletIds.filter((id) =>
     wallets.some((wallet) => wallet.id === id),
   );
+  // A wallet whose key is gone can't sign, so it is locked whatever the
+  // session record says. Persist the pruned list so getCachedKey and the
+  // UI agree.
+  const keyPresent = await Promise.all(knownIds.map((id) => isKeyStored(id)));
+  const validIds = knownIds.filter((_, index) => keyPresent[index]);
+  if (validIds.length < knownIds.length) {
+    if (validIds.length === 0) {
+      await clearKeyCache();
+      await saveSession(storage, null);
+      return null;
+    }
+    await saveSession(storage, { ...raw, unlockedWalletIds: validIds });
+  }
   if (validIds.length === 0) return null;
   return { ...raw, unlockedWalletIds: validIds };
 }
@@ -277,8 +291,10 @@ export class WalletLifecycleHandler {
     wallets.push(wallet);
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-    await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
+    // Cache the key first: loadSession treats a listed wallet with no key
+    // as locked.
     await cacheKey(wallet.id, jwk, address);
+    await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
 
     return toSummary(wallet);
   }
@@ -324,8 +340,10 @@ export class WalletLifecycleHandler {
     wallets.push(wallet);
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-    await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
+    // Cache the key first: loadSession treats a listed wallet with no key
+    // as locked.
     await cacheKey(wallet.id, shapeCheck.jwk, address);
+    await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
 
     return toSummary(wallet);
   }

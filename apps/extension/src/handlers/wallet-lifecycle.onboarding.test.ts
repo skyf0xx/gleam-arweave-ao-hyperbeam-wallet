@@ -527,6 +527,42 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     expect(await getCachedKey(wallet.id)).not.toBeNull();
   });
 
+  it("getState reports locked and drops the session when every cached key is gone", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    // The key cache can empty without lockWallet running (e.g. the
+    // session area being cleared under a live session record).
+    keySessionStore.delete(`session:key:${wallet.id}`);
+
+    const state = await handler.getState();
+
+    expect(state.session).toBeNull();
+    expect(await storage.get("session:unlockedSession")).toBeNull();
+  });
+
+  it("getState drops only the wallets whose key is missing and persists the pruned session", async () => {
+    const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    const second = await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+    keySessionStore.delete(`session:key:${first.id}`);
+
+    const state = await handler.getState();
+
+    expect(state.session?.unlockedWalletIds).toEqual([second.id]);
+    const stored = await storage.get<{ unlockedWalletIds: string[] }>("session:unlockedSession");
+    expect(stored?.unlockedWalletIds).toEqual([second.id]);
+    expect(await getCachedKey(second.id)).not.toBeNull();
+  });
+
+  it("createWallet leaves every created wallet unlocked and signable", async () => {
+    const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    const second = await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+
+    const state = await handler.getState();
+
+    expect(state.session?.unlockedWalletIds).toEqual([first.id, second.id]);
+    expect(await getCachedKey(first.id)).not.toBeNull();
+    expect(await getCachedKey(second.id)).not.toBeNull();
+  });
+
   it("getState refreshes lastActivityAt, extending the session on activity", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     const staleTimestamp = Date.now() - 1000;

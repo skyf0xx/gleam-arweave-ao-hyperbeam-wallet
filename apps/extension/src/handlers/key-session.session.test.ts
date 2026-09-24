@@ -31,8 +31,8 @@ const {
   cacheKey,
   clearKeyCache,
   getCachedKey,
-  handleServiceWorkerSuspend,
   hasCachedKey,
+  isKeyStored,
   isSessionExpired,
   removeCachedKey,
 } = await import("./key-session");
@@ -147,14 +147,14 @@ describe("key-session", () => {
     setSpy.mockRestore();
   });
 
-  it("handleServiceWorkerSuspend zeroizes and clears every cached key, unconditional of auto-lock timeout", async () => {
+  it("isKeyStored reports a stored key even when no session lists the wallet", async () => {
+    store.delete("session:unlockedSession");
+    expect(await isKeyStored("wallet-a")).toBe(false);
+
     await cacheKey("wallet-a", jwkA, "address-a");
-    await cacheKey("wallet-b", jwkB, "address-b");
 
-    await handleServiceWorkerSuspend();
-
+    expect(await isKeyStored("wallet-a")).toBe(true);
     expect(await getCachedKey("wallet-a")).toBeNull();
-    expect(await getCachedKey("wallet-b")).toBeNull();
   });
 
   describe("auto-lock on key read", () => {

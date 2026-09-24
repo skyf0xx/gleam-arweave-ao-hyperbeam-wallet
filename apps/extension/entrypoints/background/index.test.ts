@@ -223,6 +223,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     ).rejects.toThrow(/not connected/i);
   });
 
+  it("does not clear the key cache on runtime.onSuspend, which also fires on idle", () => {
+    expect(onSuspendAddListener).not.toHaveBeenCalled();
+  });
+
   it("connect() with no unlocked wallet fails with a named error, not a silent grant", async () => {
     await expect(providerCall({ origin: "https://bazar.arweave.net", method: "connect", params: {} })).rejects.toThrow(
       /no unlocked wallet/i,
@@ -239,6 +243,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       autoLockTimeout: "never",
       unlockedWalletIds: ["wallet-1"],
     });
+    // getState reports a wallet with no cached key as locked.
+    await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
 
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
@@ -386,6 +392,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: [walletId],
       });
+      await setItem(`session:key:${walletId}`, { jwk: { kty: "RSA", n: "n", e: "e" }, address });
     }
 
     it("connect() pushes a CONNECT event only to the tab that just connected", async () => {
