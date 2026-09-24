@@ -244,6 +244,45 @@ describe("ApprovalHandler: connect() -> Grant", () => {
     expect(grants).toHaveLength(1);
     expect(grants[0]?.permissions).toEqual(["ACCESS_ADDRESS", "ACCESS_TOKENS"]);
   });
+
+  it("approving new permissions adds them to the origin's grant instead of replacing it", async () => {
+    const origin = "https://bazar.arweave.net";
+    await storage.set("local:grants", [
+      { origin, walletId: WALLET_ID, permissions: ["ACCESS_ADDRESS", "SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
+    ]);
+
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin,
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_TOKENS"],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+
+    await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS", "SIGNATURE", "ACCESS_TOKENS"] });
+    const grants = await handler.getConnectedApps();
+    expect(grants).toHaveLength(1);
+    expect(grants[0]?.permissions).toEqual(["ACCESS_ADDRESS", "SIGNATURE", "ACCESS_TOKENS"]);
+  });
+
+  it("an expired grant's permissions are not carried into the new one", async () => {
+    const origin = "https://bazar.arweave.net";
+    await storage.set("local:grants", [
+      { origin, walletId: WALLET_ID, permissions: ["SIGNATURE"], createdAt: 0, expiresAt: 1, budget: null },
+    ]);
+
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin,
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+
+    await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+  });
 });
 
 describe("ApprovalHandler: connect() before any wallet exists", () => {

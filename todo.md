@@ -13,11 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **`connect()` asks again when the app already has the permissions (S, opus)**
-  `entrypoints/background/index.ts` (`connect` always calls
-  `requestApproval`). Many dApps call `connect` on every page load. Done:
-  resolve right away when an active grant already covers what was asked
-  for, and only prompt for new permissions (merged into the grant).
 - [ ] **Token list: add AO tokens and store them (M, sonnet)**
   `src/handlers/reads.ts` reads `local:watchedProcessIds:{address}`, but
   nothing writes it, so only the default AO token ever shows. Done: add

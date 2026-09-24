@@ -192,15 +192,30 @@ async function handleProviderCall(
         ) as PermissionType[])
       : [];
 
+    const wanted: PermissionType[] = requested.length > 0 ? requested : ["ACCESS_ADDRESS"];
+    const state = await lifecycle.getState();
+
+    // Many dApps call connect() on every page load. An origin whose grant
+    // already covers the request resolves without a prompt; otherwise only
+    // the missing permissions are asked for, and approval merges them in.
+    // Without a wallet there is nothing to connect to, so a leftover grant
+    // never short-circuits onboarding.
+    const existing = state.activeWalletId ? await approval.findActiveGrant(origin) : null;
+    const newPermissions = existing
+      ? wanted.filter((permission) => !existing.permissions.includes(permission))
+      : wanted;
+    if (existing && newPermissions.length === 0) {
+      return { granted: existing.permissions };
+    }
+
     // With no wallet yet, the approval window runs onboarding before it
     // shows the request, and the grant goes to the wallet created there.
     // A locked wallet is unlocked in that window the same way.
-    const state = await lifecycle.getState();
     const result = await approval.requestApproval({
       kind: "connect",
       origin,
       walletId: state.activeWalletId,
-      requestedPermissions: requested.length > 0 ? requested : ["ACCESS_ADDRESS"],
+      requestedPermissions: newPermissions,
     });
 
     // Reached only once the user approved: a rejected or timed-out request

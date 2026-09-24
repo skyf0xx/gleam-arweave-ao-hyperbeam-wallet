@@ -644,6 +644,70 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     });
   });
 
+  describe("connect() from an origin that already has a grant", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+
+    async function seedUnlockedWalletWithGrant(): Promise<void> {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS", "SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    }
+
+    it("resolves without a prompt when the grant covers every requested permission", async () => {
+      await seedUnlockedWalletWithGrant();
+
+      await expect(
+        providerCall({ origin: ORIGIN, method: "connect", params: { permissions: ["SIGNATURE"] } }),
+      ).resolves.toEqual({ granted: ["ACCESS_ADDRESS", "SIGNATURE"] });
+      await expect(providerCall({ origin: ORIGIN, method: "connect", params: {} })).resolves.toEqual({
+        granted: ["ACCESS_ADDRESS", "SIGNATURE"],
+      });
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("prompts only for the missing permissions and merges them into the grant", async () => {
+      await seedUnlockedWalletWithGrant();
+
+      const resultPromise = providerCall({
+        origin: ORIGIN,
+        method: "connect",
+        params: { permissions: ["ACCESS_ADDRESS", "ACCESS_TOKENS"] },
+      });
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      const pending = (await getItem("session:pendingApprovals")) as Array<{
+        request: { requestId: string; preview: { requestedPermissions: string[] } };
+      }>;
+      expect(pending[0]!.request.preview.requestedPermissions).toEqual(["ACCESS_TOKENS"]);
+
+      await registeredHandlers.get("resolveApproval")!({ data: { requestId: pending[0]!.request.requestId, approved: true } });
+      await expect(resultPromise).resolves.toEqual({ granted: ["ACCESS_ADDRESS", "SIGNATURE", "ACCESS_TOKENS"] });
+      expect(await getItem("local:grants")).toEqual([
+        expect.objectContaining({ origin: ORIGIN, permissions: ["ACCESS_ADDRESS", "SIGNATURE", "ACCESS_TOKENS"] }),
+      ]);
+    });
+
+    it("prompts again once the grant has expired", async () => {
+      await seedUnlockedWalletWithGrant();
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: 1, budget: null },
+      ]);
+
+      void providerCall({ origin: ORIGIN, method: "connect", params: {} }).catch(() => undefined);
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    });
+  });
+
   describe("deleteWallet keeps site grants unless no wallet is left", () => {
     const wallet = (id: string, address: string) => ({
       id,

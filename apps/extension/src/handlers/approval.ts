@@ -515,11 +515,18 @@ export class ApprovalHandler {
     }
     const grants = await this.loadGrants();
     const withoutExisting = grants.filter((grant) => grant.origin !== entry.request.origin);
+    // A connect from an already-connected origin only asks for what the
+    // grant lacks, so approving it adds to the grant instead of narrowing it.
+    const existing = await this.findActiveGrant(entry.request.origin);
+    const permissions = [...(existing?.permissions ?? [])];
+    for (const permission of preview.requestedPermissions) {
+      if (!permissions.includes(permission)) permissions.push(permission);
+    }
 
     const grant: Grant = {
       origin: entry.request.origin,
       walletId,
-      permissions: preview.requestedPermissions,
+      permissions,
       createdAt: Date.now(),
       expiresAt: null,
       budget: null,
