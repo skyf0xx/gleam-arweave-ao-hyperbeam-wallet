@@ -4,6 +4,8 @@ import { Welcome } from "./Welcome";
 import { CreatePassword } from "./CreatePassword";
 import { Backup } from "./Backup";
 import { Import } from "./Import";
+import { AddWalletStart } from "./AddWalletStart";
+import { VaultPassword } from "./VaultPassword";
 
 /**
  * Onboarding view module (`entrypoints/popup/onboarding/`) — a WXT
@@ -30,6 +32,14 @@ type Step =
 export interface OnboardingViewProps {
   runtime: RuntimePort;
   onComplete: () => void;
+  /**
+   * `"add-wallet"` adds a wallet to an existing vault: it starts from the
+   * wallet switcher instead of the welcome screen and asks for the current
+   * vault password instead of setting one.
+   */
+  mode?: "first-run" | "add-wallet";
+  /** Leaves the add-wallet flow from its first screen. */
+  onCancel?: () => void;
 }
 
 const DEFAULT_WALLET_NAMES = [
@@ -77,7 +87,8 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel }: OnboardingViewProps) {
+  const addingWallet = mode === "add-wallet";
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string>();
@@ -127,6 +138,15 @@ export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
 
   switch (step.kind) {
     case "welcome":
+      if (addingWallet) {
+        return (
+          <AddWalletStart
+            onBack={() => onCancel?.()}
+            onCreate={() => setStep({ kind: "create-password" })}
+            onImport={() => setStep({ kind: "import" })}
+          />
+        );
+      }
       return (
         <Welcome
           onCreate={() => setStep({ kind: "create-password" })}
@@ -135,6 +155,17 @@ export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
       );
 
     case "create-password":
+      if (addingWallet) {
+        return (
+          <VaultPassword
+            title="Create a wallet"
+            onBack={() => setStep({ kind: "welcome" })}
+            onSubmit={(password) => void handleCreatePassword(password)}
+            submitting={submitting}
+            serverError={serverError}
+          />
+        );
+      }
       return (
         <CreatePassword
           onBack={() => setStep({ kind: "welcome" })}
@@ -147,7 +178,9 @@ export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
     case "backup":
       return (
         <Backup
-          onBack={() => setStep({ kind: "welcome" })}
+          // The wallet already exists, so going back to the start would
+          // only offer to add another one.
+          onBack={addingWallet ? onComplete : () => setStep({ kind: "welcome" })}
           keyfileContents={step.keyfileContents}
           onDownload={() => downloadKeyfile(step.keyfileContents, step.walletName)}
           onCopy={() => void navigator.clipboard?.writeText(step.keyfileContents)}
@@ -164,6 +197,17 @@ export function OnboardingView({ runtime, onComplete }: OnboardingViewProps) {
       );
 
     case "import-password":
+      if (addingWallet) {
+        return (
+          <VaultPassword
+            title="Import a wallet"
+            onBack={() => setStep({ kind: "import" })}
+            onSubmit={(password) => void handleImportPassword(step.jwk, password)}
+            submitting={submitting}
+            serverError={serverError}
+          />
+        );
+      }
       return (
         <CreatePassword
           title="Import a wallet"

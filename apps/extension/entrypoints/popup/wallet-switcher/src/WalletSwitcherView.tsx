@@ -23,11 +23,8 @@ function truncateAddress(address: string): string {
  * already returns `{ wallets, activeWalletId }` and `switchWallet` is
  * already implemented and wired.
  *
- * "Add wallet" and the per-row "manage" kebab (wallet-switcher.html) have
- * no backing screen or action anywhere in this task's ALLOWED SCOPE — no
- * `ProtocolMap` method or popup screen for either exists yet. Rendered as
- * visual affordances matching the mockup but inert (no `onClick`) rather
- * than invented behavior; see this task's final report.
+ * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
+ * per-row "manage" kebab has no screen behind it yet and stays inert.
  *
  * Per-row identity: each wallet's row uses the same dicebear identicon as
  * the main screen's account pill (`AccountAvatar` +
@@ -41,6 +38,7 @@ export interface WalletSwitcherViewProps {
   runtime: RuntimePort;
   onSwitched: (walletId: string) => void;
   onBack: () => void;
+  onAddWallet: () => void;
 }
 
 interface LoadState {
@@ -50,7 +48,7 @@ interface LoadState {
   error: string | null;
 }
 
-export function WalletSwitcherView({ runtime, onSwitched, onBack }: WalletSwitcherViewProps) {
+export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet }: WalletSwitcherViewProps) {
   const [state, setState] = useState<LoadState>({
     wallets: [],
     activeWalletId: null,
@@ -126,6 +124,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack }: WalletSwitch
 
         <button
           type="button"
+          onClick={onAddWallet}
           className="mt-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-mist"
         >
           <span

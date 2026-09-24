@@ -85,6 +85,7 @@ type MainSubView =
   | { kind: "send"; token: TokenBalance | null }
   | { kind: "receive" }
   | { kind: "wallet-switcher" }
+  | { kind: "add-wallet" }
   | { kind: "settings-home" }
   | { kind: "lock-settings" }
   | { kind: "network-peers" }
@@ -244,6 +245,19 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
           void refresh(runtime);
         }}
         onBack={() => setSubView({ kind: "home" })}
+        onAddWallet={() => setSubView({ kind: "add-wallet" })}
+      />
+    );
+  } else if (subView.kind === "add-wallet") {
+    content = (
+      <OnboardingView
+        runtime={runtime}
+        mode="add-wallet"
+        onCancel={() => setSubView({ kind: "wallet-switcher" })}
+        onComplete={() => {
+          setSubView({ kind: "home" });
+          void refresh(runtime);
+        }}
       />
     );
   } else if (subView.kind === "settings-home") {

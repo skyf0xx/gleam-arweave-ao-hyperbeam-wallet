@@ -114,3 +114,101 @@ describe("OnboardingView: import flow", () => {
     expect(screen.getByText("Import a wallet")).toBeTruthy();
   });
 });
+
+const VALID_JWK = {
+  kty: "RSA",
+  e: "AQAB",
+  n: "n".repeat(10),
+  d: "d".repeat(10),
+  p: "p".repeat(10),
+  q: "q".repeat(10),
+  dp: "d".repeat(10),
+  dq: "d".repeat(10),
+  qi: "q".repeat(10),
+};
+
+describe("OnboardingView: add-wallet mode", () => {
+  it("starts from an Add wallet screen whose back button cancels", () => {
+    const onCancel = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime()} mode="add-wallet" onComplete={vi.fn()} onCancel={onCancel} />,
+    );
+
+    expect(screen.getByText("Add a wallet")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("creates with the current password, never asking for a new one, then shows the backup", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-2", name: "Opal" }) // createWallet
+      .mockResolvedValueOnce({ kty: "RSA", n: "example" }); // exportWallet
+    const onComplete = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" onComplete={onComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
+
+    expect(screen.queryByPlaceholderText("Re-enter your password")).toBeNull();
+    expect(screen.queryByText("Set a password")).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText("Enter your password"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByText("Your wallet is ready")).toBeTruthy());
+    expect(send).toHaveBeenNthCalledWith(1, {
+      type: "createWallet",
+      payload: { name: expect.any(String), password: GOOD_PASSWORD },
+    });
+    expect(send).toHaveBeenNthCalledWith(2, {
+      type: "exportWallet",
+      payload: { walletId: "wallet-2", password: GOOD_PASSWORD },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("shows a wrong-password rejection inline and clears the field", async () => {
+    const send = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("That password didn't work. Use the password you unlock Gleam with."));
+    render(<OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" onComplete={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
+    const field = screen.getByPlaceholderText("Enter your password");
+    fireEvent.change(field, { target: { value: "wrong password here" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("didn't work"));
+    expect((screen.getByPlaceholderText("Enter your password") as HTMLInputElement).value).toBe("");
+  });
+
+  it("imports a keyfile with the current password and completes", async () => {
+    const send = vi.fn().mockResolvedValueOnce({ id: "wallet-3", name: "Jade" });
+    const onComplete = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" onComplete={onComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Import a wallet" }));
+    fireEvent.change(screen.getByPlaceholderText(/kty/), {
+      target: { value: JSON.stringify(VALID_JWK) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    fireEvent.change(screen.getByPlaceholderText("Enter your password"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenCalledWith({
+      type: "importWallet",
+      payload: { jwk: VALID_JWK, name: expect.any(String), password: GOOD_PASSWORD },
+    });
+  });
+});

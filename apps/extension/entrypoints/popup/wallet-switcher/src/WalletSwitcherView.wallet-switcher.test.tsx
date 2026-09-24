@@ -43,7 +43,7 @@ const STATE: WalletState = {
 describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
   it("lists every wallet from getState and marks the active one", async () => {
     const send = vi.fn().mockResolvedValue(STATE);
-    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} />);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     expect(screen.getByText("Trading")).toBeTruthy();
@@ -53,7 +53,7 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
   it("calls switchWallet with the tapped row's walletId, then onSwitched", async () => {
     const send = vi.fn().mockResolvedValueOnce(STATE).mockResolvedValueOnce(undefined);
     const onSwitched = vi.fn();
-    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={onSwitched} onBack={vi.fn()} />);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={onSwitched} onBack={vi.fn()} onAddWallet={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Trading")).toBeTruthy());
     fireEvent.click(screen.getByText("Trading"));
@@ -67,7 +67,7 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
   it("does not call switchWallet when tapping the already-active wallet", async () => {
     const send = vi.fn().mockResolvedValue(STATE);
     const onSwitched = vi.fn();
-    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={onSwitched} onBack={vi.fn()} />);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={onSwitched} onBack={vi.fn()} onAddWallet={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     fireEvent.click(screen.getByText("Wallet One"));
@@ -78,7 +78,7 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
 
   it("shows the network error banner and retries on a failed load", async () => {
     const send = vi.fn().mockRejectedValueOnce(new Error("unreachable")).mockResolvedValueOnce(STATE);
-    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} />);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText(/couldn't reach the network/i)).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -88,7 +88,7 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
 
   it("renders each wallet row with its own address-seeded avatar, matching the main screen's account pill", async () => {
     const send = vi.fn().mockResolvedValue(STATE);
-    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} />);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
 
@@ -104,10 +104,27 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
   it("calls onBack when the header back button is pressed", async () => {
     const onBack = vi.fn();
     const send = vi.fn().mockResolvedValue(STATE);
-    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={onBack} />);
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={onBack} onAddWallet={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("calls onAddWallet when Add wallet is pressed", async () => {
+    const onAddWallet = vi.fn();
+    const send = vi.fn().mockResolvedValue(STATE);
+    render(
+      <WalletSwitcherView
+        runtime={fakeRuntime({ send })}
+        onSwitched={vi.fn()}
+        onBack={vi.fn()}
+        onAddWallet={onAddWallet}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Add wallet" }));
+    expect(onAddWallet).toHaveBeenCalledOnce();
   });
 });

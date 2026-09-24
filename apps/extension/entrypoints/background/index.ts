@@ -8,6 +8,7 @@ import {
   missingPermissions,
   verifyMessage,
   type PermissionType,
+  type WalletSummary,
 } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
@@ -400,8 +401,17 @@ async function setLockedIcon(locked: boolean) {
 }
 
 // wallet lifecycle
-onExtensionMessage("createWallet", (message) => lifecycle.createWallet(message.data));
-onExtensionMessage("importWallet", (message) => lifecycle.importWallet(message.data));
+// A new wallet becomes the active one. Connected dApps follow the active
+// wallet, so they hear about it; with no earlier wallet there is nothing
+// connected to tell.
+async function addWallet(add: () => Promise<WalletSummary>): Promise<WalletSummary> {
+  const before = await lifecycle.getState();
+  const summary = await add();
+  if (before.activeWalletId !== null) void broadcastWalletSwitch(summary.address);
+  return summary;
+}
+onExtensionMessage("createWallet", (message) => addWallet(() => lifecycle.createWallet(message.data)));
+onExtensionMessage("importWallet", (message) => addWallet(() => lifecycle.importWallet(message.data)));
 onExtensionMessage("deleteWallet", async (message) => {
   const { walletId } = message.data;
   const before = await lifecycle.getState();

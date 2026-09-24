@@ -200,6 +200,102 @@ describe("WalletLifecycleHandler: importWallet", () => {
   });
 });
 
+describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
+  let storage: StoragePort;
+  let handler: WalletLifecycleHandler;
+
+  beforeEach(() => {
+    storage = createFakeStorage();
+    handler = new WalletLifecycleHandler(storage);
+  });
+
+  it("createWallet rejects a password that doesn't open the vault, and stores nothing", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+
+    await expect(
+      handler.createWallet({ name: "Second", password: OTHER_PASSWORD }),
+    ).rejects.toThrow(/didn't work/i);
+
+    const state = await handler.getState();
+    expect(state.wallets).toHaveLength(1);
+  });
+
+  it("importWallet rejects a password that doesn't open the vault, and stores nothing", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+
+    await expect(
+      handler.importWallet({ jwk: validJWK(), name: "Second", password: OTHER_PASSWORD }),
+    ).rejects.toThrow(/didn't work/i);
+
+    const state = await handler.getState();
+    expect(state.wallets).toHaveLength(1);
+  });
+
+  it("createWallet with the vault password adds an unlocked, active wallet under that password", async () => {
+    const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+
+    const second = await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+
+    const state = await handler.getState();
+    expect(state.wallets.map((wallet) => wallet.id)).toEqual([first.id, second.id]);
+    expect(state.activeWalletId).toBe(second.id);
+    expect(new Set(state.session?.unlockedWalletIds)).toEqual(new Set([first.id, second.id]));
+    await handler.lockWallet();
+    const unlocked = await handler.unlockWallet({ password: GOOD_PASSWORD });
+    expect(new Set(unlocked.unlockedWalletIds)).toEqual(new Set([first.id, second.id]));
+  });
+
+  it("importWallet with the vault password adds the wallet", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+
+    const imported = await handler.importWallet({
+      jwk: validJWK(),
+      name: "Imported",
+      password: GOOD_PASSWORD,
+    });
+
+    const jwk = await handler.exportWallet({ walletId: imported.id, password: GOOD_PASSWORD });
+    expect(jwk.n).toBe(validJWK().n);
+  });
+
+  it("accepts the vault password even when it predates the password policy", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    const [wallet] = (await storage.get<Array<Record<string, unknown>>>("local:wallets"))!;
+    // Re-encrypt the first wallet under a password the policy now rejects.
+    const jwk = await handler.exportWallet({ walletId: wallet!.id as string, password: GOOD_PASSWORD });
+    const { encryptToEnvelope } = await import("@gleam/core");
+    const weak = "short1!";
+    const envelope = await encryptToEnvelope(
+      new TextEncoder().encode(JSON.stringify(jwk)) as Uint8Array<ArrayBuffer>,
+      weak,
+      wallet!.id as string,
+      wallet!.address as string,
+    );
+    await storage.set("local:wallets", [{ ...wallet, encryptedKeyfile: envelope }]);
+
+    const second = await handler.createWallet({ name: "Second", password: weak });
+
+    expect(second.name).toBe("Second");
+  });
+
+  it("accepts a password that opens any stored wallet, not only the active one", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    const otherStorage = createFakeStorage();
+    await new WalletLifecycleHandler(otherStorage).importWallet({
+      jwk: validJWK(),
+      name: "Legacy",
+      password: OTHER_PASSWORD,
+    });
+    const legacy = (await otherStorage.get<unknown[]>("local:wallets"))!;
+    const current = (await storage.get<unknown[]>("local:wallets"))!;
+    await storage.set("local:wallets", [...current, ...legacy]);
+
+    await expect(
+      handler.createWallet({ name: "Third", password: OTHER_PASSWORD }),
+    ).resolves.toMatchObject({ name: "Third" });
+  });
+});
+
 describe("WalletLifecycleHandler: unlockWallet", () => {
   let storage: StoragePort;
   let handler: WalletLifecycleHandler;
@@ -243,11 +339,17 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
   it("silently skips a stored wallet whose password doesn't match, without throwing", async () => {
     const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
-    await handler.importWallet({
+    // A vault from before the shared password can hold a wallet under a
+    // different one; the handler no longer creates that, so seed it.
+    const otherStorage = createFakeStorage();
+    await new WalletLifecycleHandler(otherStorage).importWallet({
       jwk: validJWK(),
       name: "Second",
       password: OTHER_PASSWORD,
     });
+    const legacy = (await otherStorage.get<unknown[]>("local:wallets"))!;
+    const current = (await storage.get<unknown[]>("local:wallets"))!;
+    await storage.set("local:wallets", [...current, ...legacy]);
     await handler.lockWallet();
 
     const result = await handler.unlockWallet({ password: GOOD_PASSWORD });
@@ -636,7 +738,7 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
     const storage = createFakeStorage();
     const handler = new WalletLifecycleHandler(storage);
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
-    await handler.importWallet({ jwk: validJWK(), name: "Second", password: OTHER_PASSWORD });
+    await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
 
     await handler.resetAllWallets();
 

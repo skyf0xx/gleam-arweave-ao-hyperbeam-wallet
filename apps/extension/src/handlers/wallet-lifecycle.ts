@@ -263,11 +263,50 @@ async function addUnlockedWalletToSession(
 export class WalletLifecycleHandler {
   constructor(private readonly storage: StoragePort) {}
 
-  async createWallet(req: { name: string; password: string }): Promise<WalletSummary> {
-    const passwordCheck = validatePassword(req.password);
-    if (!passwordCheck.valid) {
-      throw new Error(passwordCheck.reason);
+  /**
+   * Every wallet shares the one vault password. The first wallet sets it,
+   * so it must pass the password policy. Later wallets must reuse it: the
+   * password has to open an existing envelope, or the vault would end up
+   * with wallets that unlock under different passwords. The policy check
+   * is skipped then, because a password that opens the vault is the vault
+   * password even if it predates the current policy.
+   */
+  private async checkNewWalletPassword(password: string): Promise<void> {
+    const wallets = await loadWallets(this.storage);
+    const activeWalletId = await loadActiveWalletId(this.storage, wallets);
+    const encrypted = [
+      ...wallets.filter((wallet) => wallet.id === activeWalletId),
+      ...wallets.filter((wallet) => wallet.id !== activeWalletId),
+    ].flatMap((wallet) => (wallet.encryptedKeyfile ? [{ wallet, envelope: wallet.encryptedKeyfile }] : []));
+
+    if (encrypted.length === 0) {
+      const passwordCheck = validatePassword(password);
+      if (!passwordCheck.valid) {
+        throw new Error(passwordCheck.reason);
+      }
+      return;
     }
+
+    for (const { wallet, envelope } of encrypted) {
+      try {
+        const plaintext = await decryptFromEnvelope(
+          envelope,
+          password,
+          wallet.id,
+          wallet.address,
+        );
+        zeroize(plaintext);
+        return;
+      } catch {
+        // Wrong password for this wallet; a vault from before the shared
+        // password may have others that it opens.
+      }
+    }
+    throw new Error("That password didn't work. Use the password you unlock Gleam with.");
+  }
+
+  async createWallet(req: { name: string; password: string }): Promise<WalletSummary> {
+    await this.checkNewWalletPassword(req.password);
 
     const jwk = await generateJWK();
     const address = await deriveAddress(jwk);
@@ -307,10 +346,7 @@ export class WalletLifecycleHandler {
     name: string;
     password: string;
   }): Promise<WalletSummary> {
-    const passwordCheck = validatePassword(req.password);
-    if (!passwordCheck.valid) {
-      throw new Error(passwordCheck.reason);
-    }
+    await this.checkNewWalletPassword(req.password);
 
     const shapeCheck = validateJWKShape(req.jwk);
     if (!shapeCheck.valid) {

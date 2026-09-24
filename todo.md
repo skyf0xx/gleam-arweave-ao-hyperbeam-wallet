@@ -13,17 +13,8 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **"Add wallet" button does nothing (M, opus)**
-  `popup/wallet-switcher/src/WalletSwitcherView.tsx:127-138`. After
-  onboarding there is no way to create or import a second wallet. Done:
-  create and import from the switcher, reusing the onboarding steps minus
-  the create-password step. All wallets share the one vault password
-  (decided): the flow asks for the current password once, checks it
-  against an existing wallet's envelope, and encrypts the new wallet under
-  it. `createWallet` and `importWallet` reject a password that doesn't open
-  the vault when wallets already exist. Never prompt for a new password.
 - [ ] **Wallet "Manage" menu does nothing: rename and back up (M, sonnet)**
-  `WalletSwitcherView.tsx:178-184`. `renameWallet` and `exportWallet` are
+  `WalletSwitcherView.tsx:176-184`. `renameWallet` and `exportWallet` are
   wired in the background but have no UI after onboarding. Done: a wallet
   detail screen with rename and a password-gated keyfile download. Record
   that a backup was confirmed (needed by the next item).
@@ -254,3 +245,13 @@ vault, crypto and provider security; `sonnet` for everything else.
   A grant's `walletId` pointing at a removed wallet is normal now (grants
   follow the active wallet), so check for "no wallets", not a missing
   `walletId`: drop all grants when the wallet list is empty.
+- **Importing a keyfile that's already in the vault adds a duplicate wallet (S, sonnet)**
+  `src/handlers/wallet-lifecycle.ts` (`importWallet`). Nothing checks the
+  derived address against stored wallets, so the switcher shows two rows
+  for one account, and they share one activity log and token list. Reject
+  it, or switch to the existing wallet.
+- **Back from first-run backup returns to Welcome after the wallet exists (S, sonnet)**
+  `popup/onboarding/src/OnboardingView.tsx` (`Backup`'s `onBack`). The
+  wallet is already stored, so Welcome's "Create a wallet" then asks to
+  set a new password, which `createWallet` now rejects unless it matches
+  the first. Make back finish onboarding, as the add-wallet flow does.
