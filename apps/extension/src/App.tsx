@@ -15,14 +15,10 @@ import { ConnectedAppsView } from "@/entrypoints/popup/connected-apps/index.tsx"
 import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
 
 /**
- * The one shared shell mounted from every surface (popup, sidepanel,
- * and — once the provider-bridge layer lands — the approval window), per
- * core-design.md's Entrypoint layout.
+ * The one shared shell mounted from every surface (popup, sidepanel, and
+ * the approval window).
  *
- * View-switch design (per ARCHITECTURE.md §1.3: "a validated view-name
- * string, NOT a router library"), resolved as this task's Correction
- * Protocol log assigned it here: a top-level `VIEWS` union drives which
- * top-level surface mounts —
+ * A top-level `TopView` union drives which top-level surface mounts —
  *
  *   "loading" | "onboarding" | "unlock" | "main-screen"
  *
@@ -31,13 +27,10 @@ import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
  * unlocked session exists -> main-screen). `send`/`receive`/`activity`
  * are NOT additional entries in this top-level union — they're reached
  * as a nested view-switch one level down, inside the `main-screen`
- * branch only, exactly like `OnboardingView`'s own internal `Step` union
- * one level below the top switch. This mirrors the shape
- * `OnboardingView`/`UnlockView` already established (a view module owns
- * its own internal step state) rather than inventing a second pattern:
- * the top-level switch only ever cares about "which of the three
- * account-lifecycle states is the extension in," and everything reachable
- * once unlocked is main-screen's own concern.
+ * branch only, mirroring `OnboardingView`'s own internal `Step` union: a
+ * view module owns its own internal step state, and the top-level switch
+ * only ever cares about which of the three account-lifecycle states the
+ * extension is in.
  *
  * Re-derives `getState` again after onboarding/unlock complete (rather
  * than trusting the completing view's local assumption) so this
@@ -46,19 +39,18 @@ import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
  * shortcut that could drift from what `getState` actually reports.
  *
  * `runtime` resolution: when no `runtime` prop is supplied (every real
- * mount site — `popup/index.tsx`/`sidepanel/index.tsx`, both `scaffold`'s
- * locked scope, neither passes one), the concrete `WebextCoreRuntimePort`
- * singleton (`./adapters/runtime`) is loaded via a *dynamic* `import()`
- * inside `useEffect`, not a static top-level import. `@webext-core/
- * messaging` unconditionally imports `webextension-polyfill` at module
- * load, and that polyfill throws synchronously ("This script should only
- * be loaded in a browser extension") the instant its module body runs
- * outside a real extension context — including under `scaffold`'s own
- * `App.scaffold.test.tsx`, which mounts `<App layout="popup" />` with no
- * `runtime` prop and no `@webext-core/messaging` mock. A static import
- * of the adapter would make every test that imports `App.tsx` crash at
- * collection time, not just tests that actually exercise the runtime
- * call — so the adapter is resolved lazily, and only once actually
+ * mount site — `popup/index.tsx`/`sidepanel/index.tsx`), the concrete
+ * `WebextCoreRuntimePort` singleton (`./adapters/runtime`) is loaded via
+ * a *dynamic* `import()` inside `useEffect`, not a static top-level
+ * import. `@webext-core/messaging` unconditionally imports
+ * `webextension-polyfill` at module load, and that polyfill throws
+ * synchronously ("This script should only be loaded in a browser
+ * extension") the instant its module body runs outside a real extension
+ * context — including under a test that mounts `<App layout="popup" />`
+ * with no `runtime` prop and no `@webext-core/messaging` mock. A static
+ * import of the adapter would make every test that imports `App.tsx`
+ * crash at collection time, not just tests that actually exercise the
+ * runtime call — so the adapter is resolved lazily, only once actually
  * needed (on mount, inside the effect that immediately calls
  * `getState`), never at module-evaluation time.
  */
@@ -74,9 +66,7 @@ export interface AppProps {
  * get their own JS runtime, so this is intentionally not a cross-context
  * singleton) — module-scoped so remounts within the same document (e.g. a
  * test that renders `<App />` more than once) share one cache rather than
- * each constructing their own. `useBalances`/`useActivity` and their query
- * keys are wallet-core's scope, not this layer's — this only wires the
- * provider every later hook will read from.
+ * each constructing their own.
  */
 const queryClient = new QueryClient();
 
@@ -186,8 +176,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         // A resolution/read failure this early (no extension messaging
         // context available, or the background service worker
         // unreachable) is surfaced as a named state rather than an
-        // unhandled rejection — HONESTY: never fail silently or crash
-        // uncaught.
+        // unhandled rejection: never fail silently or crash uncaught.
         setInitError(error instanceof Error ? error.message : String(error));
       }
     }
@@ -223,7 +212,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     // `main-screen` resolved with no active wallet to show — a `getState`
     // response the current models can't actually produce (wallets.length
     // > 0 is what got us into this branch), kept as a named fallback
-    // rather than crashing, per this task's HONESTY requirement.
+    // rather than crashing.
     content = <div className="p-4 text-body text-muted">No active wallet found.</div>;
   } else if (subView.kind === "send") {
     content = (

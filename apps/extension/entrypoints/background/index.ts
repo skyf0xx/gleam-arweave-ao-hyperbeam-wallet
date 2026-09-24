@@ -98,13 +98,11 @@ registerActivityPromotionAlarm(reads);
 // dropped when the browser closes; lockWallet and auto-lock clear it.
 
 /**
- * Finds every open tab whose URL origin matches `origin` exactly — the
- * only way this task's access-control rule ("only a connected dApp...
- * receives these events") can be enforced for a *push*, since nothing
- * about `providerEvent`'s wire shape itself carries an origin check (see
- * `protocol.ts`'s doc comment on that method). `browser.tabs.query`'s own
- * `url` match pattern can't express "exact origin, any path" directly, so
- * this filters candidate tabs (queried broadly by scheme) down to an exact
+ * Finds every open tab whose URL origin matches `origin` exactly, since
+ * nothing about `providerEvent`'s wire shape itself carries an origin
+ * check. `browser.tabs.query`'s own `url` match pattern can't express
+ * "exact origin, any path" directly, so this filters candidate tabs
+ * (queried broadly by scheme) down to an exact
  * `new URL(tab.url).origin === origin` match by hand.
  */
 async function findTabsForOrigin(origin: string): Promise<number[]> {
@@ -151,12 +149,10 @@ async function emitProviderEventToOrigin<TName extends ProviderEventName>(
  * `walletSwitch` broadcast for an active-account change: unlike
  * connect/disconnect (inherently one-origin actions), a wallet switch
  * affects the whole extension, so every origin currently holding an
- * active `Grant` gets the push — never every open tab, per this task's
- * access-control rule. Origins with no Grant, or an expired one
- * (`findActiveGrant`'s own expiry check applies per-origin via
- * `getConnectedApps`, which is unfiltered by expiry — filtered here by
- * re-checking `findActiveGrant` per origin so an expired Grant is
- * silently excluded rather than pushed to).
+ * active `Grant` gets the push — never every open tab.
+ * `getConnectedApps` is unfiltered by expiry, so this re-checks
+ * `findActiveGrant` per origin so an expired Grant is silently excluded
+ * rather than pushed to.
  */
 async function broadcastWalletSwitch(address: string): Promise<void> {
   const grants = await approval.getConnectedApps();
@@ -172,9 +168,8 @@ async function broadcastWalletSwitch(address: string): Promise<void> {
 
 /**
  * Maps a `PROVIDER_SURFACE_METHODS` name + already-origin-checked params
- * into the actual read/approval-flow work — the "business logic" side of
- * the provider surface, as distinct from `providerCall`'s own job (which
- * is purely the privilege-tier gate). No `WalletState` read here ever
+ * into the actual read/approval-flow work, distinct from `providerCall`'s
+ * own job (the privilege-tier gate). No `WalletState` read here ever
  * exposes an address for an origin without an active `Grant` — every
  * branch below either reads through `approval.findActiveGrant` first or
  * is itself the `connect` call that creates one.
@@ -398,11 +393,10 @@ async function handleProviderCall(
     }
 
     default:
-      // Not a `never`-exhaustive check: `ProviderSurfaceMethod` (messaging
-      // layer's scope) can grow ahead of this switch (provider-bridge's
-      // scope) being updated to handle a new method, so an unhandled
-      // method is a named runtime failure here rather than a compile
-      // error that would block every other layer's commits.
+      // Not a `never`-exhaustive check: `ProviderSurfaceMethod` can grow
+      // ahead of this switch being updated to handle a new method, so an
+      // unhandled method is a named runtime failure here rather than a
+      // compile error.
       throw new Error(`Provider method "${String(method)}" is not implemented yet.`);
   }
 }
@@ -459,7 +453,7 @@ onExtensionMessage("switchWallet", async (message) => {
   await lifecycle.switchWallet(message.data);
   // `switchWallet`'s locked signature returns `void`, so the resulting
   // active address is derived here from `getState()` after the call
-  // resolves, per this task's INHERITED DECISIONS note.
+  // resolves.
   const state = await lifecycle.getState();
   const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
   if (active) {
@@ -500,15 +494,12 @@ onExtensionMessage("getTokenPrices", () => reads.getTokenPrices());
 onExtensionMessage("getConnectedApps", () => approval.getConnectedApps());
 
 /**
- * `TransferDraft`/`UploadDraft` type `walletId` as optional (see those
- * models' own doc comments: kept optional only to stay structurally
- * compatible with a locked test file predating the field, outside this
- * task's ALLOWED SCOPE to change). Every real caller (`SendView`/
- * `UploadView`) always supplies it, but the wire type itself can't
- * promise that — this guard turns a missing field into a named rejection
- * rather than `undefined` silently reaching the key-session lookup as a
- * wallet id. Signing material itself is no longer carried on the
- * request at all — see `key-session.ts`.
+ * `TransferDraft`/`UploadDraft` type `walletId` as optional. Every real
+ * caller (`SendView`/`UploadView`) always supplies it, but the wire type
+ * itself can't promise that — this guard turns a missing field into a
+ * named rejection rather than `undefined` silently reaching the
+ * key-session lookup as a wallet id. The request carries no signing
+ * material — see `key-session.ts`.
  */
 function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walletId: string } {
   if (!draft.walletId) {
@@ -557,11 +548,10 @@ messenger.onMessage("providerCall", (message) => {
 });
 
 export default defineBackground(() => {
-  // Registration above runs at module-evaluation time (matching
-  // `@webext-core/messaging`'s own documented pattern: `onMessage` must
+  // Registration above runs at module-evaluation time: `onMessage` must
   // be called once per JS context, not per `defineBackground` invocation,
   // since MV3 service workers only evaluate this module once per
-  // wake-up). `defineBackground`'s callback body intentionally does
-  // nothing further — it exists so WXT recognizes this file as the
-  // background entrypoint and bundles/registers it in the manifest.
+  // wake-up. This callback body intentionally does nothing further — it
+  // exists so WXT recognizes this file as the background entrypoint and
+  // bundles/registers it in the manifest.
 });

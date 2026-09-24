@@ -16,10 +16,8 @@ export interface SubmitTransferResult {
 
 /**
  * Wraps the existing `submitTransfer` `runtime.send` call as a mutationFn
- * (no transport-layer change) and, on success, invalidates both the
- * balances and activity queries for `address` — RELEVANT RULES: "After a
- * successful send, both Send and Main Screen reflect the updated balance
- * without a manual popup reopen." Both screens read through
+ * and, on success, invalidates both the balances and activity queries
+ * for `address`. Both `SendView` and `MainScreenView` read through
  * `useBalances`/`useActivity` keyed on the same `walletQueryKeys`
  * builders, so invalidating here is sufficient; neither screen needs its
  * own invalidation call.

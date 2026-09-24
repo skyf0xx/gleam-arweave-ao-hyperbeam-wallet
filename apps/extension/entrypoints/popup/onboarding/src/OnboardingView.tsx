@@ -8,19 +8,13 @@ import { AddWalletStart } from "./AddWalletStart";
 import { VaultPassword } from "./VaultPassword";
 
 /**
- * Onboarding view module (`entrypoints/popup/onboarding/`) — a WXT
- * folder per the browser-extension blueprint's naming rule, but not
- * itself a registered WXT entrypoint (ARCHITECTURE.md §1.3: the popup is
- * one entrypoint with a validated view-name string). `App.tsx` (owned by
- * `scaffold`'s scope, not this layer's) is expected to import
- * `OnboardingView` and mount it when its view-switch selects
- * `"onboarding"` — see this task's final report for the scope gap this
- * leaves (nothing in `scaffold`'s or this layer's own ALLOWED SCOPE
- * covers writing that switch statement).
+ * Onboarding view module (`entrypoints/popup/onboarding/`) — a folder, not
+ * a registered WXT entrypoint; the popup is one entrypoint with a
+ * validated view-name string, and `App.tsx` imports `OnboardingView` and
+ * mounts it when its view-switch selects `"onboarding"`.
  *
- * Internal step state only — no router, matching ARCHITECTURE.md §1.3's
- * "validated view-name string, not a router library" even one level
- * down inside a single view.
+ * Internal step state only — no router, even one level down inside a
+ * single view.
  */
 type Step =
   | { kind: "welcome" }

@@ -7,8 +7,6 @@ import { GleamProvider, install } from "./index";
  * against jsdom's real `window` (no extension context needed for any of
  * this — `crypto.randomUUID`/`crypto.subtle` and `window.
  * postMessage`/`addEventListener` are all ambient browser APIs).
- * Exercises every item in ARCHITECTURE.md §4.3's numbered list this file
- * is responsible for.
  *
  * `postResponse` dispatches a synthetic `MessageEvent` with `source`
  * explicitly set, rather than calling the real `window.postMessage` to

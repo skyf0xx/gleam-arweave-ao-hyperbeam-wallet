@@ -17,16 +17,14 @@ import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSche
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
 /**
- * Send flow (send-flow.html / TODO.md §2) — compose → review → success,
- * internal step state only (same "no router" pattern as
- * Onboarding/UnlockView). `ComposeStep`/`ReviewStep`/`SuccessStep` below
- * are pure render helpers, not independently-mounted steps, matching how
- * `OnboardingView` structures its own switch. `TokenPickerStep`/
- * `RecentRecipientsStep` (added by AO-SEND-UI-WALLET-CORE) are two more
- * pushed screens in the same internal `Step` union, following this
- * codebase's established "pushed screen with ScreenHeader + rows" pattern
- * (`WalletSwitcherView.tsx`) rather than a dropdown/modal primitive — none
- * exists in this project and none is needed here either.
+ * Compose → review → success, internal step state only (same "no router"
+ * pattern as Onboarding/UnlockView). `ComposeStep`/`ReviewStep`/
+ * `SuccessStep` below are pure render helpers, not independently-mounted
+ * steps, matching how `OnboardingView` structures its own switch.
+ * `TokenPickerStep`/`RecentRecipientsStep` are two more pushed screens in
+ * the same internal `Step` union, following this codebase's established
+ * "pushed screen with ScreenHeader + rows" pattern (`WalletSwitcherView.tsx`)
+ * rather than a dropdown/modal primitive.
  *
  * No password prompt here: `estimateTransfer`/`submitTransfer` read the
  * signing key from the background's in-memory unlocked-session cache
@@ -35,17 +33,15 @@ const WINSTON_PER_AR = 1_000_000_000_000n;
  * an unauthenticated user on the unlock screen, so `SendView` only ever
  * mounts once a wallet is unlocked.
  *
- * `token` (added by AO-TOKEN-SEND-WALLET-CORE, now mutable in-flow by
- * AO-SEND-UI-WALLET-CORE): the initial value is still `App.tsx`'s
- * entry-point context (`null` for the top-level "Send" action, a
- * `TokenBalance` for a per-token row click on `MainScreenView`), but the
- * compose step's own token picker can change it before continuing —
- * `selectedToken` local state (not the `token` prop) is what
- * `handleContinue`/the compose/review/success steps actually read from
- * this point on. `null` is always the AR path; every entry from
- * `getTokenBalances` is an AO token. Every listed token — AR or AO — is
- * genuinely sendable through this one flow; there is no disabled/"coming
- * soon" branch.
+ * `token`: the initial value is `App.tsx`'s entry-point context (`null`
+ * for the top-level "Send" action, a `TokenBalance` for a per-token row
+ * click on `MainScreenView`), but the compose step's own token picker can
+ * change it before continuing — `selectedToken` local state (not the
+ * `token` prop) is what `handleContinue`/the compose/review/success steps
+ * actually read from this point on. `null` is always the AR path; every
+ * entry from `getTokenBalances` is an AO token. Every listed token — AR or
+ * AO — is genuinely sendable through this one flow; there is no
+ * disabled/"coming soon" branch.
  */
 export interface SendViewProps {
   runtime: RuntimePort;
@@ -133,25 +129,25 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const [step, setStep] = useState<Step>(INITIAL_STEP);
   // Store the compose step state when opening the token picker so we can restore it
   const [savedComposeStep, setSavedComposeStep] = useState<Extract<Step, { kind: "compose" }> | null>(null);
-  // The in-flow-selectable token (task 1/4: compose step's own token
-  // picker can change this before continuing). Initialized from the
-  // `token` prop — `App.tsx`'s entry-point context — but from here on
-  // this state, not the prop, is authoritative; the prop never changes
-  // identity across `SendView`'s lifetime (no `useEffect` re-sync needed).
+  // The in-flow-selectable token: the compose step's own token picker can
+  // change this before continuing. Initialized from the `token` prop —
+  // `App.tsx`'s entry-point context — but from here on this state, not the
+  // prop, is authoritative; the prop never changes identity across
+  // `SendView`'s lifetime (no `useEffect` re-sync needed).
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(token);
   // Shared cache with `MainScreenView` (`useBalances`, keyed by
   // `wallet.address`) — the compose step's client-side "insufficient
-  // balance" check (RELEVANT RULES) reads this same query's current data
-  // rather than issuing its own fetch.
+  // balance" check reads this same query's current data rather than
+  // issuing its own fetch.
   const balancesQuery = useBalances(runtime, wallet.address);
   // AR-only network fee estimate, independent of the balances query — feeds
   // the compose step's "Max" affordance and its balance check (see
   // `useArFee`'s own doc comment for why it isn't wallet-address-keyed).
   const arFeeQuery = useArFee(runtime);
-  // Invalidates the shared balances/activity cache for `wallet.address`
-  // on success (RELEVANT RULES: both Send and Main Screen reflect the
-  // updated balance without a manual popup reopen), wrapping the same
-  // `submitTransfer` call this view already made directly.
+  // Invalidates the shared balances/activity cache for `wallet.address` on
+  // success so both Send and Main Screen reflect the updated balance
+  // without a manual popup reopen, wrapping the same `submitTransfer` call
+  // this view already made directly.
   const submitTransferMutation = useSubmitTransfer(runtime, wallet.address);
 
   if (step.kind === "compose") {
@@ -578,9 +574,9 @@ function ReviewRow({ label, value, mono, strong }: { label: string; value: strin
  * Synthetic `TokenBalance` for the AO default row when `balancesQuery.data`
  * has no matching AO entry yet (unloaded, or a wallet that genuinely holds
  * none). Gives the row a real, selectable `token: null`-equivalent — every
- * row here must stay clickable (RELEVANT RULES), so a `div`-only "coming
- * soon" row (what `TokenRow` renders when `onClick` is `undefined`) isn't an
- * option. `address` mirrors the connected wallet since nothing downstream of
+ * row here must stay clickable, so a `div`-only "coming soon" row (what
+ * `TokenRow` renders when `onClick` is `undefined`) isn't an option.
+ * `address` mirrors the connected wallet since nothing downstream of
  * `selectedToken` reads anything but `processId`/`ticker`/`denomination`/
  * `quantity` (see `handleContinue`/`handleSign` above).
  */
@@ -596,16 +592,15 @@ function defaultAoTokenBalance(walletAddress: string): TokenBalance {
 }
 
 /**
- * Task 1: token picker — a pushed screen (`WalletSwitcherView.tsx`'s
- * established "ScreenHeader + rows" pattern, not a dropdown/modal — none
- * exists in this project). AR and AO are synthetic default rows (mirroring
- * `MainScreenView`'s Tokens tab — see `buildDefaultTokenRows`/
- * `nonDefaultTokenBalances` there): AR is `token: null`, and AO is always
- * rendered above any other watched AO tokens, falling back to
- * `DEFAULT_AR_TOKEN`/`DEFAULT_AO_TOKEN`'s `"0"` `defaultDisplayAmount`
- * while `balancesQuery.data` is unloaded or has no AO entry, and updating to
- * the real balance once it resolves. Every row is genuinely selectable —
- * there is no disabled/"coming soon" state, per RELEVANT RULES.
+ * Token picker — a pushed screen (`WalletSwitcherView.tsx`'s established
+ * "ScreenHeader + rows" pattern, not a dropdown/modal). AR and AO are
+ * synthetic default rows (mirroring `MainScreenView`'s Tokens tab — see
+ * `buildDefaultTokenRows`/`nonDefaultTokenBalances` there): AR is
+ * `token: null`, and AO is always rendered above any other watched AO
+ * tokens, falling back to `DEFAULT_AR_TOKEN`/`DEFAULT_AO_TOKEN`'s `"0"`
+ * `defaultDisplayAmount` while `balancesQuery.data` is unloaded or has no
+ * AO entry, and updating to the real balance once it resolves. Every row
+ * is genuinely selectable — there is no disabled/"coming soon" state.
  */
 function TokenPickerStep({
   walletAddress,
@@ -702,20 +697,16 @@ function SkeletonPickerRow() {
 }
 
 /**
- * Task 2: recent-recipients picker — derived from the shared `useActivity`
- * cache (`wallet.address`-keyed, same query `MainScreenView` and this
- * view's own review step read) rather than this step's own independent
- * `getActivity` fetch. `useActivity` was already built for exactly this
- * (see its own doc comment), but this step had kept a local
- * `useState`/`useEffect` fetch that duplicated it and raced its own
- * request against `MainScreenView`'s — this closes that gap so mounting
- * this step reuses whatever's already cached (or shares the one in-flight
- * request) instead of issuing a second one. Filters to `type: 'send'`
- * entries, maps to `address`, dedupes (first occurrence wins — entries
- * already arrive most-recent-first from `mergeActivity`), and renders the
- * distinct addresses in that same most-recent-first order. Truncated
- * display here only (per RELEVANT RULES); the full address is what gets
- * passed to `onSelect`.
+ * Recent-recipients picker — derived from the shared `useActivity` cache
+ * (`wallet.address`-keyed, same query `MainScreenView` and this view's own
+ * review step read) rather than this step's own independent `getActivity`
+ * fetch, so mounting this step reuses whatever's already cached (or
+ * shares the one in-flight request) instead of issuing a second one.
+ * Filters to `type: 'send'` entries, maps to `address`, dedupes (first
+ * occurrence wins — entries already arrive most-recent-first from
+ * `mergeActivity`), and renders the distinct addresses in that same
+ * most-recent-first order. Truncated display here only; the full address
+ * is what gets passed to `onSelect`.
  */
 function RecentRecipientsStep({
   runtime,

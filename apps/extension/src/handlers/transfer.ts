@@ -21,11 +21,9 @@ import { getCachedKey } from "./key-session";
  * other handlers in this directory.
  *
  * Signing key source: an AR transfer needs the decrypted JWK, which this
- * handler now reads from `key-session.ts`'s in-memory cache — populated by
- * `WalletLifecycleHandler.unlockWallet` — instead of requiring a password
- * on every request (this file's original resolution, superseded: see
- * `wallet-lifecycle.ts`'s doc comment for why "re-derive from a
- * freshly-typed password every call" was replaced). `submitTransfer`
+ * handler reads from `key-session.ts`'s in-memory cache — populated by
+ * `WalletLifecycleHandler.unlockWallet` — rather than requiring a password
+ * on every request. `submitTransfer`
  * throws a specific "wallet is locked" error if no key is cached for
  * `req.walletId` — the caller (`SendView`) has no password field to fall
  * back to asking for, so the UI's job is to route the user back to the
@@ -122,11 +120,11 @@ export class TransferHandler {
   }
 
   /**
-   * `token: null` is the AR path (unchanged). `token: <processId>` is an
-   * AO token transfer: `firstSeenRecipient` is still computed against the
-   * same merged local+gateway AR activity history the AR path uses (per
-   * this task's packet — there is no separate AO-only recipient-history
-   * source), but `fee` has no AO equivalent — see `core/ao/transfer.ts`'s
+   * `token: null` is the AR path. `token: <processId>` is an AO token
+   * transfer: `firstSeenRecipient` is still computed against the same
+   * merged local+gateway AR activity history the AR path uses (there is
+   * no separate AO-only recipient-history source), but `fee` has no AO
+   * equivalent — see `core/ao/transfer.ts`'s
    * `AO_TRANSFER_HAS_NO_FEE` doc comment for why an AO `Transfer` message
    * has no sender-side fee quote the way an AR value-transfer does.
    * Returned as `fee: null` rather than a fabricated `0`, matching
@@ -154,10 +152,8 @@ export class TransferHandler {
 
   /**
    * Writes an optimistic `ActivityEntry` immediately after a successful
-   * submit, before gateway/network confirmation (PRD "Send submission
-   * writes an optimistic activity entry immediately, before gateway
-   * confirmation") — the entry is written here, synchronously with the
-   * response, not fire-and-forgotten after it.
+   * submit, before gateway/network confirmation — the entry is written
+   * here, synchronously with the response, not fire-and-forgotten after it.
    *
    * AO path (`req.token !== null`): "submitted" here means the
    * Messenger Unit accepted and scheduled the signed data item, not that the token process has

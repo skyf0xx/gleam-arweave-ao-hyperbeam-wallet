@@ -22,62 +22,47 @@ import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
 
 /**
- * Main screen (wallet-main-screen.html) — porting what's gettable via
- * `ProtocolMap` reads: AR balance, AO token balances (empty until a
- * "watch a token" flow exists — see `handlers/reads.ts`'s doc comment),
- * the merged activity feed, the account pill's identity avatar, and the
+ * Main screen: AR balance, AO token balances (empty until a "watch a
+ * token" flow exists — see `handlers/reads.ts`'s doc comment), the merged
+ * activity feed, the account pill's identity avatar, and the
  * total-portfolio-value chart with range tabs.
  *
  * Avatar: `AccountAvatar` (`packages/ui/src/components/wallet/
  * AccountAvatar.tsx`) renders SVG markup generated in-process by
  * `./generateAccountAvatar.ts` (`@dicebear/core` + `@dicebear/styles`,
- * `weave` style, seeded from `wallet.address`) — no network call, per
- * this task's confirmed deviation from the reference (matching
- * `UnlockScreen.tsx`'s no-per-wallet-identity-on-unlock rule and
- * `TokenGlyph.tsx`'s existing local-only identicon precedent on this same
- * screen). Generation is synchronous, so it's computed inline (via
- * `useMemo`, keyed on the address) rather than through the same
- * async-load state as the balance/activity fetches below.
+ * `weave` style, seeded from `wallet.address`) — no network call.
+ * Generation is synchronous, so it's computed inline (via `useMemo`, keyed
+ * on the address) rather than through the same async-load state as the
+ * balance/activity fetches below.
  *
  * Chart: `PortfolioChart` (same directory) is fed by `usePortfolioHistory`
  * (`./usePortfolioHistory.ts`), a `useQuery` wrapping the same
  * `getPortfolioHistory` call (`ProtocolMap`, wired to `ReadsHandler`) via
  * `@gleam/core`'s `PortfolioHistoryRange` export — the shared-cache
- * pattern this screen's balances/activity already use
- * (WALLET-STATE-TANSTACK). Switching a range tab reads/fetches that
- * range's own cache entry and updates the chart, %-change badge, and
- * period label together from one query response, never a stale
- * combination. An empty `series` (both price sources unavailable) falls
- * back to `NetworkErrorBanner`, matching the balance/activity failure
- * path, rather than a broken/blank chart.
- *
- * The `Beam` identity divider (`packages/ui/src/primitives/beam.tsx`,
- * wallet-main-screen.html's `.beam-divider`) sits between the chart's
- * range-tabs and the Send/Receive actions row, matching the reference's
- * placement now that the chart exists.
+ * pattern this screen's balances/activity already use. Switching a range
+ * tab reads/fetches that range's own cache entry and updates the chart,
+ * %-change badge, and period label together from one query response,
+ * never a stale combination. An empty `series` (both price sources
+ * unavailable) falls back to `NetworkErrorBanner`, matching the
+ * balance/activity failure path, rather than a broken/blank chart.
  *
  * Tokens/Activity: a single tab control (local `activeTab` state, no
- * routing) replaces the old stacked "Tokens" and "Activity" sections that
- * each had their own "View all" button into a full-list screen — see
- * `main-screen-tabs`'s intent. The tab-button visual/interaction pattern
- * (`role="tablist"`/`"tab"`, `aria-selected`, `bg-foreground text-background`
- * for the active tab) is copied from `PortfolioChart`'s existing range
- * tabs above, on this same screen, rather than inventing a second tab
- * visual language. The Tokens tab renders the full, untruncated
- * `state.tokenBalances` list; the Activity tab caps at the 10 most recent
- * entries and its "View all" action, along with each row's click, opens
- * lunar.arweave.net's block explorer in a new tab rather than an in-app
- * full-list screen — there is no in-app activity list/detail screen left
- * to navigate to.
+ * routing) switches between the two sections. The tab-button
+ * visual/interaction pattern (`role="tablist"`/`"tab"`, `aria-selected`,
+ * `bg-foreground text-background` for the active tab) is copied from
+ * `PortfolioChart`'s existing range tabs above, on this same screen. The
+ * Tokens tab renders the full, untruncated `state.tokenBalances` list;
+ * the Activity tab caps at the 10 most recent entries and its "View all"
+ * action, along with each row's click, opens lunar.arweave.net's block
+ * explorer in a new tab rather than an in-app full-list screen — there is
+ * no in-app activity list/detail screen to navigate to.
  *
- * Navigation entry points: the account pill's chevron
- * (wallet-main-screen.html's `.account-pill`) opens the wallet switcher
- * via `onOpenWalletSwitcher`; the header's gear icon
- * (`.icon-btn[aria-label="Settings"]`) opens the dedicated settings-home
- * screen via `onOpenSettings`, which owns navigation to every settings
- * category (lock/auto-lock, connected apps, network & peers, dark mode,
- * and so on) — this component no longer renders an inline settings menu
- * or reads/writes theme preference itself.
+ * Navigation entry points: the account pill's chevron opens the wallet
+ * switcher via `onOpenWalletSwitcher`; the header's gear icon opens the
+ * dedicated settings-home screen via `onOpenSettings`, which owns
+ * navigation to every settings category (lock/auto-lock, connected apps,
+ * network & peers, dark mode, and so on) — this component doesn't render
+ * an inline settings menu or read/write theme preference itself.
  */
 export interface MainScreenViewProps {
   runtime: RuntimePort;
@@ -124,9 +109,8 @@ function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null,
 }
 
 /**
- * Builds the AR/AO default rows always shown at the top of the Tokens tab
- * (RELEVANT RULES: "AR and AO are treated as two default tokens that
- * always appear"). Reads straight off `useBalances()`'s cache: `undefined`
+ * Builds the AR/AO default rows always shown at the top of the Tokens tab.
+ * Reads straight off `useBalances()`'s cache: `undefined`
  * `data` (not yet loaded) or no matching `TokenBalance` entry both fall
  * back to `DEFAULT_TOKENS`' own `"0"` constant, never `null`/`undefined`.
  */
@@ -157,10 +141,8 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
 
 /**
  * The non-default watched tokens rendered below the AR/AO rows — every
- * `TokenBalance` whose `processId` isn't the AO default, unchanged from
- * this screen's pre-existing rendering (RELEVANT RULES: "additional
- * watched AO tokens continue to render below these two defaults"). These
- * have no entry in `DEFAULT_TOKEN_REGISTRY`, so `usdValueFor` always
+ * `TokenBalance` whose `processId` isn't the AO default. These have no
+ * entry in `DEFAULT_TOKEN_REGISTRY`, so `usdValueFor` always
  * resolves `undefined` for them today — no `$` line until such a token
  * gets a confirmed price-source mapping.
  */
@@ -192,9 +174,9 @@ function formatActivityAmount(entry: { amount: string | null; token?: string | n
  * fires more than one `getPortfolioHistory` call (for whichever range the
  * user was still on once they stopped clicking) instead of one per tab.
  * This is what keeps a quick tab tour from tripping CoinGecko's free-tier
- * rate limit the way clicking through all 5 tabs previously could (see
- * `usePortfolioHistory`'s `staleTime` comment for the caching half of that
- * fix — this is the request-shaping half).
+ * rate limit, which a rapid click-through of all 5 tabs would otherwise
+ * hit (see `usePortfolioHistory`'s `staleTime` comment for the caching
+ * half of this — this is the request-shaping half).
  */
 const PORTFOLIO_RANGE_DEBOUNCE_MS = 400;
 

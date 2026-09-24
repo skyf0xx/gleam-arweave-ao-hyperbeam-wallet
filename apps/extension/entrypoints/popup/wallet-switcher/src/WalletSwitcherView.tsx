@@ -16,24 +16,19 @@ function truncateAddress(address: string): string {
 }
 
 /**
- * Wallet switcher (wallet-switcher.html / TODO.md 7.1) — the sheet opened
- * from the main screen's account pill. Lists every stored wallet from
- * `getState()`, marks the active one with a checkmark, and switches on tap
- * via `switchWallet`. No new backend needed (RELEVANT RULES): `getState`
- * already returns `{ wallets, activeWalletId }` and `switchWallet` is
- * already implemented and wired.
+ * The sheet opened from the main screen's account pill. Lists every stored
+ * wallet from `getState()`, marks the active one with a checkmark, and
+ * switches on tap via `switchWallet`.
  *
  * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
  * per-row "manage" kebab opens the wallet detail screen (rename/back up)
  * through `onManage`.
  *
- * Per-row identity: each wallet's row uses the same dicebear identicon as
- * the main screen's account pill (`AccountAvatar` +
- * `./generateAccountAvatar.ts`'s `generateAccountAvatarSvg`, keyed on
- * `wallet.address`, computed locally with no network call) rather than a
- * plain letter-initial glyph, so the same wallet shows the same identity
- * mark on both screens — this is the cross-screen consistency this layer
- * exists to catch, not a new design decision.
+ * Each wallet's row uses the same dicebear identicon as the main screen's
+ * account pill (`AccountAvatar` + `./generateAccountAvatar.ts`'s
+ * `generateAccountAvatarSvg`, keyed on `wallet.address`, computed locally
+ * with no network call) so the same wallet shows the same identity mark on
+ * both screens.
  */
 export interface WalletSwitcherViewProps {
   runtime: RuntimePort;

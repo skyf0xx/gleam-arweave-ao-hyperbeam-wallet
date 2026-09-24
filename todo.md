@@ -129,12 +129,10 @@ vault, crypto and provider security; `sonnet` for everything else.
   deletes it, with no confirmation beyond an undo toast, since a contact
   is only a label. Empty state: one line of muted text, nothing else.
 
-## 5. Polish and cleanup
-
-- [ ] **Strip build-log comments from `apps/extension` (S, sonnet)**
-  Same, for `apps/extension` (the background, provider, content, App and
-  handlers are the worst).
-
 ## Unsorted
+
+- `apps/extension/entrypoints/provider/index.test.ts:28`,
+  `apps/extension/entrypoints/content/index.test.ts:37`: `describe()` names
+  cite "ARCHITECTURE.md §4.3", a doc that doesn't exist in this repo.
 
 <!-- New findings go here until they're placed in the list above. -->

@@ -3,10 +3,10 @@ import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type Permission
 import { encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
- * Needed because this file's `transferAoTokens` integration test drives the
- * real dispatcher -> ApprovalHandler -> TransferHandler ->
- * `core/ao/transfer.ts` chain end-to-end, and that last hop would otherwise
- * sign and post to the real Messenger Unit.
+ * This file's `transferAoTokens` integration test drives the real
+ * dispatcher -> ApprovalHandler -> TransferHandler -> `core/ao/transfer.ts`
+ * chain end-to-end, and that last hop would otherwise sign and post to the
+ * real Messenger Unit.
  */
 const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
 vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
@@ -73,12 +73,11 @@ vi.mock("wxt/utils/define-background", () => ({
 }));
 
 /**
- * The privilege-tier choke point (this task's highest-stakes rule): a
- * page-originated `providerCall` message can only ever reach
- * `PROVIDER_METHODS`. Drives the real `onMessage("providerCall", ...)`
- * handler `background.ts` registers, captured via the mocked messenger
- * above — this is the actual dispatcher code running, not a
- * reimplementation of its logic.
+ * The privilege-tier choke point: a page-originated `providerCall`
+ * message can only ever reach `PROVIDER_METHODS`. Drives the real
+ * `onMessage("providerCall", ...)` handler `background.ts` registers,
+ * captured via the mocked messenger above — this is the actual
+ * dispatcher code running, not a reimplementation of its logic.
  */
 const originalFetch = globalThis.fetch;
 
@@ -135,14 +134,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   });
 
   /**
-   * MAIN-SCREEN-CHART-WALLET-CORE's inherited debt: `ReadsHandler.
-   * getPortfolioHistory()` (already fully tested on its own) was never
-   * registered against the dispatcher, so the main-screen chart had no
-   * reachable RPC. Drives the real registered handler with no wallets
-   * present — the one branch that returns without any network call (see
-   * `reads.ts`'s own doc comment on `resolveActiveWalletAddress`) — so
-   * this proves the wiring reaches `ReadsHandler` itself, not a
-   * reimplementation of its range validation or pricing logic.
+   * Drives the real registered handler with no wallets present — the one
+   * branch that returns without any network call — so this proves the
+   * wiring reaches `ReadsHandler` itself, not a reimplementation of its
+   * range validation or pricing logic.
    */
   it("getPortfolioHistory is reachable through the dispatcher and delegates to ReadsHandler", async () => {
     const handler = registeredHandlers.get("getPortfolioHistory")!;
@@ -161,11 +156,9 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   });
 
   /**
-   * Theme preference: dispatcher registration is this task's own debt to
-   * clear (THEME-PREFERENCE-WALLET-CORE's inherited debt note) — drives
-   * the real registered handlers end-to-end through the mocked storage
-   * above, exactly like `getLockSettings`/`setLockSettings` already do,
-   * rather than re-testing `WalletLifecycleHandler`'s own validation
+   * Drives the real registered handlers end-to-end through the mocked
+   * storage above, exactly like `getLockSettings`/`setLockSettings` already
+   * do, rather than re-testing `WalletLifecycleHandler`'s own validation
    * (already covered by its own test file).
    */
   it("getThemePreference defaults to light with no stored preference", async () => {
@@ -187,13 +180,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   });
 
   /**
-   * forgot-password-wire-contract: `resetAllWallets` previously had no
-   * `ProtocolMap` entry, so the popup's ForgotPassword flow fired
-   * `onResetComplete` optimistically with no backing call. Drives the
-   * real registered dispatcher handler end-to-end through
-   * `WalletLifecycleHandler.resetAllWallets()` (already unit-tested on
-   * its own) — this proves the wire-up reaches it, not a
-   * reimplementation of its wipe logic.
+   * Drives the real registered dispatcher handler end-to-end through
+   * `WalletLifecycleHandler.resetAllWallets()` (already unit-tested on its
+   * own) — this proves the wire-up reaches it, not a reimplementation of
+   * its wipe logic.
    */
   it("resetAllWallets is reachable through the dispatcher and wipes every stored wallet", async () => {
     const createHandler = registeredHandlers.get("createWallet")!;
@@ -321,15 +311,13 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   });
 
   /**
-   * `transferAoTokens` end-to-end, per this task's RELEVANT RULES: exercised
-   * through the real dispatcher (`providerCall`) -> `ApprovalHandler`
-   * (approval window preview + resolution) -> `TransferHandler.
-   * submitTransfer` -> `core/ao/transfer.ts` (mocked at its module
-   * boundary above, never at any layer this task owns) -> the connected
-   * dApp's resolved result. Proves the same approval-gated path every other
-   * signing method already goes through, not a trusted-RPC shortcut, and
-   * that the approval preview carries `token` for the connected origin's
-   * request.
+   * `transferAoTokens` end-to-end: exercised through the real dispatcher
+   * (`providerCall`) -> `ApprovalHandler` (approval window preview +
+   * resolution) -> `TransferHandler.submitTransfer` -> `core/ao/transfer.ts`
+   * (mocked at its module boundary above) -> the connected dApp's resolved
+   * result. Proves the same approval-gated path every other signing method
+   * already goes through, not a trusted-RPC shortcut, and that the approval
+   * preview carries `token` for the connected origin's request.
    */
   it("transferAoTokens routes through connect -> approval window -> signing, never auto-approved", async () => {
     aoSubmitMock.mockResolvedValue({ messageId: "ao-message-id-123" });

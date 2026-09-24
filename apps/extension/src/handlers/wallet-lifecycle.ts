@@ -29,11 +29,11 @@ import {
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
  * methods (`packages/messaging/src/protocol.ts`) — the actual business
- * logic the messaging dispatcher (a later layer's job; ARCHITECTURE.md
- * §4.2) will route `createWallet`/`importWallet`/.../`getState` calls
- * into. Constructed with an injected `StoragePort` rather than importing
- * the concrete adapter, per the hexagonal boundary: this file is allowed
- * to know about `StoragePort`'s shape, never about `wxt/utils/storage`.
+ * logic the messaging dispatcher routes `createWallet`/`importWallet`/
+ * .../`getState` calls into. Constructed with an injected `StoragePort`
+ * rather than importing the concrete adapter, per the hexagonal boundary:
+ * this file is allowed to know about `StoragePort`'s shape, never about
+ * `wxt/utils/storage`.
  *
  * Storage schema (all keys are this handler's own concern — `StoragePort`
  * is shape-agnostic on area per its doc comment):
@@ -43,16 +43,14 @@ import {
  * - `local:lockSettings` — `LockSettings`, default `{ autoLockTimeout:
  *   "never" }`.
  * - `local:themeSettings` — `ThemeSettings`, default `{ theme: "light" }`
- *   (theme-preference's RELEVANT RULES: no OS-driven default, light
- *   always wins when nothing is stored).
+ *   (no OS-driven default, light always wins when nothing is stored).
  * - `session:unlockedSession` — `Session`, routed to `chrome.storage.session`
  *   (memory-only, cleared on browser close) by the storage adapter's own
  *   `local:`/`session:` area routing — this handler only ever reads/writes
  *   the `session:` prefix for it, never `local:`.
  *
- * Session-state decision (supersedes this file's original one): a derived
- * `CryptoKey`/JWK is not structured-cloneable into `chrome.storage.session`
- * in a usable form (ARCHITECTURE.md §5.1/§7.2), so `Session` itself still
+ * A derived `CryptoKey`/JWK is not structured-cloneable into
+ * `chrome.storage.session` in a usable form, so `Session` itself still
  * records only bookkeeping (`unlockedAt`, `lastActivityAt`,
  * `autoLockTimeout`, `unlockedWalletIds`) — never a password or key. But
  * requiring every later signing call to carry a freshly-typed password
@@ -104,7 +102,7 @@ function toSummary(wallet: Wallet): WalletSummary {
 }
 
 /**
- * Storage is untrusted input (onboarding-unlock's RELEVANT RULES): every
+ * Storage is untrusted input: every
  * record read back is re-validated here, on every load, dropping anything
  * malformed rather than trusting the shape a previous schema version (or
  * corruption) may have left behind.
@@ -236,10 +234,8 @@ function jwkToBytes(jwk: JWKInterface): Uint8Array<ArrayBuffer> {
 
 /**
  * Extends (or starts) the unlocked session to include a just-created/
- * imported wallet. The onboarding mockups (1.3's "Continue to wallet")
- * assume the new wallet is immediately usable without a second unlock
- * prompt — the password was just typed to set it, re-asking for it a
- * screen later would contradict TODO.md 1.2/1.3's flow.
+ * imported wallet: the new wallet is immediately usable without a second
+ * unlock prompt, since the password was just typed to set it.
  */
 async function addUnlockedWalletToSession(
   storage: StoragePort,
@@ -501,8 +497,7 @@ export class WalletLifecycleHandler {
   /**
    * Tries the last-active wallet's password first, then opportunistically
    * the same password against every other stored wallet — each mismatch
-   * fails silently (never surfaced as a per-wallet prompt), per the
-   * onboarding-unlock RELEVANT RULES. Every wallet that unlocks
+   * fails silently (never surfaced as a per-wallet prompt). Every wallet that unlocks
    * successfully has its decrypted JWK cached in-memory (`key-session.ts`)
    * so later signing calls (transfer/upload/approval) don't need the
    * password again for the rest of this unlocked session.
@@ -583,9 +578,8 @@ export class WalletLifecycleHandler {
   /**
    * `ProtocolMap.getLockSettings`'s backing read — the same
    * `loadLockSettings` module function `setLockSettings`/`unlockWallet`
-   * already use internally, exposed as a public method so the
-   * dispatcher (`entrypoints/background/index.ts`, outside this task's
-   * ALLOWED SCOPE — see this task's final report) has something to wire
+   * already use internally, exposed as a public method so the dispatcher
+   * (`entrypoints/background/index.ts`) has something to wire
    * `getLockSettings` to.
    */
   async getLockSettings(): Promise<LockSettings> {
@@ -595,11 +589,8 @@ export class WalletLifecycleHandler {
   /**
    * Not part of this layer's named scope (`ProtocolMap`'s "settings"
    * group, not "wallet lifecycle") — included here only because
-   * `lockWallet`'s "Lock now" screen (TODO.md 1.6) sits directly beside
-   * the auto-lock timeout picker and both write the same `Session`
-   * record. Exposed so a later layer's dispatcher can wire it without
-   * this handler needing to change shape; not itself required by this
-   * task's ALLOWED SCOPE or VERIFICATION.
+   * `lockWallet`'s "Lock now" screen sits directly beside the auto-lock
+   * timeout picker and both write the same `Session` record.
    */
   async setLockSettings(req: LockSettings): Promise<void> {
     if (!VALID_AUTO_LOCK_TIMEOUTS.includes(req.autoLockTimeout)) {
@@ -617,8 +608,7 @@ export class WalletLifecycleHandler {
   /**
    * `ProtocolMap.getThemePreference`'s backing read — mirrors
    * `getLockSettings`, exposed as a public method so the dispatcher
-   * (`entrypoints/background/index.ts`, outside this task's ALLOWED
-   * SCOPE — see this task's final report) has something to wire
+   * (`entrypoints/background/index.ts`) has something to wire
    * `getThemePreference` to.
    */
   async getThemePreference(): Promise<ThemeSettings> {

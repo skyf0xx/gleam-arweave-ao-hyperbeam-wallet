@@ -42,9 +42,9 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 /**
  * This window mounts `ApprovalRoot` directly, never `<App>` (see
- * `ApprovalRoot.tsx`'s own doc comment) — so it's the one place in this
- * task's scope that must independently prove the stored theme preference
- * is actually applied here, not just assume App.tsx's wiring covers it.
+ * `ApprovalRoot.tsx`'s own doc comment) — so this must independently
+ * prove the stored theme preference is actually applied here, not just
+ * assume App.tsx's wiring covers it.
  */
 describe("ApprovalRoot theme application (provider-bridge closing wallet-core's approval-window gap)", () => {
   it("applies data-theme='dark' on the root once getThemePreference resolves dark", async () => {

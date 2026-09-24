@@ -10,10 +10,10 @@ vi.mock("wxt/utils/storage", () => ({
 }));
 
 /**
- * Untrusted-storage re-validation (per the onboarding-unlock packet's
- * rule) is owned by callers (`wallet-lifecycle.ts`), not this adapter —
- * this file only tests the adapter's own contract: area-prefix
- * validation and pass-through to `wxt/utils/storage`.
+ * Untrusted-storage re-validation is owned by callers
+ * (`wallet-lifecycle.ts`), not this adapter — this file only tests the
+ * adapter's own contract: area-prefix validation and pass-through to
+ * `wxt/utils/storage`.
  */
 describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
   beforeEach(() => {

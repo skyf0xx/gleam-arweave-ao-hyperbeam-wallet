@@ -19,13 +19,11 @@ function gatewayHostname(gatewayUrl: string): string {
 }
 
 /**
- * Settings home (settings-screens-gap follow-up) — the dedicated settings
- * screen the gear icon opens, replacing `MainScreenView`'s small inline
- * menu now that enough destination screens exist to justify one: grouped
+ * The dedicated settings screen the gear icon opens: grouped
  * WALLET/NETWORK/GENERAL sections of navigable rows, each showing its
- * current value on the right, matching the reference mockup. "Import &
- * export" and "About" have no screen built yet, so those two rows render
- * disabled rather than routing nowhere.
+ * current value on the right. "Import & export" and "About" have no
+ * screen built yet, so those two rows render disabled rather than
+ * routing nowhere.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;

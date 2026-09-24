@@ -20,9 +20,7 @@ import { SigningApprovalScreen } from "./SigningApprovalScreen";
  *
  * Theme: this window never mounts `<App>` (`approval/index.tsx`'s own
  * doc comment — a genuinely separate root, its own state machine), so
- * `App.tsx`'s `applyTheme`/`data-theme` wiring never runs here despite
- * that file's comment describing approval as one of "every surface" —
- * confirmed false for this window while building this task. Mirrors
+ * `App.tsx`'s `applyTheme`/`data-theme` wiring never runs here. Mirrors
  * `applyTheme` exactly (same fetch, same light fallback on any failure,
  * including the dispatcher not yet registering the method) so the
  * two surfaces apply identically instead of reimplementing the read

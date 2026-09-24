@@ -8,18 +8,15 @@ export interface WalletBalances {
 }
 
 /**
- * Shared, cached source of truth for AR + AO token balances — replaces
- * the duplicated `getBalance`/`getTokenBalances` `useState`/`useEffect`
- * pairs previously local to `SendView`'s `TokenPickerStep` and
- * `MainScreenView`. Both wrap the same existing `runtime.send` calls as
- * queryFns (RELEVANT RULES: "No change to the transport layer") — this
- * hook adds no new wire method.
+ * Shared, cached source of truth for AR + AO token balances, so
+ * `SendView`'s `TokenPickerStep` and `MainScreenView` share one fetch
+ * instead of each running its own. Wraps the existing
+ * `runtime.send` `getBalance`/`getTokenBalances` calls as queryFns.
  *
  * Keyed by `[address, 'balances']` (`walletQueryKeys.balances`) so
  * `SendView` and `MainScreenView` mounted for the same wallet share one
  * in-flight request and one cache entry instead of racing independent
- * fetches (RELEVANT RULES: "same balance without duplicate independent
- * fetches racing each other").
+ * fetches.
  */
 export function useBalances(runtime: RuntimePort, address: string) {
   return useQuery({

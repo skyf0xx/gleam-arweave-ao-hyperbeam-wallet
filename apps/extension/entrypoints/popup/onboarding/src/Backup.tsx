@@ -3,11 +3,10 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { StepDots, AddressReveal } from "@gleam/ui/src/components/onboarding/index.ts";
 
 /**
- * 1.3 Create wallet — key generated / backup prompt (onboarding.html).
- * Backup is explicit and skippable, never forced (RELEVANT RULES) — both
- * "Continue to wallet" and "I'll back this up later" lead to the same
- * `onContinue`, the only difference is whether the user revealed/
- * downloaded the keyfile first.
+ * Create wallet — key generated / backup prompt. Backup is explicit and
+ * skippable, never forced — both "Continue to wallet" and "I'll back this
+ * up later" lead to the same `onContinue`, the only difference is whether
+ * the user revealed/downloaded the keyfile first.
  */
 export interface BackupProps {
   onBack: () => void;

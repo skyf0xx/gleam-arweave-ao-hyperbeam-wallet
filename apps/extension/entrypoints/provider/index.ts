@@ -17,13 +17,13 @@ import {
 
 /**
  * The injected page-world script that installs `window.arweaveWallet`
- * (ARCHITECTURE.md §4.4, walletName "Gleam"). Loaded via `content.ts`'s
+ * (walletName "Gleam"). Loaded via `content.ts`'s
  * `injectScript("/provider.js", { keepInDom: false })` — never via
  * `world: "MAIN"` (Chromium-only, can't reach extension APIs the way
  * `injectScript`'s `<script src>` tag can via `web_accessible_resources`).
  *
- * Implements every item in ARCHITECTURE.md §4.3's page ↔ content bridge
- * list, each one a named vulnerability/bug if omitted:
+ * Implements every item in the page ↔ content bridge list below, each
+ * one a named vulnerability/bug if omitted:
  *
  * 1. `if (event.source !== window) return;` in the page-side listener —
  *    otherwise a same-document iframe could forge a response.

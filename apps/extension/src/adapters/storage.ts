@@ -5,9 +5,9 @@ import type { StoragePort } from "@gleam/core";
 /**
  * Implements `StoragePort` over WXT's `storage` API (`wxt/utils/storage`,
  * itself `@wxt-dev/storage`'s `storage.getItem`/`setItem`/`removeItem`/
- * `watch`) — the only place `chrome.storage.*` is reached in this repo
- * (ARCHITECTURE.md §2.2, core-design.md's ports/adapters split). `core`
- * never imports this file; it only sees `StoragePort`.
+ * `watch`) — the only place `chrome.storage.*` is reached in this repo,
+ * per the ports/adapters split. `core` never imports this file; it only
+ * sees `StoragePort`.
  *
  * `StoragePort.get`/`set`/`remove`/`watch` are shape-agnostic on storage
  * area on purpose (`core/ports/storage.ts`'s doc comment) — the caller's

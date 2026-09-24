@@ -9,10 +9,9 @@ import { storagePort } from "./storage";
  * boundary `storage.ts`/`runtime.ts` already follow. `core` never imports
  * this file; it only sees `WindowPort`.
  *
- * ARCHITECTURE.md §3.2: every approval window opens as its own
- * `type: "popup"` window, ~390x640, focused — never inline in the
- * extension popup, since a popup closes on focus loss and would silently
- * drop the pending request.
+ * Every approval window opens as its own `type: "popup"` window, ~390x640,
+ * focused — never inline in the extension popup, since a popup closes on
+ * focus loss and would silently drop the pending request.
  *
  * Window tracking: `WindowPort` is keyed by `requestId`, but
  * `browser.windows` by numeric window id. The `requestId -> windowId` map

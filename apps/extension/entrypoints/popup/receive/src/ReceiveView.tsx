@@ -3,10 +3,8 @@ import { AddressDisplay, QrCode } from "@gleam/ui/src/components/wallet/index.ts
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 /**
- * Receive screen (receive-screen.html / TODO.md 3.1) — QR + full address
- * + one-tap copy (RELEVANT RULES: "Receive screen shows the full address
- * with a QR code and a one-tap copy affordance"). See `QrCode`'s own doc
- * comment for the QR-encoding limitation carried into this screen.
+ * QR + full address + one-tap copy. See `QrCode`'s own doc comment for
+ * the QR-encoding limitation carried into this screen.
  */
 export interface ReceiveViewProps {
   wallet: WalletSummary;

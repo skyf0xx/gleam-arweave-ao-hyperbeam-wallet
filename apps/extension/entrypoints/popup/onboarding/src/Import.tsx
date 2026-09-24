@@ -5,12 +5,10 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validateJWKShape } from "@gleam/core/src/keys/jwk.ts";
 
 /**
- * 1.4 Import wallet (onboarding.html) — file drop + paste-JSON fallback,
- * validates JWK shape before proceeding to the password screen (TODO.md
- * 1.4). Rejects invalid files with the specific reason
- * `validateJWKShape` returns, never a generic error. Uses the shared,
- * content-agnostic `FileDropzone` primitive (replaces the onboarding-only
- * `KeyfileDropzone`, per this task's inherited debt note) — the
+ * Import wallet — file drop + paste-JSON fallback, validates JWK shape
+ * before proceeding to the password screen. Rejects invalid files with
+ * the specific reason `validateJWKShape` returns, never a generic error.
+ * Uses the shared, content-agnostic `FileDropzone` primitive — the
  * paste-JSON divider/textarea stays local screen composition, since no
  * shared primitive covers that shape yet.
  */

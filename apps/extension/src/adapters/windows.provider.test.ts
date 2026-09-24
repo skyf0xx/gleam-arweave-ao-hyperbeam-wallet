@@ -49,10 +49,10 @@ function userClosesWindow(windowId: number) {
 }
 
 /**
- * `WxtWindowPort` over `browser.windows.*` (ARCHITECTURE.md §3.2): every
- * approval window opens as its own `type: "popup"` window at the
- * documented size, and close/focus are keyed by `requestId`, resolved
- * against the adapter's own internal id map populated on create.
+ * `WxtWindowPort` over `browser.windows.*`: every approval window opens
+ * as its own `type: "popup"` window at the documented size, and
+ * close/focus are keyed by `requestId`, resolved against the adapter's
+ * own internal id map populated on create.
  */
 describe("adapters/windows: WxtWindowPort", () => {
   beforeEach(() => {

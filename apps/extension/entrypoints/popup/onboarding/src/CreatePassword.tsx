@@ -9,11 +9,10 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validatePassword } from "@gleam/core/src/vault/password-policy.ts";
 
 /**
- * 1.2 Create wallet — password (onboarding.html) — reused for both the
- * create and import flows (TODO.md 1.4: "reuse 1.2's password screen
- * after"). Client-side `validatePassword` gives an inline message as the
- * user types; the same check runs again in the handler, since a UI-only
- * check is bypassable and never the actual enforcement point.
+ * Create wallet — password, reused for both the create and import flows.
+ * Client-side `validatePassword` gives an inline message as the user
+ * types; the same check runs again in the handler, since a UI-only check
+ * is bypassable and never the actual enforcement point.
  */
 export interface CreatePasswordProps {
   title?: string;

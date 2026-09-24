@@ -10,20 +10,17 @@ import { getCachedKey } from "./key-session";
  *
  * Signing key source: submitting an upload needs the decrypted JWK to
  * sign the ANS-104 DataItem, read from `key-session.ts`'s in-memory cache
- * — same resolution as `handlers/transfer.ts`'s `submitTransfer`, see
- * that file's doc comment for why a password is no longer required on
- * this request. `reviewUpload` needs no signing key at all (it only
+ * — same resolution as `handlers/transfer.ts`'s `submitTransfer`, so this
+ * request itself carries no password. `reviewUpload` needs no signing key at all (it only
  * scans/validates), so it keeps `ProtocolMap`'s exact `UploadDraft` shape
  * unchanged.
  *
  * Bundler endpoint: no `NetworkSettings` field exists for a configurable
- * bundler URL (`packages/core/src/models/network.ts`, outside this
- * layer's scope, only carries `gatewayUrl`/`peers`) — `up.arweave.net`
- * (CLAUDE.md item 7) is `@gleam/core`'s `DEFAULT_BUNDLER_URL`, the
- * same shape of decision `transfer.ts` made for `DEFAULT_NETWORK_
- * SETTINGS`. Flagged as debt: a later layer wanting a user-configurable
- * bundler URL needs a `NetworkSettings` field added, which is out of
- * this task's ALLOWED SCOPE.
+ * bundler URL (`packages/core/src/models/network.ts` only carries
+ * `gatewayUrl`/`peers`) — `up.arweave.net` is `@gleam/core`'s
+ * `DEFAULT_BUNDLER_URL`, the same shape of decision `transfer.ts` made
+ * for `DEFAULT_NETWORK_SETTINGS`. A user-configurable bundler URL needs a
+ * `NetworkSettings` field added.
  *
  * ANS-104 build/sign/submit logic itself lives in `@gleam/core/src/
  * arweave/upload.ts`, alongside `transfer.ts`.

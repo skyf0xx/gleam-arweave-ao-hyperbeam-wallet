@@ -5,16 +5,11 @@ import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 /**
- * Network & peers settings (network-peers.html / TODO.md §7.3) — the
- * gateway is shown read-only (the mockup's `.gateway-row` has no edit
- * affordance, only a status dot) while the AO-peer list is fully
+ * The gateway is shown read-only while the AO-peer list is fully
  * editable: add, remove, per-peer enable toggle, and select-active, all
  * writing the full `NetworkSettings` object back through
- * `setNetworkSettings` in one shot (RELEVANT RULES: no new backend —
- * `getNetworkSettings`/`setNetworkSettings` are already implemented and
- * wired). Selecting a disabled peer as active is refused client-side
- * (mirrors the mockup's own "Active" label only ever appearing on an
- * enabled peer) rather than sent and rejected by the backend, since
+ * `setNetworkSettings` in one shot. Selecting a disabled peer as active is
+ * refused client-side rather than sent and rejected by the backend, since
  * `NetworkSettings`'s own shape doesn't forbid it and no validation for
  * that combination exists in `handlers/reads.ts`.
  */

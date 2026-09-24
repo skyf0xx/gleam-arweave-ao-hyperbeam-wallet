@@ -5,30 +5,16 @@ import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 /**
- * Ports `connected-apps.html` (6.3) exactly: per-origin grant list with
- * scope + expiry inline (never hidden behind a detail tap), a
- * "Revoke" action per row (brand vocabulary rule: never "disconnect" —
- * this actually ends access, calling `ProtocolMap.revokeGrant`, not just
- * hiding the row), and the populated/empty states from the mockup.
+ * Per-origin grant list with scope + expiry inline (never hidden behind
+ * a detail tap). "Revoke" (never "disconnect") actually ends access via
+ * `ProtocolMap.revokeGrant`, not just hiding the row.
  *
- * Not yet wired into `App.tsx`'s view-switch (`App.tsx` is `wallet-core`'s
- * locked scope, not this task's — see this task's final report, the same
- * "no layer owns App.tsx wiring" gap class the Correction Protocol log
- * already tracks for `send`/`receive`/`activity`) — this view module is
- * complete and independently mountable, following the exact shape
- * `OnboardingView`/`SendView`/`UploadView` already established for this
- * same reason.
+ * Not yet wired into `App.tsx`'s view-switch — this view module is
+ * complete and independently mountable, following the same shape
+ * `OnboardingView`/`SendView`/`UploadView` use for the same reason.
  *
- * This is the last remaining consumer of `ScreenHeader` from the
- * `components/onboarding` barrel's backward-compat re-export — repointed
- * here directly at the primitive, closing out that migration debt (see
- * this task's final report for the barrel-file deletion itself, which is
- * outside this task's ALLOWED SCOPE).
- *
- * settings-screens-gap: the ad hoc "Loading…" text and inline error line
- * this screen had are replaced by the shared `SkeletonRow`/
- * `NetworkErrorBanner` (already used by main-screen/activity), per
- * RELEVANT RULES — no new or parallel loading/error primitive.
+ * Uses the shared `SkeletonRow`/`NetworkErrorBanner` (already used by
+ * main-screen/activity) instead of an ad hoc loading/error primitive.
  */
 export interface ConnectedAppsViewProps {
   runtime: RuntimePort;

@@ -6,7 +6,7 @@ import { ForgotPassword } from "./ForgotPassword";
 /**
  * Unlock view module (`entrypoints/popup/unlock/`) — same "folder, not a
  * new WXT entrypoint" shape as `onboarding/`. See `OnboardingView`'s
- * comment and this task's final report for the `App.tsx` wiring gap.
+ * comment.
  */
 type Step = { kind: "unlock" } | { kind: "forgot-password" };
 

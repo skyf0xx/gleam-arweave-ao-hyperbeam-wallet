@@ -33,11 +33,10 @@ import { getCachedKey } from "./key-session";
  * `resolveApproval`, plus the internal (non-`ProtocolMap`) API the
  * `background.ts` dispatcher uses to actually create an `ApprovalRequest`,
  * open its window, and await the user's decision before letting a
- * page-originated provider call resume — the "connect() requests show the
- * origin and requested permission scopes... approval opens in its own
- * window" and "signing approval shows recipient, amount, fee, a
- * decoded-data preview, tags, and a SHA-256 hash" rules this task's
- * packet names as the highest-stakes in the project.
+ * page-originated provider call resume. `connect()` requests show the
+ * origin and requested permission scopes and open in their own window; a
+ * signing approval shows recipient, amount, fee, a decoded-data preview,
+ * tags, and a SHA-256 hash.
  *
  * Storage schema this handler owns:
  * - `local:grants` — `Grant[]`, one per approved `connect()` origin. This
@@ -59,8 +58,7 @@ import { getCachedKey } from "./key-session";
  * resolves only once `resolveApproval` is called for that `requestId`.
  * Rather than a service-worker-local `Map<requestId, deferred>` result
  * store (which cannot survive an SW restart while the approval window is
- * still open — exactly the MV3 failure mode ARCHITECTURE.md §5.1 warns
- * about), `resolveApproval` writes its outcome (`approved`/`result`/
+ * still open), `resolveApproval` writes its outcome (`approved`/`result`/
  * `error`) directly onto the pending record in `session:pendingApprovals`
  * *before* removing it, and `requestApproval`'s `StoragePort.watch`
  * callback reads that outcome back off the emitted value itself — no
@@ -68,8 +66,7 @@ import { getCachedKey } from "./key-session";
  * caller's in-flight promise survive an SW restart (an inherent MV3
  * limitation: a page's provider call has no way to survive its own
  * originating dispatcher call context dying either), but it does mean the
- * resolution data itself is never only-in-memory. See this task's final
- * report.
+ * resolution data itself is never only-in-memory.
  *
  * Closing the approval window with its own close button counts as a
  * rejection: `WindowPort.onApprovalWindowClosed` writes a rejected outcome
@@ -328,8 +325,7 @@ export class ApprovalHandler {
    * Origin -> wallet permission lookup. A connected origin's Grant must
    * still be present and unexpired for a `PROVIDER_METHODS` call to
    * proceed without a fresh approval prompt — revoking a Grant (or
-   * letting it expire) ends all access it covered, per this task's
-   * RELEVANT RULES.
+   * letting it expire) ends all access it covered.
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
     const grants = await this.loadGrants();
@@ -341,8 +337,8 @@ export class ApprovalHandler {
 
   /**
    * Creates a pending `ApprovalRequest`, opens its own approval window
-   * (never inline in the popup — CLAUDE.md/ARCHITECTURE.md §3.2), and
-   * resolves once `resolveApproval` has been called for it. Rejects on
+   * (never inline in the popup), and resolves once `resolveApproval` has
+   * been called for it. Rejects on
    * explicit rejection or on timeout (a hung/abandoned approval window
    * must not hang the calling dApp forever).
    */

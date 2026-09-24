@@ -12,11 +12,10 @@ const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
 ];
 
 /**
- * Lock & auto-lock settings (lock-settings.html / TODO.md 1.6) — "Lock
- * now" triggers `lockWallet()` immediately regardless of timeout, and the
- * auto-lock section is a radio-style option list writing
- * `setLockSettings`, pre-populated from `getLockSettings`. No new backend
- * (RELEVANT RULES): both RPCs are already implemented and wired.
+ * Lock & auto-lock settings — "Lock now" triggers `lockWallet()`
+ * immediately regardless of timeout, and the auto-lock section is a
+ * radio-style option list writing `setLockSettings`, pre-populated from
+ * `getLockSettings`.
  */
 export interface LockSettingsViewProps {
   runtime: RuntimePort;

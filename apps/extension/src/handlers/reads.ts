@@ -46,9 +46,9 @@ import type {
  * - `local:networkSettings` — `NetworkSettings`, defaulting to
  *   `arweave.net` with no HyperBEAM peers configured (an AO balance read
  *   with no active peer throws a named "no HyperBEAM peer configured"
- *   error rather than silently returning a zero balance — HONESTY: a
- *   value this handler can't compute is surfaced as unavailable, not as
- *   a plausible default).
+ *   error rather than silently returning a zero balance — a value this
+ *   handler can't compute is surfaced as unavailable, not as a plausible
+ *   default).
  * - `local:activityLog:{address}` — `ActivityEntry[]`, the local
  *   append-only action log `handlers/transfer.ts` writes optimistic
  *   entries into. Read-only from this handler's side; `transfer.ts` owns
@@ -57,15 +57,14 @@ import type {
  * - `local:wallets` / `local:activeWalletId` — owned by
  *   `handlers/wallet-lifecycle.ts` (`WalletLifecycleHandler`'s own doc
  *   comment), read-only here. `getPortfolioHistory`'s `ProtocolMap`
- *   signature (`packages/messaging/src/protocol.ts`, locked, outside this
- *   task's ALLOWED SCOPE) takes only `{ range }` — no address, unlike
- *   every other read in this file — so this handler resolves "whose
- *   balance to price" itself from these two keys rather than inventing an
- *   address param the locked contract doesn't have. `Wallet.address` is
- *   plaintext (only `encryptedKeyfile` is encrypted, per the `Wallet`
- *   model's own doc comment), so this needs no vault/decryption access —
- *   still only `StoragePort`, the same hexagonal boundary every other
- *   method in this file already respects.
+ *   signature takes only `{ range }` — no address, unlike every other
+ *   read in this file — so this handler resolves "whose balance to
+ *   price" itself from these two keys rather than inventing an address
+ *   param the contract doesn't have. `Wallet.address` is plaintext (only
+ *   `encryptedKeyfile` is encrypted, per the `Wallet` model's own doc
+ *   comment), so this needs no vault/decryption access — still only
+ *   `StoragePort`, the same hexagonal boundary every other method in
+ *   this file already respects.
  *
  * `getTokenBalances`'s AO process list: resolved against
  * `local:watchedProcessIds:{address}` (a simple `string[]`, defaulting to
@@ -218,9 +217,8 @@ export class ReadsHandler {
    * `ProtocolMap.getNetworkSettings`'s backing read — same shape as
    * `loadNetworkSettings` (used internally by `getBalance`/
    * `getTokenBalances`/`getActivity`), exposed under the exact protocol
-   * method name so the dispatcher (`entrypoints/background/index.ts`,
-   * outside this task's ALLOWED SCOPE — see this task's final report)
-   * has a call site to wire `getNetworkSettings` to.
+   * method name so the background dispatcher has a call site to wire
+   * `getNetworkSettings` to.
    */
   async getNetworkSettings(): Promise<NetworkSettings> {
     return this.loadNetworkSettings();
@@ -340,10 +338,9 @@ export class ReadsHandler {
    * `~process@1.0` path `getTokenBalances` uses, rather than fetching every
    * watched token and filtering, since only one process id was asked for.
    * Read-only: no signing-approval window needed (`provider-bridge` only
-   * needs to gate this behind a connection-approval Grant check, per this
-   * task's RELEVANT RULES).
+   * needs to gate this behind a connection-approval Grant check).
    *
-   * Same "no HyperBEAM peer configured" HONESTY failure as
+   * Same "no HyperBEAM peer configured" failure mode as
    * `getTokenBalances` — a balance this handler can't compute is a thrown,
    * named error, never a fabricated `"0"`.
    */
@@ -364,9 +361,9 @@ export class ReadsHandler {
   /**
    * `ProtocolMap`'s token-discovery read (`window.arweaveWallet`'s
    * `userTokens(options?)`, Wander-shaped) — reuses `getTokenBalances`'s
-   * exact registry-plus-spawn-tag-discovered resolution (per this task's
-   * RELEVANT RULES: no separate token-listing source) and reshapes each
-   * resolved `TokenBalance` into `UserToken`'s Wander-cased fields.
+   * exact registry-plus-spawn-tag-discovered resolution (no separate
+   * token-listing source) and reshapes each resolved `TokenBalance` into
+   * `UserToken`'s Wander-cased fields.
    *
    * Null-metadata decision: `UserToken.Ticker`/`Name`/`Denomination` have
    * no nullable variant (see `token-metadata.ts`'s own doc comment flagging
@@ -416,7 +413,7 @@ export class ReadsHandler {
   }
 
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
-    void req.cursor; // most-recent-N only in this phase — no deeper pagination cursor is implemented yet, see final report.
+    void req.cursor; // most-recent-N only — no deeper pagination cursor is implemented yet.
     const settings = await this.loadNetworkSettings();
     const [localLog, arEntries, aoEntries] = await Promise.all([
       this.loadActivityLog(req.address),
@@ -546,10 +543,10 @@ export class ReadsHandler {
    * failing the whole chart — a temporary provider hiccup for one token
    * shouldn't blank the entire portfolio value.
    *
-   * An unrecognized `range` throws a named error (HONESTY: never silently
-   * fall back to a different range than the one requested). An empty AR
-   * price series (both sources unavailable) reports `series: []` per
-   * `PortfolioHistory`'s own HONESTY contract — the popup shows
+   * An unrecognized `range` throws a named error (never silently falls
+   * back to a different range than the one requested). An empty AR price
+   * series (both sources unavailable) reports `series: []` per
+   * `PortfolioHistory`'s own contract — the popup shows
    * `NetworkErrorBanner` for that case rather than this handler
    * fabricating a flat line.
    */
@@ -620,10 +617,10 @@ export class ReadsHandler {
   /**
    * Current spot USD price for every token in `DEFAULT_TOKEN_REGISTRY`
    * (`ProtocolMap.getTokenPrices`) — drives each `TokenRow`'s per-row `$`
-   * value. A token whose price source both fail comes back with
-   * `usd: null` (HONESTY: never a fabricated `0`); a token with no
-   * `priceSource` at all (nothing outside the registry today) is skipped
-   * entirely rather than returning a meaningless entry.
+   * value. A token whose price sources both fail comes back with
+   * `usd: null` (never a fabricated `0`); a token with no `priceSource`
+   * at all (nothing outside the registry today) is skipped entirely
+   * rather than returning a meaningless entry.
    */
   async getTokenPrices(): Promise<TokenPrice[]> {
     const priced = DEFAULT_TOKEN_REGISTRY.filter((token) => token.priceSource !== null);
@@ -652,10 +649,8 @@ export const ACTIVITY_PROMOTION_ALARM_NAME = "gleam:activityPromotion";
  * wallet with no pending activity (`promotePendingActivity` itself
  * short-circuits to a single storage read and no network call when there's
  * nothing pending, so most ticks cost nothing per tracked address anyway).
- * No existing interval convention elsewhere in this codebase to match, so
- * this is this task's own choice, not a documented product requirement —
- * flagged as such in this task's final report; a tighter or looser
- * interval is trivial to change here as a single constant.
+ * A tighter or looser interval is trivial to change here as a single
+ * constant.
  */
 const ACTIVITY_PROMOTION_INTERVAL_MINUTES = 1;
 
@@ -670,14 +665,12 @@ const ACTIVITY_PROMOTION_INTERVAL_MINUTES = 1;
  * the existing `mergeActivity`-backed `getActivity` path rather than
  * duplicating it.
  *
- * Call once from the background entrypoint (`entrypoints/background/
- * index.ts`, outside this task's ALLOWED SCOPE — same "no dispatcher in
- * this task's scope" situation `wallet-core`'s original build already hit
- * for `getNetworkSettings`) with a `ReadsHandler` instance, e.g.:
- * `registerActivityPromotionAlarm(new ReadsHandler(storage))`. Errors
- * from an individual address's promotion check are caught and logged
- * per-address so one failing gateway/address never blocks promotion for
- * the wallet's other tracked addresses on the same tick.
+ * Call once from the background entrypoint with a `ReadsHandler`
+ * instance, e.g.: `registerActivityPromotionAlarm(new
+ * ReadsHandler(storage))`. Errors from an individual address's promotion
+ * check are caught and logged per-address so one failing gateway/address
+ * never blocks promotion for the wallet's other tracked addresses on the
+ * same tick.
  */
 export function registerActivityPromotionAlarm(handler: ReadsHandler): void {
   browser.alarms.create(ACTIVITY_PROMOTION_ALARM_NAME, {

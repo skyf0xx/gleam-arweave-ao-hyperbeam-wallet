@@ -6,8 +6,8 @@ import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
  * Implements `RuntimePort` over `@webext-core/messaging`'s
  * `defineExtensionMessaging<ProtocolMap>()` — the only place
  * `@webext-core/messaging` (itself wrapping `browser.runtime.sendMessage`/
- * `onMessage`) is reached in this repo (ARCHITECTURE.md §2.1). `core`
- * never imports this file; it only sees `RuntimePort`.
+ * `onMessage`) is reached in this repo. `core` never imports this file;
+ * it only sees `RuntimePort`.
  *
  * `RuntimePort` is intentionally generic (`RuntimeMessage<TPayload>`,
  * a `type` string), while `ProtocolMap` is a typed, per-method contract

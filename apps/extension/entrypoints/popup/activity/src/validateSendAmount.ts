@@ -2,11 +2,10 @@ import type { TokenBalance } from "@gleam/core";
 import type { WalletBalances } from "./useBalances";
 
 /**
- * Client-side "insufficient balance" gate (RELEVANT RULES: "Attempting to
- * send more than the current balance is blocked client-side with a clear
- * inline message, validated against the query cache's current value").
- * Pure so `SendView` can call it synchronously against whatever
- * `useBalances` currently holds, with no extra network round-trip.
+ * Client-side "insufficient balance" gate, validated against the query
+ * cache's current value. Pure so `SendView` can call it synchronously
+ * against whatever `useBalances` currently holds, with no extra network
+ * round-trip.
  *
  * `token === null` validates against `balances.arBalance`; a `TokenBalance`
  * validates against the matching `processId` entry in

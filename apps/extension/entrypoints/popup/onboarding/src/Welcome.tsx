@@ -2,8 +2,7 @@ import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
- * 1.1 Welcome (onboarding.html) — the only screen allowed the tagline as
- * hero copy (brand/guidelines.md's onboarding allowance), one primary +
+ * Welcome — the only screen with the tagline as hero copy, one primary +
  * one secondary action, nothing else.
  */
 export interface WelcomeProps {

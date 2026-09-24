@@ -339,8 +339,9 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
   it("silently skips a stored wallet whose password doesn't match, without throwing", async () => {
     const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
-    // A vault from before the shared password can hold a wallet under a
-    // different one; the handler no longer creates that, so seed it.
+    // A vault can hold a wallet under a different password than the
+    // shared one; seed that case directly since the handler always
+    // creates wallets under the shared password.
     const otherStorage = createFakeStorage();
     await new WalletLifecycleHandler(otherStorage).importWallet({
       jwk: validJWK(),

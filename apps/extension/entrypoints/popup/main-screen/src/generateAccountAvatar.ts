@@ -5,11 +5,6 @@ import waves from "@dicebear/styles/waves.json"
  * Generates the account pill's identity avatar SVG entirely in-process via
  * `@dicebear/core` + `@dicebear/styles`'s bundled `weave` style JSON —
  * no `fetch`/network call to `api.dicebear.com` or any other host, ever.
- * This is a deliberate deviation from wallet-main-screen.html's reference
- * (which shows an avatar without specifying its source), confirmed with
- * the user per this task's packet: matches `UnlockScreen.tsx`'s
- * no-per-wallet-identity-on-unlock rule and `TokenGlyph.tsx`'s existing
- * local-only identicon precedent on this same screen.
  *
  * `weave` (a geometric, faceless pattern keyed by seed) was chosen
  * over dicebear's avatar-shaped styles (`avataaars`, `micah`, etc.) since
@@ -19,9 +14,9 @@ import waves from "@dicebear/styles/waves.json"
  * the same address always renders the same avatar and two different
  * wallets render visibly different ones.
  *
- * The `Style` instance is constructed once at module scope (per
- * `@dicebear/core`'s own `Style` doc comment: "reuse the instance across
- * avatars") rather than per call.
+ * The `Style` instance is constructed once at module scope, per
+ * `@dicebear/core`'s own `Style` doc comment ("reuse the instance across
+ * avatars"), rather than per call.
  */
 const waveStyle = new Style(waves);
 

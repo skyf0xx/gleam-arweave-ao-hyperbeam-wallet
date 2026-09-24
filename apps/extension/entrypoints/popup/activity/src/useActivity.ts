@@ -3,12 +3,10 @@ import type { ActivityPage, RuntimePort } from "@gleam/core";
 import { walletQueryKeys } from "./queryKeys";
 
 /**
- * Shared, cached source of truth for the merged activity feed — replaces
- * the duplicated `getActivity` `useState`/`useEffect` blocks previously
- * local to `SendView`'s `RecentRecipientsStep` and `MainScreenView`.
- * Wraps the same existing `runtime.send({ type: "getActivity" })` call as
- * a queryFn (RELEVANT RULES: "The activity feed … is fetched via
- * useQuery"), no change to the transport layer.
+ * Shared, cached source of truth for the merged activity feed, so
+ * `SendView`'s `RecentRecipientsStep` and `MainScreenView` share one
+ * fetch instead of each running its own. Wraps the existing
+ * `runtime.send({ type: "getActivity" })` call as a queryFn.
  *
  * Keyed by `[address, 'activity']` (`walletQueryKeys.activity`).
  */

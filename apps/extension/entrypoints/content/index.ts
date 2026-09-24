@@ -14,12 +14,11 @@ import {
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 
 /**
- * The content-script half of the page ↔ content bridge
- * (ARCHITECTURE.md §4.3/§4.4): `document_start`, top frame only
- * (`allFrames: false` — a page's iframes never get their own injected
- * provider or bridge), injects `provider.js` via `injectScript` (never
- * `world: "MAIN"`, `keepInDom: false` so the `<script>` tag is removed
- * from the DOM right after it runs, per this task's RELEVANT RULES), and
+ * The content-script half of the page ↔ content bridge: `document_start`,
+ * top frame only (`allFrames: false` — a page's iframes never get their
+ * own injected provider or bridge), injects `provider.js` via
+ * `injectScript` (never `world: "MAIN"`, `keepInDom: false` so the
+ * `<script>` tag is removed from the DOM right after it runs), and
  * relays every `PageRequestEnvelope` the page posts into a real
  * `ProtocolMap.providerCall` message to the background, then relays the
  * response back as a `PageResponseEnvelope`.

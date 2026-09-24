@@ -4,18 +4,16 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 
 /**
- * Ports `signing-approval.html` (6.2) exactly — "the highest-stakes
- * screen in the product" per this task's packet: recipient, amount, fee,
- * a decoded-data preview, tags, and a SHA-256 hash of the exact signing
+ * The highest-stakes screen in the product: recipient, amount, fee, a
+ * decoded-data preview, tags, and a SHA-256 hash of the exact signing
  * payload with its own copy affordance, all shown before signing is
- * possible. Full addresses only, never truncated (`.value-mono`'s
- * `break-all`, matching the mockup, not `AddressDisplay`'s truncated
- * variant). Never uses the beam as anything but the small identity mark,
- * never uses humor here — this is the one screen the packet's RELEVANT
- * RULES singles out for "maximum clarity, zero cleverness." The
- * irreversible-tier `RiskNotice`/`destructive` Button pairing is the same
- * one `RiskNotice`'s own doc comment names as this screen's reason for
- * existing as a single shared component.
+ * possible. Full addresses only, never truncated (`break-all`, not
+ * `AddressDisplay`'s truncated variant). Never uses the beam as anything
+ * but the small identity mark, and never uses humor here — maximum
+ * clarity, zero cleverness. The irreversible-tier `RiskNotice`/
+ * `destructive` Button pairing is the same one `RiskNotice`'s own doc
+ * comment names as this screen's reason for existing as a single shared
+ * component.
  */
 export interface SigningApprovalScreenProps {
   origin: string;
@@ -47,12 +45,9 @@ function actionCopy(preview: SigningApprovalPreview): string {
 
 /**
  * Token identity shown alongside the amount for a `transferAoTokens`
- * preview. Judgment call (RELEVANT RULES don't specify exact copy/layout):
- * no token-symbol lookup exists in this layer's scope, so this renders the
- * raw AO processId truncated to a short recognizable form rather than
- * fabricating a symbol — closest existing pattern to follow was
- * `sign`/`dispatch`'s plain amount display, extended with one extra line
- * identifying the token, per `SigningApprovalPreview.token`'s intent.
+ * preview. No token-symbol lookup exists in this layer's scope, so this
+ * renders the raw AO processId truncated to a short recognizable form
+ * rather than fabricating a symbol.
  */
 function shortenProcessId(processId: string): string {
   return processId.length > 12 ? `${processId.slice(0, 6)}…${processId.slice(-4)}` : processId;

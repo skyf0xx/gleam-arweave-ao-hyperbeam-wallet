@@ -2,17 +2,12 @@ import { useState } from "react";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
- * 1.5b Forgot password (unlock-screen.html) — explicit, plainly-worded
- * destructive reset, never a silent delete (RELEVANT RULES). Requires an
- * extra confirmation tap before `onReset` fires, on top of the screen's
- * own explicit copy — the mockup names one primary action, but the
- * consequence (wiping every locally stored vault) is Irreversible-tier
- * per brand/guidelines.md Part 3, which asks for "explicit acknowledgment
- * of the specific stated risk," not a single click doing it. The reset
- * action uses the shared `Button variant="destructive"` (the only place
- * the warning-red accent is allowed to render) rather than a hand-rolled
- * red button — this screen's own risk-tier framing is exactly what that
- * variant exists for.
+ * Explicit, plainly-worded destructive reset, never a silent delete.
+ * Requires an extra confirmation tap before `onReset` fires, on top of the
+ * screen's own explicit copy, since wiping every locally stored vault
+ * can't be undone. The reset action uses the shared
+ * `Button variant="destructive"` (the only place the warning-red accent
+ * is allowed to render) rather than a hand-rolled red button.
  */
 export interface ForgotPasswordProps {
   onReset: () => void;

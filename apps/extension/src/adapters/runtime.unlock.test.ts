@@ -13,8 +13,7 @@ vi.mock("@webext-core/messaging", () => ({
  * the mock must be registered before the dynamic import in each test —
  * this file exercises the adapter's translation between `RuntimePort`'s
  * generic `RuntimeMessage`/`onMessage(type, handler)` shape and
- * `@webext-core/messaging`'s per-`ProtocolMap`-method calls (onboarding/
- * unlock naming per the task packet's filter).
+ * `@webext-core/messaging`'s per-`ProtocolMap`-method calls.
  */
 describe("adapters/runtime: WebextCoreRuntimePort (onboarding/unlock wiring)", () => {
   beforeEach(() => {

@@ -3,8 +3,7 @@ import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/ind
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
- * 1.5 Unlock screen (unlock-screen.html) — a pure brand moment, global
- * unlock. Per RELEVANT RULES: no per-wallet identity (avatar/name/
+ * A pure brand moment, global unlock: no per-wallet identity (avatar/name/
  * address) rendered here at all — this component doesn't even accept a
  * wallet prop, on purpose, so it can't regress into showing one.
  */

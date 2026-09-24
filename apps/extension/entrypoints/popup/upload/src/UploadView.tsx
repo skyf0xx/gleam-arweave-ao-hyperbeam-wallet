@@ -10,31 +10,23 @@ const GATEWAY_VIEW_URL = "https://arweave.net";
 const VIEWBLOCK_URL = "https://viewblock.io/arweave/tx";
 
 /**
- * Upload flow (upload-flow.html / TODO.md §5) — compose → review → success,
- * same internal step-state shape (no router) as `SendView`/`OnboardingView`.
- * Restyled onto shared tokens/primitives (design-system-pass) — see
- * `packages/ui/src/index.ts` for the primitives consumed here.
+ * Compose → review → success, same internal step-state shape (no router)
+ * as `SendView`/`OnboardingView`.
  *
  * No password prompt here: same as `SendView`, `submitUpload` reads the
  * signing key from the background's in-memory unlocked-session cache
  * (`apps/extension/src/handlers/key-session.ts`), not from this request —
  * see `handlers/upload.ts`'s doc comment.
  *
- * Secret-scan trip uses `RiskNotice` (RELEVANT RULES / TODO.md §5.2: "the
- * one place a scan result overrides the primary action" — the Irreversible
- * tier `RiskNotice` itself is scoped to). The tag byte-cap warning stays a
- * plain inline `TextField`-style error row instead — TODO.md §5.1 treats it
- * as routine/Consequential live validation, not an Irreversible-tier
- * warning, so it doesn't earn the warning-red `RiskNotice` treatment.
+ * Secret-scan trip uses `RiskNotice`, the one place a scan result
+ * overrides the primary action. The tag byte-cap warning stays a plain
+ * inline `TextField`-style error row instead, since it's routine live
+ * validation rather than an Irreversible-tier warning.
  *
- * UDL license picker: the sibling repo's own material (upload-flow.html,
- * CLAUDE.md item 7, TODO.md §5.1) names only "optional UDL license tag"
- * with no expanded list of license types to choose from — no screen or
- * copy for an expanded picker exists to port. This ships a minimal
- * closed set of common UDL "License-Fee" access conditions (the ones the
- * UDL spec itself names) behind a single picker rather than inventing a
- * fuller flow; reported as a gap in this task's final report rather than
- * fabricated UX.
+ * UDL license picker: ships a minimal closed set of common UDL
+ * "License-Fee" access conditions (the ones the UDL spec itself names)
+ * behind a single picker rather than an expanded license-type list, since
+ * no such list exists to port.
  */
 export interface UploadViewProps {
   runtime: RuntimePort;

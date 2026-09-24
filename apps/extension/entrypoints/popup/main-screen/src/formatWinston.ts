@@ -1,12 +1,10 @@
 /**
  * Formats a Winston atomic-integer string as an AR display string
  * (1 AR = 10^12 Winston), using `BigInt` arithmetic throughout so no
- * amount ever passes through a floating-point `Number` conversion
- * (RELEVANT RULES: "AR balance is read ... and rendered without float
- * conversion (Winston as atomic-integer strings throughout"). This is
- * the one point where a Winston string becomes a human display string —
- * the value itself is never stored, compared, or summed as a float
- * anywhere in this build.
+ * amount ever passes through a floating-point `Number` conversion. This
+ * is the one point where a Winston string becomes a human display
+ * string — the value itself is never stored, compared, or summed as a
+ * float anywhere else.
  */
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
