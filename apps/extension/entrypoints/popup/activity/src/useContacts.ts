@@ -31,3 +31,20 @@ export function useSaveContact(runtime: RuntimePort) {
     },
   });
 }
+
+/**
+ * Settings' Contacts screen deletes with no confirmation dialog beyond an
+ * undo toast (per `todo.md`'s "Address book, part 2" spec: "a contact is
+ * only a label") — undo is just calling `useSaveContact` again with the
+ * same address/name, not a separate "undelete" wire message.
+ */
+export function useDeleteContact(runtime: RuntimePort) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (address: string) => runtime.send<{ address: string }, void>({ type: "deleteContact", payload: { address } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: walletQueryKeys.contacts() });
+    },
+  });
+}

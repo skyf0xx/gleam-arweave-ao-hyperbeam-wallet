@@ -38,6 +38,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenConnectedApps={vi.fn()}
       onOpenNetworkPeers={vi.fn()}
       onOpenManageTokens={vi.fn()}
+      onOpenContacts={vi.fn()}
       {...overrides}
     />,
   );
@@ -89,6 +90,16 @@ describe("SettingsHomeView", () => {
     fireEvent.click(screen.getByText("Manage tokens"));
 
     expect(onOpenManageTokens).toHaveBeenCalled();
+  });
+
+  it("calls onOpenContacts when the Contacts row is pressed", async () => {
+    const onOpenContacts = vi.fn();
+    renderSettingsHome({ onOpenContacts });
+
+    await waitFor(() => expect(screen.getByText("Contacts")).toBeTruthy());
+    fireEvent.click(screen.getByText("Contacts"));
+
+    expect(onOpenContacts).toHaveBeenCalled();
   });
 
   it("calls onBack when the header back button is pressed", async () => {

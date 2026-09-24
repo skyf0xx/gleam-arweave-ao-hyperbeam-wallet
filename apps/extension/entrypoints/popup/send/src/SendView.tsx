@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { explorerUrlFor, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { AccountAvatar, EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
-import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
-import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
+import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
+import { AddressRow } from "../../activity/src/AddressRow";
 import { useActivity } from "../../activity/src/useActivity";
 import { useArFee } from "../../activity/src/useArFee";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
@@ -987,27 +987,6 @@ function SavedAddressesStep({
         )}
       </div>
     </div>
-  );
-}
-
-function AddressRow({ address, name, onSelect }: { address: string; name: string | null; onSelect: () => void }) {
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(address), [address]);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 hover:bg-mist"
-    >
-      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={32} className="rounded-2xl" />
-      {name ? (
-        <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="truncate text-label font-semibold text-foreground">{name}</span>
-          <span className="truncate font-mono text-caption text-faint">{truncateAddress(address)}</span>
-        </span>
-      ) : (
-        <span className="min-w-0 flex-1 truncate font-mono text-label text-foreground">{truncateAddress(address)}</span>
-      )}
-    </button>
   );
 }
 

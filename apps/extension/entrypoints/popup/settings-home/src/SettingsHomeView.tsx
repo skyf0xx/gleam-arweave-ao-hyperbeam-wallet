@@ -32,6 +32,7 @@ export interface SettingsHomeViewProps {
   onOpenConnectedApps: () => void;
   onOpenNetworkPeers: () => void;
   onOpenManageTokens: () => void;
+  onOpenContacts: () => void;
 }
 
 interface LoadState {
@@ -47,6 +48,7 @@ export function SettingsHomeView({
   onOpenConnectedApps,
   onOpenNetworkPeers,
   onOpenManageTokens,
+  onOpenContacts,
 }: SettingsHomeViewProps) {
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
@@ -115,6 +117,11 @@ export function SettingsHomeView({
             title="Manage tokens"
             subtitle="Add or remove watched AO tokens"
             onClick={onOpenManageTokens}
+          />
+          <SettingsRow
+            title="Contacts"
+            subtitle="Saved addresses for sending"
+            onClick={onOpenContacts}
           />
         </SettingsSection>
 

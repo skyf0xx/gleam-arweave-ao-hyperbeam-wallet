@@ -11,13 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 4. Other missing features
 
-- [ ] **Address book, part 2: manage contacts in Settings (S, sonnet)**
-  `popup/settings-home/src/SettingsHomeView.tsx` plus a new
-  `popup/contacts/` view. One "Contacts" row in Settings opens a flat list
-  (same row style as part 1). "+" adds a contact with a name and a
-  validated 43-character address. Tapping a row edits the name inline or
-  deletes it, with no confirmation beyond an undo toast, since a contact
-  is only a label. Empty state: one line of muted text, nothing else.
 - [ ] **Upload screen can't be reached (M, sonnet)**
   `popup/upload/src/UploadView.tsx` is complete, but `src/App.tsx` has no
   route and nothing links to it. Upload is rarely used, so it gets no
