@@ -1,10 +1,8 @@
 /**
  * Historical USD price series against CoinGecko/CoinPaprika direct — same
- * two sources and same direct-no-proxy shape as spot price (`coingecko.ts`/
- * `coinpaprika.ts`), used to drive a portfolio-value-over-time chart rather
- * than a single current price.
- *
- * Pure: no `chrome.*`/window/document dependency, injectable `fetchImpl`.
+ * two sources as spot price (`coingecko.ts`/`coinpaprika.ts`), used to
+ * drive a portfolio-value-over-time chart rather than a single current
+ * price.
  */
 import type { CoinGeckoId } from "./coingecko";
 import type { CoinPaprikaId } from "./coinpaprika";
@@ -22,23 +20,18 @@ export interface HistoricalPricePoint {
 /**
  * Range → CoinGecko `days` param and CoinPaprika `interval` param.
  *
- * CoinGecko buckets granularity automatically by `days` (its docs: <=1 day
- * is hourly, >90 days is daily) so no separate granularity choice is needed
- * on that side. CoinPaprika has no such auto-bucketing, so an explicit
- * `interval` is picked to land on a comparable point count: hourly for 24H,
- * 6-hourly for 7D (28 points), daily for 1M/1Y, and weekly for ALL (to keep
- * the point count reasonable for a full-history request). These interval
- * choices are this build's own reasonable call, not a spec requirement.
+ * CoinGecko buckets granularity automatically by `days`, so no separate
+ * granularity choice is needed on that side. CoinPaprika has no such
+ * auto-bucketing, so an explicit `interval` is picked to land on a
+ * comparable point count: hourly for 24H, 6-hourly for 7D, daily for
+ * 1M/1Y, weekly for ALL.
  *
- * `ALL` requests 365 days, not a true full-history request: both free-tier
- * APIs reject anything further back (CoinGecko's `days=max` 401s with
- * "Public API users are limited to querying historical data within the past
- * 365 days"; CoinPaprika's epoch `start` 402s as before its plan's history
- * window) — a real plan limit, not a request-construction bug. Requesting
- * `max`/epoch here always came back empty, which is what any zero-balance
- * wallet made look like a chart bug at every range. Capping at 365 days
- * makes `ALL` behave like `1Y` for both providers, matching what the free
- * tier can actually serve.
+ * `ALL` requests 365 days, not a true full-history request: both
+ * free-tier APIs reject anything further back (CoinGecko's `days=max`
+ * 401s past 365 days; CoinPaprika's epoch `start` 402s past its plan's
+ * history window) — a real plan limit, not a request-construction bug.
+ * Capping at 365 days makes `ALL` behave like `1Y` for both providers,
+ * matching what the free tier can actually serve.
  */
 function rangeToCoinGeckoDays(range: HistoricalRange): number {
   switch (range) {
@@ -131,9 +124,8 @@ export interface HistoricalPriceSource {
 
 /**
  * Tries CoinGecko, falls back to CoinPaprika on any failure, and only then
- * reports an empty series — mirrors `getUsdPriceWithFallback`'s try/catch
- * structure and its HONESTY contract (never throws to the caller; an empty
- * array means "couldn't compute", not "there is no history").
+ * reports an empty series — never throws to the caller; an empty array
+ * means "couldn't compute", not "there is no history".
  */
 export async function getHistoricalUsdPricesWithFallback(
   source: HistoricalPriceSource,
@@ -155,11 +147,9 @@ export async function getHistoricalUsdPricesWithFallback(
 }
 
 /**
- * Builds a `priceAt` callback from a fetched series by locating the nearest
- * point at-or-before the requested timestamp. Per this module's confirmed
- * HONESTY exception for `priceAt` specifically: a timestamp with no
- * covering data (empty series, or a timestamp before the series' first
- * point) resolves to `0`, never a thrown error or a fabricated price.
+ * Builds a `priceAt` callback from a fetched series by locating the
+ * nearest point at-or-before the requested timestamp. A timestamp with
+ * no covering data resolves to `0`, never a thrown error.
  */
 export function buildPriceAtFromSeries(series: HistoricalPricePoint[]): (timestamp: number) => number {
   const sorted = [...series].sort((a, b) => a.timestamp - b.timestamp);

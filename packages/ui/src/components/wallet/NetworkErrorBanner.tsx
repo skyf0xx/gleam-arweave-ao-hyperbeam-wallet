@@ -1,8 +1,7 @@
 /**
- * The shared network-unreachable banner (cross-cutting-states.html's
- * `.error-banner` / TODO.md 8.1) — direct, specific, next-step-first
- * copy, no apology theater. Caller supplies `onRetry`; this component
- * never retries on its own.
+ * The shared network-unreachable banner — direct, specific,
+ * next-step-first copy, no apology theater. Caller supplies `onRetry`;
+ * this component never retries on its own.
  */
 export interface NetworkErrorBannerProps {
   onRetry: () => void;

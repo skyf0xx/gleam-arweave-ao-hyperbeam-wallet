@@ -11,22 +11,21 @@ import { postDataItemToBundler } from "../arweave/upload";
 import { base64ToBytes } from "./base64";
 
 /**
- * `core/vault`'s share of the provider-signing-crypto intent: the actual
+ * `core/vault`'s share of the provider-signing-crypto surface: the actual
  * cryptographic operations behind `sign`/`dispatch`/`signDataItem`/
  * `batchSignDataItem`. Mirrors `core/arweave/transfer.ts` and
- * `core/arweave/upload.ts`'s established boundary exactly — every
- * function here accepts an already-decrypted `JWKInterface` and never
- * imports `core/vault`'s own envelope decryption or touches storage;
- * resolving that JWK from the unlocked-session cache
- * (`getCachedKey(walletId)`) is the later `provider-bridge` dispatch
- * layer's job, per this task's packet.
+ * `core/arweave/upload.ts`'s boundary — every function here accepts an
+ * already-decrypted `JWKInterface` and never imports `core/vault`'s own
+ * envelope decryption or touches storage; resolving that JWK from the
+ * unlocked-session cache (`getCachedKey(walletId)`) is the dispatch
+ * layer's job.
  *
  * Imports `@dha-team/arbundles/web` (not the package root) for the same
  * reason `upload.ts` documents: the Node entry pulls in an undeclared
  * `axios` dependency via its streamed-file helpers.
  */
 
-/** Threshold (bytes) above which `dispatch()` bundles rather than posts as a base AR tx — mirrors `upload.ts`'s own bundler-first convention for arbitrary payload data, since a `BASE` tx would otherwise require on-chain fee/reward computation this layer doesn't own. Below the threshold, dispatch posts directly to the gateway as a `BASE` transaction. */
+/** Threshold (bytes) above which `dispatch()` bundles rather than posts as a base AR tx. Below it, dispatch posts directly to the gateway as a `BASE` transaction. */
 const DISPATCH_BUNDLE_THRESHOLD_BYTES = 100 * 1024;
 
 function buildClient(gatewayUrl: string): Arweave {
@@ -93,10 +92,14 @@ export async function signTransaction(
 
 /**
  * Signs a transaction and submits it. Payloads over
- * `DISPATCH_BUNDLE_THRESHOLD_BYTES` are signed as an ANS-104 data item and
- * posted to `bundlerUrl` (`BUNDLED`); smaller ones are posted to the
+ * `DISPATCH_BUNDLE_THRESHOLD_BYTES` are signed as an ANS-104 data item
+ * and posted to `bundlerUrl` (`BUNDLED`); smaller ones are posted to the
  * gateway as a base transaction (`BASE`). Throws if either post is
  * rejected, so the dApp never gets an id for data that wasn't stored.
+ *
+ * A bundled DataItem can't carry `quantity`/`reward`/`last_tx`, so a
+ * transfer with a nonzero `quantity` over the threshold silently drops
+ * the AR transfer while still returning a success id — see todo.md.
  */
 export async function dispatchTransaction(
   gatewayUrl: string,

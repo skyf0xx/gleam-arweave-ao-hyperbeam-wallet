@@ -3,8 +3,7 @@
  * requests and every signing request open in their own
  * `chrome.windows.create` popup window, never inline in the extension
  * popup — a popup closes on focus loss, which would silently drop the
- * request (PRD §4 — Injected provider & connection approval; Signing
- * approval).
+ * request.
  *
  * Implemented by `apps/extension/src/adapters/windows.ts` over
  * `chrome.windows.*`. `core` never imports that adapter — only this

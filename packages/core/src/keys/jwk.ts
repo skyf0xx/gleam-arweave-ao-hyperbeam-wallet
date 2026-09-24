@@ -3,12 +3,10 @@ import type { JWKInterface } from "../models/wallet";
 
 /**
  * A single, module-level Arweave client used only for its offline
- * JWK-generation and address-derivation helpers (`wallets.generate`,
- * `wallets.jwkToAddress`) — neither touches the network, so the gateway
- * config passed to `init` is never dialed. Real network reads (balance,
- * submit, GraphQL) belong to the `wallet-core` layer's own client,
- * constructed with an explicit gateway per ARCHITECTURE.md §7.1's spike
- * note (`Arweave.init({})` silently falls back to `127.0.0.1:80`).
+ * JWK-generation and address-derivation helpers — neither touches the
+ * network, so the gateway config passed to `init` is never dialed.
+ * Real network reads use their own client, constructed with an explicit
+ * gateway (`Arweave.init({})` silently falls back to `127.0.0.1:80`).
  */
 const arweave = Arweave.init({});
 
@@ -17,9 +15,8 @@ const REQUIRED_JWK_FIELDS = ["kty", "e", "n", "d", "p", "q", "dp", "dq", "qi"] a
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /**
- * Generates a fresh RSA JWK keyfile (Phase 1 supports `jwk` wallets only
- * — `core/models/wallet.ts`'s `WalletMethod`). Callers are responsible
- * for encrypting the result into a `VaultEnvelope` before it touches any
+ * Generates a fresh RSA JWK keyfile. Callers are responsible for
+ * encrypting the result into a `VaultEnvelope` before it touches any
  * storage — this function only produces plaintext key material.
  */
 export async function generateJWK(): Promise<JWKInterface> {
@@ -41,8 +38,7 @@ export type JWKValidationResult =
 /**
  * Validates that `input` (typically `JSON.parse`d from an imported
  * keyfile) has the shape of an RSA Arweave JWK, returning a specific
- * rejection reason rather than a generic error (CLAUDE.md's "Keys" spec
- * — "That file isn't a valid Arweave keyfile").
+ * rejection reason rather than a generic error.
  */
 export function validateJWKShape(input: unknown): JWKValidationResult {
   const GENERIC_REASON = "That file isn't a valid Arweave keyfile.";

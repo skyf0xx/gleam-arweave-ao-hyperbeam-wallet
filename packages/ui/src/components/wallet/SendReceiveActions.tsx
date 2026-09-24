@@ -1,10 +1,8 @@
 import { Button } from "../../primitives/button";
 
 /**
- * The primary Send/Receive action pair (wallet-main-screen.html's
- * `.actions`, tokens-activity.html's token-detail equivalent). Composes
- * the shared `Button` primitive (primary/secondary) rather than
- * hand-rolling button markup, per this task's token/primitive migration.
+ * The primary Send/Receive action pair. Composes the shared `Button`
+ * primitive (primary/secondary) rather than hand-rolling button markup.
  */
 export interface SendReceiveActionsProps {
   onSend: () => void;

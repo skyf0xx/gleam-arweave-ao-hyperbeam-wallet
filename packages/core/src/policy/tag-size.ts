@@ -1,11 +1,9 @@
 import type { UploadTag } from "../models/upload";
 
 /**
- * ANS-104's own tag-byte-size cap (RELEVANT RULES: "Upload tag byte size
- * is capped at ~4096 bytes"). Matches `@dha-team/arbundles`'
+ * ANS-104's own tag-byte-size cap. Matches `@dha-team/arbundles`'
  * `DataItem.MAX_TAG_BYTES` (also 4096) — not re-imported from arbundles
- * here to keep this pure-domain module dependency-free; see this task's
- * final report for where arbundles itself is used.
+ * here to keep this pure-domain module dependency-free.
  */
 export const TAG_BYTES_LIMIT = 4096;
 

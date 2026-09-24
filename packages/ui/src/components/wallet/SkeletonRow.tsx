@@ -1,7 +1,6 @@
 /**
  * A skeleton placeholder row matching `TokenRow`/`ActivityRow`'s layout
- * (cross-cutting-states.html's `.skeleton-row` / TODO.md 8.2: "structural
- * skeleton placeholders... not spinners" as the loading default).
+ * — structural placeholders, not spinners, as the loading default.
  * Respects `prefers-reduced-motion` via the `.gleam-shimmer` class's own
  * `@media` override (see `packages/ui/src/tokens/theme.css`).
  */

@@ -1,13 +1,7 @@
 /**
- * Pre-upload secret scan (PRD/CLAUDE.md item 7 — "reject if payload looks
- * like a private key/JWK/PEM block"). Pure domain logic: no chrome
- * extension API, window, or document dependency, per core-design.md's
- * "core package logic has zero chrome/window/document dependency" rule.
- *
- * Heuristic, not exhaustive, per this task's packet ("this doesn't need
- * to be perfect, just catch the obvious cases per the spec's intent") —
- * it catches the shapes the spec names explicitly (PEM headers,
- * JWK-shaped JSON, raw base64 key-sized blobs) and nothing more exotic.
+ * Pre-upload secret scan: rejects a payload that looks like a private
+ * key/JWK/PEM block. Heuristic, not exhaustive — it catches PEM headers,
+ * JWK-shaped JSON, and raw base64 key-sized blobs, nothing more exotic.
  */
 
 export type SecretScanResult = { flagged: true; matchType: string } | { flagged: false };
@@ -58,7 +52,7 @@ function looksLikeJwkPrivateKey(text: string): boolean {
  * Detects payloads that look like a private key, JWK, or PEM block.
  * Returns the specific match type on a hit (e.g. `"PEM block"`, `"JWK"`,
  * `"raw key material"`) so callers can state it plainly rather than a
- * generic warning (RELEVANT RULES: "stating the specific match type").
+ * generic warning.
  */
 export function scanForSecrets(payload: string | Uint8Array): SecretScanResult {
   const text = toText(payload);

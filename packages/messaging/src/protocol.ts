@@ -21,13 +21,13 @@ import type {
 import type { ProviderSurfaceMethod } from "./page-protocol";
 
 /**
- * The typed background RPC contract, per ARCHITECTURE.md §4.1 exactly.
- * `@webext-core/messaging`'s `defineExtensionMessaging<ProtocolMap>()`
- * turns this into typed `sendMessage`/`onMessage` pairs — the dispatcher
- * that wires handlers to these methods, and enforces the privilege-tier
- * boundary between them (`PROVIDER_METHODS`/`APPROVAL_METHODS`/
- * `KEY_METHODS`, defined in `@gleam/core`'s models), is a later layer's
- * job. This layer only pins the wire shape.
+ * The typed background RPC contract. `@webext-core/messaging`'s
+ * `defineExtensionMessaging<ProtocolMap>()` turns this into typed
+ * `sendMessage`/`onMessage` pairs — the dispatcher that wires handlers
+ * to these methods, and enforces the privilege-tier boundary between
+ * them (`PROVIDER_METHODS`/`APPROVAL_METHODS`/`KEY_METHODS`, defined in
+ * `@gleam/core`'s models), is a later layer's job. This layer only pins
+ * the wire shape.
  */
 export interface ProtocolMap {
   // wallet lifecycle
@@ -44,9 +44,7 @@ export interface ProtocolMap {
   /**
    * The "forgot password" destructive full-vault reset: wipes every
    * locally stored wallet, the active-wallet pointer, and the unlocked
-   * session. Registered against the already-tested
-   * `WalletLifecycleHandler.resetAllWallets()` — this entry only pins the
-   * wire shape, per this file's own doc comment.
+   * session.
    */
   resetAllWallets(): void;
 
@@ -70,23 +68,18 @@ export interface ProtocolMap {
   /**
    * Drives the main screen's total-portfolio-value chart. `range` selects
    * one of the 5 tabs (24H/7D/1M/1Y/ALL); the response carries both the
-   * series to plot and the summary figures (current value, % change,
-   * period label) already computed, per `PortfolioHistory`'s own doc
-   * comment. An empty `series` means both price sources were unavailable
-   * — the popup falls back to `NetworkErrorBanner`, same as a balance-load
-   * failure, rather than rendering a broken or blank chart.
+   * series to plot and the summary figures already computed. An empty
+   * `series` means both price sources were unavailable — the popup falls
+   * back to `NetworkErrorBanner` rather than rendering a broken chart.
    */
   getPortfolioHistory(req: { range: PortfolioHistoryRange }): PortfolioHistory;
   /**
    * Current spot USD price for every token in `core/pricing`'s
-   * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the per-row `$` value under
-   * each `TokenRow` on the Tokens tab. A token whose price couldn't be
-   * computed (both CoinGecko/CoinPaprika unavailable) comes back with
-   * `usd: null`, never a fabricated `0` — the row simply shows no `$` line,
-   * same HONESTY contract `getPortfolioHistory` already follows. Any
-   * watched token outside the registry has no entry here at all (see
-   * `priceSourceForProcessId`'s own doc comment on why an arbitrary AO
-   * process can't be priced).
+   * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the per-row `$` value
+   * under each `TokenRow` on the Tokens tab. A token whose price
+   * couldn't be computed comes back with `usd: null`, never a
+   * fabricated `0`. Any watched token outside the registry has no entry
+   * here at all.
    */
   getTokenPrices(): TokenPrice[];
   getLockSettings(): LockSettings;
@@ -101,12 +94,11 @@ export interface ProtocolMap {
   getThemePreference(): ThemeSettings;
 
   // actions
-  // `TransferDraft`/`UploadDraft` carry `walletId` directly (added by
-  // `provider-bridge`, see those models' doc comments) — signing reads
-  // the decrypted JWK from the background's in-memory unlocked-session
-  // cache (`apps/extension/src/handlers/key-session.ts`), not a password
-  // on the request: once unlocked, no further call needs one until the
-  // session is locked or its auto-lock timeout elapses.
+  // `TransferDraft`/`UploadDraft` carry `walletId` directly — signing
+  // reads the decrypted JWK from the background's in-memory
+  // unlocked-session cache (`apps/extension/src/handlers/key-session.ts`),
+  // not a password on the request: once unlocked, no further call needs
+  // one until the session is locked or its auto-lock timeout elapses.
   estimateTransfer(req: TransferDraft): FeeEstimate;
   submitTransfer(req: TransferDraft): { txId: string };
   reviewUpload(req: UploadDraft): UploadReview; // runs the secret scan
@@ -136,21 +128,18 @@ export interface ProtocolMap {
    * The single relay point for every page-originated provider call
    * (`PROVIDER_SURFACE_METHODS`, `page-protocol.ts`). The content script
    * forwards a page's `PageRequestEnvelope` here rather than through any
-   * of this map's other, per-purpose methods — none of which exist for
-   * the 19-method ArConnect-compatible surface, since that surface is
-   * page-facing, not popup/background-facing, and only ever reaches the
-   * background through this one relay. The request carries no origin:
-   * the background reads it from Chrome's `sender` for the content
-   * script's frame, so neither a page nor a compromised content script can
-   * claim to be another site.
+   * of this map's other, per-purpose methods. The request carries no
+   * origin: the background reads it from Chrome's `sender` for the
+   * content script's frame, so neither a page nor a compromised content
+   * script can claim to be another site.
    *
-   * This is the dispatcher's actual privilege-tier choke point (this
-   * task's highest-stakes rule): every `providerCall` is checked against
-   * `PROVIDER_METHODS` before being routed anywhere, and nothing else in
-   * this map is reachable this way — `resolveApproval`/`getApproval`
-   * (`APPROVAL_METHODS`) and `createWallet`/`importWallet`/`exportWallet`
-   * (`KEY_METHODS`) are only ever called directly, by their own trusted
-   * senders, never proxied through `providerCall`.
+   * This is the dispatcher's privilege-tier choke point: every
+   * `providerCall` is checked against `PROVIDER_METHODS` before being
+   * routed anywhere, and nothing else in this map is reachable this way
+   * — `resolveApproval`/`getApproval` (`APPROVAL_METHODS`) and
+   * `createWallet`/`importWallet`/`exportWallet` (`KEY_METHODS`) are only
+   * ever called directly, by their own trusted senders, never proxied
+   * through `providerCall`.
    */
   providerCall(req: { method: ProviderSurfaceMethod; params: unknown }): unknown;
 

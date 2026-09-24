@@ -2,17 +2,14 @@ import * as React from "react";
 import { cn } from "./cn";
 
 /**
- * Labeled text input with an inline validation message (shared.css
- * `.field-error`, repeated across send-flow.html's address/amount
- * fields and onboarding.html's password fields). brand/voice.md calls
- * for "inline validation message, not a summary error block" — this
- * component is the one place that pattern is implemented, so no screen
- * hand-rolls its own error-row markup.
+ * Labeled text input with an inline validation message — never a
+ * summary error block. This is the one place that pattern is
+ * implemented, so no screen hand-rolls its own error-row markup.
  *
  * Password-specific behavior (reveal toggle, caps-lock notice) stays in
  * `components/onboarding/PasswordField.tsx` rather than being folded in
  * here — this primitive is the generic labeled-input shape every other
- * field variant (address, amount, search) composes from.
+ * field variant composes from.
  */
 export interface TextFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;

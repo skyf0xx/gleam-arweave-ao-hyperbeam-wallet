@@ -2,42 +2,30 @@ import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
 /**
- * The main screen's total-portfolio-value chart (wallet-main-screen.html's
- * chart + range-tabs block) — a hand-rolled SVG line/area chart rather
- * than a charting library, per this task's packet: "Given extension
- * bundle-size sensitivity, prefer a hand-rolled lightweight SVG chart over
- * pulling in a full charting library unless you find one already used
- * elsewhere in this codebase." No charting library appears anywhere in
- * this workspace's `pnpm-lock.yaml` — checked before choosing this
- * approach.
+ * The main screen's total-portfolio-value chart — a hand-rolled SVG
+ * line/area chart rather than a charting library, given extension
+ * bundle-size sensitivity. No charting library appears anywhere in this
+ * workspace's `pnpm-lock.yaml`.
  *
  * Purely presentational: `points` is the already-fetched, already-priced
- * series (`PortfolioHistory.series`, via `@gleam/core`'s barrel), and the
- * caller (`MainScreenView`) owns fetching per range and the
+ * series (`PortfolioHistory.series`, via `@gleam/core`'s barrel), and
+ * the caller (`MainScreenView`) owns fetching per range and the
  * loading/error states. Switching `activeRange` is the caller's
- * responsibility too — this component only renders the 5 tabs and reports
- * clicks via `onRangeChange`, so range/chart/%-change/period-label always
- * update together from one fetch rather than this component and its
- * caller disagreeing about which range is "current."
+ * responsibility too — this component only renders the 5 tabs and
+ * reports clicks via `onRangeChange`, so range/chart/%-change/
+ * period-label always update together from one fetch.
  *
  * `onRetry` (set by the caller when the active range's fetch failed)
  * swaps just the value/chart area for `NetworkErrorBanner` — the range
- * tabs always render regardless, so a failed range (e.g. hitting a
- * rate-limited "ALL") never strands the user without a way to click back
- * to a previously-cached range.
+ * tabs always render regardless, so a failed range never strands the
+ * user without a way to click back to a previously-cached range.
  *
- * Color rule (RELEVANT RULES, confirmed): reuses `--color-positive`
- * (already a Tailwind utility, `text-positive`/`border-positive`, per
- * `ActivityRow`/`AddressDisplay`'s existing usage) for gains, and the
- * sibling `--color-negative` token (`packages/ui/src/tokens/theme.css`)
+ * Color rule: reuses `--color-positive` for gains and `--color-negative`
  * for losses — both real `@theme` tokens, never `--color-beam-red`/
- * `--color-beam-green` (identity-only, brand rule). Referenced here as
- * raw CSS custom properties via inline `style`/SVG `fill`/`stroke`
- * attributes rather than the `text-positive`/`text-negative` Tailwind
- * utilities those tokens also generate, exactly like `primitives/
- * beam.tsx`'s `BeamMark` already does for `var(--color-beam-*)` —
- * `isPositive` picks the color dynamically per render, and SVG
- * `fill`/`stroke` attributes need a color value, not a class name.
+ * `--color-beam-green` (identity-only). Referenced as raw CSS custom
+ * properties via inline `style`/SVG `fill`/`stroke` since `isPositive`
+ * picks the color dynamically per render, and SVG attributes need a
+ * color value, not a class name.
  */
 export interface PortfolioChartPoint {
   timestamp: number;
@@ -58,11 +46,8 @@ export interface PortfolioChartProps {
   loading?: boolean;
   /**
    * Set when the active range's fetch failed (thrown query error, or a
-   * resolved-but-empty series — see `MainScreenView`'s caller-side
-   * comment). Replaces just the value/chart area with
-   * `NetworkErrorBanner`; the range tabs below stay rendered regardless,
-   * so a failed range never strands the user without a way back to a
-   * previously-cached one.
+   * resolved-but-empty series). Replaces just the value/chart area with
+   * `NetworkErrorBanner`; the range tabs below stay rendered regardless.
    */
   onRetry?: () => void;
   className?: string;
@@ -73,11 +58,10 @@ const CHART_HEIGHT = 40;
 
 /**
  * Fed through the same `buildLinePath` used for real data, so the
- * zero-balance empty state (no history yet) renders via the identical
- * polyline/area code path as a priced series — a gentle hand-authored
- * wave rather than a flat line, so the Gleam-shimmer treatment below has
- * a line worth traveling along. Never shown alongside real values: gated
- * on `currentUsdValue === 0 && points.every(usdValue === 0)` below.
+ * zero-balance empty state renders via the identical polyline/area code
+ * path as a priced series — a gentle hand-authored wave rather than a
+ * flat line, so the shimmer treatment below has a line worth traveling
+ * along. Never shown alongside real values.
  */
 const EMPTY_STATE_POINTS: PortfolioChartPoint[] = [
   { timestamp: 0, usdValue: 0.3 },

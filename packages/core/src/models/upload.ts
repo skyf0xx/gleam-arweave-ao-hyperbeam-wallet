@@ -5,21 +5,14 @@ export interface UploadTag {
 
 /**
  * An in-progress upload: file/text/JSON payload, tags (byte-capped ~4096
- * bytes), optional UDL license tag (PRD §3 Glossary — UploadDraft). The
- * pre-upload secret scan referenced there runs at the `upload` layer
- * (`core/policy`), not here — this type only carries the draft's shape.
+ * bytes), optional UDL license tag. The pre-upload secret scan runs at
+ * the `upload` layer (`core/policy`), not here — this type only carries
+ * the draft's shape.
  *
- * `walletId` (added by `provider-bridge`, closing a debt the `upload`
- * layer declared): signing the ANS-104 DataItem needs the decrypted JWK,
- * read from the unlocked-session cache per the same vault boundary
- * `TransferDraft` documents. `reviewUpload` (no signing needed) simply
- * ignores this field.
- *
- * Typed optional here for the same reason `TransferDraft` is (see that
- * model's doc comment): staying structurally compatible with a locked
- * test file outside this task's ALLOWED SCOPE that predates this field.
- * `handlers/upload.ts`'s own intersection type still narrows it back to
- * required for `submitUpload`'s actual signature.
+ * `walletId` is typed optional, matching `TransferDraft`'s convention:
+ * `reviewUpload` (no signing needed) simply ignores it, while
+ * `handlers/upload.ts`'s intersection type narrows it back to required
+ * for `submitUpload`'s actual signature.
  */
 export interface UploadDraft {
   contentType: string;
@@ -35,8 +28,7 @@ export interface UploadReview {
   /**
    * Non-null when the pre-upload secret scan flags the payload; names the
    * specific match type (e.g. "JWK", "PEM block") rather than a generic
-   * warning (PRD §4 — Upload content). Populated by the `upload` layer's
-   * scanner, not by this model.
+   * warning. Populated by the `upload` layer's scanner, not by this model.
    */
   secretScanMatch: string | null;
 }

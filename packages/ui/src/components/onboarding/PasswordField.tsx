@@ -3,15 +3,13 @@ import { TextField, type TextFieldProps } from "../../primitives/text-field";
 import { cn } from "../../primitives/cn";
 
 /**
- * Password input with a reveal toggle and (optionally) a caps-lock hint
- * (onboarding.html's `.password-field`, unlock-screen.html's identical
- * structure) — a thin wrapper around the shared `TextField` primitive
- * rather than a duplicate of its markup, per this task's inherited debt
- * note. `TextField` owns the border/error-row shape and is reused as-is;
- * the label is re-rendered here (rather than left to `TextField`) so the
- * reveal-toggle button can be positioned directly against the `<input>`
- * regardless of whether a label is present, without measuring layout at
- * runtime.
+ * Password input with a reveal toggle and (optionally) a caps-lock
+ * hint — a thin wrapper around the shared `TextField` primitive rather
+ * than a duplicate of its markup. `TextField` owns the border/error-row
+ * shape and is reused as-is; the label is re-rendered here (rather than
+ * left to `TextField`) so the reveal-toggle button can be positioned
+ * directly against the `<input>` regardless of whether a label is
+ * present, without measuring layout at runtime.
  */
 export interface PasswordFieldProps extends Omit<TextFieldProps, "type" | "label"> {
   label?: string;

@@ -2,19 +2,14 @@ import * as React from "react";
 import { cn } from "../../primitives/cn";
 
 /**
- * A full, untruncated, monospace address with a one-tap copy affordance
- * (receive-screen.html's `.address-row`, brand/voice.md's "every
- * displayed address needs a visible, one-tap copy affordance" and
- * "truncated addresses in confirmation copy or examples" being a thing
- * we never do). Used on Receive and the send review screen — anywhere
- * RELEVANT RULES requires the full address, never the truncated list
- * form (`ActivityRow`'s pre-truncated strings are a different,
- * low-stakes context).
+ * A full, untruncated, monospace address with a one-tap copy affordance.
+ * Used on Receive and the send review screen — anywhere the full address
+ * is required, never the truncated list form (`ActivityRow`'s
+ * pre-truncated strings are a different, low-stakes context).
  *
  * `onCopy` is the caller's responsibility (clipboard write + any
  * telemetry); this component only renders the "Copied" affordance for
- * `copiedDurationMs` after each call, matching receive-screen.html's
- * copied state.
+ * `copiedDurationMs` after each call.
  */
 export interface AddressDisplayProps {
   address: string;

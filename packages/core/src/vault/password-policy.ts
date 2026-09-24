@@ -11,12 +11,11 @@ export type PasswordValidationResult =
   | { valid: false; reason: string };
 
 /**
- * Password policy for vault encryption (CLAUDE.md "Vault / key storage
- * spec"): minimum 10 characters, rejected if it matches a common/breached
- * password. Callers must run this before `encryptToEnvelope` — the
- * envelope layer itself does not re-check policy, since re-encryption
- * (e.g. re-deriving on unlock) must never be blocked by a policy that
- * only applies at password-set time.
+ * Password policy for vault encryption: minimum 10 characters, rejected
+ * if it matches a common/breached password. Callers must run this
+ * before `encryptToEnvelope` — the envelope layer itself does not
+ * re-check policy, since re-encryption (e.g. re-deriving on unlock) must
+ * never be blocked by a policy that only applies at password-set time.
  */
 export function validatePassword(password: string): PasswordValidationResult {
   if (password.length < MIN_LENGTH) {

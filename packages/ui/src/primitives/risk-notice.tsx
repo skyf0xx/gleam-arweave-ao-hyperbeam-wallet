@@ -3,14 +3,10 @@ import { cn } from "./cn";
 
 /**
  * The explicit-risk-acknowledgment box for the Irreversible/high-exposure
- * tier (brand/guidelines.md Part 3, brand/identity.md §08; shared.css/
- * send-flow.html `.risk-notice`, e.g. "You haven't sent to this address
- * before"). This is the single component every screen with an
- * Irreversible-tier confirmation (send to a first-seen address, an
- * unlimited grant, revoking recovery, exporting key material, the
- * "forgot password" reset) composes, rather than each screen inventing
- * its own warning-box markup — the brand rule that the warning-red
- * accent appears *only* here (never Routine/Consequential) is only
+ * tier (e.g. "You haven't sent to this address before"). This is the
+ * single component every screen with an Irreversible-tier confirmation
+ * composes, rather than each screen inventing its own warning-box markup
+ * — the rule that the warning-red accent appears only here is only
  * enforceable if there's one component gating where that color can
  * appear at all.
  *

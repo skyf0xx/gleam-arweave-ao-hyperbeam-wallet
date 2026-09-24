@@ -1,12 +1,9 @@
 import { cn } from "../../primitives/cn";
 
 /**
- * The large headline balance amount (wallet-main-screen.html's
- * `.balance-amount .value`, tokens-activity.html's token-detail
- * equivalent). `amountLabel` is a pre-formatted display string (e.g.
- * "128.4204 AR" or "$1,842.63") — this component does no unit
- * conversion or number formatting itself, matching RELEVANT RULES'
- * "AR balance ... rendered without float conversion": whatever string
+ * The large headline balance amount. `amountLabel` is a pre-formatted
+ * display string (e.g. "128.4204 AR" or "$1,842.63") — this component
+ * does no unit conversion or number formatting itself; whatever string
  * the caller derived from a Winston atomic-integer amount is shown
  * verbatim.
  */

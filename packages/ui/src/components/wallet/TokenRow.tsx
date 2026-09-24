@@ -2,12 +2,11 @@ import { cn } from "../../primitives/cn";
 import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
 
 /**
- * A token balance row (wallet-main-screen.html's `.row` inside
- * `.list-card`, reused verbatim on the "all tokens" list and token
- * detail's activity section per TODO.md 4.1: "same row style as main
- * screen — no new visual language introduced just because it's a list
- * page"). Amount/usdValue are pre-formatted strings — this component
- * does no numeric formatting or unit conversion itself.
+ * A token balance row, reused verbatim on the "all tokens" list and
+ * token detail's activity section — same row style everywhere, no new
+ * visual language just because it's a list page. Amount/usdValue are
+ * pre-formatted strings — this component does no numeric formatting or
+ * unit conversion itself.
  *
  * Reuses the same row skeleton as `ListRow` (start/title-subtitle/end),
  * but stays a standalone component rather than composing `ListRow`
@@ -21,9 +20,8 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * `loading` is for a background refresh of an already-rendered row (e.g.
  * a price re-poll) — it dims the existing usdValue in place rather than
  * tearing the row down to a shimmer skeleton, so a value that's already
- * on screen never disappears. First-ever load (nothing to show yet) is
- * still the caller swapping in `SkeletonRow` instead of mounting
- * `TokenRow` at all.
+ * on screen never disappears. First-ever load is still the caller
+ * swapping in `SkeletonRow` instead of mounting `TokenRow` at all.
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone">;

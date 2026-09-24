@@ -1,12 +1,8 @@
 /**
- * USD price lookups against CoinGecko's public API directly (External
- * infra table: "pricing = CoinGecko/CoinPaprika direct" — no server of
- * this project's own proxies the request). Used on token detail screens
- * to show a balance's approximate USD value; never used for anything a
- * signature depends on (RELEVANT RULES's Winston-string rule is about
- * on-chain amounts, not this display-only USD estimate).
- *
- * Pure: no `chrome.*`/window/document dependency, injectable `fetchImpl`.
+ * USD price lookups against CoinGecko's public API directly — no server
+ * of this project's own proxies the request. Used on token detail
+ * screens to show a balance's approximate USD value; never used for
+ * anything a signature depends on.
  */
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 

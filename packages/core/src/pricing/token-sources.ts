@@ -6,18 +6,15 @@ import type { TokenMetadata } from "../models/token-metadata";
 /**
  * The single source of truth for every token this wallet knows how to
  * identify and price. One entry per token: `processId` is `null` for AR
- * (it isn't an AO process), and set for every AO token — `TokenBalance`
- * entries are matched against it the same way `packages/ui`'s
- * `DEFAULT_AO_TOKEN`/`DEFAULT_AR_TOKEN` identify the two default rows (that
- * module imports `DEFAULT_TOKEN_REGISTRY` from here rather than redefining
- * the AO process id itself, so it exists in exactly one place).
+ * (it isn't an AO process), and set for every AO token. `packages/ui`'s
+ * `DEFAULT_AO_TOKEN`/`DEFAULT_AR_TOKEN` import `DEFAULT_TOKEN_REGISTRY`
+ * from here rather than redefining the AO process id, so it exists in
+ * exactly one place.
  *
  * `priceSource` is `null` for any token with no confirmed CoinGecko/
  * CoinPaprika listing — there is no reliable way to discover a price-
- * provider id for an arbitrary AO process at runtime (ticker collisions,
- * no guarantee of a listing at all), so an unmapped token's price is
- * "unavailable", never guessed. Add a new entry here (with real, manually
- * verified provider ids) to make a new token priced.
+ * provider id for an arbitrary AO process at runtime, so an unmapped
+ * token's price is "unavailable", never guessed.
  */
 export interface TokenPriceSource {
   coinGeckoId: CoinGeckoId;
@@ -63,18 +60,12 @@ export function isRegisteredProcessId(processId: string): boolean {
 /**
  * Identifies an AO token not present in `DEFAULT_TOKEN_REGISTRY` by
  * reading its process-spawn tags via the gateway's GraphQL endpoint
- * (`queryTokenMetadata`) — additive to, and never a replacement for, the
- * hardcoded-registry/HyperBEAM-only balance path: this is purely an
- * identification fallback for tokens the registry doesn't know about, and
- * introduces no dryrun/CU round-trip of its own.
+ * (`queryTokenMetadata`) — a fallback for tokens the registry doesn't
+ * know about, with no dryrun/CU round-trip of its own.
  *
  * A registered `processId` is never looked up this way — callers should
- * check `isRegisteredProcessId`/`priceSourceForProcessId` first, per the
- * existing registry-first decision this function doesn't change. On any
- * lookup failure (unreachable gateway, unspawned/unindexed process id),
- * returns `null` rather than throwing, mirroring `getUsdPriceWithFallback`'s
- * "surface unavailability, don't propagate a hard failure" shape for a
- * caller that's just trying to label an unknown token — a caller that
+ * check `isRegisteredProcessId`/`priceSourceForProcessId` first. On any
+ * lookup failure, returns `null` rather than throwing; a caller that
  * needs to distinguish "no metadata" from "gateway error" should call
  * `queryTokenMetadata` directly instead.
  */
@@ -94,8 +85,7 @@ export async function resolveUnregisteredTokenMetadata(
  * Current spot USD price for one registered token, keyed the same way
  * `TokenBalance`/`DEFAULT_TOKEN_REGISTRY` entries are (`processId: null`
  * for AR). `usd: null` means the price couldn't be computed (both
- * providers unavailable) — never a fabricated `0`, same HONESTY contract
- * as the rest of this module.
+ * providers unavailable) — never a fabricated `0`.
  */
 export interface TokenPrice {
   processId: string | null;

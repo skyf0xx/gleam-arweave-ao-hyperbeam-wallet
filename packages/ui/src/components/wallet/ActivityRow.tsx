@@ -1,20 +1,15 @@
 import { cn } from "../../primitives/cn";
 
 /**
- * An activity-feed row (wallet-main-screen.html's `.row` with
- * `.activity-icon.{received,sent,upload}`, reused verbatim on the "all
- * activity" list per TODO.md 4.3). `title`/`subtitle`/`amountLabel` are
- * pre-formatted strings — truncated addresses are acceptable here (a
- * low-stakes, glanceable list) per brand/voice.md's truncation rule; full
+ * An activity-feed row, reused verbatim on the "all activity" list.
+ * `title`/`subtitle`/`amountLabel` are pre-formatted strings — truncated
+ * addresses are acceptable here (a low-stakes, glanceable list); full
  * addresses belong on the detail screen and confirmation screens only.
  *
  * `activityType` is a locally declared string union, not an import of
  * `@gleam/core`'s `ActivityType` — `packages/ui` has no `@gleam/core`
  * dependency declared (it's presentational-only, matching every other
- * component in this directory), and adding one is a `package.json`/
- * lockfile change outside this task's ALLOWED SCOPE (the same
- * shared-workspace-config gap class `onboarding-unlock` flagged for
- * `@webext-core/messaging`). The two unions are kept structurally
+ * component in this directory). The two unions are kept structurally
  * identical by hand; a caller passing a `core` `ActivityType` value
  * satisfies this prop without a cast.
  */

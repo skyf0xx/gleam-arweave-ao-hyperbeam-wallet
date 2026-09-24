@@ -3,34 +3,18 @@ import type { JWKInterface } from "../models/wallet";
 import type { Winston } from "../models/balance";
 
 /**
- * Interface-boundary judgment call (flagged per this task's packet):
- * building/signing/submitting an AR transfer needs the *decrypted* JWK,
- * but `wallet-lifecycle.ts` (the `onboarding-unlock` layer, already
- * built) deliberately never persists derived key material anywhere —
- * `unlockWallet` decrypts each wallet's envelope once to verify the
- * password, then discards the key, and documents that "every subsequent
- * call that needs signing key material... re-derives from the password,
- * which is never itself persisted anywhere." That decision was made
- * before this layer existed, so this module's public functions accept an
- * already-decrypted `JWKInterface` as a parameter rather than a
- * password or a wallet id — they never decrypt anything themselves, and
- * never import `core/vault`.
- *
- * This keeps `core/arweave` agnostic about *how* the caller obtained
- * signing material: today that's `handlers/transfer.ts` calling
- * `decryptFromEnvelope` with a password carried on the request (see that
- * handler's own doc comment for how the password reaches it, given
- * `ProtocolMap`'s `submitTransfer(req: TransferDraft)` has no password
- * field and is locked outside this layer's scope). A future signing
- * capability (hardware wallet, WebAuthn-gated key) could satisfy the same
- * `JWKInterface`-shaped parameter without this module changing.
+ * This module's public functions accept an already-decrypted
+ * `JWKInterface` rather than a password or wallet id — they never
+ * decrypt anything themselves, and never import `core/vault`, since key
+ * material is never persisted anywhere (see `wallet-lifecycle.ts`). This
+ * keeps `core/arweave` agnostic about how the caller obtained signing
+ * material, so a future signing capability (hardware wallet,
+ * WebAuthn-gated key) can satisfy the same parameter shape.
  *
  * No `fetchImpl` injection point here (unlike `balance.ts`/`graphql.ts`):
  * `arweave-js`'s internal `Api` class always calls the ambient `fetch`
- * directly with no override hook, so tests for this module mock
- * `globalThis.fetch` instead of passing a parameter — a real difference
- * worth calling out rather than declaring a parameter that would do
- * nothing.
+ * directly with no override hook, so tests mock `globalThis.fetch`
+ * instead.
  */
 export interface FeeQuote {
   fee: Winston;

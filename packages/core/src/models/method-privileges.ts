@@ -1,15 +1,12 @@
 /**
- * The three privilege tiers over `ProtocolMap` methods (ARCHITECTURE.md
- * §4.2). Modeled here, in `core/models`, because `messaging/src/protocol.ts`
- * references these sets when typing `ProtocolMap`, and `messaging` depends
- * on `core/models`, never the reverse.
+ * The three privilege tiers over `ProtocolMap` methods. Modeled here, in
+ * `core/models`, because `messaging/src/protocol.ts` references these
+ * sets when typing `ProtocolMap`, and `messaging` depends on
+ * `core/models`, never the reverse.
  *
  * Enforcing the boundary — routing a page-originated message through
- * `PROVIDER_METHODS` only, at a single dispatcher choke point — is a later
- * layer's job (the dispatcher lives in an extension handler, outside this
- * layer's scope). This layer only defines the sets and their types, plus a
- * test asserting they're pairwise disjoint per ARCHITECTURE.md §4.2's
- * explicit rule.
+ * `PROVIDER_METHODS` only, at a single dispatcher choke point — is the
+ * background dispatcher's job, outside this layer's scope.
  */
 
 /** Reachable from a web page via the injected provider. */

@@ -131,12 +131,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish and cleanup
 
-- [ ] **Strip build-log comments from `packages/` (S, sonnet)**
-  About 180 comments across 63 files narrate the old build ("this task's",
-  "ALLOWED SCOPE", "final report", "debt #1", "RELEVANT RULES"), and some
-  are now false (for example `core/ao/balance.ts` still says the balance
-  shape is "unverified"). Done: `packages/` comments keep only the
-  non-obvious why.
 - [ ] **Strip build-log comments from `apps/extension` (S, sonnet)**
   Same, for `apps/extension` (the background, provider, content, App and
   handlers are the worst).

@@ -3,22 +3,17 @@ import type { EncryptAlgorithm } from "../models/signing";
 
 /**
  * `encrypt()`/`decrypt()` provider methods, implemented over WebCrypto's
- * `crypto.subtle` (ambient in both an MV3 service worker and this
- * package's Vitest environment, per `envelope.ts`'s own precedent — no
- * polyfill).
+ * `crypto.subtle`.
  *
- * For `RSA-OAEP` (the dominant real-world case for an Arweave/AO wallet,
- * per this task's packet — Wander's own implementation uses the wallet's
- * RSA keypair): the wallet's JWK *is* an RSA keypair already, so
- * encrypt/decrypt import it directly as a WebCrypto `CryptoKey` via
- * `importKey("jwk", ...)` rather than deriving a separate symmetric key.
- * `AES-CTR`/`AES-CBC`/`AES-GCM` are supported too (the full
- * `EncryptAlgorithm` union `signing.ts` pins), but since the wallet holds
- * no independent AES key, those paths derive a deterministic AES-256 key
- * from the JWK's RSA private exponent (`d`) via HKDF-SHA256 — documented
- * inline below since this construction isn't specified by any Arweave/
- * ArConnect convention, and RSA-OAEP is the one real path a caller should
- * expect.
+ * For `RSA-OAEP` (the dominant real-world case — Wander's own
+ * implementation uses the wallet's RSA keypair): the wallet's JWK *is*
+ * an RSA keypair already, so encrypt/decrypt import it directly as a
+ * WebCrypto `CryptoKey` rather than deriving a separate symmetric key.
+ * `AES-CTR`/`AES-CBC`/`AES-GCM` are supported too, but since the wallet
+ * holds no independent AES key, those paths derive a deterministic
+ * AES-256 key from the JWK's RSA private exponent (`d`) via HKDF-SHA256
+ * — this construction isn't specified by any Arweave/ArConnect
+ * convention, and RSA-OAEP is the one real path a caller should expect.
  */
 
 function isArrayBuffer(value: unknown): value is ArrayBuffer {
@@ -111,11 +106,10 @@ async function importRsaPrivateKey(jwk: JWKInterface): Promise<CryptoKey> {
  * Derives a deterministic, non-extractable AES `CryptoKey` from the JWK's
  * RSA private exponent `d` via HKDF-SHA256 — the wallet's only source of
  * private key material for algorithms that need a symmetric key rather
- * than an RSA keypair. Documented design choice (flagged per this task's
- * packet as genuinely underspecified): no ArConnect/Wander convention
- * defines an AES path for `encrypt()`/`decrypt()`, since real usage is
- * RSA-OAEP; this exists only so the full `EncryptAlgorithm` union
- * type-checks against a real implementation rather than a stub.
+ * than an RSA keypair. No ArConnect/Wander convention defines an AES
+ * path for `encrypt()`/`decrypt()`, since real usage is RSA-OAEP; this
+ * exists only so the full `EncryptAlgorithm` union type-checks against a
+ * real implementation rather than a stub.
  */
 async function resolveAesKey(
   jwk: JWKInterface,

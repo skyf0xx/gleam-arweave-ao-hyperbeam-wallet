@@ -1,23 +1,16 @@
 /**
  * A Winston atomic-integer amount, always carried as a string. Never
- * converted to a floating-point number at any layer (PRD §4 — AR balance &
- * main screen).
+ * converted to a floating-point number at any layer.
  */
 export type Winston = string;
 
-/**
- * An AR balance (Winston units) for a given address. Not persisted — read
- * live, cached briefly by the caller (PRD §3 Glossary — Balance).
- */
+/** An AR balance (Winston units) for a given address. Not persisted. */
 export interface Balance {
   address: string;
   winston: Winston;
 }
 
-/**
- * An AO token balance for a given address, read via a HyperBEAM
- * `process@1.0` read (PRD §3 Glossary — Balance; PRD §4 — AO token balances).
- */
+/** An AO token balance for a given address, read via a HyperBEAM `process@1.0` read. */
 export interface TokenBalance {
   address: string;
   processId: string;

@@ -10,8 +10,7 @@ const IV_LENGTH_BYTES = 12;
  * Record-bound additional authenticated data. Binds ciphertext to the
  * exact wallet record it belongs to, so a vault envelope moved onto a
  * different wallet's record (different `walletId`/`address`) fails
- * decryption with a GCM tag mismatch rather than silently succeeding
- * (ARCHITECTURE.md §5).
+ * decryption with a GCM tag mismatch rather than silently succeeding.
  */
 function buildAAD(walletId: string, address: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(`gleam:v1:${walletId}:${address}`);
@@ -19,10 +18,8 @@ function buildAAD(walletId: string, address: string): Uint8Array<ArrayBuffer> {
 
 /**
  * Derives a non-extractable AES-GCM 256-bit CryptoKey directly from the
- * password via PBKDF2-HMAC-SHA256 — the raw derived key material is never
- * exposed to JS (ARCHITECTURE.md §5's explicit non-extractable
- * requirement). `crypto.subtle` is the ambient WebCrypto global, present
- * in both a Node test runner and an MV3 service worker with no polyfill.
+ * password via PBKDF2-HMAC-SHA256 — the raw derived key material is
+ * never exposed to JS.
  */
 async function deriveKey(
   password: string,
@@ -56,7 +53,7 @@ async function deriveKey(
  * Never use `arweave.crypto.encrypt()` for this: arweave-js's own helper
  * is PBKDF2-100k → AES-CBC with a literal `"salt"` default, weaker on
  * every axis, and exists only for dApp-facing `encrypt()`/`decrypt()`
- * interop (ARCHITECTURE.md §5).
+ * interop.
  */
 export async function encryptToEnvelope(
   plaintext: Uint8Array<ArrayBuffer>,

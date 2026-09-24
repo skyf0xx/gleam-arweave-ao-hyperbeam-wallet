@@ -1,13 +1,11 @@
 /**
  * The host must provide a way to send messages across extension contexts
- * (background/content/popup/approval) and to listen for incoming ones. This
- * is the seam `@webext-core/messaging`'s `sendMessage`/`onMessage` fills at
- * the extension layer; `core` depends only on this narrower interface so it
- * never imports `webextension-polyfill` or `chrome.runtime` directly
- * (core-design.md's ports/adapters split; ARCHITECTURE.md §2.1).
+ * (background/content/popup/approval) and to listen for incoming ones.
+ * `core` depends only on this narrower interface so it never imports
+ * `webextension-polyfill` or `chrome.runtime` directly.
  *
- * Implemented by `apps/extension/src/adapters/runtime.ts` in a later layer.
- * `core` never imports that adapter — only this interface.
+ * Implemented by `apps/extension/src/adapters/runtime.ts`. `core` never
+ * imports that adapter — only this interface.
  */
 export interface RuntimeMessage<TPayload = unknown> {
   type: string;

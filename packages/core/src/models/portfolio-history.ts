@@ -2,9 +2,8 @@
  * The main-screen total-portfolio-value chart's wire shape. Deliberately
  * its own model rather than a re-export of `core/pricing`'s
  * `HistoricalRange`/`HistoricalPricePoint` — `pricing` is a background-side
- * implementation detail (which price sources, fallback order, request
- * shaping); the messaging contract only pins what the popup is allowed to
- * ask for and what shape it gets back (PRD — main-screen chart).
+ * implementation detail; the messaging contract only pins what the popup
+ * is allowed to ask for and what shape it gets back.
  */
 export type PortfolioHistoryRange = "24H" | "7D" | "1M" | "1Y" | "ALL";
 
@@ -16,14 +15,12 @@ export interface PortfolioHistoryPoint {
 
 /**
  * The full response for a requested range: the series to plot plus the
- * summary figures the main screen shows alongside it (total value, %
- * change, period label) — computed once in the background so the popup
- * never re-derives them from the raw series on every render. `usdChange`
- * is a fraction (e.g. `0.0421` for +4.21%), not a pre-formatted string.
- * An empty `series` (both price sources unavailable) means "couldn't
- * compute" per this project's HONESTY contract — the popup shows its
- * existing `NetworkErrorBanner` for that case rather than a broken chart,
- * never a fabricated flat line.
+ * summary figures the main screen shows alongside it — computed once in
+ * the background so the popup never re-derives them from the raw series
+ * on every render. `usdChange` is a fraction (e.g. `0.0421` for +4.21%),
+ * not a pre-formatted string. An empty `series` (both price sources
+ * unavailable) means "couldn't compute" — the popup shows
+ * `NetworkErrorBanner` for that case rather than a fabricated flat line.
  */
 export interface PortfolioHistory {
   range: PortfolioHistoryRange;

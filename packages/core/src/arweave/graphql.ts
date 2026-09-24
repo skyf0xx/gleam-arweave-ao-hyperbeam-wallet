@@ -29,16 +29,10 @@ interface GraphQLTransactionsResponse {
 }
 
 /**
- * Additional gateways to fall through to when the primary (the one a
- * caller passes as `gatewayUrl`, from `NetworkSettings.gatewayUrl` — the
- * single-gateway config surface every other read in this codebase already
- * uses) fails outright (network error, non-2xx, GraphQL `errors`). Ordered
- * by general reliability/uptime reputation, not configurable — this is
- * resilience underneath the existing single-gateway happy path, not a
- * second config surface. `arweave.net` itself is deliberately included
- * first in the merged list built by `gatewayCandidates` below even when a
- * caller's own `gatewayUrl` differs, since a caller-configured gateway
- * failing is exactly the case failover exists for.
+ * Additional gateways to fall through to when the primary fails outright
+ * (network error, non-2xx, GraphQL `errors`). Not configurable — this is
+ * resilience underneath the single-gateway config surface, not a second
+ * config surface.
  */
 const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://arweave-search.goldsky.com"];
 
@@ -51,12 +45,8 @@ function gatewayCandidates(primaryGatewayUrl: string): string[] {
 /**
  * Posts `query`/`variables` to `{gateway}/graphql` for each candidate
  * gateway in order (primary first, then `FALLBACK_GATEWAYS`), returning
- * the first successful parsed response and falling through to the next
- * gateway on any failure (network error, non-2xx, or a GraphQL `errors`
- * array). Throws only if every candidate gateway fails, with the last
- * gateway's own error message — callers get the same failure shape as
- * before failover was added, just tried against more than one gateway
- * first.
+ * the first successful parsed response. Throws only if every candidate
+ * fails, with the last gateway's error message.
  */
 async function postGraphQLWithFailover<T>(
   primaryGatewayUrl: string,
@@ -100,14 +90,10 @@ async function postGraphQLWithFailover<T>(
 
 /**
  * One page of gateway GraphQL transaction results for `address`, queried
- * as owner (sent) union recipient (received) — the two queries the
- * `activity` layer's merge logic combines with the local action log
- * (PRD's Activity feed rule: "one gateway GraphQL transactions query by
- * owner and recipient, most-recent-N").
- *
- * Pure: no `chrome.*`/window/document dependency, explicit `gatewayUrl`
- * and injectable `fetchImpl`. Falls through to `FALLBACK_GATEWAYS` if
- * `gatewayUrl` fails — see `postGraphQLWithFailover`.
+ * as owner (sent) union recipient (received) — combined by the
+ * `activity` layer's merge logic with the local action log. Falls
+ * through to `FALLBACK_GATEWAYS` if `gatewayUrl` fails — see
+ * `postGraphQLWithFailover`.
  */
 export async function queryActivityTransactions(
   address: string,
@@ -151,12 +137,9 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
   return {
     txId: node.id,
     type,
-    // A transaction returned by the gateway's GraphQL index has already
-    // reached consensus in a block — this client has no way to observe
-    // "failed" (Arweave doesn't fail transactions post-inclusion the way
-    // a smart-contract call can), so every gateway-sourced entry is
-    // reported "confirmed"; only the local optimistic log ever produces
-    // "pending".
+    // Gateway-indexed means already included in a block; Arweave has no
+    // post-inclusion failure state, so this is always "confirmed" — only
+    // the local optimistic log ever produces "pending".
     status: "confirmed",
     address: type === "send" ? (node.recipient ?? "") : node.owner.address,
     amount: node.quantity.winston,
@@ -166,13 +149,10 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
 }
 
 /**
- * Minimal shape of the gateway's GraphQL response for an AO-transfer-tagged
- * transaction node — `quantity` here is deliberately typed as a raw string
- * (not `{ winston: string }`): AO message quantities are read from the
- * `Quantity` tag (an atomic-integer string in the token's own smallest
- * unit, per its resolved denomination), never from Arweave's own
- * `quantity.winston` field, which only ever reflects the tiny/zero AR
- * fee the message-send transaction itself carries.
+ * AO message quantities are read from the `Quantity` tag (an
+ * atomic-integer string in the token's own smallest unit), never from
+ * Arweave's `quantity.winston` field, which only reflects the tiny/zero
+ * AR fee the message-send transaction itself carries.
  */
 interface GraphQLAoTransferNode {
   id: string;
@@ -196,36 +176,18 @@ function tagValue(tags: GraphQLTag[], name: string): string | null {
 }
 
 /**
- * One page of AO transfer activity for `address`, read from the SAME
- * gateway `/graphql` endpoint `queryActivityTransactions` uses — no
- * separate indexer — filtered by AO's own transfer-message tag
- * convention (`{name: "Action", values: ["Transfer"]}` +
- * `{name: "Recipient", values: [address]}`, matched case-insensitively
- * the same way `token-metadata.ts`'s `toTokenMetadata` already does,
- * since live gateway responses were found to lower-case AO's spawn tags
- * there and message tags follow the same convention).
+ * One page of AO transfer activity for `address`, read from the same
+ * gateway `/graphql` endpoint `queryActivityTransactions` uses, filtered
+ * by AO's transfer-message tag convention. Only the recipient-side query
+ * is issued: an AO transfer message has exactly one recipient named by
+ * its `Recipient` tag, and `owner` on that same message identifies the
+ * sender, so one tag-filtered query recovers both directions.
  *
- * Only the recipient-side query is issued: an AO transfer message is a
- * single Data Item with exactly one recipient process/wallet named by its
- * `Recipient` tag, and `From-Process`/`owner` on that same message
- * identifies the sender — so one tag-filtered query recovers both "sent
- * to me" (`address` is `Recipient`) and, from the same edge set filtered
- * the other direction, "sent by me". This matches `queryActivityTransactions`'s
- * owner-union-recipient shape using AO's tag vocabulary instead of GraphQL's
- * native `owners`/`recipients` fields, which don't apply to a message
- * transaction's AO-level sender/recipient (those are tag-carried, not
- * transaction-native, for an AO transfer).
- *
- * Quantity is resolved via `token-metadata.ts`'s `queryTokenMetadata`
- * (through `resolveUnregisteredTokenMetadata`/`isRegisteredProcessId`,
- * `pricing/token-sources.ts`) against the process id the transfer message
- * was sent to (`node.recipient` when present, the AO process the transfer
- * targets) — resolved once per distinct process id per page, not once per
- * entry, to avoid a metadata lookup per transfer. A transfer whose process
- * id can't be resolved (metadata lookup failure) is still returned with
- * its raw `Quantity` tag value as `amount` and no `token` set, rather than
- * dropped — HONESTY: an unresolved token identity is surfaced as unlabeled
- * activity, never silently discarded.
+ * Denomination is resolved once per distinct process id per page (not
+ * once per entry) to avoid a metadata lookup per transfer. A transfer
+ * whose process id can't be resolved is still returned with its raw
+ * `Quantity` tag value as `amount` and no `token` set, rather than
+ * dropped.
  */
 export async function queryAoTransferActivity(
   address: string,
@@ -286,26 +248,18 @@ function toAoActivityEntry(
   const processId = node.recipient;
   const quantity = tagValue(node.tags, "Quantity") ?? "0";
 
-  // `denominationByProcessId` confirms the resolved process id's
-  // denomination is known — nothing here reformats `amount` against it
-  // (every ActivityEntry producer keeps `amount` as a raw atomic-integer
-  // string, matching `TokenBalance.quantity`'s own convention); a caller
-  // that needs to display a human-scaled value resolves denomination the
-  // same way `withUnregisteredMetadata` (reads.ts) already does for
-  // balances, keyed off `token`.
+  // amount stays a raw atomic-integer string here, matching every other
+  // ActivityEntry producer; a caller needing a human-scaled value
+  // resolves denomination itself (see withUnregisteredMetadata in reads.ts).
   void denominationByProcessId;
 
   return {
     txId: node.id,
     type,
-    // Same gateway-index-implies-confirmed reasoning as toActivityEntry —
-    // failed-AO-transfer detection is `merge.ts`'s concern, not this
-    // parser's; a transfer message the gateway indexed reached the AO
-    // process, whether or not the process's own handler accepted it.
+    // Reached the AO process, whether or not its handler accepted it;
+    // failed-transfer detection is merge.ts's concern, not this parser's.
     status: "confirmed",
     address: type === "send" ? (node.recipient ?? "") : node.owner.address,
-    // Plain atomic-integer string in the token's own smallest unit — NOT
-    // `{winston}`-shaped.
     amount: quantity,
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,

@@ -1,10 +1,8 @@
 /**
- * A static blocklist of the most common/breached passwords (per
- * CLAUDE.md's "Vault / key storage spec" — "reject common/breached
- * passwords (small blocklist check)"). Not an external API call: a local
- * list is the right shape here, sourced from the pattern of widely
- * published "most common passwords" compilations (e.g. annual
- * NCSC/Have I Been Pwned top-lists). Matching is case-insensitive.
+ * A static blocklist of the most common/breached passwords. Not an
+ * external API call: a local list is the right shape here, sourced from
+ * the pattern of widely published "most common passwords" compilations.
+ * Matching is case-insensitive.
  */
 export const COMMON_PASSWORDS: readonly string[] = [
   "123456",

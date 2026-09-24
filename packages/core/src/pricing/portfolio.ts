@@ -1,10 +1,10 @@
 /**
  * Pure reducer: no fetching inside it. `priceAt` is the caller's
- * responsibility to construct (e.g. via `buildPriceAtFromSeries`) and, per
- * this module's confirmed HONESTY exception, must itself return `0` for any
- * timestamp it can't price — never throw, never skip the token. `balance`
- * is a given, current/latest-known number; reconstructing true historical
- * balances from on-chain activity is out of scope for this estimate.
+ * responsibility to construct (e.g. via `buildPriceAtFromSeries`) and
+ * must itself return `0` for any timestamp it can't price — never throw,
+ * never skip the token. `balance` is a given, current/latest-known
+ * number; reconstructing true historical balances from on-chain activity
+ * is out of scope for this estimate.
  */
 export interface PricedHistoricalToken {
   balance: number;

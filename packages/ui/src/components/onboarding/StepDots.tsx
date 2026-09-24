@@ -1,9 +1,6 @@
 import { cn } from "../../primitives/cn";
 
-/**
- * Step progress indicator (onboarding.html's `.step-dots`) — plain dots,
- * no numbers or percentage, matching the mockup's minimal-chrome header.
- */
+/** Step progress indicator — plain dots, no numbers or percentage. */
 export interface StepDotsProps {
   total: number;
   current: number;

@@ -2,8 +2,7 @@ import { AO_TOKEN } from "@gleam/core";
 
 /**
  * The two tokens the Tokens tab always renders, regardless of what the
- * wallet's actual balance data contains (PRD: "AR and AO are treated as
- * two default tokens that always appear..."). Consumed by the layer that
+ * wallet's actual balance data contains. Consumed by the layer that
  * merges these against `useBalances()`'s `WalletBalances` shape to build
  * the Tokens tab's row list — this module owns only the identity/display
  * constants, not the merge logic itself.
@@ -33,8 +32,7 @@ export interface DefaultTokenIdentity {
   /**
    * The displayed amount to show before any real balance has resolved,
    * or when the wallet has no recorded balance for this token — always
-   * the string `"0"`, per RELEVANT RULES, never `null`/`undefined`/
-   * omitted.
+   * the string `"0"`, never `null`/`undefined`/omitted.
    */
   defaultDisplayAmount: "0";
 }
@@ -57,6 +55,6 @@ export const DEFAULT_AO_TOKEN: DefaultTokenIdentity = {
 
 /**
  * Ordered as the Tokens tab renders them: AR first, then AO, both ahead
- * of any additional watched AO tokens (RELEVANT RULES/ACCEPTANCE-3).
+ * of any additional watched AO tokens.
  */
 export const DEFAULT_TOKENS: readonly DefaultTokenIdentity[] = [DEFAULT_AR_TOKEN, DEFAULT_AO_TOKEN];

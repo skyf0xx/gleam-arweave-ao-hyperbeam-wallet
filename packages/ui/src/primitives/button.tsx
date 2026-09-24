@@ -5,22 +5,17 @@ import { cn } from "./cn";
 
 /**
  * shadcn/ui-derived Button primitive, copied into the tree rather than
- * installed as a package (per core-design.md: no runtime style
- * injection, no CSP nonce problem).
+ * installed as a package (no runtime style injection, no CSP nonce
+ * problem).
  *
- * Variants follow brand/guidelines.md Part 2 "Product UI" buttons rule
- * plus Part 3's risk-tier system:
+ * Variants follow the risk-tier system:
  * - `primary` — black/white, the only variant used for a screen's one
- *   primary action (shared.css `.primary-btn`).
- * - `secondary` — white background, thin border, black text
- *   (shared.css `.secondary-link-btn`'s intent, given a bordered
- *   button shape rather than a bare link).
- * - `ghost` — icon-button-weight, no border, for low-emphasis actions
- *   (shared.css `.icon-btn`).
+ *   primary action.
+ * - `secondary` — white background, thin border, black text.
+ * - `ghost` — icon-button-weight, no border, for low-emphasis actions.
  * - `destructive` — the single warning-red accent, reserved for the
- *   Irreversible-tier primary action only (shared.css `.sign-btn.risk`,
- *   e.g. "Reset wallet", a first-seen-address send). Never the beam —
- *   see `tokens/theme.css`'s `--color-warning` note.
+ *   Irreversible-tier primary action only (e.g. "Reset wallet", a
+ *   first-seen-address send). Never the beam.
  */
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:pointer-events-none disabled:opacity-50",

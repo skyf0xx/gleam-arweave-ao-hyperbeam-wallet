@@ -1,18 +1,10 @@
 import type { Winston } from "../models/balance";
 
 /**
- * Reads AR balance via the gateway's plain REST endpoint (`GET
- * {gateway}/wallet/{address}/balance`) rather than `arweave-js`'s
- * `wallets.getBalance` (which itself just wraps the same endpoint but
- * additionally runs the response through `Ar`'s winston->AR conversion
- * pipeline) — round-tripping through a float conversion is exactly what
- * RELEVANT RULES forbids ("rendered without float conversion"), so this
- * reads the endpoint directly and returns the raw Winston string
- * untouched.
- *
- * Pure: no `chrome.*`/window/document dependency, takes an explicit
- * `gatewayUrl` and an injectable `fetchImpl` (defaults to the ambient
- * `fetch`, present in both a service worker and a test runner).
+ * Reads via the gateway's plain REST endpoint rather than `arweave-js`'s
+ * `wallets.getBalance`, which round-trips the response through a
+ * winston->AR float conversion — this returns the raw Winston string
+ * untouched to avoid that precision loss.
  */
 export async function getBalance(
   address: string,

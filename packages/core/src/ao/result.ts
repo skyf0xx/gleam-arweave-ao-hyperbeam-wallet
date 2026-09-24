@@ -1,7 +1,7 @@
 /**
  * Resolves what happened to an AO `Transfer` message after the Messenger
  * Unit accepted it, by reading the process's evaluated result from the
- * legacynet Compute Unit: `GET /result/{messageId}?process-id={processId}`.
+ * legacynet Compute Unit.
  *
  * MU acceptance (`ao/transfer.ts`) only means the message was scheduled.
  * The token process can still reject it — most commonly insufficient
@@ -9,8 +9,6 @@
  * can throw, surfacing as the result's `Error` field. Neither ever shows
  * up as a tag on the sent message itself, so the gateway index alone
  * can't tell a rejected transfer from an executed one.
- *
- * Pure: no `chrome.*`/window/document dependency, injectable `fetchImpl`.
  */
 export const AO_LEGACY_CU_URL = "https://cu.ao-testnet.xyz";
 

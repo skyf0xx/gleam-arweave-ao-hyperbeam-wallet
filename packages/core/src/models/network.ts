@@ -3,10 +3,7 @@ export interface HyperBeamPeer {
   enabled: boolean;
 }
 
-/**
- * The configured Arweave gateway and list of AO-Core/HyperBEAM peer URLs
- * (PRD §3 Glossary — NetworkSettings).
- */
+/** The configured Arweave gateway and list of AO-Core/HyperBEAM peer URLs. */
 export interface NetworkSettings {
   gatewayUrl: string;
   peers: HyperBeamPeer[];

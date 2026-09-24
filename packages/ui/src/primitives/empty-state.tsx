@@ -2,12 +2,9 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
- * Empty-state pattern (shared.css/tokens-activity.html `.empty-state`,
- * 4.5). Per brand/identity.md's Design Principle 5 and
- * brand/guidelines.md Part 3: this is the *one* sanctioned "release
- * valve" for brand personality (a single dry, understated copy line) —
- * and explicitly never the warning-red accent, since "an empty state is
- * not a problem state."
+ * Empty-state pattern — the one sanctioned "release valve" for brand
+ * personality (a single dry, understated copy line), and explicitly
+ * never the warning-red accent: an empty state is not a problem state.
  */
 export interface EmptyStateProps {
   message: ReactNode;

@@ -1,10 +1,9 @@
 export type { JWKInterface } from "arweave/web/lib/wallet";
 
 /**
- * A stored key record. Phase 1 supports `jwk` only; `ethereum`/`ledger`
- * are Phase 2 method values, modeled now so the discriminated union is
- * stable for callers even though only `jwk` wallets are ever produced
- * in this phase (PRD §3 Glossary — Wallet).
+ * A stored key record. Only `jwk` is currently produced; `ethereum`/
+ * `ledger` are modeled now so the discriminated union stays stable for
+ * callers once those methods land.
  */
 export type WalletMethod = "jwk" | "ethereum" | "ledger";
 
@@ -48,8 +47,7 @@ export interface WalletSummary {
 /**
  * The encryption envelope wrapping a Wallet's key material: PBKDF2-HMAC-SHA256
  * (600,000 iterations) deriving a non-extractable AES-256-GCM key, random
- * salt/IV, record-bound AAD (`gleam:v1:<walletId>:<address>`). One Vault per
- * Wallet (PRD §3 Glossary — Vault).
+ * salt/IV, record-bound AAD (`gleam:v1:<walletId>:<address>`).
  */
 export interface VaultEnvelope {
   version: 1;

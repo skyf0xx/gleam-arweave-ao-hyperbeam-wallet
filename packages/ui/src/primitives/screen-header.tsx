@@ -3,13 +3,9 @@ import { cn } from "./cn";
 
 /**
  * The back-button + centered title header shared by every multi-step
- * screen across the reference mockups (shared.css `.screen-header`,
- * identical structure repeated in onboarding.html, send-flow.html,
- * wallet-detail.html, lock-settings.html, network-peers.html, and
- * more). The token-consuming, shared version of the pattern
+ * screen. The token-consuming, shared version of the pattern
  * `components/onboarding/ScreenHeader.tsx` built ad hoc with hardcoded
- * hex values before this package's token layer existed — see this
- * task's declared debt for the migration this leaves for screen layers.
+ * hex values before this package's token layer existed.
  */
 export interface ScreenHeaderProps {
   title: string;

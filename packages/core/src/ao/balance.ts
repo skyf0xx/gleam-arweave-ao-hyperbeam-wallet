@@ -2,23 +2,7 @@ import type { TokenBalance } from "../models/balance";
 
 /**
  * Reads an AO token balance via the HyperBEAM `process@1.0` compute path:
- * `GET /{processId}~process@1.0/compute/balances/{address}` per
- * ARCHITECTURE.md §0.2's exact endpoint form and CLAUDE.md's spec.
- *
- * ARCHITECTURE.md §0.2/§7.3 flags this as an *unverified* spike: whether
- * `compute/` or `now/` is the correct key on `~process@1.0` for a balance
- * read was still an open question as of that doc, to be resolved when
- * this feature was actually built — i.e. now. This implementation uses
- * `compute/` because that's the form CLAUDE.md's spec and this task's
- * packet both name as authoritative; the `now/` alternative was never
- * independently spiked against a live HyperBEAM node in this build (no
- * live node was reachable from this environment). If `compute/` turns
- * out wrong against a real peer, the fix is a second implementation path
- * behind the same `getTokenBalance` signature, not a redesign — see this
- * task's final report.
- *
- * Pure: no `chrome.*`/window/document dependency, explicit `peerUrl` and
- * injectable `fetchImpl`.
+ * `GET /{processId}~process@1.0/compute/balances/{address}`.
  */
 export async function getTokenBalance(
   processId: string,
@@ -40,20 +24,17 @@ export async function getTokenBalance(
 }
 
 /**
- * The compute/balances response shape is unverified against a live peer
- * (see this module's doc comment) — this parser accepts the two
- * plausible shapes named in ARCHITECTURE.md's open question (a bare
- * quantity string/number, or an object carrying `balance`/`ticker`/
- * `denomination`) and fails loudly on anything else rather than guessing.
+ * This parser accepts two response shapes (a bare quantity string/number,
+ * or an object carrying `balance`/`ticker`/`denomination`) and fails
+ * loudly on anything else rather than guessing.
  *
- * Live verification against a real HyperBEAM node (state.forward.computer)
- * confirmed `compute/balances/{address}` returns a bare atomic quantity
- * string with no denomination field, and that `now/denomination` is not
- * reachable to look it up separately. The bare-quantity shapes are only
- * ever returned for the AO token in practice, so they default to AO's
- * known denomination (12) rather than 0 — defaulting to 0 rendered every
- * balance as an undivided atomic integer (e.g. "500100000000" instead of
- * "0.5001").
+ * `compute/balances/{address}` against a live HyperBEAM node
+ * (state.forward.computer) returns a bare atomic quantity string with no
+ * denomination field, and `now/denomination` isn't reachable to look it
+ * up separately. The bare-quantity shapes are only ever returned for the
+ * AO token in practice, so they default to AO's known denomination (12)
+ * rather than 0 — defaulting to 0 rendered every balance as an undivided
+ * atomic integer (e.g. "500100000000" instead of "0.5001").
  */
 const AO_TOKEN_DENOMINATION = 12;
 

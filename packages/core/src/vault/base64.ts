@@ -1,7 +1,6 @@
 /**
- * Base64 helpers built on the ambient `btoa`/`atob` (available in both a
- * browser/MV3 service worker and the Node test runner — no polyfill,
- * no `Buffer`, keeping this package free of any Node-specific global).
+ * Base64 helpers built on the ambient `btoa`/`atob` — no polyfill, no
+ * `Buffer`, keeping this package free of any Node-specific global.
  */
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";

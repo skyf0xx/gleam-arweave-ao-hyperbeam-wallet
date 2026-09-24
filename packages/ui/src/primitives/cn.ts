@@ -4,18 +4,14 @@ import { extendTailwindMerge } from "tailwind-merge";
 /**
  * `theme.css`'s custom `--text-*` type scale (caption/label/body/h3/h2)
  * registers `text-caption`/`text-label`/etc. as font-size utilities, but
- * `tailwind-merge`'s default classification has no way to know that —
- * it only recognizes Tailwind's built-in `text-{size}` scale (`text-sm`,
- * `text-lg`, ...) as the `font-size` group, so it fell back to guessing
- * these custom names belong to the `text-color` group instead (the only
- * other group `text-*` maps to) and silently dropped whichever `text-*`
- * class came first in a className string as a "conflict" — e.g.
- * `SendReceiveActions.tsx`'s `text-background` (color) losing to a later
- * `text-label` (size) even though the two aren't actually related.
- * Declaring this scale's names as their own `font-size` group (extending,
- * not replacing, Tailwind's own scale — same fix shadcn/ui's own docs
- * give for a custom theme scale) is what makes `twMerge` treat them as
- * independent from `text-{color}` instead of clobbering one or the other.
+ * `tailwind-merge`'s default classification has no way to know that — it
+ * only recognizes Tailwind's built-in `text-{size}` scale as the
+ * `font-size` group, so it fell back to treating these custom names as
+ * `text-color` and silently dropped whichever `text-*` class came first
+ * as a "conflict" (e.g. `text-background` losing to a later `text-label`
+ * even though the two aren't related). Declaring this scale's names as
+ * their own `font-size` group is what makes `twMerge` treat them as
+ * independent from `text-{color}`.
  */
 const twMerge = extendTailwindMerge({
   extend: {

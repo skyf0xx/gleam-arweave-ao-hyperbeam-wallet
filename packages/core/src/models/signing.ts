@@ -1,29 +1,20 @@
 import type { UploadTag } from "./upload";
 
 /**
- * The 10 signing/crypto provider-surface methods' request/response shapes
- * (PRD's provider-signing-crypto intent; `page-protocol.ts`'s
- * `PROVIDER_SURFACE_METHODS`). Modeled here, in `core/models`, following
- * `transfer.ts`/`upload.ts`'s own precedent: the request/response pairing
- * lives in `core` so both `messaging` (which depends on `core/models`) and
- * the later `vault`/`wallet-core`/`provider-bridge` layers that actually
- * execute these operations can share one definition, never the reverse
- * dependency.
+ * The signing/crypto provider-surface methods' request/response shapes.
+ * Modeled here, in `core/models`, following `transfer.ts`/`upload.ts`'s
+ * precedent: the request/response pairing lives in `core` so both
+ * `messaging` and the layers that actually execute these operations can
+ * share one definition.
  *
- * Every operation resolves its signing key via the existing unlocked-session
- * cache (`getCachedKey(walletId)` in
+ * Every operation resolves its signing key via the existing
+ * unlocked-session cache (`getCachedKey(walletId)` in
  * `apps/extension/src/handlers/key-session.ts`) — none of these request
- * shapes carries a password field, matching `TransferDraft`/`UploadDraft`'s
- * already-ratified convention (see `core-design.md`'s Correction Protocol
- * log, 2026-09-15 entry). `walletId` is required here (unlike
- * `TransferDraft`/`UploadDraft`'s workaround-driven optional field) since no
- * locked test file predates these new types.
+ * shapes carries a password field.
  *
- * Approval routing (the decoded preview + payload-hash review window every
- * one of these must pass through, per `core/models/approval.ts`'s
- * `SigningApprovalPreview`) and the actual cryptographic execution
- * (`arweave-js`/`@dha-team/arbundles`) are later layers' job — this layer
- * only pins the wire shape.
+ * Approval routing and the actual cryptographic execution
+ * (`arweave-js`/`@dha-team/arbundles`) are later layers' job — this
+ * layer only pins the wire shape.
  */
 
 /**
@@ -71,13 +62,11 @@ export interface SignedTransaction {
 export type SignResult = SignedTransaction;
 
 /**
- * `dispatch()` request/response shapes, matching Wander's confirmed
- * convention exactly: a transaction-shaped `dispatch()` call resolves to
- * `{ id, type: "BASE" }` (posted directly to a gateway) or
- * `{ id, type: "BUNDLED" }` (wrapped as an ANS-104 DataItem and submitted to
- * a bundler) — `type` is optional because some dApp callers never inspect
- * it, only `id`, mirroring `AoTokenTransferResult`'s existing `{ id }`-only
- * precedent in `transfer.ts`.
+ * `dispatch()` request/response shapes, matching Wander's convention: a
+ * transaction-shaped `dispatch()` call resolves to `{ id, type: "BASE" }`
+ * (posted directly to a gateway) or `{ id, type: "BUNDLED" }` (wrapped as
+ * an ANS-104 DataItem and submitted to a bundler). `type` is optional
+ * because some dApp callers only inspect `id`.
  */
 export interface DispatchRequest {
   walletId: string;
@@ -115,13 +104,10 @@ export type BatchSignDataItemResult = ArrayBuffer[];
 
 /**
  * WebCrypto's own `RsaOaepParams`/`AesCtrParams`/`AesCbcParams`/
- * `AesGcmParams` shapes (`lib.dom.d.ts`), re-declared here rather than
- * imported: `core` has zero `chrome.*`/DOM dependency (this project's
- * ESLint `no-restricted-imports` rule), and while `RsaOaepParams` etc. are
- * ambient `lib.dom` *types* (not a runtime DOM API), redeclaring keeps this
- * model resolvable under a `lib.dom`-free tsconfig if `core`'s ever
- * tightened that far. Field names match WebCrypto exactly so a later
- * layer's real `crypto.subtle.encrypt(algorithm, key, data)` call needs no
+ * `AesGcmParams` shapes, re-declared here rather than imported: `core`
+ * has zero `chrome.*`/DOM dependency, and this keeps the model
+ * resolvable under a `lib.dom`-free tsconfig. Field names match
+ * WebCrypto exactly so a real `crypto.subtle.encrypt(...)` call needs no
  * translation.
  */
 export interface RsaOaepParams {
@@ -175,11 +161,10 @@ export interface DecryptResult {
 
 /**
  * `signature()`: ArConnect-deprecated (superseded by `sign`/`signMessage`/
- * `signDataItem` per Wander's own docs), kept here only because it remains
- * part of the ArConnect-compatible provider surface
- * (`PROVIDER_SURFACE_METHODS`) some existing dApp integrations still call.
- * Produces a raw RSA-PSS signature over arbitrary data — narrower than
- * `signMessage` (which additionally supports `hashAlgorithm`).
+ * `signDataItem`), kept because some existing dApp integrations still
+ * call it. Produces a raw RSA-PSS signature over arbitrary data —
+ * narrower than `signMessage` (which additionally supports
+ * `hashAlgorithm`).
  */
 export interface SignatureRequest {
   walletId: string;
@@ -195,12 +180,10 @@ export interface SignatureResult {
 
 /**
  * `signMessage`/`privateHash` both accept an `ArrayBuffer` directly per
- * Wander's confirmed convention (not a base64 string like `signature()`'s
- * older shape) — tagged as `TaggedArrayBuffer` at the wire-envelope layer
- * (`messaging/page-protocol.ts`) since raw `ArrayBuffer` doesn't survive
- * `postMessage`'s structured-clone/JSON boundary as-is when relayed through
- * `@webext-core/messaging`'s own envelope; this model only pins the logical
- * shape both sides agree the payload represents.
+ * Wander's convention (not a base64 string like `signature()`'s older
+ * shape) — tagged as `TaggedArrayBuffer` at the wire-envelope layer since
+ * raw `ArrayBuffer` doesn't survive `@webext-core/messaging`'s envelope
+ * as-is; this model only pins the logical shape both sides agree on.
  */
 export interface SignMessageRequest {
   walletId: string;

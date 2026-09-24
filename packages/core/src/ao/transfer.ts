@@ -16,9 +16,9 @@ import type { JWKInterface } from "../models/wallet";
  * browser build re-verifies every signed item through its bundled
  * arbundles `ArweaveSigner.verify`, which hands the owner's raw bytes to
  * `crypto.subtle.importKey("jwk", { n: <Uint8Array> })` instead of a
- * base64url string, so Chrome rejects every signature ("The JWK member 'n'
- * could not be base64url decoded"). Owning the ~100 lines of ANS-104
- * encoding also keeps Node polyfills (`Buffer`, `crypto`) out of this path.
+ * base64url string, so Chrome rejects every signature. Owning the
+ * ANS-104 encoding also keeps Node polyfills (`Buffer`, `crypto`) out of
+ * this path.
  */
 export const AO_LEGACY_MU_URL = "https://mu.ao-testnet.xyz";
 
@@ -29,15 +29,11 @@ export interface SubmittedAoTransfer {
 
 /**
  * AO token transfers have no `arweave/transfer.ts`-style fee quote to
- * estimate: an AR value-transfer pays a miner fee taken from the sender's
- * own balance, computed up front via the gateway's `price` endpoint. An AO
- * `Transfer` message posts to the token process for the process to execute
- * — the token process (not the sender) bears its own compute cost, and
- * nothing in AO's message protocol quotes a sender-side fee before
- * posting. Rather than inventing a fabricated `0` or a plausible-looking
- * placeholder, this is made explicit: there is no fee quote for this
- * path, and callers should carry `TransferDraft.fee` as `null` for every
- * AO transfer, matching its `Winston | null` shape.
+ * estimate: the token process (not the sender) bears its own compute
+ * cost, and nothing in AO's message protocol quotes a sender-side fee
+ * before posting. Callers should carry `TransferDraft.fee` as `null` for
+ * every AO transfer, matching its `Winston | null` shape, rather than a
+ * fabricated `0`.
  */
 export const AO_TRANSFER_HAS_NO_FEE = true;
 

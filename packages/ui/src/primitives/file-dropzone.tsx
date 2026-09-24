@@ -2,13 +2,11 @@ import * as React from "react";
 import { cn } from "./cn";
 
 /**
- * File drop target (shared.css/onboarding.html `.dropzone`, 1.4 Import
- * wallet). Presentational and content-agnostic: hands the dropped/
- * selected `File` up via `onFile` and lets the caller own the read
- * (text parse, size validation, etc.) — this primitive never assumes
- * the file is JSON/a keyfile specifically, so both the onboarding
- * import flow and the upload-compose flow (5.1, file/text/JSON input)
- * can compose it.
+ * File drop target. Presentational and content-agnostic: hands the
+ * dropped/selected `File` up via `onFile` and lets the caller own the
+ * read (text parse, size validation, etc.) — this primitive never
+ * assumes the file is JSON/a keyfile specifically, so both the
+ * onboarding import flow and the upload-compose flow can compose it.
  */
 export interface FileDropzoneProps {
   label?: string;

@@ -3,12 +3,11 @@ import { cn } from "../../primitives/cn";
 import { Button } from "../../primitives/button";
 
 /**
- * The "your wallet is ready" keyfile card (onboarding.html's
- * `.keyfile-card` / `.keyfile-reveal`) — backup is explicit and skippable
- * (TODO.md 1.3: "never show the raw key on screen by default; require an
- * explicit reveal tap"). This component only renders what it's given and
- * emits the three actions; downloading/copying/deciding what "content" is
- * belongs to the caller (a view module, not this presentational package).
+ * The "your wallet is ready" keyfile card — backup is explicit and
+ * skippable; the raw key is never shown by default, requiring an
+ * explicit reveal tap. This component only renders what it's given and
+ * emits the three actions; downloading/copying/deciding what "content"
+ * is belongs to the caller.
  */
 export interface AddressRevealProps {
   keyfileContents: string;

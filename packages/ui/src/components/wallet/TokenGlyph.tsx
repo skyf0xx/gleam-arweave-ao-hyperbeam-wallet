@@ -1,10 +1,9 @@
 import { cn } from "../../primitives/cn";
 
 /**
- * The small colored square token identicon (wallet-main-screen.html's
- * `.token-glyph.tone-{1..4}`) — one/two-letter ticker abbreviation on a
- * flat neutral tone. Brand guidelines Part 2: neutrals only here, the
- * five-color beam is never used to color a token glyph.
+ * The small colored square token identicon — one/two-letter ticker
+ * abbreviation on a flat neutral tone. Neutrals only: the five-color
+ * beam is never used to color a token glyph.
  */
 export interface TokenGlyphProps {
   label: string;
@@ -15,9 +14,7 @@ export interface TokenGlyphProps {
 /**
  * Tones 2-4 are a neutral gradient distinct from the foundation `muted`/
  * `faint` tokens (which are reserved for text) — kept as literals since
- * `tokens/theme.css` defines no separate glyph-tone scale, per the same
- * "no mismatched token" judgment call the `BeamMark` wordmark size debt
- * note (`DESIGN-SYSTEM-PASS-ONBOARDING-UNLOCK`) already made.
+ * `tokens/theme.css` defines no separate glyph-tone scale.
  */
 const TONE_CLASSES: Record<1 | 2 | 3 | 4, string> = {
   1: "bg-foreground text-background",

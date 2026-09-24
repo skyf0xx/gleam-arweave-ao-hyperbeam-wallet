@@ -3,10 +3,10 @@ import type { PermissionType } from "./permission";
 
 /**
  * The grant permissions each provider method needs, all of them required.
- * Matches Wander's module table. `connect`, `disconnect` and
- * `getPermissions` need none: they manage or report the grant itself.
- * `transferAoTokens` is Gleam's own method; it signs an ANS-104 item, so it
- * sits with `signDataItem` under `SIGN_TRANSACTION`.
+ * `connect`, `disconnect` and `getPermissions` need none: they manage or
+ * report the grant itself. `transferAoTokens` is Gleam's own method; it
+ * signs an ANS-104 item, so it sits with `signDataItem` under
+ * `SIGN_TRANSACTION`.
  */
 export const METHOD_PERMISSIONS: Readonly<Record<ProviderMethod, readonly PermissionType[]>> = {
   connect: [],

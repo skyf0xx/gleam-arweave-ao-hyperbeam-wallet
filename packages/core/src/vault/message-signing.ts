@@ -14,7 +14,7 @@ import { base64UrlToBytes } from "./base64";
  *   the data, salt length from `saltLength` (default 32).
  *
  * `privateHash` is `digest(data || d)`, with `d` the private exponent
- * decoded from base64url. Its parity with Wander is unverified.
+ * decoded from base64url.
  */
 
 export type MessageHashAlgorithm = "SHA-256" | "SHA-384" | "SHA-512";
@@ -77,10 +77,7 @@ export async function signature(
   return crypto.subtle.sign({ name: "RSA-PSS", saltLength }, key, data);
 }
 
-/**
- * Hashes `data` keyed by the wallet's private exponent — see module doc
- * comment for the exact construction and its provisional-parity caveat.
- */
+/** Hashes `data` keyed by the wallet's private exponent — see module doc comment for the exact construction. */
 export async function privateHash(
   jwk: JWKInterface,
   data: ArrayBuffer,

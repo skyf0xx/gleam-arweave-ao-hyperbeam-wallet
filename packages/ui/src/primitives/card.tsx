@@ -2,12 +2,9 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
- * The bordered list container repeated across the reference mockups as
- * `.list-card` (settings-home.html's grouped rows, tokens-activity.html's
- * token/activity lists, wallet-switcher.html's wallet list). Presentational
- * only — divides its children with a top border and lets each child
- * (typically `ListRow`) own its own bottom border, matching
- * shared.css's `.row:not(:last-child)` rule.
+ * The bordered list container used for grouped rows and lists.
+ * Presentational only — divides its children with a top border and lets
+ * each child (typically `ListRow`) own its own bottom border.
  */
 export interface CardProps {
   children: ReactNode;
@@ -19,10 +16,8 @@ export function Card({ children, className }: CardProps) {
 }
 
 /**
- * A single row inside a `Card` (shared.css `.row`/`.row-main`/`.row-end`).
- * Renders as a `<button>` when `onClick` is supplied (settings-home.html's
- * `.settings-row`), a plain `<div>` otherwise (a non-interactive list
- * item, e.g. tokens-activity.html's activity rows).
+ * A single row inside a `Card`. Renders as a `<button>` when `onClick`
+ * is supplied, a plain `<div>` otherwise (a non-interactive list item).
  */
 export interface ListRowProps {
   title: ReactNode;

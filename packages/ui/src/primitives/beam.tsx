@@ -1,16 +1,13 @@
 import { cn } from "./cn";
 
 /**
- * The Gleam beam — the brand's signature five-color identity element
- * (brand/identity.md §02/§03, shared.css `.beam-divider`).
+ * The Gleam beam — the brand's signature five-color identity element.
  *
- * Identity-only, per brand/guidelines.md Part 3: "Never use the
- * five-color beam as a severity/warning signal — it's reserved for
- * brand/identity moments." This component exists specifically so no
- * screen ever reaches for a bespoke five-stop gradient of its own to
- * repurpose as a status indicator — the only place this shape is
- * defined is here, and it never accepts a `variant`/`tone` prop, by
- * design, to keep it impossible to theme it into a warning color.
+ * Identity-only: never use the five-color beam as a severity/warning
+ * signal. This component exists so no screen reaches for a bespoke
+ * five-stop gradient of its own to repurpose as a status indicator, and
+ * it never accepts a `variant`/`tone` prop, by design, to keep it
+ * impossible to theme into a warning color.
  */
 export interface BeamProps {
   className?: string;
@@ -21,9 +18,9 @@ export function Beam({ className }: BeamProps) {
 }
 
 /**
- * The beam rendered as five discrete segments (brand/identity.md's
- * "■ ■ ■ ■ ■" mark), for contexts needing the beam as a small mark
- * rather than a continuous divider bar (e.g. next to the wordmark).
+ * The beam rendered as five discrete segments ("■ ■ ■ ■ ■"), for
+ * contexts needing the beam as a small mark rather than a continuous
+ * divider bar (e.g. next to the wordmark).
  */
 export function BeamMark({ className }: BeamProps) {
   const segments = [
