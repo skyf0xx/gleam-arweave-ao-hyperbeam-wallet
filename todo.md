@@ -11,13 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **`signDataItem` / `batchSignDataItem` return the wrong shape (M, 🧪, opus)**
-  Same files. The provider sends `{ dataItem }` and the background reads
-  `params.data`, so the data item is signed with empty data. Results come
-  back as `{signedDataItem: base64}`. Wander returns an `ArrayBuffer` (and
-  an array of them for batch). Done: correct input and output shapes. A
-  signed item parses with arbundles and verifies. Check it with aoconnect's
-  `createDataItemSigner(window.arweaveWallet)`.
 - [ ] **`signMessage` / `verifyMessage` / `signature` don't use Wander's construction (M, 🧪, opus)**
   `core/vault/message-signing.ts`. Wander (and permawebOS) sign the
   `hashAlgorithm` digest of the data with RSA-PSS, salt length 32, and
@@ -305,3 +298,11 @@ vault, crypto and provider security; `sonnet` for everything else.
   for the preview and re-encoded by `addTag`, so binary tags are refused
   rather than signed. Carry the raw tag bytes through to signing if a dApp
   needs them.
+- **`signDataItem`/`batchSignDataItem` ignore their `options` argument (opus)**
+  `entrypoints/background/index.ts`, `core/vault/signing.ts`. Wander takes
+  `SignatureOptions` (`saltLength`) as the second argument. Gleam forwards
+  it from the page but signs with arbundles' fixed salt length 32.
+- **`batchSignDataItem` approval shows only the first item (sonnet)**
+  `entrypoints/background/index.ts`, `src/handlers/approval.ts`. The
+  preview's data, tags and payload hash are item 1's; the other items are
+  signed unseen. permawebOS lists each item's data, target and tags.

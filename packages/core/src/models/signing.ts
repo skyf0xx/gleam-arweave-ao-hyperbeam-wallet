@@ -89,7 +89,7 @@ export interface DispatchResult {
   type?: "BASE" | "BUNDLED";
 }
 
-/** An ANS-104 DataItem input, matching `@dha-team/arbundles`'s `createData` parameters. */
+/** An ANS-104 data item to sign. `data` is standard base64; tags are plain text. */
 export interface DataItemInput {
   data: string;
   tags?: UploadTag[];
@@ -102,26 +102,16 @@ export interface SignDataItemRequest {
   dataItem: DataItemInput;
 }
 
-/** Base64-encoded signed ANS-104 DataItem bytes — the wire-safe encoding of the raw signed binary a real handler produces (a Node/Buffer-equivalent), since raw binary doesn't survive the `@webext-core/messaging` JSON boundary intact. */
-export interface SignDataItemResult {
-  signedDataItem: string;
-}
+/** The raw signed ANS-104 item, as Wander resolves it. */
+export type SignDataItemResult = ArrayBuffer;
 
 export interface BatchSignDataItemRequest {
   walletId: string;
   dataItems: DataItemInput[];
 }
 
-/**
- * `batchSignDataItem`'s confirmed convention: a `Buffer[]`-equivalent
- * result — one base64-encoded signed DataItem per input, in the same
- * order, matching `SignDataItemResult`'s own encoding since raw
- * `Buffer`/`Uint8Array` values don't survive the postMessage/
- * `@webext-core/messaging` JSON boundary intact.
- */
-export interface BatchSignDataItemResult {
-  signedDataItems: string[];
-}
+/** One raw signed item per input, in order. */
+export type BatchSignDataItemResult = ArrayBuffer[];
 
 /**
  * WebCrypto's own `RsaOaepParams`/`AesCtrParams`/`AesCbcParams`/

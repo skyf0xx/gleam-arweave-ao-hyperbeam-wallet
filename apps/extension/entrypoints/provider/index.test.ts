@@ -110,6 +110,37 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     expect(signed.tags).toBe(callerTags);
   });
 
+  it("signDataItem sends the item under dataItem and resolves to the signed ArrayBuffer", async () => {
+    const callPromise = provider.signDataItem({ data: new Uint8Array([7]), tags: [{ name: "Action", value: "Eval" }] });
+    const envelope = lastRequestEnvelope();
+    expect(envelope).toMatchObject({
+      method: "signDataItem",
+      params: { dataItem: { data: { __gleamType: "Uint8Array", data: [7] }, tags: [{ name: "Action", value: "Eval" }] } },
+    });
+
+    postResponse({ type: RESPONSE, id: envelope.id, result: { __gleamType: "ArrayBuffer", data: [1, 0, 9] } });
+    const raw = await callPromise;
+    expect(Object.prototype.toString.call(raw)).toBe("[object ArrayBuffer]");
+    expect(Array.from(new Uint8Array(raw as ArrayBuffer))).toEqual([1, 0, 9]);
+  });
+
+  it("batchSignDataItem sends the items under dataItems and resolves to an ArrayBuffer per item", async () => {
+    const callPromise = provider.batchSignDataItem([{ data: "a" }, { data: "b" }]);
+    const envelope = lastRequestEnvelope();
+    expect(envelope).toMatchObject({ method: "batchSignDataItem", params: { dataItems: [{ data: "a" }, { data: "b" }] } });
+
+    postResponse({
+      type: RESPONSE,
+      id: envelope.id,
+      result: [
+        { __gleamType: "ArrayBuffer", data: [1] },
+        { __gleamType: "ArrayBuffer", data: [2] },
+      ],
+    });
+    const raws = (await callPromise) as ArrayBuffer[];
+    expect(raws.map((raw) => Array.from(new Uint8Array(raw)))).toEqual([[1], [2]]);
+  });
+
   it("verifyMessage forwards Wander's four arguments with binary tagged", () => {
     void provider.verifyMessage(new Uint8Array([1]), "c2ln", "pubkey", { hashAlgorithm: "SHA-512" });
     expect(lastRequestEnvelope().params).toEqual({

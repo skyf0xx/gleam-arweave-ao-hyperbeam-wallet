@@ -140,9 +140,8 @@ export interface SigningRequestInput {
   quantity?: string;
   reward?: string;
   last_tx?: string;
-  /** `signDataItem`/`batchSignDataItem`'s per-item inputs — `payload` above carries only the first item's data for preview/hash purposes when this is set. */
+  /** `signDataItem`/`batchSignDataItem`'s items. `payload` and `tags` above are the first item's, for the preview. */
   dataItems?: DataItemInput[];
-  anchor?: string;
   /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
   encryptAlgorithm?: EncryptAlgorithm;
   /** `signMessage`/`signature`/`privateHash`'s hash digest selection. */
@@ -488,20 +487,16 @@ export class ApprovalHandler {
       }
 
       case "signDataItem": {
-        const dataItem = input.dataItems?.[0] ?? {
-          data: bytesToBase64(input.payload),
-          tags: input.tags,
-          target: input.target,
-          anchor: input.anchor,
-        };
-        const signedDataItem = await signDataItem(jwk, dataItem);
-        return { signedDataItem };
+        const [dataItem] = input.dataItems ?? [];
+        if (!dataItem) throw new Error("signDataItem requires a data item.");
+        // Wander resolves to the raw signed item as an ArrayBuffer, which
+        // aoconnect's createDataItemSigner parses directly.
+        return toArrayBuffer(await signDataItem(jwk, dataItem));
       }
 
       case "batchSignDataItem": {
-        const dataItems = input.dataItems ?? [];
-        const signedDataItems = await batchSignDataItem(jwk, dataItems);
-        return { signedDataItems };
+        const signed = await batchSignDataItem(jwk, input.dataItems ?? []);
+        return signed.map(toArrayBuffer);
       }
 
       case "encrypt": {

@@ -1,9 +1,31 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import Arweave from "arweave";
+import { DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";
 import { signTransaction, dispatchTransaction, signDataItem, batchSignDataItem } from "./signing";
 import { bytesToBase64 } from "./base64";
 import type { JWKInterface } from "../models/wallet";
+
+/**
+ * Checks the signature over arbundles' own parse and deep hash. Not
+ * `DataItem.verify`: the web build passes the owner's raw bytes to
+ * WebCrypto as the JWK `n` (see `core/ao/transfer.ts`).
+ */
+async function verifies(item: DataItem): Promise<boolean> {
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    { kty: "RSA", e: "AQAB", n: item.owner },
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+  return crypto.subtle.verify(
+    { name: "RSA-PSS", saltLength: 32 },
+    key,
+    new Uint8Array(item.rawSignature),
+    new Uint8Array(await item.getSignatureData()),
+  );
+}
 
 describe("vault/signing", () => {
   let jwk: JWKInterface;
@@ -157,36 +179,48 @@ describe("vault/signing", () => {
   });
 
   describe("signDataItem", () => {
-    it("returns a base64-encoded signed ANS-104 data item", async () => {
-      const result = await signDataItem(jwk, {
+    const target = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
+    const anchor = "a".repeat(32);
+
+    it("returns raw item bytes that arbundles parses and whose signature verifies", async () => {
+      const raw = await signDataItem(jwk, {
         data: bytesToBase64(new TextEncoder().encode("data item payload")),
         tags: [{ name: "Content-Type", value: "text/plain" }],
+        target,
+        anchor,
       });
 
-      expect(typeof result).toBe("string");
-      expect(result.length).toBeGreaterThan(0);
-      // round-trips through base64 without throwing
-      expect(() => atob(result)).not.toThrow();
+      expect(raw).toBeInstanceOf(Uint8Array);
+      const item = new DataItem(Buffer.from(raw));
+      expect(await verifies(item)).toBe(true);
+      expect(item.owner).toBe(jwk.n);
+      expect(item.target).toBe(target);
+      expect(Buffer.from(item.rawAnchor).toString()).toBe(anchor);
+      expect(item.tags).toEqual([{ name: "Content-Type", value: "text/plain" }]);
+      expect(Buffer.from(item.rawData).toString()).toBe("data item payload");
+    });
+
+    it("fails verification once the data is tampered with", async () => {
+      const raw = await signDataItem(jwk, { data: bytesToBase64(new TextEncoder().encode("hello")) });
+      raw[raw.byteLength - 1]! ^= 1;
+      expect(await verifies(new DataItem(Buffer.from(raw)))).toBe(false);
     });
   });
 
   describe("batchSignDataItem", () => {
-    it("signs multiple data items in order, returning one base64 string per input", async () => {
-      const inputs = [
-        { data: bytesToBase64(new TextEncoder().encode("item 1")) },
-        { data: bytesToBase64(new TextEncoder().encode("item 2")) },
-        { data: bytesToBase64(new TextEncoder().encode("item 3")) },
-      ];
-
-      const results = await batchSignDataItem(jwk, inputs);
+    it("signs each item in order, each one verifying on its own", async () => {
+      const payloads = ["item 1", "item 2", "item 3"];
+      const results = await batchSignDataItem(
+        jwk,
+        payloads.map((text) => ({ data: bytesToBase64(new TextEncoder().encode(text)) })),
+      );
 
       expect(results).toHaveLength(3);
-      for (const item of results) {
-        expect(typeof item).toBe("string");
-        expect(item.length).toBeGreaterThan(0);
+      for (const [index, raw] of results.entries()) {
+        const item = new DataItem(Buffer.from(raw));
+        expect(Buffer.from(item.rawData).toString()).toBe(payloads[index]);
+        expect(await verifies(item)).toBe(true);
       }
-      // each item is distinct (different payload)
-      expect(new Set(results).size).toBe(3);
     });
 
     it("returns an empty array for an empty input list", async () => {

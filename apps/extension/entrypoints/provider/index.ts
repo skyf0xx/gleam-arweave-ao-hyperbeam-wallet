@@ -250,8 +250,10 @@ class GleamProvider {
     return this.call("verifyMessage", { data, signature, publicKey, options });
   }
 
-  signDataItem(dataItem?: unknown): Promise<unknown> {
-    return this.call("signDataItem", { dataItem });
+  /** Resolves to the raw signed item as an `ArrayBuffer`, as Wander does. */
+  signDataItem(dataItem?: unknown, options?: unknown): Promise<unknown> {
+    const { signal, rest } = GleamProvider.extractSignal(options);
+    return this.call("signDataItem", { dataItem, options: rest }, signal);
   }
 
   /**
@@ -265,8 +267,10 @@ class GleamProvider {
     return this.call("transferAoTokens", request);
   }
 
-  batchSignDataItem(dataItems?: unknown): Promise<unknown> {
-    return this.call("batchSignDataItem", { dataItems });
+  /** Resolves to one `ArrayBuffer` per item, in order. */
+  batchSignDataItem(dataItems?: unknown, options?: unknown): Promise<unknown> {
+    const { signal, rest } = GleamProvider.extractSignal(options);
+    return this.call("batchSignDataItem", { dataItems, options: rest }, signal);
   }
 }
 

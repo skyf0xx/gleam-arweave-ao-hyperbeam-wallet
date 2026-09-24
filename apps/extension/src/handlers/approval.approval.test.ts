@@ -469,6 +469,46 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     const decrypted = await approve("decrypt", ciphertext);
     expect(new TextDecoder().decode(decrypted)).toBe("secret");
   });
+
+  describe("data items", () => {
+    const toBase64 = (text: string) => btoa(text);
+    const endsWith = (raw: ArrayBuffer, text: string) =>
+      new TextDecoder().decode(new Uint8Array(raw).slice(-text.length)) === text;
+
+    async function approve(
+      kind: "signDataItem" | "batchSignDataItem",
+      texts: string[],
+    ): Promise<unknown> {
+      const jwk = await generateJWK();
+      await cacheKey(WALLET_ID, jwk, "abc-address");
+      const pending = handler.requestApproval({
+        kind,
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode(texts[0]!),
+        dataItems: texts.map((text) => ({ data: toBase64(text), tags: [{ name: "Action", value: "Eval" }] })),
+      });
+      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+      await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+      return pending;
+    }
+
+    it("signDataItem resolves to the raw signed item as an ArrayBuffer", async () => {
+      const raw = await approve("signDataItem", ["hello"]);
+      expect(Object.prototype.toString.call(raw)).toBe("[object ArrayBuffer]");
+      // ANS-104 signature type 1 (Arweave), little-endian.
+      expect(Array.from(new Uint8Array(raw as ArrayBuffer).slice(0, 2))).toEqual([1, 0]);
+      expect(endsWith(raw as ArrayBuffer, "hello")).toBe(true);
+    });
+
+    it("batchSignDataItem resolves to one ArrayBuffer per item, in order", async () => {
+      const raws = (await approve("batchSignDataItem", ["first", "second"])) as ArrayBuffer[];
+      expect(raws).toHaveLength(2);
+      expect(raws.every((raw) => Object.prototype.toString.call(raw) === "[object ArrayBuffer]")).toBe(true);
+      expect(endsWith(raws[0]!, "first")).toBe(true);
+      expect(endsWith(raws[1]!, "second")).toBe(true);
+    });
+  });
 });
 
 describe("ApprovalHandler: transferAoTokens signing approval", () => {

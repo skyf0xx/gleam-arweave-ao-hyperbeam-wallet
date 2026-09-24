@@ -74,14 +74,8 @@ describe("SigningWireContract", () => {
     expect(verifyMessageRequest.signature.__gleamType).toBe("ArrayBuffer");
   });
 
-  it("batchSignDataItem resolves to a Buffer[]-equivalent (base64 string array, order-preserving)", () => {
-    const result: WireBatchSignDataItemResult = {
-      signedDataItems: ["YQ==", "Yg==", "Yw=="],
-    };
-    expectTypeOf<WireBatchSignDataItemResult["signedDataItems"]>().toEqualTypeOf<
-      string[]
-    >();
-    expect(result.signedDataItems).toHaveLength(3);
+  it("batchSignDataItem resolves to one ArrayBuffer per item", () => {
+    expectTypeOf<WireBatchSignDataItemResult>().toEqualTypeOf<ArrayBuffer[]>();
   });
 
   it("encrypt/decrypt's algorithm param accepts each of the 4 WebCrypto param shapes", () => {

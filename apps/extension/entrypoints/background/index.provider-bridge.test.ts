@@ -71,6 +71,8 @@ interface Wallet {
   verifyMessage(data: unknown, signature: unknown, publicKey?: unknown, options?: unknown): Promise<unknown>;
   encrypt(data: unknown, options?: unknown): Promise<unknown>;
   decrypt(data: unknown, options?: unknown): Promise<unknown>;
+  signDataItem(dataItem: unknown, options?: unknown): Promise<unknown>;
+  batchSignDataItem(dataItems: unknown, options?: unknown): Promise<unknown>;
 }
 
 const WALLET_ID = "wallet-1";
@@ -274,6 +276,51 @@ describe("provider message methods, end to end", () => {
       /does not support hashAlgorithm "MD5"/,
     );
     await expect(wallet.signMessage("plain text")).rejects.toThrow(/"data" must be an ArrayBuffer or Uint8Array/);
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("provider data item methods, end to end", () => {
+  const PROCESS_ID = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
+  const isArrayBuffer = (value: unknown) => Object.prototype.toString.call(value) === "[object ArrayBuffer]";
+  /** ANS-104: 2-byte signature type, 512-byte signature, then the 512-byte owner. */
+  const ownerOf = (raw: ArrayBuffer) => toBase64Url(new Uint8Array(raw).slice(514, 1026));
+  const endsWith = (raw: ArrayBuffer, text: string) =>
+    new TextDecoder().decode(new Uint8Array(raw).slice(-new TextEncoder().encode(text).byteLength)) === text;
+
+  it("signDataItem takes aoconnect's item shape and resolves to the raw signed ArrayBuffer", async () => {
+    const { result, request } = await approved<ArrayBuffer>(
+      wallet.signDataItem({ data: "1 + 1", tags: [{ name: "Action", value: "Eval" }], target: PROCESS_ID }),
+    );
+
+    expect(request.kind).toBe("signDataItem");
+    expect(request.preview.decodedData).toBe("1 + 1");
+    expect(request.preview.tags).toEqual([{ name: "Action", value: "Eval" }]);
+    expect(isArrayBuffer(result)).toBe(true);
+    expect(Array.from(new Uint8Array(result).slice(0, 2))).toEqual([1, 0]);
+    expect(ownerOf(result)).toBe(jwk.n);
+    expect(endsWith(result, "1 + 1")).toBe(true);
+  });
+
+  it("signDataItem signs binary data as given", async () => {
+    const { result } = await approved<ArrayBuffer>(wallet.signDataItem({ data: new Uint8Array([0xff, 0x00, 0x7f]) }));
+    expect(Array.from(new Uint8Array(result).slice(-3))).toEqual([0xff, 0x00, 0x7f]);
+  });
+
+  it("batchSignDataItem resolves to one ArrayBuffer per item, in order", async () => {
+    const { result } = await approved<ArrayBuffer[]>(
+      wallet.batchSignDataItem([{ data: "first" }, { data: "second", target: PROCESS_ID }]),
+    );
+    expect(result).toHaveLength(2);
+    expect(result.every(isArrayBuffer)).toBe(true);
+    expect(endsWith(result[0]!, "first")).toBe(true);
+    expect(endsWith(result[1]!, "second")).toBe(true);
+  });
+
+  it("rejects a malformed item clearly, without opening a window", async () => {
+    await expect(wallet.signDataItem({ data: "x", target: "not-an-address" })).rejects.toThrow(/Arweave address/);
+    await expect(wallet.signDataItem({ tags: [] })).rejects.toThrow(/needs data/);
+    await expect(wallet.batchSignDataItem([])).rejects.toThrow(/non-empty array/);
     expect(windowsCreate).not.toHaveBeenCalled();
   });
 });

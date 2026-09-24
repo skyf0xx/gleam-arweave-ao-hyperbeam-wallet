@@ -134,9 +134,9 @@ function decodeTagText(value: unknown, method: string): string {
 }
 
 /** arweave-js's `Transaction` defaults unset fields to `""`, so an empty string means "not set". */
-function readOptionalString(value: unknown, field: string, method: string): string | undefined {
+function readOptionalString(value: unknown, field: string, method: string, subject = "transaction"): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value !== "string") throw new Error(`${method}: transaction ${field} must be a string.`);
+  if (typeof value !== "string") throw new Error(`${method}: ${subject} ${field} must be a string.`);
   return value;
 }
 
@@ -197,4 +197,62 @@ export function readTransaction(value: unknown, method: "sign" | "dispatch"): Pr
     reward: reward === "0" ? undefined : reward,
     last_tx: readOptionalString(transaction.last_tx, "last_tx", method),
   };
+}
+
+export interface ProviderDataItem {
+  data: Uint8Array<ArrayBuffer>;
+  /** Plain UTF-8 text, as Wander takes them. */
+  tags: Array<{ name: string; value: string }>;
+  target?: string;
+  anchor?: string;
+}
+
+/** ANS-104 stores the anchor as its raw 32 bytes, and arbundles encodes the string as UTF-8. */
+const ANCHOR_BYTES = 32;
+
+/**
+ * Reads one data item the way Wander's `signDataItem` takes it: `data` is
+ * UTF-8 text or bytes, and tags are plain `{ name, value }` text (not
+ * base64url like a transaction's).
+ */
+export function readDataItem(value: unknown, method: "signDataItem" | "batchSignDataItem"): ProviderDataItem {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${method} requires a data item object.`);
+  }
+  const item = value as Record<string, unknown>;
+
+  if (item.data === undefined || item.data === null) {
+    throw new Error(`${method}: the data item needs data.`);
+  }
+  const data = typeof item.data === "string" ? new TextEncoder().encode(item.data) : readBytes(item.data, "data");
+
+  if (item.tags !== undefined && item.tags !== null && !Array.isArray(item.tags)) {
+    throw new Error(`${method}: data item tags must be an array.`);
+  }
+  const tags = ((item.tags as unknown[] | null | undefined) ?? []).map((tag) => {
+    const { name, value: tagValue } = (tag ?? {}) as { name?: unknown; value?: unknown };
+    if (typeof name !== "string" || typeof tagValue !== "string") {
+      throw new Error(`${method}: every tag needs a string name and value.`);
+    }
+    return { name, value: tagValue };
+  });
+
+  const target = readOptionalString(item.target, "target", method, "data item");
+  if (target !== undefined && !ADDRESS_PATTERN.test(target)) {
+    throw new Error(`${method}: data item target must be an Arweave address.`);
+  }
+
+  const anchor = readOptionalString(item.anchor, "anchor", method, "data item");
+  if (anchor !== undefined && new TextEncoder().encode(anchor).byteLength !== ANCHOR_BYTES) {
+    throw new Error(`${method}: data item anchor must be ${ANCHOR_BYTES} bytes.`);
+  }
+
+  return { data, tags, target, anchor };
+}
+
+export function readDataItems(value: unknown): ProviderDataItem[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error("batchSignDataItem requires a non-empty array of data items.");
+  }
+  return value.map((item) => readDataItem(item, "batchSignDataItem"));
 }

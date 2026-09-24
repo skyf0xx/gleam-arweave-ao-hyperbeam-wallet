@@ -15,6 +15,7 @@ import type {
   RsaOaepParams,
   SignatureRequest,
   SignDataItemRequest,
+  SignDataItemResult,
   SignMessageRequest,
   SignMessageResult,
   SignRequest,
@@ -63,14 +64,9 @@ describe("signing/crypto model shapes", () => {
     expect(batch.dataItems).toHaveLength(2);
   });
 
-  it("batchSignDataItem resolves to a Buffer[]-equivalent — base64 strings, order-preserving", () => {
-    const result: BatchSignDataItemResult = {
-      signedDataItems: ["YQ==", "Yg=="],
-    };
-    expectTypeOf<BatchSignDataItemResult["signedDataItems"]>().toEqualTypeOf<
-      string[]
-    >();
-    expect(result.signedDataItems[0]).toBe("YQ==");
+  it("signDataItem resolves to an ArrayBuffer and batchSignDataItem to one per item, as Wander does", () => {
+    expectTypeOf<SignDataItemResult>().toEqualTypeOf<ArrayBuffer>();
+    expectTypeOf<BatchSignDataItemResult>().toEqualTypeOf<ArrayBuffer[]>();
   });
 
   it("encrypt/decrypt's algorithm accepts each of RsaOaepParams | AesCtrParams | AesCbcParams | AesGcmParams", () => {

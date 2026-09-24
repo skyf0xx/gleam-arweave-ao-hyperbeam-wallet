@@ -3,6 +3,8 @@ import {
   decodeProviderParams,
   encodeProviderResult,
   readBytes,
+  readDataItem,
+  readDataItems,
   readEncryptAlgorithm,
   readHashAlgorithm,
   readTransaction,
@@ -135,5 +137,40 @@ describe("readTransaction", () => {
     expect(() => readTransaction({ ...toJsonOutput, tags: [{ name: 1, value: "" }] }, "sign")).toThrow(
       /string name and value/,
     );
+  });
+});
+
+describe("readDataItem", () => {
+  const target = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
+
+  it("takes data as UTF-8 text or bytes, and tags as plain text", () => {
+    const fromText = readDataItem(
+      { data: "hé", tags: [{ name: "Action", value: "Eval" }], target, anchor: "a".repeat(32) },
+      "signDataItem",
+    );
+    expect(new TextDecoder().decode(fromText.data)).toBe("hé");
+    expect(fromText).toMatchObject({ tags: [{ name: "Action", value: "Eval" }], target, anchor: "a".repeat(32) });
+
+    const fromBytes = readDataItem({ data: new Uint8Array([1, 2]) }, "signDataItem");
+    expect(Array.from(fromBytes.data)).toEqual([1, 2]);
+    expect(fromBytes).toMatchObject({ tags: [], target: undefined, anchor: undefined });
+  });
+
+  it("rejects what can't be signed as given", () => {
+    expect(() => readDataItem(undefined, "signDataItem")).toThrow(/requires a data item/);
+    expect(() => readDataItem({}, "signDataItem")).toThrow(/needs data/);
+    expect(() => readDataItem({ data: "x", tags: "Action" }, "signDataItem")).toThrow(/tags must be an array/);
+    expect(() => readDataItem({ data: "x", tags: [{ name: "Action" }] }, "signDataItem")).toThrow(/string name and value/);
+    expect(() => readDataItem({ data: "x", target: "short" }, "signDataItem")).toThrow(/Arweave address/);
+    expect(() => readDataItem({ data: "x", anchor: "short" }, "signDataItem")).toThrow(/32 bytes/);
+  });
+});
+
+describe("readDataItems", () => {
+  it("reads every item and rejects an empty or non-array batch", () => {
+    expect(readDataItems([{ data: "a" }, { data: "b" }])).toHaveLength(2);
+    expect(() => readDataItems([])).toThrow(/non-empty array/);
+    expect(() => readDataItems({ data: "a" })).toThrow(/non-empty array/);
+    expect(() => readDataItems([{ data: "a" }, {}])).toThrow(/batchSignDataItem: the data item needs data/);
   });
 });

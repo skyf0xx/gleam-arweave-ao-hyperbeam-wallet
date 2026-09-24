@@ -1,7 +1,7 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
-import { PERMISSION_TYPES, PROVIDER_METHODS, base64ToBytes, verifyMessage, type PermissionType } from "@gleam/core";
+import { PERMISSION_TYPES, PROVIDER_METHODS, bytesToBase64, verifyMessage, type PermissionType } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
@@ -24,6 +24,8 @@ import {
   decodeProviderParams,
   encodeProviderResult,
   readBytes,
+  readDataItem,
+  readDataItems,
   readEncryptAlgorithm,
   readHashAlgorithm,
   readTransaction,
@@ -264,55 +266,25 @@ async function handleProviderCall(
       });
     }
 
-    case "signDataItem": {
-      const signingParams = params as {
-        data?: string;
-        tags?: Array<{ name: string; value: string }>;
-        target?: string;
-        anchor?: string;
-      };
-      const payload = signingParams.data ? base64ToBytes(signingParams.data) : new Uint8Array();
-      return approval.requestApproval({
-        kind: method,
-        origin,
-        walletId: grant.walletId,
-        payload,
-        tags: signingParams.tags ?? [],
-        dataItems: [
-          {
-            data: signingParams.data ?? "",
-            tags: signingParams.tags,
-            target: signingParams.target,
-            anchor: signingParams.anchor,
-          },
-        ],
-        target: signingParams.target,
-        anchor: signingParams.anchor,
-      });
-    }
-
+    case "signDataItem":
     case "batchSignDataItem": {
-      const signingParams = params as {
-        dataItems?: Array<{
-          data?: string;
-          tags?: Array<{ name: string; value: string }>;
-          target?: string;
-          anchor?: string;
-        }>;
-      };
-      const dataItems = (signingParams.dataItems ?? []).map((item) => ({
-        data: item.data ?? "",
-        tags: item.tags,
-        target: item.target,
-        anchor: item.anchor,
-      }));
-      const payload = dataItems[0]?.data ? base64ToBytes(dataItems[0].data) : new Uint8Array();
+      const items =
+        method === "signDataItem"
+          ? [readDataItem(params.dataItem, method)]
+          : readDataItems(params.dataItems);
+      const [first] = items;
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: grant.walletId,
-        payload,
-        dataItems,
+        payload: first!.data,
+        tags: first!.tags,
+        dataItems: items.map((item) => ({
+          data: bytesToBase64(item.data),
+          tags: item.tags,
+          target: item.target,
+          anchor: item.anchor,
+        })),
       });
     }
 

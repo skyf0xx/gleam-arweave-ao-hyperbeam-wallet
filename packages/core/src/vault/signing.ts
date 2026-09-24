@@ -7,7 +7,7 @@ import type {
   DataItemInput,
   DispatchResult,
 } from "../models/signing";
-import { base64ToBytes, bytesToBase64 } from "./base64";
+import { base64ToBytes } from "./base64";
 
 /**
  * `core/vault`'s share of the provider-signing-crypto intent: the actual
@@ -134,37 +134,26 @@ export async function dispatchTransaction(
 }
 
 /**
- * Signs a single ANS-104 DataItem via arbundles' `createData(...).sign(...)`,
- * returning its base64-encoded raw signed bytes (the wire-safe encoding
- * `signing.ts`'s `SignDataItemResult` pins).
+ * Signs one ANS-104 data item and returns its raw bytes. `input.data` is
+ * standard base64 and tags are plain text.
  */
-export async function signDataItem(jwk: JWKInterface, input: DataItemInput): Promise<string> {
+export async function signDataItem(jwk: JWKInterface, input: DataItemInput): Promise<Uint8Array<ArrayBuffer>> {
   const signer = new ArweaveSigner(jwk);
-  const dataBytes = base64ToBytes(input.data);
-
-  const dataItem = createData(dataBytes, signer, {
+  const dataItem = createData(base64ToBytes(input.data), signer, {
     tags: input.tags?.map((tag) => ({ name: tag.name, value: tag.value })),
     target: input.target,
     anchor: input.anchor,
   });
   await dataItem.sign(signer);
-
-  return bytesToBase64(new Uint8Array(dataItem.getRaw()));
+  return new Uint8Array(dataItem.getRaw());
 }
 
-/**
- * Signs multiple ANS-104 DataItems with the same JWK, in order, returning
- * one base64-encoded signed item per input — the `Buffer[]`-equivalent
- * shape `BatchSignDataItemResult` pins. Signs sequentially rather than via
- * `Promise.all`: arbundles' `ArweaveSigner` has no documented concurrency
- * guarantee, and sequential signing keeps this function's behavior
- * identical to calling `signDataItem` in a loop.
- */
+/** Signs each item in order with the same key. */
 export async function batchSignDataItem(
   jwk: JWKInterface,
   inputs: DataItemInput[],
-): Promise<string[]> {
-  const results: string[] = [];
+): Promise<Array<Uint8Array<ArrayBuffer>>> {
+  const results: Array<Uint8Array<ArrayBuffer>> = [];
   for (const input of inputs) {
     results.push(await signDataItem(jwk, input));
   }
