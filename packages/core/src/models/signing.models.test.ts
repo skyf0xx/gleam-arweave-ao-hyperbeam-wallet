@@ -1,8 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
-  AesCbcParams,
-  AesCtrParams,
-  AesGcmParams,
   BatchSignDataItemRequest,
   BatchSignDataItemResult,
   DecryptRequest,
@@ -69,32 +66,14 @@ describe("signing/crypto model shapes", () => {
     expectTypeOf<BatchSignDataItemResult>().toEqualTypeOf<ArrayBuffer[]>();
   });
 
-  it("encrypt/decrypt's algorithm accepts each of RsaOaepParams | AesCtrParams | AesCbcParams | AesGcmParams", () => {
-    const rsaOaep: RsaOaepParams = { name: "RSA-OAEP" };
-    const aesCtr: AesCtrParams = {
-      name: "AES-CTR",
-      counter: new ArrayBuffer(16),
-      length: 64,
-    };
-    const aesCbc: AesCbcParams = { name: "AES-CBC", iv: new ArrayBuffer(16) };
-    const aesGcm: AesGcmParams = { name: "AES-GCM", iv: new ArrayBuffer(12) };
+  it("encrypt/decrypt's algorithm is RSA-OAEP params", () => {
+    const rsaOaep: RsaOaepParams = { name: "RSA-OAEP", label: new ArrayBuffer(3) };
+    expectTypeOf<EncryptAlgorithm>().toEqualTypeOf<RsaOaepParams>();
 
-    const algorithms: EncryptAlgorithm[] = [rsaOaep, aesCtr, aesCbc, aesGcm];
-    for (const algorithm of algorithms) {
-      const request: EncryptRequest = {
-        walletId: "wallet-1",
-        data: "cGxhaW50ZXh0",
-        algorithm,
-      };
-      expect(request.algorithm).toBe(algorithm);
-    }
-
-    const decryptRequest: DecryptRequest = {
-      walletId: "wallet-1",
-      data: "Y2lwaGVydGV4dA==",
-      algorithm: aesGcm,
-    };
-    expect(decryptRequest.algorithm.name).toBe("AES-GCM");
+    const request: EncryptRequest = { walletId: "wallet-1", data: "cGxhaW50ZXh0", algorithm: rsaOaep };
+    const decryptRequest: DecryptRequest = { walletId: "wallet-1", data: "Y2lwaGVydGV4dA==", algorithm: rsaOaep };
+    expect(request.algorithm).toBe(rsaOaep);
+    expect(decryptRequest.algorithm.name).toBe("RSA-OAEP");
   });
 
   it("signature() carries a walletId and base64 data — deprecated in favor of sign/signMessage/signDataItem", () => {

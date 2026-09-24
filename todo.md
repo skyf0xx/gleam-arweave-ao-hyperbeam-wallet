@@ -9,14 +9,6 @@ product decision before starting.
 The last tag is the model the subagent should run on: `opus` for signing,
 vault, crypto and provider security; `sonnet` for everything else.
 
-## 3. dApp provider gaps
-
-- [ ] **Check `privateHash` and non-RSA-OAEP encrypt/decrypt against Wander (M, 🧪, opus)**
-  `core/vault/message-signing.ts`, `core/vault/encryption.ts` (the legacy
-  AES path says in its own comment that it was not taken from ArConnect).
-  Done: output matches a live Wander instance for the same key and input,
-  or the unsupported options are rejected clearly.
-
 ## 4. Other missing features
 
 - [ ] **Arweave gateway can't be edited (M, 🧪, sonnet)**
@@ -85,3 +77,10 @@ vault, crypto and provider security; `sonnet` for everything else.
   `apps/extension/package.json`. The injected `walletVersion` and the
   manifest version both come from this field, which was never set to a
   release version.
+- **Wander's deprecated `{ algorithm, hash, salt }` encrypt/decrypt is refused (M)**
+  `apps/extension/src/handlers/provider-params.ts` `readEncryptAlgorithm`.
+  Wander still serves it: a random 256-byte key wrapped with RSA-OAEP
+  (first 512 bytes), then arweave-js `crypto.encrypt` (PBKDF2-SHA256 100k,
+  AES-256-CBC, random IV) over `data || salt`, with the salt stripped on
+  decrypt. It is fully specified in Wander's source, so parity is
+  reachable if a dApp needs it.

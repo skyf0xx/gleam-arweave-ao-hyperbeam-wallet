@@ -236,13 +236,15 @@ describe("provider message methods, end to end", () => {
     expect(new TextDecoder().decode(plaintext)).toBe("top secret");
   });
 
-  it("encrypt with AES-GCM carries the IV through every hop", async () => {
+  it("refuses AES params for encrypt and decrypt, without opening a window", async () => {
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const { result: ciphertext } = await approved<Uint8Array>(
-      wallet.encrypt(new TextEncoder().encode("aes"), { name: "AES-GCM", iv }),
+    await expect(wallet.encrypt(new TextEncoder().encode("aes"), { name: "AES-GCM", iv })).rejects.toThrow(
+      /encrypt: AES-GCM is not supported/,
     );
-    const { result: plaintext } = await approved<Uint8Array>(wallet.decrypt(ciphertext, { name: "AES-GCM", iv }));
-    expect(new TextDecoder().decode(plaintext)).toBe("aes");
+    await expect(wallet.decrypt(new Uint8Array([1]), { name: "AES-CBC", iv })).rejects.toThrow(
+      /decrypt: AES-CBC is not supported/,
+    );
+    expect(windowsCreate).not.toHaveBeenCalled();
   });
 
   it("encrypt and decrypt hand WebCrypto no label key, after every JSON hop, as Chrome requires", async () => {
@@ -286,12 +288,12 @@ describe("provider message methods, end to end", () => {
     }
   });
 
-  it("rejects a stray label or IV clearly, without opening a window", async () => {
+  it("rejects a stray label clearly, without opening a window", async () => {
     await expect(wallet.encrypt("data", { name: "RSA-OAEP", label: {} })).rejects.toThrow(
       /encrypt: RSA-OAEP label must be an ArrayBuffer or Uint8Array/,
     );
-    await expect(wallet.decrypt(new Uint8Array([1]), { name: "AES-GCM", iv: null })).rejects.toThrow(
-      /decrypt: AES-GCM iv is required/,
+    await expect(wallet.decrypt(new Uint8Array([1]), { name: "RSA-OAEP", label: 5 })).rejects.toThrow(
+      /decrypt: RSA-OAEP label must be an ArrayBuffer or Uint8Array/,
     );
     expect(windowsCreate).not.toHaveBeenCalled();
   });

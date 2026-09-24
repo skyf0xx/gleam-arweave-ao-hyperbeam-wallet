@@ -164,6 +164,47 @@ describe("vault/message-signing", () => {
   });
 
   describe("privateHash", () => {
+    // Known answers from `printf '%s%s' "$message" "$d" | shasum -a <bits>`,
+    // which is Wander's `digest(data || UTF-8(d))`.
+    const PRIVATE_HASH_VECTOR = {
+      d: "dGVzdC1vbmx5LXByaXZhdGUtZXhwb25lbnQtbm90LWEtcmVhbC1rZXk",
+      message: "gleam wander parity",
+      "SHA-256": "1d8a212955b38e006a54efc0c26d2de59f0f90c459c81bc54bc071ed4d9ee16c",
+      "SHA-384":
+        "d67519c5b09bef37a7b387eb40403fb7bf8798d0a2bb840366cc9eaab3aa561ea49c1e754cd017584115d08194ed486d",
+      "SHA-512":
+        "058f4b854906a69504f44fc4d9bfcd2cb8c7c599c8dbe846900901674967008496a73ac73025f317c7b97a7cfebf77cc3cfe43257fc8f75e2b7b287dc5fdbb6f",
+      /** The same input hashed over the decoded exponent bytes, which Wander does not do. */
+      decodedBytesSha256: "ba8158b24c4578f7ba8846cc7159fa5da0bd398a9ef4fe5a8b46e04a0b381bc8",
+    };
+    const vectorKey = { kty: "RSA", e: "AQAB", n: "unused", d: PRIVATE_HASH_VECTOR.d } as JWKInterface;
+    const toHex = (buffer: ArrayBuffer) =>
+      Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+    it.each(["SHA-256", "SHA-384", "SHA-512"] as const)("matches the Wander known answer for %s", async (hash) => {
+      const result = await privateHash(vectorKey, bytes(PRIVATE_HASH_VECTOR.message), hash);
+      expect(toHex(result)).toBe(PRIVATE_HASH_VECTOR[hash]);
+    });
+
+    it("hashes d as base64url text, not as the decoded exponent", async () => {
+      const result = toHex(await privateHash(vectorKey, bytes(PRIVATE_HASH_VECTOR.message)));
+      expect(result).not.toBe(PRIVATE_HASH_VECTOR.decodedBytesSha256);
+    });
+
+    it("matches Wander's construction for a generated wallet", async () => {
+      const data = bytes("any input");
+      const wander = await crypto.subtle.digest(
+        "SHA-512",
+        new Uint8Array([...new Uint8Array(data), ...new TextEncoder().encode(jwk.d)]),
+      );
+      expect(toHex(await privateHash(jwk, data, "SHA-512"))).toBe(toHex(wander));
+    });
+
+    it("rejects a key without d", async () => {
+      const publicOnly = { kty: "RSA", e: "AQAB", n: "unused" } as JWKInterface;
+      await expect(privateHash(publicOnly, bytes("x"))).rejects.toThrow(/no 'd' field/);
+    });
+
     it("is deterministic for the same wallet and input", async () => {
       const data = new TextEncoder().encode("hash me").buffer;
 

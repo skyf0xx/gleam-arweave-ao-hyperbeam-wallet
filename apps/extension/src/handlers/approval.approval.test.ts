@@ -822,11 +822,11 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     ).resolves.toBe(true);
   });
 
-  it("encrypt and decrypt survive the storage round trip, including an AES IV", async () => {
+  it("encrypt and decrypt survive the storage round trip, including an RSA-OAEP label", async () => {
     const jwk = await generateJWK();
     await cacheKey(WALLET_ID, jwk, "abc-address");
     const plaintext = new TextEncoder().encode("secret");
-    const iv = new Uint8Array(12).fill(7);
+    const label = new Uint8Array(12).fill(7);
 
     async function approve(kind: "encrypt" | "decrypt", payload: Uint8Array): Promise<Uint8Array> {
       const pending = handler.requestApproval({
@@ -834,7 +834,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
         origin: "https://bazar.arweave.net",
         walletId: WALLET_ID,
         payload,
-        encryptAlgorithm: { name: "AES-GCM", iv: iv.buffer },
+        encryptAlgorithm: { name: "RSA-OAEP", label: label.buffer },
       });
       await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
       const requestId = extractRequestId(windows.opened.pop()!);

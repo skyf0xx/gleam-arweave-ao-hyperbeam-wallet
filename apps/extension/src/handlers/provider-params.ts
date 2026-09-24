@@ -93,10 +93,10 @@ export function readSaltLength(options: unknown, method: string): number | undef
 }
 
 /**
- * Accepts the WebCrypto params object Wander takes (`{ name: "RSA-OAEP" }`
- * and the AES variants), rebuilt with only the fields that are set so a
- * `null` or `{}` from the page is dropped or rejected before an approval
- * window opens. Wander's deprecated `{ algorithm, hash, salt }`
+ * Accepts `{ name: "RSA-OAEP", label? }`, rebuilt with only the fields
+ * that are set so a `null` or `{}` from the page is dropped or rejected
+ * before an approval window opens. AES params are refused, since Wander
+ * only ever fails on them. Wander's deprecated `{ algorithm, hash, salt }`
  * form uses a hybrid RSA+AES construction this wallet does not implement,
  * so it is rejected rather than silently encrypted some other way.
  */

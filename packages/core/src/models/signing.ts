@@ -103,11 +103,10 @@ export interface BatchSignDataItemRequest {
 export type BatchSignDataItemResult = ArrayBuffer[];
 
 /**
- * WebCrypto's own `RsaOaepParams`/`AesCtrParams`/`AesCbcParams`/
- * `AesGcmParams` shapes, re-declared here rather than imported: `core`
- * has zero `chrome.*`/DOM dependency, and this keeps the model
- * resolvable under a `lib.dom`-free tsconfig. Field names match
- * WebCrypto exactly so a real `crypto.subtle.encrypt(...)` call needs no
+ * WebCrypto's `RsaOaepParams`, re-declared here rather than imported:
+ * `core` has zero `chrome.*`/DOM dependency, and this keeps the model
+ * resolvable under a `lib.dom`-free tsconfig. Field names match WebCrypto
+ * exactly so a real `crypto.subtle.encrypt(...)` call needs no
  * translation.
  */
 export interface RsaOaepParams {
@@ -115,25 +114,11 @@ export interface RsaOaepParams {
   label?: ArrayBuffer;
 }
 
-export interface AesCtrParams {
-  name: "AES-CTR";
-  counter: ArrayBuffer;
-  length: number;
-}
-
-export interface AesCbcParams {
-  name: "AES-CBC";
-  iv: ArrayBuffer;
-}
-
-export interface AesGcmParams {
-  name: "AES-GCM";
-  iv: ArrayBuffer;
-  additionalData?: ArrayBuffer;
-  tagLength?: number;
-}
-
-export type EncryptAlgorithm = RsaOaepParams | AesCtrParams | AesCbcParams | AesGcmParams;
+/**
+ * RSA-OAEP only. Wander's type also lists the AES params, but it runs
+ * them against the wallet's RSA key, where WebCrypto always rejects them.
+ */
+export type EncryptAlgorithm = RsaOaepParams;
 
 export interface EncryptRequest {
   walletId: string;

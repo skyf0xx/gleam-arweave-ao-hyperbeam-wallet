@@ -1,5 +1,4 @@
 import type { JWKInterface } from "../models/wallet";
-import { base64UrlToBytes } from "./base64";
 
 /**
  * `signMessage()`/`signature()`/`privateHash()`/`verifyMessage()` over
@@ -13,8 +12,9 @@ import { base64UrlToBytes } from "./base64";
  * - `signature` is the deprecated raw form: RSA-PSS/SHA-256 straight over
  *   the data, salt length from `saltLength` (default 32).
  *
- * `privateHash` is `digest(data || d)`, with `d` the private exponent
- * decoded from base64url.
+ * `privateHash` is `digest(data || UTF-8(d))`: Wander appends the JWK's
+ * base64url `d` string as text, not the exponent's decoded bytes
+ * (`src/api/modules/private_hash/private_hash.background.ts`).
  */
 
 export type MessageHashAlgorithm = "SHA-256" | "SHA-384" | "SHA-512";
@@ -86,12 +86,17 @@ export async function privateHash(
   if (!jwk.d) {
     throw new Error("privateHash requires a wallet's private key material (JWK has no 'd' field).");
   }
-  const privateExponentBytes = base64UrlToBytes(jwk.d);
+  const privateExponentText = new TextEncoder().encode(jwk.d);
   const dataBytes = new Uint8Array(data);
-  const combined = new Uint8Array(dataBytes.byteLength + privateExponentBytes.byteLength);
+  const combined = new Uint8Array(dataBytes.byteLength + privateExponentText.byteLength);
   combined.set(dataBytes, 0);
-  combined.set(privateExponentBytes, dataBytes.byteLength);
-  return crypto.subtle.digest(hashAlgorithm, combined);
+  combined.set(privateExponentText, dataBytes.byteLength);
+  try {
+    return await crypto.subtle.digest(hashAlgorithm, combined);
+  } finally {
+    combined.fill(0);
+    privateExponentText.fill(0);
+  }
 }
 
 /**
