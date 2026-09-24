@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Aborting any provider call disconnects the dApp (S, opus)**
-  `entrypoints/provider/index.ts` (`onAbort`). It posts a `disconnect`
-  request with `{cancelOf}`, which the background runs as a real disconnect
-  and grant revoke. Done: an abort only rejects locally (or sends a real
-  cancel message), and never revokes the grant. Regression test.
 - [ ] **Large `dispatch` signs a bundled data item and never uploads it (M, opus)**
   `core/vault/signing.ts` (`dispatchTransaction`, over 100 KB). It returns
   `{id, type: "BUNDLED"}` for a data item that is never posted anywhere, so
@@ -293,3 +288,9 @@ vault, crypto and provider security; `sonnet` for everything else.
   `Missing permission(s) for "<method>": <PERMS>`, which is modelled on
   ArConnect, not copied from a live Wander. permawebOS says
   `Missing wallet permission: <PERMS>`. Match Wander if dApps parse it.
+- **Aborting a provider call leaves its approval open (opus)**
+  `entrypoints/provider/index.ts`, `entrypoints/content/index.ts`,
+  `src/handlers/approval.ts`. An abort only rejects the page's promise.
+  The approval window stays open, and approving it still signs. Add a
+  cancel message through the bridge that closes the approval and rejects
+  the pending request.

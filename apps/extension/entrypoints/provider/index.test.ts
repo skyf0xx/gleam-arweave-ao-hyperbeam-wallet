@@ -193,17 +193,21 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     await assertion;
   });
 
-  it("supports AbortSignal, posting a cancel message and rejecting immediately (point 5)", async () => {
+  it("rejects immediately on abort without posting any further request (point 5)", async () => {
     const controller = new AbortController();
     const callPromise = provider.sign({ some: "tx" }, { signal: controller.signal } as never);
+    const signEnvelope = lastRequestEnvelope();
+    postMessageSpy.mockClear();
+
     const assertion = expect(callPromise).rejects.toThrow(/aborted/i);
     controller.abort();
     await assertion;
 
-    const cancelCall = postMessageSpy.mock.calls.find(
-      ([message]) => (message as { method?: string })?.method === "disconnect",
-    );
-    expect(cancelCall).toBeDefined();
+    // A posted `disconnect` would be run by the background and revoke the grant.
+    expect(postMessageSpy).not.toHaveBeenCalled();
+
+    // A late response for the aborted call is dropped.
+    expect(() => postResponse({ type: RESPONSE, id: signEnvelope.id, result: "late" })).not.toThrow();
   });
 
   it("rejects immediately for an already-aborted signal, without posting a request", async () => {

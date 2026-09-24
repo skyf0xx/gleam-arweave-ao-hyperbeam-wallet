@@ -31,8 +31,10 @@ import {
  * 4. A timeout that rejects — a hung/killed service worker must not hang
  *    the calling dApp forever.
  * 5. `AbortSignal` support (an `options.signal` parameter accepted on
- *    every method) — posts a distinct cancel message on abort so the
- *    content script can tell the background to give up waiting too.
+ *    every method). An abort only rejects the page-side promise. The
+ *    bridge has no cancel message, and it must never post a real method
+ *    such as `disconnect`: the background would run it and revoke the
+ *    dApp's grant.
  * 6. Tagged binary encoding/decoding for `ArrayBuffer`/`Uint8Array`
  *    params and results, since neither survives `postMessage` intact in
  *    every embedding context this provider might run in.
@@ -149,9 +151,6 @@ class GleamProvider {
         pendingCall.settled = true;
         clearTimeout(timeoutId);
         this.pending.delete(id);
-        // (5) Tells the content script/background to stop waiting too,
-        // rather than only rejecting this side's promise.
-        window.postMessage({ type: REQUEST, id, method: "disconnect", params: { cancelOf: id } }, "*");
         reject(new Error(`"${method}" was aborted.`));
       };
       signal?.addEventListener("abort", onAbort, { once: true });
