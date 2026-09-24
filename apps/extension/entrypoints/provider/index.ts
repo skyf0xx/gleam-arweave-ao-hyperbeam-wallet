@@ -42,9 +42,13 @@ import {
  * 6. Tagged binary encoding/decoding for `ArrayBuffer`/`Uint8Array`
  *    params and results, since neither survives `postMessage` intact in
  *    every embedding context this provider might run in.
- * 7. Never clobbers an existing `window.arweaveWallet` — if one is
- *    already installed (a competing wallet extension), this provider
- *    installs nothing and leaves it alone entirely.
+ * 7. Always owns `window.arweaveWallet`, even when another wallet
+ *    extension (Wander) is installed. Extension content scripts run in no
+ *    guaranteed order, so this replaces a provider that got there first,
+ *    ignores later plain assignments, and takes the slot back when a
+ *    later `defineProperty` replaces it and announces
+ *    `arweaveWalletLoaded`. A dApp that already cached the other object
+ *    keeps it.
  */
 const REQUEST_TIMEOUT_MS = 60_000;
 /** Leaves time to sign or post once the user approves at the last moment. */
@@ -284,21 +288,39 @@ class GleamProvider {
   }
 }
 
-function install(): void {
-  // (7) Never clobber an existing provider — if a competing wallet
-  // extension already installed `window.arweaveWallet`, this provider
-  // does nothing further.
-  if ((window as unknown as { arweaveWallet?: unknown }).arweaveWallet) {
-    return;
-  }
+type WalletWindow = { arweaveWallet?: unknown };
 
+function claimSlot(api: GleamProvider): boolean {
+  try {
+    Object.defineProperty(window, "arweaveWallet", {
+      get: () => api,
+      // A setter that drops the value keeps `window.arweaveWallet = other`
+      // from throwing in the other wallet's strict-mode script.
+      set: () => undefined,
+      configurable: true,
+      enumerable: true,
+    });
+    return true;
+  } catch {
+    // Another script made the slot non-configurable first. Nothing can
+    // replace it, and throwing here would only break the page.
+    return false;
+  }
+}
+
+/** Returns a teardown that stops reclaiming the slot, for tests. */
+function install(): () => void {
   const api = new GleamProvider();
-  Object.defineProperty(window, "arweaveWallet", {
-    value: api,
-    configurable: true,
-    writable: true,
-  });
+  if (!claimSlot(api)) return () => undefined;
+
+  const reclaim = () => {
+    if ((window as unknown as WalletWindow).arweaveWallet !== api) {
+      claimSlot(api);
+    }
+  };
+  window.addEventListener("arweaveWalletLoaded", reclaim);
   window.dispatchEvent(new CustomEvent("arweaveWalletLoaded"));
+  return () => window.removeEventListener("arweaveWalletLoaded", reclaim);
 }
 
 // `defineUnlistedScript` is imported explicitly from `wxt/utils/

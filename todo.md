@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 3. dApp provider gaps
 
-- [ ] **Take over `window.arweaveWallet` when Wander is also installed (S, 🧪, opus)**
-  `entrypoints/provider/index.ts` (`install` returns early if
-  `window.arweaveWallet` exists). Decided: Gleam always becomes the
-  provider, no setting. Wander is deprecated, so don't handle dApps that
-  cached its object. Done: with both installed, dApp calls reach Gleam.
 - [ ] **`sign`/`dispatch` preview shows raw Winston and no fee (S, sonnet)**
   `entrypoints/approval/src/SigningApprovalScreen.tsx`,
   `entrypoints/background/index.ts`. Done: the amount is formatted as AR,

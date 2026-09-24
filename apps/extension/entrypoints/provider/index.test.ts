@@ -333,32 +333,96 @@ describe("provider.ts: GleamProvider bridge", () => {
   });
 });
 
-describe("provider.ts: install() never clobbers an existing provider (point 7)", () => {
+describe("provider.ts: install() takes over window.arweaveWallet (point 7)", () => {
+  let teardown: (() => void) | undefined;
+
   afterEach(() => {
+    teardown?.();
+    teardown = undefined;
     // @ts-expect-error -- test cleanup of a global this suite installs
     delete window.arweaveWallet;
   });
 
+  function current(): { walletName?: string } | undefined {
+    return (window as unknown as { arweaveWallet?: { walletName?: string } })
+      .arweaveWallet;
+  }
+
+  function installOther(value: unknown, writable = true): void {
+    Object.defineProperty(window, "arweaveWallet", {
+      value,
+      configurable: true,
+      writable,
+    });
+  }
+
   it("installs window.arweaveWallet with walletName 'Gleam' when none exists", () => {
-    install();
-    expect(
-      (window as unknown as { arweaveWallet: { walletName: string } })
-        .arweaveWallet.walletName,
-    ).toBe("Gleam");
+    teardown = install();
+    expect(current()?.walletName).toBe("Gleam");
   });
 
-  it("does not overwrite an already-installed provider", () => {
-    const existing = { walletName: "SomeoneElse" };
-    Object.defineProperty(window, "arweaveWallet", {
-      value: existing,
-      configurable: true,
-      writable: true,
-    });
+  it("announces itself with arweaveWalletLoaded", () => {
+    const onLoaded = vi.fn();
+    window.addEventListener("arweaveWalletLoaded", onLoaded);
+    teardown = install();
+    window.removeEventListener("arweaveWalletLoaded", onLoaded);
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+  });
 
-    install();
+  it("replaces a provider another wallet installed first", () => {
+    installOther({ walletName: "Wander" });
+    teardown = install();
+    expect(current()?.walletName).toBe("Gleam");
+  });
 
-    expect(
-      (window as unknown as { arweaveWallet: unknown }).arweaveWallet,
-    ).toBe(existing);
+  it("replaces a read-only provider another wallet installed first", () => {
+    installOther({ walletName: "Wander" }, false);
+    teardown = install();
+    expect(current()?.walletName).toBe("Gleam");
+  });
+
+  it("ignores a later plain assignment without throwing in strict mode", () => {
+    teardown = install();
+    expect(() => {
+      (window as unknown as { arweaveWallet: unknown }).arweaveWallet = {
+        walletName: "Wander",
+      };
+    }).not.toThrow();
+    expect(current()?.walletName).toBe("Gleam");
+  });
+
+  it("takes the slot back when a later wallet redefines it and announces arweaveWalletLoaded", () => {
+    teardown = install();
+    const gleam = current();
+
+    installOther({ walletName: "Wander" });
+    window.dispatchEvent(new CustomEvent("arweaveWalletLoaded"));
+
+    expect(current()).toBe(gleam);
+  });
+
+  it("leaves a non-configurable provider alone instead of throwing", () => {
+    installOther({ walletName: "Wander" });
+    const onLoaded = vi.fn();
+    const realDefineProperty = Object.defineProperty;
+    const defineProperty = vi
+      .spyOn(Object, "defineProperty")
+      .mockImplementation((target, key, descriptor) => {
+        if (key === "arweaveWallet") {
+          throw new TypeError("Cannot redefine property: arweaveWallet");
+        }
+        return realDefineProperty(target, key, descriptor);
+      });
+    window.addEventListener("arweaveWalletLoaded", onLoaded);
+    try {
+      expect(() => {
+        teardown = install();
+      }).not.toThrow();
+      expect(current()?.walletName).toBe("Wander");
+      expect(onLoaded).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("arweaveWalletLoaded", onLoaded);
+      defineProperty.mockRestore();
+    }
   });
 });

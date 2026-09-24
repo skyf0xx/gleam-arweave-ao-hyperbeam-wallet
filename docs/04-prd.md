@@ -180,8 +180,8 @@ bridge requests through content script → background → approval popup.
     `chrome.windows.create` popup window, never inline in the extension
     popup (a popup closes on focus loss, which would silently drop the
     request).
-  - The existing `window.arweaveWallet` is never clobbered if already
-    present.
+  - Gleam always owns `window.arweaveWallet`, even when another Arweave
+    wallet extension (Wander) is installed. There is no setting for it.
 
 ### Feature: Signing approval
 Every sign/dispatch/signDataItem/batchSignDataItem request from a
