@@ -576,6 +576,44 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     expect(screen.queryByText(/AR$/)).toBeNull();
   });
 
+  it("shows the raw atomic amount, not a denomination-scaled guess, for an entry whose matching balance is unavailable", async () => {
+    const unavailableToken: TokenBalance = {
+      address: WALLET.address,
+      processId: "processABC",
+      ticker: "PNTS",
+      denomination: 12,
+      name: null,
+      quantity: "0",
+      available: false,
+    };
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-ao-unavailable",
+          type: "receive",
+          address: WALLET.address,
+          amount: "500",
+          status: "confirmed",
+          tags: [],
+          timestamp: Date.now(),
+          token: "processABC",
+        },
+      ],
+      cursor: null,
+    };
+    const send = sendWith({ tokenBalances: [unavailableToken], activity });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    // Never scaled by the unavailable row's (untrustworthy) denomination —
+    // shows the raw atomic amount instead, same as "no match at all", but
+    // still uses the resolved ticker since identity is known even though
+    // the balance isn't.
+    await waitFor(() => expect(screen.getByText("+500 PNTS")).toBeTruthy());
+  });
+
   it("falls back to a shortened process id when an AO entry's token isn't in the balance list", async () => {
     const activity: ActivityPage = {
       entries: [

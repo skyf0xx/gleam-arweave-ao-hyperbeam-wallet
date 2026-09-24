@@ -160,7 +160,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                     </span>
                     {balance ? (
                       <span className="flex-shrink-0 font-mono text-label text-muted">
-                        {formatAtomicAsDisplay(balance.quantity, balance.denomination)}
+                        {balance.available === false ? "Unavailable" : formatAtomicAsDisplay(balance.quantity, balance.denomination)}
                       </span>
                     ) : null}
                     <button
@@ -206,7 +206,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               <div className="flex items-center justify-between py-1">
                 <span className="text-label font-semibold text-foreground">{preview.ticker}</span>
                 <span className="font-mono text-label text-muted">
-                  {formatAtomicAsDisplay(preview.quantity, preview.denomination)}
+                  {preview.available === false ? "Unavailable" : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
                 </span>
               </div>
             ) : null}

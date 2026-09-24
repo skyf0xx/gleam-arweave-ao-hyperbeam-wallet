@@ -268,7 +268,7 @@ describe("ReadsHandler: getTokenBalances", () => {
     expect(unregistered?.denomination).toBe(8);
   });
 
-  it("leaves an unregistered token's balance untouched when the metadata lookup fails (one bad lookup shouldn't fail the read)", async () => {
+  it("marks an unregistered token unavailable (never AO's denomination default) when the metadata lookup fails", async () => {
     const storage = createFakeStorage();
     await storage.set("local:watchedProcessIds:addr1", ["unknownProc"]);
     await storage.set("local:networkSettings", {
@@ -281,6 +281,8 @@ describe("ReadsHandler: getTokenBalances", () => {
       if (url.includes("/graphql")) {
         return { ok: false, status: 500, json: async () => ({}) };
       }
+      // Bare-quantity HyperBEAM response: getTokenBalance's own AO-specific
+      // fallback denomination (12) must never surface for a non-AO token.
       return { ok: true, status: 200, json: async () => "42" };
     }) as unknown as typeof fetch;
 
@@ -289,6 +291,44 @@ describe("ReadsHandler: getTokenBalances", () => {
 
     const unregistered = balances.find((b) => b.processId === "unknownProc");
     expect(unregistered?.ticker).toBe("unknownProc");
+    // Denomination couldn't be confirmed, so `available: false` — not the
+    // caller trusting `getTokenBalance`'s AO-specific 12 default to scale
+    // this (or any) non-AO token's display.
+    expect(unregistered?.available).toBe(false);
+  });
+
+  it("marks an unregistered token unavailable when its spawn tags resolve no denomination", async () => {
+    const storage = createFakeStorage();
+    const processId = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
+    await storage.set("local:watchedProcessIds:addr1", [processId]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [{ node: { id: processId, tags: [{ name: "ticker", value: "wUSDC" }] } }],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    const unregistered = balances.find((b) => b.processId === processId);
+    expect(unregistered?.available).toBe(false);
   });
 
   it("caches resolved spawn-tag metadata by process id, hitting the gateway only once across repeated getTokenBalances calls", async () => {

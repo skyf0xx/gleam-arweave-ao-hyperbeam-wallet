@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **A non-AO token still falls back to AO's denomination (S, sonnet)**
-  `reads.ts` (`withUnregisteredMetadata`). When the spawn-tag lookup
-  fails, the token keeps `getTokenBalance`'s AO default of 12, so its
-  balance can be off by orders of magnitude (and a comment there claims
-  otherwise). Done: an unresolved denomination marks the row unavailable
-  instead of guessing; do this with the per-token failure item below.
 - [ ] **One failing token read blanks every token balance (S, sonnet)**
   `reads.ts` (`getTokenBalances` uses `Promise.all`). Done: per-token
   failure shows that row as unavailable, and the others still render.

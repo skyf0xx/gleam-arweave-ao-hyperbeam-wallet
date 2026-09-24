@@ -103,6 +103,15 @@ interface DefaultTokenRow {
  * (`TokenPrice.usd === null`, per that query's own HONESTY contract), so
  * `TokenRow` renders no `$` line rather than a fabricated `$0.00`.
  */
+/**
+ * Shown in place of a formatted amount for a `TokenBalance` whose
+ * `available` is `false` (`handlers/reads.ts`: a failed HyperBEAM read, or
+ * a non-AO token whose denomination couldn't be confirmed) — never a
+ * guessed quantity, which for a wrong denomination could be off by orders
+ * of magnitude.
+ */
+const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
+
 function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null, amount: number): string | undefined {
   const price = prices?.find((entry) => entry.processId === processId)?.usd;
   return typeof price === "number" ? formatUsd(amount * price) : undefined;
@@ -116,8 +125,9 @@ function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null,
  */
 function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPrice[] | undefined): DefaultTokenRow[] {
   const aoBalance = data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
+  const aoAvailable = aoBalance !== undefined && aoBalance.available !== false;
   const arAmount = data?.arBalance !== undefined ? Number(formatWinstonAsAr(data.arBalance, 12)) : 0;
-  const aoAmount = aoBalance ? Number(formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination, aoBalance.denomination)) : 0;
+  const aoAmount = aoAvailable ? Number(formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination, aoBalance.denomination)) : 0;
 
   return [
     {
@@ -132,9 +142,13 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
       key: "default-ao",
       ticker: DEFAULT_AO_TOKEN.ticker,
       name: DEFAULT_AO_TOKEN.name,
-      amount: aoBalance ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination) : DEFAULT_AO_TOKEN.defaultDisplayAmount,
-      usdValue: aoBalance ? usdValueFor(prices, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
-      sendToken: aoBalance ?? null,
+      amount: aoAvailable
+        ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination)
+        : aoBalance
+          ? UNAVAILABLE_BALANCE_LABEL
+          : DEFAULT_AO_TOKEN.defaultDisplayAmount,
+      usdValue: aoAvailable ? usdValueFor(prices, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
+      sendToken: aoAvailable ? (aoBalance ?? null) : null,
     },
   ];
 }
@@ -156,15 +170,26 @@ function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance
  * live balance instead. Falls back to the raw atomic amount and a
  * shortened processId when no matching balance is loaded, rather than
  * mislabeling the entry as AR.
+ *
+ * A `match` whose `available` is `false` (`handlers/reads.ts`: failed
+ * HyperBEAM read, or unconfirmed non-AO denomination) is treated the same
+ * as no match — its `denomination` can't be trusted to scale
+ * `entry.amount`, which would otherwise show the same guessed-by-orders-
+ * of-magnitude number the "unavailable" state exists to prevent. Its
+ * `ticker` is still used when resolved (not just an echoed process id),
+ * since identity can be known even when the balance isn't.
  */
 function formatActivityAmount(entry: { amount: string | null; token?: string | null }, tokenBalances: TokenBalance[] | undefined): string {
   if (entry.amount === null) return "—";
   if (!entry.token) return `${formatWinstonAsAr(entry.amount)} AR`;
 
   const match = tokenBalances?.find((token) => token.processId === entry.token);
-  if (match) return `${formatAtomicAsDisplay(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
+  if (match && match.available !== false) {
+    return `${formatAtomicAsDisplay(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
+  }
 
-  return `${entry.amount} ${displayTicker(entry.token)}`;
+  const ticker = match && match.ticker !== entry.token ? match.ticker : entry.token;
+  return `${entry.amount} ${displayTicker(ticker)}`;
 }
 
 /**
@@ -489,9 +514,13 @@ export function MainScreenView({
                     key={token.processId}
                     glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                     name={token.ticker}
-                    amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
+                    amount={
+                      token.available === false
+                        ? UNAVAILABLE_BALANCE_LABEL
+                        : formatAtomicAsDisplay(token.quantity, token.denomination)
+                    }
                     loading={loading}
-                    onClick={() => onSendToken(token)}
+                    onClick={token.available === false ? undefined : () => onSendToken(token)}
                   />
                 ))}
               </>

@@ -227,10 +227,14 @@ export class ReadsHandler {
    * token's identity (checked first) is never overridden by this lookup.
    *
    * Denomination for a non-AO process always comes from this metadata
-   * lookup (or stays `null`-equivalent — HyperBEAM's own response carries
-   * no denomination for anything but the AO token, see `ao/balance.ts`),
-   * never from `getTokenBalance`'s AO-specific denomination-12 default,
-   * which only actually applies to the AO token itself.
+   * lookup, never from `getTokenBalance`'s AO-specific denomination-12
+   * default, which is only actually correct for the AO token itself —
+   * HyperBEAM's own response carries no denomination for anything else
+   * (see `ao/balance.ts`). When this lookup can't confirm a denomination
+   * (metadata unresolved, or resolved with no `denomination` tag), the row
+   * is marked `available: false` rather than rendered scaled by AO's
+   * guess, which could be off by orders of magnitude for a token with a
+   * different denomination.
    *
    * Cached by process id in `local:tokenMetadata:{processId}` with no
    * expiry: spawn tags are immutable once a process exists (see
@@ -241,11 +245,10 @@ export class ReadsHandler {
    * another chance to resolve it.
    *
    * A metadata lookup failure (`resolveUnregisteredTokenMetadata` returning
-   * `null` — unreachable gateway, unspawned/unindexed process id) leaves
-   * the balance exactly as `getTokenBalance` returned it (process id as
-   * ticker, no name, HyperBEAM's own denomination guess) rather than
-   * throwing — one unresolvable token's identity shouldn't fail every other
-   * token's balance read in the same `getTokenBalances` call.
+   * `null` — unreachable gateway, unspawned/unindexed process id) never
+   * throws — one unresolvable token's identity shouldn't fail every other
+   * token's balance read in the same `getTokenBalances` call. It instead
+   * marks this one row unavailable (see above).
    */
   private async withUnregisteredMetadata(
     balance: TokenBalance,
@@ -254,12 +257,21 @@ export class ReadsHandler {
     if (isRegisteredProcessId(balance.processId)) return balance;
 
     const metadata = await this.resolveTokenMetadataCached(balance.processId, gatewayUrl);
-    if (metadata === null) return balance;
+    if (metadata === null) return { ...balance, available: false };
+
+    if (metadata.denomination === null) {
+      // Ticker/name did resolve even though denomination didn't — still
+      // applied below. `quantity` is kept as-is (it's a real atomic-unit
+      // count from the HyperBEAM read); only the denomination needed to
+      // scale it for display is unconfirmed, so `available: false` tells
+      // callers not to trust a display formatted from it.
+      return { ...balance, ticker: metadata.ticker ?? balance.ticker, name: metadata.name, available: false };
+    }
 
     return {
       ...balance,
       ticker: metadata.ticker ?? balance.ticker,
-      denomination: metadata.denomination ?? balance.denomination,
+      denomination: metadata.denomination,
       name: metadata.name,
     };
   }

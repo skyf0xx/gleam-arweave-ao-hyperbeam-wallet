@@ -116,6 +116,15 @@ const INITIAL_STEP: Extract<Step, { kind: "compose" }> = {
   submitting: false,
 };
 
+/**
+ * Shown in place of a formatted amount for a `TokenBalance` whose
+ * `available` is `false` (`handlers/reads.ts`: a failed HyperBEAM read, or
+ * an unconfirmed non-AO denomination) — such a row's `quantity`/
+ * `denomination` can't be trusted for display or for a max-send check, so
+ * the row is shown but not selectable (`onClick` omitted).
+ */
+const UNAVAILABLE_TOKEN_BALANCE_LABEL = "Unavailable";
+
 /** `token.ticker` for an AO token, `"AR"` for the native token (`token === null`). */
 function tickerFor(token: TokenBalance | null): string {
   return token === null ? "AR" : displayTicker(token.ticker);
@@ -656,9 +665,15 @@ function TokenPickerStep({
         <TokenRow
           glyph={{ label: DEFAULT_AO_TOKEN.ticker, tone: 2 }}
           name={DEFAULT_AO_TOKEN.name}
-          amount={aoBalance ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination) : DEFAULT_AO_TOKEN.defaultDisplayAmount}
+          amount={
+            aoBalance
+              ? aoBalance.available === false
+                ? UNAVAILABLE_TOKEN_BALANCE_LABEL
+                : formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination)
+              : DEFAULT_AO_TOKEN.defaultDisplayAmount
+          }
           loading={loading}
-          onClick={() => onSelect(aoToken)}
+          onClick={aoBalance?.available === false ? undefined : () => onSelect(aoToken)}
           className={selectedToken?.processId === DEFAULT_AO_TOKEN.processId ? "bg-mist" : undefined}
         />
 
@@ -673,8 +688,12 @@ function TokenPickerStep({
               key={candidate.processId}
               glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2 }}
               name={displayTicker(candidate.ticker)}
-              amount={formatAtomicAsDisplay(candidate.quantity, candidate.denomination)}
-              onClick={() => onSelect(candidate)}
+              amount={
+                candidate.available === false
+                  ? UNAVAILABLE_TOKEN_BALANCE_LABEL
+                  : formatAtomicAsDisplay(candidate.quantity, candidate.denomination)
+              }
+              onClick={candidate.available === false ? undefined : () => onSelect(candidate)}
               className={selectedToken?.processId === candidate.processId ? "bg-mist" : undefined}
             />
           ))

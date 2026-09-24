@@ -20,4 +20,16 @@ export interface TokenBalance {
   name: string | null;
   /** Atomic integer string in the token's own smallest unit. */
   quantity: string;
+  /**
+   * `false` when this row couldn't be resolved with any confidence: either
+   * the HyperBEAM balance read itself failed (in which case `quantity` is
+   * `"0"` and `denomination` is `0`, both placeholders), or the read
+   * succeeded but a non-AO process's denomination couldn't be confirmed
+   * from its spawn tags (in which case `quantity` is the real atomic-unit
+   * count, but `denomination` can't be trusted to scale it for display).
+   * Callers must render the row as unavailable rather than formatting
+   * either field. Defaults to `true` (omitted) for every balance resolved
+   * with a confirmed denomination.
+   */
+  available?: boolean;
 }
