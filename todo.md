@@ -131,10 +131,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish and cleanup
 
-- [ ] **Remove unused wire contracts (S, sonnet)**
-  `packages/messaging/src/signing-protocol.ts` and `token-protocol.ts` are
-  only imported by their own tests. Done: either the provider and
-  background use them after the section 1 fixes, or they're deleted.
 - [ ] **Strip build-log comments from `packages/` (S, sonnet)**
   About 180 comments across 63 files narrate the old build ("this task's",
   "ALLOWED SCOPE", "final report", "debt #1", "RELEVANT RULES"), and some
