@@ -10,11 +10,19 @@ import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type Permission
 const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
 vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
 
-type Handler = (message: { data: unknown }) => unknown;
+type Sender = { url?: string; origin?: string; frameId?: number; tab?: { id?: number; url?: string } };
+type Handler = (message: { data: unknown; sender?: Sender }) => unknown;
 
+const POPUP_SENDER: Sender = { url: "chrome-extension://test/popup.html" };
+const contentSender = (origin: string): Sender => ({ url: `${origin}/app`, frameId: 0, tab: { id: 7, url: `${origin}/app` } });
+
+// Direct handler calls default to the popup as sender; providerCall below
+// passes a content-script sender.
 const registeredHandlers = new Map<string, Handler>();
+const rawHandlers = new Map<string, Handler>();
 const onMessage = vi.fn((type: string, handler: Handler) => {
-  registeredHandlers.set(type, handler);
+  rawHandlers.set(type, handler);
+  registeredHandlers.set(type, (message) => handler({ sender: POPUP_SENDER, ...message }));
   return () => registeredHandlers.delete(type);
 });
 const sendMessage = vi.fn().mockResolvedValue(undefined);
@@ -77,6 +85,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
   beforeEach(async () => {
     vi.resetModules();
     registeredHandlers.clear();
+    rawHandlers.clear();
     store.clear();
     watchers.clear();
     onMessage.mockClear();
@@ -91,10 +100,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     globalThis.fetch = originalFetch;
   });
 
-  function providerCall(data: unknown): Promise<unknown> {
-    const handler = registeredHandlers.get("providerCall");
+  function providerCall({ origin, ...data }: { origin: string; method: string; params: unknown }): Promise<unknown> {
+    const handler = rawHandlers.get("providerCall");
     if (!handler) throw new Error("providerCall was never registered.");
-    return handler({ data }) as Promise<unknown>;
+    return handler({ data, sender: contentSender(origin) }) as Promise<unknown>;
   }
 
   it("registers a handler for every ProtocolMap method this layer owns", () => {
@@ -566,5 +575,64 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await expect(providerCall({ origin: ORIGIN, method, params: {} })).resolves.not.toThrow();
     });
   });
-});
 
+  describe("senders are checked against Chrome's sender, not the message body", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+
+    beforeEach(async () => {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    });
+
+    function call(method: string, data: unknown, sender: Sender): Promise<unknown> {
+      return (async () => rawHandlers.get(method)!({ data, sender }))();
+    }
+
+    it("providerCall uses the sender's origin and ignores an origin claimed in the body", async () => {
+      const data = { origin: ORIGIN, method: "getActiveAddress", params: {} };
+      await expect(call("providerCall", data, contentSender("https://evil.example"))).rejects.toThrow(
+        '"https://evil.example" is not connected',
+      );
+      await expect(call("providerCall", data, contentSender(ORIGIN))).resolves.toBe("addr-1");
+    });
+
+    it.each<[string, Sender]>([
+      ["an extension page", POPUP_SENDER],
+      ["a sub-frame", { ...contentSender(ORIGIN), frameId: 3 }],
+      ["a sender with no tab", { url: `${ORIGIN}/app` }],
+      ["a non-http page", { url: "file:///tmp/x.html", frameId: 0, tab: { id: 7 } }],
+    ])("providerCall from %s is rejected", async (_label, sender) => {
+      await expect(call("providerCall", { method: "getActiveAddress", params: {} }, sender)).rejects.toThrow(
+        /only accepted from a web page's content script/,
+      );
+    });
+
+    it("every other method is rejected from a content script, before its handler runs", async () => {
+      const guarded = [...rawHandlers.keys()].filter((method) => method !== "providerCall");
+      expect(guarded).toEqual(expect.arrayContaining(["exportWallet", "createWallet", "resolveApproval", "getApproval"]));
+      for (const method of guarded) {
+        await expect(call(method, { walletId: "wallet-1", requestId: "r", approved: true }, contentSender(ORIGIN)), method)
+          .rejects.toThrow(/can only be called from the Gleam extension/);
+      }
+      expect(store.get("local:wallets")).toHaveLength(1);
+    });
+
+    it("another extension's page is rejected", async () => {
+      await expect(call("getState", undefined, { url: "chrome-extension://other/popup.html" })).rejects.toThrow(
+        /can only be called from the Gleam extension/,
+      );
+    });
+
+    it("an extension page opened in a tab, such as the approval window, is accepted", async () => {
+      const sender = { url: "chrome-extension://test/approval.html", frameId: 0, tab: { id: 9 } };
+      await expect(call("getState", undefined, sender)).resolves.toMatchObject({
+        wallets: [expect.objectContaining({ id: "wallet-1" })],
+      });
+    });
+  });
+});

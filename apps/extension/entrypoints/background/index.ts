@@ -38,43 +38,36 @@ import {
   readTransaction,
   type ProviderArgs,
 } from "@/src/handlers/provider-params";
+import { contentScriptOrigin, isExtensionPageSender } from "@/src/sender";
 
 /**
- * The background service-worker entrypoint (this task's debt #1, and the
- * single most safety-critical file in this layer): constructs the real
- * adapters, constructs every handler class against them, and registers
- * every `ProtocolMap` method to its handler — the wiring that has never
- * existed before this task, even though every handler it wires
- * (`WalletLifecycleHandler`/`ReadsHandler`/`TransferHandler`/
- * `UploadHandler`) was already built and tested by earlier layers.
+ * The background service worker: builds the adapters and handlers and
+ * registers every `ProtocolMap` method.
  *
- * Privilege-tier enforcement (this task's highest-stakes rule, per
- * ARCHITECTURE.md §4.2): a page can only ever reach a `ProtocolMap`
- * method by routing through `providerCall` (`protocol.ts`'s own doc
- * comment on that method explains why no other entry point exists for
- * the 19-method provider surface). This file is the one and only place
- * `providerCall`'s handler validates the requested provider-surface
- * method against `PROVIDER_METHODS` before doing anything else with
- * it — the single choke point. `APPROVAL_METHODS`
- * (`getApproval`/`resolveApproval`) and
- * `KEY_METHODS` (`createWallet`/`importWallet`/`exportWallet`) are never
- * routed through `providerCall` at all; they're registered as their own
- * ordinary `onMessage` handlers, reachable only by whichever context
- * calls `sendMessage` for that exact method name directly (the approval
- * window for the former, the popup/sidepanel for the latter) — a
- * content-script relay has no way to invoke them except by going through
- * `providerCall`, which rejects every method not in `PROVIDER_METHODS`.
- * This mirrors `PROVIDER_METHODS`/`APPROVAL_METHODS`/`KEY_METHODS` being
- * pairwise disjoint (already unit-tested by `messaging`): there is no
- * method name that is simultaneously provider-reachable and
- * key/approval-reachable, so gating only `providerCall`'s single method
- * argument is sufficient to keep a page out of the other two tiers
- * entirely — a page cannot call `sendMessage("createWallet", ...)`
- * itself in the first place, since it has no `@webext-core/messaging`
- * messenger of its own; only the content script (which only ever calls
- * `providerCall`) and trusted extension pages have one.
+ * Every message is checked against Chrome's `sender`, never against
+ * anything the message body claims. `providerCall` is the only method a
+ * content script may send, and its origin is the sending frame's origin.
+ * Every other method (key export, wallet creation, approval resolution,
+ * settings) is accepted only from this extension's own pages. Within
+ * `providerCall`, the method must also be in `PROVIDER_METHODS`, which is
+ * disjoint from the approval and key tiers.
  */
 const messenger = defineExtensionMessaging<ProtocolMap>();
+const extensionBaseUrl = browser.runtime.getURL("");
+
+/**
+ * `onMessage` for methods only this extension's pages may call. A content
+ * script shares the extension's messaging channel, so without this check a
+ * compromised page's content script could export keys or approve its own
+ * requests.
+ */
+const onExtensionMessage: typeof messenger.onMessage = (type, onReceived) =>
+  messenger.onMessage(type, (message) => {
+    if (!isExtensionPageSender(message.sender, extensionBaseUrl)) {
+      throw new Error(`"${String(type)}" can only be called from the Gleam extension.`);
+    }
+    return onReceived(message);
+  });
 
 const storage = new WxtStoragePort();
 const windows = new WxtWindowPort(storage);
@@ -398,18 +391,16 @@ async function setLockedIcon(locked: boolean) {
   })
 }
 
-// wallet lifecycle — KEY_METHODS among these (createWallet/importWallet/
-// exportWallet) are never reachable through `providerCall`; see this
-// file's own doc comment for why gating `providerCall` alone suffices.
-messenger.onMessage("createWallet", (message) => lifecycle.createWallet(message.data));
-messenger.onMessage("importWallet", (message) => lifecycle.importWallet(message.data));
-messenger.onMessage("deleteWallet", async (message) => {
+// wallet lifecycle
+onExtensionMessage("createWallet", (message) => lifecycle.createWallet(message.data));
+onExtensionMessage("importWallet", (message) => lifecycle.importWallet(message.data));
+onExtensionMessage("deleteWallet", async (message) => {
   const revoked = await approval.revokeWalletAccess(message.data.walletId);
   await lifecycle.deleteWallet(message.data);
   for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
 });
-messenger.onMessage("renameWallet", (message) => lifecycle.renameWallet(message.data));
-messenger.onMessage("switchWallet", async (message) => {
+onExtensionMessage("renameWallet", (message) => lifecycle.renameWallet(message.data));
+onExtensionMessage("switchWallet", async (message) => {
   await lifecycle.switchWallet(message.data);
   // `switchWallet`'s locked signature returns `void`, so the resulting
   // active address is derived here from `getState()` after the call
@@ -420,17 +411,17 @@ messenger.onMessage("switchWallet", async (message) => {
     void broadcastWalletSwitch(active.address);
   }
 });
-messenger.onMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
-messenger.onMessage("lockWallet", async () => {
+onExtensionMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
+onExtensionMessage("lockWallet", async () => {
   await lifecycle.lockWallet();
   void setLockedIcon(true);
 });
-messenger.onMessage("unlockWallet", async (message) => {
+onExtensionMessage("unlockWallet", async (message) => {
   const result = await lifecycle.unlockWallet(message.data);
   void setLockedIcon(false);
   return result;
 });
-messenger.onMessage("resetAllWallets", async () => {
+onExtensionMessage("resetAllWallets", async () => {
   // Grants go first, here and in deleteWallet: a removal that fails
   // part-way must not leave a dApp connected to a wallet that is gone.
   const revoked = await approval.revokeAllAccess();
@@ -439,13 +430,13 @@ messenger.onMessage("resetAllWallets", async () => {
 });
 
 // reads
-messenger.onMessage("getState", () => lifecycle.getState());
-messenger.onMessage("getBalance", (message) => reads.getBalance(message.data));
-messenger.onMessage("getTokenBalances", (message) => reads.getTokenBalances(message.data));
-messenger.onMessage("getActivity", (message) => reads.getActivity(message.data));
-messenger.onMessage("getPortfolioHistory", (message) => reads.getPortfolioHistory(message.data));
-messenger.onMessage("getTokenPrices", () => reads.getTokenPrices());
-messenger.onMessage("getConnectedApps", () => approval.getConnectedApps());
+onExtensionMessage("getState", () => lifecycle.getState());
+onExtensionMessage("getBalance", (message) => reads.getBalance(message.data));
+onExtensionMessage("getTokenBalances", (message) => reads.getTokenBalances(message.data));
+onExtensionMessage("getActivity", (message) => reads.getActivity(message.data));
+onExtensionMessage("getPortfolioHistory", (message) => reads.getPortfolioHistory(message.data));
+onExtensionMessage("getTokenPrices", () => reads.getTokenPrices());
+onExtensionMessage("getConnectedApps", () => approval.getConnectedApps());
 
 /**
  * `TransferDraft`/`UploadDraft` type `walletId` as optional (see those
@@ -466,41 +457,40 @@ function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walle
 }
 
 // actions
-messenger.onMessage("estimateTransfer", (message) => transfer.estimateTransfer(requireWalletId(message.data)));
-messenger.onMessage("submitTransfer", (message) => transfer.submitTransfer(requireWalletId(message.data)));
-messenger.onMessage("reviewUpload", (message) => upload.reviewUpload(message.data));
-messenger.onMessage("submitUpload", (message) => upload.submitUpload(requireWalletId(message.data)));
+onExtensionMessage("estimateTransfer", (message) => transfer.estimateTransfer(requireWalletId(message.data)));
+onExtensionMessage("submitTransfer", (message) => transfer.submitTransfer(requireWalletId(message.data)));
+onExtensionMessage("reviewUpload", (message) => upload.reviewUpload(message.data));
+onExtensionMessage("submitUpload", (message) => upload.submitUpload(requireWalletId(message.data)));
 
-// approvals — APPROVAL_METHODS, reachable only from the approval window
-// (nothing prevents another trusted extension surface from calling these
-// directly today, since `@webext-core/messaging` has no per-sender ACL
-// primitive; see this task's final report for that residual gap).
-messenger.onMessage("getApproval", (message) => approval.getApproval(message.data));
-messenger.onMessage("resolveApproval", (message) => approval.resolveApproval(message.data));
+// approvals
+onExtensionMessage("getApproval", (message) => approval.getApproval(message.data));
+onExtensionMessage("resolveApproval", (message) => approval.resolveApproval(message.data));
 
 // settings
-messenger.onMessage("getNetworkSettings", () => reads.getNetworkSettings());
-messenger.onMessage("setNetworkSettings", (message) => storage.set("local:networkSettings", message.data));
-messenger.onMessage("getLockSettings", () => lifecycle.getLockSettings());
-messenger.onMessage("setLockSettings", (message) => lifecycle.setLockSettings(message.data));
-messenger.onMessage("getThemePreference", () => lifecycle.getThemePreference());
-messenger.onMessage("setThemePreference", (message) => lifecycle.setThemePreference(message.data));
-messenger.onMessage("revokeGrant", async (message) => {
+onExtensionMessage("getNetworkSettings", () => reads.getNetworkSettings());
+onExtensionMessage("setNetworkSettings", (message) => storage.set("local:networkSettings", message.data));
+onExtensionMessage("getLockSettings", () => lifecycle.getLockSettings());
+onExtensionMessage("setLockSettings", (message) => lifecycle.setLockSettings(message.data));
+onExtensionMessage("getThemePreference", () => lifecycle.getThemePreference());
+onExtensionMessage("setThemePreference", (message) => lifecycle.setThemePreference(message.data));
+onExtensionMessage("revokeGrant", async (message) => {
   await approval.revokeGrant(message.data);
   void emitProviderEventToOrigin(message.data.origin, PROVIDER_EVENT.DISCONNECT, {});
 });
 
-// the single provider-surface choke point (this task's debt #1)
+// The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {
-  if (!PROVIDER_METHODS.includes(message.data.method as (typeof PROVIDER_METHODS)[number])) {
-    throw new Error(
-      `Provider method "${message.data.method}" is not reachable from a web page.`,
-    );
+  const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
+  if (!origin) {
+    throw new Error("providerCall is only accepted from a web page's content script.");
   }
-  if (!PROVIDER_SURFACE_METHODS.includes(message.data.method)) {
-    throw new Error(`Unknown provider method "${message.data.method}".`);
+  const { method, params } = message.data;
+  if (!PROVIDER_METHODS.includes(method as (typeof PROVIDER_METHODS)[number])) {
+    throw new Error(`Provider method "${method}" is not reachable from a web page.`);
   }
-  const { origin, method, params } = message.data;
+  if (!PROVIDER_SURFACE_METHODS.includes(method)) {
+    throw new Error(`Unknown provider method "${method}".`);
+  }
   return (async () =>
     encodeProviderResult(await handleProviderCall(origin, method, decodeProviderParams(params))))();
 });

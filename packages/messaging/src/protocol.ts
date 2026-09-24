@@ -123,9 +123,10 @@ export interface ProtocolMap {
    * of this map's other, per-purpose methods — none of which exist for
    * the 19-method ArConnect-compatible surface, since that surface is
    * page-facing, not popup/background-facing, and only ever reaches the
-   * background through this one relay. `origin` is attached by the
-   * content script from `location.origin`, never trusted from the page's
-   * own message payload (a page cannot claim to be a different origin).
+   * background through this one relay. The request carries no origin:
+   * the background reads it from Chrome's `sender` for the content
+   * script's frame, so neither a page nor a compromised content script can
+   * claim to be another site.
    *
    * This is the dispatcher's actual privilege-tier choke point (this
    * task's highest-stakes rule): every `providerCall` is checked against
@@ -135,7 +136,7 @@ export interface ProtocolMap {
    * (`KEY_METHODS`) are only ever called directly, by their own trusted
    * senders, never proxied through `providerCall`.
    */
-  providerCall(req: { origin: string; method: ProviderSurfaceMethod; params: unknown }): unknown;
+  providerCall(req: { method: ProviderSurfaceMethod; params: unknown }): unknown;
 
   /**
    * The background → content-script push counterpart of `providerCall`:

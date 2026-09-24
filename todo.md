@@ -11,14 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **The background trusts the claimed origin and any caller (M, opus)**
-  `entrypoints/background/index.ts`. `providerCall` uses
-  `message.data.origin` instead of the sender's tab URL. Privileged methods
-  (`resolveApproval`, `exportWallet`, `createWallet`, …) accept messages
-  from content-script contexts. Done: take the origin from `sender`. Only
-  accept `providerCall` from content scripts, and only accept everything
-  else from extension pages (`sender.url` starts with
-  `runtime.getURL("")`). Tests.
 - [ ] **dApps keep seeing the old wallet after a switch (M, opus)**
   `entrypoints/background/index.ts` (`getActiveAddress` uses
   `grant.walletId`; `connect` uses `session.unlockedWalletIds[0]`).

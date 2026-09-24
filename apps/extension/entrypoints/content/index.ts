@@ -30,10 +30,9 @@ import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
  * content script has no way to call any other `ProtocolMap` method on
  * the page's behalf — it doesn't expose one.
  *
- * `location.origin` (this document's own origin, never anything read out
- * of the page's message payload) is attached to every relayed call —
- * a malicious page cannot claim to be a different origin than the tab
- * it's actually running in.
+ * The relayed call carries no origin. The background takes it from
+ * Chrome's `sender` for this frame, so a malicious page cannot claim to
+ * be a different origin than the tab it's actually running in.
  *
  * Two testability notes (see `content.provider.test.ts`):
  * `defineContentScript`/`injectScript` are imported explicitly from
@@ -62,7 +61,6 @@ async function relay(envelope: PageRequestEnvelope): Promise<void> {
   const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
   try {
     const result = await messenger.sendMessage("providerCall", {
-      origin: location.origin,
       method: envelope.method,
       params: envelope.params,
     });

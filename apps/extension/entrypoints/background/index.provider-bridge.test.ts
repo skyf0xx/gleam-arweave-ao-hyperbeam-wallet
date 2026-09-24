@@ -8,7 +8,12 @@ import { generateJWK, type JWKInterface } from "@gleam/core";
  * `chrome.storage` serialize in Chrome.
  */
 
-type Handler = (message: { data: unknown }) => unknown;
+type Handler = (message: { data: unknown; sender: unknown }) => unknown;
+
+// sendMessage is only called by the content script (and the background's
+// tab pushes); direct handler calls stand in for the approval window.
+const CONTENT_SENDER = { url: `${location.origin}/`, frameId: 0, tab: { id: 1, url: `${location.origin}/` } };
+const APPROVAL_SENDER = { url: "chrome-extension://test/approval.html", frameId: 0, tab: { id: 2 } };
 
 const jsonClone = <T,>(value: T): T => (value === undefined ? value : JSON.parse(JSON.stringify(value)));
 
@@ -20,7 +25,7 @@ const onMessage = vi.fn((type: string, handler: Handler) => {
 const sendMessage = vi.fn(async (type: string, data: unknown) => {
   const handler = registeredHandlers.get(type);
   if (!handler) throw new Error(`No handler for "${type}".`);
-  return jsonClone(await handler({ data: jsonClone(data) }));
+  return jsonClone(await handler({ data: jsonClone(data), sender: CONTENT_SENDER }));
 });
 
 vi.mock("@webext-core/messaging", () => ({
@@ -92,7 +97,7 @@ async function approveNext(): Promise<{ kind: string; preview: Record<string, un
     request: { requestId: string; kind: string; preview: Record<string, unknown> };
   }>;
   const { request } = pending[0]!;
-  await registeredHandlers.get("resolveApproval")!({ data: { requestId: request.requestId, approved: true } });
+  await registeredHandlers.get("resolveApproval")!({ data: { requestId: request.requestId, approved: true }, sender: APPROVAL_SENDER });
   windowsCreate.mockClear();
   return request;
 }

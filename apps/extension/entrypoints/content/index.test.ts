@@ -55,7 +55,7 @@ describe("content.ts: page <-> background relay (ARCHITECTURE.md §4.3/§4.4)", 
     expect(injectScript).toHaveBeenCalledWith("/provider.js", { keepInDom: false });
   });
 
-  it("relays a page REQUEST envelope to providerCall with location.origin attached", async () => {
+  it("relays a page REQUEST envelope to providerCall without claiming an origin", async () => {
     sendMessage.mockResolvedValue("resolved-value");
     const contentScript = (await import("./index")).default;
     await contentScript.main!({} as never);
@@ -69,7 +69,6 @@ describe("content.ts: page <-> background relay (ARCHITECTURE.md §4.3/§4.4)", 
 
     await vi.waitFor(() => expect(sendMessage).toHaveBeenCalled());
     expect(sendMessage).toHaveBeenCalledWith("providerCall", {
-      origin: location.origin,
       method: "getActiveAddress",
       params: {},
     });
