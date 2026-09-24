@@ -219,6 +219,17 @@ describe("TransferHandler: estimateTransfer", () => {
   });
 });
 
+describe("TransferHandler: getArFee", () => {
+  it("returns the gateway's fee quote with no recipient target", async () => {
+    mockFetchSequence([{ status: 200, body: "777" }]);
+    const handler = new TransferHandler(createFakeStorage());
+
+    const fee = await handler.getArFee();
+
+    expect(fee).toBe("777");
+  });
+});
+
 describe("TransferHandler: submitTransfer", () => {
   let storage: StoragePort;
   let wallet: Wallet;

@@ -457,6 +457,7 @@ onExtensionMessage("resetAllWallets", async () => {
 // reads
 onExtensionMessage("getState", () => lifecycle.getState());
 onExtensionMessage("getBalance", (message) => reads.getBalance(message.data));
+onExtensionMessage("getArFee", () => transfer.getArFee());
 onExtensionMessage("getTokenBalances", (message) => reads.getTokenBalances(message.data));
 onExtensionMessage("getActivity", (message) => reads.getActivity(message.data));
 onExtensionMessage("getPortfolioHistory", (message) => reads.getPortfolioHistory(message.data));

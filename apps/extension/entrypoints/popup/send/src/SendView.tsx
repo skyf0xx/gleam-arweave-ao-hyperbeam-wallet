@@ -8,6 +8,7 @@ import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
 import { useActivity } from "../../activity/src/useActivity";
+import { useArFee } from "../../activity/src/useArFee";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
@@ -143,6 +144,10 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   // balance" check (RELEVANT RULES) reads this same query's current data
   // rather than issuing its own fetch.
   const balancesQuery = useBalances(runtime, wallet.address);
+  // AR-only network fee estimate, independent of the balances query — feeds
+  // the compose step's "Max" affordance and its balance check (see
+  // `useArFee`'s own doc comment for why it isn't wallet-address-keyed).
+  const arFeeQuery = useArFee(runtime);
   // Invalidates the shared balances/activity cache for `wallet.address`
   // on success (RELEVANT RULES: both Send and Main Screen reflect the
   // updated balance without a manual popup reopen), wrapping the same
@@ -181,7 +186,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         return;
       }
 
-      const balanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data);
+      const balanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data, arFeeQuery.data);
       if (balanceError !== null) {
         setStep({ ...step, recipientError: undefined, amountError: balanceError });
         return;
@@ -202,6 +207,16 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
             fee: null,
           },
         });
+
+        // getArFee's recipient-less quote underestimates for a first-seen
+        // recipient (see its doc comment) — recheck the balance now that
+        // estimateTransfer has the real, recipient-specific fee.
+        const finalBalanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data, estimate.fee ?? undefined);
+        if (finalBalanceError !== null) {
+          setStep({ ...step, submitting: false, recipientError: undefined, amountError: finalBalanceError });
+          return;
+        }
+
         setStep({
           kind: "review",
           recipient,
@@ -223,6 +238,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         wallet={wallet}
         token={selectedToken}
         balancesQuery={balancesQuery}
+        arFeeAtomic={arFeeQuery.data}
         step={step}
         onBack={onBack}
         onChange={(patch) =>
@@ -327,6 +343,7 @@ function ComposeStep({
   wallet,
   token,
   balancesQuery,
+  arFeeAtomic,
   step,
   onBack,
   onChange,
@@ -339,6 +356,7 @@ function ComposeStep({
   wallet: WalletSummary;
   token: TokenBalance | null;
   balancesQuery: UseQueryResult<WalletBalances>;
+  arFeeAtomic: string | undefined;
   step: Extract<Step, { kind: "compose" }>;
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
@@ -354,14 +372,20 @@ function ComposeStep({
     recipientSchema.safeParse(step.recipient).success &&
     amountSchema(denomination).safeParse(step.amountDisplay).success;
   const ticker = tickerFor(token);
-  // "Max" affordance next to the amount field: the current token's spendable
-  // balance, formatted the same way the compose/review amounts already are.
-  // `undefined` while `balancesQuery` hasn't resolved yet — the pill hides
-  // rather than showing a stale/zero balance a click could act on.
-  const maxAtomic =
+  // For AR, Max is balance minus the rough fee estimate (clamped to 0),
+  // hidden until that estimate resolves. This is still an underestimate
+  // for a first-seen recipient — `handleContinue`'s post-estimate check
+  // is the one that's actually enforced.
+  const rawMaxAtomic =
     token === null
       ? balancesQuery.data?.arBalance
       : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
+  const maxAtomic =
+    token === null
+      ? rawMaxAtomic !== undefined && arFeeAtomic !== undefined
+        ? (BigInt(rawMaxAtomic) > BigInt(arFeeAtomic) ? BigInt(rawMaxAtomic) - BigInt(arFeeAtomic) : 0n).toString()
+        : undefined
+      : rawMaxAtomic;
   const maxDisplay = maxAtomic === undefined ? undefined : formatAtomicAsDisplay(maxAtomic, denomination);
 
   return (

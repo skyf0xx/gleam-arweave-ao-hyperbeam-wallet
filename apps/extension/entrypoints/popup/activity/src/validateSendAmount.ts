@@ -20,11 +20,21 @@ import type { WalletBalances } from "./useBalances";
  * blocking here would misrepresent "unknown" as "insufficient". The
  * actual send still goes through the backend, which is the authoritative
  * check; this is a pre-submission UX affordance only.
+ *
+ * `arFeeAtomic`: for the AR path (`token === null`), the estimated
+ * network fee, added to `amountAtomic` before comparing against the
+ * balance — an AR send that spends the whole balance still needs the fee
+ * on top, or the gateway rejects it. `undefined` (fee not loaded yet)
+ * skips the fee-inclusive check the same way an unloaded balance does,
+ * for the same "unknown isn't insufficient" reason. Ignored for AO token
+ * sends, which have no sender-side fee (see `FeeEstimate.fee`'s doc
+ * comment).
  */
 export function validateSendAmount(
   amountAtomic: string,
   token: TokenBalance | null,
   balances: WalletBalances | undefined,
+  arFeeAtomic?: string,
 ): string | null {
   if (!balances) return null;
 
@@ -34,7 +44,9 @@ export function validateSendAmount(
   if (available === undefined) return null;
 
   try {
-    if (BigInt(amountAtomic) > BigInt(available)) {
+    const required =
+      token === null && arFeeAtomic !== undefined ? BigInt(amountAtomic) + BigInt(arFeeAtomic) : BigInt(amountAtomic);
+    if (required > BigInt(available)) {
       return "That's more than your current balance.";
     }
   } catch {

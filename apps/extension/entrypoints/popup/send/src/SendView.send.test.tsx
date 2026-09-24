@@ -65,6 +65,7 @@ function routedSend(handlers: {
   getBalance?: (payload: { address: string }) => string;
   getTokenBalances?: (payload: { address: string }) => TokenBalance[];
   getActivity?: (payload: { address: string }) => ActivityPage;
+  getArFee?: () => string;
   estimateTransfer?: () => FeeEstimate;
   submitTransfer?: () => { txId: string };
 }): RuntimePort["send"] {
@@ -76,6 +77,8 @@ function routedSend(handlers: {
         return handlers.getTokenBalances?.(message.payload as { address: string }) ?? [];
       case "getActivity":
         return handlers.getActivity?.(message.payload as { address: string }) ?? activityPage([]);
+      case "getArFee":
+        return handlers.getArFee?.() ?? "100000000";
       case "estimateTransfer":
         return (
           handlers.estimateTransfer?.() ?? {
@@ -243,6 +246,108 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   });
 });
 
+describe("SendView AR Max and balance check account for the network fee", () => {
+  it("Max fills in balance minus the estimated fee, not the whole balance", async () => {
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    expect(maxButton.textContent).toContain("0.95");
+
+    fireEvent.click(maxButton);
+    const amountInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
+    expect(amountInput.value).toBe("0.95");
+  });
+
+  it("hides Max until the fee estimate has resolved", async () => {
+    const send = vi.fn((message: { type: string; payload: unknown }) => {
+      if (message.type === "getArFee") return new Promise(() => {}); // never resolves
+      return routedSend({})(message, undefined);
+    }) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    await screen.findByPlaceholderText("0.00");
+    expect(screen.queryByRole("button", { name: /^Max:/ })).toBeNull();
+  });
+
+  it("rejects typing an amount that alone fits the balance but would overflow once the fee is added", async () => {
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    await screen.findByRole("button", { name: /^Max:/ });
+    const amountInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
+    // The whole balance, with nothing left over for the fee — the compose
+    // step's own input clamp (matching its fee-aware Max) rejects it rather
+    // than letting it reach Continue's balance check.
+    fireEvent.change(amountInput, { target: { value: "1" } });
+    expect(amountInput.value).toBe("");
+  });
+
+  it("advances to review when the recipient-specific fee still leaves the amount affordable", async () => {
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR (rough, recipient-less quote)
+      estimateTransfer: () => ({ fee: "50000000000", firstSeenRecipient: false }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
+      target: { value: RECENT_RECIPIENT_A },
+    });
+    // Right at the fee-adjusted Max — allowed.
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    fireEvent.click(maxButton);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+  });
+
+  it("blocks advancing to review when the recipient-specific fee (larger than the rough getArFee quote) pushes the total over the balance", async () => {
+    // getArFee's rough, recipient-less quote (0.05 AR) underestimates for a
+    // first-seen recipient — estimateTransfer's real quote (0.2 AR) is
+    // larger, and the total then exceeds the balance even though the
+    // amount fit under the rough Max. Continue must not advance to review.
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR
+      estimateTransfer: () => ({ fee: "200000000000", firstSeenRecipient: true }), // 0.2 AR
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
+      target: { value: RECENT_RECIPIENT_A },
+    });
+    // Right at the rough fee-adjusted Max (0.95 AR) — passes the client
+    // clamp and the pre-estimate check, but not the post-estimate one.
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    fireEvent.click(maxButton);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByRole("alert").textContent).toContain("more than your current balance");
+    expect(screen.queryByText("Review send")).toBeNull();
+  });
+
+  it("does not apply the AR fee to an AO token's Max or balance check", async () => {
+    const send = routedSend({
+      getTokenBalances: () => [AO_TOKEN],
+      getArFee: () => "50000000000",
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    // AO_TOKEN.quantity is 5000000 at denomination 6 -> "5", unaffected by the AR fee.
+    expect(maxButton.textContent).toContain("5");
+    expect(maxButton.textContent).not.toContain("4.95");
+  });
+});
+
 describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
   it("populates from real send activity, most-recent-first and deduplicated", async () => {
     const send = routedSend({
@@ -331,7 +436,8 @@ describe("SendView recent recipients (AO-SEND-UI-WALLET-CORE)", () => {
       expect(textarea.value).toBe(RECENT_RECIPIENT_A);
     });
 
-    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "1" } });
+    // Leaves room for the default fee mock's fee, unlike the whole balance.
+    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "0.5" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());

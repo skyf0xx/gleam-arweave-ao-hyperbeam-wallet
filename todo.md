@@ -13,12 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **AR "Max" and the balance check ignore the network fee (S, sonnet)**
-  `popup/send/src/SendView.tsx:393`,
-  `popup/activity/src/validateSendAmount.ts`. "Max" fills in the whole
-  balance, and amount + fee > balance is only rejected by the gateway.
-  Done: for AR, Max is balance minus the estimated fee, and review blocks
-  when amount + fee is more than the balance.
 - [ ] **"Add wallet" button does nothing (M, opus)**
   `popup/wallet-switcher/src/WalletSwitcherView.tsx:127-138`. After
   onboarding there is no way to create or import a second wallet. Done:

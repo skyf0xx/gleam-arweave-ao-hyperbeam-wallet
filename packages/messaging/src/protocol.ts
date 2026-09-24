@@ -51,6 +51,12 @@ export interface ProtocolMap {
   // reads
   getState(): WalletState;
   getBalance(req: { address: string }): Winston;
+  /**
+   * A rough, recipient-less fee quote (drives the compose step's "Max"
+   * before a recipient is filled in). Underestimates for a first-seen
+   * recipient — see `estimateTransfer`'s own comment.
+   */
+  getArFee(): Winston;
   getTokenBalances(req: { address: string }): TokenBalance[];
   getActivity(req: { address: string; cursor?: string }): ActivityPage;
   getConnectedApps(): Grant[];

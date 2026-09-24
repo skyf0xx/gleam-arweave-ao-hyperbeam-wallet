@@ -37,11 +37,15 @@ export interface FeeQuote {
 }
 
 /**
- * Reads a fee quote for transferring `amount` Winston to `recipient`, via
- * the gateway's `price` endpoint (byte size 0 for a plain value transfer
- * — the transaction carries no data). Pure network read, no signing.
+ * Reads a fee quote for a plain AR value transfer, via the gateway's
+ * `price` endpoint (byte size 0 — the transaction carries no data). Pure
+ * network read, no signing.
+ *
+ * `recipient` is optional, but omitting it underquotes: the gateway adds
+ * a new-wallet fee once a target is known and isn't yet in the wallet
+ * list, so a recipient-less quote can be lower than the real one.
  */
-export async function estimateFee(gatewayUrl: string, recipient: string): Promise<FeeQuote> {
+export async function estimateFee(gatewayUrl: string, recipient?: string): Promise<FeeQuote> {
   const client = buildClient(gatewayUrl);
   const fee = await client.transactions.getPrice(0, recipient);
   return { fee };

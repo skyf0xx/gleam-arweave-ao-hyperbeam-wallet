@@ -11,6 +11,7 @@ import {
   type StoragePort,
   type TransferDraft,
   type Wallet,
+  type Winston,
 } from "@gleam/core";
 import { getCachedKey } from "./key-session";
 
@@ -105,6 +106,19 @@ export class TransferHandler {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
     return cached;
+  }
+
+  /**
+   * A rough, recipient-less fee quote for the compose step's "Max"
+   * affordance, computed before a recipient is filled in. Underestimates
+   * for a first-seen recipient (the gateway adds a new-wallet fee once a
+   * target is known) — `estimateTransfer`'s recipient-specific quote is
+   * the one actually enforced before submission.
+   */
+  async getArFee(): Promise<Winston> {
+    const settings = await this.loadNetworkSettings();
+    const { fee } = await estimateFee(settings.gatewayUrl);
+    return fee;
   }
 
   /**
