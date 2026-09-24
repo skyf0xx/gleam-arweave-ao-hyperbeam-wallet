@@ -445,8 +445,11 @@ export class ApprovalHandler {
    * staging step needed any more — see this class's doc comment on why
    * `unlockApprovalWallet` existed and `wallet-lifecycle.ts`'s doc comment
    * for the superseding session-cache decision) and returns the result to
-   * the original caller. Either way, closes the approval window once
-   * resolved so it doesn't linger.
+   * the original caller, then closes the approval window.
+   *
+   * If an approved request fails (locked wallet, network error), the dApp
+   * is rejected with that error and this call throws it too. The window
+   * stays open so the user sees why instead of a success message.
    */
   async resolveApproval(req: { requestId: string; approved: boolean }): Promise<void> {
     const pending = await this.loadPending();
@@ -482,6 +485,7 @@ export class ApprovalHandler {
         ),
       );
       await this.dropPending(req.requestId);
+      if (outcome.error !== undefined) throw new Error(outcome.error);
       await this.windows.closeApprovalWindow(req.requestId);
     } finally {
       this.resolving.delete(req.requestId);

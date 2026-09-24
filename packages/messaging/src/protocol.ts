@@ -107,6 +107,9 @@ export interface ProtocolMap {
    * keyed by the request's own `walletId` — so `resolveApproval` alone is
    * enough to finalize either a `connect` or a signing approval; no
    * separate password hand-off call precedes it any more.
+   *
+   * Throws when an approved request fails (locked wallet, network error).
+   * The dApp is rejected with the same error either way.
    */
   resolveApproval(req: { requestId: string; approved: boolean }): void;
 

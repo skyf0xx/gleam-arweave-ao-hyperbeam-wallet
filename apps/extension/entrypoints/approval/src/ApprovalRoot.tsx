@@ -38,7 +38,8 @@ type LoadState =
   | { kind: "no-wallet"; runtime: RuntimePort }
   | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "error"; message: string }
-  | { kind: "done"; message: string };
+  | { kind: "done"; message: string }
+  | { kind: "failed"; message: string };
 
 export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -106,6 +107,8 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
     content = <CenteredMessage text={state.message} />;
   } else if (state.kind === "done") {
     content = <CenteredMessage text={state.message} />;
+  } else if (state.kind === "failed") {
+    content = <CenteredMessage text={state.message} tone="warning" />;
   } else if (state.kind === "no-wallet") {
     content = (
       <OnboardingView
@@ -129,6 +132,21 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
       }
     };
 
+    // A failed approval has already rejected the dApp and dropped the
+    // request, so there's nothing to retry: show the error and stop.
+    const handleApprove = async (doneMessage: string, failurePrefix: string) => {
+      try {
+        await runtime.send<{ requestId: string; approved: boolean }, void>({
+          type: "resolveApproval",
+          payload: { requestId: request.requestId, approved: true },
+        });
+        setState({ kind: "done", message: doneMessage });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        setState({ kind: "failed", message: `${failurePrefix}: ${reason}` });
+      }
+    };
+
     if (request.preview.kind === "connect") {
       const preview = request.preview;
       content = (
@@ -136,17 +154,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
           origin={request.origin}
           preview={preview}
           onReject={() => void handleReject()}
-          onGrant={async () => {
-            try {
-              await runtime.send<{ requestId: string; approved: boolean }, void>({
-                type: "resolveApproval",
-                payload: { requestId: request.requestId, approved: true },
-              });
-              setState({ kind: "done", message: "Grant approved." });
-            } catch (error) {
-              setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
-            }
-          }}
+          onGrant={() => void handleApprove("Grant approved.", "Couldn't connect")}
         />
       );
     } else {
@@ -156,17 +164,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
           origin={request.origin}
           preview={signingPreview}
           onReject={() => void handleReject()}
-          onSign={async () => {
-            try {
-              await runtime.send<{ requestId: string; approved: boolean }, void>({
-                type: "resolveApproval",
-                payload: { requestId: request.requestId, approved: true },
-              });
-              setState({ kind: "done", message: "Signed." });
-            } catch (error) {
-              throw error instanceof Error ? error : new Error(String(error));
-            }
-          }}
+          onSign={() => handleApprove("Signed.", "Signing failed")}
         />
       );
     }
@@ -179,7 +177,14 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
   );
 }
 
-function CenteredMessage({ text }: { text: string }) {
+function CenteredMessage({ text, tone = "muted" }: { text: string; tone?: "muted" | "warning" }) {
+  if (tone === "warning") {
+    return (
+      <div role="alert" className="flex min-h-full items-center justify-center p-6 text-center text-sm text-warning">
+        {text}
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-full items-center justify-center p-6 text-center text-sm text-[#737373]">
       {text}

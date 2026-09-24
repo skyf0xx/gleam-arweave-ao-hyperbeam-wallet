@@ -571,8 +571,12 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
     const requestId = extractRequestId(windows.opened[0]!);
 
-    await handler.resolveApproval({ requestId, approved: true });
-    await expect(pending).rejects.toThrow(/locked/i);
+    const dappRejected = expect(pending).rejects.toThrow(/locked/i);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
+    await dappRejected;
+    // The window stays open to show the error instead of closing as if signed.
+    expect(windows.closed).not.toContain(requestId);
+    await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
   });
 
   it("signing after the auto-lock timeout has passed is rejected as locked and wipes the key", async () => {
@@ -596,9 +600,9 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       const requestId = extractRequestId(windows.opened[0]!);
 
       vi.advanceTimersByTime(5 * 60 * 1000 + 1);
-      await handler.resolveApproval({ requestId, approved: true });
-
-      await expect(pending).rejects.toThrow(/locked/i);
+      const dappRejected = expect(pending).rejects.toThrow(/locked/i);
+      await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
+      await dappRejected;
       expect(keySessionStore.has(`session:key:${WALLET_ID}`)).toBe(false);
       expect(keySessionStore.has("session:unlockedSession")).toBe(false);
     } finally {
@@ -618,13 +622,14 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
     const requestId = extractRequestId(windows.opened[0]!);
 
-    await handler.resolveApproval({ requestId, approved: true });
+    const dappRejected = expect(pending).rejects.toThrow(/gateway url/i);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/gateway url/i);
 
     // Proves the cached key was found (no "locked" error) and the flow
     // reached real signing logic, which then fails honestly because this
     // request carries no gatewayUrl (the dispatcher always supplies one
     // via ReadsHandler.getNetworkSettings() in the real extension).
-    await expect(pending).rejects.toThrow(/gateway url/i);
+    await dappRejected;
   });
 
   it("sign resolves to the signed transaction fields arweave-js copies back, built from the dApp's fields", async () => {
@@ -731,7 +736,11 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
         gatewayUrl: "https://arweave.net",
       });
       await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-      await bundlingHandler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+      // Failures reach the test through `pending`; resolveApproval throws the same error.
+      pending.catch(() => {});
+      await bundlingHandler
+        .resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true })
+        .catch(() => {});
       return pending;
     }
 
@@ -952,8 +961,9 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
     const requestId = extractRequestId(windows.opened[0]!);
 
-    await handler.resolveApproval({ requestId, approved: true });
-    await expect(pending).rejects.toThrow(/locked/i);
+    const dappRejected = expect(pending).rejects.toThrow(/locked/i);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
+    await dappRejected;
     expect(submitTransfer).not.toHaveBeenCalled();
   });
 
@@ -978,7 +988,10 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
     const requestId = extractRequestId(windows.opened[0]!);
 
-    await handler.resolveApproval({ requestId, approved: true });
-    await expect(pending).rejects.toThrow(/not wired to a transfer submitter/i);
+    const dappRejected = expect(pending).rejects.toThrow(/not wired to a transfer submitter/i);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(
+      /not wired to a transfer submitter/i,
+    );
+    await dappRejected;
   });
 });

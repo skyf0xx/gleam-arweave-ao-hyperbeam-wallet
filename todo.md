@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **The approval window reports success when signing failed (S, opus)**
-  `entrypoints/approval/src/ApprovalRoot.tsx`,
-  `approval.ts` (`resolveApproval` stores `outcome.error` and returns
-  normally). A locked wallet or a network failure shows "Signed." Done:
-  `resolveApproval` returns or throws the outcome, and the window shows the
-  real error.
 
 ## 2. Core wallet flows
 
