@@ -8,6 +8,8 @@ import type { CoinGeckoId } from "./coingecko";
 import type { CoinPaprikaId } from "./coinpaprika";
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
+/** Public demo key — CoinGecko's free tier, not a secret. */
+const COINGECKO_DEMO_API_KEY = "CG-XG6hdjK9NPY2vfPVZQbAptqY";
 const COINPAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1";
 
 export type HistoricalRange = "24H" | "7D" | "1M" | "1Y" | "ALL";
@@ -68,7 +70,7 @@ export async function getHistoricalUsdPrices(
   fetchImpl: typeof fetch = fetch,
 ): Promise<HistoricalPricePoint[]> {
   const days = rangeToCoinGeckoDays(range);
-  const url = `${COINGECKO_BASE_URL}/coins/${encodeURIComponent(coinId)}/market_chart?vs_currency=usd&days=${days}`;
+  const url = `${COINGECKO_BASE_URL}/coins/${encodeURIComponent(coinId)}/market_chart?vs_currency=usd&days=${days}&x_cg_demo_api_key=${COINGECKO_DEMO_API_KEY}`;
   const response = await fetchImpl(url);
 
   if (!response.ok) {
