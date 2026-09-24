@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { RuntimePort, UploadReview, UploadTag, WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type RuntimePort, type UploadReview, type UploadTag, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
@@ -7,7 +7,6 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 const TAG_BYTES_LIMIT = 4096;
 const GATEWAY_VIEW_URL = "https://arweave.net";
-const VIEWBLOCK_URL = "https://viewblock.io/arweave/tx";
 
 /**
  * Compose → review → success, same internal step-state shape (no router)
@@ -504,7 +503,7 @@ function ReviewRow({ label, value }: { label: string; value: ReactNode }) {
 
 function SuccessStep({ step, onDone }: { step: SuccessState; onDone: () => void }) {
   const contentUrl = `${GATEWAY_VIEW_URL}/${step.txId}`;
-  const viewblockUrl = `${VIEWBLOCK_URL}/${step.txId}`;
+  const explorerUrl = explorerUrlFor(step.txId);
 
   return (
     <div className="flex min-h-full flex-col items-center gap-4 px-6 pb-6 pt-12 text-center">
@@ -531,12 +530,12 @@ function SuccessStep({ step, onDone }: { step: SuccessState; onDone: () => void 
           View content
         </a>
         <a
-          href={viewblockUrl}
+          href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-label font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
         >
-          View on ViewBlock
+          View in explorer
         </a>
       </div>
 

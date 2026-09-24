@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import type { ActivityPage, FeeEstimate, RuntimePort, TokenBalance, WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type ActivityPage, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -827,6 +827,14 @@ function SuccessStep({
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
         <span>Pending confirmation</span>
       </div>
+      <a
+        href={explorerUrlFor(step.txId)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="-mt-1 text-label font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
+      >
+        View in explorer
+      </a>
       <Button type="button" onClick={onDone} className="mt-auto">
         Done
       </Button>

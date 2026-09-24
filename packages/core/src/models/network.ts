@@ -31,3 +31,15 @@ export const DEFAULT_HYPERBEAM_PEER_URLS: readonly string[] = ["https://state.fo
  * Also listed in apps/extension/wxt.config.ts's `host_permissions`.
  */
 export const DEFAULT_BUNDLER_URL = "https://up.arweave.net";
+
+/**
+ * lunar.arweave.net's block explorer, used everywhere a tx id or address
+ * needs an external link: activity rows, send success, upload success.
+ * Centralized so all three build the same URL.
+ */
+const EXPLORER_BASE_URL = "https://lunar.arweave.net/#/explorer";
+
+/** Builds a lunar.arweave.net explorer URL for a tx id or wallet address. */
+export function explorerUrlFor(idOrAddress: string): string {
+  return `${EXPLORER_BASE_URL}/${idOrAddress}`;
+}

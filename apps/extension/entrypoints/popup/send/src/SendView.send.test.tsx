@@ -246,6 +246,9 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
 
     await waitFor(() => expect(screen.getByText("Signed and sent.")).toBeTruthy());
     expect(screen.getByText(`2.5 ARDRIVE to ${RECENT_RECIPIENT_A}`)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View in explorer" }).getAttribute("href")).toBe(
+      "https://lunar.arweave.net/#/explorer/ao-tx-456",
+    );
   });
 });
 

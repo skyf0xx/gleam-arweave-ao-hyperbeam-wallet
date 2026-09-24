@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PortfolioHistoryRange, RuntimePort, TokenBalance, TokenPrice, WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type PortfolioHistoryRange, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -610,7 +610,7 @@ function SettingsIcon() {
  * straight to the external explorer instead.
  */
 function openInExplorer(path: string): void {
-  window.open(`https://lunar.arweave.net/#/explorer/${path}`, "_blank", "noopener,noreferrer");
+  window.open(explorerUrlFor(path), "_blank", "noopener,noreferrer");
 }
 
 function activityVerb(type: "send" | "receive" | "upload"): string {

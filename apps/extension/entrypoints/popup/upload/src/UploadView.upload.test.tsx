@@ -100,8 +100,8 @@ describe("UploadView", () => {
     expect(screen.getByRole("link", { name: "View content" }).getAttribute("href")).toBe(
       "https://arweave.net/test-tx-id-123",
     );
-    expect(screen.getByRole("link", { name: "View on ViewBlock" }).getAttribute("href")).toBe(
-      "https://viewblock.io/arweave/tx/test-tx-id-123",
+    expect(screen.getByRole("link", { name: "View in explorer" }).getAttribute("href")).toBe(
+      "https://lunar.arweave.net/#/explorer/test-tx-id-123",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));

@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Send success has no explorer link (S, sonnet)**
-  `SendView.tsx` `SuccessStep`. Upload's success step has one. Done: send
-  success links to the tx in the same explorer the activity rows use
-  (`MainScreenView.tsx` `openInExplorer`). Pull that into one shared helper
-  so all three places build the URL the same way.
 - [ ] **Importing a keyfile that's already in the vault adds a duplicate (S, sonnet)**
   `src/handlers/wallet-lifecycle.ts` (`importWallet`) doesn't check the
   derived address, so the switcher shows two rows sharing one activity
