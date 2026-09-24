@@ -26,6 +26,7 @@ export type {
 } from "./transfer";
 export type { UploadTag, UploadDraft, UploadReview } from "./upload";
 export type {
+  AddTokenApprovalPreview,
   ApprovalKind,
   ApprovalPreview,
   ApprovalRequest,

@@ -111,6 +111,14 @@ const SIGN_MESSAGE_REQUEST: ApprovalRequest = {
   createdAt: 0,
 };
 
+const ADD_TOKEN_REQUEST: ApprovalRequest = {
+  requestId: "req-3",
+  origin: "https://bazar.arweave.net",
+  kind: "addToken",
+  preview: { kind: "addToken", processId: "p".repeat(43), ticker: "TKN", name: "Token", address: "addr-1" },
+  createdAt: 0,
+};
+
 function runtimeResolvingWith(request: ApprovalRequest, resolveApproval: () => Promise<void>): RuntimePort {
   const send = vi.fn(async (message: { type: string }) => {
     if (message.type === "getState") return UNLOCKED_STATE;
@@ -160,6 +168,17 @@ describe("ApprovalRoot outcome", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/couldn't connect: storage unavailable/i);
     expect(screen.queryByText("Grant approved.")).toBeNull();
+  });
+  it("shows an addToken request on its own screen and approves it", async () => {
+    const resolve = vi.fn(async () => undefined);
+    const runtime = runtimeResolvingWith(ADD_TOKEN_REQUEST, resolve);
+    render(<ApprovalRoot requestId="req-3" runtime={runtime} />);
+
+    expect(await screen.findByText("TKN")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add token" }));
+
+    expect(await screen.findByText("Token added.")).toBeTruthy();
+    expect(resolve).toHaveBeenCalledTimes(1);
   });
 });
 

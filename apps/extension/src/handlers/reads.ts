@@ -366,6 +366,12 @@ export class ReadsHandler {
     return resolved;
   }
 
+  /** The AO token counts as added: it is always listed without being stored. */
+  async isTokenAdded(req: { address: string; processId: string }): Promise<boolean> {
+    if (req.processId === DEFAULT_AO_PROCESS_ID) return true;
+    return (await this.loadWatchedProcessIds(req.address)).includes(req.processId);
+  }
+
   async removeWatchedToken(req: { address: string; processId: string }): Promise<void> {
     const existing = await this.loadWatchedProcessIds(req.address);
     const next = existing.filter((id) => id !== req.processId);

@@ -6,7 +6,10 @@ import type { PermissionType } from "./permission";
  * `connect`, `disconnect` and `getPermissions` need none: they manage or
  * report the grant itself. `transferAoTokens` is Gleam's own method; it
  * signs an ANS-104 item, so it sits with `signDataItem` under
- * `SIGN_TRANSACTION`.
+ * `SIGN_TRANSACTION`. `addToken` and `isTokenAdded` need only a
+ * connection, as in Wander: `addToken` is answered in its own approval
+ * window, and a connected site already knows the address and can read
+ * every balance on-chain.
  */
 export const METHOD_PERMISSIONS: Readonly<Record<ProviderMethod, readonly PermissionType[]>> = {
   connect: [],
@@ -31,6 +34,8 @@ export const METHOD_PERMISSIONS: Readonly<Record<ProviderMethod, readonly Permis
   transferAoTokens: ["SIGN_TRANSACTION"],
   tokenBalance: ["ACCESS_TOKENS"],
   userTokens: ["ACCESS_TOKENS"],
+  addToken: [],
+  isTokenAdded: [],
 };
 
 /** The permissions `method` needs that `granted` lacks, in table order. */

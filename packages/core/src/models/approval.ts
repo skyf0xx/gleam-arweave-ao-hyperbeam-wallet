@@ -11,7 +11,8 @@ export type ApprovalKind =
   | "transferAoTokens"
   | "signature"
   | "signMessage"
-  | "privateHash";
+  | "privateHash"
+  | "addToken";
 
 export interface ConnectApprovalPreview {
   kind: "connect";
@@ -61,7 +62,22 @@ export interface SigningApprovalPreview {
   }> | null;
 }
 
-export type ApprovalPreview = ConnectApprovalPreview | SigningApprovalPreview;
+/**
+ * A dApp asking to add an AO token to the active wallet's token list.
+ * Metadata is resolved by the background before the window opens, so the
+ * user sees what the process claims to be, not just its id. A field the
+ * process didn't resolve is `null`.
+ */
+export interface AddTokenApprovalPreview {
+  kind: "addToken";
+  processId: string;
+  ticker: string | null;
+  name: string | null;
+  /** The address whose token list the token joins. */
+  address: string;
+}
+
+export type ApprovalPreview = ConnectApprovalPreview | SigningApprovalPreview | AddTokenApprovalPreview;
 
 /**
  * A pending action awaiting user sign-off in its own window: a Grant

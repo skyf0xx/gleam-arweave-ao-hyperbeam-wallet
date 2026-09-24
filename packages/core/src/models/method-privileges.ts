@@ -33,6 +33,8 @@ export const PROVIDER_METHODS = [
   "transferAoTokens",
   "tokenBalance",
   "userTokens",
+  "addToken",
+  "isTokenAdded",
 ] as const;
 
 /** Reachable only from the approval window. */

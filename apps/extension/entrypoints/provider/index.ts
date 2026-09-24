@@ -14,6 +14,9 @@ import {
   type PageResponseEnvelope,
   type ProviderSurfaceMethod,
 } from "@gleam/messaging/src/page-protocol.ts";
+// Named so Vite inlines only the version, not the whole package.json. WXT
+// sets the manifest version from the same field.
+import { version as WALLET_VERSION } from "../../package.json";
 
 /**
  * The injected page-world script that installs `window.arweaveWallet`
@@ -99,6 +102,7 @@ interface PendingCall {
 
 class GleamProvider {
   readonly walletName = WALLET_NAME;
+  readonly walletVersion = WALLET_VERSION;
   private readonly pending = new Map<string, PendingCall>();
 
   constructor() {
@@ -279,6 +283,20 @@ class GleamProvider {
    */
   transferAoTokens(request: { token: string; recipient: string; amount: string }): Promise<unknown> {
     return this.call("transferAoTokens", request);
+  }
+
+  /**
+   * `type` and `gateway` are accepted for Wander's signature and ignored:
+   * Gleam reads every AO token's balance the same way.
+   */
+  addToken(id: string, type?: unknown, gateway?: unknown): Promise<void> {
+    void type;
+    void gateway;
+    return this.call("addToken", { id }).then(() => undefined);
+  }
+
+  isTokenAdded(id: string): Promise<unknown> {
+    return this.call("isTokenAdded", { id });
   }
 
   /** Resolves to one `ArrayBuffer` per item, in order. */

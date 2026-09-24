@@ -12,6 +12,7 @@ import {
   signTransaction,
   signature as vaultSignature,
   PERMISSION_TYPES,
+  type AddTokenApprovalPreview,
   type ApprovalKind,
   type ApprovalPreview,
   type ApprovalRequest,
@@ -110,7 +111,7 @@ function isValidApprovalRequest(value: unknown): value is ApprovalRequest {
 
 /** A signing request's decoded intent — the input to `describeIntent`-style preview building. */
 export interface SigningRequestInput {
-  kind: Exclude<ApprovalKind, "connect">;
+  kind: Exclude<ApprovalKind, "connect" | "addToken">;
   /** Present for value-transfer-shaped calls (`sign` a transfer, `dispatch`, `transferAoTokens`). */
   recipient?: string | null;
   amount?: string | null;
@@ -177,6 +178,20 @@ export interface AoTransferSubmitter {
   submitTransfer(req: { token: string; recipient: string; amount: string; fee: null; walletId: string }): Promise<{ txId: string }>;
 }
 
+/** The subset of `ReadsHandler` an approved `addToken` request writes through. */
+export interface TokenWatchList {
+  addWatchedToken(req: { address: string; processId: string }): Promise<unknown>;
+}
+
+/** Metadata is resolved by the caller, which has network settings; this handler has none. */
+export interface AddTokenRequestInput {
+  kind: "addToken";
+  address: string;
+  processId: string;
+  ticker: string | null;
+  name: string | null;
+}
+
 export interface ConnectRequestInput {
   kind: "connect";
   requestedPermissions: PermissionType[];
@@ -189,7 +204,8 @@ export interface ConnectRequestInput {
  */
 export type CreateApprovalInput =
   | ({ origin: string; walletId: string | null } & ConnectRequestInput)
-  | ({ origin: string; walletId: string } & SigningRequestInput);
+  | ({ origin: string; walletId: string } & SigningRequestInput)
+  | ({ origin: string; walletId: string } & AddTokenRequestInput);
 
 /**
  * `result` and `signingInput` hold bytes (payloads, AES IVs, signatures),
@@ -207,7 +223,10 @@ interface PendingApprovalRecord {
   request: ApprovalRequest;
   /** `null` only for a `connect` made before any wallet existed. */
   walletId: string | null;
-  /** A tagged-binary encoded `SigningRequestInput`; `null` for a `connect` request. */
+  /**
+   * A tagged-binary encoded `SigningRequestInput` or `AddTokenRequestInput`;
+   * `null` for a `connect` request.
+   */
   signingInput: unknown;
   /** Set by `resolveApproval` immediately before the record is removed. */
   outcome?: ApprovalOutcome;
@@ -231,6 +250,16 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function buildAddTokenPreview(input: AddTokenRequestInput): AddTokenApprovalPreview {
+  return {
+    kind: "addToken",
+    processId: input.processId,
+    ticker: input.ticker,
+    name: input.name,
+    address: input.address,
+  };
 }
 
 function buildConnectPreview(requestedPermissions: PermissionType[]): ConnectApprovalPreview {
@@ -295,6 +324,7 @@ export class ApprovalHandler {
     private readonly transfers?: AoTransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
     private readonly activeWalletId: () => Promise<string | null> = async () => null,
+    private readonly tokens?: TokenWatchList,
   ) {
     windows.onApprovalWindowClosed((requestId) => {
       void this.rejectClosedWindow(requestId);
@@ -365,7 +395,9 @@ export class ApprovalHandler {
     const preview: ApprovalPreview =
       input.kind === "connect"
         ? buildConnectPreview(input.requestedPermissions)
-        : await buildSigningPreview(input);
+        : input.kind === "addToken"
+          ? buildAddTokenPreview(input)
+          : await buildSigningPreview(input);
 
     const request: ApprovalRequest = {
       requestId,
@@ -511,6 +543,9 @@ export class ApprovalHandler {
     if (entry.request.kind === "connect") {
       return this.createGrant(entry);
     }
+    if (entry.request.kind === "addToken") {
+      return this.addToken(entry);
+    }
     return this.performSigning(entry);
   }
 
@@ -541,6 +576,23 @@ export class ApprovalHandler {
 
     await this.saveGrants([...withoutExisting, grant]);
     return { granted: grant.permissions };
+  }
+
+  /**
+   * Adds to the address the request was made for, even if the user has
+   * switched wallets since: that is the address the window showed.
+   * Resolves to `undefined`, as Wander's `addToken` does.
+   */
+  private async addToken(entry: PendingApprovalRecord): Promise<undefined> {
+    if (!this.tokens) {
+      throw new Error("addToken is not wired to a token list. ApprovalHandler was constructed without one.");
+    }
+    const input = decodeTaggedBinary(entry.signingInput) as AddTokenRequestInput | null;
+    if (!input || input.kind !== "addToken") {
+      throw new Error(`Approval request "${entry.request.requestId}" has no token to add.`);
+    }
+    await this.tokens.addWatchedToken({ address: input.address, processId: input.processId });
+    return undefined;
   }
 
   /**

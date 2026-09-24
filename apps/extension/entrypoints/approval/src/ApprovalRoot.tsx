@@ -2,14 +2,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { ApprovalRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
+import { AddTokenScreen } from "./AddTokenScreen";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
 /**
  * The approval window's top-level state machine: loads the pending
  * `ApprovalRequest` for `requestId` via `getApproval`, then renders
- * `ConnectionRequestScreen` or `SigningApprovalScreen` depending on
- * `request.kind`. The dApp keeps waiting while the window first runs
+ * `ConnectionRequestScreen`, `AddTokenScreen` or `SigningApprovalScreen`
+ * depending on `request.kind`. The dApp keeps waiting while the window first runs
  * onboarding (no wallet yet) or unlock (wallet locked) in place, and the
  * request shows once that's done.
  *
@@ -184,6 +185,15 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
           preview={preview}
           onReject={() => void handleReject()}
           onGrant={() => void handleApprove("Grant approved.", "Couldn't connect")}
+        />
+      );
+    } else if (request.preview.kind === "addToken") {
+      content = (
+        <AddTokenScreen
+          origin={request.origin}
+          preview={request.preview}
+          onReject={() => void handleReject()}
+          onAdd={() => handleApprove("Token added.", "Couldn't add the token")}
         />
       );
     } else {

@@ -78,6 +78,8 @@ interface Wallet {
   decrypt(data: unknown, options?: unknown): Promise<unknown>;
   signDataItem(dataItem: unknown, options?: unknown): Promise<unknown>;
   batchSignDataItem(dataItems: unknown, options?: unknown): Promise<unknown>;
+  addToken(id: string, type?: unknown, gateway?: unknown): Promise<void>;
+  isTokenAdded(id: string): Promise<unknown>;
 }
 
 const WALLET_ID = "wallet-1";
@@ -353,5 +355,101 @@ describe("provider data item methods, end to end", () => {
     await expect(wallet.signDataItem({ tags: [] })).rejects.toThrow(/needs data/);
     await expect(wallet.batchSignDataItem([])).rejects.toThrow(/non-empty array/);
     expect(windowsCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("provider token list methods, end to end", () => {
+  const PROCESS_ID = "t".repeat(43);
+  const AO_PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    store.set("local:grants", [
+      { origin: location.origin, walletId: WALLET_ID, permissions: ["ACCESS_TOKENS"], createdAt: 0, expiresAt: null, budget: null },
+    ]);
+    // HyperBEAM answers the balance; the gateway answers the spawn tags.
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (String(url).includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: PROCESS_ID,
+                      tags: [
+                        { name: "Ticker", value: "TKN" },
+                        { name: "Name", value: "Token" },
+                        { name: "Denomination", value: "6" },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "1000000" };
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("addToken asks for approval with the resolved token, then isTokenAdded sees it", async () => {
+    await expect(wallet.isTokenAdded(PROCESS_ID)).resolves.toBe(false);
+
+    const { result, request } = await approved<undefined>(wallet.addToken(PROCESS_ID, "asset"));
+
+    expect(result).toBeUndefined();
+    expect(request.kind).toBe("addToken");
+    expect(request.preview).toEqual({ kind: "addToken", processId: PROCESS_ID, ticker: "TKN", name: "Token", address: "addr-1" });
+    expect(store.get("local:watchedProcessIds:addr-1")).toEqual([PROCESS_ID]);
+    await expect(wallet.isTokenAdded(PROCESS_ID)).resolves.toBe(true);
+  });
+
+  it("addToken resolves without a window when the token is already listed", async () => {
+    store.set("local:watchedProcessIds:addr-1", [PROCESS_ID]);
+    await expect(wallet.addToken(PROCESS_ID)).resolves.toBeUndefined();
+    await expect(wallet.addToken(AO_PROCESS_ID)).resolves.toBeUndefined();
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
+  it("addToken stores nothing when the user rejects", async () => {
+    const call = wallet.addToken(PROCESS_ID);
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pending = store.get("session:pendingApprovals") as Array<{ request: { requestId: string } }>;
+    await registeredHandlers.get("resolveApproval")!({
+      data: { requestId: pending[0]!.request.requestId, approved: false },
+      sender: APPROVAL_SENDER,
+    });
+
+    await expect(call).rejects.toThrow(/rejected/);
+    expect(store.get("local:watchedProcessIds:addr-1")).toBeUndefined();
+  });
+
+  it("rejects an id that isn't a process id, without opening a window", async () => {
+    await expect(wallet.addToken("not-a-process")).rejects.toThrow(/AO process id/);
+    await expect(wallet.isTokenAdded("")).rejects.toThrow(/AO process id/);
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
+  it("addToken and isTokenAdded need only a connection", async () => {
+    store.set("local:grants", [
+      { origin: location.origin, walletId: WALLET_ID, permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+    ]);
+    await expect(wallet.isTokenAdded(PROCESS_ID)).resolves.toBe(false);
+
+    const { request } = await approved(wallet.addToken(PROCESS_ID));
+    expect(request.kind).toBe("addToken");
+
+    store.delete("local:grants");
+    await expect(wallet.addToken(PROCESS_ID)).rejects.toThrow(/not connected/);
+    await expect(wallet.isTokenAdded(PROCESS_ID)).rejects.toThrow(/not connected/);
   });
 });

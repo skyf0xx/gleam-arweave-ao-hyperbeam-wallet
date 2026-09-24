@@ -130,6 +130,14 @@ export interface ProviderTransaction {
 const ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const ATOMIC_AMOUNT_PATTERN = /^\d+$/;
 
+/** An AO process id, which has the same shape as an Arweave address. */
+export function readProcessId(value: unknown, method: string): string {
+  if (typeof value !== "string" || !ADDRESS_PATTERN.test(value)) {
+    throw new Error(`${method}: id must be an AO process id (43 base64url characters).`);
+  }
+  return value;
+}
+
 function decodeBase64Url(value: string, what: string, method: string): Uint8Array<ArrayBuffer> {
   try {
     return base64UrlToBytes(value);

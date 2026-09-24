@@ -38,6 +38,8 @@ export const PROVIDER_SURFACE_METHODS = [
   "transferAoTokens",
   "tokenBalance",
   "userTokens",
+  "addToken",
+  "isTokenAdded",
 ] as const;
 
 export type ProviderSurfaceMethod = (typeof PROVIDER_SURFACE_METHODS)[number];
@@ -63,6 +65,7 @@ export const APPROVAL_GATED_METHODS: readonly ProviderSurfaceMethod[] = [
   "signDataItem",
   "batchSignDataItem",
   "transferAoTokens",
+  "addToken",
 ];
 
 /** Tagged binary encoding for values that don't survive the postMessage boundary intact. */

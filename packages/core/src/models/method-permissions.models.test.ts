@@ -39,6 +39,8 @@ describe("METHOD_PERMISSIONS", () => {
     ["transferAoTokens", ["SIGN_TRANSACTION"]],
     ["tokenBalance", ["ACCESS_TOKENS"]],
     ["userTokens", ["ACCESS_TOKENS"]],
+    ["addToken", []],
+    ["isTokenAdded", []],
   ])("%s needs %j", (method, permissions) => {
     expect(METHOD_PERMISSIONS[method]).toEqual(permissions);
   });

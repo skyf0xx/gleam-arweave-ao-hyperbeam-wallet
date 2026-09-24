@@ -183,7 +183,7 @@ describe("domain model shapes", () => {
       },
     };
     expect(request.preview.kind).toBe("sign");
-    if (request.preview.kind !== "connect") {
+    if (request.preview.kind === "sign") {
       expect(request.preview.payloadHash).toBe("deadbeef");
     }
   });
@@ -207,7 +207,7 @@ describe("domain model shapes", () => {
       },
     };
     expect(request.preview.kind).toBe("transferAoTokens");
-    if (request.preview.kind !== "connect") {
+    if (request.preview.kind === "transferAoTokens") {
       expect(request.preview.token).toBe("ao-process-id");
     }
   });

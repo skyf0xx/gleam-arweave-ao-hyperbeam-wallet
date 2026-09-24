@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 3. dApp provider gaps
 
-- [ ] **`addToken`, `isTokenAdded` and `walletVersion` are missing (M, opus)**
-  `packages/messaging/src/page-protocol.ts`, `core/models/method-privileges.ts`,
-  `entrypoints/provider/index.ts`, `entrypoints/background/index.ts`. Done:
-  both methods are in the surface and wired to the token storage above.
-  `addToken` gets an approval prompt. `walletVersion` is on the injected
-  object.
 - [ ] **`getArweaveConfig` ignores the gateway setting; `connect` drops `appInfo` and `gateway` (S, sonnet)**
   `entrypoints/background/index.ts`. Config is hard-coded to arweave.net.
   `appInfo` (name, logo) never reaches the connect approval screen. Done:
@@ -87,3 +81,12 @@ vault, crypto and provider security; `sonnet` for everything else.
   its amount still renders as a raw smallest-unit integer. Wiring in the
   token's `denomination` (already read for balances) would let it use
   `formatAtomicAsDisplay` for real instead of a no-op.
+- **`tokenBalance` and `userTokens` can't be called from a page (S)**
+  `entrypoints/provider/index.ts`. Both are in `PROVIDER_SURFACE_METHODS`
+  and handled in `entrypoints/background/index.ts`, but `GleamProvider`
+  has no method for either, so `window.arweaveWallet.tokenBalance` is
+  `undefined`.
+- **`walletVersion` reports `0.0.0` (S)**
+  `apps/extension/package.json`. The injected `walletVersion` and the
+  manifest version both come from this field, which was never set to a
+  release version.

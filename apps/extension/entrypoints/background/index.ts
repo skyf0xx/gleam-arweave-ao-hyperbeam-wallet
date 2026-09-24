@@ -36,6 +36,7 @@ import {
   readDataItems,
   readEncryptAlgorithm,
   readHashAlgorithm,
+  readProcessId,
   readSaltLength,
   readTransaction,
   type ProviderArgs,
@@ -85,6 +86,7 @@ const approval = new ApprovalHandler(
   transfer,
   DEFAULT_BUNDLER_URL,
   async () => (await lifecycle.getState()).activeWalletId,
+  reads,
 );
 
 // Advances locally-pending activity entries to confirmed on a background
@@ -397,6 +399,31 @@ async function handleProviderCall(
       if (!wallet) throw new Error("No active wallet to read tokens for.");
       const tokenParams = params as { options?: { cursor?: string; limit?: number } };
       return reads.userTokens({ address: wallet.address, options: tokenParams.options });
+    }
+
+    case "isTokenAdded": {
+      if (!wallet) throw new Error("No active wallet to check tokens for.");
+      return reads.isTokenAdded({ address: wallet.address, processId: readProcessId(params.id, method) });
+    }
+
+    case "addToken": {
+      if (!wallet) throw new Error("No active wallet to add a token to.");
+      const processId = readProcessId(params.id, method);
+      // Already listed: nothing to ask the user.
+      if (await reads.isTokenAdded({ address: wallet.address, processId })) return undefined;
+      // Resolving first proves the id answers as a token, and gives the
+      // prompt a ticker and name to show instead of only the id.
+      const token = await reads.previewWatchedToken({ address: wallet.address, processId });
+      return approval.requestApproval({
+        kind: "addToken",
+        origin,
+        walletId: wallet.id,
+        address: wallet.address,
+        processId,
+        // `getTokenBalance` echoes the process id when it finds no ticker.
+        ticker: token.ticker === processId ? null : token.ticker,
+        name: token.name,
+      });
     }
 
     default:

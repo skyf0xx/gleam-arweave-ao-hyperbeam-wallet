@@ -5,6 +5,7 @@ import {
   RESPONSE,
 } from "@gleam/messaging/src/page-protocol.ts";
 import { GleamProvider, install } from "./index";
+import { version as PACKAGE_VERSION } from "../../package.json";
 
 /**
  * Unit-tests the injected provider script's pure bridge logic directly
@@ -81,6 +82,38 @@ describe("provider.ts: GleamProvider bridge", () => {
       result: { id: "ao-message-id-123" },
     });
     await expect(callPromise).resolves.toEqual({ id: "ao-message-id-123" });
+  });
+
+  it("addToken sends only the id, drops Wander's type and gateway, and resolves to undefined", async () => {
+    const callPromise = provider.addToken("p".repeat(43), "asset", { host: "arweave.net" });
+    const envelope = lastRequestEnvelope();
+    expect(envelope.method).toBe("addToken");
+    expect(envelope.params).toEqual({ id: "p".repeat(43) });
+
+    postResponse({ type: RESPONSE, id: envelope.id, result: null });
+    await expect(callPromise).resolves.toBeUndefined();
+  });
+
+  it("isTokenAdded sends the id and resolves to the relayed boolean", async () => {
+    const callPromise = provider.isTokenAdded("p".repeat(43));
+    const envelope = lastRequestEnvelope();
+    expect(envelope.method).toBe("isTokenAdded");
+    expect(envelope.params).toEqual({ id: "p".repeat(43) });
+
+    postResponse({ type: RESPONSE, id: envelope.id, result: true });
+    await expect(callPromise).resolves.toBe(true);
+  });
+
+  it("addToken waits as long as an approval can take", async () => {
+    vi.useFakeTimers();
+    const callPromise = provider.addToken("p".repeat(43));
+    let settled = false;
+    callPromise.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    await vi.advanceTimersByTimeAsync(APPROVAL_TIMEOUT_MS);
+    expect(settled).toBe(false);
   });
 
   it("sign and dispatch send an arweave-js transaction as its toJSON() form", () => {
@@ -359,6 +392,13 @@ describe("provider.ts: install() takes over window.arweaveWallet (point 7)", () 
   it("installs window.arweaveWallet with walletName 'Gleam' when none exists", () => {
     teardown = install();
     expect(current()?.walletName).toBe("Gleam");
+  });
+
+  it("exposes walletVersion, the extension's own version", () => {
+    teardown = install();
+    const wallet = (window as unknown as { arweaveWallet?: { walletVersion?: unknown } }).arweaveWallet;
+    expect(wallet?.walletVersion).toBe(PACKAGE_VERSION);
+    expect(PACKAGE_VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it("announces itself with arweaveWalletLoaded", () => {

@@ -54,6 +54,8 @@ describe("method privilege tiers", () => {
         "transferAoTokens",
         "tokenBalance",
         "userTokens",
+        "addToken",
+        "isTokenAdded",
       ].sort(),
     );
   });

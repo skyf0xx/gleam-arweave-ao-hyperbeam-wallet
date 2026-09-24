@@ -739,6 +739,25 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
   });
 });
 
+describe("ReadsHandler: isTokenAdded", () => {
+  it("is true for a watched id, per address, and false otherwise", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
+    const handler = new ReadsHandler(storage);
+
+    expect(await handler.isTokenAdded({ address: "addr1", processId: "proc1" })).toBe(true);
+    expect(await handler.isTokenAdded({ address: "addr1", processId: "proc2" })).toBe(false);
+    expect(await handler.isTokenAdded({ address: "addr2", processId: "proc1" })).toBe(false);
+  });
+
+  it("is true for the AO token, which is always listed without being stored", async () => {
+    const handler = new ReadsHandler(createFakeStorage());
+    expect(
+      await handler.isTokenAdded({ address: "addr1", processId: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc" }),
+    ).toBe(true);
+  });
+});
+
 describe("ReadsHandler: getActivity", () => {
   it("merges the local activity log with the gateway query result", async () => {
     const storage = createFakeStorage();

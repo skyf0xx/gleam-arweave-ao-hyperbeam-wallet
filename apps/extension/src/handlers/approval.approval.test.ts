@@ -673,7 +673,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     const request = await handler.getApproval({ requestId });
     expect(request.kind).toBe("sign");
     expect(request.origin).toBe("https://bazar.arweave.net");
-    if (request.preview.kind !== "connect") {
+    if (request.preview.kind !== "connect" && request.preview.kind !== "addToken") {
       expect(request.preview.recipient).toBe("recipient-address");
       expect(request.preview.amount).toBe("1000");
       expect(request.preview.decodedData).toBe("hello");
@@ -952,7 +952,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       const requestId = extractRequestId(windows.opened[0]!);
 
       const request = await handler.getApproval({ requestId });
-      if (request.preview.kind === "connect") throw new Error("expected a signing preview");
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken") throw new Error("expected a signing preview");
       const { items } = request.preview;
       expect(items).toHaveLength(3);
       expect(items?.[0]).toMatchObject({ decodedData: "first", tags: [{ name: "Action", value: "Eval" }], target: null });
@@ -981,7 +981,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       const requestId = extractRequestId(windows.opened[0]!);
 
       const request = await handler.getApproval({ requestId });
-      if (request.preview.kind === "connect") throw new Error("expected a signing preview");
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken") throw new Error("expected a signing preview");
       expect(request.preview.items).toBeNull();
       expect(request.preview.decodedData).toBe("hello");
 
@@ -1121,5 +1121,75 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
       /not wired to a transfer submitter/i,
     );
     await dappRejected;
+  });
+});
+
+describe("ApprovalHandler: addToken approval", () => {
+  const PROCESS_ID = "p".repeat(43);
+
+  function requestAddToken(handler: ApprovalHandler) {
+    return handler.requestApproval({
+      kind: "addToken",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      address: "abc-address",
+      processId: PROCESS_ID,
+      ticker: "TKN",
+      name: "Token",
+    });
+  }
+
+  it("previews the token and the address it joins, without needing a signing key", async () => {
+    const storage = createWatchableStorage();
+    const windows = createFakeWindows();
+    const addWatchedToken = vi.fn().mockResolvedValue(undefined);
+    const handler = new ApprovalHandler(storage, windows, undefined, undefined, undefined, { addWatchedToken });
+    keySessionStore.clear();
+
+    const pending = requestAddToken(handler);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    const request = await handler.getApproval({ requestId });
+    expect(request.kind).toBe("addToken");
+    expect(request.preview).toEqual({
+      kind: "addToken",
+      processId: PROCESS_ID,
+      ticker: "TKN",
+      name: "Token",
+      address: "abc-address",
+    });
+
+    await handler.resolveApproval({ requestId, approved: true });
+    await expect(pending).resolves.toBeUndefined();
+    expect(addWatchedToken).toHaveBeenCalledWith({ address: "abc-address", processId: PROCESS_ID });
+  });
+
+  it("adds nothing when rejected", async () => {
+    const storage = createWatchableStorage();
+    const windows = createFakeWindows();
+    const addWatchedToken = vi.fn();
+    const handler = new ApprovalHandler(storage, windows, undefined, undefined, undefined, { addWatchedToken });
+
+    const pending = requestAddToken(handler);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: false });
+
+    await expect(pending).rejects.toThrow(/rejected/);
+    expect(addWatchedToken).not.toHaveBeenCalled();
+  });
+
+  it("rejects the dApp with the error when the token can't be stored", async () => {
+    const storage = createWatchableStorage();
+    const windows = createFakeWindows();
+    const addWatchedToken = vi.fn().mockRejectedValue(new Error("No HyperBEAM peer configured."));
+    const handler = new ApprovalHandler(storage, windows, undefined, undefined, undefined, { addWatchedToken });
+
+    const pending = requestAddToken(handler);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await expect(
+      handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true }),
+    ).rejects.toThrow(/No HyperBEAM peer/);
+    await expect(pending).rejects.toThrow(/No HyperBEAM peer/);
   });
 });
