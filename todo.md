@@ -11,10 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Importing a keyfile that's already in the vault adds a duplicate (S, sonnet)**
-  `src/handlers/wallet-lifecycle.ts` (`importWallet`) doesn't check the
-  derived address, so the switcher shows two rows sharing one activity
-  log and token list. Done: switch to the existing wallet instead.
 - [ ] **Back from first-run backup returns to Welcome after the wallet exists (S, sonnet)**
   `popup/onboarding/src/OnboardingView.tsx` (`Backup`'s `onBack`).
   "Create a wallet" then asks for a new password, which `createWallet`

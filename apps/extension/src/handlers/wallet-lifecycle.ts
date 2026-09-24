@@ -360,6 +360,19 @@ export class WalletLifecycleHandler {
     }
 
     const address = await deriveAddress(shapeCheck.jwk);
+    const wallets = await loadWallets(this.storage);
+
+    // Same key, already in the vault: switch to it instead of adding a
+    // second row that would share one address across two wallet ids, which
+    // would fork the activity log and token list the address is keyed by.
+    const existing = wallets.find((wallet) => wallet.address === address);
+    if (existing) {
+      await this.storage.set(ACTIVE_WALLET_ID_KEY, existing.id);
+      await cacheKey(existing.id, shapeCheck.jwk, address);
+      await addUnlockedWalletToSession(this.storage, existing.id, wallets);
+      return toSummary(existing);
+    }
+
     const now = Date.now();
     const id = crypto.randomUUID();
 
@@ -382,7 +395,6 @@ export class WalletLifecycleHandler {
       backupConfirmedAt: null,
     };
 
-    const wallets = await loadWallets(this.storage);
     wallets.push(wallet);
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);

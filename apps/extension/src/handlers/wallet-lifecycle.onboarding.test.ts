@@ -198,6 +198,36 @@ describe("WalletLifecycleHandler: importWallet", () => {
 
     expect(state.session?.unlockedWalletIds).toEqual([summary.id]);
   });
+
+  it("importing the same keyfile again switches to the existing wallet instead of duplicating it", async () => {
+    const jwk = validJWK();
+    const first = await handler.importWallet({ jwk, name: "Imported", password: GOOD_PASSWORD });
+
+    await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+    const second = await handler.importWallet({
+      jwk,
+      name: "Imported again",
+      password: GOOD_PASSWORD,
+    });
+
+    expect(second.id).toBe(first.id);
+    expect(second.name).toBe("Imported");
+
+    const state = await handler.getState();
+    expect(state.wallets).toHaveLength(2);
+    expect(state.activeWalletId).toBe(first.id);
+  });
+
+  it("re-importing the same keyfile leaves it unlocked", async () => {
+    const jwk = validJWK();
+    const first = await handler.importWallet({ jwk, name: "Imported", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+
+    await handler.importWallet({ jwk, name: "Imported", password: GOOD_PASSWORD });
+
+    const state = await handler.getState();
+    expect(state.session?.unlockedWalletIds).toEqual([first.id]);
+  });
 });
 
 describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
