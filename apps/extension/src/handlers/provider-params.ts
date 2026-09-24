@@ -1,4 +1,4 @@
-import { base64UrlToBytes, type EncryptAlgorithm } from "@gleam/core";
+import { base64UrlToBytes, normalizeEncryptAlgorithm, type EncryptAlgorithm } from "@gleam/core";
 import { decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
@@ -12,7 +12,6 @@ import { decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/pag
 export type HashAlgorithm = "SHA-256" | "SHA-384" | "SHA-512";
 
 const HASH_ALGORITHMS: readonly HashAlgorithm[] = ["SHA-256", "SHA-384", "SHA-512"];
-const ENCRYPT_ALGORITHM_NAMES: readonly string[] = ["RSA-OAEP", "AES-CTR", "AES-CBC", "AES-GCM"];
 
 export type ProviderArgs = Record<string, unknown>;
 
@@ -78,7 +77,9 @@ export function readHashAlgorithm(options: unknown, method: string): HashAlgorit
 
 /**
  * Accepts the WebCrypto params object Wander takes (`{ name: "RSA-OAEP" }`
- * and the AES variants). Wander's deprecated `{ algorithm, hash, salt }`
+ * and the AES variants), rebuilt with only the fields that are set so a
+ * `null` or `{}` from the page is dropped or rejected before an approval
+ * window opens. Wander's deprecated `{ algorithm, hash, salt }`
  * form uses a hybrid RSA+AES construction this wallet does not implement,
  * so it is rejected rather than silently encrypted some other way.
  */
@@ -92,8 +93,9 @@ export function readEncryptAlgorithm(options: unknown, method: "encrypt" | "decr
       `${method} does not support the deprecated { algorithm, hash, salt } options. Pass WebCrypto params such as { name: "RSA-OAEP" }.`,
     );
   }
-  if (typeof algorithm.name !== "string" || !ENCRYPT_ALGORITHM_NAMES.includes(algorithm.name)) {
-    throw new Error(`${method} does not support algorithm "${String(algorithm.name)}".`);
+  try {
+    return normalizeEncryptAlgorithm(algorithm);
+  } catch (error) {
+    throw new Error(`${method}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  return algorithm as unknown as EncryptAlgorithm;
 }

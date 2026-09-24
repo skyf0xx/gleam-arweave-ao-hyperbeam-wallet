@@ -210,6 +210,57 @@ describe("provider message methods, end to end", () => {
     expect(new TextDecoder().decode(plaintext)).toBe("aes");
   });
 
+  it("encrypt and decrypt hand WebCrypto no label key, after every JSON hop, as Chrome requires", async () => {
+    // Emulates Chrome: a present `label` that isn't a BufferSource throws,
+    // even when it is `undefined`.
+    const chromeLabelCheck = (params: unknown) => {
+      if (params && typeof params === "object" && "label" in params) {
+        const { label } = params as { label: unknown };
+        if (!(ArrayBuffer.isView(label) || Object.prototype.toString.call(label) === "[object ArrayBuffer]")) {
+          throw new TypeError("RsaOaepParams: label: Not a BufferSource");
+        }
+      }
+    };
+    const realEncrypt = crypto.subtle.encrypt.bind(crypto.subtle);
+    const realDecrypt = crypto.subtle.decrypt.bind(crypto.subtle);
+    const encryptSpy = vi.spyOn(crypto.subtle, "encrypt").mockImplementation(async (params, key, data) => {
+      chromeLabelCheck(params);
+      return realEncrypt(params, key, data);
+    });
+    const decryptSpy = vi.spyOn(crypto.subtle, "decrypt").mockImplementation(async (params, key, data) => {
+      chromeLabelCheck(params);
+      return realDecrypt(params, key, data);
+    });
+
+    try {
+      const { result: ciphertext } = await approved<Uint8Array>(wallet.encrypt("secret", { name: "RSA-OAEP" }));
+      const { result: plaintext } = await approved<Uint8Array>(
+        wallet.decrypt(ciphertext, { name: "RSA-OAEP", label: null }),
+      );
+      expect(new TextDecoder().decode(plaintext)).toBe("secret");
+      expect(encryptSpy.mock.calls[0]![0]).toStrictEqual({ name: "RSA-OAEP" });
+      expect(decryptSpy.mock.calls[0]![0]).toStrictEqual({ name: "RSA-OAEP" });
+
+      const label = new TextEncoder().encode("ctx");
+      const { result: labelled } = await approved<Uint8Array>(wallet.encrypt("secret", { name: "RSA-OAEP", label }));
+      const { result: unlabelled } = await approved<Uint8Array>(wallet.decrypt(labelled, { name: "RSA-OAEP", label }));
+      expect(new TextDecoder().decode(unlabelled)).toBe("secret");
+    } finally {
+      encryptSpy.mockRestore();
+      decryptSpy.mockRestore();
+    }
+  });
+
+  it("rejects a stray label or IV clearly, without opening a window", async () => {
+    await expect(wallet.encrypt("data", { name: "RSA-OAEP", label: {} })).rejects.toThrow(
+      /encrypt: RSA-OAEP label must be an ArrayBuffer or Uint8Array/,
+    );
+    await expect(wallet.decrypt(new Uint8Array([1]), { name: "AES-GCM", iv: null })).rejects.toThrow(
+      /decrypt: AES-GCM iv is required/,
+    );
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
   it("rejects the deprecated encrypt options clearly, without opening a window", async () => {
     await expect(wallet.encrypt("data", { algorithm: "RSA-OAEP", hash: "SHA-256" })).rejects.toThrow(
       /deprecated \{ algorithm, hash, salt \}/,

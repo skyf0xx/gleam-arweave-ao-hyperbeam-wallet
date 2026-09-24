@@ -21,6 +21,72 @@ import type { EncryptAlgorithm } from "../models/signing";
  * expect.
  */
 
+function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
+}
+
+function readBuffer(value: unknown, field: string, required: boolean): ArrayBuffer | undefined {
+  if (value === undefined || value === null) {
+    if (required) throw new Error(`${field} is required.`);
+    return undefined;
+  }
+  if (isArrayBuffer(value)) return value.slice(0);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice().buffer;
+  }
+  throw new Error(`${field} must be an ArrayBuffer or Uint8Array.`);
+}
+
+function readInteger(value: unknown, field: string, required: boolean): number | undefined {
+  if (value === undefined || value === null) {
+    if (required) throw new Error(`${field} is required.`);
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${field} must be an integer.`);
+  }
+  return value;
+}
+
+/**
+ * Builds a fresh WebCrypto params object holding only the fields that are
+ * set. Chrome rejects an optional member that is present but not a
+ * BufferSource, even `label: undefined`, so absent optionals must be
+ * missing keys, not `undefined` or `null` values.
+ */
+export function normalizeEncryptAlgorithm(value: unknown): EncryptAlgorithm {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error('The algorithm must be an object, for example { name: "RSA-OAEP" }.');
+  }
+  const raw = value as Record<string, unknown>;
+  switch (raw.name) {
+    case "RSA-OAEP": {
+      const label = readBuffer(raw.label, "RSA-OAEP label", false);
+      return label ? { name: "RSA-OAEP", label } : { name: "RSA-OAEP" };
+    }
+    case "AES-CTR":
+      return {
+        name: "AES-CTR",
+        counter: readBuffer(raw.counter, "AES-CTR counter", true)!,
+        length: readInteger(raw.length, "AES-CTR length", true)!,
+      };
+    case "AES-CBC":
+      return { name: "AES-CBC", iv: readBuffer(raw.iv, "AES-CBC iv", true)! };
+    case "AES-GCM": {
+      const additionalData = readBuffer(raw.additionalData, "AES-GCM additionalData", false);
+      const tagLength = readInteger(raw.tagLength, "AES-GCM tagLength", false);
+      return {
+        name: "AES-GCM",
+        iv: readBuffer(raw.iv, "AES-GCM iv", true)!,
+        ...(additionalData ? { additionalData } : {}),
+        ...(tagLength !== undefined ? { tagLength } : {}),
+      };
+    }
+    default:
+      throw new Error(`Unsupported encryption algorithm "${String(raw.name)}".`);
+  }
+}
+
 async function importRsaPublicKey(jwk: JWKInterface): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
@@ -90,18 +156,10 @@ export async function encrypt(
   plaintext: Uint8Array<ArrayBuffer>,
   algorithm: EncryptAlgorithm,
 ): Promise<Uint8Array> {
-  if (algorithm.name === "RSA-OAEP") {
-    const key = await importRsaPublicKey(jwk);
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: "RSA-OAEP", label: algorithm.label },
-      key,
-      plaintext,
-    );
-    return new Uint8Array(ciphertext);
-  }
-
-  const key = await resolveAesKey(jwk, algorithm, "encrypt");
-  const ciphertext = await crypto.subtle.encrypt(algorithm, key, plaintext);
+  const params = normalizeEncryptAlgorithm(algorithm);
+  const key =
+    params.name === "RSA-OAEP" ? await importRsaPublicKey(jwk) : await resolveAesKey(jwk, params, "encrypt");
+  const ciphertext = await crypto.subtle.encrypt(params, key, plaintext);
   return new Uint8Array(ciphertext);
 }
 
@@ -110,17 +168,9 @@ export async function decrypt(
   ciphertext: Uint8Array<ArrayBuffer>,
   algorithm: EncryptAlgorithm,
 ): Promise<Uint8Array> {
-  if (algorithm.name === "RSA-OAEP") {
-    const key = await importRsaPrivateKey(jwk);
-    const plaintext = await crypto.subtle.decrypt(
-      { name: "RSA-OAEP", label: algorithm.label },
-      key,
-      ciphertext,
-    );
-    return new Uint8Array(plaintext);
-  }
-
-  const key = await resolveAesKey(jwk, algorithm, "decrypt");
-  const plaintext = await crypto.subtle.decrypt(algorithm, key, ciphertext);
+  const params = normalizeEncryptAlgorithm(algorithm);
+  const key =
+    params.name === "RSA-OAEP" ? await importRsaPrivateKey(jwk) : await resolveAesKey(jwk, params, "decrypt");
+  const plaintext = await crypto.subtle.decrypt(params, key, ciphertext);
   return new Uint8Array(plaintext);
 }
