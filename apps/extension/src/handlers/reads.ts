@@ -122,16 +122,20 @@ const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
  * precedence over the fallback.
  */
 function withRegisteredTicker(balance: TokenBalance): TokenBalance {
-  if (balance.ticker !== balance.processId) return balance;
   const registered = DEFAULT_TOKEN_REGISTRY.find((token) => token.processId === balance.processId);
-  return registered ? { ...balance, ticker: registered.ticker } : balance;
+  if (!registered) return balance;
+  return {
+    ...balance,
+    ticker: balance.ticker === balance.processId ? registered.ticker : balance.ticker,
+    name: registered.name,
+  };
 }
 
 /**
  * For a `TokenBalance` whose process isn't in `DEFAULT_TOKEN_REGISTRY`
- * (so `withRegisteredTicker` had nothing to apply), resolves ticker and
- * denomination directly from the process's spawn tags via the gateway's
- * GraphQL endpoint (`resolveUnregisteredTokenMetadata` —
+ * (so `withRegisteredTicker` had nothing to apply), resolves ticker,
+ * denomination and name directly from the process's spawn tags via the
+ * gateway's GraphQL endpoint (`resolveUnregisteredTokenMetadata` —
  * `core/pricing/token-sources.ts`) rather than leaving the balance
  * identified only by its raw process id. This is purely additive
  * identification for watched-but-unregistered tokens: the balance
@@ -139,12 +143,18 @@ function withRegisteredTicker(balance: TokenBalance): TokenBalance {
  * `~process@1.0` compute path (`getTokenBalance`), and a registered
  * token's identity (checked first) is never overridden by this lookup.
  *
+ * Denomination for a non-AO process always comes from this metadata
+ * lookup (or stays `null`-equivalent — HyperBEAM's own response carries
+ * no denomination for anything but the AO token, see `ao/balance.ts`),
+ * never from `getTokenBalance`'s AO-specific denomination-12 default,
+ * which only actually applies to the AO token itself.
+ *
  * A metadata lookup failure (`resolveUnregisteredTokenMetadata` returning
  * `null` — unreachable gateway, unspawned/unindexed process id) leaves
  * the balance exactly as `getTokenBalance` returned it (process id as
- * ticker, HyperBEAM's own denomination guess) rather than throwing —
- * one unresolvable token's identity shouldn't fail every other token's
- * balance read in the same `getTokenBalances` call.
+ * ticker, no name, HyperBEAM's own denomination guess) rather than
+ * throwing — one unresolvable token's identity shouldn't fail every other
+ * token's balance read in the same `getTokenBalances` call.
  */
 async function withUnregisteredMetadata(
   balance: TokenBalance,
@@ -159,6 +169,7 @@ async function withUnregisteredMetadata(
     ...balance,
     ticker: metadata.ticker ?? balance.ticker,
     denomination: metadata.denomination ?? balance.denomination,
+    name: metadata.name,
   };
 }
 
@@ -388,8 +399,7 @@ export class ReadsHandler {
 
     const tokens: UserToken[] = [];
     for (const balance of balances) {
-      const registered = DEFAULT_TOKEN_REGISTRY.find((token) => token.processId === balance.processId);
-      const name = registered?.name ?? null;
+      const name = balance.name;
       if (name === null) continue;
 
       tokens.push({

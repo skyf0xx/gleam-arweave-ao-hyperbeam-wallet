@@ -590,6 +590,7 @@ function defaultAoTokenBalance(walletAddress: string): TokenBalance {
     processId: DEFAULT_AO_TOKEN.processId as string,
     ticker: DEFAULT_AO_TOKEN.ticker,
     denomination: 0,
+    name: DEFAULT_AO_TOKEN.name,
     quantity: "0",
   };
 }

@@ -27,7 +27,7 @@ function wrapper(queryClient: QueryClient) {
 
 const AR_BALANCE: Winston = "1000000000000";
 const TOKENS: TokenBalance[] = [
-  { address: "addr", processId: "proc-1", ticker: "TEST", denomination: 6, quantity: "500000" },
+  { address: "addr", processId: "proc-1", ticker: "TEST", denomination: 6, name: "Test Token", quantity: "500000" },
 ];
 const ACTIVITY: ActivityPage = { entries: [], cursor: null };
 
@@ -171,7 +171,7 @@ describe("validateSendAmount", () => {
   });
 
   it("returns null for a token with no matching balance entry (can't yet judge affordability)", () => {
-    const unknownToken: TokenBalance = { address: "addr", processId: "unknown", ticker: "X", denomination: 0, quantity: "0" };
+    const unknownToken: TokenBalance = { address: "addr", processId: "unknown", ticker: "X", denomination: 0, name: null, quantity: "0" };
     expect(validateSendAmount("1", unknownToken, balances)).toBeNull();
   });
 });

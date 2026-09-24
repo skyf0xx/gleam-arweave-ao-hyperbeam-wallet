@@ -13,12 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Unregistered tokens get AO's denomination and no name (S, sonnet)**
-  `core/ao/balance.ts` defaults bare-quantity replies to denomination 12.
-  `withUnregisteredMetadata` (`reads.ts`) resolves ticker and denomination
-  but not the name, and `TokenBalance` has no `name`. Done: the name is
-  resolved and carried through. The denomination always comes from token
-  metadata for non-AO tokens.
 - [ ] **Token metadata isn't cached (S, sonnet)**
   `resolveUnregisteredTokenMetadata` hits the gateway on every
   `getTokenBalances`. Done: cached by process id in storage with no expiry

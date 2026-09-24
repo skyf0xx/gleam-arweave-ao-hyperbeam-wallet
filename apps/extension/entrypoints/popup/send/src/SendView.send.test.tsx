@@ -51,6 +51,7 @@ const AO_TOKEN: TokenBalance = {
   processId: "process-ao-token-1",
   ticker: "ARDRIVE",
   denomination: 6,
+  name: null,
   quantity: "5000000",
 };
 
@@ -171,6 +172,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
       processId: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc",
       ticker: "AO",
       denomination: 12,
+      name: null,
       quantity: "3000000000000",
     };
     const send = routedSend({

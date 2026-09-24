@@ -68,6 +68,7 @@ function parseBalanceResponse(
       processId,
       ticker: processId,
       denomination: AO_TOKEN_DENOMINATION,
+      name: null,
       quantity: body,
     };
   }
@@ -78,6 +79,7 @@ function parseBalanceResponse(
       processId,
       ticker: processId,
       denomination: AO_TOKEN_DENOMINATION,
+      name: null,
       quantity: String(body),
     };
   }
@@ -101,6 +103,7 @@ function parseBalanceResponse(
           typeof candidate.denomination === "number"
             ? candidate.denomination
             : AO_TOKEN_DENOMINATION,
+        name: typeof candidate.name === "string" ? candidate.name : null,
         quantity,
       };
     }

@@ -23,6 +23,8 @@ export interface TokenBalance {
   processId: string;
   ticker: string;
   denomination: number;
+  /** The token's display name, or `null` if it couldn't be resolved (an unregistered token whose spawn tags carried no name). */
+  name: string | null;
   /** Atomic integer string in the token's own smallest unit. */
   quantity: string;
 }

@@ -252,6 +252,7 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
     processId: "processABC",
     ticker: "PNTS",
     denomination: 0,
+    name: null,
     quantity: "500",
   };
 
@@ -278,6 +279,7 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
       processId: "processXYZ",
       ticker: "USDC",
       denomination: 6,
+      name: null,
       quantity: "1500000",
     };
     const send = vi.fn(async ({ type }: { type: string }) => {
@@ -326,6 +328,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
       processId: DEFAULT_AO_PROCESS_ID,
       ticker: "AO",
       denomination: 0,
+      name: null,
       quantity: "42",
     };
     const send = sendWith({ arBalance: "5000000000000", tokenBalances: [aoBalance] });
@@ -341,6 +344,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
       processId: "processABC",
       ticker: "PNTS",
       denomination: 0,
+      name: null,
       quantity: "500",
     };
     const send = sendWith({ tokenBalances: [extraToken] });
@@ -357,6 +361,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
       processId: DEFAULT_AO_PROCESS_ID,
       ticker: "AO",
       denomination: 0,
+      name: null,
       quantity: "42",
     };
     const send = sendWith({ tokenBalances: [aoBalance] });
@@ -420,6 +425,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     processId: "processABC",
     ticker: "PNTS",
     denomination: 0,
+    name: null,
     quantity: "500",
   };
 
@@ -478,6 +484,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       processId: `process-${index}`,
       ticker: `TK${index}`,
       denomination: 0,
+      name: null,
       quantity: "1",
     }));
     const send = sendWith({ tokenBalances: tokens });

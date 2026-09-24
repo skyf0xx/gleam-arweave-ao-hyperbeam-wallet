@@ -113,7 +113,7 @@ describe("ReadsHandler: getTokenBalances", () => {
     expect(proc1Balance?.quantity).toBe("42");
   });
 
-  it("resolves ticker/denomination for an unregistered watched token from its spawn tags", async () => {
+  it("resolves ticker/denomination/name for an unregistered watched token from its spawn tags", async () => {
     const storage = createFakeStorage();
     await storage.set("local:watchedProcessIds:addr1", ["hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY"]);
     await storage.set("local:networkSettings", {
@@ -137,6 +137,7 @@ describe("ReadsHandler: getTokenBalances", () => {
                       tags: [
                         { name: "ticker", value: "wUSDC" },
                         { name: "denomination", value: "6" },
+                        { name: "name", value: "Wrapped USDC" },
                       ],
                     },
                   },
@@ -158,6 +159,113 @@ describe("ReadsHandler: getTokenBalances", () => {
     );
     expect(unregistered?.ticker).toBe("wUSDC");
     expect(unregistered?.denomination).toBe(6);
+    expect(unregistered?.name).toBe("Wrapped USDC");
+  });
+
+  it("leaves an unregistered token's name null when its spawn tags carry no name", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+                      tags: [{ name: "ticker", value: "wUSDC" }],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    const unregistered = balances.find(
+      (b) => b.processId === "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+    );
+    expect(unregistered?.name).toBeNull();
+  });
+
+  it("gives the default AO token its registered name, not null", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => "42",
+    })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    const ao = balances.find((b) => b.ticker === "AO");
+    expect(ao?.name).toBe("AO");
+  });
+
+  it("does not use AO's denomination default for an unregistered token whose metadata resolves a different one", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+                      tags: [{ name: "denomination", value: "8" }],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      // Bare-quantity HyperBEAM response: getTokenBalance's own fallback is 12.
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    const unregistered = balances.find(
+      (b) => b.processId === "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+    );
+    expect(unregistered?.denomination).toBe(8);
   });
 
   it("leaves an unregistered token's balance untouched when the metadata lookup fails (one bad lookup shouldn't fail the read)", async () => {

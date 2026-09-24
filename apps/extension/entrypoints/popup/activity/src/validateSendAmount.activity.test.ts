@@ -9,6 +9,7 @@ const AO_TOKEN: TokenBalance = {
   processId: "process-1",
   ticker: "ARDRIVE",
   denomination: 6,
+  name: null,
   quantity: "5000000",
 };
 

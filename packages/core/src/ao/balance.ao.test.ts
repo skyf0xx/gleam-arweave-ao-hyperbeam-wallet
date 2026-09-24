@@ -40,13 +40,28 @@ describe("getTokenBalance", () => {
     expect(result.denomination).toBe(12);
   });
 
-  it("parses an object balance response with ticker/denomination", async () => {
-    const fetchImpl = fakeFetch({ balance: "999", ticker: "AO", denomination: 12 });
+  it("has no name for a bare-quantity response (HyperBEAM carries no name field)", async () => {
+    const fetchImpl = fakeFetch("500100000000");
+    const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
+
+    expect(result.name).toBeNull();
+  });
+
+  it("parses an object balance response with ticker/denomination/name", async () => {
+    const fetchImpl = fakeFetch({ balance: "999", ticker: "AO", denomination: 12, name: "AO" });
     const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
 
     expect(result.quantity).toBe("999");
     expect(result.ticker).toBe("AO");
     expect(result.denomination).toBe(12);
+    expect(result.name).toBe("AO");
+  });
+
+  it("has no name for an object balance response that carries no name field", async () => {
+    const fetchImpl = fakeFetch({ balance: "999", ticker: "AO", denomination: 12 });
+    const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
+
+    expect(result.name).toBeNull();
   });
 
   it("treats a zero balance as a valid quantity, not an error", async () => {

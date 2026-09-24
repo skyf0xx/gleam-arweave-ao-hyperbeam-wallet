@@ -28,6 +28,7 @@ const BALANCE_1: TokenBalance = {
   processId: PROC_1,
   ticker: "wUSDC",
   denomination: 6,
+  name: null,
   quantity: "1000000",
 };
 
