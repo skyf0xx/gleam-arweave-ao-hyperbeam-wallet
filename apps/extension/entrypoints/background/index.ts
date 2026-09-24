@@ -403,7 +403,11 @@ async function setLockedIcon(locked: boolean) {
 // file's own doc comment for why gating `providerCall` alone suffices.
 messenger.onMessage("createWallet", (message) => lifecycle.createWallet(message.data));
 messenger.onMessage("importWallet", (message) => lifecycle.importWallet(message.data));
-messenger.onMessage("deleteWallet", (message) => lifecycle.deleteWallet(message.data));
+messenger.onMessage("deleteWallet", async (message) => {
+  const revoked = await approval.revokeWalletAccess(message.data.walletId);
+  await lifecycle.deleteWallet(message.data);
+  for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
+});
 messenger.onMessage("renameWallet", (message) => lifecycle.renameWallet(message.data));
 messenger.onMessage("switchWallet", async (message) => {
   await lifecycle.switchWallet(message.data);
@@ -426,7 +430,13 @@ messenger.onMessage("unlockWallet", async (message) => {
   void setLockedIcon(false);
   return result;
 });
-messenger.onMessage("resetAllWallets", () => lifecycle.resetAllWallets());
+messenger.onMessage("resetAllWallets", async () => {
+  // Grants go first, here and in deleteWallet: a removal that fails
+  // part-way must not leave a dApp connected to a wallet that is gone.
+  const revoked = await approval.revokeAllAccess();
+  await lifecycle.resetAllWallets();
+  for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
+});
 
 // reads
 messenger.onMessage("getState", () => lifecycle.getState());

@@ -641,6 +641,53 @@ export class ApprovalHandler {
     return { id: txId };
   }
 
+  /**
+   * Revokes every Grant bound to `walletId` and rejects the approvals
+   * still waiting on it, so a deleted wallet leaves no access behind.
+   * Returns the revoked origins, which should be told they're disconnected.
+   */
+  async revokeWalletAccess(walletId: string): Promise<string[]> {
+    const grants = await this.loadGrants();
+    const revoked = grants.filter((grant) => grant.walletId === walletId);
+    await this.saveGrants(grants.filter((grant) => grant.walletId !== walletId));
+    await this.rejectPendingWhere((entry) => entry.walletId === walletId, "The wallet was removed.");
+    return revoked.map((grant) => grant.origin);
+  }
+
+  /** `revokeWalletAccess` for every wallet at once, for a full reset. */
+  async revokeAllAccess(): Promise<string[]> {
+    const grants = await this.loadGrants();
+    await this.storage.remove(GRANTS_KEY);
+    await this.rejectPendingWhere(() => true, "The wallet was reset.");
+    return grants.map((grant) => grant.origin);
+  }
+
+  /**
+   * Skips requests `resolveApproval` is already finishing: it re-reads the
+   * record to attach its outcome, and signing fails on its own once the
+   * wallet's key is gone.
+   */
+  private async rejectPendingWhere(
+    matches: (entry: PendingApprovalRecord) => boolean,
+    error: string,
+  ): Promise<void> {
+    const pending = await this.loadPending();
+    const rejected = new Set(
+      pending
+        .filter((entry) => !entry.outcome && !this.resolving.has(entry.request.requestId) && matches(entry))
+        .map((entry) => entry.request.requestId),
+    );
+    if (rejected.size === 0) return;
+
+    const outcome: ApprovalOutcome = { approved: false, error };
+    await this.savePending(
+      pending.map((entry) => (rejected.has(entry.request.requestId) ? { ...entry, outcome } : entry)),
+    );
+    const current = await this.loadPending();
+    await this.savePending(current.filter((entry) => !rejected.has(entry.request.requestId)));
+    await Promise.all([...rejected].map((requestId) => this.windows.closeApprovalWindow(requestId)));
+  }
+
   /** Revokes a Grant — ends all access it covered immediately. */
   async revokeGrant(req: { origin: string }): Promise<void> {
     const grants = await this.loadGrants();

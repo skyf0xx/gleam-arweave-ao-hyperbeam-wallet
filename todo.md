@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Reset and delete leave dApp grants behind (S, opus)**
-  `wallet-lifecycle.ts` (`resetAllWallets`, `deleteWallet`),
-  `approval.ts` (`local:grants`). After "Forgot password" → reset, a fresh
-  wallet inherits every old grant, and `getAllAddresses` answers without a
-  new approval. Done: reset clears grants, activity logs, watched tokens
-  and pending approvals. Deleting a wallet revokes its grants. Tests.
 - [ ] **The background trusts the claimed origin and any caller (M, opus)**
   `entrypoints/background/index.ts`. `providerCall` uses
   `message.data.origin` instead of the sender's tab URL. Privileged methods
@@ -292,3 +286,16 @@ vault, crypto and provider security; `sonnet` for everything else.
   rule). The background no longer clears keys on `runtime.onSuspend`
   because it fires on idle and locked wallets mid-session. Update or retire
   that rule so a later pass doesn't put the handler back.
+- **Concurrent approval requests overwrite each other (S, opus)**
+  `src/handlers/approval.ts` (`requestApproval`, `rejectClosedWindow`,
+  `dropPending`). Each reads `session:pendingApprovals`, awaits, then writes
+  the whole array back. Two dApp calls at once lose one record: its window
+  opens on "No pending approval" and the dApp waits for the timeout. A test
+  firing two `requestApproval` calls together hung this way. Serialize the
+  read-modify-write.
+- **Grants left by an earlier reset still point at deleted wallets (sonnet)**
+  `src/handlers/approval.ts` (`findActiveGrant`),
+  `entrypoints/background/index.ts`. Reset and delete now revoke grants,
+  but a profile reset before that change keeps grants whose `walletId` no
+  longer exists, and `getAllAddresses` still answers them. Treat a grant
+  whose wallet is gone as inactive and drop it.

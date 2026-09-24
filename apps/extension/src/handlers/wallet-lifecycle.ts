@@ -73,6 +73,9 @@ const WALLETS_KEY = "local:wallets";
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const LOCK_SETTINGS_KEY = "local:lockSettings";
 const THEME_SETTINGS_KEY = "local:themeSettings";
+// Written by ReadsHandler and TransferHandler, keyed by address.
+const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
+const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 
 const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
@@ -413,14 +416,21 @@ export class WalletLifecycleHandler {
   }
 
   /**
-   * The "forgot password" destructive reset (TODO.md 1.5b): wipes every
-   * locally stored wallet, the active-wallet pointer, and the unlocked
-   * session. `ProtocolMap.resetAllWallets` now pins the wire shape for
-   * this method; registering it against the background dispatcher is
-   * `provider-bridge`'s layer (out of this layer's scope).
+   * The "forgot password" destructive reset: wipes every stored wallet,
+   * each wallet's activity log and watched tokens, the active-wallet
+   * pointer, and the unlocked session. dApp grants and pending approvals
+   * are `ApprovalHandler.revokeAllAccess`'s to clear; the background
+   * calls both.
    */
   async resetAllWallets(): Promise<void> {
     await clearKeyCache();
+    const wallets = await loadWallets(this.storage);
+    await Promise.all(
+      wallets.flatMap((wallet) => [
+        this.storage.remove(`${ACTIVITY_LOG_KEY_PREFIX}${wallet.address}`),
+        this.storage.remove(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${wallet.address}`),
+      ]),
+    );
     await saveWallets(this.storage, []);
     await this.storage.remove(ACTIVE_WALLET_ID_KEY);
     await saveSession(this.storage, null);

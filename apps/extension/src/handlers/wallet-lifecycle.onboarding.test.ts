@@ -646,6 +646,21 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
     expect(state.session).toBeNull();
   });
 
+  it("removes each wallet's activity log and watched tokens, and nothing else's", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage);
+    const wallet = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    await storage.set(`local:activityLog:${wallet.address}`, [{ id: "tx" }]);
+    await storage.set(`local:watchedProcessIds:${wallet.address}`, ["process"]);
+    await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net" });
+
+    await handler.resetAllWallets();
+
+    expect(await storage.get(`local:activityLog:${wallet.address}`)).toBeNull();
+    expect(await storage.get(`local:watchedProcessIds:${wallet.address}`)).toBeNull();
+    expect(await storage.get("local:networkSettings")).toEqual({ gatewayUrl: "https://arweave.net" });
+  });
+
   it("never throws when called with nothing stored", async () => {
     const storage = createFakeStorage();
     const handler = new WalletLifecycleHandler(storage);
