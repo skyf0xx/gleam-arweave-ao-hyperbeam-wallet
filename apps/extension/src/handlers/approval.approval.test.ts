@@ -246,6 +246,54 @@ describe("ApprovalHandler: connect() -> Grant", () => {
   });
 });
 
+describe("ApprovalHandler: connect() before any wallet exists", () => {
+  it("grants the wallet that is active when the user approves", async () => {
+    const storage = createWatchableStorage();
+    const windows = createFakeWindows();
+    let active: string | null = null;
+    const handler = new ApprovalHandler(storage, windows, undefined, undefined, async () => active);
+
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin: "https://bazar.arweave.net",
+      walletId: null,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+    // The approval window reads the request before onboarding runs.
+    await expect(handler.getApproval({ requestId })).resolves.toMatchObject({ kind: "connect" });
+
+    active = "wallet-new";
+    await handler.resolveApproval({ requestId, approved: true });
+
+    await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+    expect(await handler.getConnectedApps()).toEqual([
+      expect.objectContaining({ origin: "https://bazar.arweave.net", walletId: "wallet-new" }),
+    ]);
+  });
+
+  it("rejects the dApp and grants nothing if approved while still no wallet exists", async () => {
+    const storage = createWatchableStorage();
+    const windows = createFakeWindows();
+    const handler = new ApprovalHandler(storage, windows, undefined, undefined, async () => null);
+
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin: "https://bazar.arweave.net",
+      walletId: null,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    const settled = pending.catch((error: unknown) => error);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/no wallet to connect/i);
+    expect(await settled).toBeInstanceOf(Error);
+    expect(await handler.getConnectedApps()).toEqual([]);
+  });
+});
+
 describe("ApprovalHandler: an abandoned approval window", () => {
   let storage: StoragePort;
   let windows: ReturnType<typeof createFakeWindows>;

@@ -13,12 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **dApp requests fail when the wallet is locked or doesn't exist yet (M, 🧪, opus)**
-  `entrypoints/background/index.ts` (`connect` throws "No unlocked wallet"
-  before any window opens), `approval/src/ApprovalRoot.tsx` (no unlock
-  state; its onboarding branch can't be reached). Done: a locked wallet
-  shows unlock inside the approval window and then continues the request.
-  With no wallet, onboarding opens in place (PRD "Signing approval").
 - [ ] **`connect()` asks again when the app already has the permissions (S, opus)**
   `entrypoints/background/index.ts` (`connect` always calls
   `requestApproval`). Many dApps call `connect` on every page load. Done:
@@ -148,6 +142,19 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- **Onboarding in the approval window races the 5-minute approval timeout (S, 🧪, opus)**
+  `src/handlers/approval.ts` (`awaitResolution`), `approval/src/ApprovalRoot.tsx`.
+  A `connect` with no wallet runs create/import and keyfile backup inside
+  the approval window, and the timeout closes that window mid-onboarding.
+  The wallet survives, but the dApp is rejected. Pause or extend the
+  timeout while onboarding or unlock is showing, or keep the window open
+  with a "request expired" message.
+- **Approving a `connect` doesn't check the wallet is unlocked (S, opus)**
+  `src/handlers/approval.ts` (`createGrant`). Only the approval window's
+  UI asks for unlock first; `resolveApproval` grants a locked wallet if
+  called directly from an extension page. Consider refusing a `connect`
+  approval when the session has no unlocked wallet.
 
 - **An approval outlives the service worker that was waiting for it (M, 🧪, opus)**
   `src/handlers/approval.ts` (`awaitResolution`). The 5-minute timer and

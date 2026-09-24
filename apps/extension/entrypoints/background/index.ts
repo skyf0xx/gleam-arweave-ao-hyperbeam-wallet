@@ -2,6 +2,7 @@ import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
 import {
+  DEFAULT_BUNDLER_URL,
   PERMISSION_TYPES,
   PROVIDER_METHODS,
   bytesToBase64,
@@ -77,7 +78,13 @@ const lifecycle = new WalletLifecycleHandler(storage);
 const reads = new ReadsHandler(storage);
 const transfer = new TransferHandler(storage);
 const upload = new UploadHandler(storage);
-const approval = new ApprovalHandler(storage, windows, transfer);
+const approval = new ApprovalHandler(
+  storage,
+  windows,
+  transfer,
+  DEFAULT_BUNDLER_URL,
+  async () => (await lifecycle.getState()).activeWalletId,
+);
 
 // Advances locally-pending activity entries to confirmed on a background
 // interval, independent of any popup being open — see reads.ts's own
@@ -185,25 +192,23 @@ async function handleProviderCall(
         ) as PermissionType[])
       : [];
 
+    // With no wallet yet, the approval window runs onboarding before it
+    // shows the request, and the grant goes to the wallet created there.
+    // A locked wallet is unlocked in that window the same way.
     const state = await lifecycle.getState();
-    const walletId = state.activeWalletId;
-    if (!walletId) {
-      throw new Error("No active wallet is available to connect this app to.");
-    }
-
     const result = await approval.requestApproval({
       kind: "connect",
       origin,
-      walletId,
+      walletId: state.activeWalletId,
       requestedPermissions: requested.length > 0 ? requested : ["ACCESS_ADDRESS"],
     });
 
-    // Fires only once the user actually approved (a rejected/timed-out
-    // `requestApproval` call throws, so this line is unreached for those
-    // cases) — matches ArConnect's own "connect event fires once connect()
-    // resolves" convention, per this task's INTENT.
+    // Reached only once the user approved: a rejected or timed-out request
+    // throws. ArConnect fires `connect` once connect() resolves.
     const connectedState = await lifecycle.getState();
-    const connectedWallet = connectedState.wallets.find((candidate) => candidate.id === walletId);
+    const connectedWallet = connectedState.wallets.find(
+      (candidate) => candidate.id === connectedState.activeWalletId,
+    );
     if (connectedWallet) {
       void emitProviderEventToOrigin(origin, PROVIDER_EVENT.CONNECT, {
         activeAddress: connectedWallet.address,

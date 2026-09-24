@@ -1,17 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { ApprovalRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
+import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
 /**
  * The approval window's top-level state machine: loads the pending
- * `ApprovalRequest` for `requestId` via `getApproval`, escalates to
- * onboarding in place if no wallet exists yet (ARCHITECTURE.md §3.1's
- * "Approval-window escalation" rule — "switch to onboarding in place and
- * return to the pending request afterward, rather than rejecting the
- * dApp"), then renders `ConnectionRequestScreen` or
- * `SigningApprovalScreen` depending on `request.kind`.
+ * `ApprovalRequest` for `requestId` via `getApproval`, then renders
+ * `ConnectionRequestScreen` or `SigningApprovalScreen` depending on
+ * `request.kind`. The dApp keeps waiting while the window first runs
+ * onboarding (no wallet yet) or unlock (wallet locked) in place, and the
+ * request shows once that's done.
  *
  * `runtime` resolution mirrors `App.tsx`'s own documented reason exactly:
  * a dynamic `import()` inside `useEffect`, never a static top-level
@@ -35,11 +35,30 @@ export interface ApprovalRootProps {
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "no-wallet"; runtime: RuntimePort }
+  | { kind: "no-wallet"; runtime: RuntimePort; request: ApprovalRequest }
+  | { kind: "locked"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "error"; message: string }
   | { kind: "done"; message: string }
   | { kind: "failed"; message: string };
+
+/**
+ * The request is made for the active wallet, so that's the one that must
+ * be unlocked. Unlock opens every wallet that shares the vault password.
+ */
+function needsUnlock(state: WalletState): boolean {
+  const unlocked = state.session?.unlockedWalletIds ?? [];
+  if (state.activeWalletId === null) return unlocked.length === 0;
+  return !unlocked.includes(state.activeWalletId);
+}
+
+function hostnameOf(origin: string): string {
+  try {
+    return new URL(origin).hostname;
+  } catch {
+    return origin;
+  }
+}
 
 export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -59,16 +78,20 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
 
   const load = async (runtime: RuntimePort, id: string) => {
     try {
-      const walletState = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
-      if (walletState.wallets.length === 0) {
-        setState({ kind: "no-wallet", runtime });
-        return;
-      }
+      // The request is read first so a stale window says so instead of
+      // asking the user to set up or unlock a wallet for nothing.
       const request = await runtime.send<{ requestId: string }, ApprovalRequest>({
         type: "getApproval",
         payload: { requestId: id },
       });
-      setState({ kind: "ready", runtime, request });
+      const walletState = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
+      if (walletState.wallets.length === 0) {
+        setState({ kind: "no-wallet", runtime, request });
+      } else if (needsUnlock(walletState)) {
+        setState({ kind: "locked", runtime, request });
+      } else {
+        setState({ kind: "ready", runtime, request });
+      }
     } catch (error) {
       setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
     }
@@ -113,9 +136,17 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
     content = (
       <OnboardingView
         runtime={state.runtime}
-        onComplete={() => {
-          if (requestId) void load(state.runtime, requestId);
-        }}
+        onComplete={() => void load(state.runtime, state.request.requestId)}
+      />
+    );
+  } else if (state.kind === "locked") {
+    content = (
+      <UnlockView
+        runtime={state.runtime}
+        tagline={`Unlock to review ${hostnameOf(state.request.origin)}'s request`}
+        onUnlocked={() => void load(state.runtime, state.request.requestId)}
+        // A reset rejects every pending request, this one included.
+        onResetComplete={() => setState({ kind: "done", message: "Gleam was reset. The request was rejected." })}
       />
     );
   } else {

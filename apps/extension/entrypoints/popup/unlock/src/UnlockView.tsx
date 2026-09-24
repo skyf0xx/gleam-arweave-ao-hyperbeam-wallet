@@ -15,9 +15,10 @@ export interface UnlockViewProps {
   onUnlocked: () => void;
   /** Called once the real `resetAllWallets` RPC call has resolved successfully. */
   onResetComplete: () => void;
+  tagline?: string;
 }
 
-export function UnlockView({ runtime, onUnlocked, onResetComplete }: UnlockViewProps) {
+export function UnlockView({ runtime, onUnlocked, onResetComplete, tagline }: UnlockViewProps) {
   const [step, setStep] = useState<Step>({ kind: "unlock" });
   const [unlocking, setUnlocking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -76,6 +77,7 @@ export function UnlockView({ runtime, onUnlocked, onResetComplete }: UnlockViewP
       unlocking={unlocking}
       errorMessage={errorMessage}
       onForgotPassword={() => setStep({ kind: "forgot-password" })}
+      tagline={tagline}
     />
   );
 }

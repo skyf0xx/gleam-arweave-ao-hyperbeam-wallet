@@ -13,6 +13,8 @@ export interface UnlockScreenProps {
   unlocking?: boolean;
   errorMessage?: string;
   onForgotPassword: () => void;
+  /** Line under the wordmark. The approval window says why it's asking. */
+  tagline?: string;
 }
 
 export function UnlockScreen({
@@ -20,6 +22,7 @@ export function UnlockScreen({
   unlocking = false,
   errorMessage,
   onForgotPassword,
+  tagline = "Simple. Fast. Easy.",
 }: UnlockScreenProps) {
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -38,7 +41,7 @@ export function UnlockScreen({
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
       <div className="h-2 w-full" aria-hidden="true" />
       <div className="mt-16 mb-2">
-        <BeamMark tagline="Simple. Fast. Easy." />
+        <BeamMark tagline={tagline} />
       </div>
 
       <form

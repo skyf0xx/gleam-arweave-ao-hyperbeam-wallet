@@ -188,8 +188,13 @@ export interface ConnectRequestInput {
   requestedPermissions: PermissionType[];
 }
 
+/**
+ * A `connect` may arrive before any wallet exists: the approval window
+ * runs onboarding first, and the grant goes to whichever wallet is active
+ * when the user approves.
+ */
 export type CreateApprovalInput =
-  | ({ origin: string; walletId: string } & ConnectRequestInput)
+  | ({ origin: string; walletId: string | null } & ConnectRequestInput)
   | ({ origin: string; walletId: string } & SigningRequestInput);
 
 /**
@@ -206,7 +211,8 @@ interface ApprovalOutcome {
 
 interface PendingApprovalRecord {
   request: ApprovalRequest;
-  walletId: string;
+  /** `null` only for a `connect` made before any wallet existed. */
+  walletId: string | null;
   /** A tagged-binary encoded `SigningRequestInput`; `null` for a `connect` request. */
   signingInput: unknown;
   /** Set by `resolveApproval` immediately before the record is removed. */
@@ -287,6 +293,7 @@ export class ApprovalHandler {
     private readonly windows: WindowPort,
     private readonly transfers?: AoTransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
+    private readonly activeWalletId: () => Promise<string | null> = async () => null,
   ) {
     windows.onApprovalWindowClosed((requestId) => {
       void this.rejectClosedWindow(requestId);
@@ -311,7 +318,8 @@ export class ApprovalHandler {
         entry !== null &&
         typeof entry === "object" &&
         isValidApprovalRequest((entry as PendingApprovalRecord).request) &&
-        typeof (entry as PendingApprovalRecord).walletId === "string",
+        (typeof (entry as PendingApprovalRecord).walletId === "string" ||
+          (entry as PendingApprovalRecord).walletId === null),
     );
   }
 
@@ -501,12 +509,16 @@ export class ApprovalHandler {
 
   private async createGrant(entry: PendingApprovalRecord): Promise<{ granted: PermissionType[] }> {
     const preview = entry.request.preview as ConnectApprovalPreview;
+    const walletId = entry.walletId ?? (await this.activeWalletId());
+    if (!walletId) {
+      throw new Error("There is no wallet to connect. Create or import one first.");
+    }
     const grants = await this.loadGrants();
     const withoutExisting = grants.filter((grant) => grant.origin !== entry.request.origin);
 
     const grant: Grant = {
       origin: entry.request.origin,
-      walletId: entry.walletId,
+      walletId,
       permissions: preview.requestedPermissions,
       createdAt: Date.now(),
       expiresAt: null,
@@ -524,9 +536,8 @@ export class ApprovalHandler {
    * is display-only; the actual operation is re-derived here from
    * `signingInput`'s typed fields, never from the decoded preview.
    * Throws if the wallet isn't currently unlocked (`key-session.ts` has
-   * no cached key for it) — a signing approval can no longer collect its
-   * own password, so an approval on a locked wallet fails here rather
-   * than prompting.
+   * no cached key for it). The approval window unlocks before it shows
+   * the request, so this only fires if the wallet locks in between.
    */
   private async performSigning(entry: PendingApprovalRecord): Promise<unknown> {
     const input = decodeTaggedBinary(entry.signingInput) as SigningRequestInput | null;
@@ -534,14 +545,18 @@ export class ApprovalHandler {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
 
-    const cached = await getCachedKey(entry.walletId);
+    const { walletId } = entry;
+    if (!walletId) {
+      throw new Error(`Approval request "${entry.request.requestId}" has no wallet to sign with.`);
+    }
+    const cached = await getCachedKey(walletId);
     if (!cached) {
-      throw new Error(`Wallet "${entry.walletId}" is locked. Unlock it to continue.`);
+      throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
     const { jwk } = cached;
 
     if (input.kind === "transferAoTokens") {
-      return this.performAoTransfer(entry.walletId, input);
+      return this.performAoTransfer(walletId, input);
     }
 
     const transaction: SignTransactionInput = {

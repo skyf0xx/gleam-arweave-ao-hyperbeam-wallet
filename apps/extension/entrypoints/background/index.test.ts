@@ -237,10 +237,54 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     expect(onSuspendAddListener).not.toHaveBeenCalled();
   });
 
-  it("connect() with no wallet fails with a named error, not a silent grant", async () => {
-    await expect(providerCall({ origin: "https://bazar.arweave.net", method: "connect", params: {} })).rejects.toThrow(
-      /no active wallet/i,
+  it("connect() with no wallet waits for onboarding in the approval window, then grants the new wallet", async () => {
+    tabsQuery.mockResolvedValue([{ id: 42, url: "https://bazar.arweave.net/app" }]);
+    const resultPromise = providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "connect",
+      params: { permissions: ["ACCESS_ADDRESS"] },
+    });
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+      walletId: string | null;
+      request: { requestId: string };
+    }>;
+    expect(pendingRaw[0]!.walletId).toBeNull();
+
+    // Onboarding inside the approval window creates the first wallet.
+    const created = (await registeredHandlers.get("createWallet")!({
+      data: { name: "Wallet 1", password: "correct horse battery staple" },
+    })) as { id: string; address: string };
+
+    await registeredHandlers.get("resolveApproval")!({
+      data: { requestId: pendingRaw[0]!.request.requestId, approved: true },
+    });
+    await expect(resultPromise).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+
+    expect(await getItem("local:grants")).toEqual([
+      expect.objectContaining({ origin: "https://bazar.arweave.net", walletId: created.id }),
+    ]);
+    await vi.waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith(
+        "providerEvent",
+        { event: "connect", data: { activeAddress: created.address } },
+        42,
+      ),
     );
+  });
+
+  it("connect() on a locked wallet opens the approval window instead of failing", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+
+    void providerCall({ origin: "https://bazar.arweave.net", method: "connect", params: {} }).catch(() => undefined);
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    const pending = (await getItem("session:pendingApprovals")) as Array<{ walletId: string }>;
+    expect(pending.map((entry) => entry.walletId)).toEqual(["wallet-1"]);
   });
 
   it("connect() opens an approval window rather than granting inline", async () => {
