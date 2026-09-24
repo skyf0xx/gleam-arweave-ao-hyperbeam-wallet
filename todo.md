@@ -30,6 +30,18 @@ vault, crypto and provider security; `sonnet` for everything else.
   an array of them for batch). Done: correct input and output shapes. A
   signed item parses with arbundles and verifies. Check it with aoconnect's
   `createDataItemSigner(window.arweaveWallet)`.
+- [ ] **`signMessage` / `verifyMessage` / `signature` don't use Wander's construction (M, 🧪, opus)**
+  `core/vault/message-signing.ts`. Wander (and permawebOS) sign the
+  `hashAlgorithm` digest of the data with RSA-PSS, salt length 32, and
+  verify the same way. Gleam signs the raw data with salt length equal to
+  the digest size, so its signatures only verify against Gleam's own
+  `verifyMessage`. `signature()` also ignores Wander's `saltLength` option.
+  Done: `signMessage`/`verifyMessage` match Wander byte for byte in
+  construction (a Gleam signature verifies with Wander's algorithm and
+  vice versa, tested against a fixture made the way permawebOS does it),
+  and `signature()` honours `saltLength`. Check in Chrome that a
+  `signMessage` result verifies with `arweave.crypto.verify`-style
+  server code.
 - [ ] **Granted permissions are never enforced (M, opus)**
   `entrypoints/background/index.ts` (`handleProviderCall`). Any connected
   origin can call any method whatever it was granted. There is no
@@ -279,14 +291,14 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 <!-- New findings go here until they're placed in the list above. -->
 
-- **`signMessage` / `verifyMessage` / `signature` don't use Wander's construction (opus)**
-  `core/vault/message-signing.ts`. Wander (and permawebOS) sign the
-  `hashAlgorithm` digest of the data with RSA-PSS, salt length 32, and
-  verify the same way. Gleam signs the raw data with salt length equal to
-  the digest size, so its signatures only verify against Gleam's own
-  `verifyMessage`. `signature()` also ignores Wander's `saltLength` option.
 - **Large approval payloads may exceed `chrome.storage.session`'s quota (sonnet)**
   `src/handlers/approval.ts`. Pending approvals store the payload as a
   tagged byte array (a JSON number per byte) so it survives storage. A
   payload of a few MB can pass the 10 MB session quota. Relevant to the
   `sign`/`dispatch` item: consider base64 in storage, or a size limit.
+- **Gleam yields `window.arweaveWallet` to Wander when both are installed (❓, opus)**
+  `entrypoints/provider/index.ts` (`install` returns early if
+  `window.arweaveWallet` exists). With Wander enabled, dApp calls go to
+  Wander. Taking over is possible but needs a decision: always override,
+  a "Make Gleam the default wallet" setting, or a picker. Note that
+  dApps that cached Wander's object before Gleam injects won't switch.
