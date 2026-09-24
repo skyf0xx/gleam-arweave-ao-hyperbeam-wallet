@@ -1,7 +1,14 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
-import { PERMISSION_TYPES, PROVIDER_METHODS, bytesToBase64, verifyMessage, type PermissionType } from "@gleam/core";
+import {
+  PERMISSION_TYPES,
+  PROVIDER_METHODS,
+  bytesToBase64,
+  missingPermissions,
+  verifyMessage,
+  type PermissionType,
+} from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
@@ -224,6 +231,11 @@ async function handleProviderCall(
   const grant = await approval.findActiveGrant(origin);
   if (!grant) {
     throw new Error(`"${origin}" is not connected. Call connect() first.`);
+  }
+
+  const missing = missingPermissions(method, grant.permissions);
+  if (missing.length > 0) {
+    throw new Error(`Missing permission(s) for "${method}": ${missing.join(", ")}`);
   }
 
   const state = await lifecycle.getState();

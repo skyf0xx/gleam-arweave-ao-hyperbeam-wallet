@@ -11,17 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Granted permissions are never enforced (M, opus)**
-  `entrypoints/background/index.ts` (`handleProviderCall`). Any connected
-  origin can call any method whatever it was granted. There is no
-  method→permission map anywhere (`packages/messaging/src/permissions.ts`
-  only re-exports). Done: a map in `core/models` (`sign`→`SIGN_TRANSACTION`,
-  `getAllAddresses`→`ACCESS_ALL_ADDRESSES`, `getActivePublicKey`→
-  `ACCESS_PUBLIC_KEY`, `dispatch`→`DISPATCH`, `encrypt`/`decrypt`,
-  `signature`/`signMessage`→`SIGNATURE`, `getArweaveConfig`→
-  `ACCESS_ARWEAVE_CONFIG`, token reads→`ACCESS_TOKENS`, and so on), checked
-  before dispatch, with a Wander-style error for a missing permission.
-  Tests cover each method.
 - [ ] **Aborting any provider call disconnects the dApp (S, opus)**
   `entrypoints/provider/index.ts` (`onAbort`). It posts a `disconnect`
   request with `{cancelOf}`, which the background runs as a real disconnect
@@ -299,3 +288,8 @@ vault, crypto and provider security; `sonnet` for everything else.
   `src/handlers/approval.ts` (`payloadHash`). The approval shows SHA-256 of
   the raw message. The signed payload is the `hashAlgorithm` digest, and
   permawebOS shows the SHA-256 of that digest.
+- **Confirm the missing-permission error text against Wander (opus)**
+  `entrypoints/background/index.ts` (`handleProviderCall`). Gleam throws
+  `Missing permission(s) for "<method>": <PERMS>`, which is modelled on
+  ArConnect, not copied from a live Wander. permawebOS says
+  `Missing wallet permission: <PERMS>`. Match Wander if dApps parse it.

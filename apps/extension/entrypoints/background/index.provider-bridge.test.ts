@@ -135,7 +135,7 @@ beforeEach(async () => {
   ]);
   store.set("local:activeWalletId", WALLET_ID);
   store.set("local:grants", [
-    { origin: location.origin, walletId: WALLET_ID, permissions: ["SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
+    { origin: location.origin, walletId: WALLET_ID, permissions: ["SIGNATURE", "ENCRYPT", "DECRYPT", "SIGN_TRANSACTION"], createdAt: 0, expiresAt: null, budget: null },
   ]);
   const { cacheKey } = await import("@/src/handlers/key-session");
   await cacheKey(WALLET_ID, jwk, "addr-1");

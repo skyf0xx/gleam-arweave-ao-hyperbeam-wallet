@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
 
 /**
  * Needed because this file's `transferAoTokens` integration test drives the
@@ -290,7 +291,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       {
         origin: "https://bazar.arweave.net",
         walletId: "wallet-1",
-        permissions: ["ACCESS_ADDRESS"],
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
         createdAt: 0,
         expiresAt: null,
         budget: null,
@@ -356,7 +357,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       {
         origin: "https://bazar.arweave.net",
         walletId: "wallet-1",
-        permissions: ["ACCESS_ADDRESS"],
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
         createdAt: 0,
         expiresAt: null,
         budget: null,
@@ -504,4 +505,59 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       expect(tabsQuery).not.toHaveBeenCalled();
     });
   });
+  describe("granted permissions gate every provider method", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+    const GATED = PROVIDER_METHODS.filter((method) => METHOD_PERMISSIONS[method].length > 0);
+
+    async function seedGrant(permissions: PermissionType[]): Promise<void> {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions, createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    }
+
+    beforeEach(() => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
+    });
+
+    it.each(GATED)("%s is refused, before any window opens, when the grant lacks its permissions", async (method) => {
+      const required = METHOD_PERMISSIONS[method];
+      await seedGrant(PERMISSION_TYPES.filter((permission) => !required.includes(permission)));
+
+      await expect(providerCall({ origin: ORIGIN, method, params: {} })).rejects.toThrow(
+        `Missing permission(s) for "${method}": ${required.join(", ")}`,
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(GATED)("%s gets past the gate when the grant has exactly its permissions", async (method) => {
+      await seedGrant([...METHOD_PERMISSIONS[method]]);
+
+      const call = providerCall({ origin: ORIGIN, method, params: {} });
+      const outcome = await Promise.race([
+        call.then(
+          () => "resolved",
+          (error: Error) => error.message,
+        ),
+        vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled()).then(() => "approval window"),
+      ]);
+      expect(outcome).not.toMatch(/missing permission/i);
+    });
+
+    it("names only the missing permissions when the grant covers part of a method", async () => {
+      await seedGrant(["ACCESS_ADDRESS"]);
+      await expect(providerCall({ origin: ORIGIN, method: "getBalances", params: {} })).rejects.toThrow(
+        'Missing permission(s) for "getBalances": ACCESS_TOKENS',
+      );
+    });
+
+    it.each(["getPermissions", "disconnect"] as const)("%s needs no permission", async (method) => {
+      await seedGrant([]);
+      await expect(providerCall({ origin: ORIGIN, method, params: {} })).resolves.not.toThrow();
+    });
+  });
 });
+

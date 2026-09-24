@@ -50,6 +50,7 @@ export type {
   ApprovalMethod,
   KeyMethod,
 } from "./method-privileges";
+export { METHOD_PERMISSIONS, missingPermissions } from "./method-permissions";
 export type {
   SignTransactionInput,
   SignRequest,
