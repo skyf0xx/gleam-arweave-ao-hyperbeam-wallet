@@ -403,9 +403,26 @@ async function setLockedIcon(locked: boolean) {
 onExtensionMessage("createWallet", (message) => lifecycle.createWallet(message.data));
 onExtensionMessage("importWallet", (message) => lifecycle.importWallet(message.data));
 onExtensionMessage("deleteWallet", async (message) => {
-  const revoked = await approval.revokeWalletAccess(message.data.walletId);
+  const { walletId } = message.data;
+  const before = await lifecycle.getState();
+  const isLastWallet = before.wallets.every((candidate) => candidate.id === walletId);
+
+  // Grants follow the active wallet, so they only go when no wallet is left
+  // to follow, as on reset.
+  let revoked: string[] = [];
+  if (isLastWallet) {
+    revoked = await approval.revokeAllAccess("The wallet was removed.");
+  } else {
+    await approval.rejectWalletApprovals(walletId);
+  }
   await lifecycle.deleteWallet(message.data);
   for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
+
+  const after = await lifecycle.getState();
+  if (after.activeWalletId !== before.activeWalletId) {
+    const active = after.wallets.find((candidate) => candidate.id === after.activeWalletId);
+    if (active) void broadcastWalletSwitch(active.address);
+  }
 });
 onExtensionMessage("renameWallet", (message) => lifecycle.renameWallet(message.data));
 onExtensionMessage("switchWallet", async (message) => {
@@ -430,8 +447,8 @@ onExtensionMessage("unlockWallet", async (message) => {
   return result;
 });
 onExtensionMessage("resetAllWallets", async () => {
-  // Grants go first, here and in deleteWallet: a removal that fails
-  // part-way must not leave a dApp connected to a wallet that is gone.
+  // Grants go first, here and when deleteWallet removes the last wallet: a
+  // removal that fails part-way must not leave a dApp connected to nothing.
   const revoked = await approval.revokeAllAccess();
   await lifecycle.resetAllWallets();
   for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});

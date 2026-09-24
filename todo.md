@@ -11,17 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Deleting a wallet keeps site grants and announces the new active wallet (S, opus)**
-  `entrypoints/background/index.ts` (`deleteWallet`),
-  `src/handlers/approval.ts` (`revokeWalletAccess`). Grants belong to the
-  site and follow the active wallet (decided), but deleting a wallet still
-  revokes by `grant.walletId`, and deleting the active wallet moves
-  `activeWalletId` without a `walletSwitch` push. Done: deleting a wallet
-  revokes no grants unless it was the last wallet (then all are revoked,
-  as on reset). Pending approvals for the deleted wallet are still
-  rejected. When the active wallet changes, connected sites get
-  `walletSwitch` with the new address. Tests.
-
 ## 2. Core wallet flows
 
 - [ ] **Store and show why an AO send failed (S, sonnet)**
@@ -274,9 +263,11 @@ vault, crypto and provider security; `sonnet` for everything else.
   opens on "No pending approval" and the dApp waits for the timeout. A test
   firing two `requestApproval` calls together hung this way. Serialize the
   read-modify-write.
-- **Grants left by an earlier reset still point at deleted wallets (sonnet)**
+- **Grants left by an earlier reset outlive every wallet (sonnet)**
   `src/handlers/approval.ts` (`findActiveGrant`),
-  `entrypoints/background/index.ts`. Reset and delete now revoke grants,
-  but a profile reset before that change keeps grants whose `walletId` no
-  longer exists, and `getAllAddresses` still answers them. Treat a grant
-  whose wallet is gone as inactive and drop it.
+  `entrypoints/background/index.ts`. Reset and removing the last wallet
+  now revoke all grants, but a profile reset before that change keeps its
+  grants, and they come back into force once a new wallet is created.
+  A grant's `walletId` pointing at a removed wallet is normal now (grants
+  follow the active wallet), so check for "no wallets", not a missing
+  `walletId`: drop all grants when the wallet list is empty.

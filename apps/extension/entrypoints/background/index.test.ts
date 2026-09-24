@@ -600,6 +600,121 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     });
   });
 
+  describe("deleteWallet keeps site grants unless no wallet is left", () => {
+    const wallet = (id: string, address: string) => ({
+      id,
+      address,
+      name: id,
+      method: "jwk",
+      publicKey: `pub-${address}`,
+      createdAt: 0,
+      updatedAt: 0,
+      encryptedKeyfile: null,
+    });
+    const grantFor = (origin: string, walletId: string) => ({
+      origin,
+      walletId,
+      permissions: ["ACCESS_ADDRESS", "SIGNATURE"],
+      createdAt: 0,
+      expiresAt: null,
+      budget: null,
+    });
+
+    async function seed(walletIds: string[], activeWalletId: string): Promise<void> {
+      await setItem(
+        "local:wallets",
+        walletIds.map((id) => wallet(id, `addr-${id}`)),
+      );
+      await setItem("local:activeWalletId", activeWalletId);
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: walletIds,
+      });
+      for (const id of walletIds) {
+        await setItem(`session:key:${id}`, { jwk: { kty: "RSA", n: "n", e: "e" }, address: `addr-${id}` });
+      }
+      await setItem("local:grants", [
+        grantFor("https://a.example", walletIds[0]!),
+        grantFor("https://b.example", walletIds[walletIds.length - 1]!),
+      ]);
+      tabsQuery.mockResolvedValue([
+        { id: 1, url: "https://a.example/" },
+        { id: 2, url: "https://b.example/" },
+      ]);
+    }
+
+    const deleteWallet = (walletId: string) => registeredHandlers.get("deleteWallet")!({ data: { walletId } });
+    const grantOrigins = async () =>
+      ((await getItem("local:grants")) as Array<{ origin: string }> | null)?.map((grant) => grant.origin) ?? [];
+
+    it("deleting an inactive wallet keeps every grant and pushes no event", async () => {
+      await seed(["wallet-1", "wallet-2"], "wallet-1");
+
+      await deleteWallet("wallet-2");
+
+      expect(await grantOrigins()).toEqual(["https://a.example", "https://b.example"]);
+      await Promise.resolve();
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), expect.anything());
+      await expect(providerCall({ origin: "https://b.example", method: "getActiveAddress", params: {} })).resolves.toBe(
+        "addr-wallet-1",
+      );
+    });
+
+    it("deleting the active wallet keeps grants and announces the new active address", async () => {
+      await seed(["wallet-1", "wallet-2"], "wallet-2");
+
+      await deleteWallet("wallet-2");
+
+      expect(await grantOrigins()).toEqual(["https://a.example", "https://b.example"]);
+      for (const tabId of [1, 2]) {
+        await vi.waitFor(() =>
+          expect(sendMessage).toHaveBeenCalledWith(
+            "providerEvent",
+            { event: "walletSwitch", data: { address: "addr-wallet-1" } },
+            tabId,
+          ),
+        );
+      }
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, expect.anything());
+      await expect(providerCall({ origin: "https://b.example", method: "getActiveAddress", params: {} })).resolves.toBe(
+        "addr-wallet-1",
+      );
+    });
+
+    it("deleting a wallet still rejects the approvals waiting on it", async () => {
+      await seed(["wallet-1", "wallet-2"], "wallet-2");
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+      const call = providerCall({ origin: "https://a.example", method: "signature", params });
+      const rejected = expect(call).rejects.toThrow(/wallet was removed/i);
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+
+      await deleteWallet("wallet-2");
+
+      await rejected;
+      expect(await getItem("session:pendingApprovals")).toEqual([]);
+    });
+
+    it("deleting the last wallet revokes every grant and disconnects those sites", async () => {
+      await seed(["wallet-1"], "wallet-1");
+
+      await deleteWallet("wallet-1");
+
+      expect(await grantOrigins()).toEqual([]);
+      for (const tabId of [1, 2]) {
+        await vi.waitFor(() =>
+          expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, tabId),
+        );
+      }
+      expect(sendMessage).not.toHaveBeenCalledWith(
+        "providerEvent",
+        expect.objectContaining({ event: "walletSwitch" }),
+        expect.anything(),
+      );
+    });
+  });
+
   describe("granted permissions gate every provider method", () => {
     const ORIGIN = "https://bazar.arweave.net";
     const GATED = PROVIDER_METHODS.filter((method) => METHOD_PERMISSIONS[method].length > 0);

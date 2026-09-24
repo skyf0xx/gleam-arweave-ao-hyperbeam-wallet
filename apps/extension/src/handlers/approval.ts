@@ -646,23 +646,23 @@ export class ApprovalHandler {
   }
 
   /**
-   * Revokes every Grant bound to `walletId` and rejects the approvals
-   * still waiting on it, so a deleted wallet leaves no access behind.
-   * Returns the revoked origins, which should be told they're disconnected.
+   * Rejects the approvals still waiting on a wallet that is being removed.
+   * Grants are left alone: they belong to the site and follow whichever
+   * wallet is active, so removing one of several wallets disconnects nobody.
    */
-  async revokeWalletAccess(walletId: string): Promise<string[]> {
-    const grants = await this.loadGrants();
-    const revoked = grants.filter((grant) => grant.walletId === walletId);
-    await this.saveGrants(grants.filter((grant) => grant.walletId !== walletId));
+  async rejectWalletApprovals(walletId: string): Promise<void> {
     await this.rejectPendingWhere((entry) => entry.walletId === walletId, "The wallet was removed.");
-    return revoked.map((grant) => grant.origin);
   }
 
-  /** `revokeWalletAccess` for every wallet at once, for a full reset. */
-  async revokeAllAccess(): Promise<string[]> {
+  /**
+   * Revokes every Grant and rejects every pending approval, for when no
+   * wallet is left (a reset, or removing the last one). Returns the revoked
+   * origins, which should be told they're disconnected.
+   */
+  async revokeAllAccess(reason = "The wallet was reset."): Promise<string[]> {
     const grants = await this.loadGrants();
     await this.storage.remove(GRANTS_KEY);
-    await this.rejectPendingWhere(() => true, "The wallet was reset.");
+    await this.rejectPendingWhere(() => true, reason);
     return grants.map((grant) => grant.origin);
   }
 

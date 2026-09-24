@@ -438,7 +438,7 @@ describe("ApprovalHandler: revocation ends access", () => {
   });
 });
 
-describe("ApprovalHandler: removing wallets revokes their access", () => {
+describe("ApprovalHandler: removing wallets", () => {
   const OTHER_WALLET_ID = "wallet-2";
   let storage: StoragePort;
   let windows: ReturnType<typeof createFakeWindows>;
@@ -464,15 +464,18 @@ describe("ApprovalHandler: removing wallets revokes their access", () => {
     ]);
   });
 
-  it("revokeWalletAccess removes only that wallet's grants and returns their origins", async () => {
-    const revoked = await handler.revokeWalletAccess(WALLET_ID);
+  it("rejectWalletApprovals leaves every grant in place", async () => {
+    await handler.rejectWalletApprovals(WALLET_ID);
 
-    expect(revoked).toEqual(["https://a.test", "https://c.test"]);
-    expect((await handler.getConnectedApps()).map((grant) => grant.origin)).toEqual(["https://b.test"]);
-    expect(await handler.findActiveGrant("https://a.test")).toBeNull();
+    expect((await handler.getConnectedApps()).map((grant) => grant.origin)).toEqual([
+      "https://a.test",
+      "https://b.test",
+      "https://c.test",
+    ]);
+    expect(await handler.findActiveGrant("https://a.test")).not.toBeNull();
   });
 
-  it("revokeWalletAccess rejects that wallet's pending approvals and closes their windows", async () => {
+  it("rejectWalletApprovals rejects that wallet's pending approvals and closes their windows", async () => {
     const mine = requestConnect("https://d.test", WALLET_ID);
     const mineRejected = expect(mine).rejects.toThrow(/wallet was removed/i);
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
@@ -480,7 +483,7 @@ describe("ApprovalHandler: removing wallets revokes their access", () => {
     await vi.waitFor(() => expect(windows.opened.length).toBe(2));
     const [mineId, otherId] = windows.opened.map(extractRequestId);
 
-    await handler.revokeWalletAccess(WALLET_ID);
+    await handler.rejectWalletApprovals(WALLET_ID);
 
     await mineRejected;
     expect(windows.closed).toEqual([mineId]);
@@ -501,6 +504,16 @@ describe("ApprovalHandler: removing wallets revokes their access", () => {
     expect(await handler.getConnectedApps()).toEqual([]);
     expect(await storage.get("session:pendingApprovals")).toEqual([]);
     expect(windows.closed).toEqual([extractRequestId(windows.opened[0]!)]);
+  });
+
+  it("revokeAllAccess rejects pending approvals with the reason it is given", async () => {
+    const pending = requestConnect("https://d.test", WALLET_ID);
+    const rejected = expect(pending).rejects.toThrow("The wallet was removed.");
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+
+    await handler.revokeAllAccess("The wallet was removed.");
+
+    await rejected;
   });
 
   it("revokeAllAccess leaves nothing a new wallet could inherit", async () => {
