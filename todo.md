@@ -11,10 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Token metadata isn't cached (S, sonnet)**
-  `resolveUnregisteredTokenMetadata` hits the gateway on every
-  `getTokenBalances`. Done: cached by process id in storage with no expiry
-  (spawn tags never change).
 - [ ] **A non-AO token still falls back to AO's denomination (S, sonnet)**
   `reads.ts` (`withUnregisteredMetadata`). When the spawn-tag lookup
   fails, the token keeps `getTokenBalance`'s AO default of 12, so its

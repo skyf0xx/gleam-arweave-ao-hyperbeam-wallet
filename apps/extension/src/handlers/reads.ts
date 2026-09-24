@@ -26,6 +26,7 @@ import type {
   TokenBalance,
   TokenBalanceRequest,
   TokenBalanceResult,
+  TokenMetadata,
   TokenPrice,
   UserToken,
   UserTokensOptions,
@@ -75,6 +76,7 @@ import type {
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
+const TOKEN_METADATA_KEY_PREFIX = "local:tokenMetadata:";
 const ACTIVITY_PAGE_LIMIT = 50;
 const WALLETS_KEY = "local:wallets";
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
@@ -129,46 +131,18 @@ function withRegisteredTicker(balance: TokenBalance): TokenBalance {
   };
 }
 
-/**
- * For a `TokenBalance` whose process isn't in `DEFAULT_TOKEN_REGISTRY`
- * (so `withRegisteredTicker` had nothing to apply), resolves ticker,
- * denomination and name directly from the process's spawn tags via the
- * gateway's GraphQL endpoint (`resolveUnregisteredTokenMetadata` —
- * `core/pricing/token-sources.ts`) rather than leaving the balance
- * identified only by its raw process id. This is purely additive
- * identification for watched-but-unregistered tokens: the balance
- * quantity itself still comes only from the existing HyperBEAM
- * `~process@1.0` compute path (`getTokenBalance`), and a registered
- * token's identity (checked first) is never overridden by this lookup.
- *
- * Denomination for a non-AO process always comes from this metadata
- * lookup (or stays `null`-equivalent — HyperBEAM's own response carries
- * no denomination for anything but the AO token, see `ao/balance.ts`),
- * never from `getTokenBalance`'s AO-specific denomination-12 default,
- * which only actually applies to the AO token itself.
- *
- * A metadata lookup failure (`resolveUnregisteredTokenMetadata` returning
- * `null` — unreachable gateway, unspawned/unindexed process id) leaves
- * the balance exactly as `getTokenBalance` returned it (process id as
- * ticker, no name, HyperBEAM's own denomination guess) rather than
- * throwing — one unresolvable token's identity shouldn't fail every other
- * token's balance read in the same `getTokenBalances` call.
- */
-async function withUnregisteredMetadata(
-  balance: TokenBalance,
-  gatewayUrl: string,
-): Promise<TokenBalance> {
-  if (isRegisteredProcessId(balance.processId)) return balance;
-
-  const metadata = await resolveUnregisteredTokenMetadata(balance.processId, gatewayUrl);
-  if (metadata === null) return balance;
-
-  return {
-    ...balance,
-    ticker: metadata.ticker ?? balance.ticker,
-    denomination: metadata.denomination ?? balance.denomination,
-    name: metadata.name,
-  };
+function isValidTokenMetadata(value: unknown): value is TokenMetadata {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.processId === "string" &&
+    (candidate.denomination === null || typeof candidate.denomination === "number") &&
+    (candidate.ticker === null || typeof candidate.ticker === "string") &&
+    (candidate.name === null || typeof candidate.name === "string") &&
+    (candidate.description === null || typeof candidate.description === "string") &&
+    (candidate.logo === null || typeof candidate.logo === "string") &&
+    (candidate.totalSupply === null || typeof candidate.totalSupply === "string")
+  );
 }
 
 function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
@@ -241,6 +215,71 @@ export class ReadsHandler {
   }
 
   /**
+   * For a `TokenBalance` whose process isn't in `DEFAULT_TOKEN_REGISTRY`
+   * (so `withRegisteredTicker` had nothing to apply), resolves ticker,
+   * denomination and name directly from the process's spawn tags via the
+   * gateway's GraphQL endpoint (`resolveUnregisteredTokenMetadata` —
+   * `core/pricing/token-sources.ts`) rather than leaving the balance
+   * identified only by its raw process id. This is purely additive
+   * identification for watched-but-unregistered tokens: the balance
+   * quantity itself still comes only from the existing HyperBEAM
+   * `~process@1.0` compute path (`getTokenBalance`), and a registered
+   * token's identity (checked first) is never overridden by this lookup.
+   *
+   * Denomination for a non-AO process always comes from this metadata
+   * lookup (or stays `null`-equivalent — HyperBEAM's own response carries
+   * no denomination for anything but the AO token, see `ao/balance.ts`),
+   * never from `getTokenBalance`'s AO-specific denomination-12 default,
+   * which only actually applies to the AO token itself.
+   *
+   * Cached by process id in `local:tokenMetadata:{processId}` with no
+   * expiry: spawn tags are immutable once a process exists (see
+   * `TokenMetadata`'s own doc comment), so a resolved result never goes
+   * stale. This is what stops `resolveUnregisteredTokenMetadata` from
+   * hitting the gateway on every `getTokenBalances` call for the same
+   * watched token. A lookup failure is never cached — the next call gets
+   * another chance to resolve it.
+   *
+   * A metadata lookup failure (`resolveUnregisteredTokenMetadata` returning
+   * `null` — unreachable gateway, unspawned/unindexed process id) leaves
+   * the balance exactly as `getTokenBalance` returned it (process id as
+   * ticker, no name, HyperBEAM's own denomination guess) rather than
+   * throwing — one unresolvable token's identity shouldn't fail every other
+   * token's balance read in the same `getTokenBalances` call.
+   */
+  private async withUnregisteredMetadata(
+    balance: TokenBalance,
+    gatewayUrl: string,
+  ): Promise<TokenBalance> {
+    if (isRegisteredProcessId(balance.processId)) return balance;
+
+    const metadata = await this.resolveTokenMetadataCached(balance.processId, gatewayUrl);
+    if (metadata === null) return balance;
+
+    return {
+      ...balance,
+      ticker: metadata.ticker ?? balance.ticker,
+      denomination: metadata.denomination ?? balance.denomination,
+      name: metadata.name,
+    };
+  }
+
+  private async resolveTokenMetadataCached(
+    processId: string,
+    gatewayUrl: string,
+  ): Promise<TokenMetadata | null> {
+    const cacheKey = `${TOKEN_METADATA_KEY_PREFIX}${processId}`;
+    const cached = await this.storage.get<unknown>(cacheKey);
+    if (isValidTokenMetadata(cached)) return cached;
+
+    const metadata = await resolveUnregisteredTokenMetadata(processId, gatewayUrl);
+    if (metadata === null) return null;
+
+    await this.storage.set(cacheKey, metadata);
+    return metadata;
+  }
+
+  /**
    * Shared by `previewWatchedToken` and `addWatchedToken` so a preview and
    * the value actually stored can never disagree.
    */
@@ -253,7 +292,7 @@ export class ReadsHandler {
     }
 
     const balance = await getTokenBalance(processId, address, settings.activePeerUrl);
-    return withUnregisteredMetadata(withRegisteredTicker(balance), settings.gatewayUrl);
+    return this.withUnregisteredMetadata(withRegisteredTicker(balance), settings.gatewayUrl);
   }
 
   /**
@@ -327,7 +366,7 @@ export class ReadsHandler {
     );
     const withTickers = balances.map((balance) => withRegisteredTicker(balance));
     return Promise.all(
-      withTickers.map((balance) => withUnregisteredMetadata(balance, settings.gatewayUrl)),
+      withTickers.map((balance) => this.withUnregisteredMetadata(balance, settings.gatewayUrl)),
     );
   }
 

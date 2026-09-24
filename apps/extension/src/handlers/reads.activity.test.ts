@@ -290,6 +290,98 @@ describe("ReadsHandler: getTokenBalances", () => {
     const unregistered = balances.find((b) => b.processId === "unknownProc");
     expect(unregistered?.ticker).toBe("unknownProc");
   });
+
+  it("caches resolved spawn-tag metadata by process id, hitting the gateway only once across repeated getTokenBalances calls", async () => {
+    const storage = createFakeStorage();
+    const processId = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
+    await storage.set("local:watchedProcessIds:addr1", [processId]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    let graphqlCalls = 0;
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        graphqlCalls += 1;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: processId,
+                      tags: [
+                        { name: "ticker", value: "wUSDC" },
+                        { name: "denomination", value: "6" },
+                        { name: "name", value: "Wrapped USDC" },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.getTokenBalances({ address: "addr1" });
+    await handler.getTokenBalances({ address: "addr1" });
+
+    expect(graphqlCalls).toBe(1);
+
+    const cached = await storage.get<{ ticker: string | null }>(`local:tokenMetadata:${processId}`);
+    expect(cached?.ticker).toBe("wUSDC");
+  });
+
+  it("does not cache a failed metadata lookup, so a later call gets another chance to resolve it", async () => {
+    const storage = createFakeStorage();
+    const processId = "unknownProc";
+    await storage.set("local:watchedProcessIds:addr1", [processId]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    let graphqlCalls = 0;
+    let shouldFail = true;
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        graphqlCalls += 1;
+        if (shouldFail) return { ok: false, status: 500, json: async () => ({}) };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [{ node: { id: processId, tags: [{ name: "ticker", value: "RECOVERED" }] } }],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const first = await handler.getTokenBalances({ address: "addr1" });
+    expect(first.find((b) => b.processId === processId)?.ticker).toBe(processId);
+    expect(graphqlCalls).toBe(1);
+
+    shouldFail = false;
+    const second = await handler.getTokenBalances({ address: "addr1" });
+    expect(second.find((b) => b.processId === processId)?.ticker).toBe("RECOVERED");
+    expect(graphqlCalls).toBe(2);
+  });
 });
 
 describe("ReadsHandler: tokenBalance", () => {
