@@ -11,9 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **One failing token read blanks every token balance (S, sonnet)**
-  `reads.ts` (`getTokenBalances` uses `Promise.all`). Done: per-token
-  failure shows that row as unavailable, and the others still render.
 - [ ] **Send success has no explorer link (S, sonnet)**
   `SendView.tsx` `SuccessStep`. Upload's success step has one. Done: send
   success links to the tx in the same explorer the activity rows use

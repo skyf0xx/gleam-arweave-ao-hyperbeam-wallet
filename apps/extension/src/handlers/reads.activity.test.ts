@@ -331,6 +331,59 @@ describe("ReadsHandler: getTokenBalances", () => {
     expect(unregistered?.available).toBe(false);
   });
 
+  it("one token's failed HyperBEAM balance read doesn't blank the others (per-token failure, not Promise.all)", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["goodProc", "badProc"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: "goodProc",
+                      tags: [
+                        { name: "ticker", value: "GOOD" },
+                        { name: "denomination", value: "6" },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      if (url.includes("badProc")) {
+        return { ok: false, status: 500, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balances = await handler.getTokenBalances({ address: "addr1" });
+
+    // Default AO token + goodProc + badProc.
+    expect(balances).toHaveLength(3);
+    const good = balances.find((b) => b.processId === "goodProc");
+    const bad = balances.find((b) => b.processId === "badProc");
+    const ao = balances.find((b) => b.processId !== "goodProc" && b.processId !== "badProc");
+    expect(good?.quantity).toBe("42");
+    expect(good?.available).not.toBe(false);
+    expect(bad?.available).toBe(false);
+    expect(ao?.available).not.toBe(false);
+  });
+
   it("caches resolved spawn-tag metadata by process id, hitting the gateway only once across repeated getTokenBalances calls", async () => {
     const storage = createFakeStorage();
     const processId = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";

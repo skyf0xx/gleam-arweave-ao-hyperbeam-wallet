@@ -131,6 +131,27 @@ function withRegisteredTicker(balance: TokenBalance): TokenBalance {
   };
 }
 
+/**
+ * Placeholder row for a process id whose `getTokenBalance` HyperBEAM read
+ * itself failed (peer error, timeout, unrecognized response shape) —
+ * `getTokenBalances` uses `Promise.allSettled` so one such failure marks
+ * only this row unavailable rather than rejecting the whole call and
+ * blanking every other token's balance too. Ticker falls back to the raw
+ * process id, matching `getTokenBalance`'s own no-ticker convention, so an
+ * unavailable row still identifies which token failed.
+ */
+function unavailableTokenBalance(processId: string, address: string): TokenBalance {
+  return {
+    address,
+    processId,
+    ticker: processId,
+    denomination: 0,
+    name: null,
+    quantity: "0",
+    available: false,
+  };
+}
+
 function isValidTokenMetadata(value: unknown): value is TokenMetadata {
   if (value === null || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
@@ -373,12 +394,19 @@ export class ReadsHandler {
     }
 
     const activePeerUrl = settings.activePeerUrl;
-    const balances = await Promise.all(
+    const settled = await Promise.allSettled(
       processIds.map((processId) => getTokenBalance(processId, req.address, activePeerUrl)),
+    );
+    const balances = settled.map((result, index) =>
+      result.status === "fulfilled"
+        ? result.value
+        : unavailableTokenBalance(processIds[index] as string, req.address),
     );
     const withTickers = balances.map((balance) => withRegisteredTicker(balance));
     return Promise.all(
-      withTickers.map((balance) => this.withUnregisteredMetadata(balance, settings.gatewayUrl)),
+      withTickers.map((balance) =>
+        balance.available === false ? balance : this.withUnregisteredMetadata(balance, settings.gatewayUrl),
+      ),
     );
   }
 
