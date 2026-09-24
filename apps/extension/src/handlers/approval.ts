@@ -282,6 +282,13 @@ export class ApprovalHandler {
    */
   private readonly resolving = new Set<string>();
 
+  /**
+   * Tail of the queue every `session:pendingApprovals` read-modify-write
+   * runs on. Each one awaits a read before its write, so two running at
+   * once would each write back an array missing the other's change.
+   */
+  private pendingQueue: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly storage: StoragePort,
     private readonly windows: WindowPort,
@@ -317,8 +324,19 @@ export class ApprovalHandler {
     );
   }
 
-  private async savePending(pending: PendingApprovalRecord[]): Promise<void> {
-    await this.storage.set(PENDING_APPROVALS_KEY, pending);
+  /**
+   * The only way to write pending approvals. `update` sees the current
+   * records and returns the new ones, or `null` to leave storage untouched.
+   */
+  private updatePending(
+    update: (pending: PendingApprovalRecord[]) => PendingApprovalRecord[] | null,
+  ): Promise<void> {
+    const run = this.pendingQueue.then(async () => {
+      const next = update(await this.loadPending());
+      if (next) await this.storage.set(PENDING_APPROVALS_KEY, next);
+    });
+    this.pendingQueue = run.catch(() => {});
+    return run;
   }
 
   /**
@@ -357,13 +375,12 @@ export class ApprovalHandler {
       preview,
     };
 
-    const pending = await this.loadPending();
-    pending.push({
+    const record: PendingApprovalRecord = {
       request,
       walletId: input.walletId,
       signingInput: input.kind === "connect" ? null : encodeTaggedBinary(input),
-    });
-    await this.savePending(pending);
+    };
+    await this.updatePending((pending) => [...pending, record]);
 
     await this.windows.createApprovalWindow(
       `${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`,
@@ -411,20 +428,19 @@ export class ApprovalHandler {
    * while its window was open, even though nothing is awaiting it.
    */
   private async rejectClosedWindow(requestId: string): Promise<void> {
-    if (this.resolving.has(requestId)) return;
-    const pending = await this.loadPending();
-    if (!pending.some((entry) => entry.request.requestId === requestId && !entry.outcome)) return;
-
     const outcome: ApprovalOutcome = { approved: false, error: "The approval window was closed." };
-    await this.savePending(
-      pending.map((entry) => (entry.request.requestId === requestId ? { ...entry, outcome } : entry)),
-    );
-    await this.dropPending(requestId);
+    let rejected = false;
+    await this.updatePending((pending) => {
+      if (this.resolving.has(requestId)) return null;
+      if (!pending.some((entry) => entry.request.requestId === requestId && !entry.outcome)) return null;
+      rejected = true;
+      return pending.map((entry) => (entry.request.requestId === requestId ? { ...entry, outcome } : entry));
+    });
+    if (rejected) await this.dropPending(requestId);
   }
 
-  private async dropPending(requestId: string): Promise<void> {
-    const pending = await this.loadPending();
-    await this.savePending(pending.filter((entry) => entry.request.requestId !== requestId));
+  private dropPending(requestId: string): Promise<void> {
+    return this.updatePending((pending) => pending.filter((entry) => entry.request.requestId !== requestId));
   }
 
   /** `ProtocolMap.getApproval` — read-only, called by the approval window on mount. */
@@ -477,10 +493,8 @@ export class ApprovalHandler {
 
       // Written in two steps (outcome attached, then removed) so a watcher
       // observing this key sees the outcome at least once before the record
-      // disappears — see this class's doc comment. Re-read, because other
-      // requests may have been added or removed while this one signed.
-      const current = await this.loadPending();
-      await this.savePending(
+      // disappears — see this class's doc comment.
+      await this.updatePending((current) =>
         current.map((candidate) =>
           candidate.request.requestId === req.requestId ? { ...candidate, outcome } : candidate,
         ),
@@ -690,20 +704,20 @@ export class ApprovalHandler {
     matches: (entry: PendingApprovalRecord) => boolean,
     error: string,
   ): Promise<void> {
-    const pending = await this.loadPending();
-    const rejected = new Set(
-      pending
-        .filter((entry) => !entry.outcome && !this.resolving.has(entry.request.requestId) && matches(entry))
-        .map((entry) => entry.request.requestId),
-    );
+    const outcome: ApprovalOutcome = { approved: false, error };
+    const rejected = new Set<string>();
+    await this.updatePending((pending) => {
+      for (const entry of pending) {
+        if (!entry.outcome && !this.resolving.has(entry.request.requestId) && matches(entry)) {
+          rejected.add(entry.request.requestId);
+        }
+      }
+      if (rejected.size === 0) return null;
+      return pending.map((entry) => (rejected.has(entry.request.requestId) ? { ...entry, outcome } : entry));
+    });
     if (rejected.size === 0) return;
 
-    const outcome: ApprovalOutcome = { approved: false, error };
-    await this.savePending(
-      pending.map((entry) => (rejected.has(entry.request.requestId) ? { ...entry, outcome } : entry)),
-    );
-    const current = await this.loadPending();
-    await this.savePending(current.filter((entry) => !rejected.has(entry.request.requestId)));
+    await this.updatePending((current) => current.filter((entry) => !rejected.has(entry.request.requestId)));
     await Promise.all([...rejected].map((requestId) => this.windows.closeApprovalWindow(requestId)));
   }
 

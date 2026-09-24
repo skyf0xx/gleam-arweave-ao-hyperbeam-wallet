@@ -9,15 +9,6 @@ product decision before starting.
 The last tag is the model the subagent should run on: `opus` for signing,
 vault, crypto and provider security; `sonnet` for everything else.
 
-## 1. Correctness and security bugs
-
-- [ ] **Concurrent approval requests overwrite each other (S, opus)**
-  `src/handlers/approval.ts` (`requestApproval`, `rejectClosedWindow`,
-  `dropPending`) read `session:pendingApprovals`, await, then write the
-  whole array back. Two dApp calls at once lose one: its window opens on
-  "No pending approval" and the dApp hangs until timeout. Done: the
-  read-modify-write is serialized, with a test firing two requests together.
-
 ## 2. Core wallet flows
 
 - [ ] **Token metadata isn't cached (S, sonnet)**
@@ -132,5 +123,9 @@ vault, crypto and provider security; `sonnet` for everything else.
 - `packages/core/src/vault/signing.ts` (`dispatchTransaction`): an
   AR-sending dispatch posts its data inline, so one over the gateway's
   inline limit fails and would need chunked upload.
+- `apps/extension/src/handlers/approval.ts` (`createGrant`, `revokeGrant`):
+  `local:grants` has the same unserialized read-await-write, so two
+  `connect()` approvals from different origins finishing together can drop
+  one grant.
 
 <!-- New findings go here until they're placed in the list above. -->

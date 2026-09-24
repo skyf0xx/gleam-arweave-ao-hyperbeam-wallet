@@ -266,6 +266,34 @@ describe("ApprovalHandler: connect() -> Grant", () => {
     expect(grants[0]?.permissions).toEqual(["ACCESS_ADDRESS", "SIGNATURE", "ACCESS_TOKENS"]);
   });
 
+  it("two requests fired together both stay pending and both resolve", async () => {
+    const first = handler.requestApproval({
+      kind: "connect",
+      origin: "https://a.test",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    const second = handler.requestApproval({
+      kind: "connect",
+      origin: "https://b.test",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(2));
+    const [firstId, secondId] = windows.opened.map(extractRequestId);
+
+    await expect(handler.getApproval({ requestId: firstId! })).resolves.toMatchObject({ origin: "https://a.test" });
+    await expect(handler.getApproval({ requestId: secondId! })).resolves.toMatchObject({ origin: "https://b.test" });
+
+    await Promise.all([
+      handler.resolveApproval({ requestId: firstId!, approved: true }),
+      handler.resolveApproval({ requestId: secondId!, approved: false }),
+    ]);
+    await expect(first).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+    await expect(second).rejects.toThrow(/rejected/i);
+    expect(await storage.get("session:pendingApprovals")).toEqual([]);
+  });
+
   it("an expired grant's permissions are not carried into the new one", async () => {
     const origin = "https://bazar.arweave.net";
     await storage.set("local:grants", [
