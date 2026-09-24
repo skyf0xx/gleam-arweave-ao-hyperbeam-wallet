@@ -23,6 +23,12 @@ vault, crypto and provider security; `sonnet` for everything else.
   and `signature()` honours `saltLength`. Check in Chrome that a
   `signMessage` result verifies with `arweave.crypto.verify`-style
   server code.
+- [ ] **`batchSignDataItem` approval shows only the first item (S, 🧪, sonnet)**
+  `entrypoints/background/index.ts`, `src/handlers/approval.ts`,
+  `entrypoints/approval/src/`. The preview's data, tags and payload hash
+  are item 1's; the other items are signed unseen. Done: the approval
+  window lists every item (data, target, tags), as permawebOS does, and
+  the item count is shown. Tests.
 - [ ] **Granted permissions are never enforced (M, opus)**
   `entrypoints/background/index.ts` (`handleProviderCall`). Any connected
   origin can call any method whatever it was granted. There is no
@@ -302,7 +308,3 @@ vault, crypto and provider security; `sonnet` for everything else.
   `entrypoints/background/index.ts`, `core/vault/signing.ts`. Wander takes
   `SignatureOptions` (`saltLength`) as the second argument. Gleam forwards
   it from the page but signs with arbundles' fixed salt length 32.
-- **`batchSignDataItem` approval shows only the first item (sonnet)**
-  `entrypoints/background/index.ts`, `src/handlers/approval.ts`. The
-  preview's data, tags and payload hash are item 1's; the other items are
-  signed unseen. permawebOS lists each item's data, target and tags.
