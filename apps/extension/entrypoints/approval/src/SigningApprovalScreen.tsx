@@ -38,6 +38,13 @@ const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
   privateHash: "Generate hash",
 };
 
+function actionCopy(preview: SigningApprovalPreview): string {
+  if (preview.kind === "batchSignDataItem" && preview.items) {
+    return `${REQUEST_KIND_COPY[preview.kind]} (${preview.items.length})`;
+  }
+  return REQUEST_KIND_COPY[preview.kind];
+}
+
 /**
  * Token identity shown alongside the amount for a `transferAoTokens`
  * preview. Judgment call (RELEVANT RULES don't specify exact copy/layout):
@@ -97,7 +104,7 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
       </div>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4.5">
-        <div className="text-center text-body font-bold text-foreground">{REQUEST_KIND_COPY[preview.kind]}</div>
+        <div className="text-center text-body font-bold text-foreground">{actionCopy(preview)}</div>
 
         {isTransfer ? (
           <>
@@ -128,29 +135,42 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
           </>
         ) : null}
 
-        {preview.decodedData !== null && preview.decodedData !== "" ? (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-caption font-semibold uppercase tracking-wide text-muted">Decoded data</span>
-            <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">
-              {preview.decodedData}
-            </div>
+        {preview.items ? (
+          <div className="flex flex-col gap-3">
+            <span className="text-caption font-semibold uppercase tracking-wide text-muted">
+              {preview.items.length} item{preview.items.length === 1 ? "" : "s"} to sign
+            </span>
+            {preview.items.map((item, index) => (
+              <DataItemPreview key={index} index={index} item={item} />
+            ))}
           </div>
-        ) : null}
+        ) : (
+          <>
+            {preview.decodedData !== null && preview.decodedData !== "" ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-caption font-semibold uppercase tracking-wide text-muted">Decoded data</span>
+                <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">
+                  {preview.decodedData}
+                </div>
+              </div>
+            ) : null}
 
-        {preview.tags.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-caption font-semibold uppercase tracking-wide text-muted">Tags</span>
-            <div className="flex flex-wrap gap-1.5">
-              {preview.tags.map((tag, index) => (
-                <span key={index} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
-                  <span className="text-muted">{tag.name}:</span> {tag.value}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
+            {preview.tags.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-caption font-semibold uppercase tracking-wide text-muted">Tags</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {preview.tags.map((tag, index) => (
+                    <span key={index} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
+                      <span className="text-muted">{tag.name}:</span> {tag.value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
-        <AddrBlock label="Signing payload (SHA-256)" value={preview.payloadHash} />
+            <AddrBlock label="Signing payload (SHA-256)" value={preview.payloadHash} />
+          </>
+        )}
 
         {error ? (
           <div role="alert" className="text-caption leading-snug text-warning">
@@ -170,9 +190,57 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
             onClick={() => void handleSign()}
             className="flex-1"
           >
-            {submitting ? "Signing…" : REQUEST_KIND_COPY[preview.kind]}
+            {submitting ? "Signing…" : actionCopy(preview)}
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DataItemPreview({
+  index,
+  item,
+}: {
+  index: number;
+  item: NonNullable<SigningApprovalPreview["items"]>[number];
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
+      <span className="text-caption font-semibold text-foreground">Item {index + 1}</span>
+
+      {item.target !== null ? (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Target</span>
+          <span className="break-all font-mono text-caption text-foreground">{item.target}</span>
+        </div>
+      ) : null}
+
+      {item.decodedData !== null && item.decodedData !== "" ? (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Decoded data</span>
+          <div className="max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-[11px] leading-relaxed text-foreground">
+            {item.decodedData}
+          </div>
+        </div>
+      ) : null}
+
+      {item.tags.length > 0 ? (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Tags</span>
+          <div className="flex flex-wrap gap-1.5">
+            {item.tags.map((tag, tagIndex) => (
+              <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
+                <span className="text-muted">{tag.name}:</span> {tag.value}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-0.5">
+        <span className="text-caption font-semibold uppercase tracking-wide text-muted">Payload (SHA-256)</span>
+        <span className="break-all font-mono text-[11px] text-foreground">{item.payloadHash}</span>
       </div>
     </div>
   );

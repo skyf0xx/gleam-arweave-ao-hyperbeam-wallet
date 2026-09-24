@@ -16,6 +16,7 @@ const TRANSFER_PREVIEW: SigningApprovalPreview = {
   decodedData: null,
   tags: [],
   payloadHash: "7f3a2e9c1b6d4f80a5e2c7b91d3f6a8e0c4b7d2f9a1e6c3b8d5f0a2e7c9b4d1f",
+  items: null,
 };
 
 const AO_TRANSFER_PREVIEW: SigningApprovalPreview = {
@@ -27,6 +28,7 @@ const AO_TRANSFER_PREVIEW: SigningApprovalPreview = {
   decodedData: "",
   tags: [],
   payloadHash: "7f3a2e9c1b6d4f80a5e2c7b91d3f6a8e0c4b7d2f9a1e6c3b8d5f0a2e7c9b4d1f",
+  items: null,
 };
 
 const MESSAGE_PREVIEW: SigningApprovalPreview = {
@@ -38,6 +40,32 @@ const MESSAGE_PREVIEW: SigningApprovalPreview = {
   decodedData: '{"Action":"Transfer"}',
   tags: [{ name: "Action", value: "Transfer" }],
   payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
+  items: null,
+};
+
+const BATCH_PREVIEW: SigningApprovalPreview = {
+  kind: "batchSignDataItem",
+  recipient: null,
+  amount: null,
+  fee: null,
+  token: null,
+  decodedData: '{"Action":"Transfer"}',
+  tags: [{ name: "Action", value: "Transfer" }],
+  payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
+  items: [
+    {
+      decodedData: '{"Action":"Transfer"}',
+      tags: [{ name: "Action", value: "Transfer" }],
+      target: null,
+      payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
+    },
+    {
+      decodedData: '{"Action":"Notify"}',
+      tags: [{ name: "Action", value: "Notify" }],
+      target: "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kLp",
+      payloadHash: "2b8e5f0a3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c1a9d4f7c",
+    },
+  ],
 };
 
 describe("SigningApprovalScreen (6.2 signing approval)", () => {
@@ -118,6 +146,26 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.getAllByText(AO_TRANSFER_PREVIEW.amount!).length).toBeGreaterThan(0);
     expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("batchSignDataItem lists every item's decoded data, target and tags, not just the first", () => {
+    render(
+      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={BATCH_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
+    );
+
+    expect(screen.getByText(/"Action":"Transfer"/)).toBeTruthy();
+    expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
+    expect(screen.getByText("Notify")).toBeTruthy();
+    expect(screen.getByText(BATCH_PREVIEW.items![1]!.target!)).toBeTruthy();
+  });
+
+  it("batchSignDataItem shows the item count in the heading and the sign action", () => {
+    render(
+      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={BATCH_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
+    );
+
+    expect(screen.getByText(/2 items to sign/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /sign messages \(2\)/i })).toBeTruthy();
   });
 
   it("a sign/dispatch preview with no token shows no token-identity line", () => {

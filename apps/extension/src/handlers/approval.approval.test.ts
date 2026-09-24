@@ -508,6 +508,59 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       expect(endsWith(raws[0]!, "first")).toBe(true);
       expect(endsWith(raws[1]!, "second")).toBe(true);
     });
+
+    it("batchSignDataItem's preview carries every item's decoded data and tags, not just item 1's", async () => {
+      const pending = handler.requestApproval({
+        kind: "batchSignDataItem",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode("first"),
+        dataItems: [
+          { data: toBase64("first"), tags: [{ name: "Action", value: "Eval" }] },
+          { data: toBase64("second"), tags: [{ name: "Action", value: "Notify" }], target: "b".repeat(43) },
+          { data: toBase64("third"), tags: [] },
+        ],
+      });
+      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+      const requestId = extractRequestId(windows.opened[0]!);
+
+      const request = await handler.getApproval({ requestId });
+      if (request.preview.kind === "connect") throw new Error("expected a signing preview");
+      const { items } = request.preview;
+      expect(items).toHaveLength(3);
+      expect(items?.[0]).toMatchObject({ decodedData: "first", tags: [{ name: "Action", value: "Eval" }], target: null });
+      expect(items?.[1]).toMatchObject({
+        decodedData: "second",
+        tags: [{ name: "Action", value: "Notify" }],
+        target: "b".repeat(43),
+      });
+      expect(items?.[2]).toMatchObject({ decodedData: "third", tags: [], target: null });
+      expect(items?.every((item) => /^[0-9a-f]{64}$/.test(item.payloadHash))).toBe(true);
+
+      await handler.resolveApproval({ requestId, approved: false });
+      await expect(pending).rejects.toThrow();
+    });
+
+    it("signDataItem's preview has no items list, and keeps the single-item preview fields", async () => {
+      const pending = handler.requestApproval({
+        kind: "signDataItem",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode("hello"),
+        tags: [{ name: "Action", value: "Eval" }],
+        dataItems: [{ data: toBase64("hello"), tags: [{ name: "Action", value: "Eval" }] }],
+      });
+      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+      const requestId = extractRequestId(windows.opened[0]!);
+
+      const request = await handler.getApproval({ requestId });
+      if (request.preview.kind === "connect") throw new Error("expected a signing preview");
+      expect(request.preview.items).toBeNull();
+      expect(request.preview.decodedData).toBe("hello");
+
+      await handler.resolveApproval({ requestId, approved: false });
+      await expect(pending).rejects.toThrow();
+    });
   });
 });
 

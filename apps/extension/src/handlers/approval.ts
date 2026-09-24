@@ -1,4 +1,5 @@
 import {
+  base64ToBytes,
   bytesToBase64,
   batchSignDataItem,
   decrypt,
@@ -231,8 +232,31 @@ function buildConnectPreview(requestedPermissions: PermissionType[]): ConnectApp
   return { kind: "connect", requestedPermissions };
 }
 
+/**
+ * `signDataItem`/`batchSignDataItem` carry every item in `input.dataItems`
+ * (`input.payload`/`input.tags` are only item 1's, kept for every other
+ * kind's single-payload preview) — decodes each one so the approval window
+ * can list them all rather than showing item 1 while the rest sign unseen.
+ */
+async function buildDataItemPreviews(
+  dataItems: NonNullable<SigningRequestInput["dataItems"]>,
+): Promise<SigningApprovalPreview["items"]> {
+  return Promise.all(
+    dataItems.map(async (item) => {
+      const bytes = base64ToBytes(item.data);
+      return {
+        decodedData: decodeDataPreview(bytes),
+        tags: item.tags ?? [],
+        target: item.target ?? null,
+        payloadHash: await sha256Hex(bytes),
+      };
+    }),
+  );
+}
+
 async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
   const payloadHash = await sha256Hex(input.payload);
+  const isBatch = input.kind === "batchSignDataItem";
   return {
     kind: input.kind,
     recipient: input.recipient ?? null,
@@ -242,6 +266,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
+    items: isBatch && input.dataItems ? await buildDataItemPreviews(input.dataItems) : null,
   };
 }
 

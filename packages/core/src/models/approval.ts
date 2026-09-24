@@ -53,6 +53,20 @@ export interface SigningApprovalPreview {
   decodedData: string | null;
   tags: Array<{ name: string; value: string }>;
   payloadHash: string;
+  /**
+   * Every item `signDataItem`/`batchSignDataItem` will sign, in order — one
+   * entry per item, each with its own decoded data, target and tags, so a
+   * `batchSignDataItem` approval isn't just item 1's `decodedData`/`tags`
+   * (which stay populated above, mirroring item 1, for every other kind's
+   * single-payload preview). `null` for every kind that isn't
+   * `signDataItem`/`batchSignDataItem`.
+   */
+  items: Array<{
+    decodedData: string | null;
+    tags: Array<{ name: string; value: string }>;
+    target: string | null;
+    payloadHash: string;
+  }> | null;
 }
 
 export type ApprovalPreview = ConnectApprovalPreview | SigningApprovalPreview;

@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **`batchSignDataItem` approval shows only the first item (S, 🧪, sonnet)**
-  `entrypoints/background/index.ts`, `src/handlers/approval.ts`,
-  `entrypoints/approval/src/`. The preview's data, tags and payload hash
-  are item 1's; the other items are signed unseen. Done: the approval
-  window lists every item (data, target, tags), as permawebOS does, and
-  the item count is shown. Tests.
 - [ ] **Granted permissions are never enforced (M, opus)**
   `entrypoints/background/index.ts` (`handleProviderCall`). Any connected
   origin can call any method whatever it was granted. There is no

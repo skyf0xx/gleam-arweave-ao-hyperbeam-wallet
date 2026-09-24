@@ -178,6 +178,7 @@ describe("domain model shapes", () => {
         decodedData: null,
         tags: [],
         payloadHash: "deadbeef",
+        items: null,
       },
     };
     expect(request.preview.kind).toBe("sign");
@@ -201,6 +202,7 @@ describe("domain model shapes", () => {
         decodedData: null,
         tags: [],
         payloadHash: "deadbeef",
+        items: null,
       },
     };
     expect(request.preview.kind).toBe("transferAoTokens");
