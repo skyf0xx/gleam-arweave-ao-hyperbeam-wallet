@@ -41,15 +41,12 @@ import { getCachedKey } from "./key-session";
  *
  * Storage schema this handler owns:
  * - `local:grants` — `Grant[]`, one per approved `connect()` origin. This
- *   is the exact key/shape `ReadsHandler.getConnectedApps()` (currently a
- *   hard `[]` stub, `wallet-core`'s declared debt) should be pointed at:
- *   `getConnectedApps` should become `const raw = await storage.get<
- *   unknown>("local:grants"); return Array.isArray(raw) ? raw.filter(
- *   isValidGrant) : [];` — a straight read, no join needed, since a Grant
- *   already carries every field `connected-apps.html` renders (origin,
- *   permissions, expiresAt, createdAt). Revoking removes the origin's
- *   entry from this same array; `getConnectedApps` needs no separate
- *   change to see a revoke take effect.
+ *   handler's own `getConnectedApps` is a straight read of this key
+ *   (filtered through `isValidGrant`), since a Grant already carries every
+ *   field `connected-apps.html` renders (origin, permissions, expiresAt,
+ *   createdAt). Revoking removes the origin's entry from this same array;
+ *   `getConnectedApps` needs no separate change to see a revoke take
+ *   effect.
  * - `session:pendingApprovals` — `ApprovalRequest[]`, ephemeral
  *   (`chrome.storage.session`, memory-only) rather than `local:`: an
  *   in-flight connection/signing request has no reason to survive a full

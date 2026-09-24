@@ -881,14 +881,6 @@ describe("registerActivityPromotionAlarm", () => {
   });
 });
 
-describe("ReadsHandler: getConnectedApps", () => {
-  it("returns an empty array (stub — Grants aren't implemented yet)", async () => {
-    const handler = new ReadsHandler(createFakeStorage());
-    const grants = await handler.getConnectedApps();
-    expect(grants).toEqual([]);
-  });
-});
-
 describe("ReadsHandler: getNetworkSettings", () => {
   it("defaults to arweave.net with the default HyperBEAM peer when nothing is stored", async () => {
     const handler = new ReadsHandler(createFakeStorage());

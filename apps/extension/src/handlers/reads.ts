@@ -18,7 +18,6 @@ import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
 import type {
   ActivityEntry,
   ActivityPage,
-  Grant,
   HyperBeamPeer,
   NetworkSettings,
   PortfolioHistory,
@@ -37,8 +36,8 @@ import type {
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
- * (`getBalance`/`getTokenBalances`/`getActivity`/`getConnectedApps`) —
- * same constructor-injected-`StoragePort` shape as
+ * (`getBalance`/`getTokenBalances`/`getActivity`) — same
+ * constructor-injected-`StoragePort` shape as
  * `WalletLifecycleHandler` (`handlers/wallet-lifecycle.ts`), for the same
  * hexagonal reason: this file knows `StoragePort`'s shape, never
  * `wxt/utils/storage`.
@@ -634,21 +633,6 @@ export class ReadsHandler {
         usd: await getUsdPriceWithFallback(token.priceSource as NonNullable<typeof token.priceSource>),
       })),
     );
-  }
-
-  /**
-   * Stubbed: `Grant`/connected-apps storage doesn't exist yet — no layer
-   * before this one owns writing a `Grant` record, and `provider-bridge`
-   * (the layer that builds the connection-approval flow that would create
-   * one) hasn't been built. Returns an empty array rather than throwing,
-   * since "no connected apps yet" is a legitimate, common state this
-   * stub's behavior happens to match exactly — but it cannot yet
-   * distinguish "no apps connected" from "grants aren't implemented," so
-   * `provider-bridge` must replace this method's body (not just add to
-   * it) once `Grant` storage is real. See this task's final report.
-   */
-  async getConnectedApps(): Promise<Grant[]> {
-    return [];
   }
 }
 

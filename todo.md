@@ -131,10 +131,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish and cleanup
 
-- [ ] **Delete the dead `ReadsHandler.getConnectedApps` stub (S, sonnet)**
-  `src/handlers/reads.ts` returns `[]`, but the background routes
-  `getConnectedApps` to `ApprovalHandler`, which reads `local:grants`.
-  Done: remove the stub and its test (`reads.activity.test.ts`).
 - [ ] **Remove unused wire contracts (S, sonnet)**
   `packages/messaging/src/signing-protocol.ts` and `token-protocol.ts` are
   only imported by their own tests. Done: either the provider and
