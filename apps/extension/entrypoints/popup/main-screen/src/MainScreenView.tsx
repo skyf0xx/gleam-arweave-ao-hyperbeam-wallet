@@ -18,6 +18,7 @@ import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, tru
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
+import { useNetworkSettings } from "./useNetworkSettings";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
 
@@ -111,6 +112,20 @@ interface DefaultTokenRow {
  * of magnitude.
  */
 const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
+
+/**
+ * Falls back to the "arweave.net" default while `getNetworkSettings`
+ * hasn't resolved yet, matching `DEFAULT_NETWORK_SETTINGS` in
+ * `handlers/reads.ts` — never a blank/undefined status label mid-load.
+ */
+function gatewayHostname(gatewayUrl: string | undefined): string {
+  if (!gatewayUrl) return "arweave.net";
+  try {
+    return new URL(gatewayUrl).hostname;
+  } catch {
+    return gatewayUrl;
+  }
+}
 
 function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null, amount: number): string | undefined {
   const price = prices?.find((entry) => entry.processId === processId)?.usd;
@@ -243,6 +258,7 @@ export function MainScreenView({
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
   const tokenPricesQuery = useTokenPrices(runtime);
+  const networkSettingsQuery = useNetworkSettings(runtime);
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
@@ -370,7 +386,7 @@ export function MainScreenView({
       <div className="transition-opacity duration-300 ease-out" style={{ opacity: headerCollapsed ? 0 : 1 }}>
         <div inert={headerCollapsed}>
           <div className="px-5 pb-1">
-            <StatusDot label="arweave.net" />
+            <StatusDot label={gatewayHostname(networkSettingsQuery.data?.gatewayUrl)} />
           </div>
 
           <div className="px-6 pb-1 pt-2.5">

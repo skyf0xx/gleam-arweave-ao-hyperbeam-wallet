@@ -29,6 +29,10 @@ function successfulSend(overrides: Record<string, unknown> = {}): RuntimePort["s
     if (type === "getTokenBalances") return NO_TOKENS;
     if (type === "getActivity") return EMPTY_ACTIVITY;
     if (type === "getPortfolioHistory") return overrides.portfolioHistory ?? PORTFOLIO_HISTORY_7D;
+    if (type === "getTokenPrices") return [];
+    if (type === "getNetworkSettings") {
+      return overrides.networkSettings ?? { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
+    }
     throw new Error(`Unexpected message type "${type}"`);
   }) as RuntimePort["send"];
 }
@@ -107,6 +111,16 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it("shows the configured gateway's hostname in the status dot, not a hard-coded default", async () => {
+    const send = successfulSend({
+      networkSettings: { gatewayUrl: "https://ar-io.example.net", peers: [], activePeerUrl: null },
+    });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("ar-io.example.net")).toBeTruthy());
+    expect(screen.queryByText("arweave.net")).toBeNull();
   });
 
   it("shows the network error banner and skeleton rows already established for this screen", async () => {
@@ -212,6 +226,8 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
         const range = (payload as { range: string }).range;
         return range === "1M" ? oneMonthHistory : PORTFOLIO_HISTORY_7D;
       }
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
@@ -238,6 +254,8 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
       if (type === "getTokenBalances") return NO_TOKENS;
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") throw new Error("unreachable");
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
@@ -262,6 +280,8 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
       if (type === "getTokenBalances") return [AO_TOKEN];
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     }) as RuntimePort["send"];
     const onSendToken = vi.fn();
@@ -287,6 +307,8 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
       if (type === "getTokenBalances") return [SCALED_TOKEN];
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
@@ -308,6 +330,8 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
       if (type === "getActivity") return EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     });
   }
@@ -453,6 +477,8 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
       if (type === "getActivity") return overrides.activity ?? EMPTY_ACTIVITY;
       if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     });
   }

@@ -5,13 +5,20 @@ import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
 /**
- * The gateway is shown read-only while the AO-peer list is fully
- * editable: add, remove, per-peer enable toggle, and select-active, all
- * writing the full `NetworkSettings` object back through
- * `setNetworkSettings` in one shot. Selecting a disabled peer as active is
- * refused client-side rather than sent and rejected by the backend, since
- * `NetworkSettings`'s own shape doesn't forbid it and no validation for
- * that combination exists in `handlers/reads.ts`.
+ * The gateway and the AO-peer list are both editable, writing the full
+ * `NetworkSettings` object back through `setNetworkSettings` in one shot.
+ * Selecting a disabled peer as active is refused client-side rather than
+ * sent and rejected by the backend, since `NetworkSettings`'s own shape
+ * doesn't forbid it and no validation for that combination exists in
+ * `handlers/reads.ts`.
+ *
+ * The gateway edit is stricter than a peer add: https-only (no bare-host
+ * upgrade — a gateway typo silently downgraded to a plaintext origin would
+ * be a worse failure mode than just rejecting it), host permission is
+ * requested the same way a peer's is, and the URL must answer before it's
+ * persisted (`GET <gateway>/`, matching arweave-js's own gateway health
+ * convention) so a typo'd or dead gateway can't strand balance/activity
+ * reads with no feedback at edit time.
  */
 export interface NetworkPeersViewProps {
   runtime: RuntimePort;
@@ -56,6 +63,24 @@ function normalizePeerUrl(input: string): string | null {
 }
 
 /**
+ * Stricter than `normalizePeerUrl`: the gateway must already be an
+ * `https://` URL rather than having one assumed for it, since silently
+ * upgrading a bare host here could mask a typo as a plaintext origin
+ * instead of failing loudly.
+ */
+function normalizeGatewayUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:") return null;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+/**
  * MV3 host-permission match pattern for a peer's origin — protocol +
  * host, wildcarded path (`<scheme>://<host>/*`) per
  * `chrome.permissions.request`'s documented match-pattern shape. Derived
@@ -67,12 +92,33 @@ function peerOriginPattern(normalizedPeerUrl: string): string {
   return `${url.protocol}//${url.host}/*`;
 }
 
+/**
+ * A gateway is "reachable" if it answers at all — 4xx still proves a
+ * server is there and responding as an Arweave gateway would to an
+ * unadorned `GET /`, so only a network failure (DNS, TLS, connection
+ * refused/timeout) counts as unreachable. Matches how `estimateFee`/
+ * `getArBalance` etc. treat gateway HTTP errors as gateway-specific
+ * failures rather than "this isn't a gateway".
+ */
+async function isGatewayReachable(gatewayUrl: string): Promise<boolean> {
+  try {
+    await fetch(gatewayUrl, { method: "GET" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   const [state, setState] = useState<LoadState>({ settings: null, loading: true, error: null });
   const [saving, setSaving] = useState(false);
   const [addingPeer, setAddingPeer] = useState(false);
   const [newPeerUrl, setNewPeerUrl] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
+  const [editingGateway, setEditingGateway] = useState(false);
+  const [newGatewayUrl, setNewGatewayUrl] = useState("");
+  const [gatewayError, setGatewayError] = useState<string | null>(null);
+  const [checkingGateway, setCheckingGateway] = useState(false);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -130,6 +176,43 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     void persist({ ...state.settings, peers, activePeerUrl });
   };
 
+  const handleEditGateway = async () => {
+    if (!state.settings) return;
+    const normalized = normalizeGatewayUrl(newGatewayUrl);
+    if (normalized === null) {
+      setGatewayError("Enter a valid https:// gateway URL.");
+      return;
+    }
+    if (normalized === state.settings.gatewayUrl) {
+      setEditingGateway(false);
+      setGatewayError(null);
+      return;
+    }
+
+    let granted: boolean;
+    try {
+      granted = await browser.permissions.request({ origins: [peerOriginPattern(normalized)] });
+    } catch {
+      granted = false;
+    }
+    if (!granted) {
+      setGatewayError("Permission denied for that origin — the gateway was not changed.");
+      return;
+    }
+
+    setCheckingGateway(true);
+    const reachable = await isGatewayReachable(normalized);
+    setCheckingGateway(false);
+    if (!reachable) {
+      setGatewayError("Couldn't reach that gateway — the gateway was not changed.");
+      return;
+    }
+
+    await persist({ ...state.settings, gatewayUrl: normalized });
+    setEditingGateway(false);
+    setGatewayError(null);
+  };
+
   const handleAddPeer = async () => {
     if (!state.settings) return;
     const normalized = normalizePeerUrl(newPeerUrl);
@@ -173,8 +256,55 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
           <div>
             {state.loading ? (
               <SkeletonRow />
+            ) : editingGateway ? (
+              <div className="flex flex-col gap-2 py-3.5">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="https://arweave.net"
+                  value={newGatewayUrl}
+                  onChange={(event) => {
+                    setNewGatewayUrl(event.target.value);
+                    setGatewayError(null);
+                  }}
+                  className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+                />
+                {gatewayError ? (
+                  <span role="alert" className="text-caption text-warning">
+                    {gatewayError}
+                  </span>
+                ) : null}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    disabled={saving || checkingGateway}
+                    onClick={() => void handleEditGateway()}
+                    className="text-label font-semibold text-foreground disabled:opacity-60"
+                  >
+                    {checkingGateway ? "Checking…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingGateway(false);
+                      setNewGatewayUrl("");
+                      setGatewayError(null);
+                    }}
+                    className="text-label font-semibold text-muted"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div className="flex items-center gap-2.5 py-3.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewGatewayUrl(state.settings?.gatewayUrl ?? "");
+                  setEditingGateway(true);
+                }}
+                className="flex w-full items-center gap-2.5 py-3.5 text-left"
+              >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-label font-semibold text-foreground">
                     {state.settings ? gatewayHostname(state.settings.gatewayUrl) : "—"}
@@ -182,7 +312,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                   <span className="text-caption text-muted">Arweave gateway &amp; GraphQL</span>
                 </span>
                 <span aria-hidden="true" className="h-2 w-2 flex-shrink-0 rounded-full bg-beam-green" />
-              </div>
+              </button>
             )}
           </div>
         </div>

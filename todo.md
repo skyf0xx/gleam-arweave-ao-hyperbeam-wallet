@@ -11,13 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 4. Other missing features
 
-- [ ] **Arweave gateway can't be edited (M, 🧪, sonnet)**
-  `popup/network-peers/src/NetworkPeersView.tsx` shows the gateway
-  read-only. `MainScreenView.tsx:349` hard-codes the "arweave.net" status
-  label. PRD: "Editable list of … peer URLs and the Arweave gateway." Done:
-  edit and validate the gateway (https only, reachable), request host
-  permission as peers already do, and show the real gateway in the status
-  label.
 - [ ] **Address book, part 1: storage, and contacts inside Send (M, sonnet)**
  - Let's use minimalism for storage. E.g. in the interface where it says 'recent' change it to Saved addresses. Opening that screen can display recent as well as saved. Let's use minimalism even for saving addresses. E.g. on paste of an address, if it's not saved, show tick box (or similar) 'save this address'. On tick, show a blank input box with placeholder - enter address name. Just suggestions you decide good UX practices.
   New `core/models/contact.ts`, storage in `local:contacts` (one list for

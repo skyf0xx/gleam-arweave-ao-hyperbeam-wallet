@@ -44,6 +44,88 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     expect(send).toHaveBeenCalledWith({ type: "getNetworkSettings", payload: undefined });
   });
 
+  it("editing the gateway requests host permission, checks reachability, and persists the normalized https URL", async () => {
+    permissionsRequest.mockResolvedValue(true);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    fireEvent.click(screen.getByText("arweave.net"));
+    fireEvent.change(screen.getByPlaceholderText("https://arweave.net"), {
+      target: { value: "https://ar-io.example.net/" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("https://ar-io.example.net", { method: "GET" }));
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "setNetworkSettings",
+        payload: { ...SETTINGS, gatewayUrl: "https://ar-io.example.net" },
+      }),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a non-https gateway URL without requesting permission or persisting", async () => {
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    fireEvent.click(screen.getByText("arweave.net"));
+    fireEvent.change(screen.getByPlaceholderText("https://arweave.net"), {
+      target: { value: "http://insecure.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(screen.getByText("Enter a valid https:// gateway URL.")).toBeTruthy();
+    expect(permissionsRequest).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not persist an unreachable gateway even after permission is granted", async () => {
+    permissionsRequest.mockResolvedValue(true);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    fireEvent.click(screen.getByText("arweave.net"));
+    fireEvent.change(screen.getByPlaceholderText("https://arweave.net"), {
+      target: { value: "https://dead-gateway.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Couldn't reach that gateway — the gateway was not changed.")).toBeTruthy(),
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
+    vi.unstubAllGlobals();
+  });
+
+  it("denied host permission on gateway edit leaves the gateway unchanged", async () => {
+    permissionsRequest.mockResolvedValue(false);
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    fireEvent.click(screen.getByText("arweave.net"));
+    fireEvent.change(screen.getByPlaceholderText("https://arweave.net"), {
+      target: { value: "https://other-gateway.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Permission denied for that origin — the gateway was not changed.")).toBeTruthy(),
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it("toggling a peer's enabled switch writes the full NetworkSettings via setNetworkSettings", async () => {
     const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
     render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
