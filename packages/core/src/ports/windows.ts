@@ -6,9 +6,9 @@
  * request (PRD §4 — Injected provider & connection approval; Signing
  * approval).
  *
- * Implemented by `apps/extension/src/adapters/windows.ts` in a later layer
- * (`provider-bridge`, per `.hedgehog/core.yaml`) over `chrome.windows.*`.
- * `core` never imports that adapter — only this interface.
+ * Implemented by `apps/extension/src/adapters/windows.ts` over
+ * `chrome.windows.*`. `core` never imports that adapter — only this
+ * interface.
  */
 export interface WindowPort {
   /**

@@ -1,9 +1,0 @@
-{
-  "task": "GLEAM-WALLET-VAULT",
-  "reason": "commit c6afc94 feat(gleam): vault already landed on master before this worktree existed; worktree's fresh DB can't credit it due to hedgehog#430",
-  "confirmed_at": "2026-09-14T11:10:39.973Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

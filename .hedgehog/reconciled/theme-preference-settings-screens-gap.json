@@ -1,9 +1,0 @@
-{
-  "task": "THEME-PREFERENCE-SETTINGS-SCREENS-GAP",
-  "reason": "Already delivered in prior commits before this intent file was committed to git; theme feature confirmed live end-to-end in the shipped UI.",
-  "confirmed_at": "2026-09-14T16:06:27.336Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

@@ -1,5 +1,0 @@
-{
-  "task": "PROVIDER-EVENTS-ACCOUNT-SWITCH-WALLET-CORE",
-  "commit_message": "feat(gleam): wallet core (balances, send, receive, activity)",
-  "verified_at": "2026-09-17T02:48:12.233Z"
-}

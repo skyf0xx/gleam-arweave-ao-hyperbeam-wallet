@@ -1,8 +1,0 @@
-{
-  "task": "GLEAM-WALLET-UPLOAD",
-  "scope_add": [
-    "apps/extension/entrypoints/popup/upload/*",
-    "apps/extension/entrypoints/popup/upload/src/*"
-  ],
-  "reason": "first module through upload also creates the package shell"
-}

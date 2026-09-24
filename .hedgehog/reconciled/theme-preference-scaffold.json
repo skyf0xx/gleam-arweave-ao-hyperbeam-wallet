@@ -1,9 +1,0 @@
-{
-  "task": "THEME-PREFERENCE-SCAFFOLD",
-  "reason": "All ALLOWED SCOPE files (theme.css's [data-theme=\"dark\"] selector, App.tsx's applyTheme pre-paint gate and data-theme attribute wiring) were already delivered in prior commits before this task's intent file was committed to git. Working tree clean in scope, eslint passes clean. Confirmed by direct code inspection, not invented work.",
-  "confirmed_at": "2026-09-14T16:02:12.100Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

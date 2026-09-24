@@ -125,16 +125,11 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
 
   /**
    * Fetches the stored theme preference and applies it to the shared root
-   * before the first substantive paint — see this task's inherited debt
-   * note (no synchronous pre-paint read exists in MV3) and this file's
-   * `hedgehog decision` record for why "await it alongside `getState` in
-   * the same `init()` gate" was chosen over a flash-accepting default.
-   * Never throws: a read failure (most likely today, since
-   * `getThemePreference`/`setThemePreference` aren't registered against
-   * `background/index.ts`'s dispatcher until `THEME-PREFERENCE-PROVIDER-
-   * BRIDGE` lands) falls back to light — this intent's own default bias —
-   * rather than blocking `init()` or leaving `data-theme` unset from a
-   * throw.
+   * before the first substantive paint. No synchronous pre-paint read
+   * exists in MV3, so this awaits alongside `getState` in the same
+   * `init()` gate rather than accepting a flash of the wrong theme.
+   * Never throws: a read failure falls back to light rather than
+   * blocking `init()` or leaving `data-theme` unset.
    */
   const applyTheme = async (runtime: RuntimePort) => {
     // `MainScreenView`'s theme toggle sets `data-theme="dark"` directly on

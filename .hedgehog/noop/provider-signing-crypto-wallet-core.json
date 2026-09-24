@@ -1,5 +1,0 @@
-{
-  "task": "PROVIDER-SIGNING-CRYPTO-WALLET-CORE",
-  "commit_message": "feat(gleam): wallet core (balances, send, receive, activity)",
-  "verified_at": "2026-09-17T03:28:58.236Z"
-}

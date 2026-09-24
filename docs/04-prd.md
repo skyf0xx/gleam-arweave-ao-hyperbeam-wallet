@@ -18,10 +18,9 @@ rule — Phase 1 mining reads only these two.
   (`gleam:v1:<walletId>:<address>`). One Vault per Wallet.
 - **Session** — the unlocked state of the extension: `unlockedAt`,
   `lastActivityAt`, an optional auto-lock timeout (never/immediate/5min/
-  1hr/4hr, default never). Global, not per-Wallet — unlocking tries the
-  last-active Wallet then opportunistically the same password against
-  other stored Wallets. A Session references zero or more unlocked
-  Wallets.
+  1hr/4hr, default never). Global, not per-Wallet — every Wallet shares
+  the one Vault password, so unlocking with it unlocks every stored
+  Wallet at once. A Session references zero or more unlocked Wallets.
 - **Grant** — a per-origin permission record created when a dApp calls
   `connect()`: origin, requested permission scopes (address access, sign,
   dispatch, etc.), `expiresAt` and `budget` (nullable in Phase 1, reserved
@@ -94,9 +93,8 @@ existing JWK keyfile, gated behind setting a Vault password.
 Global unlock (not per-wallet) gating access to all stored Wallets, with
 configurable auto-lock.
 - FR — Consequences (testable):
-  - Unlock tries the last-active Wallet's password, then opportunistically
-    the same password against other stored Wallets, failing silently
-    per-wallet on mismatch (never surfaced as multiple prompts).
+  - A single Vault password unlocks every stored Wallet at once: the
+    first Wallet created sets it, and every later Wallet must reuse it.
   - Default auto-lock timeout is "never"; manual "Lock now" always
     available and immediately clears unlocked-session state regardless of
     timeout config.
@@ -150,8 +148,10 @@ feed.
     (optimistic on submit) and (b) one gateway GraphQL `transactions`
     query by owner and by recipient, most-recent-N, no multi-gateway
     aggregation.
-  - Transaction detail view shows the full (untruncated) tx id and tags;
-    the list view may show truncated addresses.
+  - The list view may show truncated addresses; there is no separate
+    transaction detail screen — a row's explorer link is the detail
+    view, opening the full (untruncated) tx id and tags on the gateway's
+    own site.
 
 ### Feature: Upload content
 Compose and submit a tagged Arweave transaction (file/text/JSON) via a

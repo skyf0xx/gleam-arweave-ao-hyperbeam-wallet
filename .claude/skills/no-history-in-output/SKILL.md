@@ -1,6 +1,6 @@
 ---
 name: no-history-in-output
-description: Apply whenever writing or updating a project-facing document — root CLAUDE.md, `.hedgehog/core-design.md`, specs, READMEs, or similar. Ensures the file reads as a clean, current, as-is snapshot rather than a log of edits or decisions. Applies on first generation and on every later revision, including "update," "rewrite," or "clean up" requests.
+description: Apply whenever writing or updating a project-facing document — root CLAUDE.md, specs, READMEs, or similar. Ensures the file reads as a clean, current, as-is snapshot rather than a log of edits or decisions. Applies on first generation and on every later revision, including "update," "rewrite," or "clean up" requests.
 ---
 
 # No History in Output
@@ -34,5 +34,5 @@ process that produced it.
 - The user explicitly asks for a changelog, revision history, or "show
   me what changed."
 - The document's entire purpose is to record a process over time — a
-  friction log entry (`hedgehog friction add`), a commit message, or
-  meeting notes. Those describe what happened and when on purpose.
+  changelog entry, a commit message, or meeting notes. Those describe
+  what happened and when on purpose.

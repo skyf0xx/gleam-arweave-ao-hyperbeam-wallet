@@ -1,9 +1,0 @@
-{
-  "task": "THEME-PREFERENCE-MESSAGING",
-  "reason": "getThemePreference/setThemePreference on ProtocolMap, ThemePreference/ThemeSettings models already delivered in prior commits before this intent file was committed. Verification command passes clean: 32/32 tests pass, tsc clean for both packages. Confirmed by direct code inspection, not invented work.",
-  "confirmed_at": "2026-09-14T16:02:41.893Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

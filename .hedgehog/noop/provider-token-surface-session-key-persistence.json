@@ -1,5 +1,0 @@
-{
-  "task": "PROVIDER-TOKEN-SURFACE-SESSION-KEY-PERSISTENCE",
-  "commit_message": "fix(gleam): persist unlocked signing keys across service-worker restarts",
-  "verified_at": "2026-09-17T03:56:26.664Z"
-}

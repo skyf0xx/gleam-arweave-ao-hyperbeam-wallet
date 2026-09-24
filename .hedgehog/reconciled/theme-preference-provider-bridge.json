@@ -1,9 +1,0 @@
-{
-  "task": "THEME-PREFERENCE-PROVIDER-BRIDGE",
-  "reason": "Already delivered in prior commits before this intent file was committed to git; theme feature confirmed live end-to-end in the shipped UI.",
-  "confirmed_at": "2026-09-14T16:06:26.990Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

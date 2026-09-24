@@ -1,9 +1,0 @@
-{
-  "task": "DESIGN-SYSTEM-PASS-ONBOARDING-UNLOCK",
-  "reason": "design system pass confirmed complete by user; build graph state was corrupted/stale, hand-closing per user instruction",
-  "confirmed_at": "2026-09-14T16:08:33.089Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

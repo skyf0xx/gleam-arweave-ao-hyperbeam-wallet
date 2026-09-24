@@ -4,10 +4,9 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 /**
  * Root Vitest config, shared by every package/app in the workspace.
- * Each layer's `verify` in `.hedgehog/core.yaml` runs `pnpm vitest run
- * <name-fragments>` — Vitest matches those fragments against test file
- * paths, so each layer's tests live under a directory or filename
- * carrying its layer id (e.g. `scaffold`, `ui`, `messaging`, `vault`).
+ * Test files are colocated with the code they test and suffixed with a
+ * layer tag (e.g. `foo.vault.test.ts`), so `pnpm vitest run <fragment>`
+ * can target one area by matching that fragment against file paths.
  */
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],

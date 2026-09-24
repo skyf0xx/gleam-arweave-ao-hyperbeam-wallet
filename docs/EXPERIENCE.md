@@ -77,10 +77,11 @@ Dual-address type switcher deferred to Phase 2 (Ethereum keys).
   send/receive shortcuts, filtered activity) share the main screen's row
   style — no new visual language per list page.
 - All-activity: merged local log + gateway query, most-recent-N,
-  truncated addresses acceptable here (low-stakes glanceable list).
-- Transaction detail: full untruncated tx id and tags, status
-  (pending/confirmed/failed), ViewBlock link, decoded-data preview where
-  applicable — the one place technical precision is shown in full.
+  truncated addresses acceptable here (low-stakes glanceable list). Each
+  row's status (pending/confirmed/failed) is shown inline; there is no
+  separate transaction detail screen — the explorer link on the row is
+  the detail view, opening the full untruncated tx id, tags and
+  decoded-data preview on the gateway's own site.
 - Empty states: one dry, understated line, no mascot/illustration beyond
   a simple geometric mark, never warning-red (empty isn't a problem
   state).

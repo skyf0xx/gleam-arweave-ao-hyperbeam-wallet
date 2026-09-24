@@ -1,9 +1,0 @@
-{
-  "task": "THEME-PREFERENCE-ONBOARDING-UNLOCK",
-  "reason": "All ALLOWED SCOPE files exist and are wired (onboarding/unlock entrypoints, wallet-lifecycle.ts, storage.ts, runtime.ts, packages/ui onboarding components, packages/core/src/index.ts). wallet-lifecycle.ts implements getThemePreference/setThemePreference backing reads/writes (THEME_SETTINGS_KEY='local:themeSettings', default {theme:'light'}, validated against VALID_THEME_PREFERENCES=['light','dark']) via the StoragePort adapter, matching THEME-PREFERENCE-MESSAGING's contract and the no-OS-default/light-default rule. FIRST ARRIVAL note was stale -- onboarding/unlock package shells already exist from prior commits. Verification passes clean: pnpm vitest run onboarding unlock = 71/71 tests pass (6 files); pnpm tsc -p packages/core --noEmit = clean; pnpm wxt build = succeeds, extension built to .output/chrome-mv3.",
-  "confirmed_at": "2026-09-14T16:04:30.119Z",
-  "evidence": {
-    "commits": [],
-    "paths": []
-  }
-}

@@ -141,18 +141,6 @@ vault, crypto and provider security; `sonnet` for everything else.
   Same, for `apps/extension` (the background, provider, content, App and
   handlers are the worst).
 
-## 6. Hedgehog cleanup
-
-- [ ] **Remove the Hedgehog scaffolding (M, sonnet)**
-  `.hedgehog/`, the Hedgehog agents and skills in `.claude/`, `AGENTS.md`,
-  and the per-layer test-naming conventions (the `*.<layer>.test.ts`
-  suffixes can stay). First move `.hedgehog/BMAD/04-prd.md` and
-  `05-ux-spec/EXPERIENCE.md` to `docs/` if they're still the spec. In them,
-  change the activity section to say explorer links are the detail view,
-  and state the single vault password. Keep
-  anything in `.hedgehog/core-design.md` that `CLAUDE.md` doesn't already
-  cover.
-
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->

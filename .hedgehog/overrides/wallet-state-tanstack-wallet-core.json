@@ -1,8 +1,0 @@
-{
-  "task": "WALLET-STATE-TANSTACK-WALLET-CORE",
-  "scope_add": [
-    "apps/extension/entrypoints/popup/activity/*",
-    "apps/extension/entrypoints/popup/activity/src/*"
-  ],
-  "reason": "first module through wallet-core also creates the activity package shell (main-screen/send/receive already exist from prior intents)"
-}

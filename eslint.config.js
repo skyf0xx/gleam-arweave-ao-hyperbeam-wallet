@@ -5,20 +5,13 @@ import importPlugin from "eslint-plugin-import";
 import reactHooks from "eslint-plugin-react-hooks";
 
 /**
- * Root ESLint flat config.
+ * Root ESLint flat config (repo-wide lint plus the import-boundary rule
+ * below; ESLint 9 reads flat config by default, not `.eslintrc.cjs`).
  *
- * `.hedgehog/core.yaml`'s scaffold layer names `.eslintrc.cjs`, the
- * legacy config format — ESLint 9 (the current release as of this
- * bootstrap) only reads flat config by default, so this is written as
- * `eslint.config.js` instead. Same role (repo-wide lint, the
- * import-boundary rule below), current tool shape; see
- * `hedgehog-bootstrap-authored-core`'s Step 4 on reconciling generator
- * drift against a locked `core.yaml`.
- *
- * The import-boundary rule enforces core-design.md's hexagonal
- * constraint: `packages/core` never imports an adapter, and popup-side
- * UI code never imports background-adapter code directly — every
- * cross-context call crosses `packages/messaging`.
+ * The import-boundary rule enforces CLAUDE.md's hexagonal constraint:
+ * `packages/core` never imports an adapter, and popup-side UI code never
+ * imports background-adapter code directly — every cross-context call
+ * crosses `packages/messaging`.
  */
 export default tseslint.config(
   {

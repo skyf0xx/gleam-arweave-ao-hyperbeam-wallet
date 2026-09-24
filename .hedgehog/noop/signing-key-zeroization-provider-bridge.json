@@ -1,5 +1,0 @@
-{
-  "task": "SIGNING-KEY-ZEROIZATION-PROVIDER-BRIDGE",
-  "commit_message": "feat(gleam): injected provider, connection approval, signing approval",
-  "verified_at": "2026-09-17T03:57:47.967Z"
-}
