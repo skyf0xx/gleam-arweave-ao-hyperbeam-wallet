@@ -9,9 +9,11 @@ import {
   missingPermissions,
   verifyMessage,
   type ConnectAppInfo,
+  type NetworkSettings,
   type PermissionType,
   type WalletSummary,
 } from "@gleam/core";
+import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gateway.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
@@ -619,11 +621,43 @@ messenger.onMessage("providerCall", (message) => {
     encodeProviderResult(await handleProviderCall(origin, method, decodeProviderParams(params))))();
 });
 
+const NETWORK_SETTINGS_KEY = "local:networkSettings";
+
+/**
+ * First-run gateway fallback: if `local:networkSettings` has never been
+ * written, checks whether `arweave.net` actually answers as a gateway
+ * and, if not, tries `FALLBACK_GATEWAY_URLS` in order
+ * (`resolveInitialGatewayUrl` — pure, given `fetch`). Only ever writes
+ * `NETWORK_SETTINGS_KEY` when it was previously empty, so a user's own
+ * gateway choice is never touched. Errors are swallowed: this must never
+ * block startup, and `reads.ts`'s own `DEFAULT_NETWORK_SETTINGS` fallback
+ * already covers "nothing was ever written" for every other read path.
+ */
+async function initializeNetworkSettingsIfMissing(): Promise<void> {
+  try {
+    const existing = await storage.get<NetworkSettings>(NETWORK_SETTINGS_KEY);
+    if (existing !== null) return;
+
+    const gatewayUrl = await resolveInitialGatewayUrl();
+    const settings = await reads.getNetworkSettings();
+    await storage.set(NETWORK_SETTINGS_KEY, { ...settings, gatewayUrl });
+  } catch {
+    // Never block startup over a first-run gateway probe.
+  }
+}
+
 export default defineBackground(() => {
   // Registration above runs at module-evaluation time: `onMessage` must
   // be called once per JS context, not per `defineBackground` invocation,
   // since MV3 service workers only evaluate this module once per
-  // wake-up. This callback body intentionally does nothing further — it
-  // exists so WXT recognizes this file as the background entrypoint and
-  // bundles/registers it in the manifest.
+  // wake-up.
+  //
+  // `runtime.onInstalled` fires once, on first install (not on every
+  // service-worker wake-up), which is exactly when
+  // `initializeNetworkSettingsIfMissing`'s "nothing written yet" check is
+  // meaningful — after that, a written NetworkSettings (default or
+  // user-edited) always short-circuits it anyway.
+  browser.runtime.onInstalled.addListener(() => {
+    void initializeNetworkSettingsIfMissing();
+  });
 });

@@ -2,6 +2,7 @@ import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
+import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -27,12 +28,19 @@ export default defineConfig({
     // it is requested at runtime via chrome.permissions.request() against
     // optional_host_permissions instead of being granted broadly up
     // front.
+    //
+    // FALLBACK_GATEWAY_URLS (packages/core/src/arweave/first-run-gateway.ts)
+    // are checked unconditionally on first run, before the user has
+    // granted anything, so each one needs a static host permission here too
+    // or it would pass that gateway check and then fail on the real reads
+    // that follow.
     host_permissions: [
       'https://arweave.net/*',
       'https://up.arweave.net/*',
       'https://api.coingecko.com/*',
       'https://api.coinpaprika.com/*',
       ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
+      ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
     ],
     optional_host_permissions: ['https://*/*'],
     // Required for content.ts's injectScript("/provider.js", ...) to
