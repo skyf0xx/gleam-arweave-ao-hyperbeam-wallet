@@ -24,11 +24,6 @@ vault, crypto and provider security; `sonnet` for everything else.
   `popup/onboarding/src/OnboardingView.tsx` (`Backup`'s `onBack`).
   "Create a wallet" then asks for a new password, which `createWallet`
   rejects. Done: back finishes onboarding, as the add-wallet flow does.
-- [ ] **Onboarding in the approval window hits the 5-minute approval timeout (S, 🧪, opus)**
-  `src/handlers/approval.ts` (`awaitResolution`), `approval/src/ApprovalRoot.tsx`.
-  Create/import plus backup can outlast the timeout, which closes the
-  window mid-onboarding and rejects the dApp. Done: the timeout doesn't
-  run while onboarding or unlock is showing.
 
 ## 3. dApp provider gaps
 
@@ -61,12 +56,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 4. Other missing features
 
-- [ ] **Upload screen can't be reached (M, sonnet)**
-  `popup/upload/src/UploadView.tsx` is complete, but `src/App.tsx` has no
-  route and nothing links to it. The UX spec's review step also wants a
-  fee or cost row, which `UploadReview` lacks. Done: an entry point from
-  the main screen, a route, and a cost line on review. Upload writes an
-  activity entry.
 - [ ] **Arweave gateway can't be edited (M, 🧪, sonnet)**
   `popup/network-peers/src/NetworkPeersView.tsx` shows the gateway
   read-only. `MainScreenView.tsx:349` hard-codes the "arweave.net" status
@@ -101,6 +90,16 @@ vault, crypto and provider security; `sonnet` for everything else.
   validated 43-character address. Tapping a row edits the name inline or
   deletes it, with no confirmation beyond an undo toast, since a contact
   is only a label. Empty state: one line of muted text, nothing else.
+- [ ] **Upload screen can't be reached (M, sonnet)**
+  `popup/upload/src/UploadView.tsx` is complete, but `src/App.tsx` has no
+  route and nothing links to it. Upload is rarely used, so it gets no
+  main-screen button: it lives in Settings, found by someone looking for
+  it. In `popup/settings-home/src/SettingsHomeView.tsx`, add a "Tools"
+  section between Network and General with one row, "Upload to Arweave",
+  subtitle "Store a file permanently". Back from Upload returns to
+  Settings. The UX spec's review step also wants a fee or cost row, which
+  `UploadReview` lacks. Done: the Settings row, a route, and a cost line
+  on review. Upload writes an activity entry.
 
 ## Unsorted
 
