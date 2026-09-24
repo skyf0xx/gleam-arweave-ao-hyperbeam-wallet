@@ -56,6 +56,35 @@ describe("OnboardingView: create flow", () => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
+  it("finishes onboarding instead of returning to Welcome when backup's back button is used", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
+      .mockResolvedValueOnce({ kty: "RSA", n: "example" }); // exportWallet
+    const runtime = fakeRuntime({ send });
+    const onComplete = vi.fn();
+
+    render(<OnboardingView runtime={runtime} onComplete={onComplete} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
+    fireEvent.change(screen.getByPlaceholderText("At least 10 characters"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByText("Your wallet is ready")).toBeTruthy());
+
+    // The wallet the user just created already exists, so going back must
+    // not land on Welcome's "Create a wallet" — that would re-run
+    // createWallet with a new password, which the vault rejects.
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
+  });
+
   it("surfaces a server-side rejection (e.g. common password) as an inline error", async () => {
     const send = vi.fn().mockRejectedValueOnce(new Error("That password is too common."));
     const runtime = fakeRuntime({ send });

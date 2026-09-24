@@ -172,9 +172,9 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     case "backup":
       return (
         <Backup
-          // The wallet already exists, so going back to the start would
-          // only offer to add another one.
-          onBack={addingWallet ? onComplete : () => setStep({ kind: "welcome" })}
+          // The wallet already exists by this step, so going back to the
+          // start would only offer to create another one.
+          onBack={onComplete}
           keyfileContents={step.keyfileContents}
           onDownload={() => downloadKeyfile(step.keyfileContents, step.walletName)}
           onCopy={() => void navigator.clipboard?.writeText(step.keyfileContents)}

@@ -9,13 +9,6 @@ product decision before starting.
 The last tag is the model the subagent should run on: `opus` for signing,
 vault, crypto and provider security; `sonnet` for everything else.
 
-## 2. Core wallet flows
-
-- [ ] **Back from first-run backup returns to Welcome after the wallet exists (S, sonnet)**
-  `popup/onboarding/src/OnboardingView.tsx` (`Backup`'s `onBack`).
-  "Create a wallet" then asks for a new password, which `createWallet`
-  rejects. Done: back finishes onboarding, as the add-wallet flow does.
-
 ## 3. dApp provider gaps
 
 - [ ] **Take over `window.arweaveWallet` when Wander is also installed (S, 🧪, opus)**
