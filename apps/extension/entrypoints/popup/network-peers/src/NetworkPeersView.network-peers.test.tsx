@@ -3,15 +3,34 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import type { NetworkSettings, RuntimePort } from "@gleam/core";
 import { NetworkPeersView } from "./NetworkPeersView";
 
-const { permissionsRequest } = vi.hoisted(() => ({ permissionsRequest: vi.fn() }));
+const { permissionsRequest, permissionsContains, sessionStore } = vi.hoisted(() => ({
+  permissionsRequest: vi.fn(),
+  permissionsContains: vi.fn(),
+  sessionStore: new Map<string, unknown>(),
+}));
 
 vi.mock("wxt/browser", () => ({
-  browser: { permissions: { request: permissionsRequest } },
+  browser: {
+    permissions: { request: permissionsRequest, contains: permissionsContains },
+    storage: {
+      session: {
+        get: vi.fn(async (key: string) => ({ [key]: sessionStore.get(key) })),
+        set: vi.fn(async (items: Record<string, unknown>) => {
+          for (const [key, value] of Object.entries(items)) sessionStore.set(key, value);
+        }),
+        remove: vi.fn(async (key: string) => {
+          sessionStore.delete(key);
+        }),
+      },
+    },
+  },
 }));
 
 afterEach(() => {
   cleanup();
   permissionsRequest.mockReset();
+  permissionsContains.mockReset();
+  sessionStore.clear();
 });
 
 function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
@@ -44,9 +63,12 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     expect(send).toHaveBeenCalledWith({ type: "getNetworkSettings", payload: undefined });
   });
 
-  it("editing the gateway requests host permission, checks reachability, and persists the normalized https URL", async () => {
+  it("editing the gateway requests host permission, checks it's an Arweave gateway, and persists the normalized https URL", async () => {
     permissionsRequest.mockResolvedValue(true);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ network: "arweave.N.1" }),
+    });
     vi.stubGlobal("fetch", fetchMock);
     const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
     render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
@@ -61,7 +83,9 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     await waitFor(() =>
       expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("https://ar-io.example.net", { method: "GET" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("https://ar-io.example.net/info", { method: "GET" }),
+    );
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
         type: "setNetworkSettings",
@@ -69,6 +93,80 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
       }),
     );
     vi.unstubAllGlobals();
+  });
+
+  it("saves the pending edit to session storage before requesting permission", async () => {
+    permissionsRequest.mockImplementation(async () => {
+      // At the moment the permission prompt would show, the draft must
+      // already be recorded — this is the only chance before Chrome could
+      // close the popup.
+      expect(sessionStore.get("session:pendingNetworkEdit")).toEqual({
+        kind: "gateway",
+        url: "https://ar-io.example.net",
+      });
+      return true;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ network: "arweave.N.1" }) }),
+    );
+    const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    fireEvent.click(screen.getByText("arweave.net"));
+    fireEvent.change(screen.getByPlaceholderText("https://arweave.net"), {
+      target: { value: "https://ar-io.example.net" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(permissionsRequest).toHaveBeenCalled());
+    // Cleared again once the flow finishes successfully.
+    await waitFor(() => expect(sessionStore.get("session:pendingNetworkEdit")).toBeUndefined());
+    vi.unstubAllGlobals();
+  });
+
+  it("on remount with a pending gateway edit and the permission now granted, finishes the flow automatically", async () => {
+    sessionStore.set("session:pendingNetworkEdit", { kind: "gateway", url: "https://ar-io.example.net" });
+    permissionsContains.mockResolvedValue(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ network: "arweave.N.1" }) }),
+    );
+    const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(permissionsContains).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
+    );
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "setNetworkSettings",
+        payload: { ...SETTINGS, gatewayUrl: "https://ar-io.example.net" },
+      }),
+    );
+    await waitFor(() => expect(sessionStore.get("session:pendingNetworkEdit")).toBeUndefined());
+    // No editor was ever opened — the flow ran automatically.
+    expect(screen.queryByPlaceholderText("https://arweave.net")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("on remount with a pending gateway edit and the permission not granted, reopens the editor pre-filled", async () => {
+    sessionStore.set("session:pendingNetworkEdit", { kind: "gateway", url: "https://ar-io.example.net" });
+    permissionsContains.mockResolvedValue(false);
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(permissionsContains).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
+    );
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText("https://arweave.net") as HTMLInputElement).value).toBe(
+        "https://ar-io.example.net",
+      ),
+    );
+    await waitFor(() => expect(sessionStore.get("session:pendingNetworkEdit")).toBeUndefined());
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
   });
 
   it("rejects a non-https gateway URL without requesting permission or persisting", async () => {
@@ -101,9 +199,32 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(screen.getByText("Couldn't reach that gateway — the gateway was not changed.")).toBeTruthy(),
+      expect(screen.getByText("That URL didn't answer as an Arweave gateway…")).toBeTruthy(),
     );
     expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a reachable but non-Arweave host as a gateway", async () => {
+    permissionsRequest.mockResolvedValue(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ status: "ok" }) }),
+    );
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    fireEvent.click(screen.getByText("arweave.net"));
+    fireEvent.change(screen.getByPlaceholderText("https://arweave.net"), {
+      target: { value: "https://google.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("That URL didn't answer as an Arweave gateway…")).toBeTruthy(),
+    );
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
     vi.unstubAllGlobals();
   });

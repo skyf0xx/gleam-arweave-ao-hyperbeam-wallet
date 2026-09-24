@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { browser } from "wxt/browser";
 import { DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
+import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
@@ -15,10 +16,19 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
  * The gateway edit is stricter than a peer add: https-only (no bare-host
  * upgrade — a gateway typo silently downgraded to a plaintext origin would
  * be a worse failure mode than just rejecting it), host permission is
- * requested the same way a peer's is, and the URL must answer before it's
- * persisted (`GET <gateway>/`, matching arweave-js's own gateway health
- * convention) so a typo'd or dead gateway can't strand balance/activity
- * reads with no feedback at edit time.
+ * requested the same way a peer's is, and the URL must answer `GET <url>/info`
+ * as an Arweave gateway (`isArweaveGateway`) before it's persisted, so a
+ * typo'd, dead, or unrelated host can't strand balance/activity reads with
+ * no feedback at edit time.
+ *
+ * `browser.permissions.request` closes the popup in Chrome the instant it
+ * shows its own prompt, which would otherwise discard whatever the user had
+ * typed. The in-flight edit (gateway or peer, plus its URL) is saved to
+ * `session:pendingNetworkEdit` right before the request, so a remount (the
+ * user reopening the popup after answering the prompt) can pick the flow
+ * back up: if the origin is now granted, it finishes automatically
+ * (reachability check, then persist); if not, it reopens the editor
+ * pre-filled instead of losing the input.
  */
 export interface NetworkPeersViewProps {
   runtime: RuntimePort;
@@ -92,20 +102,45 @@ function peerOriginPattern(normalizedPeerUrl: string): string {
   return `${url.protocol}//${url.host}/*`;
 }
 
-/**
- * A gateway is "reachable" if it answers at all — 4xx still proves a
- * server is there and responding as an Arweave gateway would to an
- * unadorned `GET /`, so only a network failure (DNS, TLS, connection
- * refused/timeout) counts as unreachable. Matches how `estimateFee`/
- * `getArBalance` etc. treat gateway HTTP errors as gateway-specific
- * failures rather than "this isn't a gateway".
- */
-async function isGatewayReachable(gatewayUrl: string): Promise<boolean> {
+interface PendingNetworkEdit {
+  kind: "gateway" | "peer";
+  url: string;
+}
+
+const PENDING_EDIT_KEY = "session:pendingNetworkEdit";
+
+async function loadPendingEdit(): Promise<PendingNetworkEdit | null> {
   try {
-    await fetch(gatewayUrl, { method: "GET" });
-    return true;
+    const result = await browser.storage.session.get(PENDING_EDIT_KEY);
+    const value = result[PENDING_EDIT_KEY] as { kind?: unknown; url?: unknown } | undefined;
+    if (
+      value !== undefined &&
+      value !== null &&
+      typeof value === "object" &&
+      (value.kind === "gateway" || value.kind === "peer") &&
+      typeof value.url === "string"
+    ) {
+      return { kind: value.kind, url: value.url };
+    }
+    return null;
   } catch {
-    return false;
+    return null;
+  }
+}
+
+async function savePendingEdit(edit: PendingNetworkEdit): Promise<void> {
+  try {
+    await browser.storage.session.set({ [PENDING_EDIT_KEY]: edit });
+  } catch {
+    // Best-effort — if this fails, the user just has to re-paste the URL.
+  }
+}
+
+async function clearPendingEdit(): Promise<void> {
+  try {
+    await browser.storage.session.remove(PENDING_EDIT_KEY);
+  } catch {
+    // Nothing to clean up if this fails.
   }
 }
 
@@ -140,6 +175,65 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Resumes a gateway/peer edit interrupted by Chrome closing the popup for
+  // its own permission prompt. Runs once per mount, after settings load, so
+  // a granted-on-remount edit reads against the freshest NetworkSettings.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current || state.settings === null) return;
+    resumedRef.current = true;
+
+    void (async () => {
+      const pending = await loadPendingEdit();
+      if (!pending) return;
+
+      let granted: boolean;
+      try {
+        granted = await browser.permissions.contains({ origins: [peerOriginPattern(pending.url)] });
+      } catch {
+        granted = false;
+      }
+
+      if (!granted) {
+        if (pending.kind === "gateway") {
+          setNewGatewayUrl(pending.url);
+          setEditingGateway(true);
+        } else {
+          setNewPeerUrl(pending.url);
+          setAddingPeer(true);
+        }
+        await clearPendingEdit();
+        return;
+      }
+
+      // Permission is already granted — finish the flow the same way the
+      // in-popup path would, then clear the draft.
+      if (pending.kind === "gateway") {
+        setCheckingGateway(true);
+        const reachable = await isArweaveGateway(pending.url);
+        setCheckingGateway(false);
+        if (!reachable) {
+          setNewGatewayUrl(pending.url);
+          setGatewayError("That URL didn't answer as an Arweave gateway…");
+          setEditingGateway(true);
+        } else {
+          const settings = state.settings;
+          if (settings) await persist({ ...settings, gatewayUrl: pending.url });
+        }
+      } else {
+        const settings = state.settings;
+        if (settings && !settings.peers.some((peer) => peer.url === pending.url)) {
+          const peers = [...settings.peers, { url: pending.url, enabled: true }];
+          await persist({ ...settings, peers });
+        }
+      }
+      await clearPendingEdit();
+    })();
+    // state.settings is read fresh inside the async closure via the outer
+    // `state` reference at call time, so it isn't in the dependency array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.settings]);
 
   const persist = async (next: NetworkSettings) => {
     setSaving(true);
@@ -189,6 +283,11 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return;
     }
 
+    // Saved before requesting permission: Chrome closes this popup the
+    // instant its own prompt appears, so this is the only chance to record
+    // what the user typed before a remount needs it back.
+    await savePendingEdit({ kind: "gateway", url: normalized });
+
     let granted: boolean;
     try {
       granted = await browser.permissions.request({ origins: [peerOriginPattern(normalized)] });
@@ -197,20 +296,23 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     }
     if (!granted) {
       setGatewayError("Permission denied for that origin — the gateway was not changed.");
+      await clearPendingEdit();
       return;
     }
 
     setCheckingGateway(true);
-    const reachable = await isGatewayReachable(normalized);
+    const reachable = await isArweaveGateway(normalized);
     setCheckingGateway(false);
     if (!reachable) {
-      setGatewayError("Couldn't reach that gateway — the gateway was not changed.");
+      setGatewayError("That URL didn't answer as an Arweave gateway…");
+      await clearPendingEdit();
       return;
     }
 
     await persist({ ...state.settings, gatewayUrl: normalized });
     setEditingGateway(false);
     setGatewayError(null);
+    await clearPendingEdit();
   };
 
   const handleAddPeer = async () => {
@@ -225,6 +327,8 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return;
     }
 
+    await savePendingEdit({ kind: "peer", url: normalized });
+
     let granted: boolean;
     try {
       granted = await browser.permissions.request({ origins: [peerOriginPattern(normalized)] });
@@ -233,6 +337,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     }
     if (!granted) {
       setAddError("Permission denied for that origin — the peer was not added.");
+      await clearPendingEdit();
       return;
     }
 
@@ -241,6 +346,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     setNewPeerUrl("");
     setAddingPeer(false);
     setAddError(null);
+    await clearPendingEdit();
   };
 
   return (
