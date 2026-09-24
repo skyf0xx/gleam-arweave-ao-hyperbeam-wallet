@@ -13,12 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **AO amounts in the activity list are labelled "AR" (S, sonnet)**
-  `popup/main-screen/src/MainScreenView.tsx:524` formats every entry with
-  `formatWinstonAsAr(...) AR`. Done: token entries use the token's
-  denomination and ticker (see `SendView.tsx`'s `formatAtomicAsDisplay`).
-  Explorer links are the activity detail view (decided), so no in-app
-  detail screen or paging is planned.
 - [ ] **AR "Max" and the balance check ignore the network fee (S, sonnet)**
   `popup/send/src/SendView.tsx:393`,
   `popup/activity/src/validateSendAmount.ts`. "Max" fills in the whole

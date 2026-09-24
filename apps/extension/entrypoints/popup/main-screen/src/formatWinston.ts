@@ -28,10 +28,9 @@ export function formatWinstonAsAr(winston: string, maxFractionDigits = 4): strin
 
 /**
  * The AO-token equivalent of `formatWinstonAsAr`, generalized over an
- * arbitrary decimal-places `denomination` instead of AR's fixed 12 —
- * mirrors `SendView.tsx`'s private `formatAtomicAsDisplay` (same
- * BigInt-only algorithm) so a token's own smallest-unit quantity never
- * renders as a raw, unscaled integer.
+ * arbitrary decimal-places `denomination` instead of AR's fixed 12, so a
+ * token's own smallest-unit quantity never renders as a raw, unscaled
+ * integer.
  */
 export function formatAtomicAsDisplay(atomic: string, denomination: number, maxFractionDigits = 4): string {
   if (!/^\d+$/.test(atomic)) return "—";
@@ -63,4 +62,18 @@ export function formatUsd(value: number): string {
 export function truncateAddress(address: string): string {
   if (address.length <= 12) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function isValidArweaveAddress(address: string): boolean {
+  return /^[A-Za-z0-9_-]{43}$/.test(address);
+}
+
+/**
+ * A `ticker` that is really an Arweave/AO process id (unregistered
+ * tokens have no other source for a symbol — see `ao/balance.ts`)
+ * shortens to a `abcd…wxyz` display form rather than showing the full
+ * 43-char address as if it were the token's name.
+ */
+export function displayTicker(ticker: string): string {
+  return isValidArweaveAddress(ticker) ? `${ticker.slice(0, 4)}…${ticker.slice(-4)}` : ticker;
 }

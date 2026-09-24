@@ -14,7 +14,7 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
-import { formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, truncateAddress } from "./formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
@@ -166,6 +166,23 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
  */
 function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
   return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
+}
+
+/**
+ * `ActivityEntry` carries only the AO token's processId, not its
+ * denomination, so an AO entry's amount is scaled using the matching
+ * live balance instead. Falls back to the raw atomic amount and a
+ * shortened processId when no matching balance is loaded, rather than
+ * mislabeling the entry as AR.
+ */
+function formatActivityAmount(entry: { amount: string | null; token?: string | null }, tokenBalances: TokenBalance[] | undefined): string {
+  if (entry.amount === null) return "—";
+  if (!entry.token) return `${formatWinstonAsAr(entry.amount)} AR`;
+
+  const match = tokenBalances?.find((token) => token.processId === entry.token);
+  if (match) return `${formatAtomicAsDisplay(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
+
+  return `${entry.amount} ${displayTicker(entry.token)}`;
 }
 
 /**
@@ -523,7 +540,11 @@ export function MainScreenView({
                             : "Failed"
                           : relativeTime(entry.timestamp)
                     }
-                    amountLabel={entry.amount ? `${entry.type === "receive" ? "+" : "-"}${formatWinstonAsAr(entry.amount)} AR` : "—"}
+                    amountLabel={
+                      entry.amount
+                        ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
+                        : "—"
+                    }
                     amountTone={entry.type === "receive" ? "positive" : "neutral"}
                     pending={entry.status === "pending"}
                     onClick={() => openInExplorer(entry.txId)}

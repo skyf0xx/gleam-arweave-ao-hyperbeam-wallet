@@ -541,4 +541,79 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       openSpy.mockRestore();
     }
   });
+
+  it("labels an AO token activity entry with the token's own ticker and denomination, not AR", async () => {
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-ao",
+          type: "receive",
+          address: WALLET.address,
+          amount: "500",
+          status: "confirmed",
+          tags: [],
+          timestamp: Date.now(),
+          token: "processABC",
+        },
+      ],
+      cursor: null,
+    };
+    const send = sendWith({ tokenBalances: [AO_TOKEN], activity });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getByText("+500 PNTS")).toBeTruthy());
+    expect(screen.queryByText(/AR$/)).toBeNull();
+  });
+
+  it("falls back to a shortened process id when an AO entry's token isn't in the balance list", async () => {
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-ao-unknown",
+          type: "send",
+          address: WALLET.address,
+          amount: "42",
+          status: "confirmed",
+          tags: [],
+          timestamp: Date.now(),
+          token: "unknownProcessId000000000000000000000000000",
+        },
+      ],
+      cursor: null,
+    };
+    const send = sendWith({ activity });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getByText("-42 unkn…0000")).toBeTruthy());
+  });
+
+  it("still labels a native AR activity entry AR", async () => {
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-ar",
+          type: "receive",
+          address: WALLET.address,
+          amount: "1000000000000",
+          status: "confirmed",
+          tags: [],
+          timestamp: Date.now(),
+        },
+      ],
+      cursor: null,
+    };
+    const send = sendWith({ activity });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getByText("+1 AR")).toBeTruthy());
+  });
 });

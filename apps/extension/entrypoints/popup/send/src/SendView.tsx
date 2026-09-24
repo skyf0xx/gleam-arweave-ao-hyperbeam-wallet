@@ -6,7 +6,7 @@ import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
-import { formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr, truncateAddress } from "../../main-screen/src/formatWinston";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
@@ -99,24 +99,6 @@ function parseDisplayToAtomic(amountDisplay: string, denomination: number): stri
   return atomic.toString();
 }
 
-/** The AO-token equivalent of `formatWinstonAsAr`, generalized over `denomination`. */
-function formatAtomicAsDisplay(atomic: string, denomination: number, maxFractionDigits = 4): string {
-  if (!/^\d+$/.test(atomic)) return "—";
-  if (denomination === 0) return atomic;
-
-  const unit = 10n ** BigInt(denomination);
-  const amount = BigInt(atomic);
-  const whole = amount / unit;
-  const remainder = amount % unit;
-
-  if (remainder === 0n) return whole.toString();
-
-  const fractionStr = remainder.toString().padStart(denomination, "0");
-  const trimmed = fractionStr.slice(0, Math.min(maxFractionDigits, denomination)).replace(/0+$/, "");
-
-  return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
-}
-
 /**
  * Strips the amount input to digits and at most one decimal point as the
  * user types — commas, letters, and extra `.`s never land in the field,
@@ -130,26 +112,12 @@ function sanitizeAmountInput(raw: string): string {
   return digitsAndDots.slice(0, firstDot + 1) + digitsAndDots.slice(firstDot + 1).replace(/\./g, "");
 }
 
-function isValidArweaveAddress(address: string): boolean {
-  return /^[A-Za-z0-9_-]{43}$/.test(address);
-}
-
 const INITIAL_STEP: Extract<Step, { kind: "compose" }> = {
   kind: "compose",
   recipient: "",
   amountDisplay: "",
   submitting: false,
 };
-
-/**
- * A `ticker` that is really an Arweave/AO process id (unregistered
- * tokens have no other source for a symbol — see `ao/balance.ts`)
- * shortens to a `abcd…wxyz` display form rather than showing the full
- * 43-char address as if it were the token's name.
- */
-function displayTicker(ticker: string): string {
-  return isValidArweaveAddress(ticker) ? `${ticker.slice(0, 4)}…${ticker.slice(-4)}` : ticker;
-}
 
 /** `token.ticker` for an AO token, `"AR"` for the native token (`token === null`). */
 function tickerFor(token: TokenBalance | null): string {
