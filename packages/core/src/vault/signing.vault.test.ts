@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import Arweave from "arweave";
 import { generateJWK } from "../keys/jwk";
 import { signTransaction, dispatchTransaction, signDataItem, batchSignDataItem } from "./signing";
 import { bytesToBase64 } from "./base64";
@@ -13,22 +14,88 @@ describe("vault/signing", () => {
   });
 
   describe("signTransaction", () => {
-    it("produces a signed transaction with id/owner/signature", async () => {
+    const arweave = Arweave.init({ host: "arweave.net", port: 443, protocol: "https" });
+    const target = "a".repeat(43);
+    const lastTx = "b".repeat(64);
+
+    it("signs the dApp's own fields without asking the gateway for defaults", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const result = await signTransaction("https://arweave.net", jwk, {
+        data: bytesToBase64(new TextEncoder().encode("hello")),
+        target,
+        quantity: "1000",
+        reward: "5000",
+        last_tx: lastTx,
+        tags: [{ name: "App-Name", value: "Gleam" }],
+      });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        format: 2,
+        owner: jwk.n,
+        target,
+        quantity: "1000",
+        reward: "5000",
+        last_tx: lastTx,
+        data_size: "5",
+        // base64url, the way arweave-js stores tags
+        tags: [{ name: "QXBwLU5hbWU", value: "R2xlYW0" }],
+      });
+      expect(result.id).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(result.data_root).toBeTruthy();
+      expect(result).not.toHaveProperty("data");
+    });
+
+    it("fetches last_tx and reward from the gateway when the dApp leaves them out", async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+        const url = typeof input === "string" ? input : (input as Request).url ?? String(input);
+        return new Response(url.includes("tx_anchor") ? lastTx : "777", { status: 200 });
+      });
+
       const result = await signTransaction("https://arweave.net", jwk, {
         data: bytesToBase64(new TextEncoder().encode("hello")),
       });
 
-      expect(result.id).toBeTruthy();
-      expect(result.owner).toBe(jwk.n);
-      expect(result.signature).toBeTruthy();
+      expect(result.last_tx).toBe(lastTx);
+      expect(result.reward).toBe("777");
     });
 
-    it("applies tags to the signed transaction", async () => {
-      const result = await signTransaction("https://arweave.net", jwk, {
-        data: bytesToBase64(new TextEncoder().encode("hi")),
-        tags: [{ name: "App-Name", value: "Gleam" }],
+    it("returns what arweave-js's use_wallet sign needs to produce a verifiable transaction", async () => {
+      // What a dApp builds before calling arweave.transactions.sign(tx).
+      const dappTx = await arweave.createTransaction({
+        // Uint8Array.from: jsdom's TextEncoder returns another realm's array.
+        data: Uint8Array.from(new TextEncoder().encode("hello from a dApp")),
+        target,
+        quantity: "42",
+        reward: "5000",
+        last_tx: lastTx,
       });
-      expect(result.tags).toEqual([{ name: "App-Name", value: "Gleam" }]);
+      dappTx.addTag("Content-Type", "text/plain");
+      dappTx.addTag("App-Name", "Gleam ✓");
+
+      const signed = await signTransaction("https://arweave.net", jwk, {
+        data: bytesToBase64(dappTx.data),
+        target: dappTx.target,
+        quantity: dappTx.quantity,
+        reward: dappTx.reward,
+        last_tx: dappTx.last_tx,
+        tags: [
+          { name: "Content-Type", value: "text/plain" },
+          { name: "App-Name", value: "Gleam ✓" },
+        ],
+      });
+
+      // arweave-js's external-wallet branch of transactions.sign.
+      dappTx.setSignature({
+        id: signed.id,
+        owner: signed.owner,
+        reward: signed.reward,
+        signature: signed.signature,
+      });
+      expect(signed.tags).toEqual(dappTx.tags.map((tag) => ({ name: tag.name, value: tag.value })));
+      expect(signed.data_root).toBe(dappTx.data_root);
+      await expect(arweave.transactions.verify(dappTx)).resolves.toBe(true);
     });
   });
 

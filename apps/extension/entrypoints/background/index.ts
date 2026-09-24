@@ -26,6 +26,7 @@ import {
   readBytes,
   readEncryptAlgorithm,
   readHashAlgorithm,
+  readTransaction,
   type ProviderArgs,
 } from "@/src/handlers/provider-params";
 
@@ -244,30 +245,22 @@ async function handleProviderCall(
 
     case "sign":
     case "dispatch": {
-      const signingParams = params as {
-        target?: string;
-        quantity?: string;
-        reward?: string;
-        last_tx?: string;
-        data?: string;
-        tags?: Array<{ name: string; value: string }>;
-      };
-      const payload = signingParams.data ? base64ToBytes(signingParams.data) : new Uint8Array();
+      const transaction = readTransaction(params.transaction, method);
       const { gatewayUrl } = await reads.getNetworkSettings();
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: grant.walletId,
-        recipient: signingParams.target ?? null,
-        amount: signingParams.quantity ?? null,
+        recipient: transaction.target ?? null,
+        amount: transaction.target ? (transaction.quantity ?? "0") : null,
         fee: null,
-        payload,
-        tags: signingParams.tags ?? [],
+        payload: transaction.data,
+        tags: transaction.tags,
         gatewayUrl,
-        target: signingParams.target,
-        quantity: signingParams.quantity,
-        reward: signingParams.reward,
-        last_tx: signingParams.last_tx,
+        target: transaction.target,
+        quantity: transaction.quantity,
+        reward: transaction.reward,
+        last_tx: transaction.last_tx,
       });
     }
 

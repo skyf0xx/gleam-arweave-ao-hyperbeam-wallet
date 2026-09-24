@@ -26,7 +26,12 @@ import type { UploadTag } from "./upload";
  * only pins the wire shape.
  */
 
-/** A raw Arweave transaction shape suitable for `arweave-js`'s `createTransaction`/`transactions.sign`. */
+/**
+ * A dApp's transaction, ready for `arweave-js`'s `createTransaction`. `data`
+ * is standard base64 and `tags` are plain UTF-8 text; arweave-js base64url-
+ * encodes the tags again when it builds the transaction. `reward` and
+ * `last_tx` are fetched from the gateway when absent.
+ */
 export interface SignTransactionInput {
   data?: string;
   target?: string;
@@ -42,16 +47,28 @@ export interface SignRequest {
   options?: Record<string, unknown>;
 }
 
-/** A signed Arweave transaction, mirroring `arweave-js`'s `Transaction` shape after `.sign()`. */
-export interface SignedTransaction extends SignTransactionInput {
+/**
+ * A signed transaction as arweave-js's `Transaction.toJSON()` shows it,
+ * without `data`: the dApp already holds the data, and arweave-js's
+ * `transactions.sign` copies only `id`, `owner`, `reward`, `tags` and
+ * `signature` back onto its own transaction. `tags` are base64url-encoded,
+ * the way arweave-js stores them.
+ */
+export interface SignedTransaction {
+  format: number;
   id: string;
+  last_tx: string;
   owner: string;
+  tags: UploadTag[];
+  target: string;
+  quantity: string;
+  data_size: string;
+  data_root: string;
+  reward: string;
   signature: string;
 }
 
-export interface SignResult {
-  signedTransaction: SignedTransaction;
-}
+export type SignResult = SignedTransaction;
 
 /**
  * `dispatch()` request/response shapes, matching Wander's confirmed

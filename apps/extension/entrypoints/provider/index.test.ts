@@ -71,6 +71,45 @@ describe("provider.ts: GleamProvider bridge (ARCHITECTURE.md §4.3)", () => {
     await expect(callPromise).resolves.toEqual({ id: "ao-message-id-123" });
   });
 
+  it("sign and dispatch send an arweave-js transaction as its toJSON() form", () => {
+    const transaction = {
+      data: new Uint8Array([1, 2, 3]),
+      chunks: { chunks: [], proofs: [] },
+      toJSON: () => ({ data: "AQID", tags: [] }),
+    };
+    void provider.sign(transaction);
+    expect(lastRequestEnvelope().params).toEqual({ transaction: { data: "AQID", tags: [] }, options: undefined });
+
+    postMessageSpy.mockClear();
+    void provider.dispatch(transaction);
+    expect(lastRequestEnvelope()).toMatchObject({ method: "dispatch", params: { transaction: { data: "AQID", tags: [] } } });
+  });
+
+  it("sign hands back the caller's own tag objects when the signed tags match", async () => {
+    class Tag {
+      constructor(
+        public name: string,
+        public value: string,
+      ) {}
+      get(): string {
+        return this.value;
+      }
+    }
+    const callerTags = [new Tag("QXBw", "R2xlYW0")];
+    const callPromise = provider.sign({ tags: callerTags, toJSON: () => ({ tags: [{ name: "QXBw", value: "R2xlYW0" }] }) });
+    const envelope = lastRequestEnvelope();
+
+    postResponse({
+      type: RESPONSE,
+      id: envelope.id,
+      result: { id: "tx-id", owner: "owner", signature: "sig", reward: "5000", tags: [{ name: "QXBw", value: "R2xlYW0" }] },
+    });
+
+    const signed = (await callPromise) as { id: string; tags: unknown[] };
+    expect(signed.id).toBe("tx-id");
+    expect(signed.tags).toBe(callerTags);
+  });
+
   it("verifyMessage forwards Wander's four arguments with binary tagged", () => {
     void provider.verifyMessage(new Uint8Array([1]), "c2ln", "pubkey", { hashAlgorithm: "SHA-512" });
     expect(lastRequestEnvelope().params).toEqual({

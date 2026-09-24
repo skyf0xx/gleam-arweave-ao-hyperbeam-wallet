@@ -11,18 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **`sign` and `dispatch` ignore the dApp's transaction (M, 🧪, opus)**
-  `entrypoints/background/index.ts`, `src/handlers/approval.ts`,
-  `core/vault/signing.ts`. The provider sends
-  `{ transaction, options }`, but the background reads
-  `target` / `data` / `tags` from the top level, so the approval preview and
-  the signed transaction are empty. Read the arguments through
-  `src/handlers/provider-params.ts` like the message methods do. arweave-js
-  tags arrive base64url-encoded and `addTag` would encode them again. Done: unwrap `transaction`, decode
-  its data and tags, and return what `arweave.transactions.sign(tx)` expects
-  from `window.arweaveWallet.sign` (`id`, `owner`, `signature`, `reward`,
-  `tags`). `dispatch` returns `{ id, type }`. Test with arweave-js
-  `use_wallet` in Chrome.
 - [ ] **`signDataItem` / `batchSignDataItem` return the wrong shape (M, 🧪, opus)**
   Same files. The provider sends `{ dataItem }` and the background reads
   `params.data`, so the data item is signed with empty data. Results come
@@ -302,3 +290,18 @@ vault, crypto and provider security; `sonnet` for everything else.
   Wander. Taking over is possible but needs a decision: always override,
   a "Make Gleam the default wallet" setting, or a picker. Note that
   dApps that cached Wander's object before Gleam injects won't switch.
+- **`sign`/`dispatch` preview shows raw Winston and no fee (sonnet)**
+  `entrypoints/approval/src/SigningApprovalScreen.tsx`,
+  `entrypoints/background/index.ts`. The amount is the raw `quantity`
+  string with no unit, and Fee is always "—" because the dApp's `reward`
+  isn't shown (Total would then leave it out). Format AR and show the
+  reward, fetching the price when the dApp left it out.
+- **`sign` ignores its `options` argument (opus)**
+  `entrypoints/background/index.ts`. arweave-js passes `SignatureOptions`
+  (`saltLength`) through to the wallet. Gleam drops them and signs with
+  arweave-js's default.
+- **`sign`/`dispatch` reject tags that aren't UTF-8 text (sonnet)**
+  `src/handlers/provider-params.ts` (`readTransaction`). Tags are decoded
+  for the preview and re-encoded by `addTag`, so binary tags are refused
+  rather than signed. Carry the raw tag bytes through to signing if a dApp
+  needs them.

@@ -37,23 +37,17 @@ function buildClient(gatewayUrl: string): Arweave {
   });
 }
 
-/**
- * Signs a raw Arweave transaction shape via arweave-js's own
- * `createTransaction`/`transactions.sign`, without posting it anywhere.
- * `gatewayUrl` is required only because `arweave-js`'s `createTransaction`
- * needs a client to compute `last_tx`/reward defaults when the caller
- * doesn't supply them — no network write happens here.
- */
-export async function signTransaction(
-  gatewayUrl: string,
+type Transaction = Awaited<ReturnType<Arweave["createTransaction"]>>;
+
+async function buildTransaction(
+  client: Arweave,
   jwk: JWKInterface,
   input: SignTransactionInput,
-): Promise<SignedTransaction> {
-  const client = buildClient(gatewayUrl);
-
+  data: Uint8Array,
+): Promise<Transaction> {
   const transaction = await client.createTransaction(
     {
-      data: input.data ? base64ToBytes(input.data) : undefined,
+      data,
       target: input.target ?? "",
       quantity: input.quantity ?? "0",
       reward: input.reward,
@@ -61,19 +55,37 @@ export async function signTransaction(
     },
     jwk,
   );
-
-  if (input.tags) {
-    for (const tag of input.tags) {
-      transaction.addTag(tag.name, tag.value);
-    }
+  for (const tag of input.tags ?? []) {
+    transaction.addTag(tag.name, tag.value);
   }
+  return transaction;
+}
 
+/**
+ * Signs the dApp's transaction without posting it. `gatewayUrl` is only
+ * used to fetch `last_tx` and `reward` when the dApp left them out.
+ */
+export async function signTransaction(
+  gatewayUrl: string,
+  jwk: JWKInterface,
+  input: SignTransactionInput,
+): Promise<SignedTransaction> {
+  const client = buildClient(gatewayUrl);
+  const data = input.data ? base64ToBytes(input.data) : new Uint8Array(0);
+  const transaction = await buildTransaction(client, jwk, input, data);
   await client.transactions.sign(transaction, jwk);
 
   return {
-    ...input,
+    format: transaction.format,
     id: transaction.id,
+    last_tx: transaction.last_tx,
     owner: transaction.owner,
+    tags: transaction.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+    target: transaction.target,
+    quantity: transaction.quantity,
+    data_size: transaction.data_size,
+    data_root: transaction.data_root,
+    reward: transaction.reward,
     signature: transaction.signature,
   };
 }
@@ -108,23 +120,7 @@ export async function dispatchTransaction(
   }
 
   const client = buildClient(gatewayUrl);
-  const transaction = await client.createTransaction(
-    {
-      data: payloadBytes,
-      target: input.target ?? "",
-      quantity: input.quantity ?? "0",
-      reward: input.reward,
-      last_tx: input.last_tx,
-    },
-    jwk,
-  );
-
-  if (input.tags) {
-    for (const tag of input.tags) {
-      transaction.addTag(tag.name, tag.value);
-    }
-  }
-
+  const transaction = await buildTransaction(client, jwk, input, payloadBytes);
   await client.transactions.sign(transaction, jwk);
 
   const response = await client.transactions.post(transaction);

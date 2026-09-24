@@ -43,6 +43,37 @@ import {
 const REQUEST_TIMEOUT_MS = 60_000;
 const WALLET_NAME = "Gleam";
 
+/**
+ * arweave-js's `toJSON()` gives base64url `data` and drops `chunks`, which
+ * would otherwise send the payload across twice.
+ */
+function serializeTransaction(transaction: unknown): unknown {
+  const candidate = transaction as { toJSON?: unknown } | null | undefined;
+  if (candidate && typeof candidate === "object" && typeof candidate.toJSON === "function") {
+    return (candidate as { toJSON: () => unknown }).toJSON();
+  }
+  return transaction;
+}
+
+/**
+ * arweave-js assigns the returned `tags` straight onto its `Transaction`.
+ * Plain objects would replace its `Tag` instances, and
+ * `getSignatureData()` (used by `transactions.verify`) calls `tag.get()`.
+ * Signing never changes the tags, so the caller's own objects go back.
+ */
+function keepCallerTags(transaction: unknown, signed: unknown): unknown {
+  const callerTags = (transaction as { tags?: unknown } | null | undefined)?.tags;
+  const signedTags = (signed as { tags?: unknown } | null | undefined)?.tags;
+  if (!Array.isArray(callerTags) || !Array.isArray(signedTags) || callerTags.length !== signedTags.length) {
+    return signed;
+  }
+  const unchanged = callerTags.every((tag: { name?: unknown; value?: unknown } | null, index) => {
+    const signedTag = signedTags[index] as { name?: unknown; value?: unknown } | null;
+    return tag?.name === signedTag?.name && tag?.value === signedTag?.value;
+  });
+  return unchanged ? { ...(signed as object), tags: callerTags } : signed;
+}
+
 interface PendingCall {
   settled: boolean;
   resolve: (value: unknown) => void;
@@ -180,13 +211,14 @@ class GleamProvider {
     return { signal: undefined, rest: options };
   }
 
-  sign(transaction?: unknown, options?: unknown): Promise<unknown> {
+  async sign(transaction?: unknown, options?: unknown): Promise<unknown> {
     const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("sign", { transaction, options: rest }, signal);
+    const signed = await this.call("sign", { transaction: serializeTransaction(transaction), options: rest }, signal);
+    return keepCallerTags(transaction, signed);
   }
 
   dispatch(transaction?: unknown): Promise<unknown> {
-    return this.call("dispatch", { transaction });
+    return this.call("dispatch", { transaction: serializeTransaction(transaction) });
   }
 
   encrypt(data?: unknown, options?: unknown): Promise<unknown> {

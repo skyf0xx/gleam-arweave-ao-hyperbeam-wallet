@@ -480,8 +480,7 @@ export class ApprovalHandler {
 
     switch (input.kind) {
       case "sign": {
-        const signed = await signTransaction(this.requireGatewayUrl(input), jwk, transaction);
-        return { signedTransaction: signed };
+        return signTransaction(this.requireGatewayUrl(input), jwk, transaction);
       }
 
       case "dispatch": {

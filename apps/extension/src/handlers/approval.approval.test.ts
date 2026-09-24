@@ -382,6 +382,43 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await expect(pending).rejects.toThrow(/gateway url/i);
   });
 
+  it("sign resolves to the signed transaction fields arweave-js copies back, built from the dApp's fields", async () => {
+    const jwk = await generateJWK();
+    await cacheKey(WALLET_ID, jwk, "abc-address");
+    const target = "a".repeat(43);
+
+    const pending = handler.requestApproval({
+      kind: "sign",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: target,
+      amount: "1000",
+      payload: new TextEncoder().encode("hello"),
+      tags: [{ name: "App-Name", value: "Gleam" }],
+      gatewayUrl: "https://arweave.net",
+      target,
+      quantity: "1000",
+      reward: "5000",
+      last_tx: "b".repeat(64),
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+
+    const signed = (await pending) as Record<string, unknown>;
+    expect(signed).toMatchObject({
+      owner: jwk.n,
+      target,
+      quantity: "1000",
+      reward: "5000",
+      last_tx: "b".repeat(64),
+      data_size: "5",
+      tags: [{ name: "QXBwLU5hbWU", value: "R2xlYW0" }],
+    });
+    expect(signed.id).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(signed.signature).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(signed).not.toHaveProperty("signedTransaction");
+  });
+
   it("signMessage returns the signature bytes, which verify against the wallet's public key", async () => {
     const jwk = await generateJWK();
     await cacheKey(WALLET_ID, jwk, "abc-address");
