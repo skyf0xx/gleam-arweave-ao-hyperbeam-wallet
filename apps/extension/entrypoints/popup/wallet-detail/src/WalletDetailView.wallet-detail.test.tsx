@@ -41,7 +41,7 @@ describe("WalletDetailView", () => {
   it("shows the wallet's name, method and truncated address", () => {
     const send = vi.fn();
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     expect(screen.getByText("JWK")).toBeTruthy();
@@ -51,7 +51,7 @@ describe("WalletDetailView", () => {
   it("shows 'Not backed up' when backupConfirmedAt is null", () => {
     const send = vi.fn();
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     expect(screen.getByText("Not backed up")).toBeTruthy();
@@ -61,7 +61,7 @@ describe("WalletDetailView", () => {
   it("shows 'Backed up' when backupConfirmedAt is set", () => {
     const send = vi.fn();
     const wallet = { ...WALLET, backupConfirmedAt: Date.now() };
-    render(<WalletDetailView runtime={fakeRuntime({ send })} wallet={wallet} onBack={vi.fn()} onRenamed={vi.fn()} />);
+    render(<WalletDetailView runtime={fakeRuntime({ send })} wallet={wallet} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />);
 
     expect(screen.getByText("Backed up")).toBeTruthy();
   });
@@ -70,7 +70,7 @@ describe("WalletDetailView", () => {
     const send = vi.fn().mockResolvedValue(undefined);
     const onRenamed = vi.fn();
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={onRenamed} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={onRenamed} onRemoved={vi.fn()} />,
     );
 
     const input = screen.getByDisplayValue("Wallet One");
@@ -89,7 +89,7 @@ describe("WalletDetailView", () => {
   it("does not call renameWallet on blur when the name is unchanged", () => {
     const send = vi.fn();
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     const input = screen.getByDisplayValue("Wallet One");
@@ -102,7 +102,7 @@ describe("WalletDetailView", () => {
     const send = vi.fn().mockRejectedValue(new Error("No stored wallet"));
     const onRenamed = vi.fn();
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={onRenamed} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={onRenamed} onRemoved={vi.fn()} />,
     );
 
     const input = screen.getByDisplayValue("Wallet One");
@@ -119,7 +119,7 @@ describe("WalletDetailView", () => {
       .mockResolvedValueOnce(JWK) // exportWallet
       .mockResolvedValueOnce(undefined); // confirmWalletBackup
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
@@ -154,7 +154,7 @@ describe("WalletDetailView", () => {
       .mockResolvedValueOnce(JWK) // exportWallet
       .mockResolvedValueOnce(undefined); // confirmWalletBackup
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
@@ -179,7 +179,7 @@ describe("WalletDetailView", () => {
     Object.assign(navigator, { clipboard: { writeText } });
     const send = vi.fn().mockResolvedValueOnce(JWK); // exportWallet only — confirmWalletBackup must not be reached
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
@@ -202,7 +202,7 @@ describe("WalletDetailView", () => {
   it("shows the server error and lets the user retry the password", async () => {
     const send = vi.fn().mockRejectedValueOnce(new Error("That password didn't work."));
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
@@ -215,10 +215,81 @@ describe("WalletDetailView", () => {
   it("calls onBack from the detail screen's header", () => {
     const onBack = vi.fn();
     render(
-      <WalletDetailView runtime={fakeRuntime()} wallet={WALLET} onBack={onBack} onRenamed={vi.fn()} />,
+      <WalletDetailView runtime={fakeRuntime()} wallet={WALLET} onBack={onBack} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("warns explicitly that access is lost permanently when there's no confirmed backup", () => {
+    const send = vi.fn();
+    render(
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+
+    expect(screen.getByRole("alert").textContent).toMatch(/lost permanently/i);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("does not show the backup-loss warning once a backup is confirmed", () => {
+    const send = vi.fn();
+    const wallet = { ...WALLET, backupConfirmedAt: Date.now() };
+    render(
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={wallet} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText(/re-import it later/i)).toBeTruthy();
+  });
+
+  it("calls deleteWallet and onRemoved when the removal is confirmed", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const onRemoved = vi.fn();
+    render(
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={onRemoved} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, remove wallet" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "deleteWallet",
+        payload: { walletId: "wallet-1" },
+      }),
+    );
+    await waitFor(() => expect(onRemoved).toHaveBeenCalled());
+  });
+
+  it("shows a server error and does not call onRemoved when deleteWallet fails", async () => {
+    const send = vi.fn().mockRejectedValue(new Error("No stored wallet"));
+    const onRemoved = vi.fn();
+    render(
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={onRemoved} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, remove wallet" }));
+
+    await waitFor(() => expect(screen.getByText("No stored wallet")).toBeTruthy());
+    expect(onRemoved).not.toHaveBeenCalled();
+  });
+
+  it("cancels back to the detail screen without deleting", () => {
+    const send = vi.fn();
+    render(
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(screen.getByText("Not backed up")).toBeTruthy();
+    expect(send).not.toHaveBeenCalled();
   });
 });

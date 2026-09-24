@@ -264,6 +264,10 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
           setSubView({ kind: "wallet-switcher" });
           void refresh(runtime);
         }}
+        onRemoved={() => {
+          setSubView({ kind: "home" });
+          void refresh(runtime);
+        }}
       />
     ) : (
       <div className="p-4 text-body text-muted">Wallet not found.</div>

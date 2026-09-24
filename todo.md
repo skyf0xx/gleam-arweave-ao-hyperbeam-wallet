@@ -13,12 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Remove a wallet, with the spec's backup warning (M, sonnet)**
-  Same screen, `wallet-lifecycle.ts` (`deleteWallet`). PRD: "Removing a
-  Wallet with no confirmed backup warns explicitly that access will be lost
-  permanently." Done: remove action with Irreversible-tier confirmation
-  when no backup is recorded. Removing the last wallet goes back to
-  onboarding.
 - [ ] **dApp requests fail when the wallet is locked or doesn't exist yet (M, 🧪, opus)**
   `entrypoints/background/index.ts` (`connect` throws "No unlocked wallet"
   before any window opens), `approval/src/ApprovalRoot.tsx` (no unlock

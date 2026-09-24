@@ -4,6 +4,7 @@ import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
 
@@ -47,14 +48,17 @@ export interface WalletDetailViewProps {
   wallet: WalletSummary;
   onBack: () => void;
   onRenamed: (name: string) => void;
+  /** Called after `deleteWallet` succeeds — the caller re-derives its view from `getState` (removing the last wallet returns to onboarding on its own). */
+  onRemoved: () => void;
 }
 
 type Step =
   | { kind: "detail" }
   | { kind: "export-password"; submitting: boolean; serverError?: string }
-  | { kind: "export-reveal"; keyfileContents: string };
+  | { kind: "export-reveal"; keyfileContents: string }
+  | { kind: "remove-confirm"; removing: boolean; serverError?: string };
 
-export function WalletDetailView({ runtime, wallet, onBack, onRenamed }: WalletDetailViewProps) {
+export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved }: WalletDetailViewProps) {
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
   const [name, setName] = useState(wallet.name);
@@ -108,6 +112,36 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed }: WalletD
     });
     setBackupConfirmedAt(Date.now());
   };
+
+  const handleRemove = async () => {
+    setStep({ kind: "remove-confirm", removing: true });
+    try {
+      await runtime.send<{ walletId: string }, void>({
+        type: "deleteWallet",
+        payload: { walletId: wallet.id },
+      });
+      onRemoved();
+    } catch (error) {
+      setStep({
+        kind: "remove-confirm",
+        removing: false,
+        serverError: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  if (step.kind === "remove-confirm") {
+    return (
+      <RemoveConfirmStep
+        walletName={wallet.name}
+        backedUp={backupConfirmedAt !== null}
+        onBack={() => setStep({ kind: "detail" })}
+        onConfirm={() => void handleRemove()}
+        removing={step.removing}
+        serverError={step.serverError}
+      />
+    );
+  }
 
   if (step.kind === "export-password") {
     return (
@@ -200,6 +234,63 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed }: WalletD
           onClick={() => setStep({ kind: "export-password", submitting: false })}
         >
           Back up keyfile
+        </Button>
+
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => setStep({ kind: "remove-confirm", removing: false })}
+        >
+          Remove wallet
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RemoveConfirmStep({
+  walletName,
+  backedUp,
+  onBack,
+  onConfirm,
+  removing,
+  serverError,
+}: {
+  walletName: string;
+  backedUp: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+  removing: boolean;
+  serverError?: string;
+}) {
+  return (
+    <div className="flex min-h-full flex-col">
+      <ScreenHeader title="Remove wallet" onBack={onBack} />
+      <div className="flex flex-1 flex-col gap-5 px-6 py-6">
+        <p className="text-body leading-relaxed text-muted">
+          This removes <span className="font-semibold text-foreground">{walletName}</span> from
+          this browser.
+        </p>
+
+        {!backedUp ? (
+          <RiskNotice>
+            You haven&apos;t backed up this wallet&apos;s keyfile. Once removed, there&apos;s no
+            way to recover it and access is lost permanently.
+          </RiskNotice>
+        ) : (
+          <p className="text-body leading-relaxed text-muted">
+            You backed up this wallet&apos;s keyfile, so you can re-import it later.
+          </p>
+        )}
+
+        {serverError ? (
+          <p role="alert" className="text-caption leading-relaxed text-warning">
+            {serverError}
+          </p>
+        ) : null}
+
+        <Button type="button" variant="destructive" disabled={removing} onClick={onConfirm} className="mt-8">
+          {removing ? "Removing…" : "Yes, remove wallet"}
         </Button>
       </div>
     </div>
