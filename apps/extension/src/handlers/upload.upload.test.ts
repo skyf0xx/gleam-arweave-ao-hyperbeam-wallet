@@ -88,6 +88,13 @@ const originalFetch = globalThis.fetch;
 beforeEach(async () => {
   keySessionStore.clear();
   await clearKeyCache();
+  // getCachedKey only returns keys for wallets an unexpired session lists.
+  keySessionStore.set("session:unlockedSession", {
+    unlockedAt: Date.now(),
+    lastActivityAt: Date.now(),
+    autoLockTimeout: "never",
+    unlockedWalletIds: [WALLET_ID],
+  });
 });
 
 afterEach(async () => {
@@ -169,6 +176,36 @@ describe("UploadHandler: submitUpload", () => {
     ).rejects.toThrow(/4,?096|limit/i);
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("throws once the auto-lock timeout has passed, and wipes the cached key", async () => {
+    // Only Date is faked, so the handler's own timers and waitFor still run.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    keySessionStore.set("session:unlockedSession", {
+      unlockedAt: Date.now(),
+      lastActivityAt: Date.now(),
+      autoLockTimeout: "5min",
+      unlockedWalletIds: [WALLET_ID],
+    });
+    try {
+      const storage = createFakeStorage();
+      const { wallet, jwk } = await createTestWallet();
+      await storage.set("local:wallets", [wallet]);
+      await cacheKey(WALLET_ID, jwk, wallet.address);
+      const fetchSpy = vi.fn();
+      globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      const handler = new UploadHandler(storage);
+
+      await expect(
+        handler.submitUpload({ ...textDraft("hello world"), walletId: WALLET_ID }),
+      ).rejects.toThrow(/locked/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(keySessionStore.has(`session:key:${WALLET_ID}`)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("throws when the wallet isn't unlocked (no cached signing key)", async () => {

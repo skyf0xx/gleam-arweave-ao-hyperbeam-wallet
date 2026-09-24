@@ -43,16 +43,20 @@ const OTHER_PASSWORD = "another very long safe password!";
  * revalidation drops them, rather than trusting whatever's already there.
  */
 function createFakeStorage(): StoragePort {
-  const store = new Map<string, unknown>();
+  const localStore = new Map<string, unknown>();
+  // `session:` keys share key-session's store, as they share
+  // chrome.storage.session in the extension: getCachedKey reads the
+  // session record this handler writes.
+  const areaFor = (key: string) => (key.startsWith("session:") ? keySessionStore : localStore);
   return {
     async get<T>(key: string) {
-      return store.has(key) ? (store.get(key) as T) : null;
+      return areaFor(key).has(key) ? (areaFor(key).get(key) as T) : null;
     },
     async set<T>(key: string, value: T) {
-      store.set(key, value);
+      areaFor(key).set(key, value);
     },
     async remove(key: string) {
-      store.delete(key);
+      areaFor(key).delete(key);
     },
     watch() {
       return () => {};

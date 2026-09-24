@@ -30,6 +30,13 @@ vi.mock("../adapters/storage", () => ({
 
 beforeEach(() => {
   keySessionStore.clear();
+  // getCachedKey only returns keys for wallets an unexpired session lists.
+  keySessionStore.set("session:unlockedSession", {
+    unlockedAt: Date.now(),
+    lastActivityAt: Date.now(),
+    autoLockTimeout: "never",
+    unlockedWalletIds: [WALLET_ID],
+  });
 });
 
 /**
@@ -492,6 +499,37 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
 
     await handler.resolveApproval({ requestId, approved: true });
     await expect(pending).rejects.toThrow(/locked/i);
+  });
+
+  it("signing after the auto-lock timeout has passed is rejected as locked and wipes the key", async () => {
+    // Only Date is faked, so the handler's own timers and waitFor still run.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    keySessionStore.set("session:unlockedSession", {
+      unlockedAt: Date.now(),
+      lastActivityAt: Date.now(),
+      autoLockTimeout: "5min",
+      unlockedWalletIds: [WALLET_ID],
+    });
+    await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
+    try {
+      const pending = handler.requestApproval({
+        kind: "signMessage",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode("hello"),
+      });
+      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+      const requestId = extractRequestId(windows.opened[0]!);
+
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      await handler.resolveApproval({ requestId, approved: true });
+
+      await expect(pending).rejects.toThrow(/locked/i);
+      expect(keySessionStore.has(`session:key:${WALLET_ID}`)).toBe(false);
+      expect(keySessionStore.has("session:unlockedSession")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("signing with a cached key but no gatewayUrl fails with a named gateway error (not a locked-wallet error)", async () => {

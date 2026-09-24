@@ -1,4 +1,4 @@
-import type { AutoLockTimeout, JWKInterface } from "@gleam/core";
+import type { AutoLockTimeout, JWKInterface, Session } from "@gleam/core";
 import { storagePort } from "../adapters/storage";
 
 /**
@@ -20,6 +20,8 @@ import { storagePort } from "../adapters/storage";
  */
 const KEY_PREFIX = "session:key:";
 const CACHED_WALLET_IDS_KEY = "session:cachedWalletIds";
+/** Written by `wallet-lifecycle.ts`; read here so every key read can enforce auto-lock. */
+export const SESSION_KEY = "session:unlockedSession";
 
 const AUTO_LOCK_TIMEOUT_MS: Record<AutoLockTimeout, number | null> = {
   never: null,
@@ -80,8 +82,35 @@ export async function cacheKey(walletId: string, jwk: JWKInterface, address: str
   await trackWalletId(walletId);
 }
 
-/** Returns a cached wallet's decrypted key, or `null` if it isn't (or is no longer) cached. */
+export function isValidSession(value: unknown): value is Session {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.unlockedAt === "number" &&
+    typeof candidate.lastActivityAt === "number" &&
+    typeof candidate.autoLockTimeout === "string" &&
+    Object.hasOwn(AUTO_LOCK_TIMEOUT_MS, candidate.autoLockTimeout) &&
+    Array.isArray(candidate.unlockedWalletIds) &&
+    candidate.unlockedWalletIds.every((id) => typeof id === "string")
+  );
+}
+
+/**
+ * Returns a cached wallet's decrypted key, or `null` if the wallet is
+ * locked. Handlers read keys without going through `getState`, so the
+ * auto-lock timeout is enforced here too: an expired session wipes every
+ * cached key and the session record before anything can sign with them.
+ * A key with no session listing its wallet is treated as locked.
+ */
 export async function getCachedKey(walletId: string): Promise<CachedKey | null> {
+  const session = await storagePort.get<unknown>(SESSION_KEY);
+  if (!isValidSession(session)) return null;
+  if (isSessionExpired(session.lastActivityAt, session.autoLockTimeout)) {
+    await clearKeyCache();
+    await storagePort.remove(SESSION_KEY);
+    return null;
+  }
+  if (!session.unlockedWalletIds.includes(walletId)) return null;
   return storagePort.get<CachedKey>(`${KEY_PREFIX}${walletId}`);
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import type { JWKInterface } from "@gleam/core";
 
 /**
@@ -40,8 +40,18 @@ const {
 const jwkA = { kty: "RSA", n: "wallet-a-n", e: "AQAB" } as unknown as JWKInterface;
 const jwkB = { kty: "RSA", n: "wallet-b-n", e: "AQAB" } as unknown as JWKInterface;
 
+function setSession(autoLockTimeout: string, lastActivityAt = Date.now(), unlockedWalletIds = ["wallet-a", "wallet-b"]) {
+  store.set("session:unlockedSession", {
+    unlockedAt: lastActivityAt,
+    lastActivityAt,
+    autoLockTimeout,
+    unlockedWalletIds,
+  });
+}
+
 beforeEach(() => {
   store.clear();
+  setSession("never");
 });
 
 describe("key-session", () => {
@@ -145,6 +155,62 @@ describe("key-session", () => {
 
     expect(await getCachedKey("wallet-a")).toBeNull();
     expect(await getCachedKey("wallet-b")).toBeNull();
+  });
+
+  describe("auto-lock on key read", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("returns the key while the session is within its timeout", async () => {
+      setSession("5min");
+      await cacheKey("wallet-a", jwkA, "address-a");
+
+      vi.advanceTimersByTime(5 * 60 * 1000);
+
+      expect(await getCachedKey("wallet-a")).toEqual({ jwk: jwkA, address: "address-a" });
+    });
+
+    it("once the timeout has passed, returns null and wipes every key and the session", async () => {
+      setSession("5min");
+      await cacheKey("wallet-a", jwkA, "address-a");
+      await cacheKey("wallet-b", jwkB, "address-b");
+
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+      expect(await getCachedKey("wallet-a")).toBeNull();
+      expect(store.has("session:key:wallet-a")).toBe(false);
+      expect(store.has("session:key:wallet-b")).toBe(false);
+      expect(store.has("session:unlockedSession")).toBe(false);
+    });
+
+    it("never expires a 'never' session", async () => {
+      setSession("never");
+      await cacheKey("wallet-a", jwkA, "address-a");
+
+      vi.advanceTimersByTime(365 * 24 * 60 * 60 * 1000);
+
+      expect(await getCachedKey("wallet-a")).not.toBeNull();
+    });
+
+    it("returns null when there is no session, even if a key is stored", async () => {
+      await cacheKey("wallet-a", jwkA, "address-a");
+      store.delete("session:unlockedSession");
+
+      expect(await getCachedKey("wallet-a")).toBeNull();
+    });
+
+    it("returns null for a wallet the session doesn't list", async () => {
+      setSession("never", Date.now(), ["wallet-b"]);
+      await cacheKey("wallet-a", jwkA, "address-a");
+
+      expect(await getCachedKey("wallet-a")).toBeNull();
+    });
   });
 
   describe("isSessionExpired", () => {

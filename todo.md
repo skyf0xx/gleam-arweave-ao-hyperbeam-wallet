@@ -11,13 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Auto-lock is not enforced when a key is used (M, opus)**
-  `src/handlers/key-session.ts` (`getCachedKey`),
-  `src/handlers/wallet-lifecycle.ts` (`loadSession`). Expiry is only checked
-  when something calls `getState()`. `approval.ts`, `transfer.ts` and
-  `upload.ts` read the key directly, so a dApp can get a signature after the
-  auto-lock time has passed. Done: every key read checks session expiry and
-  clears the cache when it has expired. Tests use fake timers.
 - [ ] **The UI can say "unlocked" while the key cache is empty (M, 🧪, opus)**
   `entrypoints/background/index.ts` (`runtime.onSuspend` →
   `clearKeyCache`) vs `wallet-lifecycle.ts` (`getState`). If Chrome fires
@@ -294,3 +287,12 @@ vault, crypto and provider security; `sonnet` for everything else.
   reverse: it bundles only small, zero-quantity transactions and posts the
   rest as base transactions. Confirm Wander's rule. At minimum, never
   bundle when `quantity` isn't zero.
+- **"Immediately" auto-lock locks before the user can do anything (❓, opus)**
+  `src/handlers/key-session.ts` (`isSessionExpired`: `"immediate"` is
+  0 ms), `wallet-lifecycle.ts` (`getState`). The session expires on any
+  read 1 ms after the last activity, so the popup's own `getState` after
+  unlock locks it, and every key read now fails too. Only `getState`
+  refreshes `lastActivityAt`, so a popup left open past the timeout also
+  fails its next send with "locked" and no unlock prompt. Decide what
+  "Immediately" means (likely "when the popup closes") and whether a
+  user-initiated send or approval counts as activity.

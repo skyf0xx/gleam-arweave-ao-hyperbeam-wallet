@@ -73,6 +73,13 @@ const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
   keySessionStore.clear();
+  // getCachedKey only returns keys for wallets an unexpired session lists.
+  keySessionStore.set("session:unlockedSession", {
+    unlockedAt: Date.now(),
+    lastActivityAt: Date.now(),
+    autoLockTimeout: "never",
+    unlockedWalletIds: [WALLET_ID],
+  });
 });
 
 afterEach(async () => {
@@ -276,6 +283,33 @@ describe("TransferHandler: submitTransfer", () => {
     const [entry] = log as Array<Record<string, unknown>>;
     expect(entry?.amount).toBe(huge);
     expect(typeof entry?.amount).toBe("string");
+  });
+
+  it("throws once the auto-lock timeout has passed, and wipes the cached key", async () => {
+    // Only Date is faked, so the handler's own timers and waitFor still run.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    keySessionStore.set("session:unlockedSession", {
+      unlockedAt: Date.now(),
+      lastActivityAt: Date.now(),
+      autoLockTimeout: "5min",
+      unlockedWalletIds: [WALLET_ID],
+    });
+    try {
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      const handler = new TransferHandler(storage);
+      await expect(
+        handler.submitTransfer({
+          walletId: WALLET_ID,
+          recipient: "someAddr",
+          token: null,
+          amount: "1",
+          fee: null,
+        }),
+      ).rejects.toThrow(/locked/);
+      expect(keySessionStore.has(`session:key:${WALLET_ID}`)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("throws when the wallet isn't unlocked (no cached signing key)", async () => {

@@ -16,7 +16,14 @@ import {
   type WalletState,
   type WalletSummary,
 } from "@gleam/core";
-import { cacheKey, clearKeyCache, isSessionExpired, removeCachedKey } from "./key-session";
+import {
+  cacheKey,
+  clearKeyCache,
+  isSessionExpired,
+  isValidSession,
+  removeCachedKey,
+  SESSION_KEY,
+} from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
@@ -56,16 +63,15 @@ import { cacheKey, clearKeyCache, isSessionExpired, removeCachedKey } from "./ke
  * plaintext JWK in hand before encrypting it, so no extra decrypt is
  * needed), so `TransferHandler`/`UploadHandler`/`ApprovalHandler` can sign
  * without asking for the password again. `lockWallet` and an expired
- * auto-lock timeout (`loadSession`'s `isSessionExpired` check) both clear
- * that cache; a restarted service worker starts with an empty one
- * regardless of what `Session` in storage still claims.
+ * auto-lock timeout both clear that cache. Expiry is checked by
+ * `loadSession` here and by `getCachedKey` on every key read, since
+ * signing handlers never go through `getState`.
  */
 
 const WALLETS_KEY = "local:wallets";
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const LOCK_SETTINGS_KEY = "local:lockSettings";
 const THEME_SETTINGS_KEY = "local:themeSettings";
-const SESSION_KEY = "session:unlockedSession";
 
 const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
@@ -159,18 +165,6 @@ async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
     return { theme: (raw as ThemeSettings).theme };
   }
   return DEFAULT_THEME_SETTINGS;
-}
-
-function isValidSession(value: unknown): value is Session {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.unlockedAt === "number" &&
-    typeof candidate.lastActivityAt === "number" &&
-    VALID_AUTO_LOCK_TIMEOUTS.includes(candidate.autoLockTimeout as AutoLockTimeout) &&
-    Array.isArray(candidate.unlockedWalletIds) &&
-    candidate.unlockedWalletIds.every((id) => typeof id === "string")
-  );
 }
 
 /**
