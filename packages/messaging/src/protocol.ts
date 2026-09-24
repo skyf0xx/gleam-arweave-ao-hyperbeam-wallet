@@ -1,6 +1,7 @@
 import type {
   ActivityPage,
   ApprovalRequest,
+  Contact,
   FeeEstimate,
   Grant,
   JWKInterface,
@@ -92,6 +93,8 @@ export interface ProtocolMap {
    * by trusted extension UI, never proxied through `providerCall`.
    */
   getThemePreference(): ThemeSettings;
+  /** One list for the whole vault, most-recently-saved first. */
+  listContacts(): Contact[];
 
   // actions
   // `TransferDraft`/`UploadDraft` carry `walletId` directly — signing
@@ -123,6 +126,13 @@ export interface ProtocolMap {
   setLockSettings(req: LockSettings): void;
   setThemePreference(req: ThemeSettings): void;
   revokeGrant(req: { origin: string }): void;
+  /**
+   * Upserts by `address` (case-sensitive exact match): saving over an
+   * address already in the list replaces its name rather than adding a
+   * duplicate entry. `name` is trimmed and must be 1-32 characters.
+   */
+  saveContact(req: { address: string; name: string }): Contact;
+  deleteContact(req: { address: string }): void;
 
   /**
    * The single relay point for every page-originated provider call

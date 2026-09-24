@@ -35,8 +35,11 @@ describe("ProtocolMap", () => {
       "getThemePreference",
       "setThemePreference",
       "revokeGrant",
+      "listContacts",
+      "saveContact",
+      "deleteContact",
     ];
-    expect(methodNames.length).toBe(24);
+    expect(methodNames.length).toBe(27);
     expect(new Set(methodNames).size).toBe(methodNames.length);
   });
 

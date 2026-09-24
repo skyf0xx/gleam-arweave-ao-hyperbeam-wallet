@@ -11,26 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 4. Other missing features
 
-- [ ] **Address book, part 1: storage, and contacts inside Send (M, sonnet)**
- - Let's use minimalism for storage. E.g. in the interface where it says 'recent' change it to Saved addresses. Opening that screen can display recent as well as saved. Let's use minimalism even for saving addresses. E.g. on paste of an address, if it's not saved, show tick box (or similar) 'save this address'. On tick, show a blank input box with placeholder - enter address name. Just suggestions you decide good UX practices.
-  New `core/models/contact.ts`, storage in `local:contacts` (one list for
-  the whole vault, deduped by address; names are 1–32 characters and
-  trimmed), `listContacts` / `saveContact` / `deleteContact` in
-  `ProtocolMap`, and a handler. Keep it minimal (`DESIGN.md`: white space,
-  no cards, color only for meaning). Contacts live where addresses are
-  typed, not in their own destination:
-  - Focusing Send's recipient field shows a plain list under it: saved
-    contacts, then "Your wallets" (the other wallets in the vault). Each
-    row is the address identicon used in the wallet switcher, the name, and
-    a truncated mono address. Typing filters by name or address. Pasting a
-    full address hides the list.
-  - Review shows the contact's name above the full address (never
-    truncated). A saved contact or one of your own wallets counts as a
-    known recipient, so it skips first-seen framing.
-  - Send success to an address you haven't saved shows one quiet inline
-    line, "Save as contact", which opens a name field in place. No modal
-    and no nag.
-  Done: all of the above, with tests for the model, the handler and filtering.
 - [ ] **Address book, part 2: manage contacts in Settings (S, sonnet)**
   `popup/settings-home/src/SettingsHomeView.tsx` plus a new
   `popup/contacts/` view. One "Contacts" row in Settings opens a flat list

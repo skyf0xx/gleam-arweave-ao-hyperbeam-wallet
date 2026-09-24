@@ -28,6 +28,7 @@ import { WxtStoragePort } from "@/src/adapters/storage";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
 import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/reads";
+import { ContactsHandler } from "@/src/handlers/contacts";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
@@ -83,6 +84,7 @@ const lifecycle = new WalletLifecycleHandler(storage);
 const reads = new ReadsHandler(storage);
 const transfer = new TransferHandler(storage);
 const upload = new UploadHandler(storage);
+const contacts = new ContactsHandler(storage);
 const approval = new ApprovalHandler(
   storage,
   windows,
@@ -566,6 +568,7 @@ onExtensionMessage("getActivity", (message) => reads.getActivity(message.data));
 onExtensionMessage("getPortfolioHistory", (message) => reads.getPortfolioHistory(message.data));
 onExtensionMessage("getTokenPrices", () => reads.getTokenPrices());
 onExtensionMessage("getConnectedApps", () => approval.getConnectedApps());
+onExtensionMessage("listContacts", () => contacts.listContacts());
 
 /**
  * `TransferDraft`/`UploadDraft` type `walletId` as optional. Every real
@@ -603,6 +606,8 @@ onExtensionMessage("revokeGrant", async (message) => {
   await approval.revokeGrant(message.data);
   void emitProviderEventToOrigin(message.data.origin, PROVIDER_EVENT.DISCONNECT, {});
 });
+onExtensionMessage("saveContact", (message) => contacts.saveContact(message.data));
+onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.data));
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {

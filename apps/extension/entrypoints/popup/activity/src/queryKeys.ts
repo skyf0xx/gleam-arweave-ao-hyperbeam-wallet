@@ -10,4 +10,6 @@
 export const walletQueryKeys = {
   balances: (address: string) => [address, "balances"] as const,
   activity: (address: string) => [address, "activity"] as const,
+  /** Not address-scoped: contacts are one list for the whole vault. */
+  contacts: () => ["contacts"] as const,
 };
