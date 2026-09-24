@@ -37,6 +37,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenLockSettings={vi.fn()}
       onOpenConnectedApps={vi.fn()}
       onOpenNetworkPeers={vi.fn()}
+      onOpenManageTokens={vi.fn()}
       {...overrides}
     />,
   );
@@ -78,6 +79,16 @@ describe("SettingsHomeView", () => {
     fireEvent.click(screen.getByText("Network & peers"));
 
     expect(onOpenNetworkPeers).toHaveBeenCalled();
+  });
+
+  it("calls onOpenManageTokens when the Manage tokens row is pressed", async () => {
+    const onOpenManageTokens = vi.fn();
+    renderSettingsHome({ onOpenManageTokens });
+
+    await waitFor(() => expect(screen.getByText("Manage tokens")).toBeTruthy());
+    fireEvent.click(screen.getByText("Manage tokens"));
+
+    expect(onOpenManageTokens).toHaveBeenCalled();
   });
 
   it("calls onBack when the header back button is pressed", async () => {

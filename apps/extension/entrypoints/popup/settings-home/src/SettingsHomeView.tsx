@@ -33,6 +33,7 @@ export interface SettingsHomeViewProps {
   onOpenLockSettings: () => void;
   onOpenConnectedApps: () => void;
   onOpenNetworkPeers: () => void;
+  onOpenManageTokens: () => void;
 }
 
 interface LoadState {
@@ -47,6 +48,7 @@ export function SettingsHomeView({
   onOpenLockSettings,
   onOpenConnectedApps,
   onOpenNetworkPeers,
+  onOpenManageTokens,
 }: SettingsHomeViewProps) {
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
@@ -110,6 +112,11 @@ export function SettingsHomeView({
             title="Connected apps"
             subtitle="Manage sites with an active grant"
             onClick={onOpenConnectedApps}
+          />
+          <SettingsRow
+            title="Manage tokens"
+            subtitle="Add or remove watched AO tokens"
+            onClick={onOpenManageTokens}
           />
         </SettingsSection>
 

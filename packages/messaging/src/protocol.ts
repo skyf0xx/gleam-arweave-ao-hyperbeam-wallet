@@ -60,6 +60,11 @@ export interface ProtocolMap {
    */
   getArFee(): Winston;
   getTokenBalances(req: { address: string }): TokenBalance[];
+  getWatchedTokens(req: { address: string }): string[];
+  /** Resolves a process id's ticker/balance without storing it. */
+  previewWatchedToken(req: { address: string; processId: string }): TokenBalance;
+  addWatchedToken(req: { address: string; processId: string }): TokenBalance;
+  removeWatchedToken(req: { address: string; processId: string }): void;
   getActivity(req: { address: string; cursor?: string }): ActivityPage;
   getConnectedApps(): Grant[];
   /**

@@ -299,6 +299,153 @@ describe("ReadsHandler: userTokens", () => {
   });
 });
 
+describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken / removeWatchedToken", () => {
+  it("returns an empty list when nothing has been watched yet", async () => {
+    const handler = new ReadsHandler(createFakeStorage());
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
+  });
+
+  it("previewWatchedToken resolves the balance without storing the process id", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "1000000" })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balance = await handler.previewWatchedToken({ address: "addr1", processId: "proc1" });
+
+    expect(balance.quantity).toBe("1000000");
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
+  });
+
+  it("previewWatchedToken rejects an empty process id", async () => {
+    const handler = new ReadsHandler(createFakeStorage());
+    await expect(handler.previewWatchedToken({ address: "addr1", processId: "  " })).rejects.toThrow(
+      /Enter a process id/,
+    );
+  });
+
+  it("adds a process id after validating its balance resolves, and returns the resolved balance", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  {
+                    node: {
+                      id: "proc1",
+                      tags: [
+                        { name: "Ticker", value: "wUSDC" },
+                        { name: "Denomination", value: "6" },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "1000000" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const balance = await handler.addWatchedToken({ address: "addr1", processId: "proc1" });
+
+    expect(balance.processId).toBe("proc1");
+    expect(balance.quantity).toBe("1000000");
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc1"]);
+  });
+
+  it("rejects an empty process id without writing to storage", async () => {
+    const storage = createFakeStorage();
+    const handler = new ReadsHandler(storage);
+    await expect(handler.addWatchedToken({ address: "addr1", processId: "  " })).rejects.toThrow(
+      /Enter a process id/,
+    );
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
+  });
+
+  it("throws a named error when no peer is configured, rather than silently adding an unresolved token", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: null,
+    });
+    const handler = new ReadsHandler(storage);
+    await expect(handler.addWatchedToken({ address: "addr1", processId: "proc1" })).rejects.toThrow(
+      /No HyperBEAM peer configured/,
+    );
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
+  });
+
+  it("does not add a duplicate when the process id is already watched", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.addWatchedToken({ address: "addr1", processId: "proc1" });
+
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc1"]);
+  });
+
+  it("is a no-op for the default AO process id (already always shown, never stored in the watch list)", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    await handler.addWatchedToken({ address: "addr1", processId: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc" });
+
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
+  });
+
+  it("removes a watched process id", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["proc1", "proc2"]);
+
+    const handler = new ReadsHandler(storage);
+    await handler.removeWatchedToken({ address: "addr1", processId: "proc1" });
+
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc2"]);
+  });
+
+  it("is a no-op when removing a process id that isn't watched", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
+
+    const handler = new ReadsHandler(storage);
+    await handler.removeWatchedToken({ address: "addr1", processId: "not-watched" });
+
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc1"]);
+  });
+});
+
 describe("ReadsHandler: getActivity", () => {
   it("merges the local activity log with the gateway query result", async () => {
     const storage = createFakeStorage();

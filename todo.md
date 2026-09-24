@@ -13,11 +13,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 2. Core wallet flows
 
-- [ ] **Token list: add AO tokens and store them (M, sonnet)**
-  `src/handlers/reads.ts` reads `local:watchedProcessIds:{address}`, but
-  nothing writes it, so only the default AO token ever shows. Done: add
-  (paste a process id, preview ticker and balance) and remove in the
-  popup, stored per address. Unblocks `addToken` below.
 - [ ] **Unregistered tokens get AO's denomination and no name (S, sonnet)**
   `core/ao/balance.ts` defaults bare-quantity replies to denomination 12.
   `withUnregisteredMetadata` (`reads.ts`) resolves ticker and denomination
@@ -137,6 +132,15 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- **`addWatchedToken`'s HyperBEAM validation makes adding a token strictly
+  stronger than showing it (sonnet)** `src/handlers/reads.ts`
+  (`addWatchedToken`). Validating with a live balance read before storing
+  a process id means a token can't be added while no HyperBEAM peer is
+  configured, or if that one read has a transient hiccup — unlike
+  `getTokenBalances`, which tolerates a single token's read failing (see
+  the next todo item). Consider allowing the add and letting the next
+  balance read surface the failure per-row instead, once that item lands.
 
 - **Onboarding in the approval window races the 5-minute approval timeout (S, 🧪, opus)**
   `src/handlers/approval.ts` (`awaitResolution`), `approval/src/ApprovalRoot.tsx`.

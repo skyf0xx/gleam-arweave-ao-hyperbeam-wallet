@@ -68,16 +68,11 @@ import type {
  *   still only `StoragePort`, the same hexagonal boundary every other
  *   method in this file already respects.
  *
- * `getTokenBalances`'s AO process list: `TokenBalance` has no
- * "which processIds does this wallet hold" registry anywhere in `core`'s
- * models or this task's ALLOWED SCOPE — no layer owns a token-list/watch
- * list concept yet. This handler resolves that against
- * `local:watchedProcessIds:{address}` (a simple `string[]` this handler
- * also defaults to empty), which is the least-invented storage key that
- * makes `getTokenBalances` return something rather than nothing; see this
- * task's final report for why a real "add a token" flow isn't included
- * here (out of ALLOWED SCOPE — no popup screen for it was requested by
- * this packet either).
+ * `getTokenBalances`'s AO process list: resolved against
+ * `local:watchedProcessIds:{address}` (a simple `string[]`, defaulting to
+ * empty). The default AO process id is always included in
+ * `getTokenBalances`'s result regardless of this list's contents (see
+ * `DEFAULT_AO_PROCESS_ID`) and is never itself stored in it.
  */
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
@@ -231,6 +226,71 @@ export class ReadsHandler {
     const raw = await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`);
     if (!Array.isArray(raw)) return [];
     return raw.filter((id): id is string => typeof id === "string");
+  }
+
+  async getWatchedTokens(req: { address: string }): Promise<string[]> {
+    return this.loadWatchedProcessIds(req.address);
+  }
+
+  /**
+   * Shared by `previewWatchedToken` and `addWatchedToken` so a preview and
+   * the value actually stored can never disagree.
+   */
+  private async resolveTokenBalance(address: string, processId: string): Promise<TokenBalance> {
+    const settings = await this.loadNetworkSettings();
+    if (settings.activePeerUrl === null) {
+      throw new Error(
+        "No HyperBEAM peer configured. Add one in Network settings to read AO token balances.",
+      );
+    }
+
+    const balance = await getTokenBalance(processId, address, settings.activePeerUrl);
+    return withUnregisteredMetadata(withRegisteredTicker(balance), settings.gatewayUrl);
+  }
+
+  /**
+   * Read-only resolve for the "paste a process id" add-token flow: proves
+   * the id is a live token and returns its ticker/balance without storing
+   * anything, so the popup can show a preview before the user confirms.
+   */
+  async previewWatchedToken(req: { address: string; processId: string }): Promise<TokenBalance> {
+    const processId = req.processId.trim();
+    if (processId.length === 0) {
+      throw new Error("Enter a process id.");
+    }
+    return this.resolveTokenBalance(req.address, processId);
+  }
+
+  /**
+   * Persists a previewed process id to the watch list. Re-resolves rather
+   * than trusting a client-supplied balance, so a stale or forged preview
+   * can't be stored as-is. No-op (but not an error) for an id that's
+   * already watched, or for the default AO process id, which is always
+   * shown without being in this list.
+   */
+  async addWatchedToken(req: { address: string; processId: string }): Promise<TokenBalance> {
+    const processId = req.processId.trim();
+    if (processId.length === 0) {
+      throw new Error("Enter a process id.");
+    }
+
+    const resolved = await this.resolveTokenBalance(req.address, processId);
+
+    if (processId !== DEFAULT_AO_PROCESS_ID) {
+      const existing = await this.loadWatchedProcessIds(req.address);
+      if (!existing.includes(processId)) {
+        await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, [...existing, processId]);
+      }
+    }
+
+    return resolved;
+  }
+
+  async removeWatchedToken(req: { address: string; processId: string }): Promise<void> {
+    const existing = await this.loadWatchedProcessIds(req.address);
+    const next = existing.filter((id) => id !== req.processId);
+    if (next.length === existing.length) return;
+    await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, next);
   }
 
   async getBalance(req: { address: string }): Promise<Winston> {
