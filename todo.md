@@ -177,7 +177,7 @@ vault, crypto and provider security; `sonnet` for everything else.
   `window.arweaveWallet` exists). With Wander enabled, dApp calls go to
   Wander. Taking over is possible but needs a decision: always override,
   a "Make Gleam the default wallet" setting, or a picker. Note that
-  dApps that cached Wander's object before Gleam injects won't switch.
+  dApps that cached Wander's object before Gleam injects won't switch. Actually no setting necessary make it default automaticaly. Wander is deprecated - don't bother with backward compatibility for cached wander objects.
 - **`sign`/`dispatch` preview shows raw Winston and no fee (sonnet)**
   `entrypoints/approval/src/SigningApprovalScreen.tsx`,
   `entrypoints/background/index.ts`. The amount is the raw `quantity`
