@@ -28,6 +28,11 @@ import { base64ToBytes } from "./base64";
 /** Threshold (bytes) above which `dispatch()` bundles rather than posts as a base AR tx. Below it, dispatch posts directly to the gateway as a `BASE` transaction. */
 const DISPATCH_BUNDLE_THRESHOLD_BYTES = 100 * 1024;
 
+/** Anything other than an empty or all-zero quantity moves AR, including malformed values arweave-js will reject. */
+function transfersAr(quantity: string | undefined): boolean {
+  return !/^0*$/.test(quantity?.trim() ?? "");
+}
+
 function buildClient(gatewayUrl: string): Arweave {
   const url = new URL(gatewayUrl);
   return Arweave.init({
@@ -97,9 +102,9 @@ export async function signTransaction(
  * gateway as a base transaction (`BASE`). Throws if either post is
  * rejected, so the dApp never gets an id for data that wasn't stored.
  *
- * A bundled DataItem can't carry `quantity`/`reward`/`last_tx`, so a
- * transfer with a nonzero `quantity` over the threshold silently drops
- * the AR transfer while still returning a success id — see todo.md.
+ * A data item has no `quantity` field, so bundling a transaction that
+ * sends AR would store the data and quietly drop the transfer. Those
+ * always go to the gateway as a base transaction, whatever their size.
  */
 export async function dispatchTransaction(
   gatewayUrl: string,
@@ -109,7 +114,7 @@ export async function dispatchTransaction(
 ): Promise<DispatchResult> {
   const payloadBytes = input.data ? base64ToBytes(input.data) : new Uint8Array(0);
 
-  if (payloadBytes.byteLength > DISPATCH_BUNDLE_THRESHOLD_BYTES) {
+  if (payloadBytes.byteLength > DISPATCH_BUNDLE_THRESHOLD_BYTES && !transfersAr(input.quantity)) {
     const signer = new ArweaveSigner(jwk);
     const dataItem = createData(payloadBytes, signer, {
       tags: input.tags?.map((tag) => ({ name: tag.name, value: tag.value })),

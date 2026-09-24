@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **A large `dispatch` that sends AR silently drops the transfer (S, opus)**
-  `core/vault/signing.ts` (`dispatchTransaction`). Over 100 KB the
-  transaction becomes a data item, which can't carry `quantity`, `reward`
-  or `last_tx`, so the call resolves but no AR moves. Done: never bundle
-  when `quantity` isn't zero; post those as base transactions.
 - [ ] **Concurrent approval requests overwrite each other (S, opus)**
   `src/handlers/approval.ts` (`requestApproval`, `rejectClosedWindow`,
   `dropPending`) read `session:pendingApprovals`, await, then write the
@@ -134,5 +129,8 @@ vault, crypto and provider security; `sonnet` for everything else.
 - `apps/extension/entrypoints/provider/index.test.ts:28`,
   `apps/extension/entrypoints/content/index.test.ts:37`: `describe()` names
   cite "ARCHITECTURE.md §4.3", a doc that doesn't exist in this repo.
+- `packages/core/src/vault/signing.ts` (`dispatchTransaction`): an
+  AR-sending dispatch posts its data inline, so one over the gateway's
+  inline limit fails and would need chunked upload.
 
 <!-- New findings go here until they're placed in the list above. -->

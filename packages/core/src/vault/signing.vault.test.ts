@@ -183,6 +183,39 @@ describe("vault/signing", () => {
       expect(Buffer.from(item.rawData).equals(Buffer.from(largeData))).toBe(true);
     });
 
+    it("posts a large payload that sends AR to the gateway as a BASE transaction", async () => {
+      const fetchSpy = mockGatewayFetch(200);
+      const target = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
+
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+        data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
+        target,
+        quantity: "1000",
+      });
+
+      expect(result.type).toBe("BASE");
+      const urls = fetchSpy.mock.calls.map(([url]) => String(url));
+      expect(urls.some((url) => url.startsWith(BUNDLER))).toBe(false);
+      const posted = fetchSpy.mock.calls.find(
+        ([url, init]) => new URL(String(url)).pathname === "/tx" && init?.method === "POST",
+      );
+      expect(posted).toBeDefined();
+      const body = JSON.parse(String(posted![1]!.body)) as { id: string; quantity: string; target: string };
+      expect(body).toMatchObject({ id: result.id, quantity: "1000", target });
+    });
+
+    it.each(["0", "", "000"])("still bundles a large payload whose quantity is %j", async (quantity) => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+        data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
+        quantity,
+      });
+
+      expect(result.type).toBe("BUNDLED");
+      expect(String(fetchSpy.mock.calls[0]![0])).toBe("https://up.arweave.net/tx");
+    });
+
     it("throws when the bundler rejects a large payload", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
         new Response(null, { status: 402, statusText: "Payment Required" }),
