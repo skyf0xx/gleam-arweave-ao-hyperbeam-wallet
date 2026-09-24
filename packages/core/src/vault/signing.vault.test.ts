@@ -122,6 +122,8 @@ describe("vault/signing", () => {
   });
 
   describe("dispatchTransaction", () => {
+    const BUNDLER = "https://up.arweave.net";
+
     /**
      * arweave-js's `createTransaction`/`transactions.post` call the
      * gateway's `tx_anchor`/`price`/`tx` endpoints directly via ambient
@@ -145,7 +147,7 @@ describe("vault/signing", () => {
     it("posts small payloads as a BASE transaction", async () => {
       const fetchSpy = mockGatewayFetch(200);
 
-      const result = await dispatchTransaction("https://arweave.net", jwk, {
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
         data: bytesToBase64(new TextEncoder().encode("small payload")),
       });
 
@@ -154,24 +156,60 @@ describe("vault/signing", () => {
       expect(fetchSpy).toHaveBeenCalled();
     });
 
-    it("bundles large payloads as a BUNDLED data item without posting", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch");
+    it("posts large payloads to the bundler as a signed BUNDLED data item", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
       const largeData = new Uint8Array(150 * 1024).fill(1);
+      const target = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
 
-      const result = await dispatchTransaction("https://arweave.net", jwk, {
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
         data: bytesToBase64(largeData),
+        target,
+        tags: [{ name: "Content-Type", value: "application/octet-stream" }],
       });
 
       expect(result.type).toBe("BUNDLED");
-      expect(result.id).toBeTruthy();
-      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0]!;
+      expect(String(url)).toBe("https://up.arweave.net/tx");
+      expect(init?.method).toBe("POST");
+      expect(new Headers(init?.headers).get("Content-Type")).toBe("application/octet-stream");
+
+      const item = new DataItem(Buffer.from(init?.body as Uint8Array));
+      expect(item.id).toBe(result.id);
+      expect(await verifies(item)).toBe(true);
+      expect(item.owner).toBe(jwk.n);
+      expect(item.target).toBe(target);
+      expect(item.tags).toEqual([{ name: "Content-Type", value: "application/octet-stream" }]);
+      expect(Buffer.from(item.rawData).equals(Buffer.from(largeData))).toBe(true);
+    });
+
+    it("throws when the bundler rejects a large payload", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(null, { status: 402, statusText: "Payment Required" }),
+      );
+
+      await expect(
+        dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+          data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
+        }),
+      ).rejects.toThrow(/bundler https:\/\/up\.arweave\.net.*HTTP 402/);
+    });
+
+    it("throws when the bundler can't be reached", async () => {
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+
+      await expect(
+        dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+          data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
+        }),
+      ).rejects.toThrow(/Failed to fetch/);
     });
 
     it("throws when the gateway rejects the posted transaction", async () => {
       mockGatewayFetch(500, "Internal Server Error");
 
       await expect(
-        dispatchTransaction("https://arweave.net", jwk, {
+        dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
           data: bytesToBase64(new TextEncoder().encode("x")),
         }),
       ).rejects.toThrow(/Failed to dispatch transaction/);

@@ -1,6 +1,6 @@
 import { scanForSecrets, validateTagBytes } from "@gleam/core/src/policy/index.ts";
 import { submitUploadToBundler } from "@gleam/core/src/arweave/index.ts";
-import { base64ToBytes, type StoragePort, type UploadDraft, type UploadReview } from "@gleam/core";
+import { base64ToBytes, DEFAULT_BUNDLER_URL, type StoragePort, type UploadDraft, type UploadReview } from "@gleam/core";
 import { getCachedKey } from "./key-session";
 
 /**
@@ -19,7 +19,7 @@ import { getCachedKey } from "./key-session";
  * Bundler endpoint: no `NetworkSettings` field exists for a configurable
  * bundler URL (`packages/core/src/models/network.ts`, outside this
  * layer's scope, only carries `gatewayUrl`/`peers`) — `up.arweave.net`
- * (CLAUDE.md item 7) is hardcoded as `DEFAULT_BUNDLER_URL` below, the
+ * (CLAUDE.md item 7) is `@gleam/core`'s `DEFAULT_BUNDLER_URL`, the
  * same shape of decision `transfer.ts` made for `DEFAULT_NETWORK_
  * SETTINGS`. Flagged as debt: a later layer wanting a user-configurable
  * bundler URL needs a `NetworkSettings` field added, which is out of
@@ -31,8 +31,6 @@ import { getCachedKey } from "./key-session";
 export interface SubmitUploadRequest extends UploadDraft {
   walletId: string;
 }
-
-const DEFAULT_BUNDLER_URL = "https://up.arweave.net";
 
 export class UploadHandler {
   constructor(

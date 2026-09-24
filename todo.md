@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Large `dispatch` signs a bundled data item and never uploads it (M, opus)**
-  `core/vault/signing.ts` (`dispatchTransaction`, over 100 KB). It returns
-  `{id, type: "BUNDLED"}` for a data item that is never posted anywhere, so
-  the dApp thinks the data is stored. Done: POST the item to the bundler
-  (`core/arweave/upload.ts` already has the path) and fail loudly if the
-  upload fails. Test with a stubbed fetch.
 - [ ] **Provider times out at 60 s while the approval waits 5 min; closing the window doesn't reject (M, 🧪, opus)**
   `entrypoints/provider/index.ts` (`REQUEST_TIMEOUT_MS`),
   `src/handlers/approval.ts` (`APPROVAL_TIMEOUT_MS`),
@@ -294,3 +288,11 @@ vault, crypto and provider security; `sonnet` for everything else.
   The approval window stays open, and approving it still signs. Add a
   cancel message through the bridge that closes the approval and rejects
   the pending request.
+- **Bundled `dispatch` drops the AR transfer and fee fields (opus)**
+  `core/vault/signing.ts` (`dispatchTransaction`). Over 100 KB, the
+  transaction becomes a data item, and a data item can't carry
+  `quantity`, `reward` or `last_tx`. A large dispatch that also sends AR
+  resolves as stored, but the AR is never sent. Wander appears to do the
+  reverse: it bundles only small, zero-quantity transactions and posts the
+  rest as base transactions. Confirm Wander's rule. At minimum, never
+  bundle when `quantity` isn't zero.

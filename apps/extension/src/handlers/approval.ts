@@ -3,6 +3,7 @@ import {
   bytesToBase64,
   batchSignDataItem,
   decrypt,
+  DEFAULT_BUNDLER_URL,
   dispatchTransaction,
   encrypt,
   privateHash as vaultPrivateHash,
@@ -275,6 +276,7 @@ export class ApprovalHandler {
     private readonly storage: StoragePort,
     private readonly windows: WindowPort,
     private readonly transfers?: AoTransferSubmitter,
+    private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
   ) {}
 
   private async loadGrants(): Promise<Grant[]> {
@@ -510,7 +512,7 @@ export class ApprovalHandler {
       }
 
       case "dispatch": {
-        return dispatchTransaction(this.requireGatewayUrl(input), jwk, transaction);
+        return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, jwk, transaction);
       }
 
       case "signDataItem": {

@@ -470,6 +470,51 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     expect(new TextDecoder().decode(decrypted)).toBe("secret");
   });
 
+  describe("dispatch of a payload large enough to bundle", () => {
+    const BUNDLER = "https://bundler.example";
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    async function dispatchLarge(bundlingHandler: ApprovalHandler): Promise<unknown> {
+      const pending = bundlingHandler.requestApproval({
+        kind: "dispatch",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new Uint8Array(150 * 1024).fill(1),
+        gatewayUrl: "https://arweave.net",
+      });
+      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+      await bundlingHandler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+      return pending;
+    }
+
+    it("posts the signed item to the handler's bundler and resolves to its id", async () => {
+      await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+
+      const result = (await dispatchLarge(new ApprovalHandler(storage, windows, undefined, BUNDLER))) as {
+        id: string;
+        type: string;
+      };
+
+      expect(result.type).toBe("BUNDLED");
+      expect(result.id).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(String(fetchSpy.mock.calls[0]![0])).toBe(`${BUNDLER}/tx`);
+    });
+
+    it("rejects the dApp's request when the bundler refuses the item", async () => {
+      await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 500, statusText: "Server Error" }));
+
+      await expect(dispatchLarge(new ApprovalHandler(storage, windows, undefined, BUNDLER))).rejects.toThrow(
+        /bundler.*HTTP 500/,
+      );
+    });
+  });
+
   describe("data items", () => {
     const toBase64 = (text: string) => btoa(text);
     const endsWith = (raw: ArrayBuffer, text: string) =>

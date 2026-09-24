@@ -28,3 +28,9 @@ export interface NetworkSettings {
  * prevent.
  */
 export const DEFAULT_HYPERBEAM_PEER_URLS: readonly string[] = ["https://state.forward.computer"];
+
+/**
+ * ANS-104 bundler that uploads and bundled `dispatch` items are posted to.
+ * Also listed in apps/extension/wxt.config.ts's `host_permissions`.
+ */
+export const DEFAULT_BUNDLER_URL = "https://up.arweave.net";

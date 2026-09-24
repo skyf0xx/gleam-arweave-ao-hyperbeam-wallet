@@ -7,6 +7,7 @@ import type {
   DataItemInput,
   DispatchResult,
 } from "../models/signing";
+import { postDataItemToBundler } from "../arweave/upload";
 import { base64ToBytes } from "./base64";
 
 /**
@@ -91,19 +92,15 @@ export async function signTransaction(
 }
 
 /**
- * Signs a transaction and, depending on payload size, either posts it as
- * a base Arweave transaction (`BASE`) or wraps it as an ANS-104 DataItem
- * and returns its locally-computed id (`BUNDLED`) — see
- * `DISPATCH_BUNDLE_THRESHOLD_BYTES`'s doc comment for why. A `BUNDLED`
- * dispatch is signed but **not submitted to a bundler endpoint here**:
- * this layer owns crypto, not network submission policy or bundler-URL
- * configuration, which belongs to the caller (the same boundary
- * `submitUploadToBundler` draws around bundler endpoints). Callers that
- * need the bundled item actually posted should pass the returned item's
- * bytes through `core/arweave/upload.ts`'s bundler submission path.
+ * Signs a transaction and submits it. Payloads over
+ * `DISPATCH_BUNDLE_THRESHOLD_BYTES` are signed as an ANS-104 data item and
+ * posted to `bundlerUrl` (`BUNDLED`); smaller ones are posted to the
+ * gateway as a base transaction (`BASE`). Throws if either post is
+ * rejected, so the dApp never gets an id for data that wasn't stored.
  */
 export async function dispatchTransaction(
   gatewayUrl: string,
+  bundlerUrl: string,
   jwk: JWKInterface,
   input: SignTransactionInput,
 ): Promise<DispatchResult> {
@@ -116,6 +113,7 @@ export async function dispatchTransaction(
       target: input.target,
     });
     await dataItem.sign(signer);
+    await postDataItemToBundler(bundlerUrl, new Uint8Array(dataItem.getRaw()));
     return { id: dataItem.id, type: "BUNDLED" };
   }
 

@@ -76,8 +76,17 @@ export async function submitUploadToBundler(
   // even via the `/web` entry point) — copied into a plain `Uint8Array`
   // so it satisfies `fetch`'s `BodyInit` typing without depending on
   // `Buffer` structurally matching it, which TS' DOM lib doesn't assume.
-  const rawBytes = new Uint8Array(dataItem.getRaw());
+  await postDataItemToBundler(bundlerUrl, new Uint8Array(dataItem.getRaw()));
 
+  return { txId: dataItem.id };
+}
+
+/**
+ * POSTs an already-signed ANS-104 data item's raw bytes to
+ * `<bundlerUrl>/tx`. Throws on any non-2xx response, so a caller never
+ * reports an id for data the bundler didn't accept.
+ */
+export async function postDataItemToBundler(bundlerUrl: string, rawBytes: Uint8Array<ArrayBuffer>): Promise<void> {
   const endpoint = new URL(BUNDLER_TX_ENDPOINT_SUFFIX, bundlerUrl).toString();
   const response = await fetch(endpoint, {
     method: "POST",
@@ -87,9 +96,7 @@ export async function submitUploadToBundler(
 
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
-      `Failed to submit upload to bundler ${bundlerUrl} (HTTP ${response.status}: ${response.statusText}).`,
+      `Failed to submit data item to bundler ${bundlerUrl} (HTTP ${response.status}: ${response.statusText}).`,
     );
   }
-
-  return { txId: dataItem.id };
 }

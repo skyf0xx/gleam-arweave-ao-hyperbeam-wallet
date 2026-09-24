@@ -33,7 +33,7 @@ export type {
   SigningApprovalPreview,
 } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
-export { DEFAULT_HYPERBEAM_PEER_URLS } from "./network";
+export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
 export type {
   PortfolioHistoryRange,
