@@ -32,4 +32,11 @@ export interface WindowPort {
    * surfaced rather than duplicated.
    */
   focusApprovalWindow(requestId: string): Promise<void>;
+
+  /**
+   * Calls `listener` with the `requestId` of an approval window the user
+   * closed themselves. Not called for a window closed through
+   * `closeApprovalWindow`. Returns an unsubscribe function.
+   */
+  onApprovalWindowClosed(listener: (requestId: string) => void): () => void;
 }

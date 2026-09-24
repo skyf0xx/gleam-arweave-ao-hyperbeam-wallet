@@ -11,6 +11,9 @@ describe("WindowPort", () => {
       },
       async closeApprovalWindow() {},
       async focusApprovalWindow() {},
+      onApprovalWindowClosed() {
+        return () => {};
+      },
     };
 
     await port.createApprovalWindow("/approval.html?requestId=req-1");

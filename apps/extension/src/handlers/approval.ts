@@ -25,7 +25,7 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
+import { APPROVAL_TIMEOUT_MS, decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 import { getCachedKey } from "./key-session";
 
 /**
@@ -73,11 +73,15 @@ import { getCachedKey } from "./key-session";
  * originating dispatcher call context dying either), but it does mean the
  * resolution data itself is never only-in-memory. See this task's final
  * report.
+ *
+ * Closing the approval window with its own close button counts as a
+ * rejection: `WindowPort.onApprovalWindowClosed` writes a rejected outcome
+ * the same way `resolveApproval` does, so the dApp hears back at once
+ * instead of after `APPROVAL_TIMEOUT_MS`.
  */
 const GRANTS_KEY = "local:grants";
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 const APPROVAL_WINDOW_PATH = "/approval.html";
-const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
 
 function isValidPermissionType(value: unknown): value is PermissionType {
   return typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value);
@@ -272,12 +276,22 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
 }
 
 export class ApprovalHandler {
+  /**
+   * Requests `resolveApproval` is finishing. Closing the window while an
+   * approved request signs or posts must not also report it as rejected.
+   */
+  private readonly resolving = new Set<string>();
+
   constructor(
     private readonly storage: StoragePort,
     private readonly windows: WindowPort,
     private readonly transfers?: AoTransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
-  ) {}
+  ) {
+    windows.onApprovalWindowClosed((requestId) => {
+      void this.rejectClosedWindow(requestId);
+    });
+  }
 
   private async loadGrants(): Promise<Grant[]> {
     const raw = await this.storage.get<unknown>(GRANTS_KEY);
@@ -369,6 +383,7 @@ export class ApprovalHandler {
       const timeout = setTimeout(() => {
         unwatch();
         void this.dropPending(requestId);
+        void this.windows.closeApprovalWindow(requestId);
         reject(new Error("Approval request timed out — the approval window was not resolved in time."));
       }, APPROVAL_TIMEOUT_MS);
 
@@ -380,7 +395,7 @@ export class ApprovalHandler {
         unwatch();
         const { outcome } = entry;
         if (!outcome.approved) {
-          reject(new Error("The request was rejected."));
+          reject(new Error(outcome.error ?? "The request was rejected."));
         } else if (outcome.error) {
           reject(new Error(outcome.error));
         } else {
@@ -388,6 +403,22 @@ export class ApprovalHandler {
         }
       });
     });
+  }
+
+  /**
+   * Also drops a record left behind by a service worker that restarted
+   * while its window was open, even though nothing is awaiting it.
+   */
+  private async rejectClosedWindow(requestId: string): Promise<void> {
+    if (this.resolving.has(requestId)) return;
+    const pending = await this.loadPending();
+    if (!pending.some((entry) => entry.request.requestId === requestId && !entry.outcome)) return;
+
+    const outcome: ApprovalOutcome = { approved: false, error: "The approval window was closed." };
+    await this.savePending(
+      pending.map((entry) => (entry.request.requestId === requestId ? { ...entry, outcome } : entry)),
+    );
+    await this.dropPending(requestId);
   }
 
   private async dropPending(requestId: string): Promise<void> {
@@ -424,25 +455,37 @@ export class ApprovalHandler {
       throw new Error(`No pending approval request with id "${req.requestId}".`);
     }
 
-    let outcome: ApprovalOutcome;
-    if (!req.approved) {
-      outcome = { approved: false };
-    } else {
-      try {
-        outcome = { approved: true, result: encodeTaggedBinary(await this.finalizeApproval(entry)) };
-      } catch (error) {
-        outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
-      }
+    if (this.resolving.has(req.requestId)) {
+      throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
     }
+    this.resolving.add(req.requestId);
+    try {
+      let outcome: ApprovalOutcome;
+      if (!req.approved) {
+        outcome = { approved: false };
+      } else {
+        try {
+          outcome = { approved: true, result: encodeTaggedBinary(await this.finalizeApproval(entry)) };
+        } catch (error) {
+          outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
+        }
+      }
 
-    // Written in two steps (outcome attached, then removed) so a watcher
-    // observing this key sees the outcome at least once before the record
-    // disappears — see this class's doc comment.
-    await this.savePending(
-      pending.map((candidate) => (candidate.request.requestId === req.requestId ? { ...candidate, outcome } : candidate)),
-    );
-    await this.dropPending(req.requestId);
-    await this.windows.closeApprovalWindow(req.requestId);
+      // Written in two steps (outcome attached, then removed) so a watcher
+      // observing this key sees the outcome at least once before the record
+      // disappears — see this class's doc comment. Re-read, because other
+      // requests may have been added or removed while this one signed.
+      const current = await this.loadPending();
+      await this.savePending(
+        current.map((candidate) =>
+          candidate.request.requestId === req.requestId ? { ...candidate, outcome } : candidate,
+        ),
+      );
+      await this.dropPending(req.requestId);
+      await this.windows.closeApprovalWindow(req.requestId);
+    } finally {
+      this.resolving.delete(req.requestId);
+    }
   }
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {

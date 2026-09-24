@@ -78,7 +78,7 @@ import {
 const messenger = defineExtensionMessaging<ProtocolMap>();
 
 const storage = new WxtStoragePort();
-const windows = new WxtWindowPort();
+const windows = new WxtWindowPort(storage);
 
 const lifecycle = new WalletLifecycleHandler(storage);
 const reads = new ReadsHandler(storage);

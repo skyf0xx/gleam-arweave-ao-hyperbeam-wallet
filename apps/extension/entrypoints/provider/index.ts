@@ -1,5 +1,7 @@
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
 import {
+  APPROVAL_GATED_METHODS,
+  APPROVAL_TIMEOUT_MS,
   EVENT,
   REQUEST,
   RESPONSE,
@@ -29,7 +31,9 @@ import {
  * 3. A `settled` flag per pending call, so a duplicate or late response
  *    (e.g. the content script relays twice) can't resolve/reject twice.
  * 4. A timeout that rejects — a hung/killed service worker must not hang
- *    the calling dApp forever.
+ *    the calling dApp forever. Methods that can open an approval window
+ *    wait longer than the background's own approval timeout, so the dApp
+ *    never sees a timeout for a request the user can still approve.
  * 5. `AbortSignal` support (an `options.signal` parameter accepted on
  *    every method). An abort only rejects the page-side promise. The
  *    bridge has no cancel message, and it must never post a real method
@@ -43,6 +47,12 @@ import {
  *    installs nothing and leaves it alone entirely.
  */
 const REQUEST_TIMEOUT_MS = 60_000;
+/** Leaves time to sign or post once the user approves at the last moment. */
+const APPROVAL_REQUEST_TIMEOUT_MS = APPROVAL_TIMEOUT_MS + 60_000;
+
+function timeoutFor(method: ProviderSurfaceMethod): number {
+  return APPROVAL_GATED_METHODS.includes(method) ? APPROVAL_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+}
 const WALLET_NAME = "Gleam";
 
 /**
@@ -133,6 +143,7 @@ class GleamProvider {
     }
 
     const id = crypto.randomUUID();
+    const timeoutMs = timeoutFor(method);
 
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -140,8 +151,8 @@ class GleamProvider {
         if (!call || call.settled) return;
         call.settled = true;
         this.pending.delete(id);
-        reject(new Error(`"${method}" timed out after ${REQUEST_TIMEOUT_MS}ms.`));
-      }, REQUEST_TIMEOUT_MS);
+        reject(new Error(`"${method}" timed out after ${timeoutMs}ms.`));
+      }, timeoutMs);
 
       const pendingCall: PendingCall = { settled: false, resolve, reject, timeoutId };
       this.pending.set(id, pendingCall);

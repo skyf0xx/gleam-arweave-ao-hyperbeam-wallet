@@ -72,9 +72,12 @@ function createWatchableStorage(): StoragePort {
 function createFakeWindows(): WindowPort & {
   opened: string[];
   closed: string[];
+  /** Simulates the user closing the window with its own close button. */
+  userCloses(requestId: string): void;
 } {
   const opened: string[] = [];
   const closed: string[] = [];
+  const listeners = new Set<(requestId: string) => void>();
   return {
     opened,
     closed,
@@ -85,6 +88,13 @@ function createFakeWindows(): WindowPort & {
       closed.push(requestId);
     },
     async focusApprovalWindow() {},
+    onApprovalWindowClosed(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    userCloses(requestId: string) {
+      for (const listener of listeners) listener(requestId);
+    },
   };
 }
 
@@ -226,6 +236,129 @@ describe("ApprovalHandler: connect() -> Grant", () => {
     const grants = await handler.getConnectedApps();
     expect(grants).toHaveLength(1);
     expect(grants[0]?.permissions).toEqual(["ACCESS_ADDRESS", "ACCESS_TOKENS"]);
+  });
+});
+
+describe("ApprovalHandler: an abandoned approval window", () => {
+  let storage: StoragePort;
+  let windows: ReturnType<typeof createFakeWindows>;
+  let handler: ApprovalHandler;
+
+  beforeEach(async () => {
+    storage = createWatchableStorage();
+    windows = createFakeWindows();
+    handler = new ApprovalHandler(storage, windows);
+    await seedWallet(storage);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function requestConnect() {
+    return handler.requestApproval({
+      kind: "connect",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+  }
+
+  it("closing the window rejects the request at once and drops it", async () => {
+    const pending = requestConnect();
+    const assertion = expect(pending).rejects.toThrow(/approval window was closed/i);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    windows.userCloses(requestId);
+
+    await assertion;
+    await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
+    expect(await handler.getConnectedApps()).toEqual([]);
+  });
+
+  it("drops a record nothing awaits any more, such as one left by a service-worker restart", async () => {
+    const orphan = { requestId: "orphan", kind: "connect", origin: "https://x.test", createdAt: 0, preview: { kind: "connect", requestedPermissions: [] } };
+    await storage.set("session:pendingApprovals", [{ request: orphan, walletId: WALLET_ID, signingInput: null }]);
+
+    windows.userCloses("orphan");
+
+    await vi.waitFor(async () => expect(await storage.get("session:pendingApprovals")).toEqual([]));
+  });
+
+  it("closing the window while an approved request is being finalized doesn't reject it", async () => {
+    let finishTransfer: (value: { txId: string }) => void = () => {};
+    const transfers = {
+      submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
+    };
+    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    windows = createFakeWindows();
+    handler = new ApprovalHandler(storage, windows, transfers);
+
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: "recipient",
+      amount: "1",
+      token: "token-process",
+      payload: new Uint8Array(),
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    const resolving = handler.resolveApproval({ requestId, approved: true });
+    await vi.waitFor(() => expect(transfers.submitTransfer).toHaveBeenCalled());
+    windows.userCloses(requestId);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    finishTransfer({ txId: "tx-1" });
+
+    await resolving;
+    await expect(pending).resolves.toEqual({ id: "tx-1" });
+  });
+
+  it("a second resolveApproval for a request already being resolved is refused", async () => {
+    let finishTransfer: (value: { txId: string }) => void = () => {};
+    const transfers = {
+      submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
+    };
+    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    windows = createFakeWindows();
+    handler = new ApprovalHandler(storage, windows, transfers);
+
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      recipient: "recipient",
+      amount: "1",
+      token: "token-process",
+      payload: new Uint8Array(),
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    const first = handler.resolveApproval({ requestId, approved: true });
+    await vi.waitFor(() => expect(transfers.submitTransfer).toHaveBeenCalled());
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/already being resolved/);
+    finishTransfer({ txId: "tx-1" });
+
+    await first;
+    await expect(pending).resolves.toEqual({ id: "tx-1" });
+    expect(transfers.submitTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it("a timed-out request closes its window", async () => {
+    vi.useFakeTimers();
+    const pending = requestConnect();
+    const assertion = expect(pending).rejects.toThrow(/timed out/i);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    const requestId = extractRequestId(windows.opened[0]!);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+    await assertion;
+    expect(windows.closed).toContain(requestId);
   });
 });
 

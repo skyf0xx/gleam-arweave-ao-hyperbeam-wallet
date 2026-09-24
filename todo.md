@@ -11,16 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 1. Correctness and security bugs
 
-- [ ] **Provider times out at 60 s while the approval waits 5 min; closing the window doesn't reject (M, 🧪, opus)**
-  `entrypoints/provider/index.ts` (`REQUEST_TIMEOUT_MS`),
-  `src/handlers/approval.ts` (`APPROVAL_TIMEOUT_MS`),
-  `src/adapters/windows.ts`. If the user approves after 60 s, the dApp has
-  already seen a timeout, but a `dispatch` still posts. Closing the approval
-  window with the X leaves the request pending for 5 min. Done:
-  approval-gated methods have no short page timeout (or it's longer than
-  the approval timeout). `windows.onRemoved` rejects the pending request.
-  The window-id map survives a service-worker restart (store it in
-  `session:`).
 - [ ] **Auto-lock is not enforced when a key is used (M, opus)**
   `src/handlers/key-session.ts` (`getCachedKey`),
   `src/handlers/wallet-lifecycle.ts` (`loadSession`). Expiry is only checked
@@ -237,6 +227,14 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- **An approval outlives the service worker that was waiting for it (M, 🧪, opus)**
+  `src/handlers/approval.ts` (`awaitResolution`). The 5-minute timer and
+  the dApp's pending call live in the worker. If Chrome stops the worker
+  while the window is open (5 minutes is also Chrome's per-event limit),
+  the record stays in `session:pendingApprovals` and approving it still
+  signs, and for `dispatch` posts, with nobody to receive the result.
+  Consider a `createdAt` expiry check in `resolveApproval`/`getApproval`.
 
 - **Large approval payloads may exceed `chrome.storage.session`'s quota (sonnet)**
   `src/handlers/approval.ts`. Pending approvals store the payload as a

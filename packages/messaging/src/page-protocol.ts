@@ -43,6 +43,29 @@ export const PROVIDER_SURFACE_METHODS = [
 
 export type ProviderSurfaceMethod = (typeof PROVIDER_SURFACE_METHODS)[number];
 
+/** How long the background waits for the user to answer an approval window. */
+export const APPROVAL_TIMEOUT_MS = 5 * 60_000;
+
+/**
+ * Methods that can open an approval window. The page must wait at least
+ * as long as the background does for them: a shorter page timeout would
+ * report a failure to the dApp while an approval that still signs, or
+ * `dispatch` still posts, is open.
+ */
+export const APPROVAL_GATED_METHODS: readonly ProviderSurfaceMethod[] = [
+  "connect",
+  "sign",
+  "dispatch",
+  "encrypt",
+  "decrypt",
+  "signature",
+  "signMessage",
+  "privateHash",
+  "signDataItem",
+  "batchSignDataItem",
+  "transferAoTokens",
+];
+
 /**
  * Tagged binary encoding for values that don't survive the postMessage
  * boundary intact (ARCHITECTURE.md §4.3 point 6).
