@@ -172,11 +172,11 @@ describe("SettingsHomeView", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBeNull();
   });
 
-  it("disables Import & export and About rows (no destination screen yet)", async () => {
+  it("does not render the removed Import & export or About placeholder rows", async () => {
     renderSettingsHome();
 
-    await waitFor(() => expect(screen.getByText("Import & export")).toBeTruthy());
-    expect((screen.getByText("Import & export").closest("button") as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByText("About").closest("button") as HTMLButtonElement).disabled).toBe(true);
+    await waitFor(() => expect(screen.getByText("Auto-lock")).toBeTruthy());
+    expect(screen.queryByText("Import & export")).toBeNull();
+    expect(screen.queryByText("About")).toBeNull();
   });
 });

@@ -21,9 +21,7 @@ function gatewayHostname(gatewayUrl: string): string {
 /**
  * The dedicated settings screen the gear icon opens: grouped
  * WALLET/NETWORK/TOOLS/GENERAL sections of navigable rows, each showing
- * its current value on the right. "Import & export" and "About" have no
- * screen built yet, so those two rows render disabled rather than
- * routing nowhere. "Upload to Arweave" is also disabled, with a
+ * its current value on the right. "Upload to Arweave" is disabled, with a
  * "Coming soon" label, until bundler uploads work reliably.
  */
 export interface SettingsHomeViewProps {
@@ -155,8 +153,6 @@ export function SettingsHomeView({
             disabled={savingTheme}
             onToggle={() => void handleToggleTheme()}
           />
-          <SettingsRow title="Import & export" subtitle="Back up or restore settings" disabled />
-          <SettingsRow title="About" disabled />
         </SettingsSection>
       </div>
     </div>
