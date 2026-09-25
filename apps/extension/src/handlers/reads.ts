@@ -449,14 +449,18 @@ export class ReadsHandler {
    * `getTokenBalance` falls back to the process id as the ticker when it
    * finds none, so that fallback is dropped rather than passed off as a
    * ticker. A row the popup would show as unavailable reports a `null`
-   * balance: its quantity may be a placeholder.
+   * balance: its quantity may be a placeholder. `Denomination` is left out
+   * entirely for such a row rather than sending its placeholder/guessed
+   * value, since a dApp scaling a raw quantity by an unconfirmed
+   * denomination could be off by orders of magnitude.
    */
   async userTokens(req: { address: string; options?: UserTokensOptions }): Promise<UserTokensResult> {
     const balances = await this.getTokenBalances({ address: req.address });
     const fetchBalance = req.options?.fetchBalance === true;
 
     return balances.map((balance): UserToken => {
-      const token: UserToken = { processId: balance.processId, Denomination: balance.denomination };
+      const token: UserToken = { processId: balance.processId };
+      if (balance.available !== false) token.Denomination = balance.denomination;
       if (balance.name !== null) token.Name = balance.name;
       if (balance.ticker !== balance.processId) token.Ticker = balance.ticker;
       if (fetchBalance) token.balance = balance.available === false ? null : balance.quantity;

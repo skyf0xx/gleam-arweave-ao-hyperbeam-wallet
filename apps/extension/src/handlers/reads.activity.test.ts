@@ -569,9 +569,42 @@ describe("ReadsHandler: userTokens", () => {
     expect(unknown).toBeDefined();
     expect(unknown).not.toHaveProperty("Name");
     expect(unknown).not.toHaveProperty("Ticker");
-    expect(typeof unknown?.Denomination).toBe("number");
-    // Its denomination can't be confirmed, so the popup would show it as unavailable.
+    // Its denomination can't be confirmed, so it's left out entirely rather
+    // than sent as a placeholder/guessed number.
+    expect(unknown).not.toHaveProperty("Denomination");
     expect(unknown?.balance).toBeNull();
+  });
+
+  it("leaves out Denomination when metadata resolves a ticker but no denomination tag", async () => {
+    const storage = await seededStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["partialProc"]);
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [
+                  { node: { id: "partialProc", tags: [{ name: "Ticker", value: "wUSDC" }] } },
+                ],
+              },
+            },
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => "42" };
+    }) as unknown as typeof fetch;
+
+    const tokens = await new ReadsHandler(storage).userTokens({ address: "addr1", options: { fetchBalance: true } });
+
+    const partial = tokens.find((t) => t.processId === "partialProc");
+    expect(partial).toBeDefined();
+    expect(partial?.Ticker).toBe("wUSDC");
+    expect(partial).not.toHaveProperty("Denomination");
+    expect(partial?.balance).toBeNull();
   });
 });
 

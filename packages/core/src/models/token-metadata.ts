@@ -58,7 +58,14 @@ export interface UserToken {
   Name?: string;
   Ticker?: string;
   Logo?: string;
-  Denomination: number;
+  /**
+   * Omitted when the token's denomination couldn't be confirmed (the
+   * underlying `TokenBalance` came back `available: false`) — a dApp that
+   * scales a raw quantity by a guessed denomination could be off by
+   * orders of magnitude, so "missing" is reported instead of a
+   * placeholder number.
+   */
+  Denomination?: number;
   /**
    * Present only when `fetchBalance` was set. An atomic integer string in
    * the token's smallest unit, or `null` when the balance couldn't be read.
