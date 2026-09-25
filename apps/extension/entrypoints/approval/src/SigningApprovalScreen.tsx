@@ -61,10 +61,36 @@ function shortenProcessId(processId: string): string {
  * (an AO transfer has no sender-side fee — `core/ao/transfer.ts`'s
  * `AO_TRANSFER_HAS_NO_FEE`), so it's formatted with `formatWinstonAsAr`
  * regardless of what `token` the amount itself is denominated in.
+ *
+ * An AO amount's `tokenDenomination` comes from the same balance-metadata
+ * read the token list uses (`ReadsHandler.previewWatchedToken`), resolved
+ * by the background before the approval window opens. That read is best-
+ * effort and never blocks the approval — when it's `null` (lookup failed,
+ * or hasn't happened for this token), the raw atomic integer is shown
+ * as-is; `formatAmountUnit` below labels it "smallest units" so it doesn't
+ * read as a scaled amount.
  */
-function formatAmount(atomic: string | null, token: string | null): string {
+function formatAmount(atomic: string | null, token: string | null, tokenDenomination: number | null): string {
   if (atomic === null) return "—";
-  return token === null ? formatWinstonAsAr(atomic) : formatAtomicAsDisplay(atomic, 0);
+  if (token === null) return formatWinstonAsAr(atomic);
+  return tokenDenomination === null ? atomic : formatAtomicAsDisplay(atomic, tokenDenomination);
+}
+
+/**
+ * Companion to `formatAmount`: the unit label shown under an AO transfer's
+ * amount. Prefers the resolved ticker; falls back to a shortened process id
+ * when no ticker resolved, or when the "ticker" is just the process id
+ * echoed back (`TokenBalance.ticker` defaults to `processId` when unresolved
+ * — see `withRegisteredTicker`/`withUnregisteredMetadata` in `reads.ts`).
+ * Falls back further to "smallest units" whenever the denomination itself
+ * is unknown, since a ticker with no confirmed scale is misleading on its
+ * own (is this 1000 units, or 0.000001?).
+ */
+function formatAmountUnit(token: string | null, tokenDenomination: number | null, tokenTicker: string | null): string | null {
+  if (token === null) return null;
+  if (tokenDenomination === null) return "smallest units";
+  if (tokenTicker !== null && tokenTicker !== token) return tokenTicker;
+  return shortenProcessId(token);
 }
 
 function formatFee(fee: string | null): string {
@@ -77,8 +103,13 @@ function formatFee(fee: string | null): string {
  * separate from what leaves the wallet. `null` for anything not
  * AR-denominated (`transferAoTokens`'s fee is always `null`).
  */
-function formatTotal(amount: string | null, fee: string | null, token: string | null): string {
-  if (token !== null || amount === null || fee === null) return formatAmount(amount, token);
+function formatTotal(
+  amount: string | null,
+  fee: string | null,
+  token: string | null,
+  tokenDenomination: number | null,
+): string {
+  if (token !== null || amount === null || fee === null) return formatAmount(amount, token, tokenDenomination);
   try {
     return formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString());
   } catch {
@@ -138,11 +169,11 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
           <>
             <div className="flex flex-col items-center gap-1 py-1 text-center">
               <span className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-                {formatAmount(preview.amount, preview.token)}
+                {formatAmount(preview.amount, preview.token, preview.tokenDenomination)}
               </span>
               {preview.token != null ? (
                 <span className="text-caption font-semibold uppercase tracking-wide text-muted">
-                  {shortenProcessId(preview.token)}
+                  {formatAmountUnit(preview.token, preview.tokenDenomination, preview.tokenTicker)}
                 </span>
               ) : null}
             </div>
@@ -158,7 +189,11 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
 
             <div className="flex flex-col">
               <ReviewRow label="Fee" value={formatFee(preview.fee)} />
-              <ReviewRow label="Total" value={formatTotal(preview.amount, preview.fee, preview.token)} strong />
+              <ReviewRow
+                label="Total"
+                value={formatTotal(preview.amount, preview.fee, preview.token, preview.tokenDenomination)}
+                strong
+              />
             </div>
           </>
         ) : null}

@@ -11,15 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish
 
-- [ ] **AO transfer approval shows the raw atomic amount (S, 🧪, sonnet)**
-  `entrypoints/approval/src/SigningApprovalScreen.tsx` `formatAmount`,
-  `entrypoints/background/index.ts` `transferAoTokens` case. The preview
-  has no token denomination, so it renders the smallest-unit integer.
-  Done: the background puts the token's denomination (already read for
-  balances) into the preview, and the amount shows as a decimal with the
-  ticker. If the denomination can't be read, the raw amount is shown with
-  a "smallest units" label rather than a guess.
-
 ## Not planned
 
 - Wander's deprecated `{ algorithm, hash, salt }` encrypt/decrypt stays

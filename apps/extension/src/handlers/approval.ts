@@ -124,6 +124,22 @@ export interface SigningRequestInput {
    * comment); every other signing kind carries no token.
    */
   token?: string | null;
+  /**
+   * Decimal-places count for `token`'s atomic `amount` — resolved by the
+   * dispatcher the same way a token balance's denomination is (`ReadsHandler.
+   * previewWatchedToken`) before calling `requestApproval`. `undefined`/`null`
+   * when `token` is `null` or that resolution failed; the approval screen
+   * then falls back to the raw atomic amount (see `SigningApprovalPreview.
+   * tokenDenomination`'s own doc comment).
+   */
+  tokenDenomination?: number | null;
+  /**
+   * `token`'s resolved ticker from that same lookup — the unit label shown
+   * once the amount is scaled by `tokenDenomination`. `undefined`/`null`
+   * when `token` is `null` or the lookup didn't resolve a ticker (see
+   * `SigningApprovalPreview.tokenTicker`'s own doc comment).
+   */
+  tokenTicker?: string | null;
   /** Raw bytes this request will sign/encrypt/decrypt, for the payload hash and decoded preview. */
   payload: Uint8Array;
   tags?: Array<{ name: string; value: string }>;
@@ -303,6 +319,8 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     amount: input.amount ?? null,
     fee: input.fee ?? null,
     token: input.token ?? null,
+    tokenDenomination: input.tokenDenomination ?? null,
+    tokenTicker: input.tokenTicker ?? null,
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,

@@ -41,6 +41,18 @@ export interface ConnectApprovalPreview {
  * strings are in — `null` for the native AR token (matching
  * `TransferDraft.token`'s own `null`-means-AR convention), an AO processId
  * otherwise. Only meaningful when `amount` is non-null.
+ *
+ * `tokenDenomination` is the decimal-places count for `token`'s atomic
+ * amount, resolved the same way a token balance's denomination is (see
+ * `ReadsHandler.previewWatchedToken` in `handlers/reads.ts`). `null` when
+ * `token` is `null` (AR, always shown via `formatWinstonAsAr` instead) or
+ * when that resolution failed/hasn't run — the approval screen then falls
+ * back to the raw atomic amount rather than guessing a scale.
+ *
+ * `tokenTicker` is that same lookup's resolved ticker, shown as the unit
+ * label once the amount is scaled. `null` when `token` is `null`, or when
+ * the lookup didn't resolve a ticker (falls back to a shortened `token`
+ * process id — see `SigningApprovalScreen.tsx`'s `formatAmountUnit`).
  */
 export interface SigningApprovalPreview {
   kind:
@@ -58,6 +70,8 @@ export interface SigningApprovalPreview {
   amount: string | null;
   fee: string | null;
   token: string | null;
+  tokenDenomination: number | null;
+  tokenTicker: string | null;
   decodedData: string | null;
   tags: Array<{ name: string; value: string }>;
   payloadHash: string;

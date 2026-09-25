@@ -103,6 +103,8 @@ const SIGN_MESSAGE_REQUEST: ApprovalRequest = {
     amount: null,
     fee: null,
     token: null,
+    tokenDenomination: null,
+    tokenTicker: null,
     decodedData: "hello",
     tags: [],
     payloadHash: "ab".repeat(32),

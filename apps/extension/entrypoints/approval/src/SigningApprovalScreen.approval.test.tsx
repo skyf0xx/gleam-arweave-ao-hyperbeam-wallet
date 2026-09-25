@@ -15,6 +15,8 @@ const TRANSFER_PREVIEW: SigningApprovalPreview = {
   amount: "50000000000000",
   fee: "800000000",
   token: null,
+  tokenDenomination: null,
+  tokenTicker: null,
   decodedData: null,
   tags: [],
   payloadHash: "7f3a2e9c1b6d4f80a5e2c7b91d3f6a8e0c4b7d2f9a1e6c3b8d5f0a2e7c9b4d1f",
@@ -27,6 +29,8 @@ const AO_TRANSFER_PREVIEW: SigningApprovalPreview = {
   amount: "1000",
   fee: null,
   token: "ao-process-id-abcdef1234",
+  tokenDenomination: null,
+  tokenTicker: null,
   decodedData: "",
   tags: [],
   payloadHash: "7f3a2e9c1b6d4f80a5e2c7b91d3f6a8e0c4b7d2f9a1e6c3b8d5f0a2e7c9b4d1f",
@@ -39,6 +43,8 @@ const MESSAGE_PREVIEW: SigningApprovalPreview = {
   amount: null,
   fee: null,
   token: null,
+  tokenDenomination: null,
+  tokenTicker: null,
   decodedData: '{"Action":"Transfer"}',
   tags: [{ name: "Action", value: "Transfer" }],
   payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
@@ -51,6 +57,8 @@ const BATCH_PREVIEW: SigningApprovalPreview = {
   amount: null,
   fee: null,
   token: null,
+  tokenDenomination: null,
+  tokenTicker: null,
   decodedData: '{"Action":"Transfer"}',
   tags: [{ name: "Action", value: "Transfer" }],
   payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
@@ -140,14 +148,56 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(onReject).toHaveBeenCalledTimes(1);
   });
 
-  it("transferAoTokens shows the amount, the token identity, and Send as the action label", () => {
+  it("transferAoTokens with no resolved denomination shows the raw atomic amount and a smallest-units label", () => {
     render(
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={AO_TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
     );
 
     expect(screen.getAllByText(AO_TRANSFER_PREVIEW.amount!).length).toBeGreaterThan(0);
-    expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
+    expect(screen.getByText(/smallest units/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("transferAoTokens with a resolved denomination but no ticker shows the scaled amount and a shortened process id", () => {
+    const preview: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: 12 };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getAllByText("0.15").length).toBeGreaterThan(0);
+    expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
+    expect(screen.queryByText(/smallest units/i)).toBeNull();
+  });
+
+  it("transferAoTokens with a resolved ticker shows it as the unit label instead of the process id", () => {
+    const preview: SigningApprovalPreview = {
+      ...AO_TRANSFER_PREVIEW,
+      amount: "150000000000",
+      tokenDenomination: 12,
+      tokenTicker: "AO",
+    };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getAllByText("0.15").length).toBeGreaterThan(0);
+    expect(screen.getByText("AO")).toBeTruthy();
+    expect(screen.queryByText(/ao-pro.*1234/i)).toBeNull();
+  });
+
+  it("transferAoTokens whose ticker is just its own process id echoed back falls back to the shortened process id", () => {
+    const preview: SigningApprovalPreview = {
+      ...AO_TRANSFER_PREVIEW,
+      amount: "150000000000",
+      tokenDenomination: 12,
+      tokenTicker: AO_TRANSFER_PREVIEW.token,
+    };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
+  });
+
+  it("transferAoTokens's Total row shows the scaled amount, matching the amount above it, once the denomination is known", () => {
+    const preview: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: 12 };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getAllByText("0.15").length).toBeGreaterThan(1);
   });
 
   it("batchSignDataItem lists every item's decoded data, target and tags, not just the first", () => {

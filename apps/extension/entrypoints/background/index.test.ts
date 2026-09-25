@@ -463,10 +463,21 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     const { cacheKey } = await import("@/src/handlers/key-session");
     cacheKey("wallet-1", { kty: "RSA", n: "n", e: "e" } as never, "addr-1");
 
+    // `previewWatchedToken`'s balance read for the amount's denomination —
+    // a bare atomic-quantity string, the shape a live HyperBEAM node
+    // actually returns (see `ao/balance.ts`'s `parseBalanceResponse`),
+    // which resolves to AO's known denomination (12). Uses the real AO
+    // process id so `isRegisteredProcessId` short-circuits the metadata
+    // lookup this mocked fetch can't answer, matching what balances do
+    // for a registered token.
+    const fetchMock = vi.fn().mockResolvedValue(new Response("0", { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const aoProcessId = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
+
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
       method: "transferAoTokens",
-      params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+      params: { token: aoProcessId, recipient: "recipient-addr", amount: "1000" },
     });
 
     await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
@@ -481,7 +492,12 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       kind: "transferAoTokens",
       recipient: "recipient-addr",
       amount: "1000",
-      token: "ao-process-id",
+      token: aoProcessId,
+      tokenDenomination: 12,
+      // `withRegisteredTicker` overrides the bare-quantity response's
+      // process-id-echoed ticker with AO's known "AO" ticker, since this
+      // test uses the real registered AO process id.
+      tokenTicker: "AO",
     });
 
     // Not auto-approved: the dApp's call must still be pending at this point.
@@ -498,6 +514,101 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     await expect(resultPromise).resolves.toEqual({ id: "ao-message-id-123" });
     expect(aoSubmitMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("transferAoTokens still opens the approval window when the denomination read fails", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+    await setItem("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example",
+    });
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
+
+    const resultPromise = providerCall({
+      origin: "https://bazar.arweave.net",
+      method: "transferAoTokens",
+      params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+    });
+    resultPromise.catch(() => {});
+
+    await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+
+    const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+      request: { preview: Record<string, unknown> };
+    }>;
+    expect(pendingRaw).toHaveLength(1);
+    expect(pendingRaw[0]!.request.preview).toMatchObject({
+      token: "ao-process-id",
+      tokenDenomination: null,
+      tokenTicker: null,
+    });
+  });
+
+  it("transferAoTokens still opens the approval window (with an unresolved denomination) when the peer read hangs past the lookup timeout", async () => {
+    await setItem("local:wallets", [
+      { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await setItem("local:activeWalletId", "wallet-1");
+    await setItem("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example",
+    });
+    await setItem("local:grants", [
+      {
+        origin: "https://bazar.arweave.net",
+        walletId: "wallet-1",
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        createdAt: 0,
+        expiresAt: null,
+        budget: null,
+      },
+    ]);
+
+    vi.useFakeTimers();
+    try {
+      // Never resolves — simulates a hung HyperBEAM peer.
+      globalThis.fetch = vi.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+
+      const resultPromise = providerCall({
+        origin: "https://bazar.arweave.net",
+        method: "transferAoTokens",
+        params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+      });
+      resultPromise.catch(() => {});
+
+      // Advance past the lookup's own race timeout without waiting on real
+      // wall-clock time, then let the window-open path proceed.
+      await vi.advanceTimersByTimeAsync(3_000);
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled(), { timeout: 1000 });
+
+      const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{
+        request: { preview: Record<string, unknown> };
+      }>;
+      expect(pendingRaw).toHaveLength(1);
+      expect(pendingRaw[0]!.request.preview).toMatchObject({
+        token: "ao-process-id",
+        tokenDenomination: null,
+        tokenTicker: null,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("transferAoTokens for an unconnected origin is rejected before any approval window opens", async () => {

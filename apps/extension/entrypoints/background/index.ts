@@ -208,6 +208,29 @@ function arweaveConfigFromGatewayUrl(gatewayUrl: string): { protocol: string; ho
 }
 
 /**
+ * A hung HyperBEAM peer (or gateway metadata lookup) must not delay opening
+ * a `transferAoTokens` approval — the user is waiting on a signing prompt,
+ * not a balance read. Races `ReadsHandler.previewWatchedToken` against this
+ * timeout, resolving to "unresolved" either way rather than ever rejecting.
+ */
+const TOKEN_METADATA_LOOKUP_TIMEOUT_MS = 3_000;
+
+async function resolveTokenDenominationAndTicker(
+  address: string,
+  processId: string,
+): Promise<{ tokenDenomination: number | null; tokenTicker: string | null }> {
+  const UNRESOLVED = { tokenDenomination: null, tokenTicker: null };
+  const lookup = reads
+    .previewWatchedToken({ address, processId })
+    .then((balance) => (balance.available === false ? UNRESOLVED : { tokenDenomination: balance.denomination, tokenTicker: balance.ticker }))
+    .catch(() => UNRESOLVED);
+  const timeout = new Promise<typeof UNRESOLVED>((resolve) =>
+    setTimeout(() => resolve(UNRESOLVED), TOKEN_METADATA_LOOKUP_TIMEOUT_MS),
+  );
+  return Promise.race([lookup, timeout]);
+}
+
+/**
  * Maps a `PROVIDER_SURFACE_METHODS` name + already-origin-checked params
  * into the actual read/approval-flow work, distinct from `providerCall`'s
  * own job (the privilege-tier gate). No `WalletState` read here ever
@@ -381,6 +404,21 @@ async function handleProviderCall(
       if (!transferParams.token || !transferParams.recipient || !transferParams.amount) {
         throw new Error("transferAoTokens requires token, recipient, and amount.");
       }
+      if (!wallet) throw new Error("No active wallet to sign with.");
+
+      // Best-effort: the same denomination/ticker read the token list uses
+      // for balances, so the approval amount can render scaled with its
+      // ticker instead of as a raw atomic integer. A failed, unresolvable,
+      // or hanging lookup (unconfigured peer, unreachable HyperBEAM node)
+      // must never block or delay showing the approval — raced against
+      // `TOKEN_METADATA_LOOKUP_TIMEOUT_MS` so a hung peer can't stall the
+      // window open. `formatAmount`/`formatAmountUnit` fall back to the raw
+      // amount and a "smallest units" label when either comes back `null`.
+      const { tokenDenomination, tokenTicker } = await resolveTokenDenominationAndTicker(
+        wallet.address,
+        transferParams.token,
+      );
+
       return approval.requestApproval({
         kind: "transferAoTokens",
         origin,
@@ -389,6 +427,8 @@ async function handleProviderCall(
         amount: transferParams.amount,
         fee: null,
         token: transferParams.token,
+        tokenDenomination,
+        tokenTicker,
         payload: new Uint8Array(),
         tags: [],
       });
