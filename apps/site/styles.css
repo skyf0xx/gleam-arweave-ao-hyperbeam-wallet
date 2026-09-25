@@ -46,7 +46,26 @@ a { color: inherit; }
 
 /* Header */
 
-.site-header { padding-top: 28px; padding-bottom: 28px; }
+/* Frosted glass: the same colour as the page, so it's invisible at the top and only
+   shows as a blur once content scrolls beneath the wordmark */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(247, 247, 247, .72);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  backdrop-filter: saturate(160%) blur(18px);
+}
+
+.site-header .wrap { padding-top: 20px; padding-bottom: 20px; }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-header { background: rgba(247, 247, 247, .96); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .site-header { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 
 .wordmark {
   display: inline-flex;
