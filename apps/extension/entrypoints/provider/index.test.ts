@@ -46,7 +46,7 @@ describe("provider.ts: GleamProvider bridge", () => {
 
   function lastRequestEnvelope() {
     const call = postMessageSpy.mock.calls.find(
-      ([message]) => (message as { type?: string })?.type === REQUEST,
+      ([message]: [unknown]) => (message as { type?: string })?.type === REQUEST,
     );
     if (!call) throw new Error("No REQUEST envelope was posted.");
     return call[0] as { id: string; method: string; params: unknown };

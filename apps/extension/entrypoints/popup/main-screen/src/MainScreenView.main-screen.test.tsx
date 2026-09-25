@@ -324,7 +324,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
   function sendWith(overrides: {
     arBalance?: Winston;
     tokenBalances?: TokenBalance[];
-  }): ReturnType<typeof vi.fn> {
+  }): RuntimePort["send"] {
     return vi.fn(async ({ type }: { type: string }) => {
       if (type === "getBalance") return overrides.arBalance ?? BALANCE;
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
@@ -333,7 +333,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
       if (type === "getTokenPrices") return [];
       if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
   }
 
   it("shows an AR row and an AO row reading 0 for a fresh wallet with no balances, never hitting the empty state", async () => {
@@ -471,7 +471,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
   function sendWith(overrides: {
     tokenBalances?: TokenBalance[];
     activity?: ActivityPage;
-  }): ReturnType<typeof vi.fn> {
+  }): RuntimePort["send"] {
     return vi.fn(async ({ type }: { type: string }) => {
       if (type === "getBalance") return BALANCE;
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
@@ -480,7 +480,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       if (type === "getTokenPrices") return [];
       if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
-    });
+    }) as RuntimePort["send"];
   }
 
   it("shows the Tokens tab by default with both Tokens and Activity tab controls", async () => {
