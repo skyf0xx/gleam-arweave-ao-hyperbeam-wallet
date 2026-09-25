@@ -24,6 +24,14 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 <!-- New findings go here until they're placed in the list above. -->
 
+- `arweave` is pinned to 1.15.7; the 2.1.0 bump (Dependabot PR #14, closed)
+  breaks `Transaction.get`/`createTransaction` — `b64UrlToBuffer` throws
+  `InvalidCharacterError`, hit directly by `submitTransfer`
+  (`packages/core/src/arweave/transfer.ts:61`) and caught by
+  `transfer.arweave.test.ts` + `transfer.send.test.ts`. Upgrading needs a
+  real pass: read arweave-js's v2 migration notes, adapt `transfer.ts`,
+  re-test AR sends manually in Chrome. M 🧪 `opus`
+
 - Chrome Web Store: not yet submitted. First submission is manual (Developer
   Dashboard, $5 one-time registration, store listing copy/screenshots,
   privacy-practices disclosures, and a manual review pass since this is a
