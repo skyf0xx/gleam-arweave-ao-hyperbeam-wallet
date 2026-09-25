@@ -122,8 +122,8 @@ importers:
         specifier: ^1.0.3
         version: 1.0.4(supports-color@7.2.0)
       arweave:
-        specifier: ^1.15.7
-        version: 1.15.7
+        specifier: ^2.1.0
+        version: 2.1.0
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -1357,6 +1357,10 @@ packages:
   arweave@1.15.7:
     resolution: {integrity: sha512-F+Y4iWU1qea9IsKQ/YNmLsY4DHQVsaJBuhEbFxQn9cfGHOmtXE+bwo14oY8xqymsqSNf/e1PeIfLk7G7qN/hVA==}
     engines: {node: '>=18'}
+
+  arweave@2.1.0:
+    resolution: {integrity: sha512-YQQfUpvUFvq3fCXewakjN6KFH8JXG28S1Gudgz66uZdhaavWZRUMFVLLPqCC+dFAjAaPzUB8C/KJEw+pMs2FrQ==}
+    engines: {node: '>=22'}
 
   asn1.js@4.10.1:
     resolution: {integrity: sha512-p32cOF5q0Zqs9uBiONKYLm6BClCoBCM5O9JfeUSlnQLBTxYdTK+pW+nXflm8UkKd2UYlEbYz5qEi0JuZR9ckSw==}
@@ -5520,6 +5524,11 @@ snapshots:
       arconnect: 0.4.2
       asn1.js: 5.4.1
       base64-js: 1.5.1
+      bignumber.js: 9.3.1
+
+  arweave@2.1.0:
+    dependencies:
+      asn1.js: 5.4.1
       bignumber.js: 9.3.1
 
   asn1.js@4.10.1:
