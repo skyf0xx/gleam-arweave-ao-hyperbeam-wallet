@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <title>Privacy: Gleam</title>
+  <meta name="description" content="What the Gleam wallet and this website collect, store and send. Short version: we have no server.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+  </header>
+
+  <main class="wrap">
+    <article class="prose">
+      <h1>Privacy</h1>
+      <p class="updated small">Last updated: 25 September 2026</p>
+
+      <h2>What Gleam is</h2>
+      <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam server and no Gleam account.</p>
+
+      <h2>What stays on your device</h2>
+      <p>Your key is encrypted with your password and stored in the browser's extension storage. While the wallet is unlocked, the decrypted key is held in the browser's session storage. It's cleared when you lock the wallet, when auto-lock runs, or when the browser restarts.</p>
+      <p>Your settings, contacts, the sites you've connected and a local log of your activity are stored in the extension too. None of it is sent to us. We have no server to send it to.</p>
+
+      <h2>What we can't see</h2>
+      <p>We can't see your key, your password, your balances, your addresses or your activity. That also means we can't recover a lost password or key.</p>
+
+      <h2>Network requests the extension makes</h2>
+      <p>To show balances, prices and activity, and to send transactions, the extension talks to these services:</p>
+      <ul>
+        <li>An Arweave gateway, <code>arweave.net</code> by default, or one you choose: AR balances, activity (through GraphQL), token details and posting transactions. If a GraphQL query fails there, it's retried on <code>arweave.net</code> and then <code>arweave-search.goldsky.com</code>.</li>
+        <li><code>ar-io.dev</code> and <code>permagate.io</code>: on first install, if <code>arweave.net</code> doesn't answer, these are checked in turn to pick a working gateway.</li>
+        <li><code>up.arweave.net</code>: data uploads.</li>
+        <li><code>mu.ao-testnet.xyz</code>: submitting AO messages, such as token sends. <code>cu.ao-testnet.xyz</code>: reading their results.</li>
+        <li>HyperBEAM peers, <code>state.forward.computer</code> by default, plus any peer you add: AO balance reads.</li>
+        <li><code>api.coingecko.com</code> and <code>api.coinpaprika.com</code>: AR and AO prices, for USD values and the balance chart. These requests only name the token. They don't include your address.</li>
+        <li><code>lunar.arweave.net</code>: a block explorer. It opens in a new tab only when you click a transaction or address.</li>
+      </ul>
+      <p>Each of these services receives your IP address, as with any web request. Gateways and AO nodes also receive your public address when looking up your balances and activity, because that's how public blockchains work. Transactions you send are public and permanent on Arweave and AO.</p>
+
+      <h2>Sites you connect</h2>
+      <p>A site sees only what you grant it, such as your address. Every signing request opens its own approval window. You can revoke a site's access at any time in Connected apps.</p>
+
+      <h2>No tracking</h2>
+      <p>There are no analytics, telemetry, cookies, ads or third-party scripts, in the extension or on this website. The website is static and hosted on GitHub Pages. GitHub may log standard request data, as described in <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.</p>
+
+      <h2>Changes</h2>
+      <p>If this policy changes, the new version is posted on this page with a new date. The code is public on <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a>.</p>
+
+      <h2>Contact</h2>
+      <p><a href="mailto:gleam.wallet@proton.me"><code>gleam.wallet@proton.me</code></a></p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+</html>

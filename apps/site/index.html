@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <title>Gleam: crypto without the clutter</title>
+  <meta name="description" content="Gleam is a wallet for AO and Arweave. Open it, do the thing, done.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Gleam">
+  <meta property="og:title" content="Gleam: crypto without the clutter">
+  <meta property="og:description" content="Gleam is a wallet for AO and Arweave. Open it, do the thing, done.">
+  <meta property="og:url" content="https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/">
+  <meta property="og:image" content="https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/img/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@gleam_wallet">
+  <meta name="twitter:title" content="Gleam: crypto without the clutter">
+  <meta name="twitter:description" content="Gleam is a wallet for AO and Arweave. Open it, do the thing, done.">
+  <meta name="twitter:image" content="https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/img/og.jpg">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="preload" as="image" imagesrcset="img/dashboard-hero-502.webp 502w, img/dashboard-hero-1004.webp 1004w" imagesizes="(max-width: 900px) min(520px, 100vw), 45vw">
+  <link rel="stylesheet" href="styles.css">
+  <script>document.documentElement.classList.add("js");</script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+  </header>
+
+  <main>
+    <section class="hero wrap reveal" aria-labelledby="hero-title">
+      <div class="hero-text reveal-text">
+        <h1 id="hero-title" class="display">Crypto without the clutter.</h1>
+        <p class="line">Your wallet for AO and Arweave. Open it, do the thing, done.</p>
+        <div class="cta">
+          <a class="button" href="https://x.com/gleam_wallet" rel="noopener">Follow @gleam_wallet</a>
+          <p class="small">Coming to the Chrome Web Store.</p>
+        </div>
+      </div>
+      <div class="shot">
+        <div class="float">
+          <img src="img/dashboard-hero-1004.webp"
+               srcset="img/dashboard-hero-502.webp 502w, img/dashboard-hero-1004.webp 1004w"
+               sizes="(max-width: 900px) min(520px, 100vw), 45vw"
+               width="1004" height="1365" fetchpriority="high" decoding="async"
+               alt="Gleam wallet home screen showing a $2.14 balance, a 7-day chart, Send and Receive buttons, and AR and AO token balances.">
+        </div>
+      </div>
+    </section>
+
+    <section class="showcase wrap reveal" aria-labelledby="send-title">
+      <div class="reveal-text">
+        <h2 id="send-title" class="heading">See what you're sending.</h2>
+        <p class="line">The amount, the full address and the fee, before you sign.</p>
+      </div>
+      <div class="shot">
+        <div class="float float-2 crop">
+          <img src="img/review-send-1200.webp"
+               srcset="img/review-send-600.webp 600w, img/review-send-1200.webp 1200w"
+               sizes="(max-width: 639px) 150vw, (max-width: 900px) 100vw, 60vw"
+               width="1200" height="896" loading="lazy" decoding="async"
+               alt="Review send screen: 0.002 AO to a full, untruncated recipient address, no network fee, and a Sign and send button.">
+        </div>
+      </div>
+    </section>
+
+    <section class="showcase flip wrap reveal" aria-labelledby="glance-title">
+      <div class="reveal-text">
+        <h2 id="glance-title" class="heading">Everything at a glance.</h2>
+        <p class="line">Balances and activity for AR and AO in one view. A send shows its progress until it confirms.</p>
+      </div>
+      <div class="shot">
+        <div class="float float-3 crop">
+          <img src="img/activity-pending-1200.webp"
+               srcset="img/activity-pending-600.webp 600w, img/activity-pending-1200.webp 1200w"
+               sizes="(max-width: 639px) 150vw, (max-width: 900px) 100vw, 60vw"
+               width="1200" height="896" loading="lazy" decoding="async"
+               alt="Activity tab showing a pending 0.002 AO send with a progress bar, above an earlier confirmed send.">
+        </div>
+      </div>
+    </section>
+
+    <section class="showcase wrap reveal" aria-labelledby="ao-title">
+      <div class="reveal-text">
+        <h2 id="ao-title" class="heading">Built for AO.</h2>
+        <p class="line">Arweave and AO, and nothing else. No network switcher, no chain list.</p>
+      </div>
+      <div class="shot">
+        <div class="float float-4 crop">
+          <img src="img/network-peers-1200.webp"
+               srcset="img/network-peers-600.webp 600w, img/network-peers-1200.webp 1200w"
+               sizes="(max-width: 639px) 150vw, (max-width: 900px) 100vw, 60vw"
+               width="1200" height="896" loading="lazy" decoding="async"
+               alt="Network and peers settings showing the arweave.net gateway and an active AO peer.">
+        </div>
+      </div>
+    </section>
+
+    <section class="final reveal" aria-labelledby="final-title">
+      <div class="refraction" aria-hidden="true"></div>
+      <div class="wrap">
+        <div class="shot">
+          <div class="float float-5 crop">
+            <img src="img/dashboard-front-1200.webp"
+                 srcset="img/dashboard-front-600.webp 600w, img/dashboard-front-1200.webp 1200w"
+                 sizes="(max-width: 639px) 150vw, 760px"
+                 width="1200" height="896" loading="lazy" decoding="async"
+                 alt="Gleam wallet home screen.">
+          </div>
+        </div>
+        <div class="reveal-text">
+          <h2 id="final-title" class="display">Crypto without the clutter.</h2>
+          <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="cta">
+            <a class="button" href="https://x.com/gleam_wallet" rel="noopener">Follow @gleam_wallet</a>
+            <p class="small">Coming to the Chrome Web Store.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+</html>

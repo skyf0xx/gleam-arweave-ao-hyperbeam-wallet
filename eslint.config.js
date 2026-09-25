@@ -47,4 +47,21 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // The static site's vanilla script runs in the browser; `globals` isn't
+    // resolvable from the root, so the handful it uses are listed here.
+    files: ["apps/site/**/*.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: {
+        window: "readonly",
+        document: "readonly",
+        IntersectionObserver: "readonly",
+        requestAnimationFrame: "readonly",
+        cancelAnimationFrame: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+      },
+    },
+  },
 );
