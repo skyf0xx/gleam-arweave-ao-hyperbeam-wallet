@@ -17,6 +17,8 @@ vault, crypto and provider security; `sonnet` for everything else.
   that changes.
 - `userTokens` doesn't set `Logo` (`reads.ts`): `TokenBalance` doesn't
   carry the spawn-tag logo, and no dApp has asked for it.
+- Upload is disabled in Settings until bundler uploads work with current
+  AO wallets; re-enabling means restoring the row's `onOpenUpload` wiring.
 
 ## Unsorted
 

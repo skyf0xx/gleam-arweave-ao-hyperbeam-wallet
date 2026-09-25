@@ -23,7 +23,8 @@ function gatewayHostname(gatewayUrl: string): string {
  * WALLET/NETWORK/TOOLS/GENERAL sections of navigable rows, each showing
  * its current value on the right. "Import & export" and "About" have no
  * screen built yet, so those two rows render disabled rather than
- * routing nowhere.
+ * routing nowhere. "Upload to Arweave" is also disabled, with a
+ * "Coming soon" label, until bundler uploads work reliably.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
@@ -52,6 +53,9 @@ export function SettingsHomeView({
   onOpenContacts,
   onOpenUpload,
 }: SettingsHomeViewProps) {
+  // Upload row is disabled below; onOpenUpload stays in the prop contract
+  // so re-enabling it is a one-line change.
+  void onOpenUpload;
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
@@ -139,11 +143,9 @@ export function SettingsHomeView({
         </SettingsSection>
 
         <SettingsSection title="Tools">
-          <SettingsRow
-            title="Upload to Arweave"
-            subtitle="Store a file permanently"
-            onClick={onOpenUpload}
-          />
+          {/* Bundler uploads don't yet work reliably with current AO wallets;
+              re-enable by restoring onClick={onOpenUpload} below. */}
+          <SettingsRow title="Upload to Arweave" subtitle="Store a file permanently" disabled comingSoon />
         </SettingsSection>
 
         <SettingsSection title="General">
@@ -178,17 +180,20 @@ function SettingsRow({
   value,
   onClick,
   disabled = false,
+  comingSoon = false,
 }: {
   title: string;
   subtitle?: string;
   value?: string;
   onClick?: () => void;
   disabled?: boolean;
+  comingSoon?: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
+      aria-disabled={disabled}
       onClick={onClick}
       className="flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist disabled:cursor-default disabled:opacity-50"
     >
@@ -197,7 +202,8 @@ function SettingsRow({
         {subtitle ? <span className="text-caption text-muted">{subtitle}</span> : null}
       </span>
       {value ? <span className="flex-shrink-0 text-label text-muted">{value}</span> : null}
-      {disabled ? null : (
+      {comingSoon ? <span className="flex-shrink-0 text-caption text-faint">Coming soon</span> : null}
+      {disabled || comingSoon ? null : (
         <span aria-hidden="true" className="flex-shrink-0 text-faint">
           <ChevronIcon />
         </span>

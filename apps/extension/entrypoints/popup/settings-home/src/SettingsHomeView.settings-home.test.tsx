@@ -103,14 +103,19 @@ describe("SettingsHomeView", () => {
     expect(onOpenContacts).toHaveBeenCalled();
   });
 
-  it("calls onOpenUpload when the Upload to Arweave row is pressed", async () => {
+  it("shows the Upload to Arweave row as disabled with a Coming soon label and never calls onOpenUpload", async () => {
     const onOpenUpload = vi.fn();
     renderSettingsHome({ onOpenUpload });
 
     await waitFor(() => expect(screen.getByText("Upload to Arweave")).toBeTruthy());
-    fireEvent.click(screen.getByText("Upload to Arweave"));
+    expect(screen.getByText("Coming soon")).toBeTruthy();
 
-    expect(onOpenUpload).toHaveBeenCalled();
+    const row = screen.getByText("Upload to Arweave").closest("button") as HTMLButtonElement;
+    expect(row.disabled).toBe(true);
+
+    fireEvent.click(row);
+
+    expect(onOpenUpload).not.toHaveBeenCalled();
   });
 
   it("calls onBack when the header back button is pressed", async () => {
