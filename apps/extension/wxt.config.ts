@@ -8,6 +8,9 @@ import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
+    // WXT falls back to package.json's "name" ("@gleam/extension") when
+    // this is unset, which Chrome then shows as the extension's name.
+    name: 'Gleam',
     // 'tabs' lets the background worker resolve tab.url/origin for
     // provider-event delivery (background/index.ts's findTabsForOrigin)
     // without needing a granted host_permission per origin — MV3's

@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish
 
-- [ ] **Chrome shows the extension as "@gleam/extension" (S, sonnet)**
-  `apps/extension/wxt.config.ts`. WXT falls back to `package.json`'s
-  `name` because the manifest config sets none. Done: the built
-  manifest's `name` is "Gleam" (and `action.default_title` still says
-  "Gleam").
 - [ ] **`userTokens` reports a placeholder `Denomination` it couldn't confirm (S, sonnet)**
   `apps/extension/src/handlers/reads.ts` `userTokens`. When the
   denomination read fails, the row still sends a placeholder (0), and a
