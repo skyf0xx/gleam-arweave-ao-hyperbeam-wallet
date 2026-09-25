@@ -2,11 +2,7 @@
 
 <img src="docs/branding/images/dashboard-tilted-crisp.png" alt="Gleam wallet dashboard" width="360" />
 
-A Chrome browser-extension wallet for Arweave and AO. Password-protected key
-vault, AR and AO balances, send/receive, a merged activity feed, tagged
-Arweave uploads, and an ArConnect-compatible `window.arweaveWallet`
-provider — every dApp signing request opens its own approval window with a
-decoded preview.
+A Chrome browser-extension wallet for Arweave and AO.
 
 ## Getting started
 
