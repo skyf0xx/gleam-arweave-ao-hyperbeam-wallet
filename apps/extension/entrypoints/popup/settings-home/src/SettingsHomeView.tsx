@@ -20,8 +20,8 @@ function gatewayHostname(gatewayUrl: string): string {
 
 /**
  * The dedicated settings screen the gear icon opens: grouped
- * WALLET/NETWORK/GENERAL sections of navigable rows, each showing its
- * current value on the right. "Import & export" and "About" have no
+ * WALLET/NETWORK/TOOLS/GENERAL sections of navigable rows, each showing
+ * its current value on the right. "Import & export" and "About" have no
  * screen built yet, so those two rows render disabled rather than
  * routing nowhere.
  */
@@ -33,6 +33,7 @@ export interface SettingsHomeViewProps {
   onOpenNetworkPeers: () => void;
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
+  onOpenUpload: () => void;
 }
 
 interface LoadState {
@@ -49,6 +50,7 @@ export function SettingsHomeView({
   onOpenNetworkPeers,
   onOpenManageTokens,
   onOpenContacts,
+  onOpenUpload,
 }: SettingsHomeViewProps) {
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
@@ -133,6 +135,14 @@ export function SettingsHomeView({
               state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
             }
             onClick={onOpenNetworkPeers}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Tools">
+          <SettingsRow
+            title="Upload to Arweave"
+            subtitle="Store a file permanently"
+            onClick={onOpenUpload}
           />
         </SettingsSection>
 

@@ -1,6 +1,13 @@
 import { scanForSecrets, validateTagBytes } from "@gleam/core/src/policy/index.ts";
 import { submitUploadToBundler } from "@gleam/core/src/arweave/index.ts";
-import { base64ToBytes, DEFAULT_BUNDLER_URL, type StoragePort, type UploadDraft, type UploadReview } from "@gleam/core";
+import {
+  base64ToBytes,
+  DEFAULT_BUNDLER_URL,
+  type ActivityEntry,
+  type StoragePort,
+  type UploadDraft,
+  type UploadReview,
+} from "@gleam/core";
 import { getCachedKey } from "./key-session";
 
 /**
@@ -29,11 +36,26 @@ export interface SubmitUploadRequest extends UploadDraft {
   walletId: string;
 }
 
+const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
+
+function isValidActivityEntry(value: unknown): value is ActivityEntry {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.txId === "string" && typeof candidate.timestamp === "number";
+}
+
 export class UploadHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
   ) {}
+
+  /** Same `local:activityLog:{address}` log `TransferHandler` writes to and `ReadsHandler` reads. */
+  private async appendActivityLog(address: string, entry: ActivityEntry): Promise<void> {
+    const raw = await this.storage.get<unknown>(`${ACTIVITY_LOG_KEY_PREFIX}${address}`);
+    const existing = Array.isArray(raw) ? raw.filter(isValidActivityEntry) : [];
+    await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, [entry, ...existing]);
+  }
 
   /**
    * Runs the pre-upload secret scan and tag byte-size validation over an
@@ -82,7 +104,7 @@ export class UploadHandler {
     }
     const dataBytes = base64ToBytes(req.data);
 
-    return submitUploadToBundler(
+    const { txId } = await submitUploadToBundler(
       this.bundlerUrl,
       cached.jwk,
       dataBytes,
@@ -90,5 +112,18 @@ export class UploadHandler {
       req.tags,
       req.licenseTag,
     );
+
+    await this.appendActivityLog(cached.address, {
+      txId,
+      type: "upload",
+      status: "pending",
+      address: cached.address,
+      amount: null,
+      tags: req.tags,
+      timestamp: Date.now(),
+      token: null,
+    });
+
+    return { txId };
   }
 }

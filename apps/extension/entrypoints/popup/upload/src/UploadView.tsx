@@ -1,12 +1,19 @@
 import { useState, type ReactNode } from "react";
-import { explorerUrlFor, type RuntimePort, type UploadReview, type UploadTag, type WalletSummary } from "@gleam/core";
+import {
+  explorerUrlFor,
+  type RuntimePort,
+  type UploadReview,
+  type UploadTag,
+  type WalletSummary,
+} from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { useNetworkSettings } from "@/entrypoints/popup/main-screen/src/useNetworkSettings";
 
 const TAG_BYTES_LIMIT = 4096;
-const GATEWAY_VIEW_URL = "https://arweave.net";
+const FALLBACK_GATEWAY_VIEW_URL = "https://arweave.net";
 
 /**
  * Compose → review → success, same internal step-state shape (no router)
@@ -118,6 +125,8 @@ const INITIAL_STEP: ComposeState = {
 
 export function UploadView({ runtime, wallet, onBack, onDone }: UploadViewProps) {
   const [step, setStep] = useState<Step>(INITIAL_STEP);
+  const networkSettingsQuery = useNetworkSettings(runtime);
+  const gatewayUrl = networkSettingsQuery.data?.gatewayUrl ?? FALLBACK_GATEWAY_VIEW_URL;
 
   if (step.kind === "compose") {
     return (
@@ -211,7 +220,7 @@ export function UploadView({ runtime, wallet, onBack, onDone }: UploadViewProps)
     );
   }
 
-  return <SuccessStep step={step} onDone={onDone} />;
+  return <SuccessStep step={step} gatewayUrl={gatewayUrl} onDone={onDone} />;
 }
 
 function ComposeStep({
@@ -420,6 +429,12 @@ function FileRow({ name, size, onRemove }: { name: string; size: number; onRemov
   );
 }
 
+/**
+ * The cost row always reads "Free": `submitUpload` posts the signed
+ * ANS-104 DataItem to the `up.arweave.net` bundler (`core/arweave/
+ * upload.ts`), which doesn't charge the sender — there's no L1
+ * transaction or `estimateFee` call on this path.
+ */
 function ReviewStep({
   wallet,
   step,
@@ -468,6 +483,7 @@ function ReviewStep({
             }
           />
           <ReviewRow label="License" value={step.licenseTag ? step.licenseTag.value : "No license"} />
+          <ReviewRow label="Cost" value="Free" />
         </div>
 
         {step.error ? (
@@ -501,8 +517,16 @@ function ReviewRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function SuccessStep({ step, onDone }: { step: SuccessState; onDone: () => void }) {
-  const contentUrl = `${GATEWAY_VIEW_URL}/${step.txId}`;
+function SuccessStep({
+  step,
+  gatewayUrl,
+  onDone,
+}: {
+  step: SuccessState;
+  gatewayUrl: string;
+  onDone: () => void;
+}) {
+  const contentUrl = `${gatewayUrl}/${step.txId}`;
   const explorerUrl = explorerUrlFor(step.txId);
 
   return (

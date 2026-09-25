@@ -39,6 +39,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenNetworkPeers={vi.fn()}
       onOpenManageTokens={vi.fn()}
       onOpenContacts={vi.fn()}
+      onOpenUpload={vi.fn()}
       {...overrides}
     />,
   );
@@ -100,6 +101,16 @@ describe("SettingsHomeView", () => {
     fireEvent.click(screen.getByText("Contacts"));
 
     expect(onOpenContacts).toHaveBeenCalled();
+  });
+
+  it("calls onOpenUpload when the Upload to Arweave row is pressed", async () => {
+    const onOpenUpload = vi.fn();
+    renderSettingsHome({ onOpenUpload });
+
+    await waitFor(() => expect(screen.getByText("Upload to Arweave")).toBeTruthy());
+    fireEvent.click(screen.getByText("Upload to Arweave"));
+
+    expect(onOpenUpload).toHaveBeenCalled();
   });
 
   it("calls onBack when the header back button is pressed", async () => {

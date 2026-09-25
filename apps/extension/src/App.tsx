@@ -14,6 +14,7 @@ import { SettingsHomeView } from "@/entrypoints/popup/settings-home/index.tsx";
 import { ConnectedAppsView } from "@/entrypoints/popup/connected-apps/index.tsx";
 import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
 import { ContactsView } from "@/entrypoints/popup/contacts/index.tsx";
+import { UploadView } from "@/entrypoints/popup/upload/index.tsx";
 
 /**
  * The one shared shell mounted from every surface (popup, sidepanel, and
@@ -85,7 +86,8 @@ type MainSubView =
   | { kind: "network-peers" }
   | { kind: "connected-apps" }
   | { kind: "manage-tokens" }
-  | { kind: "contacts" };
+  | { kind: "contacts" }
+  | { kind: "upload" };
 
 function resolveTopView(state: WalletState): TopView {
   if (state.wallets.length === 0) return "onboarding";
@@ -282,6 +284,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
+        onOpenUpload={() => setSubView({ kind: "upload" })}
       />
     );
   } else if (subView.kind === "lock-settings") {
@@ -306,6 +309,15 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     );
   } else if (subView.kind === "contacts") {
     content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+  } else if (subView.kind === "upload") {
+    content = (
+      <UploadView
+        runtime={runtime}
+        wallet={wallet}
+        onBack={() => setSubView({ kind: "settings-home" })}
+        onDone={() => setSubView({ kind: "settings-home" })}
+      />
+    );
   } else {
     content = (
       <MainScreenView

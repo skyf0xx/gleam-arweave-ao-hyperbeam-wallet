@@ -9,19 +9,6 @@ product decision before starting.
 The last tag is the model the subagent should run on: `opus` for signing,
 vault, crypto and provider security; `sonnet` for everything else.
 
-## 4. Other missing features
-
-- [ ] **Upload screen can't be reached (M, sonnet)**
-  `popup/upload/src/UploadView.tsx` is complete, but `src/App.tsx` has no
-  route and nothing links to it. Upload is rarely used, so it gets no
-  main-screen button: it lives in Settings, found by someone looking for
-  it. In `popup/settings-home/src/SettingsHomeView.tsx`, add a "Tools"
-  section between Network and General with one row, "Upload to Arweave",
-  subtitle "Store a file permanently". Back from Upload returns to
-  Settings. The UX spec's review step also wants a fee or cost row, which
-  `UploadReview` lacks. Done: the Settings row, a route, and a cost line
-  on review. Upload writes an activity entry.
-
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->

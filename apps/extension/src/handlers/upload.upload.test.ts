@@ -241,6 +241,32 @@ describe("UploadHandler: submitUpload", () => {
     expect(result.txId.length).toBeGreaterThan(0);
   });
 
+  it("writes a pending upload entry to the wallet's activity log on success", async () => {
+    const storage = createFakeStorage();
+    const { wallet, jwk } = await createTestWallet();
+    await storage.set("local:wallets", [wallet]);
+    await cacheKey(WALLET_ID, jwk, wallet.address);
+    mockBundlerFetch(200);
+
+    const handler = new UploadHandler(storage);
+    const result = await handler.submitUpload({
+      ...textDraft("hello world", [{ name: "App-Name", value: "Gleam" }]),
+      walletId: WALLET_ID,
+    });
+
+    const log = await storage.get<Array<{ txId: string; type: string; status: string; address: string }>>(
+      `local:activityLog:${wallet.address}`,
+    );
+    expect(log).toEqual([
+      expect.objectContaining({
+        txId: result.txId,
+        type: "upload",
+        status: "pending",
+        address: wallet.address,
+      }),
+    ]);
+  });
+
   it("throws a descriptive error when the bundler responds with a non-2xx status", async () => {
     const storage = createFakeStorage();
     const { wallet, jwk } = await createTestWallet();
