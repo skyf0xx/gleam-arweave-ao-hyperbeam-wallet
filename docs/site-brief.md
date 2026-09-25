@@ -52,20 +52,29 @@ apps/site/
 |---|---|---|---|
 | `dashboard-hero` | 1004×1365, 502×683 | Wallet home, crisp, portrait, slight tilt | Hero |
 | `review-send` | 1200×896, 600×448 | "Review send": amount, full recipient address, fee, Sign and send | Showcase 1 |
-| `activity-pending` | 1200×896, 600×448 | Activity tab: pending send with beam progress bar | Showcase 2 |
-| `network-peers` | 1200×896, 600×448 | Network & peers: arweave.net gateway, AO peer | Showcase 3 |
-| `dashboard-front` | 1200×896, 600×448 | Wallet home, front-facing, floating | Final CTA |
+| `tokens` | 1024×1024, 512×512 | Illustration: a stack of token rows (AR, AO and others) with amounts and USD values, prismatic card edges | Showcase 2 |
+| `send-receive` | 1024×1024, 512×512 | Illustration: two floating cards, black "Send" and white "Receive", prismatic edges | Showcase 3 |
+| `network-peers` | 1200×896, 600×448 | Network & peers: arweave.net gateway, AO peer | Showcase 4 |
+| `collage-prism` | 1376×768, 688×384 | Three screens (home, receive, activity) floating on the right, a thin prismatic beam crossing them, empty space on the left | Final CTA |
+| `activity-pending` | 1200×896, 600×448 | Activity tab: pending send with beam progress bar | Alternate (not used) |
+| `activity-card` | 1024×1024, 512×512 | Illustration: activity card with received, sent and uploaded rows | Alternate (not used) |
+| `dashboard-front` | 1200×896, 600×448 | Wallet home, front-facing, floating | Alternate (not used); source of `og.jpg` |
 
-Each render is a white product card floating on a near-white backdrop
-(`#E5E5E5`–`#FFFFFF`) with its shadow baked in. The card fills roughly the
-middle 40–60% of the frame. Use them like this:
+Use the images in the "Used in" column exactly as assigned. The alternates
+stay in the folder but aren't loaded.
+
+Each image is a white product card, or a group of cards, floating on a
+near-white backdrop (`#E5E5E5`–`#FFFFFF`) with its shadow baked in. Some
+cards have soft prismatic edges baked into the render. That's the "light
+catching an object" effect from the art direction, so don't add CSS
+effects that compete with it. Use the images like this:
 
 - `<img srcset="… 600w, … 1200w" sizes="…" width height alt loading decoding>`. Set `width`/`height` so there's no layout shift. Give the hero image `fetchpriority="high"` and add a matching `<link rel="preload" as="image" imagesrcset imagesizes>`. Lazy-load all the others.
 - **Fade every image's edges into the page** with a radial mask so the backdrop never shows as a rectangle:
   `mask-image: radial-gradient(closest-side, #000 72%, transparent 100%)`. Tune the stops per image by eye. The card and its shadow must stay fully opaque. Only the empty backdrop fades.
-- **Mobile crop:** below 640px the card would be tiny inside a 1200×896 frame. Wrap each landscape image in a box with `aspect-ratio: 4 / 5; overflow: hidden` and give the image `object-fit: cover; object-position: center`, scaled up (e.g. `width: 150%` centred) so the card fills most of the width. Check that no card is ever clipped.
-- Use only the prepared files in `apps/site/img/`. Never reference `docs/branding/images/`, which holds the full-size sources. Files there prefixed `unusable-` have garbled AI text, invented tokens, or show features that haven't shipped. They must never appear on the site.
-- Sources of the prepared images, for any future re-export: `dashboard-hero` ← `dashboard-tilted-crisp.png`, `review-send` ← `review-send-front.png`, `activity-pending` ← `activity-pending-send-tilted.png`, `network-peers` ← `network-peers-front.png`, `dashboard-front` and `og.jpg` ← `dashboard-floating-front.png`.
+- **Mobile crop:** below 640px the card would be tiny inside a 1200×896 frame. (The square 1024 images need little or no crop.) Wrap each landscape image in a box with `aspect-ratio: 4 / 5; overflow: hidden` and give the image `object-fit: cover; object-position: center`, scaled up (e.g. `width: 150%` centred) so the card fills most of the width. Check that no card is ever clipped.
+- Use only the prepared files in `apps/site/img/`. Never reference `docs/branding/images/`, which holds the full-size sources.
+- Sources of the prepared images, for any future re-export: `dashboard-hero` ← `dashboard-tilted-crisp.png`, `review-send` ← `review-send-front.png`, `tokens` ← `tokens-stack-illustration.png`, `send-receive` ← `send-receive-cards.png`, `network-peers` ← `network-peers-front.png`, `collage-prism` ← `collage-prism-beam.png`, `activity-pending` ← `activity-pending-send-tilted.png`, `activity-card` ← `activity-card-illustration.png`, `dashboard-front` and `og.jpg` ← `dashboard-floating-front.png`.
 
 ## 3. Design tokens
 
@@ -102,7 +111,7 @@ Components:
 
 ## 4. `index.html`: structure and copy
 
-There's no navigation. The page runs hero → three showcases → final CTA →
+There's no navigation. The page runs hero → four showcases → final CTA →
 footer. Use the copy **exactly as written**. It follows the brand voice (§11).
 
 **Header** (not sticky, not a nav): the wordmark top-left, linking to `./`.
@@ -115,22 +124,26 @@ Nothing on the right.
 - Caption under the button, small and muted: Coming to the Chrome Web Store.
 - Image: `dashboard-hero`, large. Desktop: the right column, about 45–50% of the width, allowed to be taller than the text column. Alt: "Gleam wallet home screen showing a $2.14 balance, a 7-day chart, Send and Receive buttons, and AR and AO token balances."
 
-**Showcase sections** (each at least ~80svh with generous vertical padding, ~20–30vh between sections). Each one has a single large image and a short text block (heading + one line). Alternate the image side on desktop: image right, then left, then right. On mobile, stack the text first. Vertically centre the text against the image.
+**Showcase sections** (each at least ~80svh with generous vertical padding, ~20–30vh between sections). Each one has a single large image and a short text block (heading + one line). Alternate the image side on desktop: image right, left, right, left. On mobile, stack the text first. Vertically centre the text against the image.
 
 1. `<h2>` See what you're sending.
    Line: The amount, the full address and the fee, before you sign.
    Image `review-send`. Alt: "Review send screen: 0.002 AO to a full, untruncated recipient address, no network fee, and a Sign and send button."
 2. `<h2>` Everything at a glance.
-   Line: Balances and activity for AR and AO in one view. A send shows its progress until it confirms.
-   Image `activity-pending`. Alt: "Activity tab showing a pending 0.002 AO send with a progress bar, above an earlier confirmed send."
-3. `<h2>` Built for AO.
+   Line: Every token you hold and what it's worth, in one list.
+   Image `tokens`. Alt: "A list of token balances with their values in US dollars."
+3. `<h2>` Just send. Just receive.
+   Line: Two buttons, and nothing to set up first.
+   Image `send-receive`. Alt: "Two floating cards labelled Send and Receive."
+4. `<h2>` Built for AO.
    Line: Arweave and AO, and nothing else. No network switcher, no chain list.
    Image `network-peers`. Alt: "Network and peers settings showing the arweave.net gateway and an active AO peer."
 
-**Final CTA** (centred, lots of empty space above and below)
-- Image `dashboard-front`, centred, with the refraction line (§6) passing behind it. Alt: "Gleam wallet home screen."
+**Final CTA** (full-bleed; lots of empty space above and below)
+- Image `collage-prism` spans the section width (up to ~1400px). Its prismatic beam is the light passing behind the product, so no CSS beam or refraction effect goes here. Alt: "Three Gleam screens (home, receive and activity) floating in light."
+- Desktop: overlay the text block on the image's empty left third, vertically centred and left-aligned. Mobile: stack the text first, then the image cropped towards its right side (`object-position: right center`) so the screens stay large.
 - `<h2>` (Display size) Crypto without the clutter.
-- The beam (72×3px), centred, 24px below the headline.
+- The beam (72×3px), left-aligned with the text, 24px below the headline.
 - The same primary button and caption as the hero.
 
 **Footer** (one quiet row, small, muted, a 1px `--line` rule above it; it wraps on mobile)
@@ -154,8 +167,9 @@ UI demo.
 
 - **Float**: each image wrapper translates Y by ±3px (never more than 4px, because the baked-in shadow moves with it) using `ease-in-out` over 7s, 8.5s, 9.5s and 10s. Give each element a different duration and a negative `animation-delay` so they never move in sync. Pure CSS.
 - **Reveal**: when a section first enters the viewport (IntersectionObserver, `threshold: 0.2`), its text and image fade from 0 to 1 opacity and rise 16px over 900ms `cubic-bezier(.2,.7,.2,1)`, with the image following 120ms after the text. It runs once. Without JS, everything must be visible: add a `js` class to `<html>` from script and gate the hidden state behind `.js`.
-- **Glint** (optional, and cut it if it reads as a shimmer): every 12–20s at a random interval, one currently visible showcase image gets a narrow diagonal highlight sweeping across it over 1.6s. Build it as a pseudo-element with a band of `rgba(255,255,255,.0)` → a faint spectral edge at ~6–8% opacity using the beam colours → transparent, with `mix-blend-mode: soft-light`, inside the image's masked wrapper. Only one glint on the page at a time.
-- **Refraction line** (final CTA only): behind the `dashboard-front` image, draw five parallel 2px lines in the beam colours at ~30% opacity, touching each other with hard edges and no blur. Run them diagonally across the section at about −28°, from off-screen left to off-screen right. It should read as a thin beam of split light passing behind the object. It must not read as a rainbow graphic. On pointer-capable devices (`matchMedia('(pointer: fine)')`), shift it up to ±6px following the cursor, eased with `requestAnimationFrame`.
+- **Glint** (optional, and cut it if it reads as a shimmer): every 12–20s at a random interval, one currently visible showcase image (never the final CTA) gets a narrow diagonal highlight sweeping across it over 1.6s. Build it as a pseudo-element with a band of `rgba(255,255,255,.0)` → a faint spectral edge at ~6–8% opacity using the beam colours → transparent, with `mix-blend-mode: soft-light`, inside the image's masked wrapper. Only one glint on the page at a time.
+- **Final CTA drift**: on pointer-capable devices (`matchMedia('(pointer: fine)')`), shift the `collage-prism` image up to ±6px following the cursor, eased with `requestAnimationFrame`. This one doesn't float.
+- **Don't draw any CSS rainbow or refraction effect.** The prismatic light is already in the renders.
 - **`prefers-reduced-motion: reduce`**: no float, no glint, no pointer tracking, and reveals show instantly.
 - Pause float and glint when the tab is hidden (`visibilitychange`).
 
