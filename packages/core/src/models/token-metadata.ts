@@ -42,29 +42,28 @@ export interface TokenBalanceRequest {
 export type TokenBalanceResult = string;
 
 /**
- * The `params` shape a dApp sends when calling `window.arweaveWallet`'s
- * `userTokens` provider-surface method. Cursor-based pagination, matching
- * Wander's own `{ cursor?, limit? }` shape.
+ * The options a dApp passes to `window.arweaveWallet.userTokens`, as in
+ * Wander. Balances are left out unless `fetchBalance` is `true`.
  */
 export interface UserTokensOptions {
-  cursor?: string;
-  limit?: number;
+  fetchBalance?: boolean;
 }
 
 /**
- * One entry in the `userTokens` discovery list. Field names match Wander's
- * `userTokens()` response shape (`Ticker`/`Name`/`Denomination`/`Logo`,
- * capitalized) rather than this codebase's internal `TokenMetadata`
- * naming. `TokenMetadata`'s fields are nullable, but Wander's shape has
- * no nullable variant, so a caller resolving this from a `TokenMetadata`
- * with `null` fields needs to decide a fallback.
+ * One entry in the `userTokens` list, in Wander's shape: capitalized
+ * metadata fields, and `Name`/`Ticker` omitted when the token has none.
  */
 export interface UserToken {
   processId: string;
-  Ticker: string;
-  Name: string;
-  Denomination: string;
+  Name?: string;
+  Ticker?: string;
   Logo?: string;
+  Denomination: number;
+  /**
+   * Present only when `fetchBalance` was set. An atomic integer string in
+   * the token's smallest unit, or `null` when the balance couldn't be read.
+   */
+  balance?: string | null;
 }
 
 export type UserTokensResult = UserToken[];

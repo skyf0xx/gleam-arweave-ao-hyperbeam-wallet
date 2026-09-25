@@ -11,12 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish
 
-- [ ] **`tokenBalance` and `userTokens` can't be called from a page (S, opus)**
-  `entrypoints/provider/index.ts`. Both are in `PROVIDER_SURFACE_METHODS`
-  and handled in `entrypoints/background/index.ts`, but `GleamProvider`
-  has no method for either, so `window.arweaveWallet.tokenBalance` is
-  `undefined`. Done: both are on the injected object with Wander's
-  signatures, behind the same permissions the background already enforces.
 - [ ] **AO transfer approval shows the raw atomic amount (S, 🧪, sonnet)**
   `entrypoints/approval/src/SigningApprovalScreen.tsx` `formatAmount`,
   `entrypoints/background/index.ts` `transferAoTokens` case. The preview
@@ -36,3 +30,10 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- `apps/extension/src/handlers/reads.ts` `userTokens`: a row whose
+  denomination couldn't be confirmed still reports its placeholder
+  `Denomination` (0 when the balance read failed). A dApp that scales by
+  it will show a wrong amount; Wander's shape has no "unknown" value.
+- `apps/extension/src/handlers/reads.ts` `userTokens`: `Logo` is never
+  set, because `TokenBalance` doesn't carry the spawn-tag logo through.

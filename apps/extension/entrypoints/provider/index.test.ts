@@ -4,7 +4,7 @@ import {
   REQUEST,
   RESPONSE,
 } from "@gleam/messaging/src/page-protocol.ts";
-import { GleamProvider, install } from "./index";
+import { GleamProvider, install, PROVIDER_SURFACE_METHODS } from "./index";
 import { version as PACKAGE_VERSION } from "../../package.json";
 
 /**
@@ -102,6 +102,34 @@ describe("provider.ts: GleamProvider bridge", () => {
 
     postResponse({ type: RESPONSE, id: envelope.id, result: true });
     await expect(callPromise).resolves.toBe(true);
+  });
+
+  it("has a method for every provider surface method", () => {
+    const missing = PROVIDER_SURFACE_METHODS.filter(
+      (method) => typeof (provider as unknown as Record<string, unknown>)[method] !== "function",
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("tokenBalance sends the id and resolves to the relayed balance string", async () => {
+    const callPromise = provider.tokenBalance("p".repeat(43));
+    const envelope = lastRequestEnvelope();
+    expect(envelope.method).toBe("tokenBalance");
+    expect(envelope.params).toEqual({ id: "p".repeat(43) });
+
+    postResponse({ type: RESPONSE, id: envelope.id, result: "1000000" });
+    await expect(callPromise).resolves.toBe("1000000");
+  });
+
+  it("userTokens forwards Wander's options and resolves to the relayed list", async () => {
+    const tokens = [{ processId: "p".repeat(43), Ticker: "TKN", Denomination: 6, balance: "5" }];
+    const callPromise = provider.userTokens({ fetchBalance: true });
+    const envelope = lastRequestEnvelope();
+    expect(envelope.method).toBe("userTokens");
+    expect(envelope.params).toEqual({ options: { fetchBalance: true } });
+
+    postResponse({ type: RESPONSE, id: envelope.id, result: tokens });
+    await expect(callPromise).resolves.toEqual(tokens);
   });
 
   it("addToken waits as long as an approval can take", async () => {

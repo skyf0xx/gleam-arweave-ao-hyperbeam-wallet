@@ -80,6 +80,8 @@ interface Wallet {
   batchSignDataItem(dataItems: unknown, options?: unknown): Promise<unknown>;
   addToken(id: string, type?: unknown, gateway?: unknown): Promise<void>;
   isTokenAdded(id: string): Promise<unknown>;
+  tokenBalance(id: string): Promise<unknown>;
+  userTokens(options?: { fetchBalance?: boolean }): Promise<unknown>;
 }
 
 const WALLET_ID = "wallet-1";
@@ -439,6 +441,43 @@ describe("provider token list methods, end to end", () => {
     await expect(wallet.addToken("not-a-process")).rejects.toThrow(/AO process id/);
     await expect(wallet.isTokenAdded("")).rejects.toThrow(/AO process id/);
     expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
+  it("tokenBalance resolves to the balance string for one process", async () => {
+    await expect(wallet.tokenBalance(PROCESS_ID)).resolves.toBe("1000000");
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
+      expect.stringContaining(`/${PROCESS_ID}~process@1.0/compute/balances/addr-1`),
+    );
+  });
+
+  it("tokenBalance rejects an id that isn't a process id, without a network call", async () => {
+    await expect(wallet.tokenBalance("../x")).rejects.toThrow(/AO process id/);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("userTokens lists watched tokens in Wander's shape, with balances only on request", async () => {
+    store.set("local:watchedProcessIds:addr-1", [PROCESS_ID]);
+
+    const plain = (await wallet.userTokens()) as Array<Record<string, unknown>>;
+    expect(plain.find((token) => token.processId === PROCESS_ID)).toEqual({
+      processId: PROCESS_ID,
+      Name: "Token",
+      Ticker: "TKN",
+      Denomination: 6,
+    });
+
+    const withBalances = (await wallet.userTokens({ fetchBalance: true })) as Array<Record<string, unknown>>;
+    expect(withBalances.find((token) => token.processId === PROCESS_ID)?.balance).toBe("1000000");
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
+  it("tokenBalance and userTokens need ACCESS_TOKENS", async () => {
+    store.set("local:grants", [
+      { origin: location.origin, walletId: WALLET_ID, permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+    ]);
+    await expect(wallet.tokenBalance(PROCESS_ID)).rejects.toThrow(/ACCESS_TOKENS/);
+    await expect(wallet.userTokens()).rejects.toThrow(/ACCESS_TOKENS/);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("addToken and isTokenAdded need only a connection", async () => {

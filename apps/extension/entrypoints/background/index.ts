@@ -432,15 +432,14 @@ async function handleProviderCall(
 
     case "tokenBalance": {
       if (!wallet) throw new Error("No active wallet to read a token balance for.");
-      const tokenParams = params as { id?: string };
-      if (!tokenParams.id) throw new Error("tokenBalance requires an id.");
-      return reads.tokenBalance({ address: wallet.address, id: tokenParams.id });
+      // The id becomes a path segment of the HyperBEAM URL.
+      return reads.tokenBalance({ address: wallet.address, id: readProcessId(params.id, method) });
     }
 
     case "userTokens": {
       if (!wallet) throw new Error("No active wallet to read tokens for.");
-      const tokenParams = params as { options?: { cursor?: string; limit?: number } };
-      return reads.userTokens({ address: wallet.address, options: tokenParams.options });
+      const options = params.options as { fetchBalance?: unknown } | null | undefined;
+      return reads.userTokens({ address: wallet.address, options: { fetchBalance: options?.fetchBalance === true } });
     }
 
     case "isTokenAdded": {

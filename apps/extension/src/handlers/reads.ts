@@ -444,57 +444,24 @@ export class ReadsHandler {
   }
 
   /**
-   * `ProtocolMap`'s token-discovery read (`window.arweaveWallet`'s
-   * `userTokens(options?)`, Wander-shaped) — reuses `getTokenBalances`'s
-   * exact registry-plus-spawn-tag-discovered resolution (no separate
-   * token-listing source) and reshapes each resolved `TokenBalance` into
-   * `UserToken`'s Wander-cased fields.
-   *
-   * Null-metadata decision: `UserToken.Ticker`/`Name`/`Denomination` have
-   * no nullable variant (see `token-metadata.ts`'s own doc comment flagging
-   * this gap), while `TokenBalance.ticker`/`denomination` here are always
-   * populated (either from `DEFAULT_TOKEN_REGISTRY`, resolved spawn tags,
-   * or `getTokenBalance`'s own raw-process-id/HyperBEAM-denomination
-   * fallback — see `withRegisteredTicker`/`withUnregisteredMetadata`), so
-   * `Ticker`/`Denomination` are never actually null at this point. `Name`
-   * has no fallback anywhere in the existing `TokenBalance` shape, so a
-   * balance with an unregistered, spawn-tag-unresolved process id has no
-   * name to show — that entry is omitted from the result entirely (a
-   * dApp can't usefully display an unnamed token), rather than inventing a
-   * placeholder name. This never drops AR/AO (both always named via the
-   * registry) or any token whose spawn tags resolved a name.
-   *
-   * Pagination: `UserTokensOptions.cursor`/`limit` have no existing
-   * convention elsewhere in this handler (`getActivity`'s own `cursor` is
-   * explicitly unimplemented, see its comment above) to follow, so this
-   * applies a simple slice-based cursor: `cursor` is the stringified
-   * offset into the resolved (and name-filtered) list to resume from, and
-   * `limit` caps how many entries come back. `UserTokensResult` itself
-   * (locked, `token-metadata.ts`) carries no next-cursor field, so there's
-   * nothing for a caller to page with beyond re-deriving the next offset
-   * from `options.cursor + result.length` — acceptable since Wander's own
-   * `userTokens()` shape is the same bare array.
+   * `window.arweaveWallet.userTokens(options?)`, in Wander's shape. Reads
+   * the same token list as `getTokenBalances`, then reshapes each entry.
+   * `getTokenBalance` falls back to the process id as the ticker when it
+   * finds none, so that fallback is dropped rather than passed off as a
+   * ticker. A row the popup would show as unavailable reports a `null`
+   * balance: its quantity may be a placeholder.
    */
   async userTokens(req: { address: string; options?: UserTokensOptions }): Promise<UserTokensResult> {
     const balances = await this.getTokenBalances({ address: req.address });
+    const fetchBalance = req.options?.fetchBalance === true;
 
-    const tokens: UserToken[] = [];
-    for (const balance of balances) {
-      const name = balance.name;
-      if (name === null) continue;
-
-      tokens.push({
-        processId: balance.processId,
-        Ticker: balance.ticker,
-        Name: name,
-        Denomination: String(balance.denomination),
-      });
-    }
-
-    const cursor = req.options?.cursor;
-    const offset = cursor !== undefined && /^\d+$/.test(cursor) ? Number(cursor) : 0;
-    const limit = req.options?.limit;
-    return limit !== undefined ? tokens.slice(offset, offset + limit) : tokens.slice(offset);
+    return balances.map((balance): UserToken => {
+      const token: UserToken = { processId: balance.processId, Denomination: balance.denomination };
+      if (balance.name !== null) token.Name = balance.name;
+      if (balance.ticker !== balance.processId) token.Ticker = balance.ticker;
+      if (fetchBalance) token.balance = balance.available === false ? null : balance.quantity;
+      return token;
+    });
   }
 
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {

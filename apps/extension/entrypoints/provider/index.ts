@@ -299,6 +299,16 @@ class GleamProvider {
     return this.call("isTokenAdded", { id });
   }
 
+  /** Resolves to the balance as an atomic integer string, as Wander does. */
+  tokenBalance(id: string): Promise<unknown> {
+    return this.call("tokenBalance", { id });
+  }
+
+  /** `options.fetchBalance` adds each token's `balance`, as in Wander. */
+  userTokens(options?: { fetchBalance?: boolean }): Promise<unknown> {
+    return this.call("userTokens", { options });
+  }
+
   /** Resolves to one `ArrayBuffer` per item, in order. */
   batchSignDataItem(dataItems?: unknown, options?: unknown): Promise<unknown> {
     const { signal, rest } = GleamProvider.extractSignal(options);

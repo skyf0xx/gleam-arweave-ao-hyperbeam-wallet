@@ -514,37 +514,47 @@ describe("ReadsHandler: tokenBalance", () => {
 });
 
 describe("ReadsHandler: userTokens", () => {
-  it("returns registered tokens (AR-registry-backed name/ticker) in Wander's capitalized shape", async () => {
+  async function seededStorage() {
     const storage = createFakeStorage();
     await storage.set("local:networkSettings", {
       gatewayUrl: "https://arweave.net",
       peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
       activePeerUrl: "https://hyperbeam.example.com",
     });
+    return storage;
+  }
 
+  it("returns Wander's shape, with a numeric Denomination and no balance by default", async () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,
       status: 200,
       json: async () => "42",
     })) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
-    const tokens = await handler.userTokens({ address: "addr1" });
+    const tokens = await new ReadsHandler(await seededStorage()).userTokens({ address: "addr1" });
 
     const ao = tokens.find((t) => t.Ticker === "AO");
-    expect(ao).toBeDefined();
-    expect(ao?.Name).toBe("AO");
-    expect(typeof ao?.Denomination).toBe("string");
+    expect(ao).toEqual({ processId: ao?.processId, Name: "AO", Ticker: "AO", Denomination: 12 });
   });
 
-  it("omits an unregistered token whose spawn-tag metadata never resolved a name", async () => {
-    const storage = createFakeStorage();
-    await storage.set("local:watchedProcessIds:addr1", ["unknownProc"]);
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
+  it("adds each balance when fetchBalance is set", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => "42",
+    })) as unknown as typeof fetch;
+
+    const tokens = await new ReadsHandler(await seededStorage()).userTokens({
+      address: "addr1",
+      options: { fetchBalance: true },
     });
+
+    expect(tokens.find((t) => t.Ticker === "AO")?.balance).toBe("42");
+  });
+
+  it("keeps a token with no resolved metadata, leaving out Name and the process-id ticker fallback", async () => {
+    const storage = await seededStorage();
+    await storage.set("local:watchedProcessIds:addr1", ["unknownProc"]);
 
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes("/graphql")) {
@@ -553,42 +563,15 @@ describe("ReadsHandler: userTokens", () => {
       return { ok: true, status: 200, json: async () => "42" };
     }) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
-    const tokens = await handler.userTokens({ address: "addr1" });
+    const tokens = await new ReadsHandler(storage).userTokens({ address: "addr1", options: { fetchBalance: true } });
 
-    expect(tokens.find((t) => t.processId === "unknownProc")).toBeUndefined();
-    // AO is still present — always registered/named regardless of the watch list.
-    expect(tokens.find((t) => t.Ticker === "AO")).toBeDefined();
-  });
-
-  it("honors cursor/limit as a slice-based offset over the resolved list", async () => {
-    const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
-    });
-
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => "42",
-    })) as unknown as typeof fetch;
-
-    const handler = new ReadsHandler(storage);
-    const all = await handler.userTokens({ address: "addr1" });
-    const limited = await handler.userTokens({ address: "addr1", options: { limit: 1 } });
-
-    expect(limited).toHaveLength(1);
-    expect(limited[0]).toEqual(all[0]);
-
-    if (all.length > 1) {
-      const nextPage = await handler.userTokens({
-        address: "addr1",
-        options: { cursor: "1", limit: 1 },
-      });
-      expect(nextPage[0]).toEqual(all[1]);
-    }
+    const unknown = tokens.find((t) => t.processId === "unknownProc");
+    expect(unknown).toBeDefined();
+    expect(unknown).not.toHaveProperty("Name");
+    expect(unknown).not.toHaveProperty("Ticker");
+    expect(typeof unknown?.Denomination).toBe("number");
+    // Its denomination can't be confirmed, so the popup would show it as unavailable.
+    expect(unknown?.balance).toBeNull();
   });
 });
 
