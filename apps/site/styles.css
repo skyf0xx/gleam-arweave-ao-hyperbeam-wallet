@@ -297,6 +297,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .float-3 { animation-duration: 9.5s; animation-delay: -5.3s; }
 .float-4 { animation-duration: 10s; animation-delay: -7.7s; }
 .float-5 { animation-duration: 7s; animation-delay: -4.4s; }
+.float-6 { animation-duration: 8s; animation-delay: -6.2s; }
 
 .paused .float { animation-play-state: paused; }
 
