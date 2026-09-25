@@ -2,13 +2,23 @@ import Arweave from "arweave";
 import type { JWKInterface } from "../models/wallet";
 
 /**
- * A single, module-level Arweave client used only for its offline
+ * A single, lazily-constructed Arweave client used only for its offline
  * JWK-generation and address-derivation helpers — neither touches the
- * network, so the gateway config passed to `init` is never dialed.
- * Real network reads use their own client, constructed with an explicit
+ * network, so the gateway config passed to `init` is never dialed. Real
+ * network reads use their own client, constructed with an explicit
  * gateway (`Arweave.init({})` silently falls back to `127.0.0.1:80`).
+ * Built on first use rather than at module scope: `arweave-js`'s CJS
+ * interop attaches `Arweave.init` to its default export as a side effect
+ * of its own module evaluation, and calling `Arweave.init` from another
+ * module's top level can race that assignment depending on bundler chunk
+ * ordering.
  */
-const arweave = Arweave.init({});
+let arweave: ReturnType<typeof Arweave.init> | undefined;
+
+function getArweave(): ReturnType<typeof Arweave.init> {
+  arweave ??= Arweave.init({});
+  return arweave;
+}
 
 const REQUIRED_JWK_FIELDS = ["kty", "e", "n", "d", "p", "q", "dp", "dq", "qi"] as const;
 
@@ -20,7 +30,7 @@ const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
  * storage — this function only produces plaintext key material.
  */
 export async function generateJWK(): Promise<JWKInterface> {
-  return arweave.wallets.generate();
+  return getArweave().wallets.generate();
 }
 
 /**
@@ -28,7 +38,7 @@ export async function generateJWK(): Promise<JWKInterface> {
  * always yields the same address.
  */
 export async function deriveAddress(jwk: JWKInterface): Promise<string> {
-  return arweave.wallets.jwkToAddress(jwk);
+  return getArweave().wallets.jwkToAddress(jwk);
 }
 
 export type JWKValidationResult =
