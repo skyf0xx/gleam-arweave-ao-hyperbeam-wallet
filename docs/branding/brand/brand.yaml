@@ -1,0 +1,28 @@
+schema_version: 1
+slug: gleam
+name: Gleam
+one_liner: Your go-to wallet for AO & Arweave.
+tagline: "Simple. Fast. Easy."
+archetype: "Sage (primary), Creator (secondary)"
+status: draft
+stage: pre-launch
+industry: crypto / web3 wallet
+languages: [en]
+links:
+  domain: ""
+  repo: ""
+created: 2026-09-12
+updated: 2026-09-13
+version: 20
+artifacts:
+  context: true
+  naming: true
+  strategy: true
+  architecture: false
+  identity: true
+  voice: true
+  messaging: true
+  positioning: true
+  story: true
+  guidelines: true
+  audit: false

@@ -23,3 +23,8 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- `packages/core/src/arweave/graphql.ts:37` — GraphQL falls back to
+  `arweave-search.goldsky.com`, but `apps/extension/wxt.config.ts` grants no
+  host permission for it, so the fallback may fail from the service worker.
+  Verify, then add the permission or drop the fallback. S 🧪 `sonnet`
