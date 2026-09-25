@@ -64,7 +64,8 @@ middle 40–60% of the frame. Use them like this:
 - **Fade every image's edges into the page** with a radial mask so the backdrop never shows as a rectangle:
   `mask-image: radial-gradient(closest-side, #000 72%, transparent 100%)`. Tune the stops per image by eye. The card and its shadow must stay fully opaque. Only the empty backdrop fades.
 - **Mobile crop:** below 640px the card would be tiny inside a 1200×896 frame. Wrap each landscape image in a box with `aspect-ratio: 4 / 5; overflow: hidden` and give the image `object-fit: cover; object-position: center`, scaled up (e.g. `width: 150%` centred) so the card fills most of the width. Check that no card is ever clipped.
-- Do not use any image from `docs/branding/images/` directly. Several of those renders have garbled AI text.
+- Use only the prepared files in `apps/site/img/`. Never reference `docs/branding/images/`, which holds the full-size sources. Files there prefixed `unusable-` have garbled AI text, invented tokens, or show features that haven't shipped. They must never appear on the site.
+- Sources of the prepared images, for any future re-export: `dashboard-hero` ← `dashboard-tilted-crisp.png`, `review-send` ← `review-send-front.png`, `activity-pending` ← `activity-pending-send-tilted.png`, `network-peers` ← `network-peers-front.png`, `dashboard-front` and `og.jpg` ← `dashboard-floating-front.png`.
 
 ## 3. Design tokens
 
