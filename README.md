@@ -8,12 +8,6 @@ Arweave uploads, and an ArConnect-compatible `window.arweaveWallet`
 provider — every dApp signing request opens its own approval window with a
 decoded preview.
 
-## Stack
-
-TypeScript, pnpm workspaces, [WXT](https://wxt.dev) (MV3), React 19,
-Tailwind 4, shadcn/Radix primitives, `@tanstack/react-query`,
-`@webext-core/messaging`, Vitest, `arweave-js`, `@dha-team/arbundles`.
-
 ## Getting started
 
 ```bash
@@ -30,8 +24,6 @@ pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/
 pnpm eslint --max-warnings=0 .
 ```
 
-See [CLAUDE.md](CLAUDE.md) for the architecture and [CONTRIBUTING.md](CONTRIBUTING.md)
-for the contribution workflow. Found a security issue? See [SECURITY.md](SECURITY.md).
 
 ## License
 
