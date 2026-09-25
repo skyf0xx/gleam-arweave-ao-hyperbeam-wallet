@@ -11,11 +11,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 ## 5. Polish
 
-- [ ] **`walletVersion` reports `0.0.0` (S, sonnet)**
-  `apps/extension/package.json`. The injected `walletVersion` and the
-  manifest version both come from this field. Done: it is set to `0.1.0`,
-  and the built manifest and `window.arweaveWallet.walletVersion` both
-  show it.
 - [ ] **`tokenBalance` and `userTokens` can't be called from a page (S, opus)**
   `entrypoints/provider/index.ts`. Both are in `PROVIDER_SURFACE_METHODS`
   and handled in `entrypoints/background/index.ts`, but `GleamProvider`
