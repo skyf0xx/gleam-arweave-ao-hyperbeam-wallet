@@ -359,16 +359,19 @@ code { font-family: var(--mono); font-size: 0.9em; }
 @media (max-width: 639px) {
   /* Centred throughout, so text lines up with the centred renders and the final CTA */
   .hero-text, .showcase .reveal-text { text-align: center; }
-  .hero .line, .showcase .line { margin-left: auto; margin-right: auto; }
-  .hero-text { padding-top: 6vh; }
-  .hero .cta { display: flex; flex-direction: column; align-items: center; }
-  .hero { gap: 0; padding-bottom: 0; }
-  .hero .shot { margin-top: 8px; }
+  .hero .line, .showcase .line { margin-left: auto; margin-right: auto; max-width: 20em; text-wrap: balance; }
+  .heading { font-size: 1.875rem; }
+  .line { margin-top: 16px; }
 
-  .showcase { padding-top: 56px; padding-bottom: 24px; }
+  /* The hero is headline, line and render only; the CTA waits for the final section */
+  .hero { gap: 0; padding-top: 0; padding-bottom: 0; }
+  .hero-text { padding-top: 12vh; }
+  .hero .cta { display: none; }
+  .hero .shot { margin-top: 56px; }
+
+  .showcase { padding-top: 128px; padding-bottom: 40px; }
   .showcase + .showcase { margin-top: 0; }
-  /* The crop's top band is empty backdrop; pull the render up under its text */
-  .showcase .shot { margin: -24px 0 0; }
+  .showcase .shot { margin: 0; }
 
   .site-footer .wrap { justify-content: center; text-align: center; }
   .site-footer .copy { margin-left: 0; flex-basis: 100%; }
@@ -401,7 +404,20 @@ code { font-family: var(--mono); font-size: 0.9em; }
     mask-image: radial-gradient(closest-side, #000 70%, transparent 100%);
   }
 
-  .final { padding-top: 64px; padding-bottom: 96px; }
+  .final { padding-top: 160px; padding-bottom: 160px; }
+  .final .display { margin-top: 24px; }
+
+  /* The render spans the screen, so a shallow line would hide behind it. Run it steeply
+     through the card's centre (160px padding + half the 125vw-tall crop) so it shows above
+     and below the card, with faded ends */
+  .refraction {
+    top: calc(160px + 62.5vw - 5px);
+    width: 150vw;
+    margin-left: -75vw;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+    transform: rotate(-62deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
