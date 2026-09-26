@@ -7,6 +7,8 @@ stats.html
 stats-*.json
 web-ext.config.ts
 *.log
+test-results/
+playwright-report/
 
 # Editor / OS
 .DS_Store

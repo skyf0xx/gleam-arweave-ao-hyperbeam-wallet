@@ -7,12 +7,14 @@
     "prepare": "lefthook install",
     "dev": "pnpm --filter @gleam/extension exec wxt",
     "wxt:build": "pnpm --filter @gleam/extension exec wxt build",
+    "test:smoke": "playwright test",
     "eslint": "eslint",
     "vitest": "vitest",
     "tsc": "tsc"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.1",
