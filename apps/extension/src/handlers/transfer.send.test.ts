@@ -50,6 +50,7 @@ function createFakeStorage(): StoragePort {
 }
 
 const WALLET_ID = "wallet-1";
+const AR_RECIPIENT = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
 
 async function createTestWallet(): Promise<{ wallet: Wallet; jwk: JWKInterface }> {
   const jwk = await generateJWK();
@@ -348,7 +349,7 @@ describe("TransferHandler: submitTransfer", () => {
     const handler = new TransferHandler(storage);
     const result = await handler.submitTransfer({
       walletId: WALLET_ID,
-      recipient: "recipientAddr",
+      recipient: AR_RECIPIENT,
       token: null,
       amount: "1000000000000",
       fee: null,
@@ -361,7 +362,7 @@ describe("TransferHandler: submitTransfer", () => {
     const [entry] = log as Array<Record<string, unknown>>;
     expect(entry?.txId).toBe(result.txId);
     expect(entry?.status).toBe("pending");
-    expect(entry?.address).toBe("recipientAddr");
+    expect(entry?.address).toBe(AR_RECIPIENT);
     expect(entry?.amount).toBe("1000000000000");
   });
 });

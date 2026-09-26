@@ -4,6 +4,8 @@ import { estimateFee, submitTransfer } from "./transfer";
 
 const jwk = await Arweave.init({}).wallets.generate();
 
+const RECIPIENT = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
+
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
@@ -43,7 +45,7 @@ describe("submitTransfer", () => {
       { status: 200, body: { ok: true } }, // post
     ]);
 
-    const result = await submitTransfer("https://arweave.net", jwk, "recipientAddr", "1000000000000");
+    const result = await submitTransfer("https://arweave.net", jwk, RECIPIENT, "1000000000000");
     expect(typeof result.txId).toBe("string");
     expect(result.txId.length).toBeGreaterThan(0);
   });
@@ -56,7 +58,16 @@ describe("submitTransfer", () => {
     ]);
 
     await expect(
-      submitTransfer("https://arweave.net", jwk, "recipientAddr", "1000000000000"),
+      submitTransfer("https://arweave.net", jwk, RECIPIENT, "1000000000000"),
     ).rejects.toThrow(/Failed to submit transfer/);
+  });
+
+  it("rejects a recipient that isn't an Arweave address before touching the network", async () => {
+    mockFetchSequence([{ status: 200, body: "" }]);
+
+    await expect(
+      submitTransfer("https://arweave.net", jwk, "recipientAddr", "1000000000000"),
+    ).rejects.toThrow(/must be an Arweave address/);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

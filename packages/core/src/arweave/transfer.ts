@@ -56,6 +56,11 @@ export async function submitTransfer(
   recipient: string,
   amount: Winston,
 ): Promise<SubmittedTransfer> {
+  // arweave-js decodes `target` with strict base64 and would otherwise
+  // throw a bare "Invalid character" DOMException.
+  if (!/^[A-Za-z0-9_-]{43}$/.test(recipient)) {
+    throw new Error(`Transfer recipient must be an Arweave address (43 base64url characters), got "${recipient}".`);
+  }
   const client = buildClient(gatewayUrl);
 
   const transaction = await client.createTransaction(
