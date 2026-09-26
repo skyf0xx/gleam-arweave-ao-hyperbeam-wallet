@@ -27,11 +27,6 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 <!-- New findings go here until they're placed in the list above. -->
 
-- `apps/extension/src/handlers/provider-params.ts` — a dApp's `last_tx`
-  isn't checked as base64url. arweave-js 2.x decodes it strictly, so a
-  malformed one reaches the dApp as a bare `Invalid character` error
-  instead of a named `sign`/`dispatch` validation error. S `sonnet`
-
 - Chrome Web Store: not yet submitted. First submission is manual (Developer
   Dashboard, $5 one-time registration, store listing copy/screenshots,
   privacy-practices disclosures, and a manual review pass since this is a

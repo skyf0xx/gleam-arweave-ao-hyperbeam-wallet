@@ -145,6 +145,9 @@ describe("readTransaction", () => {
     expect(() => readTransaction({ ...toJsonOutput, target: "not-an-address" }, "sign")).toThrow(/target/);
     expect(() => readTransaction({ ...toJsonOutput, quantity: "1.5" }, "sign")).toThrow(/quantity/);
     expect(() => readTransaction({ ...toJsonOutput, data: "not base64!" }, "sign")).toThrow(/base64url/);
+    expect(() => readTransaction({ ...toJsonOutput, last_tx: "not base64!" }, "sign")).toThrow(
+      /last_tx is not valid base64url/,
+    );
     expect(() => readTransaction({ ...toJsonOutput, tags: [{ name: "__4", value: "" }] }, "sign")).toThrow(
       /UTF-8/,
     );

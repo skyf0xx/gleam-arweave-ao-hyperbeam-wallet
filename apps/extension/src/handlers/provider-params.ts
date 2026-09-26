@@ -214,13 +214,18 @@ export function readTransaction(value: unknown, method: "sign" | "dispatch"): Pr
   // fetched instead.
   const reward = readAtomicAmount(transaction.reward, "reward", method);
 
+  // arweave-js decodes last_tx strictly and would otherwise throw a bare
+  // "Invalid character" DOMException while signing.
+  const lastTx = readOptionalString(transaction.last_tx, "last_tx", method);
+  if (lastTx !== undefined) decodeBase64Url(lastTx, "transaction last_tx", method);
+
   return {
     data,
     tags,
     target,
     quantity: readAtomicAmount(transaction.quantity, "quantity", method),
     reward: reward === "0" ? undefined : reward,
-    last_tx: readOptionalString(transaction.last_tx, "last_tx", method),
+    last_tx: lastTx,
   };
 }
 
