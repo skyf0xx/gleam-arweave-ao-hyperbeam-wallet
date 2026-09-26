@@ -1,4 +1,4 @@
-import Arweave from "arweave";
+import { Arweave } from "./client";
 import type { JWKInterface } from "../models/wallet";
 import type { Winston } from "../models/balance";
 

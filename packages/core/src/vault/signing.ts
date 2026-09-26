@@ -1,4 +1,4 @@
-import Arweave from "arweave";
+import { Arweave } from "../arweave/client";
 import { ArweaveSigner, createData } from "@dha-team/arbundles/web";
 import type { JWKInterface } from "../models/wallet";
 import type {

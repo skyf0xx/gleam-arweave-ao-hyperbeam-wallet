@@ -1,21 +1,18 @@
-import Arweave from "arweave";
+import { Arweave } from "../arweave/client";
 import type { JWKInterface } from "../models/wallet";
 
 /**
- * A single, lazily-constructed Arweave client used only for its offline
- * JWK-generation and address-derivation helpers — neither touches the
- * network, so the gateway config passed to `init` is never dialed. Real
- * network reads use their own client, constructed with an explicit
- * gateway (`Arweave.init({})` silently falls back to `127.0.0.1:80`).
- * Built on first use rather than at module scope: `arweave-js`'s CJS
- * interop attaches `Arweave.init` to its default export as a side effect
- * of its own module evaluation, and calling `Arweave.init` from another
- * module's top level can race that assignment depending on bundler chunk
- * ordering.
+ * A single Arweave client used only for its offline JWK-generation and
+ * address-derivation helpers — neither touches the network, so the
+ * gateway config passed to `init` is never dialed. Real network reads use
+ * their own client, constructed with an explicit gateway
+ * (`Arweave.init({})` silently falls back to `127.0.0.1:80`). Built on
+ * first use so importing this module (the popup only needs
+ * `validateJWKShape`) does no work.
  */
-let arweave: ReturnType<typeof Arweave.init> | undefined;
+let arweave: Arweave | undefined;
 
-function getArweave(): ReturnType<typeof Arweave.init> {
+function getArweave(): Arweave {
   arweave ??= Arweave.init({});
   return arweave;
 }
