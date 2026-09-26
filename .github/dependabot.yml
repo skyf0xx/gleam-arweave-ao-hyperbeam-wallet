@@ -6,6 +6,21 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     groups:
+      # Bundler, extension framework and their plugins arrive together in a
+      # clearly labelled PR instead of hiding inside an unrelated bump (a
+      # plugin-react bump once pulled in Vite 8 and broke the built popup).
+      # Listed before npm-minor-patch because a dependency joins the first
+      # group it matches. A major in this group needs the manual Chrome
+      # check (load .output/chrome-mv3 unpacked) before merging.
+      build-toolchain:
+        patterns:
+          - vite
+          - "@vitejs/*"
+          - wxt
+          - "@wxt-dev/*"
+          - rolldown
+          - "@tailwindcss/vite"
+          - vite-plugin-node-polyfills
       npm-minor-patch:
         update-types:
           - minor

@@ -19,38 +19,13 @@ vault, crypto and provider security; `sonnet` for everything else.
   carry the spawn-tag logo, and no dApp has asked for it.
 - Upload is disabled in Settings until bundler uploads work with current
   AO wallets; re-enabling means restoring the row's `onOpenUpload` wiring.
+- Pinning back to Vite 7. We stay on Vite 8: `packages/core/src/arweave/client.ts`
+  handles its CommonJS default-import interop, and `pnpm test:smoke`
+  catches the next bundle-only crash like it.
 
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
-
-The next item keeps the Vite 8 upgrade from breaking the extension
-without anyone noticing again.
-
-**Background.** Dependabot PR #10 (`chore(deps): bump
-@vitejs/plugin-react from 5.2.0 to 6.1.1`, commit `3d80ec6`) needs
-`vite ^8`, so it moved the whole workspace from `vite@7.3.6` to
-`vite@8.3.0`. Vite 8 builds with Rolldown and changed how default imports
-from CommonJS packages work (Vite 8 migration guide: "Consistent CommonJS
-interop"). In the built extension, `import Arweave from "arweave"`
-started returning `{ default: Arweave }`, and the popup failed to load
-with `Uncaught TypeError: u(...).default.init is not a function`. That's
-fixed: every source file now imports `Arweave` from
-`packages/core/src/arweave/client.ts`, which accepts either shape. The
-item below and the `pnpm test:smoke` CI step are about catching the
-next bug like it before it ships. We're staying on Vite 8; don't pin back to 7.
-
-- **Dependabot: give build-toolchain bumps their own group.**
-  `ci(deps): …` S `sonnet`
-
-  PR #10 changed the bundler while looking like a React plugin bump (see
-  **Background** above). In `.github/dependabot.yml`, add a group for
-  `vite`, `@vitejs/*`, `wxt`, `@wxt-dev/*`, `rolldown`,
-  `@tailwindcss/vite` and `vite-plugin-node-polyfills`, so these arrive
-  as one clearly labelled PR. Check that the existing `npm-minor-patch`
-  group doesn't also claim these packages; Dependabot applies the first
-  group that matches. Add a comment in the file saying that majors in
-  this group need the manual Chrome check before merging.
 
 - `arweave` is pinned to 1.15.7; the 2.1.0 bump (Dependabot PR #14, closed)
   breaks `Transaction.get`/`createTransaction` — `b64UrlToBuffer` throws
