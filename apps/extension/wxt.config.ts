@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
+import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -36,14 +37,19 @@ export default defineConfig({
     // are checked unconditionally on first run, before the user has
     // granted anything, so each one needs a static host permission here too
     // or it would pass that gateway check and then fail on the real reads
-    // that follow.
+    // that follow. GRAPHQL_FALLBACK_GATEWAYS (packages/core/src/arweave/graphql.ts)
+    // are retried whenever the user's gateway fails a GraphQL query, so
+    // they're granted statically for the same reason.
     host_permissions: [
-      'https://arweave.net/*',
-      'https://up.arweave.net/*',
-      'https://api.coingecko.com/*',
-      'https://api.coinpaprika.com/*',
-      ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
-      ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
+      ...new Set([
+        'https://arweave.net/*',
+        'https://up.arweave.net/*',
+        'https://api.coingecko.com/*',
+        'https://api.coinpaprika.com/*',
+        ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
+        ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
+        ...GRAPHQL_FALLBACK_GATEWAYS.map((url) => `${url}/*`),
+      ]),
     ],
     optional_host_permissions: ['https://*/*'],
     // Required for content.ts's injectScript("/provider.js", ...) to

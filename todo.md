@@ -42,8 +42,3 @@ vault, crypto and provider security; `sonnet` for everything else.
   tag-triggered release workflow (`chrome-webstore-upload` API, secrets:
   `EXTENSION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`) so future
   releases are a version-tag push. S ❓ `sonnet`
-
-- `packages/core/src/arweave/graphql.ts:37` — GraphQL falls back to
-  `arweave-search.goldsky.com`, but `apps/extension/wxt.config.ts` grants no
-  host permission for it, so the fallback may fail from the service worker.
-  Verify, then add the permission or drop the fallback. S 🧪 `sonnet`

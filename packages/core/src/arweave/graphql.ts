@@ -32,9 +32,10 @@ interface GraphQLTransactionsResponse {
  * Additional gateways to fall through to when the primary fails outright
  * (network error, non-2xx, GraphQL `errors`). Not configurable — this is
  * resilience underneath the single-gateway config surface, not a second
- * config surface.
+ * config surface. Exported so `wxt.config.ts` grants each a static host
+ * permission.
  */
-const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://arweave-search.goldsky.com"];
+export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://arweave-search.goldsky.com"];
 
 function gatewayCandidates(primaryGatewayUrl: string): string[] {
   const primary = trimTrailingSlash(primaryGatewayUrl);
