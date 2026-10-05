@@ -46,6 +46,7 @@ import {
   type ProviderArgs,
 } from "@/src/handlers/provider-params";
 import { contentScriptOrigin, isExtensionPageSender } from "@/src/sender";
+import { handleInstalledSitePages } from "@/src/site-pages";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
 
 /**
@@ -701,7 +702,18 @@ export default defineBackground(() => {
   // `initializeNetworkSettingsIfMissing`'s "nothing written yet" check is
   // meaningful — after that, a written NetworkSettings (default or
   // user-edited) always short-circuits it anyway.
-  browser.runtime.onInstalled.addListener(() => {
+  browser.runtime.onInstalled.addListener((details) => {
     void initializeNetworkSettingsIfMissing();
+    // Dev builds reload constantly; opening the site from them would
+    // inflate the install and uninstall counts.
+    if (import.meta.env.PROD) {
+      handleInstalledSitePages(details.reason, {
+        version: browser.runtime.getManifest().version,
+        openTab: (url) => browser.tabs.create({ url }),
+        setUninstallUrl: (url) => browser.runtime.setUninstallURL(url),
+      }).catch(() => {
+        // A failed tab or uninstall URL must never break install.
+      });
+    }
   });
 });
