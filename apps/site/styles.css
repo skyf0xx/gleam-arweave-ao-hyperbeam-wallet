@@ -128,7 +128,7 @@ a { color: inherit; }
   transition: background-color .2s ease, transform .2s ease;
 }
 
-.button .x-logo { width: 16px; height: 16px; margin-right: 10px; fill: currentColor; flex: none; }
+.button .btn-icon { width: 16px; height: 16px; margin-right: 10px; flex: none; }
 
 .button:hover { background: #000; transform: translateY(-1px); }
 
