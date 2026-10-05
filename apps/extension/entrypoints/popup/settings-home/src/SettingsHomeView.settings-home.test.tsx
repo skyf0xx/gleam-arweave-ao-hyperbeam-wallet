@@ -40,6 +40,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenManageTokens={vi.fn()}
       onOpenContacts={vi.fn()}
       onOpenUpload={vi.fn()}
+      onOpenFeedback={vi.fn()}
       {...overrides}
     />,
   );
@@ -51,6 +52,16 @@ describe("SettingsHomeView", () => {
 
     await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
     expect(screen.getByText("arweave.net")).toBeTruthy();
+  });
+
+  it("calls onOpenFeedback when the feedback card is pressed", async () => {
+    const onOpenFeedback = vi.fn();
+    renderSettingsHome({ onOpenFeedback });
+
+    fireEvent.click(screen.getByRole("button", { name: /Got an issue or suggestion\?/ }));
+
+    expect(onOpenFeedback).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
   });
 
   it("calls onOpenLockSettings when the Auto-lock row is pressed", async () => {

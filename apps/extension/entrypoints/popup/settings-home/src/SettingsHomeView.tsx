@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AutoLockTimeout, LockSettings, NetworkSettings, RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 
 const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
   never: "Never",
@@ -21,8 +22,9 @@ function gatewayHostname(gatewayUrl: string): string {
 /**
  * The dedicated settings screen the gear icon opens: grouped
  * WALLET/NETWORK/TOOLS/GENERAL sections of navigable rows, each showing
- * its current value on the right. "Upload to Arweave" is disabled, with a
- * "Coming soon" label, until bundler uploads work reliably.
+ * its current value on the right, with a feedback card pinned below them.
+ * "Upload to Arweave" is disabled, with a "Coming soon" label, until
+ * bundler uploads work reliably.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
@@ -33,6 +35,7 @@ export interface SettingsHomeViewProps {
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
   onOpenUpload: () => void;
+  onOpenFeedback: () => void;
 }
 
 interface LoadState {
@@ -50,6 +53,7 @@ export function SettingsHomeView({
   onOpenManageTokens,
   onOpenContacts,
   onOpenUpload,
+  onOpenFeedback,
 }: SettingsHomeViewProps) {
   // Upload row is disabled below; onOpenUpload stays in the prop contract
   // so re-enabling it is a one-line change.
@@ -154,6 +158,8 @@ export function SettingsHomeView({
             onToggle={() => void handleToggleTheme()}
           />
         </SettingsSection>
+
+        <FeedbackCard onClick={onOpenFeedback} />
       </div>
     </div>
   );
@@ -242,6 +248,43 @@ function ToggleRow({
         />
       </span>
     </button>
+  );
+}
+
+/**
+ * Sits apart from the setting rows: it leaves the wallet for the website's
+ * feedback form, so it reads as an invitation rather than another setting.
+ */
+function FeedbackCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-auto flex w-full items-center gap-3 rounded-xl bg-mist px-4 py-4 text-left transition-colors hover:bg-line"
+    >
+      <span className="flex min-w-0 flex-1 flex-col gap-2">
+        <Beam className="w-8" />
+        <span className="text-label font-semibold text-foreground">Got an issue or suggestion?</span>
+        <span className="text-caption text-muted">Send us a message</span>
+      </span>
+      <span aria-hidden="true" className="shrink-0 text-muted">
+        <ExternalIcon />
+      </span>
+    </button>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

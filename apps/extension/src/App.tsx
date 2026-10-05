@@ -15,6 +15,8 @@ import { ConnectedAppsView } from "@/entrypoints/popup/connected-apps/index.tsx"
 import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
 import { ContactsView } from "@/entrypoints/popup/contacts/index.tsx";
 import { UploadView } from "@/entrypoints/popup/upload/index.tsx";
+import { browser } from "wxt/browser";
+import { sitePageUrl } from "@/src/site-pages";
 
 /**
  * The one shared shell mounted from every surface (popup, sidepanel, and
@@ -285,6 +287,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
         onOpenUpload={() => setSubView({ kind: "upload" })}
+        onOpenFeedback={() =>
+          window.open(sitePageUrl("feedback", browser.runtime.getManifest().version), "_blank", "noopener,noreferrer")
+        }
       />
     );
   } else if (subView.kind === "lock-settings") {
