@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <meta name="robots" content="noindex">
+  <title>Gleam feedback</title>
+  <meta name="description" content="Report an issue or suggest an improvement to the Gleam wallet.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5" data-domains="gleam-wallet.vercel.app"></script>
+  <script defer src="pages.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="page">
+      <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <h1 class="heading">Got an issue or suggestion?</h1>
+      <p class="line">Tell us what went wrong or what you'd like Gleam to do. We read every message.</p>
+
+      <div class="notice">
+        <p><strong>Never include your keyfile, private key or password.</strong> We'll never ask for them.</p>
+      </div>
+
+      <form class="form" data-web3forms data-sent="sent">
+        <input type="hidden" name="access_key" value="40cc50fc-b4f4-4d15-8080-f76867356c98">
+        <input type="hidden" name="subject" value="Gleam feedback">
+        <input type="hidden" name="from_name" value="Gleam feedback form">
+        <input type="hidden" name="version">
+        <input type="hidden" name="browser">
+        <input type="checkbox" name="botcheck" class="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+        <div class="field">
+          <label for="message">Your message</label>
+          <textarea id="message" name="message" required maxlength="5000"
+            placeholder="What happened, or what would make Gleam better?"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="email">Email <span class="hint">(optional, if you'd like a reply)</span></label>
+          <input id="email" type="email" name="email" autocomplete="email" maxlength="254">
+        </div>
+
+        <button class="button" type="submit">Send message</button>
+        <p class="status" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="sent" class="sent" hidden>
+        <h2 class="heading" style="font-size: 1.5rem">Thanks, we got it.</h2>
+        <p class="line">If you left an email, we'll reply there. You can close this tab.</p>
+      </div>
+
+      <p class="small" style="margin-top: 40px">We receive your message, your email if you give one, your Gleam version and your browser name. Nothing about your wallet is sent.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+</html>

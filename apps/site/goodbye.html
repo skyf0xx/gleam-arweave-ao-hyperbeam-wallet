@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <meta name="robots" content="noindex">
+  <title>Gleam uninstalled</title>
+  <meta name="description" content="Gleam has been removed. Tell us why, in one tap.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5" data-domains="gleam-wallet.vercel.app"></script>
+  <script defer src="pages.js"></script>
+</head>
+<body data-event="gleam-uninstalled">
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="page">
+      <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <h1 class="heading">Sorry to see you go.</h1>
+      <p class="line">Gleam has been removed from this browser.</p>
+
+      <div class="notice">
+        <p><strong>Your wallet was stored only in this browser.</strong> If it held funds, you'll need your keyfile to get them back. Import it into Gleam or any Arweave wallet.</p>
+      </div>
+
+      <form class="form" data-web3forms data-sent="sent">
+        <input type="hidden" name="access_key" value="40cc50fc-b4f4-4d15-8080-f76867356c98">
+        <input type="hidden" name="subject" value="Gleam uninstall reason">
+        <input type="hidden" name="from_name" value="Gleam uninstall form">
+        <input type="hidden" name="version">
+        <input type="checkbox" name="botcheck" class="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+        <fieldset class="field">
+          <legend>What made you uninstall? <span class="hint">(helps us improve)</span></legend>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="reason" value="Missing a feature I need" required>Missing a feature I need</label>
+            <label class="choice"><input type="radio" name="reason" value="Something didn't work">Something didn't work</label>
+            <label class="choice"><input type="radio" name="reason" value="I didn't feel it was safe">I didn't feel it was safe</label>
+            <label class="choice"><input type="radio" name="reason" value="I switched to another wallet">I switched to another wallet</label>
+            <label class="choice"><input type="radio" name="reason" value="I was only trying it out">I was only trying it out</label>
+            <label class="choice"><input type="radio" name="reason" value="Other">Other</label>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <label for="details">Anything else? <span class="hint">(optional)</span></label>
+          <textarea id="details" name="details" maxlength="5000"
+            placeholder="Which feature, what broke, or which wallet you moved to."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="email">Email <span class="hint">(optional, if you'd like a reply)</span></label>
+          <input id="email" type="email" name="email" autocomplete="email" maxlength="254">
+        </div>
+
+        <button class="button" type="submit">Send</button>
+        <p class="status" role="status" aria-live="polite"></p>
+      </form>
+
+      <div id="sent" class="sent" hidden>
+        <h2 class="heading" style="font-size: 1.5rem">Thank you.</h2>
+        <p class="line">It really helps. You can close this tab.</p>
+      </div>
+
+      <div class="links">
+        <a href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" rel="noopener">Changed your mind? Reinstall Gleam</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+</html>

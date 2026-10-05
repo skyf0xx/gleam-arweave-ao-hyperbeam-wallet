@@ -497,6 +497,116 @@ main { overflow-x: clip; }
 
 code { font-family: var(--mono); font-size: 0.9em; }
 
+/* Welcome, feedback and goodbye: pages the extension opens */
+
+.page { max-width: 560px; padding-top: 8vh; padding-bottom: 14vh; }
+
+.page .beam { margin: 0 0 28px; }
+
+.page .line { margin-top: 16px; }
+
+.steps { list-style: none; margin: 48px 0 0; padding: 0; counter-reset: step; }
+
+.steps li {
+  position: relative;
+  padding: 20px 0 20px 52px;
+  border-top: 1px solid var(--line);
+  counter-increment: step;
+}
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 20px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--fg);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.steps h2 { margin: 4px 0 4px; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+
+.steps p { margin: 0; color: var(--muted); }
+
+.steps .ico { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: -0.2em; }
+
+.notice {
+  margin: 32px 0 0;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--beam-red);
+}
+
+.notice p { margin: 0; }
+
+.notice strong { font-weight: 600; }
+
+.page .links { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 0.9375rem; }
+
+.page .links a { text-underline-offset: 3px; }
+
+.form { margin-top: 40px; display: flex; flex-direction: column; gap: 22px; }
+
+.field { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+
+.field > label, .field > legend { padding: 0; font-weight: 600; font-size: 0.9375rem; }
+
+.field .hint { font-weight: 400; color: var(--muted); }
+
+.field input[type="email"], .field textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--fg);
+  font: inherit;
+}
+
+.field textarea { min-height: 140px; resize: vertical; }
+
+.field input:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+
+.choices { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+}
+
+.choice:has(input:checked) { border-color: var(--fg); }
+
+.choice input { margin: 0; accent-color: var(--fg); }
+
+/* The honeypot: hidden from people, still filled in by naive bots */
+.botcheck { position: absolute; left: -9999px; }
+
+.form .button { align-self: flex-start; border: 0; cursor: pointer; font-family: inherit; }
+
+.form .button:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+.status { margin: 0; min-height: 1.5em; font-size: 0.9375rem; }
+
+.status[data-state="error"] { color: #b42318; }
+
+.sent { margin-top: 40px; }
+
+.sent[hidden], .form[hidden] { display: none; }
+
 /* Motion */
 
 @keyframes float {
