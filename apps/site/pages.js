@@ -52,6 +52,14 @@
         });
       })
       .then(function () {
+        var sentEvent = form.getAttribute("data-sent-event");
+        if (sentEvent && window.umami) {
+          // The reason is one of the fixed choices, never the free text.
+          var reason = form.querySelector('input[name="reason"]:checked');
+          var data = { version: version || "unknown" };
+          if (reason) data.reason = reason.value;
+          window.umami.track(sentEvent, data);
+        }
         form.hidden = true;
         if (sent) sent.hidden = false;
       })
