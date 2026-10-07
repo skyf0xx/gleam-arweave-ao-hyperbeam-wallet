@@ -36,10 +36,6 @@ code work.
 
 ### Build
 
-- **feat(points-api): daily snapshot scheduler.** Read every live wallet's AR
-  and AO balances in one bounded-concurrency pass. Write `snapshots` and
-  `points` in one transaction, idempotent per day. If the run takes over
-  an hour, add batching. **M** · `sonnet`
 - **feat(points-api): signed score endpoint.** `POST /me` returns
   per-wallet totals, today's rate, percentile, number of referees and
   invite code. **S** · `sonnet`
@@ -87,3 +83,7 @@ code work.
 
 - `packages/core/src/ao/transfer.ts`: its private `bytesToBase64Url` and
   `base64UrlToBytes` duplicate `vault/base64.ts`. Switch to the shared ones.
+- `packages/core/src/ao/balance.ts`: HyperBEAM answers 404 for an address
+  the AO token never credited, and `getTokenBalance` throws on it. A fresh
+  wallet may show an AO balance error instead of 0. The points API
+  already reads 404 as 0 (`apps/points-api/src/balances.ts`).
