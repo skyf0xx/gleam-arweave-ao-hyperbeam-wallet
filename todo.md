@@ -26,3 +26,15 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- **M** 🧪 ❓ `opus` — Floating "Connect with Gleam" pill
+  (`entrypoints/content`). dApps only show Wander/permawebOS buttons, so
+  Gleam is invisible until they add one. Show a small Gleam-branded pill
+  on pages detected as Arweave dApps (wallet-kit globals, aoconnect,
+  `arweaveWalletLoaded` listeners) when the origin has no permissions.
+  A user click (`isTrusted`) runs the normal `connect` approval; after
+  that, fire `walletSwitch`/`arweaveWalletLoaded` so the page re-checks,
+  and fall back to a "reload to finish" hint. Needs a per-site
+  "don't show again" and a global toggle in Settings. Isolate it in a
+  shadow root so page CSS can't restyle it. ❓ detection heuristics and
+  whether it's on by default (Chrome Web Store review of UI injection).
