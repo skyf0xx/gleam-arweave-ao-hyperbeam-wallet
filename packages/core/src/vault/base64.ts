@@ -24,3 +24,8 @@ export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
   const standard = value.replace(/-/g, "+").replace(/_/g, "/");
   return base64ToBytes(standard + "=".repeat((4 - (standard.length % 4)) % 4));
 }
+
+/** Unpadded base64url, the encoding Arweave uses for addresses and signatures. */
+export function bytesToBase64Url(bytes: Uint8Array): string {
+  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}

@@ -15,7 +15,9 @@ distributed in proportion to each wallet's share of all points.
 - **Referrals.** A wallet that joined with an invite code earns +10% on
   its own holding points. The wallet that invited it earns 10% of that
   wallet's holding points. Referral points never earn further referral
-  points, so referrals pay out one level only. There are no caps.
+  points, so referrals pay out one level only. There are no caps. A
+  referrer that isn't live that day earns no referrer bonus. The
+  referee's own bonus doesn't depend on its referrer being live.
 - **Airdrop share** = a wallet's points ÷ all points. Points carry no
   promised value or conversion ratio. Before any distribution they are
   subject to an eligibility review, which can exclude abusive wallets.
@@ -46,10 +48,12 @@ AR and AO, so `base` needs no conversion. Use integer arithmetic only:
   key signs `gleam-points:heartbeat:v1:<unixSeconds>`. The server
   rejects timestamps more than 10 minutes old and stores the latest
   heartbeat per device.
-- **Score reads** are signed by the device key, and the server answers
-  only for wallets registered to that device. No leaderboard is public.
+- **Score reads** are signed by the device key over
+  `gleam-points:me:v1:<unixSeconds>`, and the server answers only for
+  wallets registered to that device. No leaderboard is public.
 
-Every signed payload starts with the `gleam-points:` prefix, so none of
+Invite codes are 6–16 characters of `A–Z0–9`. Input is trimmed and
+uppercased before it is checked. Every signed payload starts with the `gleam-points:` prefix, so none of
 them can be replayed as a transaction or a dApp message.
 
 ## Attribution
@@ -96,7 +100,8 @@ Requests are rate-limited per IP and per device.
 - **Points sheet** (opened from the chip). Shows points, "Top N%", the
   invite link with a copy button, the number of friends who joined, the
   invite-code field and a "How points work" link. No new tab.
-- **Placement.** Pure logic lives in `core/points/`: message builders,
-  the local estimator and formula helpers. Wire contracts live in
+- **Placement.** Pure logic lives in `core/points/`: message builders
+  and parsers, the device-key thumbprint, the daily formula and the
+  local estimator. The points API uses the same module. Wire contracts live in
   `messaging`, the background work in `handlers/points.ts`, and the
   points API URL is a build-time constant.

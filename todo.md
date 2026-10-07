@@ -39,10 +39,6 @@ code work.
 
 ### Build
 
-- **feat(points): points formula and signed-message builders in core.**
-  Add `packages/core/src/points/` with the register, heartbeat and score
-  payload builders, the daily formula (`base`, referee and referrer bonus,
-  integer-only) and the local estimator, plus tests. **M** · `opus`
 - **feat(points-api): scaffold apps/points-api with schema and
   migrations.** Add a new workspace app (Vercel Functions, TypeScript,
   `@neondatabase/serverless`), plain SQL migrations for the four tables,
@@ -100,3 +96,6 @@ code work.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
+
+- `packages/core/src/ao/transfer.ts`: its private `bytesToBase64Url` and
+  `base64UrlToBytes` duplicate `vault/base64.ts`. Switch to the shared ones.
