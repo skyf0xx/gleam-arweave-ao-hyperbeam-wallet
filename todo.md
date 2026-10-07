@@ -26,11 +26,3 @@ vault, crypto and provider security; `sonnet` for everything else.
 ## Unsorted
 
 <!-- New findings go here until they're placed in the list above. -->
-
-- Chrome Web Store: not yet submitted. First submission is manual (Developer
-  Dashboard, $5 one-time registration, store listing copy/screenshots,
-  privacy-practices disclosures, and a manual review pass since this is a
-  wallet). Once that first listing exists and has an extension ID, add a
-  tag-triggered release workflow (`chrome-webstore-upload` API, secrets:
-  `EXTENSION_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`) so future
-  releases are a version-tag push. S ❓ `sonnet`
