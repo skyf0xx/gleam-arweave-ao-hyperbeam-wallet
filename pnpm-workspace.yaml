@@ -12,3 +12,7 @@ overrides:
   "@ethersproject/providers>ws": ^7.5.11
   jsdom>ws: ^8.21.3
   image-size: ^2.0.3
+  "brace-expansion@>=4.0.0 <5.0.12": ^5.0.12
+  source-map-js: ^1.2.2
+  shell-quote: ^1.11.0
+  pbkdf2: ^3.1.7
