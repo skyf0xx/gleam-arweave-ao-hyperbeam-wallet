@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
@@ -444,6 +444,15 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
 });
 
 describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
+  // jsdom has no window.scrollTo, and every tab click calls it.
+  beforeEach(() => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const AO_TOKEN: TokenBalance = {
     address: WALLET.address,
     processId: "processABC",
@@ -521,6 +530,20 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       expect(screen.getAllByText(token.ticker).length).toBeGreaterThan(0);
     }
   });
+
+  it.each(["Tokens", "Activity"])(
+    "clicking the %s tab scrolls the list section up to its docked position under the pinned header",
+    async (tabName) => {
+      renderMainScreen({ runtime: fakeRuntime({ send: sendWith({}) }) });
+      await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+
+      const section = screen.getByRole("tablist", { name: "Tokens and activity" }).parentElement as HTMLElement;
+      vi.spyOn(section, "getBoundingClientRect").mockReturnValue({ top: 420 } as DOMRect);
+      fireEvent.click(screen.getByRole("tab", { name: tabName }));
+
+      expect(window.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 420 - 64 }));
+    },
+  );
 
   it("caps the Activity tab at the 10 most recent entries even when more exist", async () => {
     const send = sendWith({ activity: manyEntries(15) });

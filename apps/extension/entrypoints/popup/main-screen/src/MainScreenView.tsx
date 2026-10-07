@@ -337,6 +337,25 @@ export function MainScreenView({
     return () => window.clearTimeout(timer);
   }, [headerCollapsed]);
 
+  /**
+   * Picking a tab scrolls the window until the section reaches its docked
+   * position, so the header fades, the section docks, and the whole list
+   * has the popup to itself. Once docked, the section scrolls on its own,
+   * so the click just brings that inner list back to its top.
+   */
+  const selectTab = (tab: "tokens" | "activity") => {
+    setActiveTab(tab);
+    const section = listSectionRef.current;
+    if (!section) return;
+    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    if (listDocked) {
+      section.scrollTo?.({ top: 0, behavior });
+      return;
+    }
+    const top = window.scrollY + section.getBoundingClientRect().top - LIST_DOCK_TOP_PX;
+    window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
+  };
+
   return (
     <div className="flex min-h-full flex-col">
       {loadError ? (
@@ -468,12 +487,21 @@ export function MainScreenView({
         jumps when it detaches. `--dock-offset` carries the measured
         distance still remaining to that resting `top` at the moment of
         detaching, so the transform can start exactly where the section
-        already was and animate down to 0 instead of snapping.
+        already was and animate down to 0 instead of snapping. Docked, it
+        runs to the popup's bottom edge and scrolls internally — a fixed
+        box can't be moved by window scroll, so without that a list longer
+        than the popup would be cut off. The undocked min-height keeps the
+        page tall enough for a tab click to scroll the section all the way
+        up to its docked position even when the list is short.
       */}
       {listDocked ? <div style={{ height: listSectionRef.current?.offsetHeight }} /> : null}
       <div
         ref={listSectionRef}
-        className={`px-6 pb-6 ${listDocked ? "gleam-dock-in fixed inset-x-0 top-16 z-20" : ""}`}
+        className={`px-6 pb-6 ${
+          listDocked
+            ? "gleam-dock-in fixed inset-x-0 bottom-0 top-16 z-20 overflow-y-auto bg-background"
+            : "min-h-[calc(100vh-4rem)]"
+        }`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
       >
         <div
@@ -485,7 +513,7 @@ export function MainScreenView({
             type="button"
             role="tab"
             aria-selected={activeTab === "tokens"}
-            onClick={() => setActiveTab("tokens")}
+            onClick={() => selectTab("tokens")}
             className={`rounded-md px-2.5 py-1 text-label ${
               activeTab === "tokens" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
@@ -496,7 +524,7 @@ export function MainScreenView({
             type="button"
             role="tab"
             aria-selected={activeTab === "activity"}
-            onClick={() => setActiveTab("activity")}
+            onClick={() => selectTab("activity")}
             className={`rounded-md px-2.5 py-1 text-label ${
               activeTab === "activity" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
