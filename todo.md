@@ -27,14 +27,21 @@ vault, crypto and provider security; `sonnet` for everything else.
 
 <!-- New findings go here until they're placed in the list above. -->
 
-- **M** 🧪 ❓ `opus` — Floating "Connect with Gleam" pill
-  (`entrypoints/content`). dApps only show Wander/permawebOS buttons, so
-  Gleam is invisible until they add one. Show a small Gleam-branded pill
-  on pages detected as Arweave dApps (wallet-kit globals, aoconnect,
-  `arweaveWalletLoaded` listeners) when the origin has no permissions.
-  A user click (`isTrusted`) runs the normal `connect` approval; after
-  that, fire `walletSwitch`/`arweaveWalletLoaded` so the page re-checks,
-  and fall back to a "reload to finish" hint. Needs a per-site
-  "don't show again" and a global toggle in Settings. Isolate it in a
-  shadow root so page CSS can't restyle it. ❓ detection heuristics and
-  whether it's on by default (Chrome Web Store review of UI injection).
+- **M** 🧪 ❓ `opus` — "Connect with Gleam" prompt for dApps without a
+  Gleam button (`entrypoints/content`, `entrypoints/background`). dApps only
+  show Wander/permawebOS buttons, so Gleam is invisible until they add one.
+  When a page is detected as an Arweave dApp and the origin has no
+  permissions, offer a one-click connect that runs the normal `connect`
+  approval, then fire `walletSwitch`/`arweaveWalletLoaded` so the page
+  re-checks, with a "reload to finish" fallback. Needs a per-site
+  "don't show again" and a global toggle in Settings.
+  - ❓ **Surface: prefer no page injection.** Injecting UI into third-party
+    pages invites heavier Chrome Web Store review. Default to extension-owned
+    surfaces only: toolbar badge/icon state on the tab, with the connect
+    button in the popup or side panel. Fall back to an in-page pill (shadow
+    root, user click only) only if that proves too hidden.
+  - ❓ **Detection heuristics.** Candidate signals, read-only: the page
+    offers the permawebOS wallet (its connect option or injected object is
+    present), arweave-wallet-kit / Wander Connect globals, aoconnect, or
+    `arweaveWalletLoaded` listeners. Decide which to use and whether the
+    prompt is on by default.
