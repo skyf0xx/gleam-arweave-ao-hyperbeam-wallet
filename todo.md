@@ -36,11 +36,6 @@ code work.
 
 ### Build
 
-- **feat(points-api): register and heartbeat endpoints.** Verify the RSA-PSS
-  registration signature with `@gleam/core` `verifyMessage`, derive the
-  address from `n`, check the ECDSA device signature on heartbeats,
-  reject stale timestamps, apply an invite code only to the device's
-  first wallet, and rate-limit. **M** · `opus`
 - **feat(points-api): daily snapshot scheduler.** Read every live wallet's AR
   and AO balances in one bounded-concurrency pass. Write `snapshots` and
   `points` in one transaction, idempotent per day. If the run takes over

@@ -24,3 +24,52 @@ export async function addressFromOwner(publicKeyModulus: string): Promise<string
   const digest = await crypto.subtle.digest("SHA-256", base64UrlToBytes(publicKeyModulus));
   return bytesToBase64Url(new Uint8Array(digest));
 }
+
+const COORDINATE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/** Shape check for a device public key arriving over the wire. */
+export function isDevicePublicJwk(value: unknown): value is DevicePublicJwk {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.kty === "EC" &&
+    candidate.crv === "P-256" &&
+    typeof candidate.x === "string" &&
+    COORDINATE_PATTERN.test(candidate.x) &&
+    typeof candidate.y === "string" &&
+    COORDINATE_PATTERN.test(candidate.y)
+  );
+}
+
+const DEVICE_SIGNATURE_PARAMS: EcdsaParams = { name: "ECDSA", hash: "SHA-256" };
+
+/** Signs a points payload with the install's device key; returns base64url. */
+export async function signDeviceMessage(privateKey: CryptoKey, message: string): Promise<string> {
+  const signature = await crypto.subtle.sign(DEVICE_SIGNATURE_PARAMS, privateKey, new TextEncoder().encode(message));
+  return bytesToBase64Url(new Uint8Array(signature));
+}
+
+export async function verifyDeviceSignature(
+  publicJwk: DevicePublicJwk,
+  message: string,
+  signature: string,
+): Promise<boolean> {
+  try {
+    const key = await crypto.subtle.importKey(
+      "jwk",
+      { kty: publicJwk.kty, crv: publicJwk.crv, x: publicJwk.x, y: publicJwk.y },
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"],
+    );
+    return await crypto.subtle.verify(
+      DEVICE_SIGNATURE_PARAMS,
+      key,
+      base64UrlToBytes(signature),
+      new TextEncoder().encode(message),
+    );
+  } catch {
+    // A malformed key or signature is a failed verification, not a server error.
+    return false;
+  }
+}

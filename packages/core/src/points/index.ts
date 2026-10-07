@@ -10,7 +10,13 @@ export {
   isFreshIssuedAt,
 } from "./messages";
 export type { RegisterMessage, DeviceMessageKind } from "./messages";
-export { deviceKeyThumbprint, addressFromOwner } from "./identity";
+export {
+  deviceKeyThumbprint,
+  addressFromOwner,
+  isDevicePublicJwk,
+  signDeviceMessage,
+  verifyDeviceSignature,
+} from "./identity";
 export type { DevicePublicJwk } from "./identity";
 export { basePoints, computeDailyPoints, estimatePoints, ownDailyRate } from "./formula";
 export type { WalletSnapshot, DailyPoints, PointsEstimateInput } from "./formula";
