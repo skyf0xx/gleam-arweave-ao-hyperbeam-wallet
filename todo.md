@@ -14,44 +14,37 @@ vault, crypto and provider security; `sonnet` for everything else.
 Spec: `POINTS.md`. Items marked 👤 are for Will. Everything else is
 code work.
 
-### 👤 Setup (before the server items)
+### 👤 Setup (before the server goes live)
 
-- 👤 Create a Vercel project for `apps/points-api`, using the same Vercel
-  account as the site. Add a Neon Postgres database from the Vercel
-  Marketplace. Pick a domain such as `points.<site-domain>`, or use the
-  default `*.vercel.app`.
-- 👤 Set these env vars on that project (Production and Preview):
-  - `DATABASE_URL`: set automatically by the Neon integration.
-  - `CRON_SECRET`: a random 32+ character string. Vercel Cron sends it
-    as a bearer token.
-  - `ARWEAVE_GATEWAY_URL`: `https://arweave.net` unless you prefer
-    another gateway.
-  - `HYPERBEAM_URL`: the HyperBEAM peer for AO balance reads. Defaults to
-    the extension's first `DEFAULT_HYPERBEAM_PEER_URLS` entry.
-  - `ALLOWED_ORIGIN`: the extension origin
-    `chrome-extension://<store extension id>`.
-- 👤 Send me the points API base URL and the Chrome Web Store extension
-  ID. The extension's build-time constant and `externally_connectable`
-  both need them.
+- 👤 Create a Railway project from this GitHub repo. Add a Postgres
+  database to it. In the service's settings, set **Config file path** to
+  `apps/points-api/railway.json` and leave Root Directory empty. The
+  build needs the whole workspace.
+- 👤 Set the service variables:
+  - `DATABASE_URL`: reference the Postgres service's `DATABASE_URL`.
+  - `ARWEAVE_GATEWAY_URL` (optional): defaults to `https://arweave.net`.
+  - `HYPERBEAM_URL` (optional): defaults to
+    `https://state.forward.computer`.
+  - `PORT` is set by Railway.
+- 👤 Generate a public domain for the service, or attach
+  `points.<your domain>`, then send me the URL and the Chrome Web Store
+  extension ID. The extension's build constant, `host_permissions` and
+  `externally_connectable` need them.
 - 👤 Before launch: legal review of the points wording ("may be
   considered in a future distribution", eligibility review, no promised
   value).
 
 ### Build
 
-- **feat(points-api): scaffold apps/points-api with schema and
-  migrations.** Add a new workspace app (Vercel Functions, TypeScript,
-  `@neondatabase/serverless`), plain SQL migrations for the four tables,
-  and tsc/eslint/vitest wiring. Add it to lefthook and CI. **M** · `sonnet`
 - **feat(points-api): register and heartbeat endpoints.** Verify the RSA-PSS
   registration signature with `@gleam/core` `verifyMessage`, derive the
   address from `n`, check the ECDSA device signature on heartbeats,
   reject stale timestamps, apply an invite code only to the device's
   first wallet, and rate-limit. **M** · `opus`
-- **feat(points-api): daily snapshot cron.** Read every live wallet's AR
+- **feat(points-api): daily snapshot scheduler.** Read every live wallet's AR
   and AO balances in one bounded-concurrency pass. Write `snapshots` and
   `points` in one transaction, idempotent per day. If the run takes over
-  about 250s, switch to batched runs. **M** · `sonnet`
+  an hour, add batching. **M** · `sonnet`
 - **feat(points-api): signed score endpoint.** `POST /me` returns
   per-wallet totals, today's rate, percentile, number of referees and
   invite code. **S** · `sonnet`

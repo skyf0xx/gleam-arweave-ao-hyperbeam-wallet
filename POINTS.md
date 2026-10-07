@@ -72,9 +72,10 @@ extension, so the code travels through the site:
 
 ## Server
 
-`apps/points-api` is a TypeScript app on Vercel Functions with Postgres
-(Neon). It reuses `@gleam/core` for balance reads and message
-verification.
+`apps/points-api` is a Hono app on Node, run with `tsx` so it imports
+`@gleam/core`'s TypeScript source directly. It runs on Railway from
+`apps/points-api/Dockerfile`, with Railway Postgres. Migrations in
+`src/migrations/` apply on boot.
 
 | Table | Columns |
 | --- | --- |
@@ -88,9 +89,15 @@ verification.
 | `POST /register` | Bind a wallet to a device and apply an invite code. Returns the wallet's own invite code. |
 | `POST /heartbeat` | Device liveness. |
 | `POST /me` | Signed by the device key. For each of its wallets: total points, today's rate, percentile, number of referees, invite code. |
-| `GET /cron/snapshot` | Vercel Cron, daily at 00:00 UTC, guarded by `CRON_SECRET`. One pass reads every eligible wallet's balances (bounded concurrency), then writes `snapshots` and `points` in one transaction. Idempotent per `day`. |
 
 Requests are rate-limited per IP and per device.
+
+**Daily snapshot.** An in-process scheduler checks every 10 minutes. If
+today's UTC date has no `snapshot_runs` row, it takes a Postgres
+advisory lock and runs. One pass reads every live wallet's balances
+(bounded concurrency, retried), then writes `snapshots`, `points` and the
+`snapshot_runs` row in one transaction. A restart or a second replica
+can't double-run a day, and a missed run catches up on the next check.
 
 ## Extension
 

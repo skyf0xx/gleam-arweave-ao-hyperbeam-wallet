@@ -25,6 +25,7 @@ jobs:
       - run: pnpm tsc -p packages/messaging --noEmit
       - run: pnpm tsc -p packages/ui --noEmit
       - run: pnpm tsc -p apps/extension --noEmit
+      - run: pnpm tsc -p apps/points-api --noEmit
 
   test:
     runs-on: ubuntu-latest
