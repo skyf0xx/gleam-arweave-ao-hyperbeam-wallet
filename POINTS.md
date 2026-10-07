@@ -88,7 +88,7 @@ extension, so the code travels through the site:
 | --- | --- |
 | `POST /register` | Bind a wallet to a device and apply an invite code. Returns the wallet's own invite code. |
 | `POST /heartbeat` | Device liveness. |
-| `POST /me` | Signed by the device key. For each of its wallets: total points, today's rate, percentile, number of referees, invite code. |
+| `POST /me` | Signed by the device key. Returns `settledAt` (when the latest snapshot completed) and, for each of the device's wallets: total points, the latest day's breakdown, "Top N%" among wallets with points, number of referees, and invite code. |
 
 Requests are rate-limited per IP and per device.
 

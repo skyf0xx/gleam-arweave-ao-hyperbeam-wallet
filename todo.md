@@ -36,9 +36,6 @@ code work.
 
 ### Build
 
-- **feat(points-api): signed score endpoint.** `POST /me` returns
-  per-wallet totals, today's rate, percentile, number of referees and
-  invite code. **S** · `sonnet`
 - **feat(points): device key and heartbeat in the extension.** Create a
   non-extractable P-256 key in IndexedDB on first need and send the
   heartbeat from a daily `browser.alarms` alarm in `handlers/points.ts`.

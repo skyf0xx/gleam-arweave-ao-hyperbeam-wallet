@@ -5,6 +5,7 @@ import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from ".
 import { randomInviteCode } from "./invite-code";
 import { RateLimiter } from "./rate-limit";
 import { parseRegisterRequest, register } from "./register";
+import { scoresForDevice } from "./score";
 
 export interface AppDeps {
   db: Db;
@@ -20,6 +21,8 @@ export function createApp(deps: AppDeps): Hono {
   const registerByIp = new RateLimiter(20, HOUR_MS);
   const heartbeatByIp = new RateLimiter(120, HOUR_MS);
   const heartbeatByDevice = new RateLimiter(6, HOUR_MS);
+  const scoreByIp = new RateLimiter(600, HOUR_MS);
+  const scoreByDevice = new RateLimiter(60, HOUR_MS);
 
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 16 * 1024 }));
@@ -48,6 +51,17 @@ export function createApp(deps: AppDeps): Hono {
     if (!auth.ok) return c.json({ error: auth.error }, auth.status);
     await recordHeartbeat(deps.db, auth.deviceId, now());
     return c.json({ ok: true });
+  });
+
+  app.post("/me", async (c) => {
+    if (!scoreByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const request = parseDeviceSignedRequest(await readJson(c));
+    if (!request) return c.json({ error: "Malformed request." }, 400);
+    if (!scoreByDevice.allow(request.deviceId, now().getTime())) return tooManyRequests(c);
+
+    const auth = await authenticateDevice(deps.db, "me", request, now());
+    if (!auth.ok) return c.json({ error: auth.error }, auth.status);
+    return c.json(await scoresForDevice(deps.db, auth.deviceId));
   });
 
   return app;
