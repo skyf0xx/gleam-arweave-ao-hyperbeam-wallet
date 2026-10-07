@@ -13,7 +13,7 @@ const SCOPED_PREVIEW: ConnectApprovalPreview = {
   appInfo: null,
 };
 
-const UNLIMITED_PREVIEW: ConnectApprovalPreview = {
+const SPEND_PREVIEW: ConnectApprovalPreview = {
   kind: "connect",
   requestedPermissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
   appInfo: null,
@@ -49,30 +49,18 @@ describe("ConnectionRequestScreen (6.1 connection request)", () => {
     expect(screen.queryByText(/\bapproval\b/i)).toBeNull();
   });
 
-  it("stays at Consequential tier (no risk notice) for a scoped grant with no spending permission", () => {
-    render(
-      <ConnectionRequestScreen
-        origin="https://bazar.arweave.net"
-        preview={SCOPED_PREVIEW}
-        onReject={vi.fn()}
-        onGrant={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByRole("alert")).toBeNull();
-  });
-
-  it("escalates to Irreversible-tier framing when the request includes SIGN_TRANSACTION", () => {
+  it("describes SIGN_TRANSACTION as requesting payments, with no risk notice", () => {
     render(
       <ConnectionRequestScreen
         origin="https://unknown-app.example"
-        preview={UNLIMITED_PREVIEW}
+        preview={SPEND_PREVIEW}
         onReject={vi.fn()}
         onGrant={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("alert").textContent).toMatch(/no spending limit/i);
+    expect(screen.getByText("Request payments")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("calls onGrant/onReject from their respective buttons", () => {

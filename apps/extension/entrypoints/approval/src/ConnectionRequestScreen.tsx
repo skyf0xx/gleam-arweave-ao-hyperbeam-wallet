@@ -1,19 +1,14 @@
 import { useState } from "react";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 
 /**
- * Ports `connection-request.html` (6.1) exactly: origin identity, "wants
- * to:" scope list in plain nouns (brand vocabulary rule — "grant," never
- * "connection"/"approval," for the scope itself), an Irreversible-tier
- * red escalation when a requested scope has no spending limit, and a
- * two-button reject/grant action row. This build's Phase 1 `Grant` model
- * has no spending-limit concept yet (`budget` is always `null` — see
- * `core/models/grant.ts`), so the escalation here triggers on
- * `SIGN_TRANSACTION`/`DISPATCH` (the two scopes that let a connected app
- * move funds with no per-grant limit in this phase) rather than on a
- * budget comparison the model can't yet express.
+ * Ports `connection-request.html` (6.1): origin identity, "wants to:"
+ * scope list in plain nouns (brand vocabulary rule — "grant," never
+ * "connection"/"approval," for the scope itself), and a two-button
+ * reject/grant action row. Spending scopes carry no risk escalation here:
+ * they only let the app *request* a payment, and every payment opens its
+ * own signing approval, which is where the Irreversible tier lives.
  */
 export interface ConnectionRequestScreenProps {
   origin: string;
@@ -22,17 +17,17 @@ export interface ConnectionRequestScreenProps {
   onGrant: () => void;
 }
 
-const SCOPE_COPY: Record<PermissionType, { title: string; detail: string; risk?: boolean }> = {
+const SCOPE_COPY: Record<PermissionType, { title: string; detail: string }> = {
   ACCESS_ADDRESS: { title: "See your address", detail: "Your public wallet address" },
   ACCESS_PUBLIC_KEY: { title: "See your public key", detail: "Used to verify signatures" },
   ACCESS_ALL_ADDRESSES: { title: "See all your wallets", detail: "Every address you've added" },
   ACCESS_ARWEAVE_CONFIG: { title: "See your network settings", detail: "Gateway and peer configuration" },
   ACCESS_TOKENS: { title: "See your token balances", detail: "AR and AO token balances" },
-  SIGN_TRANSACTION: { title: "Spend with no limit", detail: "Until revoked", risk: true },
+  SIGN_TRANSACTION: { title: "Request payments", detail: "You'll confirm each one" },
   SIGNATURE: { title: "Ask you to sign data", detail: "Reviewed individually, every time" },
   ENCRYPT: { title: "Encrypt data for you", detail: "Using your key" },
   DECRYPT: { title: "Decrypt data for you", detail: "Using your key" },
-  DISPATCH: { title: "Spend with no limit", detail: "Until revoked", risk: true },
+  DISPATCH: { title: "Request payments", detail: "You'll confirm each one" },
 };
 
 function faviconLetter(origin: string): string {
@@ -53,9 +48,6 @@ function hostnameOf(origin: string): string {
 
 export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: ConnectionRequestScreenProps) {
   const { requestedPermissions, appInfo } = preview;
-  const hasUnlimitedSpend = requestedPermissions.some(
-    (permission) => permission === "SIGN_TRANSACTION" || permission === "DISPATCH",
-  );
   const fallbackName = hostnameOf(origin).split(".")[0] ?? origin;
   const displayName = appInfo?.name?.trim() || fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -90,11 +82,7 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
             const copy = SCOPE_COPY[permission];
             return (
               <div key={permission} className="flex items-start gap-2.5 border-b border-line py-3 last:border-b-0">
-                <div
-                  className={`mt-px flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md ${
-                    copy.risk ? "bg-warning-surface text-warning" : "bg-mist text-foreground"
-                  }`}
-                >
+                <div className="mt-px flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
                   <ScopeIcon />
                 </div>
                 <div className="flex flex-col gap-px">
@@ -106,23 +94,11 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
           })}
         </div>
 
-        {hasUnlimitedSpend ? (
-          <RiskNotice>
-            <strong className="font-bold">This grant has no spending limit.</strong> Most apps don&apos;t need
-            this. Only continue if you trust this app completely.
-          </RiskNotice>
-        ) : null}
-
         <div className="mt-auto flex gap-2.5">
           <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
             Reject
           </Button>
-          <Button
-            type="button"
-            variant={hasUnlimitedSpend ? "destructive" : "primary"}
-            onClick={onGrant}
-            className="flex-1"
-          >
+          <Button type="button" variant="primary" onClick={onGrant} className="flex-1">
             Grant
           </Button>
         </div>

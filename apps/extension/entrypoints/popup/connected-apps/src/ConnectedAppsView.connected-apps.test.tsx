@@ -55,7 +55,7 @@ describe("ConnectedAppsView (6.3 connected-apps)", () => {
 
     await waitFor(() => expect(screen.getAllByText("bazar.arweave.net")[0]).toBeTruthy());
     expect(screen.getByText(/sees your address only/i)).toBeTruthy();
-    expect(screen.getByText(/spend with no limit/i)).toBeTruthy();
+    expect(screen.getByText(/can request payments/i)).toBeTruthy();
   });
 
   it("Revoke calls revokeGrant with the row's origin, then reloads the list", async () => {

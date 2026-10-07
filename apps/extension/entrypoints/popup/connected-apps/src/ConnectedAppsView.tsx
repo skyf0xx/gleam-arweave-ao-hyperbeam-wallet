@@ -29,12 +29,12 @@ function hostnameOf(origin: string): string {
   }
 }
 
-function canSpendUnlimited(grant: Grant): boolean {
+function canRequestPayments(grant: Grant): boolean {
   return grant.permissions.some((permission) => permission === "SIGN_TRANSACTION" || permission === "DISPATCH");
 }
 
 function scopeSummary(grant: Grant): string {
-  if (canSpendUnlimited(grant)) return "Sees your address, can spend with no limit";
+  if (canRequestPayments(grant)) return "Sees your address, can request payments";
   if (grant.permissions.length > 1) return "Sees your address and more";
   return "Sees your address only";
 }
@@ -92,11 +92,6 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
                     <span className="truncate text-label font-semibold text-foreground">
                       {hostnameOf(grant.origin)}
                     </span>
-                    {canSpendUnlimited(grant) ? (
-                      <span className="flex-shrink-0 rounded-md border border-warning-border bg-warning-surface px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-warning">
-                        NO LIMIT
-                      </span>
-                    ) : null}
                   </div>
                   <span className="font-mono text-caption text-faint">{hostnameOf(grant.origin)}</span>
                   <span className="text-label leading-snug text-muted">{scopeSummary(grant)}</span>
