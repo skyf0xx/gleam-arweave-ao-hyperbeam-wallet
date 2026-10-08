@@ -607,6 +607,145 @@ code { font-family: var(--mono); font-size: 0.9em; }
 
 .sent[hidden], .form[hidden] { display: none; }
 
+/* Gleam Points */
+
+.points { max-width: 820px; padding-top: 8vh; padding-bottom: 12vh; }
+
+.points-hero .beam { margin: 0 0 28px; }
+
+.points-kicker { margin: 0 0 14px; font-size: 0.875rem; font-weight: 600; letter-spacing: 0.02em; color: var(--muted); }
+
+.points-title { font-size: clamp(2.5rem, 6vw, 4.5rem); max-width: 12em; }
+
+.points-section { margin-top: clamp(64px, 10vh, 112px); }
+
+.points-h2 {
+  margin: 0 0 24px;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.points-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(56px, 9vh, 96px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--line);
+}
+
+.stat { display: flex; flex-direction: column; gap: 8px; padding: 24px 22px; background: #fff; }
+
+.stat-value {
+  font-weight: 600;
+  font-size: clamp(2.25rem, 4.4vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label { color: var(--muted); font-size: 0.9375rem; line-height: 1.45; }
+
+/* The calculator: inputs on the left, results on the right */
+
+.calc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.calc-inputs { display: flex; flex-direction: column; gap: 22px; padding: 28px; }
+
+.calc-field { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; font-weight: 600; font-size: 0.9375rem; }
+
+.calc-field > span { grid-column: 1 / -1; }
+
+.calc-field input[type="number"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.calc-field input[type="number"]:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+
+.calc-field input[type="range"] { width: 100%; accent-color: var(--fg); }
+
+.calc-field output { min-width: 2ch; text-align: right; font-variant-numeric: tabular-nums; }
+
+.calc-check { display: flex; align-items: center; gap: 10px; font-size: 0.9375rem; cursor: pointer; }
+
+.calc-check input { margin: 0; width: 16px; height: 16px; accent-color: var(--fg); }
+
+.calc-results {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px;
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+}
+
+/* The beam marks the result, the one place on the page that's yours */
+.calc-results::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: 0;
+  width: 72px;
+  height: 3px;
+  background: linear-gradient(90deg,
+    var(--beam-red) 0 20%, var(--beam-purple) 20% 40%, var(--beam-sky) 40% 60%,
+    var(--beam-yellow) 60% 80%, var(--beam-green) 80% 100%);
+}
+
+.calc-result { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+
+.calc-period { color: var(--muted); font-size: 0.9375rem; }
+
+.calc-value { font-weight: 600; font-size: 1.5rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+.calc-result-main { padding-top: 18px; border-top: 1px solid var(--line); }
+
+.calc-result-main .calc-value { font-size: clamp(2.25rem, 4.4vw, 3rem); letter-spacing: -0.04em; }
+
+.calc-note { margin: 0; color: var(--muted); font-size: 0.8125rem; }
+
+.points-why { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+
+.why h3 { margin: 0 0 8px; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+
+.why p { margin: 0; color: var(--muted); }
+
+.points-rules { max-width: 680px; padding: 0; }
+
+.points-rules h2 { margin-top: 0; }
+
+.points-final { margin-top: clamp(72px, 12vh, 128px); }
+
+.points-final .beam { margin: 0 0 24px; }
+
+@media (max-width: 720px) {
+  .points-stats, .points-why { grid-template-columns: minmax(0, 1fr); }
+  .calc { grid-template-columns: minmax(0, 1fr); }
+  .calc-results { border-left: 0; border-top: 1px solid var(--line); }
+}
+
 /* Motion */
 
 @keyframes float {

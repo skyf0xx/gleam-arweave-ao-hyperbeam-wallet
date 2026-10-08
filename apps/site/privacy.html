@@ -6,14 +6,14 @@
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#F7F7F7">
   <title>Privacy: Gleam</title>
-  <meta name="description" content="What the Gleam wallet and this website collect, store and send. Short version: we have no server.">
+  <meta name="description" content="What the Gleam wallet and this website collect, store and send. Short version: nothing leaves your device unless you join Gleam Points.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Gleam">
   <meta property="og:title" content="Privacy: Gleam">
-  <meta property="og:description" content="What the Gleam wallet and this website collect, store and send. Short version: we have no server.">
+  <meta property="og:description" content="What the Gleam wallet and this website collect, store and send. Short version: nothing leaves your device unless you join Gleam Points.">
   <meta property="og:url" content="https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/privacy.html">
   <meta property="og:image" content="https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/img/og.jpg?v=4">
   <meta property="og:image:width" content="1200">
@@ -24,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@gleam_wallet">
   <meta name="twitter:title" content="Privacy: Gleam">
-  <meta name="twitter:description" content="What the Gleam wallet and this website collect, store and send. Short version: we have no server.">
+  <meta name="twitter:description" content="What the Gleam wallet and this website collect, store and send. Short version: nothing leaves your device unless you join Gleam Points.">
   <meta name="twitter:image" content="https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/img/og.jpg?v=4">
   <meta name="twitter:image:alt" content="gleam: Crypto without the clutter. Your wallet for AO and Arweave. Beside it, the Gleam wallet home screen.">
   <link rel="stylesheet" href="styles.css">
@@ -39,17 +39,17 @@
   <main class="wrap">
     <article class="prose">
       <h1>Privacy</h1>
-      <p class="updated small">Last updated: 6 October 2026</p>
+      <p class="updated small">Last updated: 8 October 2026</p>
 
       <h2>What Gleam is</h2>
-      <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam server and no Gleam account.</p>
+      <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam account. Gleam runs one server, for Gleam Points, and it's optional: the extension sends it nothing unless you join.</p>
 
       <h2>What stays on your device</h2>
       <p>Your key is encrypted with your password and stored in the browser's extension storage. While the wallet is unlocked, the decrypted key is held in the browser's session storage. It's cleared when you lock the wallet, when auto-lock runs, or when the browser restarts.</p>
-      <p>Your settings, contacts, the sites you've connected and a local log of your activity are stored in the extension too. None of it is sent to us. We have no server to send it to.</p>
+      <p>Your settings, contacts, the sites you've connected and a local log of your activity are stored in the extension too. None of it is sent to us.</p>
 
       <h2>What we can't see</h2>
-      <p>We can't see your key, your password, your balances, your addresses or your activity. That also means we can't recover a lost password or key.</p>
+      <p>We can't see your key, your password or your activity. That also means we can't recover a lost password or key. If you join Gleam Points, we see that wallet's address and its AR and AO balances, as described below. Otherwise we don't see your addresses or balances either.</p>
 
       <h2>Network requests the extension makes</h2>
       <p>To show balances, prices and activity, and to send transactions, the extension talks to these services:</p>
@@ -61,24 +61,37 @@
         <li>HyperBEAM peers, <code>state.forward.computer</code> by default, plus any peer you add: AO balance reads.</li>
         <li><code>api.coingecko.com</code> and <code>api.coinpaprika.com</code>: AR and AO prices, for USD values and the balance chart. These requests only name the token. They don't include your address.</li>
         <li><code>lunar.arweave.net</code>: a block explorer. It opens in a new tab only when you click a transaction or address.</li>
+        <li><code>gleam-points.up.railway.app</code>: the Gleam Points server. The extension contacts it only after you join, as described below.</li>
       </ul>
       <p>Each of these services receives your IP address, as with any web request. Gateways and AO nodes also receive your public address when looking up your balances and activity, because that's how public blockchains work. Transactions you send are public and permanent on Arweave and AO.</p>
+
+      <h2 id="points">Gleam Points</h2>
+      <p>Gleam Points is optional. Nothing is sent to its server until you choose to join a wallet. When you do:</p>
+      <ul>
+        <li>Your install creates a device key, which stays in the browser. It only proves that requests come from the same install. It can't sign transactions or reach your funds.</li>
+        <li>The wallet signs a message linking its public address to that device key, and the server stores the address, the device key's public half, the wallet's invite code, and who invited it, if anyone.</li>
+        <li>About once a day, the extension sends a signed check-in so the server knows Gleam is still installed. The server stores when it last heard from your install.</li>
+        <li>Once a day, the server reads each joined wallet's AR and AO balance from public Arweave and AO nodes and stores it with that day's points.</li>
+      </ul>
+      <p>Because all wallets on one install share the device key, the server can tell they belong to the same install. We use this, the invite links between wallets and the balance history only to run Gleam Points and to review points for abuse. There's no public leaderboard: your points and rank are shown only to your install. The server never receives your key or your password.</p>
+      <p>The server also receives your IP address with each request, as with any web request. We don't store it, apart from short-lived rate limiting.</p>
+      <p>To stop, remove the wallet or uninstall Gleam. Its check-ins stop, and a wallet with no check-in for 3 days earns no points. To have a wallet's points data deleted, email us from the contact below with the address.</p>
 
       <h2>Sites you connect</h2>
       <p>A site sees only what you grant it, such as your address. Every signing request opens its own approval window. You can revoke a site's access at any time in Connected apps.</p>
 
       <h2>No tracking in the wallet</h2>
-      <p>The extension has no analytics, telemetry, cookies or ads, and it never reports what you do in it.</p>
+      <p>The extension has no analytics, cookies or ads, and it never reports what you do in it. The only exception is the daily Gleam Points check-in, which tells the points server Gleam is still installed. It's sent only after you join, and it carries nothing about what you do in the wallet.</p>
       <p>It does open three pages on this website. The welcome page opens once, when you install Gleam. The goodbye page opens when you uninstall it. The feedback page opens when you choose "Send us a message" in Settings. The only thing the extension adds to these links is its version number.</p>
 
       <h2>Install counts</h2>
-      <p>The welcome, goodbye and feedback pages use <a href="https://umami.is/privacy">Umami</a>, a cookieless analytics service, to count visits. Umami records the page, the Gleam version, your browser type and your country, and whether a form was sent. For the goodbye form, it also records which reason you picked, but never what you typed. It sets no cookies and doesn't identify you. It's how we count installs and uninstalls. The rest of this website has no analytics.</p>
+      <p>The welcome, goodbye, feedback, invite and Gleam Points pages use <a href="https://umami.is/privacy">Umami</a>, a cookieless analytics service, to count visits. Umami records the page, the Gleam version, your browser type and your country, and whether a form was sent. For the goodbye form, it also records which reason you picked, but never what you typed. On the invite and Gleam Points pages it counts invite visits, invite codes passed to a new install, use of the points calculator, and clicks on "Add to Chrome". It never records the invite code itself. It sets no cookies and doesn't identify you. It's how we count installs, uninstalls and invites. The rest of this website has no analytics.</p>
 
       <h2>Feedback and uninstall forms</h2>
       <p>If you send a message on the feedback or goodbye page, it's delivered to us by email through <a href="https://web3forms.com/privacy">Web3Forms</a>. We receive what you type, your email if you give one, your Gleam version, and, for feedback, your browser's user-agent string. We use it only to answer you and improve Gleam.</p>
 
       <h2>Hosting</h2>
-      <p>The website is static and hosted on Vercel. Vercel may log standard request data, as described in <a href="https://vercel.com/legal/privacy-policy">Vercel's privacy policy</a>.</p>
+      <p>The website is static and hosted on Vercel. Vercel may log standard request data, as described in <a href="https://vercel.com/legal/privacy-policy">Vercel's privacy policy</a>. The Gleam Points server is hosted on Railway, which may also log standard request data, as described in <a href="https://railway.com/legal/privacy">Railway's privacy policy</a>.</p>
 
       <h2>Changes</h2>
       <p>If this policy changes, the new version is posted on this page with a new date. The code is public on <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a>.</p>

@@ -21,17 +21,14 @@ code work.
   open an invite link before a fresh install. The unpacked build has a
   different extension id than the store, so the welcome-page handoff
   only works from the store build (the e2e test covers it locally).
-- 👤 Before launch: legal review of the points wording ("may be
-  considered in a future distribution", eligibility review, no promised
-  value).
+- 👤 Before launch: legal review of the points wording in
+  `apps/site/points.html` (§ The rules), `terms.html` (§ Gleam Points) and
+  `privacy.html` (§ Gleam Points). The privacy page promises deletion of a
+  wallet's points data on request by email; that's a manual delete from
+  `wallets`, `snapshots` and `points` for now.
 
 ### Build
 
-- **docs(site): points rules, privacy and terms.** Add the "How points
-  work" page `points.html` (the Points screen already links to it) and update `privacy.html` (device key, the server-side link
-  between wallets on one install, heartbeat data) and `terms.html`
-  (eligibility review, no promised value). **S** · ❓ legal wording ·
-  `sonnet`
 
 ## Not planned
 

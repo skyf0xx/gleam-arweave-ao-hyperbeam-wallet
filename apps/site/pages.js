@@ -1,5 +1,5 @@
 // Shared by welcome.html, feedback.html and goodbye.html, the pages the
-// extension opens, and by invite.html. The extension passes only its
+// extension opens, and by invite.html and points.html. The extension passes only its
 // version (?v=), never anything about the user or their wallet.
 (function () {
   "use strict";
@@ -29,6 +29,8 @@
         codeLine.querySelector("[data-invite-code-value]").textContent = code;
         codeLine.hidden = false;
       }
+      // Counts invite visits. The code itself is never sent.
+      trackOnce("gleam-invite-open", {});
     }
   }
 
@@ -49,6 +51,7 @@
       // missing listener out of the console.
       if (runtime.lastError) return;
       if (reply && reply.ok) {
+        trackOnce("gleam-invite-handoff", { version: version || "unknown" });
         try {
           localStorage.removeItem(INVITE_KEY);
         } catch {
@@ -56,6 +59,60 @@
         }
       }
     });
+  }
+
+  // Umami loads deferred alongside this script, so an event fired before
+  // it's ready waits for the page's load event.
+  function trackOnce(name, data) {
+    var send = function () {
+      try {
+        if (sessionStorage.getItem(name)) return;
+        sessionStorage.setItem(name, "1");
+      } catch {
+        // Storage blocked: count it anyway.
+      }
+      if (window.umami) window.umami.track(name, data);
+    };
+    if (document.readyState === "complete") send();
+    else window.addEventListener("load", send);
+  }
+
+  var calc = document.querySelector("form[data-points-calc]");
+  if (calc) setUpCalculator(calc);
+
+  // Mirrors POINTS.md § Rules: 1 point per AR or AO a day, +10% for an
+  // invited wallet, and 10% of each invited friend's points.
+  function setUpCalculator(form) {
+    var fields = form.elements;
+    var format = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+    var touched = false;
+
+    function read(name) {
+      var value = parseFloat(fields[name].value);
+      return isFinite(value) && value > 0 ? value : 0;
+    }
+
+    function update() {
+      var friends = Math.round(read("friends"));
+      fields.friendsOut.value = String(friends);
+      var own = read("holding") * (fields.invited.checked ? 1.1 : 1);
+      var perDay = own + friends * read("friendHolding") * 0.1;
+      form.querySelector('[data-out="day"]').textContent = format.format(perDay);
+      form.querySelector('[data-out="month"]').textContent = format.format(perDay * 30);
+      form.querySelector('[data-out="year"]').textContent = format.format(perDay * 365);
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+    });
+    form.addEventListener("input", function () {
+      update();
+      if (!touched) {
+        touched = true;
+        trackOnce("points-calculator-used", {});
+      }
+    });
+    update();
   }
 
   var event = document.body.getAttribute("data-event");

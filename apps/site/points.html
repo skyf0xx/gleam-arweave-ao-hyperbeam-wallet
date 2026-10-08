@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <title>Gleam Points</title>
+  <meta name="description" content="Keep AR and AO in Gleam and earn points every day. Invite friends and earn 10% of their points too.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Gleam">
+  <meta property="og:title" content="Gleam Points">
+  <meta property="og:description" content="Keep AR and AO in Gleam and earn points every day. Invite friends and earn 10% of their points too.">
+  <meta property="og:url" content="https://gleam-permaweb.vercel.app/points.html">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:site" content="@gleam_wallet">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5" data-domains="gleam-permaweb.vercel.app"></script>
+  <script defer src="pages.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="points">
+      <section class="points-hero">
+        <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <p class="points-kicker">Gleam Points</p>
+        <h1 class="display points-title">Your AR and AO earn points every day.</h1>
+        <p class="line">Keep them in Gleam and points add up on their own. Invite friends and you earn on theirs too.</p>
+        <div class="cta">
+          <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome">Add to Chrome</a>
+          <p class="small">Already have Gleam? Open it and tap <strong>Gleam Points</strong> in your tokens.</p>
+        </div>
+      </section>
+
+      <section class="points-stats" aria-label="How points add up">
+        <div class="stat">
+          <span class="stat-value">1</span>
+          <span class="stat-label">point a day for every AR or AO you hold</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">+10%</span>
+          <span class="stat-label">on your own points when a friend invites you</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">10%</span>
+          <span class="stat-label">of every friend's points, every day, for as long as you both stay</span>
+        </div>
+      </section>
+
+      <section class="points-section">
+        <h2 class="points-h2">See what you'd earn</h2>
+        <form class="calc" data-points-calc>
+          <div class="calc-inputs">
+            <label class="calc-field">
+              <span>AR + AO you keep in Gleam</span>
+              <input type="number" name="holding" value="100" min="0" step="any" inputmode="decimal">
+            </label>
+            <label class="calc-field">
+              <span>Friends you invite</span>
+              <input type="range" name="friends" value="3" min="0" max="25" step="1">
+              <output name="friendsOut">3</output>
+            </label>
+            <label class="calc-field">
+              <span>AR + AO each friend keeps</span>
+              <input type="number" name="friendHolding" value="50" min="0" step="any" inputmode="decimal">
+            </label>
+            <label class="calc-check">
+              <input type="checkbox" name="invited">
+              <span>A friend invited me (+10%)</span>
+            </label>
+          </div>
+          <div class="calc-results" aria-live="polite">
+            <div class="calc-result">
+              <span class="calc-period">A day</span>
+              <span class="calc-value" data-out="day">115</span>
+            </div>
+            <div class="calc-result">
+              <span class="calc-period">30 days</span>
+              <span class="calc-value" data-out="month">3,450</span>
+            </div>
+            <div class="calc-result calc-result-main">
+              <span class="calc-period">A year</span>
+              <span class="calc-value" data-out="year">41,975</span>
+            </div>
+            <p class="calc-note">Uses today's rules and assumes balances stay the same.</p>
+          </div>
+        </form>
+      </section>
+
+      <section class="points-section">
+        <h2 class="points-h2">How it works</h2>
+        <ol class="steps">
+          <li>
+            <h2>Join from your wallet</h2>
+            <p>Open Gleam and tap <strong>Gleam Points</strong> in your tokens. Joining takes one tap. If a friend sent you an invite code, paste it in.</p>
+          </li>
+          <li>
+            <h2>Hold AR and AO</h2>
+            <p>Once a day Gleam counts the AR and AO in each joined wallet. Every whole AR or AO earns 1 point. Fractions count too.</p>
+          </li>
+          <li>
+            <h2>Keep Gleam installed</h2>
+            <p>Gleam checks in quietly in the background, so there's nothing to remember. If it hasn't checked in for 3 days, that wallet earns nothing until it does.</p>
+          </li>
+          <li>
+            <h2>Share your invite link</h2>
+            <p>Your link is on the Points screen. Friends who join with it earn 10% extra, and you earn 10% of their points every day.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="points-section points-why">
+        <div class="why">
+          <h3>Points start the day you join</h3>
+          <p>Nothing is backdated. A wallet that joins today has every day from today on its side, and one that joins next month starts from zero then.</p>
+        </div>
+        <div class="why">
+          <h3>Invites keep paying</h3>
+          <p>An invite isn't a one-off bonus. You earn 10% of a friend's points every day for as long as you both keep Gleam, and the more they hold, the more you earn.</p>
+        </div>
+        <div class="why">
+          <h3>See where you stand</h3>
+          <p>The Points screen shows your rank among everyone earning, updated daily. Nobody else can see yours, and there's no public leaderboard.</p>
+        </div>
+      </section>
+
+      <section class="points-section prose points-rules" id="rules">
+        <h2>The rules</h2>
+        <ul>
+          <li><strong>What counts.</strong> Native AR and the AO token in a joined wallet. Wrapped AR, liquidity positions and staked tokens don't. 1 AR and 1 AO earn the same.</li>
+          <li><strong>When.</strong> Balances are counted once a day, around 00:00 UTC, and that day's points are added then.</li>
+          <li><strong>Staying active.</strong> A wallet earns only if its Gleam install checked in during the 3 days before the count.</li>
+          <li><strong>Invites.</strong> Each install's first wallet to join can use one invite code. That wallet earns 10% extra on its own points. The wallet that invited it earns 10% of those points on days it's active itself. Invite points don't earn further invite points, and there's no cap.</li>
+          <li><strong>Each wallet separately.</strong> Every wallet joins on its own and earns on its own balance.</li>
+          <li><strong>Fair play.</strong> Points are reviewed before they're used for anything. Wallets that game the system can lose them.</li>
+          <li><strong>No cash value.</strong> Points can't be bought, sold or transferred. Gleam may use them in the future, for example to decide a distribution, but nothing is promised and the rules may change. Changes are posted on this page.</li>
+        </ul>
+        <p>What joining shares with the Gleam Points server is in our <a href="privacy.html#points">privacy policy</a>.</p>
+      </section>
+
+      <section class="points-final">
+        <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <h2 class="heading">Start earning today.</h2>
+        <div class="cta">
+          <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome-final">Add to Chrome</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+</html>
