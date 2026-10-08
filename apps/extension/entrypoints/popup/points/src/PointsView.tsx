@@ -51,13 +51,13 @@ function JoinView({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSum
       <div className="flex flex-col gap-2">
         <h2 className="text-h3 font-semibold text-foreground">Earn points for holding AR and AO</h2>
         <p className="text-body text-muted">
-          {wallet.name} earns points every day for the AR and AO it holds. Invite friends and you both earn more.
+          Earn points every day for the AR and AO you hold. Invite friends and you both earn more.
         </p>
       </div>
 
       <TextField
         label="Invite code"
-        hint="Optional"
+        placeholder="Paste a code if you have one to earn extra points"
         value={inviteCode}
         onChange={(event) => setInviteCode(event.target.value)}
         autoCapitalize="characters"
