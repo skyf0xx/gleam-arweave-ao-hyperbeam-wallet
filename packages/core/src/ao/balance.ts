@@ -3,6 +3,10 @@ import type { TokenBalance } from "../models/balance";
 /**
  * Reads an AO token balance via the HyperBEAM `process@1.0` compute path:
  * `GET /{processId}~process@1.0/compute/balances/{address}`.
+ *
+ * HyperBEAM answers 404 for an address the token has never credited, which
+ * is every fresh wallet, so that's a balance of 0. A process that doesn't
+ * exist answers 500 instead, and still fails.
  */
 export async function getTokenBalance(
   processId: string,
@@ -12,6 +16,10 @@ export async function getTokenBalance(
 ): Promise<TokenBalance> {
   const url = `${trimTrailingSlash(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
   const response = await fetchImpl(url);
+
+  if (response.status === 404) {
+    return parseBalanceResponse("0", processId, address);
+  }
 
   if (!response.ok) {
     throw new Error(

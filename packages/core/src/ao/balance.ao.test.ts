@@ -70,6 +70,14 @@ describe("getTokenBalance", () => {
     expect(result.quantity).toBe("0");
   });
 
+  it("reads a 404 (an address the token never credited) as a zero balance", async () => {
+    const fetchImpl = fakeFetch(null, false, 404);
+    const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
+
+    expect(result.quantity).toBe("0");
+    expect(result.denomination).toBe(12);
+  });
+
   it("throws on a non-2xx response (peer down)", async () => {
     const fetchImpl = fakeFetch(null, false, 502);
     await expect(getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl)).rejects.toThrow(

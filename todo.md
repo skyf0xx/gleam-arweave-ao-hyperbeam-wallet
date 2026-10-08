@@ -27,9 +27,6 @@ code work.
   wallet's points data on request by email; that's a manual delete from
   `wallets`, `snapshots` and `points` for now.
 
-### Build
-
-
 ## Not planned
 
 - Wander's deprecated `{ algorithm, hash, salt }` encrypt/decrypt stays
@@ -68,7 +65,3 @@ code work.
     prompt is on by default.
 - `packages/core/src/ao/transfer.ts`: its private `bytesToBase64Url` and
   `base64UrlToBytes` duplicate `vault/base64.ts`. Switch to the shared ones.
-- `packages/core/src/ao/balance.ts`: HyperBEAM answers 404 for an address
-  the AO token never credited, and `getTokenBalance` throws on it. A fresh
-  wallet may show an AO balance error instead of 0. The points API
-  already reads 404 as 0 (`apps/points-api/src/balances.ts`).
