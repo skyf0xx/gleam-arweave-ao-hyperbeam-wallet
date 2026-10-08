@@ -17,7 +17,9 @@ distributed in proportion to each wallet's share of all points.
   wallet's holding points. Referral points never earn further referral
   points, so referrals pay out one level only. There are no caps. A
   referrer that isn't live that day earns no referrer bonus. The
-  referee's own bonus doesn't depend on its referrer being live.
+  referee's own bonus doesn't depend on its referrer being live. If either
+  wallet leaves, the bonuses between them stop; points already credited
+  stay with the wallet that remains.
 - **Airdrop share** = a wallet's points ÷ all points. Points carry no
   promised value or conversion ratio. Before any distribution they are
   subject to an eligibility review, which can exclude abusive wallets.
@@ -90,6 +92,7 @@ extension, so the code travels through the site:
 | --- | --- |
 | `POST /register` | Bind a wallet to a device and apply an invite code. Returns the wallet's own invite code. |
 | `POST /heartbeat` | Device liveness. |
+| `POST /leave` | Signed by the wallet over `gleam-points:leave:v1:<address>:<unixSeconds>`. Deletes the wallet, its snapshots and points, and its device once no other wallet uses it. Wallets it invited stop being credited as invited. Leaving twice succeeds. |
 | `POST /me` | Signed by the device key. Returns `settledAt` (when the latest snapshot completed) and, for each of the device's wallets: total points, the latest day's breakdown, "Top N%" among wallets with points, number of referees, and invite code. |
 
 Requests are rate-limited per IP and per device.
@@ -113,7 +116,9 @@ can't double-run a day, and a missed run catches up on the next check.
   joined: an explanation, an optional invite-code field and the join
   button. Once joined: points, "Top N%", today's rate, the number of
   friends who joined, the invite link with a copy button, and a "How
-  points work" link to the site's `points.html`.
+  points work" link to the site's `points.html`. A quiet "Leave Gleam
+  Points" link asks for confirmation, then deletes the wallet's data on
+  the server. Once no wallet on the install is a member, heartbeats stop.
 - **Placement.** Pure logic lives in `core/points/`: message builders
   and parsers, the device-key thumbprint, the daily formula and the
   local estimator. The points API uses the same module. Wire contracts live in

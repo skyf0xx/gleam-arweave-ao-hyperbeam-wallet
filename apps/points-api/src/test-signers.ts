@@ -1,5 +1,6 @@
 import {
   buildDeviceMessage,
+  buildLeaveMessage,
   buildRegisterMessage,
   deviceKeyThumbprint,
   signDeviceMessage,
@@ -55,4 +56,10 @@ export async function registerBody(
 export async function deviceBody(device: TestDevice, kind: "heartbeat" | "me", issuedAt: number) {
   const message = buildDeviceMessage(kind, issuedAt);
   return { deviceId: device.id, message, signature: await signDeviceMessage(device.privateKey, message) };
+}
+
+export async function leaveBody(wallet: TestWallet, issuedAt: number, address = wallet.address) {
+  const message = buildLeaveMessage(address, issuedAt);
+  const signature = await signMessage(wallet.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
+  return { owner: wallet.jwk.n, message, signature: bytesToBase64Url(new Uint8Array(signature)) };
 }

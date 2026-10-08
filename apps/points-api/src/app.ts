@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { Db } from "./db";
 import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./heartbeat";
 import { randomInviteCode } from "./invite-code";
+import { parseLeaveRequest, leave } from "./leave";
 import { RateLimiter } from "./rate-limit";
 import { parseRegisterRequest, register } from "./register";
 import { scoresForDevice } from "./score";
@@ -19,6 +20,7 @@ export function createApp(deps: AppDeps): Hono {
   const now = deps.now ?? (() => new Date());
   const newInviteCode = deps.newInviteCode ?? randomInviteCode;
   const registerByIp = new RateLimiter(20, HOUR_MS);
+  const leaveByIp = new RateLimiter(20, HOUR_MS);
   const heartbeatByIp = new RateLimiter(120, HOUR_MS);
   const heartbeatByDevice = new RateLimiter(6, HOUR_MS);
   const scoreByIp = new RateLimiter(600, HOUR_MS);
@@ -51,6 +53,15 @@ export function createApp(deps: AppDeps): Hono {
     if (!auth.ok) return c.json({ error: auth.error }, auth.status);
     await recordHeartbeat(deps.db, auth.deviceId, now());
     return c.json({ ok: true });
+  });
+
+  app.post("/leave", async (c) => {
+    if (!leaveByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const request = parseLeaveRequest(await readJson(c));
+    if (!request) return c.json({ error: "Malformed request." }, 400);
+
+    const outcome = await leave(deps.db, request, now());
+    return outcome.ok ? c.json({ ok: true }) : c.json({ error: outcome.error }, outcome.status);
   });
 
   app.post("/me", async (c) => {

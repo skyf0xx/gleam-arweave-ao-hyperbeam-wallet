@@ -5,7 +5,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { SITE_URL } from "@/src/site-pages";
 import { formatPoints } from "./formatPoints";
-import { useJoinPoints, usePointsStanding } from "./usePoints";
+import { useJoinPoints, useLeavePoints, usePointsStanding } from "./usePoints";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -28,7 +28,7 @@ export function PointsView({ runtime, wallet, onBack }: PointsViewProps) {
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Gleam Points" onBack={onBack} />
       {standing.status === "joined" ? (
-        <JoinedView standing={standing} />
+        <JoinedView runtime={runtime} wallet={wallet} standing={standing} />
       ) : standing.status === "not-joined" ? (
         <JoinView runtime={runtime} wallet={wallet} />
       ) : null}
@@ -82,7 +82,15 @@ function JoinView({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSum
   );
 }
 
-function JoinedView({ standing }: { standing: Extract<ReturnType<typeof usePointsStanding>, { status: "joined" }> }) {
+function JoinedView({
+  runtime,
+  wallet,
+  standing,
+}: {
+  runtime: RuntimePort;
+  wallet: WalletSummary;
+  standing: Extract<ReturnType<typeof usePointsStanding>, { status: "joined" }>;
+}) {
   const [copied, setCopied] = useState(false);
   const inviteLink = inviteLinkFor(standing.membership.inviteCode);
 
@@ -131,14 +139,54 @@ function JoinedView({ standing }: { standing: Extract<ReturnType<typeof usePoint
         </p>
       </div>
 
-      <a
-        href={HOW_IT_WORKS_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-auto text-center text-label text-muted underline hover:text-foreground"
-      >
-        How points work
-      </a>
+      <div className="mt-auto flex flex-col items-center gap-3">
+        <a
+          href={HOW_IT_WORKS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-label text-muted underline hover:text-foreground"
+        >
+          How points work
+        </a>
+        <LeaveControl runtime={runtime} wallet={wallet} points={formatPoints(standing.estimateAtomic)} />
+      </div>
+    </div>
+  );
+}
+
+function LeaveControl({ runtime, wallet, points }: { runtime: RuntimePort; wallet: WalletSummary; points: string }) {
+  const leave = useLeavePoints(runtime);
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button type="button" onClick={() => setConfirming(true)} className="text-caption text-faint hover:text-muted">
+        Leave Gleam Points
+      </button>
+    );
+  }
+
+  return (
+    <div role="alertdialog" aria-label="Leave Gleam Points" className="flex w-full flex-col gap-3 rounded-lg border border-line p-4">
+      <p className="text-label text-foreground">
+        You'll lose your {points} points and your invite link will stop working. This can't be undone.
+      </p>
+      {leave.error instanceof Error ? <p className="text-caption text-warning">{leave.error.message}</p> : null}
+      <div className="flex gap-2">
+        <Button type="button" variant="secondary" size="sm" className="flex-1" onClick={() => setConfirming(false)}>
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          className="flex-1"
+          disabled={leave.isPending}
+          onClick={() => leave.mutate({ walletId: wallet.id })}
+        >
+          {leave.isPending ? "Leaving…" : "Leave"}
+        </Button>
+      </div>
     </div>
   );
 }

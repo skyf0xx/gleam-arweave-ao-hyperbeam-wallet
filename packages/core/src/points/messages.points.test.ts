@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDeviceMessage,
+  buildLeaveMessage,
+  parseLeaveMessage,
   buildRegisterMessage,
   isFreshIssuedAt,
   isValidInviteCode,
@@ -40,6 +42,24 @@ describe("register message", () => {
     ["a lowercase invite code", `gleam-points:register:v1:${THUMBPRINT}:gleam42:1`],
   ])("rejects %s", (_label, text) => {
     expect(parseRegisterMessage(text)).toBeNull();
+  });
+});
+
+describe("leave message", () => {
+  const ADDRESS = "aB3k4f9qP2xR8m1tN6vW3jL7yH0sD9eK5cF9fQx1234";
+
+  it("round-trips", () => {
+    const text = buildLeaveMessage(ADDRESS, 1_760_000_000);
+
+    expect(text).toBe(`gleam-points:leave:v1:${ADDRESS}:1760000000`);
+    expect(parseLeaveMessage(text)).toEqual({ address: ADDRESS, issuedAt: 1_760_000_000 });
+  });
+
+  it("rejects another kind, a bad address and a malformed timestamp", () => {
+    expect(parseLeaveMessage(`gleam-points:heartbeat:v1:${ADDRESS}:1`)).toBeNull();
+    expect(parseLeaveMessage("gleam-points:leave:v1:short:1")).toBeNull();
+    expect(parseLeaveMessage(`gleam-points:leave:v1:${ADDRESS}:x`)).toBeNull();
+    expect(() => buildLeaveMessage("short", 1)).toThrow();
   });
 });
 

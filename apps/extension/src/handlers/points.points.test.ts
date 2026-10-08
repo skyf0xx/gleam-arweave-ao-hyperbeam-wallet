@@ -10,6 +10,7 @@ import {
 import {
   deviceKeyThumbprint,
   parseDeviceMessage,
+  parseLeaveMessage,
   parseRegisterMessage,
   verifyDeviceSignature,
   type DevicePublicJwk,
@@ -244,5 +245,68 @@ describe("PointsHandler.scores", () => {
     const { handler } = await setup({ registered: true, lastHeartbeatAt: NOW }, 500);
 
     await expect(handler.scores()).rejects.toThrow(/500/);
+  });
+});
+
+describe("PointsHandler.leave", () => {
+  const member = { address: "x", inviteCode: "MYCODE22", referred: false, joinedAt: 1 };
+
+  it("posts a leave payload the wallet signed for its own address", async () => {
+    const { handler, fetchImpl } = await setup({ registered: true, lastHeartbeatAt: NOW }, 200, {
+      responseBody: { ok: true },
+      extraStorage: { [POINTS_MEMBERSHIPS_KEY]: { w1: member } },
+    });
+
+    await handler.leave({ walletId: "w1" });
+
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("https://points.example/leave");
+    const body = JSON.parse(init!.body as string) as { owner: string; message: string; signature: string };
+    expect(body.owner).toBe(wallet.jwk.n);
+    expect(parseLeaveMessage(body.message)).toEqual({ address: wallet.address, issuedAt: NOW / 1000 });
+    expect(
+      await verifyMessage(
+        wallet.jwk.n,
+        new TextEncoder().encode(body.message).buffer as ArrayBuffer,
+        base64UrlToBytes(body.signature).buffer,
+      ),
+    ).toBe(true);
+  });
+
+  it("stops heartbeats once the last member wallet leaves", async () => {
+    const { handler, storage } = await setup({ registered: true, lastHeartbeatAt: NOW }, 200, {
+      responseBody: { ok: true },
+      extraStorage: { [POINTS_MEMBERSHIPS_KEY]: { w1: member } },
+    });
+
+    await handler.leave({ walletId: "w1" });
+
+    expect(await handler.getMemberships()).toEqual({});
+    expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual({ registered: false, lastHeartbeatAt: null });
+  });
+
+  it("keeps heartbeats on while another wallet is still a member", async () => {
+    const state = { registered: true, lastHeartbeatAt: NOW };
+    const { handler, storage } = await setup(state, 200, {
+      responseBody: { ok: true },
+      extraStorage: { [POINTS_MEMBERSHIPS_KEY]: { w1: member, w2: member } },
+    });
+
+    await handler.leave({ walletId: "w1" });
+
+    expect(await handler.getMemberships()).toEqual({ w2: member });
+    expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual(state);
+  });
+
+  it("keeps the membership when the server refuses, and needs the wallet unlocked", async () => {
+    const { handler } = await setup({ registered: true, lastHeartbeatAt: NOW }, 401, {
+      responseBody: { error: "Leave message is stale." },
+      extraStorage: { [POINTS_MEMBERSHIPS_KEY]: { w1: member } },
+    });
+    const locked = await setup(null, 200, { locked: true });
+
+    await expect(handler.leave({ walletId: "w1" })).rejects.toThrow(/stale/);
+    expect(await handler.getMemberships()).toEqual({ w1: member });
+    await expect(locked.handler.leave({ walletId: "w1" })).rejects.toThrow(/Unlock/);
   });
 });

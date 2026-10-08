@@ -41,6 +41,16 @@ export function useJoinPoints(runtime: RuntimePort) {
   });
 }
 
+export function useLeavePoints(runtime: RuntimePort) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: { walletId: string }) => runtime.send<typeof req, void>({ type: "leavePoints", payload: req }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["points"] });
+    },
+  });
+}
+
 export type PointsStanding =
   | { status: "loading" }
   | { status: "not-joined" }

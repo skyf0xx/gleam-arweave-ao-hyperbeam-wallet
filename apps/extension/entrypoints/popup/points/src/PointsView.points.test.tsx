@@ -162,4 +162,42 @@ describe("PointsView", () => {
     expect(writeText).toHaveBeenCalledWith("https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
+
+  it("leaves after confirming, then offers to join again", async () => {
+    let memberships: Record<string, PointsMembership> = { [WALLET.id]: MEMBERSHIP };
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => memberships,
+      getPointsScores: () => SCORES,
+      leavePoints: () => {
+        memberships = {};
+      },
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Leave Gleam Points" }));
+    expect(screen.getByText(/can't be undone/)).toBeTruthy();
+    expect(runtime.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "leavePoints" }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    await waitFor(() =>
+      expect(runtime.send).toHaveBeenCalledWith({ type: "leavePoints", payload: { walletId: WALLET.id } }),
+    );
+    expect(await screen.findByRole("button", { name: "Join Gleam Points" })).toBeTruthy();
+  });
+
+  it("backs out of leaving with Cancel", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Leave Gleam Points" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByText(/can't be undone/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Leave Gleam Points" })).toBeTruthy();
+  });
 });

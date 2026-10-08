@@ -664,6 +664,7 @@ onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.
 
 // Gleam Points
 onExtensionMessage("joinPoints", (message) => points.join(message.data));
+onExtensionMessage("leavePoints", (message) => points.leave(message.data));
 onExtensionMessage("getPointsMemberships", () => points.getMemberships());
 onExtensionMessage("getPointsScores", () => points.scores());
 

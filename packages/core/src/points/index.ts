@@ -5,6 +5,8 @@ export {
   normalizeInviteCode,
   buildRegisterMessage,
   parseRegisterMessage,
+  buildLeaveMessage,
+  parseLeaveMessage,
   buildDeviceMessage,
   parseDeviceMessage,
   isFreshIssuedAt,

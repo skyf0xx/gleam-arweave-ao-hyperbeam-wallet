@@ -44,8 +44,13 @@ describe("ProtocolMap", () => {
   });
 
   it("declares Gleam Points methods", () => {
-    const methodNames: Array<keyof ProtocolMap> = ["joinPoints", "getPointsMemberships", "getPointsScores"];
-    expect(methodNames).toHaveLength(3);
+    const methodNames: Array<keyof ProtocolMap> = [
+      "joinPoints",
+      "leavePoints",
+      "getPointsMemberships",
+      "getPointsScores",
+    ];
+    expect(methodNames).toHaveLength(4);
   });
 
   it("createWallet returns a WalletSummary, never the encrypted keyfile", () => {

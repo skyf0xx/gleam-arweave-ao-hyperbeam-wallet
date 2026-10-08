@@ -9,6 +9,7 @@ import {
 } from "@gleam/core";
 import {
   buildDeviceMessage,
+  buildLeaveMessage,
   buildRegisterMessage,
   isValidInviteCode,
   normalizeInviteCode,
@@ -125,6 +126,37 @@ export class PointsHandler {
     });
     await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
     return membership;
+  }
+
+  /**
+   * Deletes the wallet's points data on the server, then forgets the
+   * membership. Once no wallet on this install is a member, heartbeats
+   * stop. The device key is kept: the server no longer knows it, and a
+   * later join reuses it.
+   */
+  async leave(req: { walletId: string }): Promise<void> {
+    const key = await this.deps.signingKey(req.walletId);
+    if (!key) throw new Error("Unlock this wallet to leave Gleam Points.");
+
+    const message = buildLeaveMessage(key.address, Math.floor(this.now() / 1000));
+    const signature = await signMessage(key.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
+    const response = await this.fetchImpl(`${this.deps.apiUrl}/leave`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ owner: key.jwk.n, message, signature: bytesToBase64Url(new Uint8Array(signature)) }),
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+      const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
+      throw new Error(`Couldn't leave Gleam Points: ${reason}`);
+    }
+
+    const remaining = { ...(await this.getMemberships()) };
+    delete remaining[req.walletId];
+    await this.deps.storage.set(POINTS_MEMBERSHIPS_KEY, remaining);
+    if (Object.keys(remaining).length === 0) {
+      await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
+    }
   }
 
   /**

@@ -143,6 +143,11 @@ export interface ProtocolMap {
    * one, a code the site handed over on install is used, if any.
    */
   joinPoints(req: { walletId: string; inviteCode?: string }): PointsMembership;
+  /**
+   * Leaves Gleam Points: deletes the wallet's points data from the server
+   * and forgets its membership here. The wallet must be unlocked.
+   */
+  leavePoints(req: { walletId: string }): void;
   /** Registered wallets, keyed by wallet id. */
   getPointsMemberships(): Record<string, PointsMembership>;
   /** This install's wallets' standing from the points API; null before any wallet joins. */

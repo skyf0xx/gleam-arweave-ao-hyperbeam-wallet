@@ -23,6 +23,9 @@ export interface SnapshotSummary {
  * today already has one. Wallets whose balance reads keep failing are
  * left out of the day and counted in `snapshot_runs.failed_count`.
  *
+ * Balance reads take minutes, so a wallet can leave mid-run; the inserts
+ * skip any address no longer in `wallets`.
+ *
  * Callers serialize runs with `Db.withLock`; inserting the
  * `snapshot_runs` row first also makes a racing duplicate fail its
  * transaction instead of crediting a day twice.
@@ -63,7 +66,9 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
     );
     await tx.query(
       `INSERT INTO snapshots (day, address, ar_atomic, ao_atomic, live)
-       SELECT $1::date, * FROM unnest($2::text[], $3::numeric[], $4::numeric[], $5::boolean[])`,
+       SELECT $1::date, s.* FROM unnest($2::text[], $3::numeric[], $4::numeric[], $5::boolean[])
+         AS s (address, ar, ao, live)
+        WHERE EXISTS (SELECT 1 FROM wallets w WHERE w.address = s.address)`,
       [
         day,
         snapshots.map((s) => s.address),
@@ -75,7 +80,9 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
     const credited = [...points].filter(([, p]) => p.totalAtomic !== "0");
     await tx.query(
       `INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, referrer_bonus_atomic)
-       SELECT $1::date, * FROM unnest($2::text[], $3::numeric[], $4::numeric[], $5::numeric[])`,
+       SELECT $1::date, p.* FROM unnest($2::text[], $3::numeric[], $4::numeric[], $5::numeric[])
+         AS p (address, holding, referee, referrer)
+        WHERE EXISTS (SELECT 1 FROM wallets w WHERE w.address = p.address)`,
       [
         day,
         credited.map(([address]) => address),

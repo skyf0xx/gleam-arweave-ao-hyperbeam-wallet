@@ -76,6 +76,27 @@ export function parseRegisterMessage(text: string): RegisterMessage | null {
   };
 }
 
+const ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Signed by the wallet's RSA key to leave Gleam Points and delete its
+ * data. Naming the address binds the signature to that one wallet.
+ */
+export function buildLeaveMessage(address: string, issuedAt: number): string {
+  if (!ADDRESS_PATTERN.test(address)) throw new Error(`"${address}" isn't an Arweave address.`);
+  assertUnixSeconds(issuedAt);
+  return `gleam-points:leave:v1:${address}:${issuedAt}`;
+}
+
+export function parseLeaveMessage(text: string): { address: string; issuedAt: number } | null {
+  const parts = text.split(":");
+  if (parts.length !== 5) return null;
+  const [scheme, kind, version, address, issuedAt] = parts as [string, string, string, string, string];
+  if (scheme !== "gleam-points" || kind !== "leave" || version !== "v1") return null;
+  if (!ADDRESS_PATTERN.test(address) || !UNIX_SECONDS_PATTERN.test(issuedAt)) return null;
+  return { address, issuedAt: Number(issuedAt) };
+}
+
 /** Device-key-signed payloads that carry only a timestamp. */
 export type DeviceMessageKind = "heartbeat" | "me";
 
