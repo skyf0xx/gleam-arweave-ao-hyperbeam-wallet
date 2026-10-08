@@ -1,2 +1,2 @@
 export { PointsView, type PointsViewProps } from "./src/PointsView";
-export { PointsChip, type PointsChipProps } from "./src/PointsChip";
+export { PointsTokenRow, type PointsTokenRowProps } from "./src/PointsTokenRow";

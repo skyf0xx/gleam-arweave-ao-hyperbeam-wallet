@@ -21,7 +21,7 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { useNetworkSettings } from "./useNetworkSettings";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
-import { PointsChip } from "../../points/index.tsx";
+import { PointsTokenRow } from "../../points/index.tsx";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -388,17 +388,14 @@ export function MainScreenView({
           </span>
         </button>
 
-        <div className="flex flex-shrink-0 items-center gap-1">
-          <PointsChip runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />
-          <button
-            type="button"
-            aria-label="Settings"
-            onClick={onOpenSettings}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
-          >
-            <SettingsIcon />
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-label="Settings"
+          onClick={onOpenSettings}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
+        >
+          <SettingsIcon />
+        </button>
       </div>
 
       {/*
@@ -559,6 +556,7 @@ export function MainScreenView({
                     onClick={row.sendToken ? () => onSendToken(row.sendToken as TokenBalance) : undefined}
                   />
                 ))}
+                <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />
                 {nonDefaultTokenBalances(balancesQuery.data).map((token) => (
                   <TokenRow
                     key={token.processId}

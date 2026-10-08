@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PointsMembership, PointsScores, RuntimePort, WalletSummary } from "@gleam/core";
-import { PointsChip } from "./PointsChip";
+import { PointsTokenRow } from "./PointsTokenRow";
 import { PointsView } from "./PointsView";
 
 afterEach(() => {
@@ -67,19 +67,19 @@ function renderWithQuery(ui: React.ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-describe("PointsChip", () => {
-  it("invites a wallet that hasn't joined", async () => {
+describe("PointsTokenRow", () => {
+  it("asks a wallet that hasn't joined to sign up, and opens the Points screen", async () => {
     const onOpen = vi.fn();
     const runtime = fakeRuntime({ ...BALANCES, getPointsMemberships: () => ({}) });
 
-    renderWithQuery(<PointsChip runtime={runtime} wallet={WALLET} onOpen={onOpen} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+    renderWithQuery(<PointsTokenRow runtime={runtime} wallet={WALLET} onOpen={onOpen} />);
+    expect(await screen.findByText("Sign up")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Gleam Points/ }));
 
-    expect(screen.getByText("Earn points")).toBeTruthy();
     expect(onOpen).toHaveBeenCalled();
   });
 
-  it("shows a joined wallet's settled total", async () => {
+  it("shows a joined wallet's settled total and no USD value", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: Date.parse(SETTLED_AT) });
     const runtime = fakeRuntime({
       ...BALANCES,
@@ -87,9 +87,10 @@ describe("PointsChip", () => {
       getPointsScores: () => SCORES,
     });
 
-    renderWithQuery(<PointsChip runtime={runtime} wallet={WALLET} onOpen={vi.fn()} />);
+    renderWithQuery(<PointsTokenRow runtime={runtime} wallet={WALLET} onOpen={vi.fn()} />);
 
-    expect(await screen.findByText("5.00 pts")).toBeTruthy();
+    expect(await screen.findByText("5.00 points")).toBeTruthy();
+    expect(screen.queryByText(/\$/)).toBeNull();
   });
 });
 

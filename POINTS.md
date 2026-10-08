@@ -103,10 +103,13 @@ can't double-run a day, and a missed run catches up on the next check.
 
 ## Extension
 
-- **Header chip.** Shows the active wallet's total points. Between
-  snapshots it ticks up live from the wallet's current balances × the
-  published rate. It reads "Earn points" for a wallet that hasn't joined.
-- **Points screen** (opened from the chip). For a wallet that hasn't
+- **Points row.** "Gleam Points" is always the third row of the Tokens
+  list, after AR and AO. It shows the active wallet's total, which ticks
+  up live between snapshots from the wallet's current balances × the
+  published rate, or "Sign up" for a wallet that hasn't joined. It has no
+  USD value and no send action, and its glyph tone differs from the token
+  rows, since points aren't a token.
+- **Points screen** (opened from the row). For a wallet that hasn't
   joined: an explanation, an optional invite-code field and the join
   button. Once joined: points, "Top N%", today's rate, the number of
   friends who joined, the invite link with a copy button, and a "How

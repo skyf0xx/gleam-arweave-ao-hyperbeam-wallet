@@ -295,6 +295,31 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
     expect(onSendToken).toHaveBeenCalledWith(AO_TOKEN);
   });
 
+  it("lists Gleam Points third, after AR and AO and before other tokens, and opens it on click", async () => {
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return BALANCE;
+      if (type === "getTokenBalances") return [AO_TOKEN];
+      if (type === "getActivity") return EMPTY_ACTIVITY;
+      if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
+      if (type === "getPointsMemberships") return {};
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+    const onOpenPoints = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send }), onOpenPoints });
+
+    await waitFor(() => expect(screen.getByText("Sign up")).toBeTruthy());
+    const rowNames = screen
+      .getAllByText(/^(Arweave|AO|Gleam Points|PNTS)$/)
+      .filter((element) => element.classList.contains("font-semibold"))
+      .map((element) => element.textContent);
+    expect(rowNames).toEqual(["Arweave", "AO", "Gleam Points", "PNTS"]);
+
+    fireEvent.click(screen.getByRole("button", { name: /Gleam Points/ }));
+    expect(onOpenPoints).toHaveBeenCalled();
+  });
+
   it("formats a token's balance in its own denomination, not as a raw atomic-unit integer", async () => {
     const SCALED_TOKEN: TokenBalance = {
       address: WALLET.address,
