@@ -1,13 +1,27 @@
-import { describe, expect, it, vi } from "vitest";
-import type { StoragePort } from "@gleam/core";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  base64UrlToBytes,
+  deriveAddress,
+  generateJWK,
+  verifyMessage,
+  type JWKInterface,
+  type StoragePort,
+} from "@gleam/core";
 import {
   deviceKeyThumbprint,
   parseDeviceMessage,
+  parseRegisterMessage,
   verifyDeviceSignature,
   type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
 import type { DeviceKey } from "../adapters/device-key";
-import { POINTS_DEVICE_STATE_KEY, PointsHandler, type PointsDeviceState } from "./points";
+import {
+  POINTS_DEVICE_STATE_KEY,
+  POINTS_MEMBERSHIPS_KEY,
+  POINTS_PENDING_INVITE_KEY,
+  PointsHandler,
+  type PointsDeviceState,
+} from "./points";
 
 vi.mock("wxt/browser", () => ({ browser: {} }));
 
@@ -40,16 +54,31 @@ async function createDeviceKey(): Promise<DeviceKey> {
 const NOW = Date.UTC(2026, 9, 8, 12);
 const HOUR = 3_600_000;
 
-async function setup(state: PointsDeviceState | null, status = 200) {
-  const storage = createFakeStorage(state ? { [POINTS_DEVICE_STATE_KEY]: state } : {});
+let wallet: { jwk: JWKInterface; address: string };
+
+beforeAll(async () => {
+  const jwk = await generateJWK();
+  wallet = { jwk, address: await deriveAddress(jwk) };
+}, 60_000);
+
+async function setup(
+  state: PointsDeviceState | null,
+  status = 200,
+  options: { responseBody?: unknown; extraStorage?: Record<string, unknown>; locked?: boolean } = {},
+) {
+  const storage = createFakeStorage({
+    ...(state ? { [POINTS_DEVICE_STATE_KEY]: state } : {}),
+    ...options.extraStorage,
+  });
   const device = await createDeviceKey();
   const fetchImpl = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
-    async () => new Response("{}", { status }),
+    async () => new Response(JSON.stringify(options.responseBody ?? {}), { status }),
   );
   const handler = new PointsHandler({
     storage,
     deviceKey: async () => device,
     apiUrl: "https://points.example",
+    signingKey: async (walletId) => (walletId === "w1" && !options.locked ? wallet : null),
     fetchImpl: fetchImpl as unknown as typeof fetch,
     now: () => NOW,
   });
@@ -98,5 +127,93 @@ describe("PointsHandler.heartbeatIfDue", () => {
 
     await expect(handler.heartbeatIfDue()).rejects.toThrow(/502/);
     expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual(state);
+  });
+});
+
+describe("PointsHandler.join", () => {
+  const joined = () => ({ address: wallet.address, inviteCode: "MYCODE22", referred: true });
+
+  function sentBody(fetchImpl: Awaited<ReturnType<typeof setup>>["fetchImpl"]) {
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("https://points.example/register");
+    return JSON.parse(init!.body as string) as {
+      owner: string;
+      message: string;
+      signature: string;
+      devicePublicKey: DevicePublicJwk;
+    };
+  }
+
+  it("signs the register payload with the wallet key and the pending invite code", async () => {
+    const { handler, fetchImpl, device } = await setup(null, 200, {
+      responseBody: joined(),
+      extraStorage: { [POINTS_PENDING_INVITE_KEY]: "FRIEND42" },
+    });
+
+    await handler.join({ walletId: "w1" });
+
+    const body = sentBody(fetchImpl);
+    expect(body.owner).toBe(wallet.jwk.n);
+    expect(body.devicePublicKey).toEqual(device.publicKey);
+    expect(parseRegisterMessage(body.message)).toEqual({
+      deviceKeyThumbprint: device.id,
+      inviteCode: "FRIEND42",
+      issuedAt: NOW / 1000,
+    });
+    expect(
+      await verifyMessage(
+        wallet.jwk.n,
+        new TextEncoder().encode(body.message).buffer as ArrayBuffer,
+        base64UrlToBytes(body.signature).buffer,
+      ),
+    ).toBe(true);
+  });
+
+  it("stores the membership, turns on the heartbeat and clears the pending code", async () => {
+    const { handler, storage } = await setup(null, 200, {
+      responseBody: joined(),
+      extraStorage: { [POINTS_PENDING_INVITE_KEY]: "FRIEND42" },
+    });
+
+    const membership = await handler.join({ walletId: "w1" });
+
+    expect(membership).toEqual({ address: wallet.address, inviteCode: "MYCODE22", referred: true, joinedAt: NOW });
+    expect(await handler.getMemberships()).toEqual({ w1: membership });
+    expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual({ registered: true, lastHeartbeatAt: NOW });
+    expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
+  });
+
+  it("prefers a typed invite code, normalized, over the pending one", async () => {
+    const { handler, fetchImpl } = await setup(null, 200, {
+      responseBody: joined(),
+      extraStorage: { [POINTS_PENDING_INVITE_KEY]: "FRIEND42" },
+    });
+
+    await handler.join({ walletId: "w1", inviteCode: "  typed123 " });
+
+    expect(parseRegisterMessage(sentBody(fetchImpl).message)?.inviteCode).toBe("TYPED123");
+  });
+
+  it("rejects a malformed typed code and a locked wallet without calling the server", async () => {
+    const { handler, fetchImpl } = await setup(null);
+    const locked = await setup(null, 200, { locked: true });
+
+    await expect(handler.join({ walletId: "w1", inviteCode: "no!" })).rejects.toThrow(/isn't valid/);
+    await expect(locked.handler.join({ walletId: "w1" })).rejects.toThrow(/Unlock/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(locked.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the server's error and stores nothing", async () => {
+    const { handler, storage } = await setup(null, 401, { responseBody: { error: "Register message is stale." } });
+
+    await expect(handler.join({ walletId: "w1" })).rejects.toThrow(/stale/);
+    expect(storage.store.has(POINTS_MEMBERSHIPS_KEY)).toBe(false);
+  });
+
+  it("rejects a response for a different address", async () => {
+    const { handler } = await setup(null, 200, { responseBody: { ...joined(), address: "someone-else" } });
+
+    await expect(handler.join({ walletId: "w1" })).rejects.toThrow(/unexpected/);
   });
 });

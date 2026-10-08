@@ -35,6 +35,7 @@ import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
+import { getCachedKey } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -103,7 +104,12 @@ const approval = new ApprovalHandler(
 // doc comment on registerActivityPromotionAlarm.
 registerActivityPromotionAlarm(reads);
 
-const points = new PointsHandler({ storage, deviceKey: loadOrCreateDeviceKey, apiUrl: POINTS_API_URL });
+const points = new PointsHandler({
+  storage,
+  deviceKey: loadOrCreateDeviceKey,
+  apiUrl: POINTS_API_URL,
+  signingKey: getCachedKey,
+});
 registerPointsHeartbeatAlarm(points);
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
@@ -654,6 +660,10 @@ onExtensionMessage("revokeGrant", async (message) => {
 });
 onExtensionMessage("saveContact", (message) => contacts.saveContact(message.data));
 onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.data));
+
+// Gleam Points
+onExtensionMessage("joinPoints", (message) => points.join(message.data));
+onExtensionMessage("getPointsMemberships", () => points.getMemberships());
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {

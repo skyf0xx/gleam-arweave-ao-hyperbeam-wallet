@@ -7,6 +7,7 @@ import type {
   JWKInterface,
   LockSettings,
   NetworkSettings,
+  PointsMembership,
   PortfolioHistory,
   PortfolioHistoryRange,
   ThemeSettings,
@@ -133,6 +134,16 @@ export interface ProtocolMap {
    */
   saveContact(req: { address: string; name: string }): Contact;
   deleteContact(req: { address: string }): void;
+
+  /**
+   * Opts a wallet into Gleam Points (POINTS.md § Identity): the wallet
+   * signs a register payload binding it to this install's device key. The
+   * wallet must be unlocked. `inviteCode` is a hand-typed code; without
+   * one, a code the site handed over on install is used, if any.
+   */
+  joinPoints(req: { walletId: string; inviteCode?: string }): PointsMembership;
+  /** Registered wallets, keyed by wallet id. */
+  getPointsMemberships(): Record<string, PointsMembership>;
 
   /**
    * The single relay point for every page-originated provider call

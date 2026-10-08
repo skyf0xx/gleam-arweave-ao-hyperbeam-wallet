@@ -43,6 +43,11 @@ describe("ProtocolMap", () => {
     expect(new Set(methodNames).size).toBe(methodNames.length);
   });
 
+  it("declares Gleam Points methods", () => {
+    const methodNames: Array<keyof ProtocolMap> = ["joinPoints", "getPointsMemberships"];
+    expect(methodNames).toHaveLength(2);
+  });
+
   it("createWallet returns a WalletSummary, never the encrypted keyfile", () => {
     expectTypeOf<ReturnType<ProtocolMap["createWallet"]>>().not.toHaveProperty(
       "encryptedKeyfile",

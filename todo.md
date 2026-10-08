@@ -22,21 +22,19 @@ code work.
 
 ### Build
 
-- **feat(points): opt-in registration.** Add a `ProtocolMap` method and a
-  handler that signs the register payload with the active wallet's
-  session key and posts it. Store the returned invite code per wallet,
-  and set `points:device.registered`, which turns on the heartbeat in
-  `handlers/points.ts`.
-  **M** · 🧪 · `opus`
 - **feat(site): invite links and first-run code handoff.** Add
   `invite.html` (store the code, redirect to the store). `welcome.html`
   sends the code via `chrome.runtime.sendMessage`. The extension gets
   `externally_connectable` for the site origin and an
-  `onMessageExternal` handler that keeps a pending code (format check
-  only). **M** · 🧪 · `sonnet`
+  `onMessageExternal` handler that writes the code to
+  `local:points:pendingInviteCode` (format check only). `joinPoints`
+  already reads it. **M** · 🧪 · `sonnet`
 - **feat(points): header chip and points sheet.** Implement them per
   `POINTS.md` § Extension and `DESIGN.md`. The chip ticks with the local
-  estimator, and the sheet has a manual invite-code field. **M** · 🧪 ·
+  estimator, and the sheet has a manual invite-code field. Joining calls
+  `joinPoints`, and the sheet needs a background `getPointsScores` that
+  signs `POST /me`. The 🧪 check covers joining, the heartbeat, and the
+  score read against the live API. **M** · 🧪 ·
   `sonnet`
 - **docs(site): points rules, privacy and terms.** Add a "How points work"
   page and update `privacy.html` (device key, the server-side link

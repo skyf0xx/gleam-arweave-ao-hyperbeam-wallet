@@ -10,6 +10,7 @@ export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
 export type { ActivityEntry, ActivityType, ActivityStatus, ActivityPage } from "./activity";
 export type { Contact } from "./contact";
+export type { PointsMembership } from "./points";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";
 export type {
