@@ -22,13 +22,6 @@ code work.
 
 ### Build
 
-- **feat(site): invite links and first-run code handoff.** Add
-  `invite.html` (store the code, redirect to the store). `welcome.html`
-  sends the code via `chrome.runtime.sendMessage`. The extension gets
-  `externally_connectable` for the site origin and an
-  `onMessageExternal` handler that writes the code to
-  `local:points:pendingInviteCode` (format check only). `joinPoints`
-  already reads it. **M** · 🧪 · `sonnet`
 - **feat(points): header chip and points sheet.** Implement them per
   `POINTS.md` § Extension and `DESIGN.md`. The chip ticks with the local
   estimator, and the sheet has a manual invite-code field. Joining calls

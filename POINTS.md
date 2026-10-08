@@ -61,13 +61,15 @@ them can be replayed as a transaction or a dApp message.
 A Chrome Web Store link can't carry a referral code into the installed
 extension, so the code travels through the site:
 
-1. An invite link `https://<site>/invite?c=<code>` stores the code in
-   `localStorage` and redirects to the Chrome Web Store listing.
+1. An invite link `https://gleam-permaweb.vercel.app/invite.html?c=<code>`
+   stores the code in the site's `localStorage` for 30 days, shows it,
+   and links to the Chrome Web Store listing.
 2. On first install the extension already opens `welcome.html`. That page
    reads the code and sends it to the extension with
    `chrome.runtime.sendMessage(EXTENSION_ID, …)`. This requires
    `externally_connectable` for the site's origin.
-3. The extension keeps the code until a wallet registers. A manual
+3. The extension accepts the message only from the site's origin, and
+   keeps the code until a wallet registers. A manual
    "Have an invite code?" field in the Points sheet is the fallback.
 
 ## Server

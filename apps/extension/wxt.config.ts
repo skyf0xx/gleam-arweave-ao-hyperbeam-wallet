@@ -54,6 +54,11 @@ export default defineConfig({
       ]),
     ],
     optional_host_permissions: ['https://*/*'],
+    // Lets the site's welcome page hand over a Gleam Points invite code
+    // (src/points-invite.ts). Only this origin can message the extension.
+    externally_connectable: {
+      matches: ['https://gleam-permaweb.vercel.app/*'],
+    },
     // Required for content.ts's injectScript("/provider.js", ...) to
     // resolve at runtime — WXT does not add this automatically (see its
     // own inject-script.mjs doc comment).

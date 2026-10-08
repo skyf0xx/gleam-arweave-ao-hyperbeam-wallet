@@ -51,6 +51,7 @@ import {
 } from "@/src/handlers/provider-params";
 import { contentScriptOrigin, isExtensionPageSender } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
+import { acceptSiteInvite } from "@/src/points-invite";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
 
 /**
@@ -718,6 +719,13 @@ export default defineBackground(() => {
   // `initializeNetworkSettingsIfMissing`'s "nothing written yet" check is
   // meaningful — after that, a written NetworkSettings (default or
   // user-edited) always short-circuits it anyway.
+  // The site's welcome page hands over a Gleam Points invite code here.
+  // Returning true keeps the reply channel open for the async storage write.
+  browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    void acceptSiteInvite(message, sender.origin, storage).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  });
+
   browser.runtime.onInstalled.addListener((details) => {
     void initializeNetworkSettingsIfMissing();
     // Dev builds reload constantly; opening the site from them would
