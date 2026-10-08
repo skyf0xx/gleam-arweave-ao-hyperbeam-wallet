@@ -64,6 +64,7 @@ export default tseslint.config(
         location: "readonly",
         navigator: "readonly",
         sessionStorage: "readonly",
+        localStorage: "readonly",
         fetch: "readonly",
         URLSearchParams: "readonly",
         FormData: "readonly",

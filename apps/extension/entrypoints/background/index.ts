@@ -3,6 +3,7 @@ import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
 import {
   DEFAULT_BUNDLER_URL,
+  POINTS_API_URL,
   PERMISSION_TYPES,
   PROVIDER_METHODS,
   bytesToBase64,
@@ -32,6 +33,9 @@ import { ContactsHandler } from "@/src/handlers/contacts";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
+import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
+import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
+import { getCachedKey } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -47,6 +51,7 @@ import {
 } from "@/src/handlers/provider-params";
 import { contentScriptOrigin, isExtensionPageSender } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
+import { acceptSiteInvite } from "@/src/points-invite";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
 
 /**
@@ -99,6 +104,14 @@ const approval = new ApprovalHandler(
 // interval, independent of any popup being open — see reads.ts's own
 // doc comment on registerActivityPromotionAlarm.
 registerActivityPromotionAlarm(reads);
+
+const points = new PointsHandler({
+  storage,
+  deviceKey: loadOrCreateDeviceKey,
+  apiUrl: POINTS_API_URL,
+  signingKey: getCachedKey,
+});
+registerPointsHeartbeatAlarm(points);
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
 // the worker idles out (~30s), not only on browser shutdown, so clearing
@@ -649,6 +662,11 @@ onExtensionMessage("revokeGrant", async (message) => {
 onExtensionMessage("saveContact", (message) => contacts.saveContact(message.data));
 onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.data));
 
+// Gleam Points
+onExtensionMessage("joinPoints", (message) => points.join(message.data));
+onExtensionMessage("getPointsMemberships", () => points.getMemberships());
+onExtensionMessage("getPointsScores", () => points.scores());
+
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {
   const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
@@ -702,6 +720,13 @@ export default defineBackground(() => {
   // `initializeNetworkSettingsIfMissing`'s "nothing written yet" check is
   // meaningful — after that, a written NetworkSettings (default or
   // user-edited) always short-circuits it anyway.
+  // The site's welcome page hands over a Gleam Points invite code here.
+  // Returning true keeps the reply channel open for the async storage write.
+  browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    void acceptSiteInvite(message, sender.origin, storage).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  });
+
   browser.runtime.onInstalled.addListener((details) => {
     void initializeNetworkSettingsIfMissing();
     // Dev builds reload constantly; opening the site from them would

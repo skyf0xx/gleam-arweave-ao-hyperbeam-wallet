@@ -11,4 +11,5 @@ pre-commit:
         pnpm tsc -p packages/core --noEmit &&
         pnpm tsc -p packages/messaging --noEmit &&
         pnpm tsc -p packages/ui --noEmit &&
-        pnpm tsc -p apps/extension --noEmit
+        pnpm tsc -p apps/extension --noEmit &&
+        pnpm tsc -p apps/points-api --noEmit

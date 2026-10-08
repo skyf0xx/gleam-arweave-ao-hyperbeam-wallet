@@ -1,16 +1,69 @@
 // Shared by welcome.html, feedback.html and goodbye.html, the pages the
-// extension opens. The extension passes only its version (?v=), never
-// anything about the user or their wallet.
+// extension opens, and by invite.html. The extension passes only its
+// version (?v=), never anything about the user or their wallet.
 (function () {
   "use strict";
 
   var params = new URLSearchParams(location.search);
   var version = (params.get("v") || "").slice(0, 32);
 
+  // Gleam Points invites (POINTS.md § Attribution). A Chrome Web Store
+  // install can't carry the code, so invite.html keeps it in this site's
+  // localStorage and welcome.html, which the extension opens on first
+  // install, hands it to the extension.
+  var EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
+  var INVITE_KEY = "gleam:inviteCode";
+  var INVITE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+  var INVITE_CODE = /^[A-Z0-9]{6,16}$/;
+
+  if (document.body.hasAttribute("data-invite")) {
+    var code = (params.get("c") || "").trim().toUpperCase();
+    if (INVITE_CODE.test(code)) {
+      try {
+        localStorage.setItem(INVITE_KEY, JSON.stringify({ code: code, savedAt: Date.now() }));
+      } catch {
+        // Storage blocked: the code shown below can still be typed in.
+      }
+      var codeLine = document.querySelector("[data-invite-code]");
+      if (codeLine) {
+        codeLine.querySelector("[data-invite-code-value]").textContent = code;
+        codeLine.hidden = false;
+      }
+    }
+  }
+
+  function handOverInvite() {
+    var saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(INVITE_KEY) || "null");
+    } catch {
+      return;
+    }
+    if (!saved || !INVITE_CODE.test(saved.code) || Date.now() - saved.savedAt > INVITE_MAX_AGE_MS) return;
+    // window.chrome.runtime exists here only because the extension's
+    // manifest lists this site under externally_connectable.
+    var runtime = window.chrome && window.chrome.runtime;
+    if (!runtime || !runtime.sendMessage) return;
+    runtime.sendMessage(EXTENSION_ID, { type: "gleam-points:invite", code: saved.code }, function (reply) {
+      // Reading lastError tells Chrome it was handled, which keeps a
+      // missing listener out of the console.
+      if (runtime.lastError) return;
+      if (reply && reply.ok) {
+        try {
+          localStorage.removeItem(INVITE_KEY);
+        } catch {
+          // Nothing to clean up if storage is blocked.
+        }
+      }
+    });
+  }
+
+  var event = document.body.getAttribute("data-event");
+  if (event === "gleam-installed") handOverInvite();
+
   // Only count a visit the extension opened (it always passes ?v=), so
   // someone landing here from a search or a shared link isn't an install.
   // sessionStorage stops a reload from counting twice.
-  var event = document.body.getAttribute("data-event");
   if (event && version) {
     window.addEventListener("load", function () {
       try {

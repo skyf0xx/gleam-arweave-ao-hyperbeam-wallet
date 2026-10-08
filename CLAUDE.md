@@ -29,6 +29,8 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 - `packages/ui`: design tokens, primitives and shared components.
 - `apps/extension/entrypoints/`: `background`, `content`, `provider`
   (injected into the page), `approval`, `sidepanel`, and `popup/<screen>/`.
+- `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
+  `tsx` on Railway). Spec in `POINTS.md`.
 - `apps/extension/src/handlers/`: background handlers such as
   `wallet-lifecycle`, `reads`, `transfer`, `upload`, `approval` and
   `key-session`. `src/adapters/` implements the core ports.
@@ -67,12 +69,12 @@ pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, apps/extension
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, apps/extension, apps/points-api
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-four projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
+five projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
 pass. If a change touches signing, network or extension wiring, it also
 needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 

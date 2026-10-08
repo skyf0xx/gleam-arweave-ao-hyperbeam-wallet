@@ -43,3 +43,9 @@ const EXPLORER_BASE_URL = "https://lunar.arweave.net/#/explorer";
 export function explorerUrlFor(idOrAddress: string): string {
   return `${EXPLORER_BASE_URL}/${idOrAddress}`;
 }
+
+/**
+ * Gleam Points API (apps/points-api). Also listed in
+ * apps/extension/wxt.config.ts's `host_permissions`.
+ */
+export const POINTS_API_URL = "https://gleam-points.up.railway.app";

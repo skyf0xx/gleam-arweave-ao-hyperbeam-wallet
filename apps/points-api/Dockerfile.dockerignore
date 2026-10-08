@@ -1,0 +1,10 @@
+**/node_modules
+**/.output
+**/.wxt
+**/dist
+.git
+test-results
+playwright-report
+apps/extension
+apps/site
+e2e

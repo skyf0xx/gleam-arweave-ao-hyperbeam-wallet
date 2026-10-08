@@ -10,6 +10,7 @@ export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
 export type { ActivityEntry, ActivityType, ActivityStatus, ActivityPage } from "./activity";
 export type { Contact } from "./contact";
+export type { PointsMembership, PointsScores, PointsWalletScore } from "./points";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";
 export type {
@@ -37,7 +38,7 @@ export type {
   SigningApprovalPreview,
 } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
-export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, explorerUrlFor } from "./network";
+export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
 export type {
   PortfolioHistoryRange,

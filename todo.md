@@ -9,6 +9,30 @@ product decision before starting.
 The last tag is the model the subagent should run on: `opus` for signing,
 vault, crypto and provider security; `sonnet` for everything else.
 
+## Gleam Points
+
+Spec: `POINTS.md`. Items marked 👤 are for Will. Everything else is
+code work.
+
+### 👤 Setup
+
+- 👤 🧪 Load `.output/chrome-mv3` unpacked and run the live flow: join with
+  a wallet, check the Points screen loads its score from the server, and
+  open an invite link before a fresh install. The unpacked build has a
+  different extension id than the store, so the welcome-page handoff
+  only works from the store build (the e2e test covers it locally).
+- 👤 Before launch: legal review of the points wording ("may be
+  considered in a future distribution", eligibility review, no promised
+  value).
+
+### Build
+
+- **docs(site): points rules, privacy and terms.** Add the "How points
+  work" page `points.html` (the Points screen already links to it) and update `privacy.html` (device key, the server-side link
+  between wallets on one install, heartbeat data) and `terms.html`
+  (eligibility review, no promised value). **S** · ❓ legal wording ·
+  `sonnet`
+
 ## Not planned
 
 - Wander's deprecated `{ algorithm, hash, salt }` encrypt/decrypt stays
@@ -45,3 +69,9 @@ vault, crypto and provider security; `sonnet` for everything else.
     present), arweave-wallet-kit / Wander Connect globals, aoconnect, or
     `arweaveWalletLoaded` listeners. Decide which to use and whether the
     prompt is on by default.
+- `packages/core/src/ao/transfer.ts`: its private `bytesToBase64Url` and
+  `base64UrlToBytes` duplicate `vault/base64.ts`. Switch to the shared ones.
+- `packages/core/src/ao/balance.ts`: HyperBEAM answers 404 for an address
+  the AO token never credited, and `getTokenBalance` throws on it. A fresh
+  wallet may show an AO balance error instead of 0. The points API
+  already reads 404 as 0 (`apps/points-api/src/balances.ts`).
