@@ -1,7 +1,7 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
+import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL } from '../../packages/core/src/models/network';
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
 
@@ -24,8 +24,9 @@ export default defineConfig({
     // unconditionally (Arweave gateway, the up.arweave.net bundler used
     // for uploads — a distinct host from arweave.net under MV3's exact
     // match-pattern rules, not covered by 'https://arweave.net/*' —
-    // CoinGecko, CoinPaprika, and the default HyperBEAM peers AO balance
-    // reads use out of the box, from packages/core's
+    // CoinGecko, CoinPaprika, the Gleam Points API, and the default
+    // HyperBEAM peers AO balance reads use out of the box, from
+    // packages/core's
     // DEFAULT_HYPERBEAM_PEER_URLS) are known at build time and granted
     // statically. Any *other* HyperBEAM peer a user adds is an arbitrary
     // origin chosen in Network settings, not knowable at build time, so
@@ -46,6 +47,7 @@ export default defineConfig({
         'https://up.arweave.net/*',
         'https://api.coingecko.com/*',
         'https://api.coinpaprika.com/*',
+        `${POINTS_API_URL}/*`,
         ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
         ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
         ...GRAPHQL_FALLBACK_GATEWAYS.map((url) => `${url}/*`),

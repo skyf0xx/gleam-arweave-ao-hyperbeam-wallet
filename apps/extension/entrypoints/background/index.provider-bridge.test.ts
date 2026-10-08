@@ -60,7 +60,7 @@ vi.mock("wxt/browser", () => ({
     windows: { create: windowsCreate, remove: vi.fn(), update: vi.fn(), onRemoved: { addListener: vi.fn() } },
     runtime: { getURL: (path: string) => `chrome-extension://test${path}`, onSuspend: { addListener: vi.fn() } },
     tabs: { query: vi.fn().mockResolvedValue([]) },
-    alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
+    alarms: { create: vi.fn(), get: vi.fn(async () => undefined), onAlarm: { addListener: vi.fn() } },
   },
 }));
 

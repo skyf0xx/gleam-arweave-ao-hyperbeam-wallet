@@ -3,6 +3,7 @@ import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
 import {
   DEFAULT_BUNDLER_URL,
+  POINTS_API_URL,
   PERMISSION_TYPES,
   PROVIDER_METHODS,
   bytesToBase64,
@@ -32,6 +33,8 @@ import { ContactsHandler } from "@/src/handlers/contacts";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
+import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
+import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -99,6 +102,9 @@ const approval = new ApprovalHandler(
 // interval, independent of any popup being open — see reads.ts's own
 // doc comment on registerActivityPromotionAlarm.
 registerActivityPromotionAlarm(reads);
+
+const points = new PointsHandler({ storage, deviceKey: loadOrCreateDeviceKey, apiUrl: POINTS_API_URL });
+registerPointsHeartbeatAlarm(points);
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
 // the worker idles out (~30s), not only on browser shutdown, so clearing

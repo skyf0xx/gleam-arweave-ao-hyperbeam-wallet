@@ -14,38 +14,19 @@ vault, crypto and provider security; `sonnet` for everything else.
 Spec: `POINTS.md`. Items marked 👤 are for Will. Everything else is
 code work.
 
-### 👤 Setup (before the server goes live)
+### 👤 Setup
 
-- 👤 Create a Railway project from this GitHub repo. Add a Postgres
-  database to it. Leave the service's Root Directory empty: the build
-  needs the whole workspace.
-- 👤 Set the service variables:
-  - `RAILWAY_DOCKERFILE_PATH`: `apps/points-api/Dockerfile`. This makes
-    Railway build with that Dockerfile.
-  - `DATABASE_URL`: reference the Postgres service's `DATABASE_URL`.
-  - `ARWEAVE_GATEWAY_URL` (optional): defaults to `https://arweave.net`.
-  - `HYPERBEAM_URL` (optional): defaults to
-    `https://state.forward.computer`.
-  - `PORT` is set by Railway.
-- 👤 In the service's Deploy settings, set the healthcheck path to
-  `/health` and the restart policy to "On failure".
-- 👤 Generate a public domain for the service, or attach
-  `points.<your domain>`, then send me the URL and the Chrome Web Store
-  extension ID. The extension's build constant, `host_permissions` and
-  `externally_connectable` need them.
 - 👤 Before launch: legal review of the points wording ("may be
   considered in a future distribution", eligibility review, no promised
   value).
 
 ### Build
 
-- **feat(points): device key and heartbeat in the extension.** Create a
-  non-extractable P-256 key in IndexedDB on first need and send the
-  heartbeat from a daily `browser.alarms` alarm in `handlers/points.ts`.
-  Add the points API host to `host_permissions`. **M** · 🧪 · `opus`
 - **feat(points): opt-in registration.** Add a `ProtocolMap` method and a
   handler that signs the register payload with the active wallet's
-  session key and posts it. Store the returned invite code per wallet.
+  session key and posts it. Store the returned invite code per wallet,
+  and set `points:device.registered`, which turns on the heartbeat in
+  `handlers/points.ts`.
   **M** · 🧪 · `opus`
 - **feat(site): invite links and first-run code handoff.** Add
   `invite.html` (store the code, redirect to the store). `welcome.html`
