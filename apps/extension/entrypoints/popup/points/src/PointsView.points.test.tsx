@@ -74,6 +74,7 @@ describe("PointsTokenRow", () => {
 
     renderWithQuery(<PointsTokenRow runtime={runtime} wallet={WALLET} onOpen={onOpen} />);
     expect(await screen.findByText("Sign up")).toBeTruthy();
+    expect(screen.queryByText("GP")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Gleam Points/ }));
 
     expect(onOpen).toHaveBeenCalled();

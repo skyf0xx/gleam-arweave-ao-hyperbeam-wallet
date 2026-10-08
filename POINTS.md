@@ -107,8 +107,8 @@ can't double-run a day, and a missed run catches up on the next check.
   list, after AR and AO. It shows the active wallet's total, which ticks
   up live between snapshots from the wallet's current balances × the
   published rate, or "Sign up" for a wallet that hasn't joined. It has no
-  USD value and no send action, and its glyph tone differs from the token
-  rows, since points aren't a token.
+  USD value and no send action, and its icon is a short Gleam beam in place
+  of a ticker glyph, since points aren't a token.
 - **Points screen** (opened from the row). For a wallet that hasn't
   joined: an explanation, an optional invite-code field and the join
   button. Once joined: points, "Top N%", today's rate, the number of

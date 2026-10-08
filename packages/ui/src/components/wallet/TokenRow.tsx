@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "../../primitives/cn";
 import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
 
@@ -25,6 +26,11 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone">;
+  /**
+   * Replaces the ticker glyph, for a row that isn't a token (the Gleam
+   * Points row). `glyph.label` still names the row for tests and snapshots.
+   */
+  icon?: ReactNode;
   name: string;
   amount: string;
   usdValue?: string;
@@ -33,7 +39,7 @@ export interface TokenRowProps {
   className?: string;
 }
 
-export function TokenRow({ glyph, name, amount, usdValue, loading = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, icon, name, amount, usdValue, loading = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -45,7 +51,7 @@ export function TokenRow({ glyph, name, amount, usdValue, loading = false, onCli
         className,
       )}
     >
-      <TokenGlyph {...glyph} />
+      {icon ?? <TokenGlyph {...glyph} />}
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
         <div className="text-caption tabular-nums text-muted">{amount}</div>
