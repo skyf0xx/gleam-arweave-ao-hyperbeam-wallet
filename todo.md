@@ -17,15 +17,18 @@ code work.
 ### 👤 Setup (before the server goes live)
 
 - 👤 Create a Railway project from this GitHub repo. Add a Postgres
-  database to it. In the service's settings, set **Config file path** to
-  `apps/points-api/railway.json` and leave Root Directory empty. The
-  build needs the whole workspace.
+  database to it. Leave the service's Root Directory empty: the build
+  needs the whole workspace.
 - 👤 Set the service variables:
+  - `RAILWAY_DOCKERFILE_PATH`: `apps/points-api/Dockerfile`. This makes
+    Railway build with that Dockerfile.
   - `DATABASE_URL`: reference the Postgres service's `DATABASE_URL`.
   - `ARWEAVE_GATEWAY_URL` (optional): defaults to `https://arweave.net`.
   - `HYPERBEAM_URL` (optional): defaults to
     `https://state.forward.computer`.
   - `PORT` is set by Railway.
+- 👤 In the service's Deploy settings, set the healthcheck path to
+  `/health` and the restart policy to "On failure".
 - 👤 Generate a public domain for the service, or attach
   `points.<your domain>`, then send me the URL and the Chrome Web Store
   extension ID. The extension's build constant, `host_permissions` and
