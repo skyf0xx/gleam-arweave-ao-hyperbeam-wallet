@@ -665,6 +665,7 @@ onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.
 // Gleam Points
 onExtensionMessage("joinPoints", (message) => points.join(message.data));
 onExtensionMessage("getPointsMemberships", () => points.getMemberships());
+onExtensionMessage("getPointsScores", () => points.scores());
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {

@@ -103,12 +103,14 @@ can't double-run a day, and a missed run catches up on the next check.
 
 ## Extension
 
-- **Header chip.** Shows total points. Between server updates it ticks up
-  live using the wallet's current balances × the published rate. It shows
-  "Join" for a wallet that hasn't registered.
-- **Points sheet** (opened from the chip). Shows points, "Top N%", the
-  invite link with a copy button, the number of friends who joined, the
-  invite-code field and a "How points work" link. No new tab.
+- **Header chip.** Shows the active wallet's total points. Between
+  snapshots it ticks up live from the wallet's current balances × the
+  published rate. It reads "Earn points" for a wallet that hasn't joined.
+- **Points screen** (opened from the chip). For a wallet that hasn't
+  joined: an explanation, an optional invite-code field and the join
+  button. Once joined: points, "Top N%", today's rate, the number of
+  friends who joined, the invite link with a copy button, and a "How
+  points work" link to the site's `points.html`.
 - **Placement.** Pure logic lives in `core/points/`: message builders
   and parsers, the device-key thumbprint, the daily formula and the
   local estimator. The points API uses the same module. Wire contracts live in

@@ -16,21 +16,19 @@ code work.
 
 ### 👤 Setup
 
+- 👤 🧪 Load `.output/chrome-mv3` unpacked and run the live flow: join with
+  a wallet, check the Points screen loads its score from the server, and
+  open an invite link before a fresh install. The unpacked build has a
+  different extension id than the store, so the welcome-page handoff
+  only works from the store build (the e2e test covers it locally).
 - 👤 Before launch: legal review of the points wording ("may be
   considered in a future distribution", eligibility review, no promised
   value).
 
 ### Build
 
-- **feat(points): header chip and points sheet.** Implement them per
-  `POINTS.md` § Extension and `DESIGN.md`. The chip ticks with the local
-  estimator, and the sheet has a manual invite-code field. Joining calls
-  `joinPoints`, and the sheet needs a background `getPointsScores` that
-  signs `POST /me`. The 🧪 check covers joining, the heartbeat, and the
-  score read against the live API. **M** · 🧪 ·
-  `sonnet`
-- **docs(site): points rules, privacy and terms.** Add a "How points work"
-  page and update `privacy.html` (device key, the server-side link
+- **docs(site): points rules, privacy and terms.** Add the "How points
+  work" page `points.html` (the Points screen already links to it) and update `privacy.html` (device key, the server-side link
   between wallets on one install, heartbeat data) and `terms.html`
   (eligibility review, no promised value). **S** · ❓ legal wording ·
   `sonnet`

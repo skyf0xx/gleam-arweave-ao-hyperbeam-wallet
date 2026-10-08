@@ -30,6 +30,7 @@ function successfulSend(overrides: Record<string, unknown> = {}): RuntimePort["s
     if (type === "getActivity") return EMPTY_ACTIVITY;
     if (type === "getPortfolioHistory") return overrides.portfolioHistory ?? PORTFOLIO_HISTORY_7D;
     if (type === "getTokenPrices") return [];
+    if (type === "getPointsMemberships") return {};
     if (type === "getNetworkSettings") {
       return overrides.networkSettings ?? { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
     }
@@ -84,6 +85,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
         onReceive={vi.fn()}
         onOpenWalletSwitcher={vi.fn()}
         onOpenSettings={vi.fn()}
+        onOpenPoints={vi.fn()}
         {...overrides}
       />
     </QueryClientProvider>,

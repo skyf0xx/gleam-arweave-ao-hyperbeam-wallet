@@ -8,6 +8,7 @@ import type {
   LockSettings,
   NetworkSettings,
   PointsMembership,
+  PointsScores,
   PortfolioHistory,
   PortfolioHistoryRange,
   ThemeSettings,
@@ -144,6 +145,8 @@ export interface ProtocolMap {
   joinPoints(req: { walletId: string; inviteCode?: string }): PointsMembership;
   /** Registered wallets, keyed by wallet id. */
   getPointsMemberships(): Record<string, PointsMembership>;
+  /** This install's wallets' standing from the points API; null before any wallet joins. */
+  getPointsScores(): PointsScores | null;
 
   /**
    * The single relay point for every page-originated provider call

@@ -14,6 +14,7 @@ import { SettingsHomeView } from "@/entrypoints/popup/settings-home/index.tsx";
 import { ConnectedAppsView } from "@/entrypoints/popup/connected-apps/index.tsx";
 import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
 import { ContactsView } from "@/entrypoints/popup/contacts/index.tsx";
+import { PointsView } from "@/entrypoints/popup/points/index.tsx";
 import { UploadView } from "@/entrypoints/popup/upload/index.tsx";
 import { browser } from "wxt/browser";
 import { sitePageUrl } from "@/src/site-pages";
@@ -89,6 +90,7 @@ type MainSubView =
   | { kind: "connected-apps" }
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
+  | { kind: "points" }
   | { kind: "upload" };
 
 function resolveTopView(state: WalletState): TopView {
@@ -230,6 +232,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onDone={() => setSubView({ kind: "home" })}
       />
     );
+  } else if (subView.kind === "points") {
+    content = <PointsView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "receive") {
     content = <ReceiveView wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "wallet-switcher") {
@@ -333,6 +337,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onReceive={() => setSubView({ kind: "receive" })}
         onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
         onOpenSettings={() => setSubView({ kind: "settings-home" })}
+        onOpenPoints={() => setSubView({ kind: "points" })}
       />
     );
   }

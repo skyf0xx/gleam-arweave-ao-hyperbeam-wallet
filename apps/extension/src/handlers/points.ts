@@ -1,5 +1,12 @@
 import { browser } from "wxt/browser";
-import { bytesToBase64Url, signMessage, type JWKInterface, type PointsMembership, type StoragePort } from "@gleam/core";
+import {
+  bytesToBase64Url,
+  signMessage,
+  type JWKInterface,
+  type PointsMembership,
+  type PointsScores,
+  type StoragePort,
+} from "@gleam/core";
 import {
   buildDeviceMessage,
   buildRegisterMessage,
@@ -121,6 +128,20 @@ export class PointsHandler {
   }
 
   /**
+   * Reads this install's standing with a device-signed `POST /me`. Returns
+   * null before any wallet has joined, since the server doesn't know the
+   * device yet.
+   */
+  async scores(): Promise<PointsScores | null> {
+    if (!(await this.loadState()).registered) return null;
+    const response = await this.postDeviceSigned("me");
+    if (!response.ok) throw new Error(`Couldn't load Gleam Points (HTTP ${response.status}).`);
+    const body = (await response.json()) as PointsScores;
+    if (!Array.isArray(body?.wallets)) throw new Error("The points server sent an unexpected response.");
+    return body;
+  }
+
+  /**
    * Sends a heartbeat if this install has registered a wallet and the last
    * one is older than the interval. Returns whether one was sent. A 404
    * means the server no longer knows this device, so the install is
@@ -131,17 +152,7 @@ export class PointsHandler {
     if (!state.registered) return false;
     if (state.lastHeartbeatAt !== null && this.now() - state.lastHeartbeatAt < HEARTBEAT_INTERVAL_MS) return false;
 
-    const device = await this.deps.deviceKey();
-    const message = buildDeviceMessage("heartbeat", Math.floor(this.now() / 1000));
-    const response = await this.fetchImpl(`${this.deps.apiUrl}/heartbeat`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        deviceId: device.id,
-        message,
-        signature: await signDeviceMessage(device.privateKey, message),
-      }),
-    });
+    const response = await this.postDeviceSigned("heartbeat");
 
     if (response.status === 404) {
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
@@ -154,6 +165,20 @@ export class PointsHandler {
       lastHeartbeatAt: this.now(),
     });
     return true;
+  }
+
+  private async postDeviceSigned(kind: "heartbeat" | "me"): Promise<Response> {
+    const device = await this.deps.deviceKey();
+    const message = buildDeviceMessage(kind, Math.floor(this.now() / 1000));
+    return this.fetchImpl(`${this.deps.apiUrl}/${kind}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        deviceId: device.id,
+        message,
+        signature: await signDeviceMessage(device.privateKey, message),
+      }),
+    });
   }
 }
 

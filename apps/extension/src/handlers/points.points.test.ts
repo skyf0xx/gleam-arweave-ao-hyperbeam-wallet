@@ -217,3 +217,32 @@ describe("PointsHandler.join", () => {
     await expect(handler.join({ walletId: "w1" })).rejects.toThrow(/unexpected/);
   });
 });
+
+describe("PointsHandler.scores", () => {
+  it("returns null before any wallet joins, without calling the server", async () => {
+    const { handler, fetchImpl } = await setup(null);
+
+    expect(await handler.scores()).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("posts a device-signed score read and returns the server's scores", async () => {
+    const scores = { settledAt: "2026-10-08T00:05:00.000Z", wallets: [] };
+    const { handler, fetchImpl, device } = await setup({ registered: true, lastHeartbeatAt: NOW }, 200, {
+      responseBody: scores,
+    });
+
+    expect(await handler.scores()).toEqual(scores);
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("https://points.example/me");
+    const body = JSON.parse(init!.body as string) as { message: string; signature: string };
+    expect(parseDeviceMessage("me", body.message)).toBe(NOW / 1000);
+    expect(await verifyDeviceSignature(device.publicKey, body.message, body.signature)).toBe(true);
+  });
+
+  it("throws on a server error", async () => {
+    const { handler } = await setup({ registered: true, lastHeartbeatAt: NOW }, 500);
+
+    await expect(handler.scores()).rejects.toThrow(/500/);
+  });
+});

@@ -21,6 +21,7 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { useNetworkSettings } from "./useNetworkSettings";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
+import { PointsChip } from "../../points/index.tsx";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -79,6 +80,7 @@ export interface MainScreenViewProps {
   onReceive: () => void;
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
+  onOpenPoints: () => void;
 }
 
 /**
@@ -248,6 +250,7 @@ export function MainScreenView({
   onReceive,
   onOpenWalletSwitcher,
   onOpenSettings,
+  onOpenPoints,
 }: MainScreenViewProps) {
   const [activeTab, setActiveTab] = useState<"tokens" | "activity">("tokens");
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
@@ -385,14 +388,17 @@ export function MainScreenView({
           </span>
         </button>
 
-        <button
-          type="button"
-          aria-label="Settings"
-          onClick={onOpenSettings}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
-        >
-          <SettingsIcon />
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <PointsChip runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />
+          <button
+            type="button"
+            aria-label="Settings"
+            onClick={onOpenSettings}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
+          >
+            <SettingsIcon />
+          </button>
+        </div>
       </div>
 
       {/*
