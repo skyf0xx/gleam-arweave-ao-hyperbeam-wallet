@@ -23,15 +23,17 @@ code work.
   only works from the store build (the e2e test covers it locally).
 - 👤 Before launch: legal review of the points wording in
   `apps/site/points.html` (§ The rules), `terms.html` (§ Gleam Points) and
-  `privacy.html` (§ Gleam Points). The privacy page promises deletion of a
-  wallet's points data on request by email; that's a manual delete from
-  `wallets`, `snapshots` and `points` until the item below lands.
+  `privacy.html` (§ Gleam Points).
+- 👤 **Launch blocker:** `privacy.html#points` already describes the
+  self-serve "Leave Gleam Points" delete below as live. Ship that item
+  before launch. Until it ships, honour a request by deleting from
+  `wallets`, `snapshots` and `points` by hand.
 
 ### Build
 
 - **M** 🧪 ❓ `opus` — **feat(points): let a wallet leave Gleam Points and
-  delete its data.** Replaces the manual email delete that
-  `privacy.html#points` promises today. A self-serve delete in the wallet,
+  delete its data.** `privacy.html#points` already describes this flow,
+  so it must ship before launch. A self-serve delete in the wallet,
   signed by the wallet key, so we never delete on an unverifiable email.
   - **Signed request.** Add `buildLeaveMessage`/`parseLeaveMessage` to
     `core/points/messages.ts`:
@@ -76,11 +78,11 @@ code work.
       link will stop working. This can't be undone." The wallet must be
       unlocked.
   - **Site.**
-    - Update `privacy.html#points`: replace "email us" with "Leave Gleam
-      Points on the Points screen". Keep email only as a fallback for a
-      wallet whose install is gone, and only for a request signed with
-      that wallet (e.g. a `signMessage` from any wallet, which we verify
-      by hand).
+    - `privacy.html#points` already describes "Leave Gleam Points" and
+      an email fallback for a wallet whose install is gone. Honour the
+      fallback only for a request signed with that wallet (e.g. a
+      `signMessage` from any wallet, which we verify by hand), and
+      check the page still matches what shipped.
     - Note that Railway's database backups keep deleted rows until they
       expire, and say how long that is.
   - **Tests.**
