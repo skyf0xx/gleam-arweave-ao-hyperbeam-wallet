@@ -42,6 +42,7 @@ const SCORES: PointsScores = {
       totalAtomic: (5n * BigInt(ONE_POINT)).toString(),
       lastDay: { holdingAtomic: ONE_POINT, refereeBonusAtomic: "0", referrerBonusAtomic: "0" },
       topPercent: 12,
+      foundingNumber: 7,
     },
   ],
 };

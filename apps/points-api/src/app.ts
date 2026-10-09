@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { cors } from "hono/cors";
 import type { Db } from "./db";
 import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./heartbeat";
 import { randomInviteCode } from "./invite-code";
@@ -12,9 +13,12 @@ export interface AppDeps {
   db: Db;
   now?: () => Date;
   newInviteCode?: () => string;
+  /** Defaults to 1, like `POINTS_PHASE`. */
+  pointsPhase?: 1 | 2;
 }
 
 const HOUR_MS = 3_600_000;
+const STATS_TTL_MS = 60_000;
 
 export function createApp(deps: AppDeps): Hono {
   const now = deps.now ?? (() => new Date());
@@ -25,6 +29,8 @@ export function createApp(deps: AppDeps): Hono {
   const heartbeatByDevice = new RateLimiter(6, HOUR_MS);
   const scoreByIp = new RateLimiter(600, HOUR_MS);
   const scoreByDevice = new RateLimiter(60, HOUR_MS);
+  const statsByIp = new RateLimiter(600, HOUR_MS);
+  let statsCache: { foundingMembers: number; expiresAt: number } | null = null;
 
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 16 * 1024 }));
@@ -34,12 +40,24 @@ export function createApp(deps: AppDeps): Hono {
     return c.json({ ok: true });
   });
 
+  // Read by static pages on other origins.
+  app.use("/stats", cors({ origin: "*" }));
+  app.get("/stats", async (c) => {
+    if (!statsByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    if (!statsCache || now().getTime() >= statsCache.expiresAt) {
+      const { rows } = await deps.db.query<{ count: string }>("SELECT count(founding_number)::text AS count FROM wallets");
+      statsCache = { foundingMembers: Number(rows[0]!.count), expiresAt: now().getTime() + STATS_TTL_MS };
+    }
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json({ foundingMembers: statsCache.foundingMembers });
+  });
+
   app.post("/register", async (c) => {
     if (!registerByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
     const request = parseRegisterRequest(await readJson(c));
     if (!request) return c.json({ error: "Malformed request." }, 400);
 
-    const outcome = await register(deps.db, request, now(), newInviteCode);
+    const outcome = await register(deps.db, request, now(), newInviteCode, deps.pointsPhase ?? 1);
     return outcome.ok ? c.json(outcome.result) : c.json({ error: outcome.error }, outcome.status);
   });
 

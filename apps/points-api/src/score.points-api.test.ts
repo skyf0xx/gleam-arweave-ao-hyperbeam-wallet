@@ -70,6 +70,7 @@ describe("POST /me", () => {
           totalAtomic: "0",
           lastDay: null,
           topPercent: null,
+          foundingNumber: 2,
         },
         {
           address: carol.address,
@@ -79,6 +80,7 @@ describe("POST /me", () => {
           totalAtomic: "0",
           lastDay: null,
           topPercent: null,
+          foundingNumber: 3,
         },
       ]),
     );

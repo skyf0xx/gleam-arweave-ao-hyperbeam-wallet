@@ -10,6 +10,8 @@ export interface WalletScore {
   lastDay: { holdingAtomic: string; refereeBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with any points; null until the wallet has some. */
   topPercent: number | null;
+  /** Null for wallets that registered after Phase 1. */
+  foundingNumber: number | null;
 }
 
 export interface DeviceScores {
@@ -36,6 +38,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
     referee_count: string;
     total: string | null;
     rank: string | null;
+    founding_number: number | null;
     ranked: string;
     holding: string | null;
     referee_bonus: string | null;
@@ -49,7 +52,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
        SELECT address, total, rank() OVER (ORDER BY total DESC) AS rank, count(*) OVER () AS ranked
          FROM totals WHERE total > 0
      )
-     SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred,
+     SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred, w.founding_number,
             (SELECT count(*) FROM wallets r WHERE r.referred_by = w.address)::text AS referee_count,
             r.total::text AS total, r.rank::text AS rank,
             coalesce((SELECT count(*) FROM ranked), 0)::text AS ranked,
@@ -79,6 +82,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
               refereeBonusAtomic: row.referee_bonus!,
               referrerBonusAtomic: row.referrer_bonus!,
             },
+      foundingNumber: row.founding_number,
       topPercent: row.rank === null ? null : topPercent(Number(row.rank), Number(row.ranked)),
     })),
   };

@@ -48,12 +48,17 @@ export function parseRegisterRequest(body: unknown): RegisterRequest | null {
  * reinstall) and keeps its invite code and referrer. An invite code
  * counts only for the first wallet an install registers; an unknown code
  * is ignored rather than failing the registration.
+ *
+ * A new wallet registered during Phase 1 takes the next founding number
+ * from a sequence, which is atomic across concurrent registrations and
+ * never hands a number out twice, even after its wallet leaves.
  */
 export async function register(
   db: Db,
   request: RegisterRequest,
   now: Date,
   newInviteCode: () => string,
+  pointsPhase: 1 | 2,
 ): Promise<RegisterOutcome> {
   const message = parseRegisterMessage(request.message);
   if (!message) return { ok: false, status: 400, error: "Malformed register message." };
@@ -96,7 +101,7 @@ export async function register(
     }
 
     const referredBy = message.inviteCode ? await referrerFor(tx, deviceId, message.inviteCode, address) : null;
-    const inviteCode = await insertWallet(tx, { address, deviceId, referredBy, now }, newInviteCode);
+    const inviteCode = await insertWallet(tx, { address, deviceId, referredBy, now, pointsPhase }, newInviteCode);
     return { address, inviteCode, referred: referredBy !== null };
   });
 
@@ -118,17 +123,17 @@ async function referrerFor(tx: Queryable, deviceId: string, inviteCode: string, 
 
 async function insertWallet(
   tx: Queryable,
-  wallet: { address: string; deviceId: string; referredBy: string | null; now: Date },
+  wallet: { address: string; deviceId: string; referredBy: string | null; now: Date; pointsPhase: 1 | 2 },
   newInviteCode: () => string,
 ): Promise<string> {
   for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
     const inviteCode = newInviteCode();
     const inserted = await tx.query<{ invite_code: string }>(
-      `INSERT INTO wallets (address, device_id, invite_code, referred_by, registered_at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO wallets (address, device_id, invite_code, referred_by, registered_at, founding_number)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN nextval('founding_number_seq')::integer END)
        ON CONFLICT (invite_code) DO NOTHING
        RETURNING invite_code`,
-      [wallet.address, wallet.deviceId, inviteCode, wallet.referredBy, wallet.now],
+      [wallet.address, wallet.deviceId, inviteCode, wallet.referredBy, wallet.now, wallet.pointsPhase === 1],
     );
     if (inserted.rows[0]) return inserted.rows[0].invite_code;
   }

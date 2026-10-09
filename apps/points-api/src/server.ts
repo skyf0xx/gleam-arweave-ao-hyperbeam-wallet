@@ -13,7 +13,7 @@ const db = dbFromPool(new pg.Pool({ connectionString: config.databaseUrl }));
 const applied = await migrate(db);
 if (applied.length > 0) console.log(`Applied migrations: ${applied.join(", ")}`);
 
-serve({ fetch: createApp({ db }).fetch, port: config.port }, (info) => {
+serve({ fetch: createApp({ db, pointsPhase: config.pointsPhase }).fetch, port: config.port }, (info) => {
   console.log(`Points API listening on :${info.port}`);
 });
 

@@ -18,6 +18,8 @@ export interface PointsWalletScore {
   lastDay: { holdingAtomic: string; refereeBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with points; null until the wallet has some. */
   topPercent: number | null;
+  /** Null for wallets that registered after Phase 1. */
+  foundingNumber: number | null;
 }
 
 export interface PointsScores {
