@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "tsx src/server.ts"
+    "start": "tsx src/server.ts",
+    "drop-code": "tsx scripts/drop-code.ts",
+    "funnel": "tsx scripts/funnel.ts"
   },
   "dependencies": {
     "@gleam/core": "workspace:*",

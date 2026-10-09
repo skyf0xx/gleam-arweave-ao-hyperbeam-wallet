@@ -4,8 +4,12 @@ import { randomInt } from "node:crypto";
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const LENGTH = 8;
 
+export function randomCodeSuffix(length: number): string {
+  let suffix = "";
+  for (let i = 0; i < length; i++) suffix += ALPHABET[randomInt(ALPHABET.length)];
+  return suffix;
+}
+
 export function randomInviteCode(): string {
-  let code = "";
-  for (let i = 0; i < LENGTH; i++) code += ALPHABET[randomInt(ALPHABET.length)];
-  return code;
+  return randomCodeSuffix(LENGTH);
 }
