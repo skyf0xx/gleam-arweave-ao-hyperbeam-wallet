@@ -128,7 +128,9 @@ async function readJson(c: Context): Promise<unknown> {
   }
 }
 
-// Railway's proxy appends the caller to X-Forwarded-For; its first entry is the client.
+// Railway's edge replaces any X-Forwarded-For the client sends, so its first
+// entry is the connecting client and can't be spoofed (checked against the
+// live service on 2026-10-09). Recheck if the API moves off Railway.
 function clientIp(c: Context): string {
   return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 }
