@@ -2,6 +2,8 @@ import { browser } from "wxt/browser";
 import {
   bytesToBase64Url,
   signMessage,
+  type InviteRedeemResult,
+  type InviteUnlock,
   type JWKInterface,
   type PointsMembership,
   type PointsScores,
@@ -10,6 +12,7 @@ import {
 import {
   buildDeviceMessage,
   buildLeaveMessage,
+  buildRedeemMessage,
   buildRegisterMessage,
   isValidInviteCode,
   normalizeInviteCode,
@@ -27,6 +30,8 @@ export const POINTS_DEVICE_STATE_KEY = "local:points:device";
 export const POINTS_MEMBERSHIPS_KEY = "local:points:memberships";
 /** An invite code the site handed over on install, kept until a wallet joins. */
 export const POINTS_PENDING_INVITE_KEY = "local:points:pendingInviteCode";
+/** The outcome of the install-time invite redemption; `ok` is the unlock. */
+export const POINTS_INVITE_UNLOCK_KEY = "local:points:inviteUnlock";
 
 /**
  * A wallet earns only if its install sent a heartbeat in the 3 days before
@@ -126,6 +131,52 @@ export class PointsHandler {
     });
     await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
     return membership;
+  }
+
+  async getInviteUnlock(): Promise<InviteUnlock | null> {
+    return this.deps.storage.get<InviteUnlock>(POINTS_INVITE_UNLOCK_KEY);
+  }
+
+  /**
+   * Redeems `code` for this install with a device-signed `POST
+   * /invite/redeem` and stores the outcome. An already unlocked install
+   * returns its stored unlock without asking again. A request that gets no
+   * verdict (network error, 429, 5xx) is stored as `offline` so the gate
+   * can retry; the code is checked here only for format.
+   */
+  async redeemInvite(rawCode: string): Promise<InviteUnlock> {
+    const code = normalizeInviteCode(rawCode);
+    if (!isValidInviteCode(code)) throw new Error("That invite code isn't valid.");
+    const existing = await this.getInviteUnlock();
+    if (existing?.result === "ok") return existing;
+
+    const result = await this.requestRedeem(code);
+    const unlock: InviteUnlock = { code, result, at: this.now() };
+    await this.deps.storage.set(POINTS_INVITE_UNLOCK_KEY, unlock);
+    return unlock;
+  }
+
+  private async requestRedeem(code: string): Promise<InviteRedeemResult> {
+    try {
+      const device = await this.deps.deviceKey();
+      const message = buildRedeemMessage(code, Math.floor(this.now() / 1000));
+      const response = await this.fetchImpl(`${this.deps.apiUrl}/invite/redeem`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          code,
+          message,
+          signature: await signDeviceMessage(device.privateKey, message),
+          devicePublicKey: device.publicKey,
+        }),
+      });
+      if (!response.ok) return "offline";
+      const body = (await response.json().catch(() => null)) as { result?: unknown } | null;
+      const result = body?.result;
+      return result === "ok" || result === "full" || result === "unknown" ? result : "offline";
+    } catch {
+      return "offline";
+    }
   }
 
   /**

@@ -667,6 +667,8 @@ onExtensionMessage("joinPoints", (message) => points.join(message.data));
 onExtensionMessage("leavePoints", (message) => points.leave(message.data));
 onExtensionMessage("getPointsMemberships", () => points.getMemberships());
 onExtensionMessage("getPointsScores", () => points.scores());
+onExtensionMessage("getPointsInviteUnlock", () => points.getInviteUnlock());
+onExtensionMessage("redeemPointsInvite", (message) => points.redeemInvite(message.data.code));
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {
@@ -724,7 +726,7 @@ export default defineBackground(() => {
   // The site's welcome page hands over a Gleam Points invite code here.
   // Returning true keeps the reply channel open for the async storage write.
   browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-    void acceptSiteInvite(message, sender.origin, storage).then(sendResponse, () => sendResponse({ ok: false }));
+    void acceptSiteInvite(message, sender.origin, storage, points).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   });
 

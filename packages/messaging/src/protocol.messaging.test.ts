@@ -49,8 +49,10 @@ describe("ProtocolMap", () => {
       "leavePoints",
       "getPointsMemberships",
       "getPointsScores",
+      "getPointsInviteUnlock",
+      "redeemPointsInvite",
     ];
-    expect(methodNames).toHaveLength(4);
+    expect(methodNames).toHaveLength(6);
   });
 
   it("createWallet returns a WalletSummary, never the encrypted keyfile", () => {

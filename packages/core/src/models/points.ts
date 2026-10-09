@@ -31,3 +31,17 @@ export interface PointsScores {
   settledAt: string | null;
   wallets: PointsWalletScore[];
 }
+
+/**
+ * What the points API said about an install's invite code. `offline` means
+ * the request didn't get an answer (network, rate limit, server error), so
+ * it can be tried again; the other three are the server's verdict.
+ */
+export type InviteRedeemResult = "ok" | "full" | "unknown" | "offline";
+
+/** An install's install-time redemption, as the extension stores it. */
+export interface InviteUnlock {
+  code: string;
+  result: InviteRedeemResult;
+  at: number;
+}

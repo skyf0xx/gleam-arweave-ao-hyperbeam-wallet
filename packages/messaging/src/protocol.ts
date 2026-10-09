@@ -4,6 +4,7 @@ import type {
   Contact,
   FeeEstimate,
   Grant,
+  InviteUnlock,
   JWKInterface,
   LockSettings,
   NetworkSettings,
@@ -152,6 +153,13 @@ export interface ProtocolMap {
   getPointsMemberships(): Record<string, PointsMembership>;
   /** This install's wallets' standing from the points API; null before any wallet joins. */
   getPointsScores(): PointsScores | null;
+  /** The install-time invite redemption, or null if no code has been redeemed yet. */
+  getPointsInviteUnlock(): InviteUnlock | null;
+  /**
+   * Redeems a hand-typed invite code with this install's device key (the
+   * Founding gate). Skips the request once the install is unlocked.
+   */
+  redeemPointsInvite(req: { code: string }): InviteUnlock;
 
   /**
    * The single relay point for every page-originated provider call
