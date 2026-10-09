@@ -52,8 +52,11 @@ describe("ProtocolMap", () => {
       "getPointsInviteUnlock",
       "redeemPointsInvite",
       "getFoundingCount",
+      "getPointsPendingInvite",
+      "getPointsRevealSeen",
+      "markPointsRevealSeen",
     ];
-    expect(methodNames).toHaveLength(7);
+    expect(methodNames).toHaveLength(10);
   });
 
   it("createWallet returns a WalletSummary, never the encrypted keyfile", () => {

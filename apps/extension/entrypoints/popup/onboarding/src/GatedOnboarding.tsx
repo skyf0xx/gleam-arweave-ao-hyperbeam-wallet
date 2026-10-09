@@ -20,6 +20,7 @@ export interface GatedOnboardingProps {
  */
 export function GatedOnboarding({ runtime, onComplete, gateEnabled = FOUNDING_GATE }: GatedOnboardingProps) {
   const [passed, setPassed] = useState(false);
+  const claim = gateEnabled ? "founding" : "open";
   const stored = useQuery({
     queryKey: ["points", "inviteUnlock"],
     queryFn: () => runtime.send<undefined, InviteUnlock | null>({ type: "getPointsInviteUnlock", payload: undefined }),
@@ -31,8 +32,8 @@ export function GatedOnboarding({ runtime, onComplete, gateEnabled = FOUNDING_GA
     retry: false,
   });
 
-  if (!gateEnabled || passed || stored.isError) return <OnboardingView runtime={runtime} onComplete={onComplete} />;
+  if (!gateEnabled || passed || stored.isError) return <OnboardingView runtime={runtime} onComplete={onComplete} claim={claim} />;
   if (stored.isPending) return null;
-  if (stored.data?.result === "ok") return <OnboardingView runtime={runtime} onComplete={onComplete} />;
+  if (stored.data?.result === "ok") return <OnboardingView runtime={runtime} onComplete={onComplete} claim={claim} />;
   return <FoundingGate runtime={runtime} initialUnlock={stored.data} onUnlocked={() => setPassed(true)} />;
 }

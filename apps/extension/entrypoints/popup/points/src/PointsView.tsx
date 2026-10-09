@@ -3,7 +3,8 @@ import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
-import { SITE_URL } from "@/src/site-pages";
+import { inviteLinkFor } from "@/src/points-share";
+import { HOW_IT_WORKS_URL, JoinNote } from "./JoinNote";
 import { formatPoints } from "./formatPoints";
 import { useJoinPoints, useLeavePoints, usePointsStanding } from "./usePoints";
 
@@ -12,14 +13,6 @@ export interface PointsViewProps {
   wallet: WalletSummary;
   onBack: () => void;
 }
-
-export function inviteLinkFor(inviteCode: string): string {
-  const url = new URL("invite.html", SITE_URL);
-  url.searchParams.set("c", inviteCode);
-  return url.toString();
-}
-
-const HOW_IT_WORKS_URL = new URL("points.html", SITE_URL).toString();
 
 export function PointsView({ runtime, wallet, onBack }: PointsViewProps) {
   const standing = usePointsStanding(runtime, wallet);
@@ -71,12 +64,7 @@ function JoinView({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSum
         <Button type="submit" disabled={join.isPending}>
           {join.isPending ? "Joining…" : "Join Gleam Points"}
         </Button>
-        <p className="text-center text-caption text-faint">
-          Joining links this wallet's address to this browser on the Gleam Points server.{" "}
-          <a href={HOW_IT_WORKS_URL} target="_blank" rel="noreferrer" className="underline hover:text-muted">
-            How points work
-          </a>
-        </p>
+        <JoinNote />
       </div>
     </form>
   );

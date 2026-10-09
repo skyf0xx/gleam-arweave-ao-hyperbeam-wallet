@@ -6,6 +6,8 @@ import { Backup } from "./Backup";
 import { Import } from "./Import";
 import { AddWalletStart } from "./AddWalletStart";
 import { VaultPassword } from "./VaultPassword";
+import { ClaimStep, type ClaimPhase } from "./ClaimStep";
+import { FoundingRevealScreen } from "./FoundingReveal";
 
 /**
  * Onboarding view module (`entrypoints/popup/onboarding/`) — a folder, not
@@ -19,9 +21,11 @@ import { VaultPassword } from "./VaultPassword";
 type Step =
   | { kind: "welcome" }
   | { kind: "create-password" }
-  | { kind: "backup"; keyfileContents: string; walletName: string }
+  | { kind: "backup"; keyfileContents: string; walletName: string; wallet: WalletSummary }
   | { kind: "import" }
-  | { kind: "import-password"; jwk: unknown };
+  | { kind: "import-password"; jwk: unknown }
+  | { kind: "claim"; wallet: WalletSummary }
+  | { kind: "reveal"; wallet: WalletSummary; inviteCode: string };
 
 export interface OnboardingViewProps {
   runtime: RuntimePort;
@@ -34,6 +38,12 @@ export interface OnboardingViewProps {
   mode?: "first-run" | "add-wallet";
   /** Leaves the add-wallet flow from its first screen. */
   onCancel?: () => void;
+  /**
+   * Ends the flow on the Gleam Points claim step (and, for `founding`, the
+   * founding reveal) before `onComplete`. Without it the flow ends at
+   * backup or import.
+   */
+  claim?: ClaimPhase;
 }
 
 const DEFAULT_WALLET_NAMES = [
@@ -81,11 +91,16 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim }: OnboardingViewProps) {
   const addingWallet = mode === "add-wallet";
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string>();
+
+  const finish = (wallet: WalletSummary) => {
+    if (claim) setStep({ kind: "claim", wallet });
+    else onComplete();
+  };
 
   const handleCreatePassword = async (password: string) => {
     setSubmitting(true);
@@ -106,6 +121,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         kind: "backup",
         keyfileContents: JSON.stringify(jwk),
         walletName: summary.name,
+        wallet: summary,
       });
     } catch (error) {
       setServerError(error instanceof Error ? error.message : String(error));
@@ -118,11 +134,11 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     setSubmitting(true);
     setServerError(undefined);
     try {
-      await runtime.send({
+      const summary = await runtime.send<{ jwk: unknown; name: string; password: string }, WalletSummary>({
         type: "importWallet",
         payload: { jwk, name: randomDefaultWalletName(), password },
       });
-      onComplete();
+      finish(summary);
     } catch (error) {
       setServerError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -178,7 +194,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
           keyfileContents={step.keyfileContents}
           onDownload={() => downloadKeyfile(step.keyfileContents, step.walletName)}
           onCopy={() => void navigator.clipboard?.writeText(step.keyfileContents)}
-          onContinue={onComplete}
+          onContinue={() => finish(step.wallet)}
         />
       );
 
@@ -209,6 +225,32 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
           onSubmit={(password) => handleImportPassword(step.jwk, password)}
           submitting={submitting}
           serverError={serverError}
+        />
+      );
+
+    case "claim":
+      return (
+        <ClaimStep
+          runtime={runtime}
+          walletId={step.wallet.id}
+          phase={claim ?? "open"}
+          onClaimed={(membership) =>
+            claim === "founding"
+              ? setStep({ kind: "reveal", wallet: step.wallet, inviteCode: membership.inviteCode })
+              : onComplete()
+          }
+          onSkip={onComplete}
+        />
+      );
+
+    case "reveal":
+      return (
+        <FoundingRevealScreen
+          runtime={runtime}
+          walletId={step.wallet.id}
+          address={step.wallet.address}
+          inviteCode={step.inviteCode}
+          onDone={onComplete}
         />
       );
   }

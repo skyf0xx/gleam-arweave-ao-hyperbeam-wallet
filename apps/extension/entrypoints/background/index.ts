@@ -671,6 +671,9 @@ onExtensionMessage("getPointsScores", () => points.scores());
 onExtensionMessage("getPointsInviteUnlock", () => points.getInviteUnlock());
 onExtensionMessage("redeemPointsInvite", (message) => points.redeemInvite(message.data.code));
 onExtensionMessage("getFoundingCount", () => points.foundingCount());
+onExtensionMessage("getPointsPendingInvite", () => points.pendingInvite());
+onExtensionMessage("getPointsRevealSeen", () => points.getRevealSeen());
+onExtensionMessage("markPointsRevealSeen", (message) => points.markRevealSeen(message.data));
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {

@@ -13,8 +13,9 @@ export const pointsQueryKeys = {
 /** Scores change once a day, so a popup session reads them once. */
 const SCORES_STALE_MS = 5 * 60_000;
 
-export function usePointsMemberships(runtime: RuntimePort) {
+export function usePointsMemberships(runtime: RuntimePort, options: { enabled?: boolean; retry?: false } = {}) {
   return useQuery({
+    ...options,
     queryKey: pointsQueryKeys.memberships(),
     queryFn: () =>
       runtime.send<undefined, Record<string, PointsMembership>>({ type: "getPointsMemberships", payload: undefined }),

@@ -162,6 +162,14 @@ export interface ProtocolMap {
   redeemPointsInvite(req: { code: string }): InviteUnlock;
   /** Founding members so far, for the gate's live count. Null if the points API can't be reached. */
   getFoundingCount(): number | null;
+  /**
+   * The member invite code the claim step will apply, or null. A drop
+   * code (no referrer) is never returned.
+   */
+  getPointsPendingInvite(): string | null;
+  /** Ids of wallets whose founding reveal was already shown. */
+  getPointsRevealSeen(): string[];
+  markPointsRevealSeen(req: { walletId: string }): void;
 
   /**
    * The single relay point for every page-originated provider call

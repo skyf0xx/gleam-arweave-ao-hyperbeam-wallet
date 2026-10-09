@@ -32,6 +32,8 @@ export const POINTS_MEMBERSHIPS_KEY = "local:points:memberships";
 export const POINTS_PENDING_INVITE_KEY = "local:points:pendingInviteCode";
 /** The outcome of the install-time invite redemption; `ok` is the unlock. */
 export const POINTS_INVITE_UNLOCK_KEY = "local:points:inviteUnlock";
+/** Ids of wallets whose founding reveal has been shown, as `{ [walletId]: true }`. */
+export const POINTS_REVEAL_SEEN_KEY = "local:points:foundingRevealSeen";
 
 /**
  * A wallet earns only if its install sent a heartbeat in the 3 days before
@@ -167,6 +169,47 @@ export class PointsHandler {
   async markUnlockedForVault(): Promise<void> {
     if ((await this.getInviteUnlock())?.result === "ok") return;
     await this.deps.storage.set<InviteUnlock>(POINTS_INVITE_UNLOCK_KEY, { code: "", result: "ok", at: this.now() });
+  }
+
+  /**
+   * The code the claim step will apply, or null if there is none. A drop
+   * code has no referrer, so it is dropped here rather than shown as a
+   * code that earns anything. If the server can't say what kind of code
+   * it is, the code is kept: `join` sends it and the server decides.
+   */
+  async pendingInvite(): Promise<string | null> {
+    const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
+    if (typeof pending !== "string" || !isValidInviteCode(pending)) return null;
+    if ((await this.inviteKind(pending)) === "drop") {
+      await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
+      return null;
+    }
+    return pending;
+  }
+
+  async getRevealSeen(): Promise<string[]> {
+    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_REVEAL_SEEN_KEY);
+    return stored !== null && typeof stored === "object" ? Object.keys(stored) : [];
+  }
+
+  async markRevealSeen(req: { walletId: string }): Promise<void> {
+    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_REVEAL_SEEN_KEY);
+    await this.deps.storage.set(POINTS_REVEAL_SEEN_KEY, { ...(stored !== null && typeof stored === "object" ? stored : {}), [req.walletId]: true });
+  }
+
+  private async inviteKind(code: string): Promise<"member" | "drop" | null> {
+    try {
+      const response = await this.fetchImpl(`${this.deps.apiUrl}/invite/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      if (!response.ok) return null;
+      const body = (await response.json().catch(() => null)) as { kind?: unknown } | null;
+      return body?.kind === "member" || body?.kind === "drop" ? body.kind : null;
+    } catch {
+      return null;
+    }
   }
 
   /** The live founding-member count, or null on any failure so the gate hides the line. */

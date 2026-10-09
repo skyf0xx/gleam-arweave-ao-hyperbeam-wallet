@@ -20,6 +20,7 @@ import {
   POINTS_DEVICE_STATE_KEY,
   POINTS_MEMBERSHIPS_KEY,
   POINTS_PENDING_INVITE_KEY,
+  POINTS_REVEAL_SEEN_KEY,
   PointsHandler,
   type PointsDeviceState,
 } from "./points";
@@ -404,5 +405,66 @@ describe("PointsHandler.markUnlockedForVault", () => {
     const kept = createFakeStorage({ "local:points:inviteUnlock": redeemed });
     await build(kept, vi.fn() as unknown as typeof fetch).markUnlockedForVault();
     expect(kept.store.get("local:points:inviteUnlock")).toEqual(redeemed);
+  });
+});
+
+describe("PointsHandler.pendingInvite", () => {
+  function build(initial: Record<string, unknown>, fetchImpl: typeof fetch) {
+    const storage = createFakeStorage(initial);
+    const handler = new PointsHandler({
+      storage,
+      deviceKey: createDeviceKey,
+      apiUrl: "https://points.test",
+      signingKey: async () => null,
+      fetchImpl,
+      now: () => NOW,
+    });
+    return { storage, handler };
+  }
+  const kind = (value: unknown) => (async () => new Response(JSON.stringify({ kind: value }))) as unknown as typeof fetch;
+
+  it("returns null when there is no pending code, without asking the server", async () => {
+    const fetchImpl = vi.fn();
+    const { handler } = build({}, fetchImpl as unknown as typeof fetch);
+    expect(await handler.pendingInvite()).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns a member code", async () => {
+    const { handler } = build({ [POINTS_PENDING_INVITE_KEY]: "FRIEND42" }, kind("member"));
+    expect(await handler.pendingInvite()).toBe("FRIEND42");
+  });
+
+  it("forgets a drop code, which has no referrer", async () => {
+    const { handler, storage } = build({ [POINTS_PENDING_INVITE_KEY]: "GLEAMDROP7" }, kind("drop"));
+    expect(await handler.pendingInvite()).toBeNull();
+    expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
+  });
+
+  it("keeps the code when the server can't say what kind it is", async () => {
+    const failing = (async () => {
+      throw new Error("offline");
+    }) as unknown as typeof fetch;
+    const { handler } = build({ [POINTS_PENDING_INVITE_KEY]: "FRIEND42" }, failing);
+    expect(await handler.pendingInvite()).toBe("FRIEND42");
+  });
+});
+
+describe("PointsHandler founding reveal seen", () => {
+  it("records each wallet once and lists them", async () => {
+    const storage = createFakeStorage();
+    const handler = new PointsHandler({
+      storage,
+      deviceKey: createDeviceKey,
+      apiUrl: "https://points.test",
+      signingKey: async () => null,
+      now: () => NOW,
+    });
+    expect(await handler.getRevealSeen()).toEqual([]);
+    await handler.markRevealSeen({ walletId: "w1" });
+    await handler.markRevealSeen({ walletId: "w2" });
+    await handler.markRevealSeen({ walletId: "w1" });
+    expect(await handler.getRevealSeen()).toEqual(["w1", "w2"]);
+    expect(storage.store.get(POINTS_REVEAL_SEEN_KEY)).toEqual({ w1: true, w2: true });
   });
 });
