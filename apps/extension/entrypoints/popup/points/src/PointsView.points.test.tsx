@@ -44,6 +44,7 @@ const SCORES: PointsScores = {
       topPercent: 12,
       foundingNumber: 7,
       originalFounder: false,
+      seatsLeft: 3,
     },
   ],
 };

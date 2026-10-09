@@ -130,7 +130,8 @@ async function insertWallet(
     const inviteCode = newInviteCode();
     const inserted = await tx.query<{ invite_code: string }>(
       `INSERT INTO wallets (address, device_id, invite_code, referred_by, registered_at, founding_number)
-       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN nextval('founding_number_seq')::integer END)
+       SELECT $1, $2, $3, $4, $5, CASE WHEN $6::boolean THEN nextval('founding_number_seq')::integer END
+        WHERE NOT EXISTS (SELECT 1 FROM drop_codes WHERE code = $3)
        ON CONFLICT (invite_code) DO NOTHING
        RETURNING invite_code`,
       [wallet.address, wallet.deviceId, inviteCode, wallet.referredBy, wallet.now, wallet.pointsPhase === 1],

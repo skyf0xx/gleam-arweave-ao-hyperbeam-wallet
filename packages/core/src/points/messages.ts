@@ -97,6 +97,26 @@ export function parseLeaveMessage(text: string): { address: string; issuedAt: nu
   return { address, issuedAt: Number(issuedAt) };
 }
 
+/**
+ * Signed by the install's device key to redeem an invite code during
+ * Phase 1. The device key, not a wallet, signs it because the gate comes
+ * before any wallet exists.
+ */
+export function buildRedeemMessage(code: string, issuedAt: number): string {
+  if (!isValidInviteCode(code)) throw new Error(`"${code}" isn't a valid invite code.`);
+  assertUnixSeconds(issuedAt);
+  return `gleam-points:redeem:v1:${code}:${issuedAt}`;
+}
+
+export function parseRedeemMessage(text: string): { code: string; issuedAt: number } | null {
+  const parts = text.split(":");
+  if (parts.length !== 5) return null;
+  const [scheme, kind, version, code, issuedAt] = parts as [string, string, string, string, string];
+  if (scheme !== "gleam-points" || kind !== "redeem" || version !== "v1") return null;
+  if (!isValidInviteCode(code) || !UNIX_SECONDS_PATTERN.test(issuedAt)) return null;
+  return { code, issuedAt: Number(issuedAt) };
+}
+
 /** Device-key-signed payloads that carry only a timestamp. */
 export type DeviceMessageKind = "heartbeat" | "me";
 

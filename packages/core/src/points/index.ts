@@ -7,6 +7,8 @@ export {
   parseRegisterMessage,
   buildLeaveMessage,
   parseLeaveMessage,
+  buildRedeemMessage,
+  parseRedeemMessage,
   buildDeviceMessage,
   parseDeviceMessage,
   isFreshIssuedAt,

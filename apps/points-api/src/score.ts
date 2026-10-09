@@ -1,4 +1,5 @@
 import type { Queryable } from "./db";
+import { memberSeatsLeft, PENDING_MEMBER_REDEMPTIONS_SQL } from "./invite";
 
 export interface WalletScore {
   address: string;
@@ -14,6 +15,8 @@ export interface WalletScore {
   foundingNumber: number | null;
   /** Backfilled before Phase 1: gets the referee bonus without a code. */
   originalFounder: boolean;
+  /** Installs the wallet's code can still let in; null when seats aren't limited (Phase 2). */
+  seatsLeft: number | null;
 }
 
 export interface DeviceScores {
@@ -27,7 +30,7 @@ export interface DeviceScores {
  * every credited day; once it shows up in latency, keep running totals in
  * a table the snapshot updates.
  */
-export async function scoresForDevice(db: Queryable, deviceId: string): Promise<DeviceScores> {
+export async function scoresForDevice(db: Queryable, deviceId: string, pointsPhase: 1 | 2): Promise<DeviceScores> {
   const latest = await db.query<{ day: string; completed_at: Date }>(
     "SELECT day::text AS day, completed_at FROM snapshot_runs ORDER BY day DESC LIMIT 1",
   );
@@ -42,6 +45,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
     rank: string | null;
     founding_number: number | null;
     original_founder: boolean;
+    pending_redemptions: string;
     ranked: string;
     holding: string | null;
     referee_bonus: string | null;
@@ -58,6 +62,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
      )
      SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred, w.founding_number, w.original_founder,
             (SELECT count(*) FROM wallets r WHERE r.referred_by = w.address)::text AS referee_count,
+            ${PENDING_MEMBER_REDEMPTIONS_SQL}::text AS pending_redemptions,
             r.total::text AS total, r.rank::text AS rank,
             coalesce((SELECT count(*) FROM ranked), 0)::text AS ranked,
             p.holding_atomic::text AS holding, p.referee_bonus_atomic::text AS referee_bonus,
@@ -90,6 +95,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
             },
       foundingNumber: row.founding_number,
       originalFounder: row.original_founder,
+      seatsLeft: memberSeatsLeft(Number(row.pending_redemptions), pointsPhase),
       topPercent: row.rank === null ? null : topPercent(Number(row.rank), Number(row.ranked)),
     })),
   };

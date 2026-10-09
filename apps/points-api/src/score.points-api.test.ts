@@ -72,6 +72,7 @@ describe("POST /me", () => {
           topPercent: null,
           foundingNumber: 2,
           originalFounder: false,
+          seatsLeft: 3,
         },
         {
           address: carol.address,
@@ -83,6 +84,7 @@ describe("POST /me", () => {
           topPercent: null,
           foundingNumber: 3,
           originalFounder: false,
+          seatsLeft: 3,
         },
       ]),
     );

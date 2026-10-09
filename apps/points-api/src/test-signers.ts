@@ -1,6 +1,7 @@
 import {
   buildDeviceMessage,
   buildLeaveMessage,
+  buildRedeemMessage,
   buildRegisterMessage,
   deviceKeyThumbprint,
   signDeviceMessage,
@@ -62,4 +63,14 @@ export async function leaveBody(wallet: TestWallet, issuedAt: number, address = 
   const message = buildLeaveMessage(address, issuedAt);
   const signature = await signMessage(wallet.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
   return { owner: wallet.jwk.n, message, signature: bytesToBase64Url(new Uint8Array(signature)) };
+}
+
+export async function redeemBody(device: TestDevice, code: string, issuedAt: number) {
+  const message = buildRedeemMessage(code, issuedAt);
+  return {
+    code,
+    message,
+    signature: await signDeviceMessage(device.privateKey, message),
+    devicePublicKey: device.publicKey,
+  };
 }

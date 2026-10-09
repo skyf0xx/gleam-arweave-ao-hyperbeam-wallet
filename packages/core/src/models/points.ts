@@ -22,6 +22,8 @@ export interface PointsWalletScore {
   foundingNumber: number | null;
   /** Backfilled before Phase 1: gets the referee bonus without a code. */
   originalFounder: boolean;
+  /** Installs the wallet's code can still let in; null when seats aren't limited (Phase 2). */
+  seatsLeft: number | null;
 }
 
 export interface PointsScores {

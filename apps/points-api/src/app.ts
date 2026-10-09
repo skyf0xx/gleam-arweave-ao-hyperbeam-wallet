@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import type { Db } from "./db";
 import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./heartbeat";
+import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./invite";
 import { randomInviteCode } from "./invite-code";
 import { parseLeaveRequest, leave } from "./leave";
 import { RateLimiter } from "./rate-limit";
@@ -22,6 +23,7 @@ const STATS_TTL_MS = 60_000;
 
 export function createApp(deps: AppDeps): Hono {
   const now = deps.now ?? (() => new Date());
+  const pointsPhase = deps.pointsPhase ?? 1;
   const newInviteCode = deps.newInviteCode ?? randomInviteCode;
   const registerByIp = new RateLimiter(20, HOUR_MS);
   const leaveByIp = new RateLimiter(20, HOUR_MS);
@@ -30,6 +32,9 @@ export function createApp(deps: AppDeps): Hono {
   const scoreByIp = new RateLimiter(600, HOUR_MS);
   const scoreByDevice = new RateLimiter(60, HOUR_MS);
   const statsByIp = new RateLimiter(600, HOUR_MS);
+  // Shared by check and redeem, so codes can't be enumerated through either.
+  // 30 an hour covers a person retrying typos and reopening the invite page.
+  const inviteByIp = new RateLimiter(30, HOUR_MS);
   let statsCache: { foundingMembers: number; expiresAt: number } | null = null;
 
   const app = new Hono();
@@ -52,12 +57,31 @@ export function createApp(deps: AppDeps): Hono {
     return c.json({ foundingMembers: statsCache.foundingMembers });
   });
 
+  // Read by invite.html, a static page on another origin.
+  app.use("/invite/check", cors({ origin: "*" }));
+  app.post("/invite/check", async (c) => {
+    if (!inviteByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const body = await readJson(c);
+    const code = parseInviteCode(body !== null && typeof body === "object" ? (body as { code?: unknown }).code : null);
+    if (!code) return c.json({ error: "Malformed invite code." }, 400);
+    return c.json(await checkInviteCode(deps.db, code, pointsPhase));
+  });
+
+  app.post("/invite/redeem", async (c) => {
+    if (!inviteByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const request = parseRedeemRequest(await readJson(c));
+    if (!request) return c.json({ error: "Malformed request." }, 400);
+
+    const outcome = await redeemInviteCode(deps.db, request, now(), pointsPhase);
+    return outcome.ok ? c.json({ result: outcome.result }) : c.json({ error: outcome.error }, outcome.status);
+  });
+
   app.post("/register", async (c) => {
     if (!registerByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
     const request = parseRegisterRequest(await readJson(c));
     if (!request) return c.json({ error: "Malformed request." }, 400);
 
-    const outcome = await register(deps.db, request, now(), newInviteCode, deps.pointsPhase ?? 1);
+    const outcome = await register(deps.db, request, now(), newInviteCode, pointsPhase);
     return outcome.ok ? c.json(outcome.result) : c.json({ error: outcome.error }, outcome.status);
   });
 
@@ -90,7 +114,7 @@ export function createApp(deps: AppDeps): Hono {
 
     const auth = await authenticateDevice(deps.db, "me", request, now());
     if (!auth.ok) return c.json({ error: auth.error }, auth.status);
-    return c.json(await scoresForDevice(deps.db, auth.deviceId));
+    return c.json(await scoresForDevice(deps.db, auth.deviceId, pointsPhase));
   });
 
   return app;

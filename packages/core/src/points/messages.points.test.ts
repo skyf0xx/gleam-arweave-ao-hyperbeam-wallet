@@ -3,6 +3,8 @@ import {
   buildDeviceMessage,
   buildLeaveMessage,
   parseLeaveMessage,
+  buildRedeemMessage,
+  parseRedeemMessage,
   buildRegisterMessage,
   isFreshIssuedAt,
   isValidInviteCode,
@@ -60,6 +62,30 @@ describe("leave message", () => {
     expect(parseLeaveMessage("gleam-points:leave:v1:short:1")).toBeNull();
     expect(parseLeaveMessage(`gleam-points:leave:v1:${ADDRESS}:x`)).toBeNull();
     expect(() => buildLeaveMessage("short", 1)).toThrow();
+  });
+});
+
+describe("redeem message", () => {
+  it("round-trips", () => {
+    const text = buildRedeemMessage("GLEAMDROP7", 1_760_000_000);
+
+    expect(text).toBe("gleam-points:redeem:v1:GLEAMDROP7:1760000000");
+    expect(parseRedeemMessage(text)).toEqual({ code: "GLEAMDROP7", issuedAt: 1_760_000_000 });
+  });
+
+  it("refuses to build with a malformed code", () => {
+    expect(() => buildRedeemMessage("gleam", 1)).toThrow();
+    expect(() => buildRedeemMessage("A:B:CDEF", 1)).toThrow();
+  });
+
+  it.each([
+    ["another kind", "gleam-points:leave:v1:GLEAMDROP7:1"],
+    ["another version", "gleam-points:redeem:v2:GLEAMDROP7:1"],
+    ["a lowercase code", "gleam-points:redeem:v1:gleamdrop7:1"],
+    ["a missing code", "gleam-points:redeem:v1:1"],
+    ["a non-numeric timestamp", "gleam-points:redeem:v1:GLEAMDROP7:x"],
+  ])("rejects %s", (_label, text) => {
+    expect(parseRedeemMessage(text)).toBeNull();
   });
 });
 
