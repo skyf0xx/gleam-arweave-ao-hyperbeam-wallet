@@ -13,12 +13,10 @@ import {
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
-import { StatusDot } from "@gleam/ui/src/primitives/status-dot.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, truncateAddress } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
-import { useNetworkSettings } from "./useNetworkSettings";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
 import { PointsTokenRow } from "../../points/index.tsx";
@@ -114,20 +112,6 @@ interface DefaultTokenRow {
  * of magnitude.
  */
 const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
-
-/**
- * Falls back to the "arweave.net" default while `getNetworkSettings`
- * hasn't resolved yet, matching `DEFAULT_NETWORK_SETTINGS` in
- * `handlers/reads.ts` — never a blank/undefined status label mid-load.
- */
-function gatewayHostname(gatewayUrl: string | undefined): string {
-  if (!gatewayUrl) return "arweave.net";
-  try {
-    return new URL(gatewayUrl).hostname;
-  } catch {
-    return gatewayUrl;
-  }
-}
 
 function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null, amount: number): string | undefined {
   const price = prices?.find((entry) => entry.processId === processId)?.usd;
@@ -261,7 +245,6 @@ export function MainScreenView({
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
   const tokenPricesQuery = useTokenPrices(runtime);
-  const networkSettingsQuery = useNetworkSettings(runtime);
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
@@ -288,7 +271,7 @@ export function MainScreenView({
    * Chrome renders the popup as one continuously-growing box past its
    * 600px ceiling (see theme.css's `[data-layout="popup"]` comment) —
    * there's no inner scroll container, so `window.scrollY` is the only
-   * scroll position that exists here. Fades the header (status dot, chart,
+   * scroll position that exists here. Fades the header (chart,
    * actions) once scrolled down past it, and un-fades on scrolling back up
    * to the top rather than on scroll direction generally — matching the
    * reference apps this is feature-matched against, where the compact
@@ -383,9 +366,6 @@ export function MainScreenView({
           <span className="truncate font-mono text-label text-faint">
             {truncateAddress(wallet.address)}
           </span>
-          <span aria-hidden="true" className="flex-shrink-0 text-faint">
-            <ChevronIcon />
-          </span>
         </button>
 
         <button
@@ -399,7 +379,7 @@ export function MainScreenView({
       </div>
 
       {/*
-        Fades the status dot + chart block toward invisible on scroll. Its
+        Fades the chart block toward invisible on scroll. Its
         space stays reserved in the layout at all times — only opacity
         transitions — and the chart's own fetch/range state stays alive
         underneath, so re-expanding never re-fetches or resets the range
@@ -407,10 +387,6 @@ export function MainScreenView({
       */}
       <div className="transition-opacity duration-300 ease-out" style={{ opacity: headerCollapsed ? 0 : 1 }}>
         <div inert={headerCollapsed}>
-          <div className="px-5 pb-1">
-            <StatusDot label={gatewayHostname(networkSettingsQuery.data?.gatewayUrl)} />
-          </div>
-
           <div className="px-6 pb-1 pt-2.5">
             <PortfolioChart
               points={portfolioHistoryQuery.data?.series ?? []}
@@ -624,14 +600,6 @@ export function MainScreenView({
         )}
       </div>
     </div>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 

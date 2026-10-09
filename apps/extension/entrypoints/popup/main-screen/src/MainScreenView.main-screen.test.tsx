@@ -115,16 +115,6 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
     expect(onOpenSettings).toHaveBeenCalled();
   });
 
-  it("shows the configured gateway's hostname in the status dot, not a hard-coded default", async () => {
-    const send = successfulSend({
-      networkSettings: { gatewayUrl: "https://ar-io.example.net", peers: [], activePeerUrl: null },
-    });
-    renderMainScreen({ runtime: fakeRuntime({ send }) });
-
-    await waitFor(() => expect(screen.getByText("ar-io.example.net")).toBeTruthy());
-    expect(screen.queryByText("arweave.net")).toBeNull();
-  });
-
   it("shows the network error banner and skeleton rows already established for this screen", async () => {
     const send = vi.fn().mockRejectedValue(new Error("unreachable"));
     renderMainScreen({ runtime: fakeRuntime({ send }) });
