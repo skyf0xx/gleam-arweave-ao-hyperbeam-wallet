@@ -1,5 +1,5 @@
 // Shared by welcome.html, feedback.html and goodbye.html, the pages the
-// extension opens, and by invite.html and points.html. The extension passes only its
+// extension opens, and by invite.html, points.html and future.html. The extension passes only its
 // version (?v=), never anything about the user or their wallet.
 (function () {
   "use strict";
@@ -75,6 +75,34 @@
     };
     if (document.readyState === "complete") send();
     else window.addEventListener("load", send);
+  }
+
+  // future.html: the founding count comes from the points server. Until it
+  // answers with a real positive number the element stays hidden, so a
+  // down server never shows a zero or a placeholder.
+  var foundingCount = document.querySelector("[data-founding-count]");
+  if (foundingCount && window.fetch) {
+    var controller = window.AbortController ? new window.AbortController() : null;
+    var timer = setTimeout(function () {
+      if (controller) controller.abort();
+    }, 5000);
+    fetch("https://gleam-points.up.railway.app/stats", controller ? { signal: controller.signal } : undefined)
+      .then(function (res) {
+        if (!res.ok) throw new Error("stats " + res.status);
+        return res.json();
+      })
+      .then(function (body) {
+        var n = body && body.foundingMembers;
+        if (typeof n !== "number" || !isFinite(n) || n < 1 || Math.floor(n) !== n) return;
+        foundingCount.querySelector("[data-founding-number]").textContent = new Intl.NumberFormat("en-US").format(n);
+        foundingCount.hidden = false;
+      })
+      .catch(function () {
+        // Leave the count hidden.
+      })
+      .then(function () {
+        clearTimeout(timer);
+      });
   }
 
   var calc = document.querySelector("form[data-points-calc]");
