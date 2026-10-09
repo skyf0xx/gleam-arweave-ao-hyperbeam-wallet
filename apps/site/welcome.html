@@ -29,6 +29,35 @@
       <h1 class="heading">Gleam is installed.</h1>
       <p class="line">Three quick steps and you're ready to use AO and Arweave.</p>
 
+      <div class="invite-state" data-welcome="ready" hidden>
+        <h2 class="invite-sub">Your invite is ready.</h2>
+        <p class="small">Open Gleam from your toolbar.</p>
+      </div>
+
+      <div class="invite-state" data-welcome="pending" hidden>
+        <h2 class="invite-sub">Your invite code is <span data-welcome-code></span>.</h2>
+        <p class="small">Open Gleam from your toolbar to finish.</p>
+      </div>
+
+      <div class="invite-state" data-welcome="full" hidden>
+        <h2 class="invite-sub">This code is full.</h2>
+        <p class="small">Every seat on it has been taken. Someone who's already in may have a spare.</p>
+        <p style="margin-top: 20px">
+          <a class="button" href="https://x.com/intent/post?text=Tried%20a%20%40gleam_wallet%20invite%20and%20it%20was%20already%20full.%20Anyone%20have%20a%20spare%3F" target="_blank" rel="noopener" data-umami-event="welcome-ask-on-x">Ask for an invite on X</a>
+        </p>
+        <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="welcome-follow-on-x">Follow for the next drop</a></p>
+      </div>
+
+      <div class="invite-state" data-welcome="none" hidden>
+        <p class="small" data-welcome-not-found hidden>That code wasn't found.</p>
+        <h2 class="invite-sub">Gleam is invite-only for now.</h2>
+        <p class="small">Ask in public. Someone who's already in may have a seat for you.</p>
+        <p style="margin-top: 20px">
+          <a class="button" href="https://x.com/intent/post?text=Looking%20for%20a%20%40gleam_wallet%20invite.%20Anyone%20have%20one%20to%20spare%3F%20It%27s%20the%20new%20wallet%20for%20AO." target="_blank" rel="noopener" data-umami-event="welcome-ask-on-x">Ask for an invite on X</a>
+        </p>
+        <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="welcome-follow-on-x">Follow @gleam_wallet for code drops</a></p>
+      </div>
+
       <ol class="steps">
         <li>
           <h2>Pin Gleam to your toolbar</h2>

@@ -34,30 +34,57 @@
     }
   }
 
+  // Shows one of welcome.html's Phase 1 states (POINTS.md § Messaging).
+  function showWelcome(name, code, notFound) {
+    document.querySelectorAll("[data-welcome]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-welcome") !== name;
+    });
+    var codeEl = document.querySelector("[data-welcome-code]");
+    if (codeEl && code) codeEl.textContent = code;
+    var notFoundEl = document.querySelector("[data-welcome-not-found]");
+    if (notFoundEl) notFoundEl.hidden = !notFound;
+  }
+
   function handOverInvite() {
     var saved = null;
     try {
       saved = JSON.parse(localStorage.getItem(INVITE_KEY) || "null");
     } catch {
+      saved = null;
+    }
+    if (!saved || !INVITE_CODE.test(saved.code) || Date.now() - saved.savedAt > INVITE_MAX_AGE_MS) {
+      showWelcome("none");
       return;
     }
-    if (!saved || !INVITE_CODE.test(saved.code) || Date.now() - saved.savedAt > INVITE_MAX_AGE_MS) return;
+    // Until the extension answers (or can't), say nothing about the code.
+    // Without a reply the code is shown but success isn't claimed.
+    var pending = function () {
+      showWelcome("pending", saved.code);
+    };
     // window.chrome.runtime exists here only because the extension's
     // manifest lists this site under externally_connectable.
     var runtime = window.chrome && window.chrome.runtime;
-    if (!runtime || !runtime.sendMessage) return;
+    if (!runtime || !runtime.sendMessage) {
+      pending();
+      return;
+    }
     runtime.sendMessage(EXTENSION_ID, { type: "gleam-points:invite", code: saved.code }, function (reply) {
       // Reading lastError tells Chrome it was handled, which keeps a
       // missing listener out of the console.
-      if (runtime.lastError) return;
-      if (reply && reply.ok) {
-        trackOnce("gleam-invite-handoff", { version: version || "unknown" });
-        try {
-          localStorage.removeItem(INVITE_KEY);
-        } catch {
-          // Nothing to clean up if storage is blocked.
-        }
+      if (runtime.lastError || !reply || !reply.ok) {
+        pending();
+        return;
       }
+      trackOnce("gleam-invite-handoff", { version: version || "unknown" });
+      try {
+        localStorage.removeItem(INVITE_KEY);
+      } catch {
+        // Nothing to clean up if storage is blocked.
+      }
+      if (reply.redeem === "ok") showWelcome("ready");
+      else if (reply.redeem === "full") showWelcome("full");
+      else if (reply.redeem === "unknown") showWelcome("none", "", true);
+      else pending();
     });
   }
 
