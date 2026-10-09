@@ -82,7 +82,9 @@ export function createApp(deps: AppDeps): Hono {
     if (!request) return c.json({ error: "Malformed request." }, 400);
 
     const outcome = await register(deps.db, request, now(), newInviteCode, pointsPhase);
-    return outcome.ok ? c.json(outcome.result) : c.json({ error: outcome.error }, outcome.status);
+    if (outcome.ok) return c.json(outcome.result);
+    if (outcome.status === 403) return c.json({ error: outcome.error, code: outcome.code }, 403);
+    return c.json({ error: outcome.error }, outcome.status);
   });
 
   app.post("/heartbeat", async (c) => {

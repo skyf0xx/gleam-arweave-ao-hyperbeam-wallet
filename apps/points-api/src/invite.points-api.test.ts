@@ -49,6 +49,15 @@ async function addDropCode(db: Db, code: string, seats: number | null) {
   await db.query("INSERT INTO drop_codes (code, seats, label) VALUES ($1, $2, 'test')", [code, seats]);
 }
 
+/** A member who joined before invites were required, so holds no redemption. */
+async function addMember(db: Db, wallet: TestWallet, device: TestDevice) {
+  await db.query("INSERT INTO devices (id, public_key_jwk) VALUES ($1, $2)", [device.id, JSON.stringify(device.publicKey)]);
+  await db.query(
+    "INSERT INTO wallets (address, device_id, invite_code, founding_number) VALUES ($1, $2, 'ALICE001', nextval('founding_number_seq'))",
+    [wallet.address, device.id],
+  );
+}
+
 async function redemptions(db: Db) {
   const { rows } = await db.query<{ device_id: string; code: string }>(
     "SELECT device_id, code FROM invite_redemptions ORDER BY redeemed_at, device_id",
@@ -58,8 +67,8 @@ async function redemptions(db: Db) {
 
 describe("POST /invite/redeem", () => {
   it("takes a seat on a member code and creates the install's device row", async () => {
-    const { db, check, redeem, register } = await setup();
-    await register(alice, await createTestDevice());
+    const { db, check, redeem } = await setup();
+    await addMember(db, alice, await createTestDevice());
     const newcomer = await createTestDevice();
 
     const { status, json } = await redeem(newcomer, "ALICE001");
@@ -76,8 +85,8 @@ describe("POST /invite/redeem", () => {
   });
 
   it("answers ok again from the same install without another seat, whatever code it sends", async () => {
-    const { db, check, redeem, register } = await setup();
-    await register(alice, await createTestDevice());
+    const { db, check, redeem } = await setup();
+    await addMember(db, alice, await createTestDevice());
     await addDropCode(db, "GLEAMDROP7", 5);
     const newcomer = await createTestDevice();
     await redeem(newcomer, "ALICE001");
@@ -92,8 +101,8 @@ describe("POST /invite/redeem", () => {
   });
 
   it("answers full once a member code's 3 seats are taken", async () => {
-    const { db, check, redeem, register } = await setup();
-    await register(alice, await createTestDevice());
+    const { db, check, redeem } = await setup();
+    await addMember(db, alice, await createTestDevice());
     for (let i = 0; i < 3; i++) expect((await redeem(await createTestDevice(), "ALICE001")).json.result).toBe("ok");
 
     const late = await createTestDevice();
@@ -115,7 +124,7 @@ describe("POST /invite/redeem", () => {
   it("hands a seat back when an install it let in registers a wallet", async () => {
     const { db, check, post, redeem, register, me } = await setup();
     const alicesDevice = await createTestDevice();
-    await register(alice, alicesDevice);
+    await addMember(db, alice, alicesDevice);
     const letIn = await createTestDevice();
     await redeem(letIn, "ALICE001");
     await redeem(await createTestDevice(), "ALICE001");
@@ -195,8 +204,8 @@ describe("POST /invite/redeem", () => {
   });
 
   it("normalises the code and rejects a malformed one", async () => {
-    const { db, post, register } = await setup();
-    await register(alice, await createTestDevice());
+    const { db, post } = await setup();
+    await addMember(db, alice, await createTestDevice());
     const device = await createTestDevice();
 
     const malformed = await post("/invite/redeem", { ...(await redeemBody(device, "ALICE001", NOW_SECONDS)), code: "a!" });
@@ -259,8 +268,8 @@ describe("POST /invite/check", () => {
   });
 
   it("normalises the code, rejects a malformed one and is open to other origins", async () => {
-    const { check, post, register } = await setup();
-    await register(alice, await createTestDevice());
+    const { db, check, post } = await setup();
+    await addMember(db, alice, await createTestDevice());
 
     expect((await check("  alice001")).json).toEqual({ exists: true, kind: "member", seatsLeft: 3 });
     expect((await check("ab")).status).toBe(400);
@@ -300,13 +309,15 @@ describe("invites alongside registration", () => {
   });
 
   it("never gives a wallet a member code that a drop code already uses", async () => {
-    const { db, register } = await setup({ newInviteCode: (() => {
+    const { db, redeem, register } = await setup({ newInviteCode: (() => {
       const codes = ["GLEAMDROP7", "ALICE001"];
       return () => codes.shift()!;
     })() });
     await addDropCode(db, "GLEAMDROP7", 5);
+    const device = await createTestDevice();
+    await redeem(device, "GLEAMDROP7");
 
-    const { json } = await register(alice, await createTestDevice());
+    const { json } = await register(alice, device);
 
     expect(json.inviteCode).toBe("ALICE001");
     const numbers = await db.query<{ founding_number: number }>("SELECT founding_number FROM wallets");
@@ -327,11 +338,11 @@ describe("invites alongside registration", () => {
   });
 
   it("keeps a redemption whose install never joins, without disturbing snapshots or /me", async () => {
-    const { db, post, redeem, register } = await setup();
+    const { db, post, redeem } = await setup();
     await addDropCode(db, "GLEAMDROP7", 5);
     const lurker = await createTestDevice();
     await redeem(lurker, "GLEAMDROP7");
-    await register(alice, await createTestDevice());
+    await addMember(db, alice, await createTestDevice());
 
     const summary = await runSnapshot(db, NOW, { readBalances: async () => ({ arAtomic: "100", aoAtomic: "0" }) });
     const lurkersView = await post("/me", await deviceBody(lurker, "me", NOW_SECONDS));

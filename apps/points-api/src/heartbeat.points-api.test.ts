@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "./app";
-import { createTestDb } from "./test-db";
+import { admitInstall, createTestDb } from "./test-db";
 import { createTestDevice, createTestWallet, deviceBody, registerBody, type TestWallet } from "./test-signers";
 
 const REGISTERED_AT = new Date("2026-10-08T12:00:00Z");
@@ -19,6 +19,7 @@ async function registeredSetup() {
   const device = await createTestDevice();
   let now = REGISTERED_AT;
   const app = createApp({ db, now: () => now });
+  await admitInstall(db, device);
   await app.request("/register", {
     method: "POST",
     headers: { "content-type": "application/json" },

@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import { runSnapshot } from "./snapshot";
-import { createTestDb } from "./test-db";
+import { admitInstall, createTestDb } from "./test-db";
 import {
   createTestDevice,
   createTestWallet,
@@ -35,7 +35,9 @@ async function setup() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(await registerBody(wallet, device, { inviteCode, issuedAt: NOW_SECONDS })),
     });
+  await admitInstall(db, devices.alice);
   await register(alice, devices.alice);
+  await admitInstall(db, devices.bob, "ALICE001");
   await register(bob, devices.bob, "ALICE001");
   await register(carol, devices.bob);
 

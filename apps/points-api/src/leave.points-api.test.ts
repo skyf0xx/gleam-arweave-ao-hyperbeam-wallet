@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import type { Db } from "./db";
 import { runSnapshot } from "./snapshot";
-import { createTestDb } from "./test-db";
+import { admitInstall, createTestDb } from "./test-db";
 import {
   createTestDevice,
   createTestWallet,
@@ -34,7 +34,9 @@ async function setup() {
     post("/register", await registerBody(wallet, device, { inviteCode, issuedAt: NOW_SECONDS }));
 
   const devices = { alice: await createTestDevice(), bob: await createTestDevice() };
+  await admitInstall(db, devices.alice);
   await register(alice, devices.alice);
+  await admitInstall(db, devices.bob, "ALICE001");
   await register(bob, devices.bob, "ALICE001");
   await register(carol, devices.bob);
   return { db, devices, post };

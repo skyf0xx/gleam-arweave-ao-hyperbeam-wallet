@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createApp, type AppDeps } from "./app";
 import { dbFromPglite, type Db } from "./db";
 import { migrate } from "./migrate";
-import { createTestDb } from "./test-db";
+import { admitInstall, createTestDb } from "./test-db";
 import {
   createTestDevice,
   createTestWallet,
@@ -39,13 +39,11 @@ function setup(db: Db, deps: Partial<AppDeps> = {}) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-  const register = async (wallet: TestWallet, device?: TestDevice) =>
-    post(
-      "/register",
-      await registerBody(wallet, device ?? (await createTestDevice()), {
-        issuedAt: NOW_SECONDS,
-      }),
-    );
+  const register = async (wallet: TestWallet, device?: TestDevice) => {
+    const install = device ?? (await createTestDevice());
+    await admitInstall(db, install);
+    return post("/register", await registerBody(wallet, install, { issuedAt: NOW_SECONDS }));
+  };
   return { app, post, register };
 }
 

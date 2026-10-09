@@ -24,7 +24,12 @@ export interface RegisterResult {
   referred: boolean;
 }
 
-export type RegisterOutcome = { ok: true; result: RegisterResult } | { ok: false; status: 400 | 401; error: string };
+export type RegisterOutcome =
+  | { ok: true; result: RegisterResult }
+  | { ok: false; status: 400 | 401; error: string }
+  | { ok: false; status: 403; error: string; code: "invite_required" };
+
+const INVITE_REQUIRED = { ok: false, status: 403, error: "Invite required.", code: "invite_required" } as const;
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const MAX_OWNER_LENGTH = 700;
@@ -48,6 +53,10 @@ export function parseRegisterRequest(body: unknown): RegisterRequest | null {
  * reinstall) and keeps its invite code and referrer. An invite code
  * counts only for the first wallet an install registers; an unknown code
  * is ignored rather than failing the registration.
+ *
+ * During Phase 1 a new wallet needs an install that redeemed an invite or
+ * already has a registered wallet. Re-registering is always allowed, so a
+ * founder who reinstalls gets back in.
  *
  * A new wallet registered during Phase 1 takes the next founding number
  * from a sequence, which is atomic across concurrent registrations and
@@ -84,28 +93,40 @@ export async function register(
   const address = await addressFromOwner(request.owner);
   const deviceId = message.deviceKeyThumbprint;
 
-  const result = await db.transaction(async (tx) => {
+  return db.transaction(async (tx): Promise<RegisterOutcome> => {
+    const existing = await tx.query<{ invite_code: string; referred_by: string | null }>(
+      "SELECT invite_code, referred_by FROM wallets WHERE address = $1 FOR UPDATE",
+      [address],
+    );
+    // Checked before the device upsert, so a refused install leaves no
+    // device row and an existing device's heartbeat isn't bumped.
+    if (!existing.rows[0] && pointsPhase === 1 && !(await installMayAddWallet(tx, deviceId))) return INVITE_REQUIRED;
+
     await tx.query(
       `INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ($1, $2, $3)
        ON CONFLICT (id) DO UPDATE SET last_heartbeat_at = EXCLUDED.last_heartbeat_at`,
       [deviceId, JSON.stringify(request.devicePublicKey), now],
     );
 
-    const existing = await tx.query<{ invite_code: string; referred_by: string | null }>(
-      "SELECT invite_code, referred_by FROM wallets WHERE address = $1 FOR UPDATE",
-      [address],
-    );
     if (existing.rows[0]) {
       await tx.query("UPDATE wallets SET device_id = $1 WHERE address = $2", [deviceId, address]);
-      return { address, inviteCode: existing.rows[0].invite_code, referred: existing.rows[0].referred_by !== null };
+      const { invite_code, referred_by } = existing.rows[0];
+      return { ok: true, result: { address, inviteCode: invite_code, referred: referred_by !== null } };
     }
 
     const referredBy = message.inviteCode ? await referrerFor(tx, deviceId, message.inviteCode, address) : null;
     const inviteCode = await insertWallet(tx, { address, deviceId, referredBy, now, pointsPhase }, newInviteCode);
-    return { address, inviteCode, referred: referredBy !== null };
+    return { ok: true, result: { address, inviteCode, referred: referredBy !== null } };
   });
+}
 
-  return { ok: true, result };
+async function installMayAddWallet(tx: Queryable, deviceId: string): Promise<boolean> {
+  const { rows } = await tx.query<{ allowed: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM invite_redemptions WHERE device_id = $1)
+         OR EXISTS (SELECT 1 FROM wallets WHERE device_id = $1) AS allowed`,
+    [deviceId],
+  );
+  return rows[0]?.allowed === true;
 }
 
 async function referrerFor(tx: Queryable, deviceId: string, inviteCode: string, address: string): Promise<string | null> {
