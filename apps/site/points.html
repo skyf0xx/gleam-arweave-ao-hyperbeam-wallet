@@ -6,14 +6,14 @@
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#F7F7F7">
   <title>Gleam Points</title>
-  <meta name="description" content="Keep AR and AO in Gleam and earn points every day. Invite friends and earn 10% of their points too.">
+  <meta name="description" content="Earn by using Gleam. Your AR and AO earn Gleam Points every day, and you get a 10% daily bonus for every friend you invite.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Gleam">
   <meta property="og:title" content="Gleam Points">
-  <meta property="og:description" content="Keep AR and AO in Gleam and earn points every day. Invite friends and earn 10% of their points too.">
+  <meta property="og:description" content="Earn by using Gleam. Your AR and AO earn Gleam Points every day, and you get a 10% daily bonus for every friend you invite.">
   <meta property="og:url" content="https://gleam-permaweb.vercel.app/points.html">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:site" content="@gleam_wallet">
@@ -34,46 +34,53 @@
       <section class="points-hero">
         <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
         <p class="points-kicker">Gleam Points</p>
-        <h1 class="display points-title">Your AR and AO earn points every day.</h1>
-        <p class="line">Keep them in Gleam and points add up on their own. Invite friends and you earn on theirs too.</p>
+        <h1 class="display points-title">Earn by using Gleam.</h1>
+        <p class="line">Your AR and AO earn Gleam Points every day.</p>
         <div class="cta">
           <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome">Install Gleam</a>
-          <p class="small">Already have Gleam? Open it and tap <strong>Gleam Points</strong> in your tokens.</p>
         </div>
       </section>
 
       <section class="points-stats" aria-label="How points add up">
         <div class="stat">
           <span class="stat-value">1</span>
-          <span class="stat-label">point a day for every AR or AO you hold</span>
+          <span class="stat-label">Point / day</span>
+          <span class="stat-sub">per AR or AO you hold</span>
         </div>
         <div class="stat">
           <span class="stat-value">+10%</span>
-          <span class="stat-label">on your own points when a friend invites you</span>
+          <span class="stat-label">Daily bonus</span>
+          <span class="stat-sub">on your points, if you join through an invite</span>
         </div>
         <div class="stat">
-          <span class="stat-value">10%</span>
-          <span class="stat-label">of every friend's points, every day, for as long as you both stay</span>
+          <span class="stat-value">+10%</span>
+          <span class="stat-label">Daily invite bonus</span>
+          <span class="stat-sub">for every friend you invite, based on how much they hold</span>
         </div>
       </section>
 
       <section class="points-section">
-        <h2 class="points-h2">See what you'd earn</h2>
+        <h2 class="points-h2">What could your points look like?</h2>
         <form class="calc" data-points-calc>
           <div class="calc-inputs">
-            <label class="calc-field">
-              <span>AR + AO you keep in Gleam</span>
-              <input type="number" name="holding" value="100" min="0" step="any" inputmode="decimal">
-            </label>
-            <label class="calc-field">
-              <span>Friends you invite</span>
+            <div class="calc-line">
+              <span>I hold</span>
+              <span class="calc-amounts">
+                <label class="calc-field"><span class="visually-hidden">AR you hold</span><input type="number" name="ar" value="100" min="0" step="any" inputmode="decimal"><span class="calc-unit" aria-hidden="true">AR</span></label>
+                <label class="calc-field"><span class="visually-hidden">AO you hold</span><input type="number" name="ao" value="50" min="0" step="any" inputmode="decimal"><span class="calc-unit" aria-hidden="true">AO</span></label>
+              </span>
+            </div>
+            <label class="calc-line calc-line-range">
+              <span>I invite <output name="friendsOut">3</output> <span data-friends-word>friends</span></span>
               <input type="range" name="friends" value="3" min="0" max="25" step="1">
-              <output name="friendsOut">3</output>
             </label>
-            <label class="calc-field">
-              <span>AR + AO each friend keeps</span>
-              <input type="number" name="friendHolding" value="50" min="0" step="any" inputmode="decimal">
-            </label>
+            <div class="calc-line">
+              <span>Each friend holds</span>
+              <span class="calc-amounts">
+                <label class="calc-field"><span class="visually-hidden">AR each friend holds</span><input type="number" name="friendAr" value="100" min="0" step="any" inputmode="decimal"><span class="calc-unit" aria-hidden="true">AR</span></label>
+                <label class="calc-field"><span class="visually-hidden">AO each friend holds</span><input type="number" name="friendAo" value="50" min="0" step="any" inputmode="decimal"><span class="calc-unit" aria-hidden="true">AO</span></label>
+              </span>
+            </div>
             <label class="calc-check">
               <input type="checkbox" name="invited">
               <span>A friend invited me (+10%)</span>
@@ -81,20 +88,45 @@
           </div>
           <div class="calc-results" aria-live="polite">
             <div class="calc-result">
-              <span class="calc-period">A day</span>
-              <span class="calc-value" data-out="day">115</span>
+              <span class="calc-period">Per day</span>
+              <span class="calc-value" data-out="day">195</span>
             </div>
             <div class="calc-result">
               <span class="calc-period">30 days</span>
-              <span class="calc-value" data-out="month">3,450</span>
+              <span class="calc-value" data-out="month">5,850</span>
             </div>
             <div class="calc-result calc-result-main">
-              <span class="calc-period">A year</span>
-              <span class="calc-value" data-out="year">41,975</span>
+              <span class="calc-period">1 year</span>
+              <span class="calc-value" data-out="year">71,175</span>
             </div>
-            <p class="calc-note">Uses today's rules and assumes balances stay the same.</p>
           </div>
         </form>
+      </section>
+
+      <section class="points-section">
+        <h2 class="points-h2">Bring a friend. Both wallets earn more.</h2>
+        <div class="referral">
+          <ol class="referral-flow" aria-label="How an invite works">
+            <li>You</li>
+            <li class="referral-arrow" aria-hidden="true"></li>
+            <li>Invite</li>
+            <li class="referral-arrow" aria-hidden="true"></li>
+            <li>Friend</li>
+          </ol>
+          <div class="referral-gets">
+            <div>
+              <span class="referral-who">Your friend gets</span>
+              <span class="referral-value">+10%</span>
+              <span class="referral-what">daily bonus on their own points</span>
+            </div>
+            <div>
+              <span class="referral-who">You get</span>
+              <span class="referral-value">+10%</span>
+              <span class="referral-what">daily bonus, based on how much they hold</span>
+            </div>
+          </div>
+          <p class="referral-note">An invite isn't a one-off bonus. It keeps paying for as long as you both stay, and there's no limit on how many friends you invite.</p>
+        </div>
       </section>
 
       <section class="points-section">
@@ -102,50 +134,55 @@
         <ol class="steps">
           <li>
             <h2>Join from your wallet</h2>
-            <p>Open Gleam and tap <strong>Gleam Points</strong> in your tokens. Joining takes one tap. If a friend sent you an invite code, paste it in.</p>
+            <p>Open Gleam and tap <strong>Gleam Points</strong> in your tokens. If a friend sent you an invite code, paste it in.</p>
           </li>
           <li>
             <h2>Hold AR and AO</h2>
             <p>Once a day Gleam counts the AR and AO in each joined wallet. Every whole AR or AO earns 1 point. Fractions count too.</p>
           </li>
           <li>
-            <h2>Keep Gleam installed</h2>
-            <p>Gleam checks in quietly in the background, so there's nothing to remember. If it hasn't checked in for 3 days, that wallet earns nothing until it does.</p>
+            <h2>Share your invite link</h2>
+            <p>Friends who join with your link get a 10% daily bonus, and so do you, based on how much they hold.</p>
           </li>
           <li>
-            <h2>Share your invite link</h2>
-            <p>Your link is on the Points screen. Friends who join with it earn 10% extra, and you earn 10% of their points every day.</p>
+            <h2>Watch your total grow</h2>
+            <p>The Points screen shows your total and your rank, updated daily. Only you can see your rank. There's no public leaderboard.</p>
           </li>
         </ol>
       </section>
 
-      <section class="points-section points-why">
-        <div class="why">
-          <h3>Points start the day you join</h3>
-          <p>Nothing is backdated. A wallet that joins today has every day from today on its side, and one that joins next month starts from zero then.</p>
+      <section class="points-section points-rules" id="rules">
+        <h2 class="points-h2">Rules and eligibility</h2>
+        <div class="points-why">
+          <div class="why">
+            <h3>Native AR and AO count</h3>
+            <p>AR and AO tokens earn points equally. Wrapped AR, liquidity positions and staked tokens don't count.</p>
+          </div>
+          <div class="why">
+            <h3>Points start when you join</h3>
+            <p>A wallet that joins today starts earning today.</p>
+          </div>
+          <div class="why">
+            <h3>Keep Gleam installed</h3>
+            <p>You don't need to open Gleam. It checks in on its own whenever your browser is open. Open your browser at least once every 3 days to keep earning.</p>
+          </div>
         </div>
-        <div class="why">
-          <h3>Invites keep paying</h3>
-          <p>An invite isn't a one-off bonus. You earn 10% of a friend's points every day for as long as you both keep Gleam, and the more they hold, the more you earn.</p>
-        </div>
-        <div class="why">
-          <h3>See where you stand</h3>
-          <p>The Points screen shows your rank among everyone earning, updated daily. Nobody else can see yours, and there's no public leaderboard.</p>
-        </div>
-      </section>
 
-      <section class="points-section prose points-rules" id="rules">
-        <h2>The rules</h2>
-        <ul>
-          <li><strong>What counts.</strong> Native AR and the AO token in a joined wallet. Wrapped AR, liquidity positions and staked tokens don't. 1 AR and 1 AO earn the same.</li>
-          <li><strong>When.</strong> Balances are counted once a day, around 00:00 UTC, and that day's points are added then.</li>
-          <li><strong>Staying active.</strong> A wallet earns only if its Gleam install checked in during the 3 days before the count.</li>
-          <li><strong>Invites.</strong> Each install's first wallet to join can use one invite code. That wallet earns 10% extra on its own points. The wallet that invited it earns 10% of those points on days it's active itself. Invite points don't earn further invite points, and there's no cap. If either wallet leaves Gleam Points, the invite bonuses between them stop, and points already earned stay.</li>
-          <li><strong>Each wallet separately.</strong> Every wallet joins on its own and earns on its own balance. A wallet can leave at any time from the Points screen, which deletes its points.</li>
-          <li><strong>Fair play.</strong> Points are reviewed before they're used for anything. Wallets that game the system can lose them.</li>
-          <li><strong>No cash value.</strong> Points can't be bought, sold or transferred. Gleam may use them in the future, for example to decide a distribution, but nothing is promised and the rules may change. Changes are posted on this page.</li>
-        </ul>
-        <p>What joining shares with the Gleam Points server is in our <a href="privacy.html#points">privacy policy</a>.</p>
+        <details class="rules-more">
+          <summary>Read the full rules</summary>
+          <div class="rules-body prose">
+            <ul>
+              <li><strong>What counts.</strong> Native AR and AO in a joined wallet. Each whole AR or AO earns 1 point a day, and fractions count too. Wrapped AR, liquidity positions and staked tokens don't count.</li>
+              <li><strong>When points are added.</strong> Gleam counts balances once a day, around 00:00 UTC, and adds that day's points then.</li>
+              <li><strong>Staying active.</strong> A wallet earns on a given day only if its Gleam checked in at least once in the 3 days before the count. You don't need to open or unlock Gleam: it checks in on its own whenever your browser is open and online.</li>
+              <li><strong>Invites.</strong> Each install can use one invite code, for the first wallet that joins from it. That wallet gets a 10% daily bonus on its own points. The wallet that invited it also gets a daily bonus of 10% of those points, on days it's active itself. Both bonuses come from Gleam, not from either wallet. Bonuses don't earn further bonuses, and there's no limit on how many friends you invite. If either wallet leaves, the bonuses between them stop. Points already earned stay.</li>
+              <li><strong>Each wallet on its own.</strong> Every wallet joins separately and earns on its own balance. You can take a wallet out at any time from the Points screen. This deletes that wallet's points.</li>
+              <li><strong>Fair play.</strong> Points are reviewed before they're used for anything. Wallets that game the system can lose them.</li>
+              <li><strong>No cash value.</strong> Points can't be bought, sold or transferred. Gleam may use them in the future, for example to decide a distribution, but nothing is promised. The rules may change, and any change will be posted on this page.</li>
+            </ul>
+            <p>What joining shares with the Gleam Points server is in our <a href="privacy.html#points">privacy policy</a>.</p>
+          </div>
+        </details>
       </section>
 
       <section class="points-final">

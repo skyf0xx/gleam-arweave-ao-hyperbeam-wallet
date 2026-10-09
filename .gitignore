@@ -12,3 +12,5 @@ playwright-report/
 
 # Editor / OS
 .DS_Store
+POINTS.md
+todo.md

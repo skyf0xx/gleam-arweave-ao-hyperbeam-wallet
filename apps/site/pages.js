@@ -95,8 +95,11 @@
     function update() {
       var friends = Math.round(read("friends"));
       fields.friendsOut.value = String(friends);
-      var own = read("holding") * (fields.invited.checked ? 1.1 : 1);
-      var perDay = own + friends * read("friendHolding") * 0.1;
+      form.querySelector("[data-friends-word]").textContent = friends === 1 ? "friend" : "friends";
+      var balance = read("ar") + read("ao");
+      var bonus = fields.invited.checked ? balance * 0.1 : 0;
+      var fromFriends = friends * (read("friendAr") + read("friendAo")) * 0.1;
+      var perDay = balance + bonus + fromFriends;
       form.querySelector('[data-out="day"]').textContent = format.format(perDay);
       form.querySelector('[data-out="month"]').textContent = format.format(perDay * 30);
       form.querySelector('[data-out="year"]').textContent = format.format(perDay * 365);
