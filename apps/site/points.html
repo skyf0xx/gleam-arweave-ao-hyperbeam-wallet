@@ -89,15 +89,15 @@
           <div class="calc-results" aria-live="polite">
             <div class="calc-result">
               <span class="calc-period">Per day</span>
-              <span class="calc-value" data-out="day">195</span>
+              <span class="calc-value" data-out="day">188</span>
             </div>
             <div class="calc-result">
               <span class="calc-period">30 days</span>
-              <span class="calc-value" data-out="month">5,850</span>
+              <span class="calc-value" data-out="month">5,653</span>
             </div>
             <div class="calc-result calc-result-main">
               <span class="calc-period">1 year</span>
-              <span class="calc-value" data-out="year">71,175</span>
+              <span class="calc-value" data-out="year">68,778</span>
             </div>
           </div>
         </form>
@@ -138,7 +138,7 @@
           </li>
           <li>
             <h2>Hold AR and AO</h2>
-            <p>Once a day Gleam counts the AR and AO in each joined wallet. Every whole AR or AO earns 1 point. Fractions count too.</p>
+            <p>Once a day Gleam counts the AR and AO in each joined wallet. Every AR and AO you hold earns points daily. Bigger balances (whales) earn on a curve, so points stay fair.</p>
           </li>
           <li>
             <h2>Share your invite link</h2>
@@ -168,15 +168,20 @@
           </div>
         </div>
 
+        <div class="why points-curve">
+          <h3>Protecting the minnows from whales (large balances)</h3>
+          <p>Each AR and AO earns 1 point a day, up to 100. Above that, points grow more slowly, so no single wallet takes most of the pool. Balances are counted per install, so splitting coins across wallets doesn't earn more.</p>
+        </div>
+
         <details class="rules-more">
           <summary>Read the full rules</summary>
           <div class="rules-body prose">
             <ul>
-              <li><strong>What counts.</strong> Native AR and AO in a joined wallet. Each whole AR or AO earns 1 point a day, and fractions count too. Wrapped AR, liquidity positions and staked tokens don't count.</li>
+              <li><strong>What counts.</strong> Native AR and AO in a joined wallet. Each whole AR or AO earns 1 point a day, up to 100 per install, and fractions count too. Above 100, points grow more slowly. Wrapped AR, liquidity positions and staked tokens don't count.</li>
               <li><strong>When points are added.</strong> Gleam counts balances once a day, around 00:00 UTC, and adds that day's points then.</li>
               <li><strong>Staying active.</strong> A wallet earns on a given day only if its Gleam checked in at least once in the 3 days before the count. You don't need to open or unlock Gleam: it checks in on its own whenever your browser is open and online.</li>
               <li><strong>Invites.</strong> Each install can use one invite code, for the first wallet that joins from it. That wallet gets a 10% daily bonus on its own points. The wallet that invited it also gets a daily bonus of 10% of those points, on days it's active itself. Both bonuses come from Gleam, not from either wallet. Bonuses don't earn further bonuses, and there's no limit on how many friends you invite. If either wallet leaves, the bonuses between them stop. Points already earned stay.</li>
-              <li><strong>Each wallet on its own.</strong> Every wallet joins separately and earns on its own balance. You can take a wallet out at any time from the Points screen. This deletes that wallet's points.</li>
+              <li><strong>Wallets on one install.</strong> Every wallet joins separately. The curve applies to the combined balance of all wallets joined from one install, and those points are shared between them by balance. You can take a wallet out at any time from the Points screen. This deletes that wallet's points.</li>
               <li><strong>Fair play.</strong> Points are reviewed before they're used for anything. Wallets that game the system can lose them.</li>
               <li><strong>No cash value.</strong> Points can't be bought, sold or transferred. Gleam may use them in the future, for example to decide a distribution, but nothing is promised. The rules may change, and any change will be posted on this page.</li>
             </ul>

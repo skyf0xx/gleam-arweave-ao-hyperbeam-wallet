@@ -81,6 +81,6 @@ needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 ## Workflow
 
 Take the top item in `todo.md`. Make one Conventional Commit per item
-(`fix(ao): …`, `feat(activity): …`). Remove the item from `todo.md` in
-that same commit. Add anything new you find to `todo.md`'s **Unsorted**
+(`fix(ao): …`, `feat(activity): …`), then remove the item from
+`todo.md`. `todo.md` is not tracked in git. Add anything new you find to `todo.md`'s **Unsorted**
 section instead of fixing it on the side.

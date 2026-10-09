@@ -80,8 +80,13 @@
   var calc = document.querySelector("form[data-points-calc]");
   if (calc) setUpCalculator(calc);
 
-  // Mirrors POINTS.md § Rules: 1 point per AR or AO a day, +10% for an
-  // invited wallet, and 10% of each invited friend's points.
+  // Mirrors POINTS.md § Rules: 1 point per AR or AO a day up to 100, a
+  // square-root curve above that, +10% for an invited wallet, and 10% of
+  // each invited friend's points.
+  function curve(balance) {
+    return balance <= 100 ? balance : 2 * Math.sqrt(100 * balance) - 100;
+  }
+
   function setUpCalculator(form) {
     var fields = form.elements;
     var format = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -96,9 +101,9 @@
       var friends = Math.round(read("friends"));
       fields.friendsOut.value = String(friends);
       form.querySelector("[data-friends-word]").textContent = friends === 1 ? "friend" : "friends";
-      var balance = read("ar") + read("ao");
+      var balance = curve(read("ar") + read("ao"));
       var bonus = fields.invited.checked ? balance * 0.1 : 0;
-      var fromFriends = friends * (read("friendAr") + read("friendAo")) * 0.1;
+      var fromFriends = friends * curve(read("friendAr") + read("friendAo")) * 0.1;
       var perDay = balance + bonus + fromFriends;
       form.querySelector('[data-out="day"]').textContent = format.format(perDay);
       form.querySelector('[data-out="month"]').textContent = format.format(perDay * 30);
