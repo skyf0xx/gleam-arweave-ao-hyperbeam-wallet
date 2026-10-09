@@ -66,6 +66,30 @@ describe("runSnapshot", () => {
     });
   });
 
+  it("stores the founder bonus for original founders only, not Phase 1 joiners", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { address: "founder", heartbeat: HOURS_AGO },
+      { address: "joiner", heartbeat: HOURS_AGO },
+      { address: "referred", heartbeat: HOURS_AGO, referredBy: "joiner" },
+    ]);
+    await db.query("UPDATE wallets SET original_founder = true WHERE address IN ('founder', 'referred')");
+    const balance = { arAtomic: "1000", aoAtomic: "0" };
+
+    await runSnapshot(db, NOW, { readBalances: reader({ founder: balance, joiner: balance, referred: balance }) });
+
+    const { rows } = await db.query<{ address: string; referee: string; founder: string; referrer: string }>(
+      `SELECT address, referee_bonus_atomic::text AS referee, founder_bonus_atomic::text AS founder,
+              referrer_bonus_atomic::text AS referrer
+         FROM points ORDER BY address`,
+    );
+    expect(rows).toEqual([
+      { address: "founder", referee: "0", founder: "100", referrer: "0" },
+      { address: "joiner", referee: "0", founder: "0", referrer: "100" },
+      { address: "referred", referee: "100", founder: "0", referrer: "0" },
+    ]);
+  });
+
   it("doesn't read balances for wallets whose install went quiet, and credits them nothing", async () => {
     const db = await createTestDb();
     await seed(db, [{ address: "gone", heartbeat: DAYS_AGO }]);

@@ -7,11 +7,13 @@ export interface WalletScore {
   refereeCount: number;
   totalAtomic: string;
   /** The latest snapshot's credit, which the extension projects forward from. */
-  lastDay: { holdingAtomic: string; refereeBonusAtomic: string; referrerBonusAtomic: string } | null;
+  lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with any points; null until the wallet has some. */
   topPercent: number | null;
   /** Null for wallets that registered after Phase 1. */
   foundingNumber: number | null;
+  /** Backfilled before Phase 1: gets the referee bonus without a code. */
+  originalFounder: boolean;
 }
 
 export interface DeviceScores {
@@ -39,24 +41,27 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
     total: string | null;
     rank: string | null;
     founding_number: number | null;
+    original_founder: boolean;
     ranked: string;
     holding: string | null;
     referee_bonus: string | null;
+    founder_bonus: string | null;
     referrer_bonus: string | null;
   }>(
     `WITH totals AS (
-       SELECT address, sum(holding_atomic + referee_bonus_atomic + referrer_bonus_atomic) AS total
+       SELECT address, sum(holding_atomic + referee_bonus_atomic + founder_bonus_atomic + referrer_bonus_atomic) AS total
          FROM points GROUP BY address
      ),
      ranked AS (
        SELECT address, total, rank() OVER (ORDER BY total DESC) AS rank, count(*) OVER () AS ranked
          FROM totals WHERE total > 0
      )
-     SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred, w.founding_number,
+     SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred, w.founding_number, w.original_founder,
             (SELECT count(*) FROM wallets r WHERE r.referred_by = w.address)::text AS referee_count,
             r.total::text AS total, r.rank::text AS rank,
             coalesce((SELECT count(*) FROM ranked), 0)::text AS ranked,
             p.holding_atomic::text AS holding, p.referee_bonus_atomic::text AS referee_bonus,
+            p.founder_bonus_atomic::text AS founder_bonus,
             p.referrer_bonus_atomic::text AS referrer_bonus
        FROM wallets w
        LEFT JOIN ranked r ON r.address = w.address
@@ -80,9 +85,11 @@ export async function scoresForDevice(db: Queryable, deviceId: string): Promise<
           : {
               holdingAtomic: row.holding,
               refereeBonusAtomic: row.referee_bonus!,
+              founderBonusAtomic: row.founder_bonus!,
               referrerBonusAtomic: row.referrer_bonus!,
             },
       foundingNumber: row.founding_number,
+      originalFounder: row.original_founder,
       topPercent: row.rank === null ? null : topPercent(Number(row.rank), Number(row.ranked)),
     })),
   };

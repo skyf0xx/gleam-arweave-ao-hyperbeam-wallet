@@ -71,6 +71,7 @@ describe("POST /me", () => {
           lastDay: null,
           topPercent: null,
           foundingNumber: 2,
+          originalFounder: false,
         },
         {
           address: carol.address,
@@ -81,6 +82,7 @@ describe("POST /me", () => {
           lastDay: null,
           topPercent: null,
           foundingNumber: 3,
+          originalFounder: false,
         },
       ]),
     );
@@ -104,7 +106,7 @@ describe("POST /me", () => {
     expect(alicesView.wallets[0]).toMatchObject({
       refereeCount: 1,
       totalAtomic: "2020",
-      lastDay: { holdingAtomic: "1000", refereeBonusAtomic: "0", referrerBonusAtomic: "10" },
+      lastDay: { holdingAtomic: "1000", refereeBonusAtomic: "0", founderBonusAtomic: "0", referrerBonusAtomic: "10" },
       topPercent: 34,
     });
     const byAddress = Object.fromEntries(
@@ -114,6 +116,26 @@ describe("POST /me", () => {
       ]),
     );
     expect(byAddress).toEqual({ [bob.address]: ["220", 67], [carol.address]: ["20", 100] });
+  });
+
+  it("reports the founder flag and counts the founder bonus in the total and last day", async () => {
+    const { db, devices, me } = await setup();
+    await db.query("UPDATE wallets SET original_founder = true WHERE address = $1", [alice.address]);
+    const balances: Record<string, { arAtomic: string; aoAtomic: string }> = {
+      [alice.address]: { arAtomic: "1000", aoAtomic: "0" },
+      [bob.address]: { arAtomic: "0", aoAtomic: "0" },
+      [carol.address]: { arAtomic: "0", aoAtomic: "0" },
+    };
+
+    await runSnapshot(db, NOW, { readBalances: async (address) => balances[address]! });
+
+    const wallet = (await me(devices.alice)).json.wallets[0];
+    expect(wallet).toMatchObject({
+      originalFounder: true,
+      totalAtomic: "1100",
+      lastDay: { holdingAtomic: "1000", refereeBonusAtomic: "0", founderBonusAtomic: "100", referrerBonusAtomic: "0" },
+    });
+    expect((await me(devices.bob)).json.wallets[0].originalFounder).toBe(false);
   });
 
   it("refuses a heartbeat payload and another device's signature", async () => {

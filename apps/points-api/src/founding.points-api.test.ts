@@ -83,7 +83,7 @@ describe("founding numbers", () => {
     await insert("alpha", "2026-01-03T00:00:00Z");
     await insert("omega", "2026-01-01T00:00:00Z");
 
-    expect(await migrate(db)).toEqual(["003_founding_number.sql"]);
+    expect(await migrate(db)).toEqual(["003_founding_number.sql", "004_original_founder.sql"]);
 
     const { rows } = await db.query<{
       address: string;
@@ -93,6 +93,49 @@ describe("founding numbers", () => {
     expect(rows.map((r) => r.founding_number)).toEqual([1, 2, 3, 4]);
     const next = await db.query<{ n: string }>("SELECT nextval('founding_number_seq')::text AS n");
     expect(next.rows[0]?.n).toBe("5");
+  });
+
+  it("flags only the wallets numbered before the original-founder migration", async () => {
+    const db = dbFromPglite(new PGlite());
+    await db.query(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
+    );
+    for (const name of ["001_init.sql", "002_leave.sql", "003_founding_number.sql"]) {
+      const sql = await readFile(new URL(`./migrations/${name}`, import.meta.url), "utf8");
+      for (const statement of sql
+        .split("\n")
+        .filter((l) => !l.trimStart().startsWith("--"))
+        .join("\n")
+        .split(";")) {
+        if (statement.trim()) await db.query(statement);
+      }
+      await db.query("INSERT INTO schema_migrations (name) VALUES ($1)", [name]);
+    }
+    await db.query("INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ('d', '{}', now())");
+    await db.query("INSERT INTO wallets (address, device_id, invite_code, founding_number) VALUES ('member', 'd', 'c1', 1)");
+    await db.query(
+      "INSERT INTO wallets (address, device_id, invite_code, founding_number) VALUES ('unnumbered', 'd', 'c2', NULL)",
+    );
+
+    await migrate(db);
+
+    const { rows } = await db.query<{ address: string; original_founder: boolean }>(
+      "SELECT address, original_founder FROM wallets ORDER BY address",
+    );
+    expect(rows).toEqual([
+      { address: "member", original_founder: true },
+      { address: "unnumbered", original_founder: false },
+    ]);
+  });
+
+  it("numbers a Phase 1 joiner without making it an original founder", async () => {
+    const db = await createTestDb();
+    const { register } = setup(db);
+
+    await register(wallets[0]!);
+
+    const { rows } = await db.query("SELECT founding_number, original_founder FROM wallets");
+    expect(rows).toEqual([{ founding_number: 1, original_founder: false }]);
   });
 
   it("assigns the next number to each new wallet in Phase 1 and keeps it on re-register", async () => {

@@ -4,7 +4,7 @@ import { computeDailyPoints, estimatePoints, ownDailyRate, type WalletSnapshot }
 const ONE = "1000000000000";
 
 function wallet(address: string, overrides: Partial<WalletSnapshot> = {}): WalletSnapshot {
-  return { address, arAtomic: "0", aoAtomic: "0", live: true, referredBy: null, ...overrides };
+  return { address, arAtomic: "0", aoAtomic: "0", live: true, referredBy: null, originalFounder: false, ...overrides };
 }
 
 describe("computeDailyPoints", () => {
@@ -14,6 +14,7 @@ describe("computeDailyPoints", () => {
     expect(points.get("a")).toEqual({
       holdingAtomic: "2000000000000",
       refereeBonusAtomic: "0",
+      founderBonusAtomic: "0",
       referrerBonusAtomic: "0",
       totalAtomic: "2000000000000",
     });
@@ -31,6 +32,38 @@ describe("computeDailyPoints", () => {
 
     expect(points.get("referee")).toMatchObject({ holdingAtomic: "50", refereeBonusAtomic: "5", totalAtomic: "55" });
     expect(points.get("referrer")).toMatchObject({ referrerBonusAtomic: "5", totalAtomic: "1000000000005" });
+  });
+
+  it("gives an original founder the 10% with nobody paid for it", () => {
+    const points = computeDailyPoints([
+      wallet("founder", { arAtomic: "105", originalFounder: true }),
+      wallet("other", { arAtomic: "50" }),
+    ]);
+
+    expect(points.get("founder")).toMatchObject({
+      refereeBonusAtomic: "0",
+      founderBonusAtomic: "10",
+      referrerBonusAtomic: "0",
+      totalAtomic: "115",
+    });
+    expect(points.get("other")?.totalAtomic).toBe("50");
+  });
+
+  it("gives an original founder with a referrer the 10% once, as a referee", () => {
+    const points = computeDailyPoints([
+      wallet("referrer", { arAtomic: "1000" }),
+      wallet("founder", { arAtomic: "100", referredBy: "referrer", originalFounder: true }),
+    ]);
+
+    expect(points.get("founder")).toMatchObject({ refereeBonusAtomic: "10", founderBonusAtomic: "0", totalAtomic: "110" });
+    expect(points.get("referrer")?.referrerBonusAtomic).toBe("10");
+  });
+
+  it("gives a wallet that isn't an original founder nothing extra", () => {
+    expect(computeDailyPoints([wallet("joiner", { arAtomic: "100" })]).get("joiner")).toMatchObject({
+      founderBonusAtomic: "0",
+      totalAtomic: "100",
+    });
   });
 
   it("sums bonuses across referees but never pays on a referee's own referral points", () => {
@@ -98,5 +131,10 @@ describe("ownDailyRate", () => {
   it("adds the referee bonus only when referred", () => {
     expect(ownDailyRate("100", "50", false)).toBe("150");
     expect(ownDailyRate("100", "50", true)).toBe("165");
+  });
+
+  it("adds it for an original founder, once", () => {
+    expect(ownDailyRate("100", "50", false, true)).toBe("165");
+    expect(ownDailyRate("100", "50", true, true)).toBe("165");
   });
 });

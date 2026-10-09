@@ -8,7 +8,7 @@ describe("migrate", () => {
   it("applies every migration once and records it", async () => {
     const db = dbFromPglite(new PGlite());
 
-    expect(await migrate(db)).toEqual(["001_init.sql", "002_leave.sql", "003_founding_number.sql"]);
+    expect(await migrate(db)).toEqual(["001_init.sql", "002_leave.sql", "003_founding_number.sql", "004_original_founder.sql"]);
     expect(await migrate(db)).toEqual([]);
 
     const { rows } = await db.query<{ table_name: string }>(

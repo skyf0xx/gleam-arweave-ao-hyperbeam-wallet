@@ -15,11 +15,13 @@ export interface PointsWalletScore {
   referred: boolean;
   refereeCount: number;
   totalAtomic: string;
-  lastDay: { holdingAtomic: string; refereeBonusAtomic: string; referrerBonusAtomic: string } | null;
+  lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with points; null until the wallet has some. */
   topPercent: number | null;
   /** Null for wallets that registered after Phase 1. */
   foundingNumber: number | null;
+  /** Backfilled before Phase 1: gets the referee bonus without a code. */
+  originalFounder: boolean;
 }
 
 export interface PointsScores {

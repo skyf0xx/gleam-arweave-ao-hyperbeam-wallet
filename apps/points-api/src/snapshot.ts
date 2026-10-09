@@ -35,8 +35,8 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
   const done = await db.query("SELECT 1 FROM snapshot_runs WHERE day = $1", [day]);
   if (done.rows.length > 0) return null;
 
-  const { rows: wallets } = await db.query<{ address: string; referred_by: string | null; live: boolean }>(
-    `SELECT w.address, w.referred_by,
+  const { rows: wallets } = await db.query<{ address: string; referred_by: string | null; original_founder: boolean; live: boolean }>(
+    `SELECT w.address, w.referred_by, w.original_founder,
             coalesce(d.last_heartbeat_at >= $1, false) AS live
        FROM wallets w JOIN devices d ON d.id = w.device_id`,
     [new Date(now.getTime() - LIVENESS_WINDOW_MS)],
@@ -46,7 +46,7 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
   let failedCount = 0;
   await forEachWithConcurrency(wallets, options.concurrency ?? 8, async (wallet) => {
     if (!wallet.live) {
-      snapshots.push({ address: wallet.address, arAtomic: "0", aoAtomic: "0", live: false, referredBy: wallet.referred_by });
+      snapshots.push({ address: wallet.address, arAtomic: "0", aoAtomic: "0", live: false, referredBy: wallet.referred_by, originalFounder: wallet.original_founder });
       return;
     }
     const balances = await withRetries(() => options.readBalances(wallet.address), options);
@@ -54,7 +54,7 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
       failedCount += 1;
       return;
     }
-    snapshots.push({ address: wallet.address, ...balances, live: true, referredBy: wallet.referred_by });
+    snapshots.push({ address: wallet.address, ...balances, live: true, referredBy: wallet.referred_by, originalFounder: wallet.original_founder });
   });
 
   const points = computeDailyPoints(snapshots);
@@ -79,15 +79,16 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
     );
     const credited = [...points].filter(([, p]) => p.totalAtomic !== "0");
     await tx.query(
-      `INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, referrer_bonus_atomic)
-       SELECT $1::date, p.* FROM unnest($2::text[], $3::numeric[], $4::numeric[], $5::numeric[])
-         AS p (address, holding, referee, referrer)
+      `INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, founder_bonus_atomic, referrer_bonus_atomic)
+       SELECT $1::date, p.* FROM unnest($2::text[], $3::numeric[], $4::numeric[], $5::numeric[], $6::numeric[])
+         AS p (address, holding, referee, founder, referrer)
         WHERE EXISTS (SELECT 1 FROM wallets w WHERE w.address = p.address)`,
       [
         day,
         credited.map(([address]) => address),
         credited.map(([, p]) => p.holdingAtomic),
         credited.map(([, p]) => p.refereeBonusAtomic),
+        credited.map(([, p]) => p.founderBonusAtomic),
         credited.map(([, p]) => p.referrerBonusAtomic),
       ],
     );

@@ -11,11 +11,15 @@ export interface WalletSnapshot {
   /** Whether the wallet's install sent a heartbeat inside the liveness window. */
   live: boolean;
   referredBy: string | null;
+  /** Backfilled before Phase 1, so never had a code to redeem. */
+  originalFounder: boolean;
 }
 
 export interface DailyPoints {
   holdingAtomic: string;
   refereeBonusAtomic: string;
+  /** The referee bonus for an original founder with no referrer. */
+  founderBonusAtomic: string;
   referrerBonusAtomic: string;
   totalAtomic: string;
 }
@@ -34,7 +38,9 @@ export function basePoints(snapshot: Pick<WalletSnapshot, "arAtomic" | "aoAtomic
  * Bonuses are always 10% of the referee's base, rounded down, so
  * referral points never earn referral points. A referrer that isn't live,
  * or isn't in the snapshot at all, earns nothing that day. The referee's
- * own bonus doesn't depend on its referrer being live.
+ * own bonus doesn't depend on its referrer being live. An original
+ * founder with no referrer gets the same 10% with nobody paid for it; one
+ * with a referrer gets it once, as a referee.
  */
 export function computeDailyPoints(snapshots: readonly WalletSnapshot[]): Map<string, DailyPoints> {
   const byAddress = new Map<string, WalletSnapshot>();
@@ -50,9 +56,13 @@ export function computeDailyPoints(snapshots: readonly WalletSnapshot[]): Map<st
 
   const referrerBonus = new Map<string, bigint>();
   const refereeBonus = new Map<string, bigint>();
+  const founderBonus = new Map<string, bigint>();
   for (const snapshot of snapshots) {
     const referrer = snapshot.referredBy;
-    if (referrer === null || referrer === snapshot.address) continue;
+    if (referrer === null || referrer === snapshot.address) {
+      if (snapshot.originalFounder) founderBonus.set(snapshot.address, base.get(snapshot.address)! / BONUS_DIVISOR);
+      continue;
+    }
     const bonus = base.get(snapshot.address)! / BONUS_DIVISOR;
     refereeBonus.set(snapshot.address, bonus);
     if (byAddress.get(referrer)?.live) {
@@ -64,12 +74,14 @@ export function computeDailyPoints(snapshots: readonly WalletSnapshot[]): Map<st
   for (const snapshot of snapshots) {
     const holding = base.get(snapshot.address)!;
     const asReferee = refereeBonus.get(snapshot.address) ?? 0n;
+    const asFounder = founderBonus.get(snapshot.address) ?? 0n;
     const asReferrer = referrerBonus.get(snapshot.address) ?? 0n;
     result.set(snapshot.address, {
       holdingAtomic: holding.toString(),
       refereeBonusAtomic: asReferee.toString(),
+      founderBonusAtomic: asFounder.toString(),
       referrerBonusAtomic: asReferrer.toString(),
-      totalAtomic: (holding + asReferee + asReferrer).toString(),
+      totalAtomic: (holding + asReferee + asFounder + asReferrer).toString(),
     });
   }
   return result;
@@ -105,9 +117,9 @@ export function estimatePoints(input: PointsEstimateInput): string {
  * The referrer share depends on other wallets' balances, so callers add
  * the server-reported `referrerBonusAtomic` to this.
  */
-export function ownDailyRate(arAtomic: string, aoAtomic: string, referred: boolean): string {
+export function ownDailyRate(arAtomic: string, aoAtomic: string, referred: boolean, originalFounder = false): string {
   const base = parseAtomic(arAtomic) + parseAtomic(aoAtomic);
-  return (referred ? base + base / BONUS_DIVISOR : base).toString();
+  return (referred || originalFounder ? base + base / BONUS_DIVISOR : base).toString();
 }
 
 function parseAtomic(value: string): bigint {

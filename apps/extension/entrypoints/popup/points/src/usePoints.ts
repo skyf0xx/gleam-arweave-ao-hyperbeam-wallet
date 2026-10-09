@@ -88,7 +88,7 @@ export function usePointsStanding(runtime: RuntimePort, wallet: WalletSummary): 
   const score = scores.data?.wallets.find((candidate) => candidate.address === wallet.address) ?? null;
   const ao = balances.data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
   const aoAtomic = ao && ao.available !== false ? ao.quantity : "0";
-  const ownRate = ownDailyRate(balances.data?.arBalance ?? "0", aoAtomic, membership.referred);
+  const ownRate = ownDailyRate(balances.data?.arBalance ?? "0", aoAtomic, membership.referred, score?.originalFounder);
   const dailyRateAtomic = (BigInt(ownRate) + BigInt(score?.lastDay?.referrerBonusAtomic ?? "0")).toString();
 
   const settledAt = scores.data?.settledAt ? Date.parse(scores.data.settledAt) : null;
