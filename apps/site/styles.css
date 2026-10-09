@@ -914,6 +914,22 @@ code { font-family: var(--mono); font-size: 0.9em; }
 
 .vision-cta .button { margin-top: auto; }
 
+.invite-state[hidden] { display: none; }
+
+.invite-state .small { margin: 16px 0 0; }
+
+.invite-state .small a { color: var(--fg); text-underline-offset: 3px; }
+
+.invite-sub { margin: 32px 0 0; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+
+.invite-sub + .small { margin-top: 8px; }
+
+.invite-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+
+.invite-meta .vision-count { margin: 0; }
+
+.invite-facts { margin-top: 40px; }
+
 @media (max-width: 720px) {
   .vision-ctas { grid-template-columns: minmax(0, 1fr); }
 }

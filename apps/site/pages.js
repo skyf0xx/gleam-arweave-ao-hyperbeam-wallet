@@ -77,32 +77,147 @@
     else window.addEventListener("load", send);
   }
 
-  // future.html: the founding count comes from the points server. Until it
-  // answers with a real positive number the element stays hidden, so a
-  // down server never shows a zero or a placeholder.
-  var foundingCount = document.querySelector("[data-founding-count]");
-  if (foundingCount && window.fetch) {
+  // Calls the points server. Resolves to the parsed body, or null on any
+  // failure (down, slow, non-2xx), so callers fall back to showing nothing.
+  var POINTS_API = "https://gleam-points.up.railway.app";
+
+  function callPointsApi(path, body) {
+    if (!window.fetch) return Promise.resolve(null);
     var controller = window.AbortController ? new window.AbortController() : null;
     var timer = setTimeout(function () {
       if (controller) controller.abort();
     }, 5000);
-    fetch("https://gleam-points.up.railway.app/stats", controller ? { signal: controller.signal } : undefined)
+    var init = controller ? { signal: controller.signal } : {};
+    if (body) {
+      init.method = "POST";
+      init.headers = { "Content-Type": "application/json" };
+      init.body = JSON.stringify(body);
+    }
+    return fetch(POINTS_API + path, init)
       .then(function (res) {
-        if (!res.ok) throw new Error("stats " + res.status);
+        if (!res.ok) throw new Error(path + " " + res.status);
         return res.json();
       })
-      .then(function (body) {
-        var n = body && body.foundingMembers;
-        if (typeof n !== "number" || !isFinite(n) || n < 1 || Math.floor(n) !== n) return;
-        foundingCount.querySelector("[data-founding-number]").textContent = new Intl.NumberFormat("en-US").format(n);
-        foundingCount.hidden = false;
-      })
       .catch(function () {
-        // Leave the count hidden.
+        return null;
       })
-      .then(function () {
+      .then(function (result) {
         clearTimeout(timer);
+        return result;
       });
+  }
+
+  // The founding count stays hidden until the server answers with a real
+  // positive number, so a down server never shows a zero or a placeholder.
+  function showFoundingCount(el) {
+    callPointsApi("/stats").then(function (body) {
+      var n = body && body.foundingMembers;
+      if (typeof n !== "number" || !isFinite(n) || n < 1 || Math.floor(n) !== n) return;
+      el.querySelector("[data-founding-number]").textContent = new Intl.NumberFormat("en-US").format(n);
+      el.hidden = false;
+    });
+  }
+
+  var foundingCount = document.querySelector("[data-founding-count]");
+  if (foundingCount) showFoundingCount(foundingCount);
+
+  if (document.body.hasAttribute("data-invite")) setUpInvitePage();
+
+  // invite.html (POINTS.md § Messaging). The page opens in the invite state
+  // when a well-formed code is in the URL and switches to the ask state if
+  // the server says the code is unknown or full. If the server can't be
+  // reached the invite state stays, without seats.
+  var MEMBER_SEATS = 3;
+
+  function setUpInvitePage() {
+    var inviteCode = (params.get("c") || "").trim().toUpperCase();
+    if (!INVITE_CODE.test(inviteCode)) inviteCode = "";
+    var states = {};
+    document.querySelectorAll("[data-state]").forEach(function (el) {
+      states[el.getAttribute("data-state")] = el;
+    });
+    var seatsEl = document.querySelector("[data-seats]");
+    var countdownEl = document.querySelector("[data-countdown]");
+    var notFound = document.querySelector("[data-not-found]");
+
+    function show(name) {
+      Object.keys(states).forEach(function (key) {
+        states[key].hidden = key !== name;
+      });
+    }
+
+    // The kind (never the code) rides along on the page's click events.
+    function tagKind(kind) {
+      document.querySelectorAll("[data-umami-event]").forEach(function (el) {
+        el.setAttribute("data-umami-event-kind", kind);
+      });
+    }
+
+    function seatsText(kind, left) {
+      if (typeof left !== "number" || left < 0) return "";
+      if (kind === "member" && left <= MEMBER_SEATS) return left + " of " + MEMBER_SEATS + " seats left";
+      return left + (left === 1 ? " seat left" : " seats left");
+    }
+
+    // Drop links carry the close time as ?until=<ISO date>; the server has
+    // no such field. Past or unparseable dates show nothing.
+    var until = Date.parse(params.get("until") || "");
+    var countdownTimer = 0;
+
+    function tickCountdown() {
+      var ms = until - Date.now();
+      if (!(ms > 0)) {
+        countdownEl.hidden = true;
+        window.clearInterval(countdownTimer);
+        return;
+      }
+      var mins = Math.floor(ms / 60000);
+      var d = Math.floor(mins / 1440);
+      var h = Math.floor((mins % 1440) / 60);
+      var m = mins % 60;
+      var text = d ? d + "d " + h + "h" : h ? h + "h " + m + "m" : Math.max(m, 1) + "m";
+      countdownEl.querySelector("[data-countdown-text]").textContent = text;
+      countdownEl.hidden = false;
+    }
+
+    function showCountdown() {
+      if (!countdownEl || !isFinite(until)) return;
+      tickCountdown();
+      countdownTimer = window.setInterval(tickCountdown, 30000);
+    }
+
+    if (!inviteCode) {
+      show("none");
+      return;
+    }
+    show("code");
+
+    callPointsApi("/invite/check", { code: inviteCode }).then(function (res) {
+      if (!res || typeof res.exists !== "boolean") {
+        showCountdown();
+        return;
+      }
+      if (!res.exists) {
+        if (notFound) notFound.hidden = false;
+        show("none");
+        return;
+      }
+      var kind = res.kind === "drop" ? "drop" : res.kind === "member" ? "member" : "";
+      if (kind) {
+        tagKind(kind);
+        trackOnce("gleam-invite-code-kind", { kind: kind });
+      }
+      if (res.seatsLeft === 0) {
+        show("full");
+        return;
+      }
+      var text = seatsText(kind, res.seatsLeft);
+      if (seatsEl && text) {
+        seatsEl.textContent = text;
+        seatsEl.hidden = false;
+      }
+      if (kind === "drop") showCountdown();
+    });
   }
 
   var calc = document.querySelector("form[data-points-calc]");
