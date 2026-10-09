@@ -160,6 +160,8 @@ export interface ProtocolMap {
    * Founding gate). Skips the request once the install is unlocked.
    */
   redeemPointsInvite(req: { code: string }): InviteUnlock;
+  /** Founding members so far, for the gate's live count. Null if the points API can't be reached. */
+  getFoundingCount(): number | null;
 
   /**
    * The single relay point for every page-originated provider call

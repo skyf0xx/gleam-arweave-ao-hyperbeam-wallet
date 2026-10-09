@@ -1,6 +1,6 @@
 export const SITE_URL = "https://gleam-permaweb.vercel.app/";
 
-export type SitePage = "welcome" | "feedback" | "goodbye";
+export type SitePage = "welcome" | "feedback" | "goodbye" | "future";
 
 /**
  * A page on the Gleam website. The extension version is the only thing

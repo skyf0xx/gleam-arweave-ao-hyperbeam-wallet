@@ -213,6 +213,30 @@ select,
 }
 
 /*
+ * A one-time reveal of the beam from left to right, for moments that
+ * arrive (the Founding gate, its unlock). Reduced motion shows the
+ * finished beam.
+ */
+@keyframes gleam-beam-draw {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.gleam-beam-sweep {
+  animation: gleam-beam-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-beam-sweep {
+    animation: none;
+  }
+}
+
+/*
  * Shimmer sweep keyframe — slides the gradient's 200%-wide background
  * across the element's own box by animating `background-position` alone
  * (never `background`/`transform`), so the moving highlight stays a

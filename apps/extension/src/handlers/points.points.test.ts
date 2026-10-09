@@ -310,3 +310,99 @@ describe("PointsHandler.leave", () => {
     await expect(locked.handler.leave({ walletId: "w1" })).rejects.toThrow(/Unlock/);
   });
 });
+
+describe("PointsHandler.foundingCount", () => {
+  function counter(fetchImpl: typeof fetch) {
+    return new PointsHandler({
+      storage: createFakeStorage(),
+      deviceKey: createDeviceKey,
+      apiUrl: "https://points.test",
+      signingKey: async () => null,
+      fetchImpl,
+      now: () => NOW,
+    });
+  }
+
+  it("reads the count from /stats", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ foundingMembers: 184 })));
+    expect(await counter(fetchImpl as unknown as typeof fetch).foundingCount()).toBe(184);
+    expect(fetchImpl).toHaveBeenCalledWith("https://points.test/stats");
+  });
+
+  it("returns null on a network error, a bad status or a malformed body", async () => {
+    const failing = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    expect(await counter(failing as unknown as typeof fetch).foundingCount()).toBeNull();
+    const limited = vi.fn(async () => new Response("{}", { status: 429 }));
+    expect(await counter(limited as unknown as typeof fetch).foundingCount()).toBeNull();
+    const malformed = vi.fn(async () => new Response(JSON.stringify({ foundingMembers: "many" })));
+    expect(await counter(malformed as unknown as typeof fetch).foundingCount()).toBeNull();
+  });
+});
+
+describe("PointsHandler.redeemInvite", () => {
+  it("keeps a code that unlocked the install as the pending invite for the claim step", async () => {
+    const storage = createFakeStorage();
+    const handler = new PointsHandler({
+      storage,
+      deviceKey: createDeviceKey,
+      apiUrl: "https://points.test",
+      signingKey: async () => null,
+      fetchImpl: (async () => new Response(JSON.stringify({ result: "ok" }))) as unknown as typeof fetch,
+      now: () => NOW,
+    });
+    await handler.redeemInvite("gleamdrop7");
+    expect(storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("GLEAMDROP7");
+  });
+
+  it("does not keep a code that was full", async () => {
+    const storage = createFakeStorage();
+    const handler = new PointsHandler({
+      storage,
+      deviceKey: createDeviceKey,
+      apiUrl: "https://points.test",
+      signingKey: async () => null,
+      fetchImpl: (async () => new Response(JSON.stringify({ result: "full" }))) as unknown as typeof fetch,
+      now: () => NOW,
+    });
+    await handler.redeemInvite("GLEAMDROP7");
+    expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
+  });
+});
+
+describe("PointsHandler.markUnlockedForVault", () => {
+  function build(storage: ReturnType<typeof createFakeStorage>, fetchImpl: typeof fetch) {
+    return new PointsHandler({
+      storage,
+      deviceKey: createDeviceKey,
+      apiUrl: "https://points.test",
+      signingKey: async () => null,
+      fetchImpl,
+      now: () => NOW,
+    });
+  }
+
+  it("unlocks an install that has a vault and never asks the server again", async () => {
+    const storage = createFakeStorage();
+    const fetchImpl = vi.fn();
+    const handler = build(storage, fetchImpl as unknown as typeof fetch);
+    await handler.markUnlockedForVault();
+    expect(await handler.getInviteUnlock()).toEqual({ code: "", result: "ok", at: NOW });
+    await handler.redeemInvite("GLEAMDROP7");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("replaces a stored failure but keeps a redeemed unlock", async () => {
+    const full = { code: "GLEAMDROP7", result: "full", at: 1 };
+    const storage = createFakeStorage({ "local:points:inviteUnlock": full });
+    const handler = build(storage, vi.fn() as unknown as typeof fetch);
+    await handler.markUnlockedForVault();
+    expect((await handler.getInviteUnlock())?.result).toBe("ok");
+
+    const redeemed = { code: "GLEAMDROP7", result: "ok", at: 1 };
+    const kept = createFakeStorage({ "local:points:inviteUnlock": redeemed });
+    await build(kept, vi.fn() as unknown as typeof fetch).markUnlockedForVault();
+    expect(kept.store.get("local:points:inviteUnlock")).toEqual(redeemed);
+  });
+});

@@ -153,7 +153,33 @@ export class PointsHandler {
     const result = await this.requestRedeem(code);
     const unlock: InviteUnlock = { code, result, at: this.now() };
     await this.deps.storage.set(POINTS_INVITE_UNLOCK_KEY, unlock);
+    // The claim step applies this code when the first wallet joins.
+    if (result === "ok") await this.deps.storage.set(POINTS_PENDING_INVITE_KEY, code);
     return unlock;
+  }
+
+  /**
+   * An install that has a vault never meets the gate, including after it
+   * resets or deletes its last wallet and has to import again. Such an
+   * install is stored as unlocked with an empty code, since it redeemed
+   * none.
+   */
+  async markUnlockedForVault(): Promise<void> {
+    if ((await this.getInviteUnlock())?.result === "ok") return;
+    await this.deps.storage.set<InviteUnlock>(POINTS_INVITE_UNLOCK_KEY, { code: "", result: "ok", at: this.now() });
+  }
+
+  /** The live founding-member count, or null on any failure so the gate hides the line. */
+  async foundingCount(): Promise<number | null> {
+    try {
+      const response = await this.fetchImpl(`${this.deps.apiUrl}/stats`);
+      if (!response.ok) return null;
+      const body = (await response.json()) as { foundingMembers?: unknown };
+      const count = body.foundingMembers;
+      return typeof count === "number" && Number.isInteger(count) && count >= 0 ? count : null;
+    } catch {
+      return null;
+    }
   }
 
   private async requestRedeem(code: string): Promise<InviteRedeemResult> {

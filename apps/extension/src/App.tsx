@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RuntimePort, ThemeSettings, TokenBalance, WalletState, WalletSummary } from "@gleam/core";
-import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
+import { GatedOnboarding, OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
 import { SendView } from "@/entrypoints/popup/send/index.tsx";
@@ -207,7 +207,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else if (view === "loading" || runtime === null) {
     content = <div className="p-4 text-body text-muted">Loading&hellip;</div>;
   } else if (view === "onboarding") {
-    content = <OnboardingView runtime={runtime} onComplete={() => void refresh(runtime)} />;
+    content = <GatedOnboarding runtime={runtime} onComplete={() => void refresh(runtime)} />;
   } else if (view === "unlock") {
     content = (
       <UnlockView

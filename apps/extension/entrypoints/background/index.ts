@@ -550,6 +550,7 @@ async function setLockedIcon(locked: boolean) {
 async function addWallet(add: () => Promise<WalletSummary>): Promise<WalletSummary> {
   const before = await lifecycle.getState();
   const summary = await add();
+  void points.markUnlockedForVault().catch(() => {});
   if (before.activeWalletId !== null) void broadcastWalletSwitch(summary.address);
   return summary;
 }
@@ -669,6 +670,7 @@ onExtensionMessage("getPointsMemberships", () => points.getMemberships());
 onExtensionMessage("getPointsScores", () => points.scores());
 onExtensionMessage("getPointsInviteUnlock", () => points.getInviteUnlock());
 onExtensionMessage("redeemPointsInvite", (message) => points.redeemInvite(message.data.code));
+onExtensionMessage("getFoundingCount", () => points.foundingCount());
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {
@@ -713,6 +715,13 @@ async function initializeNetworkSettingsIfMissing(): Promise<void> {
 }
 
 export default defineBackground(() => {
+  // Installs that had a vault before the gate existed (and every wake-up
+  // after) are marked unlocked, so a reset never locks them out.
+  void lifecycle
+    .getState()
+    .then((state) => (state.wallets.length > 0 ? points.markUnlockedForVault() : undefined))
+    .catch(() => {});
+
   // Registration above runs at module-evaluation time: `onMessage` must
   // be called once per JS context, not per `defineBackground` invocation,
   // since MV3 service workers only evaluate this module once per
