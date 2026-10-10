@@ -21,10 +21,15 @@
   var handedOverToInstalled = false;
 
   if (document.body.hasAttribute("data-invite")) {
-    var code = (params.get("c") || params.get("code") || "").trim().toUpperCase();
+    var code = (params.get("c") || params.get("code") || "")
+      .trim()
+      .toUpperCase();
     if (INVITE_CODE.test(code)) {
       try {
-        localStorage.setItem(INVITE_KEY, JSON.stringify({ code: code, savedAt: Date.now() }));
+        localStorage.setItem(
+          INVITE_KEY,
+          JSON.stringify({ code: code, savedAt: Date.now() }),
+        );
       } catch {
         // Storage blocked: the code shown below can still be typed in.
       }
@@ -44,21 +49,26 @@
   function handOverToInstalled(code) {
     var runtime = window.chrome && window.chrome.runtime;
     if (!runtime || !runtime.sendMessage) return;
-    runtime.sendMessage(EXTENSION_ID, { type: "gleam-points:invite", code: code }, function (reply) {
-      if (runtime.lastError || !reply || !reply.ok || reply.redeem !== "ok") return;
-      try {
-        localStorage.removeItem(INVITE_KEY);
-      } catch {
-        // Nothing to clean up if storage is blocked.
-      }
-      var ready = document.querySelector("[data-invite-ready]");
-      if (!ready) return;
-      handedOverToInstalled = true;
-      document.querySelectorAll(".invite-state").forEach(function (el) {
-        el.hidden = true;
-      });
-      ready.hidden = false;
-    });
+    runtime.sendMessage(
+      EXTENSION_ID,
+      { type: "gleam-points:invite", code: code },
+      function (reply) {
+        if (runtime.lastError || !reply || !reply.ok || reply.redeem !== "ok")
+          return;
+        try {
+          localStorage.removeItem(INVITE_KEY);
+        } catch {
+          // Nothing to clean up if storage is blocked.
+        }
+        var ready = document.querySelector("[data-invite-ready]");
+        if (!ready) return;
+        handedOverToInstalled = true;
+        document.querySelectorAll(".invite-state").forEach(function (el) {
+          el.hidden = true;
+        });
+        ready.hidden = false;
+      },
+    );
   }
 
   // Shows one of welcome.html's Phase 1 states (POINTS.md § Messaging).
@@ -79,7 +89,11 @@
     } catch {
       saved = null;
     }
-    if (!saved || !INVITE_CODE.test(saved.code) || Date.now() - saved.savedAt > INVITE_MAX_AGE_MS) {
+    if (
+      !saved ||
+      !INVITE_CODE.test(saved.code) ||
+      Date.now() - saved.savedAt > INVITE_MAX_AGE_MS
+    ) {
       showWelcome("none");
       return;
     }
@@ -95,24 +109,28 @@
       pending();
       return;
     }
-    runtime.sendMessage(EXTENSION_ID, { type: "gleam-points:invite", code: saved.code }, function (reply) {
-      // Reading lastError tells Chrome it was handled, which keeps a
-      // missing listener out of the console.
-      if (runtime.lastError || !reply || !reply.ok) {
-        pending();
-        return;
-      }
-      trackOnce("gleam-invite-handoff", { version: version || "unknown" });
-      try {
-        localStorage.removeItem(INVITE_KEY);
-      } catch {
-        // Nothing to clean up if storage is blocked.
-      }
-      if (reply.redeem === "ok") showWelcome("ready");
-      else if (reply.redeem === "full") showWelcome("full");
-      else if (reply.redeem === "unknown") showWelcome("none", "", true);
-      else pending();
-    });
+    runtime.sendMessage(
+      EXTENSION_ID,
+      { type: "gleam-points:invite", code: saved.code },
+      function (reply) {
+        // Reading lastError tells Chrome it was handled, which keeps a
+        // missing listener out of the console.
+        if (runtime.lastError || !reply || !reply.ok) {
+          pending();
+          return;
+        }
+        trackOnce("gleam-invite-handoff", { version: version || "unknown" });
+        try {
+          localStorage.removeItem(INVITE_KEY);
+        } catch {
+          // Nothing to clean up if storage is blocked.
+        }
+        if (reply.redeem === "ok") showWelcome("ready");
+        else if (reply.redeem === "full") showWelcome("full");
+        else if (reply.redeem === "unknown") showWelcome("none", "", true);
+        else pending();
+      },
+    );
   }
 
   // Umami loads deferred alongside this script, so an event fired before
@@ -137,7 +155,9 @@
 
   function callPointsApi(path, body) {
     if (!window.fetch) return Promise.resolve(null);
-    var controller = window.AbortController ? new window.AbortController() : null;
+    var controller = window.AbortController
+      ? new window.AbortController()
+      : null;
     var timer = setTimeout(function () {
       if (controller) controller.abort();
     }, 5000);
@@ -170,7 +190,9 @@
   var MEMBER_SEATS = 3;
 
   function setUpInvitePage() {
-    var inviteCode = (params.get("c") || params.get("code") || "").trim().toUpperCase();
+    var inviteCode = (params.get("c") || params.get("code") || "")
+      .trim()
+      .toUpperCase();
     if (!INVITE_CODE.test(inviteCode)) inviteCode = "";
     var states = {};
     document.querySelectorAll("[data-state]").forEach(function (el) {
@@ -196,7 +218,8 @@
 
     function seatsText(kind, left) {
       if (typeof left !== "number" || left < 0) return "";
-      if (kind === "member" && left <= MEMBER_SEATS) return left + " of " + MEMBER_SEATS + " seats left";
+      if (kind === "member" && left <= MEMBER_SEATS)
+        return left + " of " + MEMBER_SEATS + " seats left";
       return left + (left === 1 ? " seat left" : " seats left");
     }
 
@@ -216,7 +239,11 @@
       var d = Math.floor(mins / 1440);
       var h = Math.floor((mins % 1440) / 60);
       var m = mins % 60;
-      var text = d ? d + "d " + h + "h" : h ? h + "h " + m + "m" : Math.max(m, 1) + "m";
+      var text = d
+        ? d + "d " + h + "h"
+        : h
+          ? h + "h " + m + "m"
+          : Math.max(m, 1) + "m";
       countdownEl.querySelector("[data-countdown-text]").textContent = text;
       countdownEl.hidden = false;
     }
@@ -243,7 +270,8 @@
         show("none");
         return;
       }
-      var kind = res.kind === "drop" ? "drop" : res.kind === "member" ? "member" : "";
+      var kind =
+        res.kind === "drop" ? "drop" : res.kind === "member" ? "member" : "";
       if (kind) {
         tagKind(kind);
         trackOnce("gleam-invite-code-kind", { kind: kind });
@@ -257,12 +285,111 @@
         seatsEl.textContent = text;
         // invite.html draws one seat per member-code seat from these
         seatsEl.setAttribute("data-left", String(res.seatsLeft));
-        if (kind === "member") seatsEl.setAttribute("data-total", String(MEMBER_SEATS));
+        if (kind === "member")
+          seatsEl.setAttribute("data-total", String(MEMBER_SEATS));
         seatsEl.hidden = false;
       }
       if (kind === "drop") showCountdown();
     });
   }
+
+  // Ask-on-X posts open with an opinion about wallets rather than a plea,
+  // so the poster reads as someone with taste. The link's static href is
+  // the fallback when this script doesn't run.
+  var ASK_LINES = [
+    "A wallet should be the cleanest app on your screen, not the scariest.",
+    "The best wallet is the one you never have to think about.",
+    "Your wallet should work for you, not the other way around.",
+    "Crypto is complicated enough. Your wallet shouldn't be.",
+    "A wallet should feel like a window into crypto, not a cockpit.",
+    "Crypto should feel simple. Your wallet should make it so.",
+    "The best technology is the kind you barely notice.",
+    "Less managing your crypto. More living with it.",
+    "A wallet should be powerful underneath. Effortless on the surface.",
+    "Your crypto deserves a better home.",
+    "A wallet should open doors, not add steps.",
+    "Crypto moves fast. Your wallet should keep up.",
+    "Your wallet should make more possible, not more complicated.",
+    "A good wallet earns your attention. A great one gives it back.",
+    "The internet of value deserves a better front door.",
+    "The future of money shouldn't feel like operating machinery.",
+    "The future of computing deserves a better interface.",
+    "Decentralised computing shouldn't require centralised levels of patience.",
+    "Big ideas run on AO. They should be easy to access with Gleam.",
+    "The permaweb is forever. Your wallet should feel right at home.",
+    "The permaweb is growing up. Its wallet should too.",
+    "Give me a wallet for the world being built on Arweave.",
+    "A wallet is the first thing people see of a chain. It should look the part.",
+    "Wallet design matters more than most people in crypto admit.",
+    "The permaweb needs wallets people enjoy opening.",
+    "Good wallet UX is how a chain gets its next million users.",
+    "I judge a crypto project by how its wallet feels.",
+    "Arweave keeps data forever. The tools around it should be built with that much care.",
+    "Self custody only wins when it's easier than handing your keys to someone else.",
+    "Sending tokens should feel as easy as sending a message.",
+    "Tokens sitting in a wallet should be earning something.",
+    "A wallet should be nice enough that you open it for fun.",
+    "The next wave of AO users will pick the wallet that feels best to use.",
+    "Your wallet is your login for the whole permaweb. It should feel that important.",
+    "Crypto UX gets better one wallet at a time.",
+    "Crypto apps should be as nice to use as the best apps on your phone.",
+    "Good design is the most underrated thing in crypto.",
+    "A wallet should be beautiful. I'll die on this hill.",
+    "Every extra click in a wallet is a person who gives up.",
+    "The wallet that feels best wins. Features come second.",
+    "I want a wallet that feels calm.",
+    "Crypto has plenty of smart people. It needs more good designers.",
+    "People trust what looks cared for. Wallets included.",
+    "Using crypto should feel as good as owning it.",
+    "If my mum can't send tokens with it, the wallet isn't finished.",
+    "The best crypto apps will be the ones that feel the least like crypto.",
+    "Taste is a feature. Wallets need more of it.",
+    "A wallet should make you feel in control the moment you open it.",
+    "Small details in a wallet add up to trust.",
+    "I'd switch wallets for better design alone.",
+    "Clear words beat clever features in a wallet.",
+    "Crypto should feel friendly the first time you open it.",
+    "Design is how crypto stops feeling like a chore.",
+    "Good design in crypto makes my day.",
+    "Nothing beats a wallet that just works.",
+    "A well designed wallet is a joy to use.",
+    "Beautiful software makes crypto feel like the future.",
+    "The teams that sweat the small details are the ones I want to back.",
+    "When a wallet feels good, I use crypto more.",
+    "Great design makes hard things feel simple. That's the whole job.",
+    "A smooth send is a small joy.",
+    "Good design is a form of respect for the person using it.",
+    "Crypto feels different when the tools are beautiful.",
+    "The permaweb is getting really nice to use.",
+    "Polish is underrated. I notice it every time.",
+    "Love seeing builders on Arweave care this much about design.",
+    "Well made tools make me want to build.",
+    "The best feeling in crypto is when everything just makes sense.",
+    "Taste is spreading through the permaweb and I'm here for it.",
+    "Calm, clear, beautiful. That's the wallet I want.",
+    "Good wallets turn curious people into regulars.",
+  ];
+  var ASK_CLOSERS = [
+    "Drop me an invite if you have one.",
+    "Anyone with a spare Gleam seat, I'll put it to good use.",
+    "Anyone have a Gleam invite to spare?",
+  ];
+
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  document.querySelectorAll("a[data-ask-on-x]").forEach(function (link) {
+    var line = pick(ASK_LINES);
+    // A line that already asks for a seat needs no closer.
+    var text =
+      line.slice(-1) === "?" ? line : line + "\n\n" + pick(ASK_CLOSERS);
+    text += "\n@gleam_wallet @aoTheComputer @ArweaveEco";
+    link.href = "https://x.com/intent/post?text=" + encodeURIComponent(text);
+    // The text rather than its index, so click counts stay meaningful as
+    // lines are added or cut.
+    link.setAttribute("data-umami-event-line", line);
+  });
 
   var calc = document.querySelector("form[data-points-calc]");
   if (calc) setUpCalculator(calc);
@@ -287,14 +414,21 @@
     function update() {
       var friends = Math.round(read("friends"));
       fields.friendsOut.value = String(friends);
-      form.querySelector("[data-friends-word]").textContent = friends === 1 ? "friend" : "friends";
+      form.querySelector("[data-friends-word]").textContent =
+        friends === 1 ? "friend" : "friends";
       var balance = curve(read("ar") + read("ao"));
       var bonus = fields.invited.checked ? balance * 0.1 : 0;
-      var fromFriends = friends * curve(read("friendAr") + read("friendAo")) * 0.1;
+      var fromFriends =
+        friends * curve(read("friendAr") + read("friendAo")) * 0.1;
       var perDay = balance + bonus + fromFriends;
-      form.querySelector('[data-out="day"]').textContent = format.format(perDay);
-      form.querySelector('[data-out="month"]').textContent = format.format(perDay * 30);
-      form.querySelector('[data-out="year"]').textContent = format.format(perDay * 365);
+      form.querySelector('[data-out="day"]').textContent =
+        format.format(perDay);
+      form.querySelector('[data-out="month"]').textContent = format.format(
+        perDay * 30,
+      );
+      form.querySelector('[data-out="year"]').textContent = format.format(
+        perDay * 365,
+      );
       // points.html draws its scoreboard from this; the text above stays for
       // screen readers and for when that script is missing
       form.gleamEstimate = {
@@ -358,12 +492,16 @@
 
     fetch("https://api.web3forms.com/submit", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
       body: JSON.stringify(Object.fromEntries(new FormData(form))),
     })
       .then(function (res) {
         return res.json().then(function (body) {
-          if (!res.ok || !body.success) throw new Error(body.message || "Send failed");
+          if (!res.ok || !body.success)
+            throw new Error(body.message || "Send failed");
         });
       })
       .then(function () {
@@ -380,7 +518,8 @@
       })
       .catch(function () {
         status.setAttribute("data-state", "error");
-        status.textContent = "That didn't send. Check your connection and try again.";
+        status.textContent =
+          "That didn't send. Check your connection and try again.";
         button.disabled = false;
       });
   });
