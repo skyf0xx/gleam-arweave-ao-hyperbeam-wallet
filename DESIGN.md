@@ -188,6 +188,51 @@ Motion reinforces the brand's sense of responsiveness and care. Every animation 
 
 ---
 
+### Vision page (`gleam.html`)
+
+The Vision page is the one surface where the beam runs at full power. It
+breaks several rules above on purpose. Everything else stays quiet.
+Styles are in `apps/site/gleam.css` and behaviour is in
+`apps/site/gleam.js`.
+
+- **Ink bands.** The hero, the timeline and the CTA sit on ink `#0A0A0A`,
+  with white text and muted `#A3A3A3`. The light bands (`#F7F7F7` and
+  white) carry the reading sections between them. The header and footer
+  are on ink on this page.
+- **Section breaks** are never flat. An angled cut carries the five beam
+  hairlines along its edge. A curved cut is stroked with the beam. A
+  gradient fade takes white down to ink before the timeline. Each break is
+  an SVG with `vector-effect: non-scaling-stroke`, so lines stay 2px at any
+  width.
+- **Beam as a stack.** Here the beam is often five stacked stripes (2px
+  each, 10px in all) running the full bleed, not a 72px run of segments.
+  It is still a line and never a fill.
+- **Motion has to mean something.** One clock drives it all. An example
+  balance of 250 AO earns 250 points a day, sped up 240×.
+  - A pulse on the hero beam is a point on its way.
+  - Shards from the beam's end are that point arriving.
+  - The drizzle between pulses is fractional points accruing.
+  - Each whole point lands with an odometer roll, a punch, a one-frame
+    split into beam colours, a `+1`, a shockwave and the ping.
+  - The timeline's lit beam is time passing. "You are here" is a beacon,
+    and the counter runs from it.
+  - Decorative loops, floating particles, pulsing buttons and confetti
+    stay out. XP bars, streaks, levels and badges stay out too.
+- **Colour per point.** Points cycle red, purple, sky, yellow, green. The
+  ping steps up a major pentatonic in the same order, so five points climb
+  the beam.
+- **Sound.** The ping is synthesised with Web Audio: a noise click, a
+  glass-bar partial stack and a short damped echo. It is on by default and
+  arms on the first gesture. A fixed "Sound on / Sound off" pill stays on
+  screen, and its state is stored in `localStorage` under `gleam:sound`.
+- **The counter is always labelled as an example** and is never shown as a
+  real or projected balance.
+- **Pausing.** The clock runs only while the tab is visible and a counter
+  or signal is on screen.
+- **Reduced motion.** The canvas, the pulses, the punch and the
+  scroll-driven timeline all drop out. The counters still tick, and the
+  timeline becomes a plain horizontal scroller parked at "you are here".
+
 ### Things Not to Say
 
 - No trust-by-assertion claims: "bank-grade," "military-grade," "industry-leading security" — trust isn't the pitch here at all; simplicity is.
