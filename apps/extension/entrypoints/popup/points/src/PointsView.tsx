@@ -1,13 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { browser } from "wxt/browser";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
+import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { inviteLinkFor, invitePost, invitesLine, xIntentUrl } from "@/src/points-share";
-import { sitePageUrl } from "@/src/site-pages";
-import { HOW_IT_WORKS_URL, JoinNote } from "./JoinNote";
-import { SharePrompt } from "./SharePrompt";
+import { howItWorksUrl, JoinNote } from "./JoinNote";
+import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
 import { useJoinPoints, useLeavePoints, usePendingInvite, usePointsStanding } from "./usePoints";
@@ -16,38 +15,41 @@ export interface PointsViewProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
   onBack: () => void;
-  /** Replaces the share prompt at the top of the Invite section. */
-  banner?: ReactNode;
 }
 
-const NOTE_TEXT =
-  "Your early moves count. We're exploring how points could connect to future Gleam benefits. Their eventual utility, if any, hasn't been finalised.";
+/** The seats a member code starts with (POINTS.md § Invites). */
+const MEMBER_SEATS = 3;
 
-function FutureLink({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <a
-      href={sitePageUrl("gleam", browser.runtime.getManifest().version)}
-      target="_blank"
-      rel="noreferrer"
-      className={className ?? "text-label text-muted underline hover:text-foreground"}
-    >
-      {children}
-    </a>
-  );
-}
+const BEAM_COLORS = [
+  "var(--color-beam-red)",
+  "var(--color-beam-purple)",
+  "var(--color-beam-sky)",
+  "var(--color-beam-yellow)",
+  "var(--color-beam-green)",
+];
 
-export function PointsView({ runtime, wallet, onBack, banner }: PointsViewProps) {
+export function PointsView({ runtime, wallet, onBack }: PointsViewProps) {
   const standing = usePointsStanding(runtime, wallet);
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Gleam Points" onBack={onBack} />
       {standing.status === "joined" ? (
-        <JoinedView runtime={runtime} wallet={wallet} standing={standing} banner={banner} />
+        <JoinedView runtime={runtime} wallet={wallet} standing={standing} />
       ) : standing.status === "not-joined" ? (
         <JoinView runtime={runtime} wallet={wallet} />
       ) : null}
     </div>
+  );
+}
+
+/** The ink panel the site's Points pages are built on, with the beam along its top. */
+function InkCard({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section aria-label={label} className="flex flex-col gap-4 rounded-lg bg-ink px-5 pb-5 pt-4 text-on-ink">
+      <Beam className="w-12" />
+      {children}
+    </section>
   );
 }
 
@@ -59,22 +61,20 @@ function JoinView({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSum
 
   return (
     <form
-      className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-7"
+      className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-5"
       onSubmit={(event) => {
         event.preventDefault();
         join.mutate({ walletId: wallet.id, inviteCode: inviteCode.trim() || undefined });
       }}
     >
-      <div className="flex flex-col gap-2">
-        <p className="text-body text-muted">
-          Earn points every day for the AR and AO you hold. Invite friends and you both earn more.
-        </p>
-        <FutureLink>What could points become?</FutureLink>
-      </div>
+      <InkCard label="About Gleam Points">
+        <p className="text-h3 font-semibold tracking-tight">Earn points every day for the AR and AO you hold.</p>
+        <p className="text-label text-on-ink-muted">Invite friends and you both earn more.</p>
+      </InkCard>
 
       <TextField
         label="Invite code"
-        placeholder="Paste a code if you have one to earn extra points"
+        placeholder="Optional. Adds 10% every day."
         value={inviteCode}
         onChange={(event) => setTyped(event.target.value)}
         autoCapitalize="characters"
@@ -94,87 +94,115 @@ function JoinView({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSum
   );
 }
 
+/** The total the way the site draws it: whole points large, decimals and unit beside them. */
+function PointsTotal({ value }: { value: string }) {
+  const [whole, decimals] = value.split(".");
+  return (
+    <p className="flex items-end gap-1 leading-none">
+      <span className="sr-only">{value} points</span>
+      <span aria-hidden="true" className="text-[44px] font-bold tracking-[-0.05em] tabular-nums">
+        {whole}
+      </span>
+      <span aria-hidden="true" className="flex flex-col gap-1 pb-1">
+        {decimals ? <span className="text-h3 font-semibold tabular-nums text-on-ink-muted">.{decimals}</span> : null}
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-ink-muted">Points</span>
+      </span>
+    </p>
+  );
+}
+
+function InkStat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-caption text-on-ink-muted">{label}</dt>
+      <dd className="min-h-5 text-body font-semibold tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+/** One square per seat on the member's code, lit in beam order while it's open. */
+function Seats({ left }: { left: number }) {
+  const total = Math.max(left, MEMBER_SEATS);
+  return (
+    <span aria-hidden="true" className="flex items-center gap-1">
+      {Array.from({ length: total }, (_, index) => (
+        <span
+          key={index}
+          className={index < left ? "h-2.5 w-2.5 rounded-[2px]" : "h-2.5 w-2.5 rounded-[2px] border border-line"}
+          style={index < left ? { backgroundColor: BEAM_COLORS[index % BEAM_COLORS.length] } : undefined}
+        />
+      ))}
+    </span>
+  );
+}
+
 function JoinedView({
   runtime,
   wallet,
   standing,
-  banner,
 }: {
   runtime: RuntimePort;
   wallet: WalletSummary;
   standing: Extract<ReturnType<typeof usePointsStanding>, { status: "joined" }>;
-  banner?: ReactNode;
 }) {
   const { score } = standing;
-  const inviteLink = inviteLinkFor(standing.membership.inviteCode);
+  const inviteCode = standing.membership.inviteCode;
+  const inviteLink = inviteLinkFor(inviteCode);
   const { copied, copy } = useCopy(inviteLink);
   const seatsLeft = score?.seatsLeft ?? null;
-  const shareHref = xIntentUrl(invitePost({ seats: seatsLeft, link: inviteLink }));
+  const prompt = useSharePrompt({ runtime, wallet, inviteCode, score });
+  const post = prompt?.post ?? invitePost({ seats: seatsLeft, link: inviteLink });
+  const heading = prompt?.text ?? (seatsLeft !== null ? invitesLine(seatsLeft) : "Invite friends");
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-7">
-      <section aria-label="Standing" className="flex flex-col items-center gap-1 text-center">
-        <span className="text-h2 font-semibold tabular-nums text-foreground">{formatPoints(standing.estimateAtomic)}</span>
-        {score?.originalFounder ? <span className="text-label text-muted">Early member bonus · +10% daily</span> : null}
-        <span className="text-label text-muted">
-          {score?.topPercent != null ? `Top ${score.topPercent}%` : "Your rank appears after the next daily snapshot"}
-        </span>
-      </section>
-
-      <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
-        <div className="flex flex-col gap-0.5 bg-background px-3 py-3">
-          <dt className="text-caption text-faint">Today&apos;s rate</dt>
-          <dd className="text-body tabular-nums text-foreground">{formatPoints(standing.dailyRateAtomic)}</dd>
+    <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-5">
+      <InkCard label="Standing">
+        <div className="flex flex-col gap-2">
+          <PointsTotal value={formatPoints(standing.estimateAtomic)} />
+          {score?.originalFounder ? (
+            <span className="text-label text-on-ink-muted">Early member bonus · +10% daily</span>
+          ) : null}
         </div>
-        <div className="flex flex-col gap-0.5 bg-background px-3 py-3">
-          <dt className="text-caption text-faint">Friends joined</dt>
-          <dd className="text-body tabular-nums text-foreground">{score?.refereeCount ?? 0}</dd>
-        </div>
-        <div className="flex flex-col gap-0.5 bg-background px-3 py-3">
-          <dt className="text-caption text-faint">Invites left</dt>
-          <dd className="min-h-6 text-body tabular-nums text-foreground">{seatsLeft}</dd>
-        </div>
-      </dl>
+        <dl className="grid grid-cols-3 gap-3 border-t border-ink-line pt-3">
+          <InkStat label="Today">+{formatPoints(standing.dailyRateAtomic)}</InkStat>
+          <InkStat label="Rank">
+            {score?.topPercent != null ? (
+              `Top ${score.topPercent}%`
+            ) : (
+              <span className="text-caption font-normal text-on-ink-muted">After the next count</span>
+            )}
+          </InkStat>
+          <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
+        </dl>
+      </InkCard>
 
       <section aria-label="Invite" className="flex flex-col gap-3">
-        {banner ?? (
-          <SharePrompt runtime={runtime} wallet={wallet} inviteCode={standing.membership.inviteCode} score={score} />
-        )}
-        {seatsLeft !== null ? <h2 className="text-h3 font-semibold text-foreground">{invitesLine(seatsLeft)}</h2> : null}
-        <Button asChild>
-          <a href={shareHref} target="_blank" rel="noreferrer">
-            Share on X
-          </a>
-        </Button>
-        <div className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
-          <span className="min-w-0 flex-1 truncate font-mono text-label text-foreground">{inviteLink}</span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={copy}
-          >
-            {copied ? "Copied" : "Copy"}
-          </Button>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-h3 font-semibold text-foreground">{heading}</h2>
+          {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
         </div>
-        <p className="text-caption text-faint">
-          A friend who installs Gleam from your link and joins earns 10% extra, and you earn 10% of their points.
-        </p>
+        <p className="text-label text-muted">Friends get 10% extra every day, and you get 10% of their points.</p>
+        <div className="mt-1 flex flex-col items-center gap-3">
+          <Button asChild>
+            <a href={xIntentUrl(post)} target="_blank" rel="noreferrer" onClick={() => prompt?.finish()}>
+              Share on X
+            </a>
+          </Button>
+          <button
+            type="button"
+            className="text-label font-semibold text-muted hover:text-foreground"
+            onClick={() => {
+              copy();
+              prompt?.finish();
+            }}
+          >
+            {copied ? "Copied" : "Copy invite link"}
+          </button>
+        </div>
       </section>
 
-      <section aria-label="Where points are going" className="flex flex-col gap-1">
-        <h2 className="text-label font-semibold text-muted">Where points are going</h2>
-        <p className="text-caption text-faint">{NOTE_TEXT}</p>
-        <FutureLink className="text-caption text-muted underline hover:text-foreground">What could points become?</FutureLink>
-      </section>
-
-      <footer className="mt-auto flex flex-col items-center gap-3">
-        <a
-          href={HOW_IT_WORKS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="text-label text-muted underline hover:text-foreground"
-        >
+      <footer className="mt-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
+        <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="text-label text-muted underline hover:text-foreground">
           How points work
         </a>
         <LeaveControl runtime={runtime} wallet={wallet} points={formatPoints(standing.estimateAtomic)} />
@@ -189,7 +217,7 @@ function LeaveControl({ runtime, wallet, points }: { runtime: RuntimePort; walle
 
   if (!confirming) {
     return (
-      <button type="button" onClick={() => setConfirming(true)} className="text-caption text-faint hover:text-muted">
+      <button type="button" onClick={() => setConfirming(true)} className="text-label text-faint hover:text-muted">
         Leave Gleam Points
       </button>
     );

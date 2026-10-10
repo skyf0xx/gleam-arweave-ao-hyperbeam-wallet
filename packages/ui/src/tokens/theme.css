@@ -58,6 +58,16 @@
   --color-beam-yellow: #ffe45c;
   --color-beam-green: #28f02d;
 
+  /*
+   * Gleam Points ink — the site's Points pages (apps/site/program.css) sit
+   * on this, and the Points screen's standing card matches them. The same
+   * in both themes: ink is the program's surface, not a neutral.
+   */
+  --color-ink: #0a0a0a;
+  --color-ink-line: #262626;
+  --color-on-ink: #ffffff;
+  --color-on-ink-muted: #a3a3a3;
+
   /* Positive/confirmed-amount accent (tokens-activity.html's `.amount.positive`) — distinct from both warning and beam, a plain semantic green with no identity meaning. */
   --color-positive: #16a34a;
 

@@ -7,7 +7,7 @@ import { PointsView } from "./PointsView";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
-const GLEAM_URL = "https://gleam-permaweb.vercel.app/gleam.html?v=1.2.3";
+const POINTS_URL = "https://gleam-permaweb.vercel.app/points.html?v=1.2.3";
 const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
 
 afterEach(() => {
@@ -124,7 +124,7 @@ describe("PointsView", () => {
       expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id, inviteCode: "friend42" } }),
     );
     expect(await screen.findByText("Top 12%")).toBeTruthy();
-    expect(screen.getByText(LINK)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
   });
 
   it("lays out the not-joined state in order, pre-filled from the pending code", async () => {
@@ -139,11 +139,10 @@ describe("PointsView", () => {
     await waitFor(() => expect(field.value).toBe("PENDING1"));
 
     const line = screen.getByText(/Earn points every day for the AR and AO you hold/);
-    const future = screen.getByRole("link", { name: "What could points become?" });
     const join = screen.getByRole("button", { name: "Join Gleam Points" });
     const note = screen.getByText(/Joining links this wallet's address to this browser/);
-    expect(future.getAttribute("href")).toBe(GLEAM_URL);
-    for (const [before, after] of [[line, future], [future, field], [field, join], [join, note]] as const) {
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual([POINTS_URL]);
+    for (const [before, after] of [[line, field], [field, join], [join, note]] as const) {
       expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
 
@@ -153,7 +152,7 @@ describe("PointsView", () => {
     );
   });
 
-  it("lays out the joined state in order with the standing, stats and invite", async () => {
+  it("lays out the joined state in order: standing, invite, footer", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
@@ -165,10 +164,10 @@ describe("PointsView", () => {
     expect(screen.queryByText(/OG/)).toBeNull();
     expect(screen.queryByText(/Early member bonus/)).toBeNull();
 
-    const stats = within(screen.getByText("Today's rate").closest("dl")!);
-    expect(stats.getByText("Today's rate")).toBeTruthy();
-    expect(stats.getByText("Friends joined").nextElementSibling?.textContent).toBe("3");
-    expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("3");
+    const standing = within(screen.getByRole("region", { name: "Standing" }));
+    expect(standing.getByText(/^[\d.,]+ points$/)).toBeTruthy();
+    expect(standing.getByText("Today").nextElementSibling?.textContent).toBe("+1.00");
+    expect(standing.getByText("Friends joined").nextElementSibling?.textContent).toBe("3");
 
     expect(screen.getByRole("heading", { name: "You have 3 invites" })).toBeTruthy();
     const share = screen.getByRole("link", { name: "Share on X" });
@@ -176,17 +175,12 @@ describe("PointsView", () => {
       `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
     );
 
-    const futureLinks = screen.getAllByRole("link", { name: "What could points become?" });
-    expect(futureLinks.map((a) => a.getAttribute("href"))).toEqual([GLEAM_URL]);
-    expect(screen.getByRole("link", { name: "How points work" }).getAttribute("href")).toBe(
-      "https://gleam-permaweb.vercel.app/points.html",
-    );
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Share on X", "How points work"]);
+    expect(screen.getByRole("link", { name: "How points work" }).getAttribute("href")).toBe(POINTS_URL);
 
     const sections = [
       screen.getByRole("region", { name: "Standing" }),
-      screen.getByText("Today's rate").closest("dl")!,
       screen.getByRole("region", { name: "Invite" }),
-      screen.getByRole("region", { name: "Where points are going" }),
       screen.getByRole("contentinfo"),
     ];
     for (let i = 1; i < sections.length; i += 1) {
@@ -220,8 +214,7 @@ describe("PointsView", () => {
     expect(await screen.findByText("Top 12%")).toBeTruthy();
 
     expect(screen.queryByText(/You have .* invites?/)).toBeNull();
-    const stats = within(screen.getByText("Today's rate").closest("dl")!);
-    expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("");
+    expect(screen.getByRole("heading", { name: "Invite friends" })).toBeTruthy();
     const href = screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!;
     expect(decodeURIComponent(href)).toContain(`Just joined @gleam_wallet and I'm now earning GLEAM.\n${LINK}`);
   });
@@ -236,20 +229,6 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     expect(await screen.findByRole("heading", { name: "You have no invites left" })).toBeTruthy();
-  });
-
-  it("renders the banner slot at the top of the Invite section", async () => {
-    const runtime = fakeRuntime({
-      ...BALANCES,
-      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
-      getPointsScores: () => SCORES,
-    });
-
-    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} banner={<p>Share prompt</p>} />);
-
-    const invite = within(await screen.findByRole("region", { name: "Invite" }));
-    expect(invite.getByText("Share prompt")).toBeTruthy();
-    expect(invite.getByText("Share prompt").compareDocumentPosition(invite.getByRole("link", { name: "Share on X" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows why a join failed", async () => {
@@ -276,7 +255,7 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Your rank appears after the next daily snapshot")).toBeTruthy();
+    expect(await screen.findByText("After the next count")).toBeTruthy();
   });
 
   it("copies the invite link", async () => {
@@ -289,7 +268,7 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Copy" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Copy invite link" }));
 
     expect(writeText).toHaveBeenCalledWith("https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();

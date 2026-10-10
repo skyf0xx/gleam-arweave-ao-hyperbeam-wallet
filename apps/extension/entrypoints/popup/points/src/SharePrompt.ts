@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointsSharePrompt, PointsWalletScore, RuntimePort, WalletSummary } from "@gleam/core";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { FOUNDING_GATE } from "@/src/founding-gate";
-import { foundingPost, gainedSeatPost, inviteLinkFor, lastSeatPost, xIntentUrl } from "@/src/points-share";
-import { useCopy } from "./useCopy";
+import { foundingPost, gainedSeatPost, inviteLinkFor, lastSeatPost } from "@/src/points-share";
 import {
   useMarkSeatsSeen,
   useMarkShareSeen,
@@ -16,7 +14,7 @@ export type SharePromptKind = "gainedSeat" | PointsSharePrompt;
 
 export interface SharePromptState {
   score: PointsWalletScore;
-  /** The named prompts this wallet has already dismissed or acted on. */
+  /** The named prompts this wallet has already acted on. */
   shareSeen: readonly PointsSharePrompt[];
   /** The seat count the member was last shown; undefined if never recorded. */
   seatsSeen: number | undefined;
@@ -27,7 +25,7 @@ export interface SharePromptState {
 /**
  * Picks the one prompt to show. A new invite comes first because it is
  * news and time-bound, then the last seat, then the join moment, which the
- * always-available share card also covers. The join prompt is skipped when
+ * always-available Share on X also covers. The join prompt is skipped when
  * the founding reveal already offered the same post.
  */
 export function pickSharePrompt({ score, shareSeen, seatsSeen, revealSeen }: SharePromptState): SharePromptKind | null {
@@ -39,46 +37,43 @@ export function pickSharePrompt({ score, shareSeen, seatsSeen, revealSeen }: Sha
   return null;
 }
 
-interface PromptContent {
+export interface PromptContent {
+  /** Stands in for the Invite section's heading. */
   text: string;
   post: string;
-  /** Null when the post carries no link on purpose. */
-  link: string | null;
 }
 
 function promptContent(kind: SharePromptKind, score: PointsWalletScore, link: string): PromptContent {
   switch (kind) {
     case "gainedSeat":
-      return {
-        text: "Someone you invited joined. You have another invite.",
-        post: gainedSeatPost({ link }),
-        link,
-      };
+      return { text: "A friend joined. You got another invite.", post: gainedSeatPost({ link }) };
     case "lastSeat":
-      return { text: "You have one invite left.", post: lastSeatPost(), link: null };
+      return { text: "Your last invite", post: lastSeatPost() };
     case "joined":
-      return {
-        text: "You're in and earning GLEAM.",
-        post: foundingPost({ seats: score.seatsLeft, link }),
-        link,
-      };
+      return { text: "You're in and earning GLEAM.", post: foundingPost({ seats: score.seatsLeft, link }) };
   }
 }
 
-export interface SharePromptProps {
+export interface SharePromptArgs {
   runtime: RuntimePort;
   wallet: WalletSummary;
   inviteCode: string;
   score: PointsWalletScore | null;
 }
 
+export interface ActiveSharePrompt extends PromptContent {
+  /** Records the prompt as acted on; call when the member shares or copies. */
+  finish: () => void;
+}
+
 /**
- * The Invite section's banner (POINTS.md § Share prompts): at most one
- * prompt, each shown once. Opening the screen records the seat count as
- * seen, which clears the toolbar dot; the banner stays up for this visit
- * and does not return on the next.
+ * The Invite section's one-time news (POINTS.md § Share prompts): at most
+ * one prompt, which takes over the section's heading and the post behind
+ * its Share on X. Opening the screen records the seat count as seen, which
+ * clears the toolbar dot; the prompt stays for this visit, and a named
+ * prompt returns until the member shares or copies from it.
  */
-export function SharePrompt({ runtime, wallet, inviteCode, score }: SharePromptProps) {
+export function useSharePrompt({ runtime, wallet, inviteCode, score }: SharePromptArgs): ActiveSharePrompt | null {
   const seats = score?.seatsLeft ?? null;
   const ready = FOUNDING_GATE && seats !== null;
   const shareSeen = usePointsShareSeen(runtime, ready);
@@ -87,7 +82,6 @@ export function SharePrompt({ runtime, wallet, inviteCode, score }: SharePromptP
   const markSeats = useMarkSeatsSeen(runtime);
   const markShare = useMarkShareSeen(runtime);
   const [shown, setShown] = useState<SharePromptKind | null>(null);
-  const [dismissed, setDismissed] = useState(false);
 
   const loaded = score !== null && ready && shareSeen.isSuccess && seatsSeen.isSuccess && revealSeen.isSuccess;
   const pick = loaded
@@ -114,50 +108,12 @@ export function SharePrompt({ runtime, wallet, inviteCode, score }: SharePromptP
   }, [loaded, seats, seatsSeen.data, wallet.id]);
 
   const kind = shown ?? pick;
-  const link = inviteLinkFor(inviteCode);
-  const { copied, copy } = useCopy(link);
-  if (kind === null || score === null || dismissed) return null;
-
-  const content = promptContent(kind, score, link);
-  // A new invite is marked seen when it shows; the named prompts only once acted on.
-  const finish = () => {
-    if (kind !== "gainedSeat") markShare.mutate({ walletId: wallet.id, prompt: kind });
+  if (kind === null || score === null) return null;
+  return {
+    ...promptContent(kind, score, inviteLinkFor(inviteCode)),
+    // A new invite was marked seen when it showed; the named prompts only once acted on.
+    finish: () => {
+      if (kind !== "gainedSeat") markShare.mutate({ walletId: wallet.id, prompt: kind });
+    },
   };
-
-  return (
-    <section aria-label="Share prompt" className="relative flex flex-col gap-3 rounded-lg border border-line px-3 py-3">
-      <p className="pr-6 text-label text-foreground">{content.text}</p>
-      <div className="flex gap-2">
-        <Button asChild size="sm">
-          <a href={xIntentUrl(content.post)} target="_blank" rel="noreferrer" onClick={() => finish()}>
-            Share on X
-          </a>
-        </Button>
-        {content.link ? (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              copy();
-              finish();
-            }}
-          >
-            {copied ? "Copied" : "Copy link"}
-          </Button>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        aria-label="Dismiss"
-        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center text-body text-faint hover:text-foreground"
-        onClick={() => {
-          finish();
-          setDismissed(true);
-        }}
-      >
-        ×
-      </button>
-    </section>
-  );
 }

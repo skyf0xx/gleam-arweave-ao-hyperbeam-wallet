@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PointsMembership, RuntimePort, WalletSummary } from "@gleam/core";
 import { PendingClaim } from "./PendingClaim";
 
+vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
+
 afterEach(cleanup);
 
 const WALLET = { id: "w1", name: "Opal", address: "ADDR1" } as WalletSummary;

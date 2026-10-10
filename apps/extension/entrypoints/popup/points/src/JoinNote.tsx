@@ -1,13 +1,17 @@
-import { SITE_URL } from "@/src/site-pages";
+import { browser } from "wxt/browser";
+import { sitePageUrl } from "@/src/site-pages";
 
-export const HOW_IT_WORKS_URL = new URL("points.html", SITE_URL).toString();
+/** points.html, which drops its install CTAs for a visitor the extension sent (?v=). */
+export function howItWorksUrl(): string {
+  return sitePageUrl("points", browser.runtime.getManifest().version);
+}
 
 /** The disclosure shown wherever joining Gleam Points is offered. */
 export function JoinNote() {
   return (
     <p className="text-center text-caption text-faint">
       Joining links this wallet's address to this browser on the Gleam Points server.{" "}
-      <a href={HOW_IT_WORKS_URL} target="_blank" rel="noreferrer" className="underline hover:text-muted">
+      <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="underline hover:text-muted">
         How points work
       </a>
     </p>

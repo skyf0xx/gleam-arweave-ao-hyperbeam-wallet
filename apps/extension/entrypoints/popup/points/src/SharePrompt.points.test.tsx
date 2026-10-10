@@ -106,88 +106,73 @@ describe("pickSharePrompt", () => {
   });
 });
 
-describe("SharePrompt", () => {
-  it("announces a new invite, posts it with the link, and records the count as seen", async () => {
+describe("share prompts on the Points screen", () => {
+  const invite = () => within(screen.getByRole("region", { name: "Invite" }));
+
+  it("announces a new invite in the heading, posts it with the link, and records the count as seen", async () => {
     const runtime = setup({ seatsSeen: { [WALLET.id]: 2 } });
 
-    const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
-    expect(prompt.getByText("Someone you invited joined. You have another invite.")).toBeTruthy();
-    expect(prompt.getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
+    expect(await screen.findByRole("heading", { name: "A friend joined. You got another invite." })).toBeTruthy();
+    expect(invite().getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
       intent(`Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
-    expect(prompt.getByRole("button", { name: "Copy link" })).toBeTruthy();
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsSeatsSeen", payload: { walletId: WALLET.id, seats: 3 } }),
     );
-    expect(screen.getByRole("region", { name: "Share prompt" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "A friend joined. You got another invite." })).toBeTruthy();
     expect(runtime.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsShareSeen" }));
   });
 
-  it("copies the invite link and dismisses", async () => {
+  it("posts the last seat without a link, copies the link anyway, and marks it seen", async () => {
     const writeText = vi.fn(async () => {});
     Object.assign(navigator, { clipboard: { writeText } });
-    setup({ seatsSeen: { [WALLET.id]: 2 } });
-
-    const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
-    fireEvent.click(prompt.getByRole("button", { name: "Copy link" }));
-    expect(writeText).toHaveBeenCalledWith(LINK);
-    fireEvent.click(prompt.getByRole("button", { name: "Dismiss" }));
-
-    expect(screen.queryByRole("region", { name: "Share prompt" })).toBeNull();
-  });
-
-  it("shows the last-seat post without a link or Copy link, and marks it seen when shared", async () => {
     const runtime = setup({ score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 1 } });
 
-    const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
-    const share = prompt.getByRole("link", { name: "Share on X" });
-    expect(share.getAttribute("href")).toBe(
+    expect(await screen.findByRole("heading", { name: "Your last invite" })).toBeTruthy();
+    expect(invite().getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
       intent("I've got one @gleam_wallet invite left. Reply if you want it and I'll send it over.\n@ArweaveEco @aoTheComputer"),
     );
-    expect(prompt.queryByRole("button", { name: "Copy link" })).toBeNull();
-    fireEvent.click(share);
+    fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
 
+    expect(writeText).toHaveBeenCalledWith(LINK);
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsShareSeen", payload: { walletId: WALLET.id, prompt: "lastSeat" } }),
     );
   });
 
-  it("offers the join post once for a wallet that never saw the reveal, and marks it seen on dismiss", async () => {
+  it("offers the join post once for a wallet that never saw the reveal, and marks it seen when shared", async () => {
     const runtime = setup({ revealSeen: [] });
 
-    const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
-    expect(prompt.getByText("You're in and earning GLEAM.")).toBeTruthy();
-    expect(prompt.getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
+    expect(await screen.findByRole("heading", { name: "You're in and earning GLEAM." })).toBeTruthy();
+    const share = invite().getByRole("link", { name: "Share on X" });
+    expect(share.getAttribute("href")).toBe(
       intent(`Just got into @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
-    fireEvent.click(prompt.getByRole("button", { name: "Dismiss" }));
+    fireEvent.click(share);
 
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsShareSeen", payload: { walletId: WALLET.id, prompt: "joined" } }),
     );
-    expect(screen.queryByRole("region", { name: "Share prompt" })).toBeNull();
   });
 
   it("shows one prompt at a time, the new invite first", async () => {
     setup({ score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 0 }, revealSeen: [] });
 
-    await screen.findByRole("region", { name: "Share prompt" });
-    expect(screen.getAllByRole("region", { name: "Share prompt" })).toHaveLength(1);
-    expect(screen.getByText("Someone you invited joined. You have another invite.")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "A friend joined. You got another invite." })).toBeTruthy();
   });
 
-  it("shows nothing once every prompt has been seen", async () => {
+  it("falls back to the invite count once every prompt has been seen", async () => {
     const runtime = setup({ shareSeen: { [WALLET.id]: ["lastSeat", "joined"] }, score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 1 }, revealSeen: [] });
 
     await screen.findByText("Top 12%");
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith(expect.objectContaining({ type: "getPointsRevealSeen" })));
-    expect(screen.queryByRole("region", { name: "Share prompt" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "You have 1 invite" })).toBeTruthy();
   });
 
-  it("shows nothing when seats are not limited", async () => {
+  it("shows no prompt when seats are not limited", async () => {
     setup({ score: { seatsLeft: null }, revealSeen: [] });
 
     await screen.findByText("Top 12%");
-    expect(screen.queryByRole("region", { name: "Share prompt" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Invite friends" })).toBeTruthy();
   });
 });

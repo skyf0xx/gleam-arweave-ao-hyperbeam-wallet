@@ -5,6 +5,8 @@ import type { PointsScores, PointsWalletScore, RuntimePort } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
 import type { ClaimPhase } from "./ClaimStep";
 
+vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
+
 afterEach(cleanup);
 
 const PASSWORD = "correct horse battery staple";
