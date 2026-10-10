@@ -1,9 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import type { PointsMembership, RuntimePort } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { JoinNote } from "../../points/src/JoinNote";
-import { useJoinPoints } from "../../points/src/usePoints";
+import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
 
 /** `founding` is the Phase 1 build, where joining earns a founding number. */
 export type ClaimPhase = "founding" | "open";
@@ -19,12 +18,7 @@ export interface ClaimStepProps {
 /** The last onboarding step (POINTS.md § Extension): opt in to Gleam Points, or skip. */
 export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: ClaimStepProps) {
   const join = useJoinPoints(runtime);
-  const pending = useQuery({
-    queryKey: ["points", "pendingInvite"],
-    queryFn: () => runtime.send<undefined, string | null>({ type: "getPointsPendingInvite", payload: undefined }),
-    staleTime: Infinity,
-    retry: false,
-  });
+  const pending = usePendingInvite(runtime);
   const founding = phase === "founding";
 
   return (

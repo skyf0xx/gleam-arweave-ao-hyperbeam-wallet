@@ -3,15 +3,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { foundingPost, inviteLinkFor, xIntentUrl } from "@/src/points-share";
+import { foundingPost, inviteLinkFor, invitesLine, xIntentUrl } from "@/src/points-share";
 import { usePointsScores } from "../../points/src/usePoints";
 
 export const REVEAL_SEEN_QUERY_KEY = ["points", "revealSeen"] as const;
-
-function invitesLine(seats: number): string {
-  if (seats <= 0) return "You have no invites left";
-  return `You have ${seats} ${seats === 1 ? "invite" : "invites"}`;
-}
 
 export interface FoundingRevealProps {
   /** Null while the server hasn't reported it: the slot stays empty. */

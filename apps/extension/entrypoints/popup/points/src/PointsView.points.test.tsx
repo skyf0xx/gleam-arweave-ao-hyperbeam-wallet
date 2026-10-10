@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PointsMembership, PointsScores, RuntimePort, WalletSummary } from "@gleam/core";
 import { PointsTokenRow } from "./PointsTokenRow";
 import { PointsView } from "./PointsView";
+
+vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
+
+const FUTURE_URL = "https://gleam-permaweb.vercel.app/future.html?v=1.2.3";
+const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
 
 afterEach(() => {
   cleanup();
@@ -119,8 +124,133 @@ describe("PointsView", () => {
       expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id, inviteCode: "friend42" } }),
     );
     expect(await screen.findByText("Top 12%")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
-    expect(screen.getByText("https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22")).toBeTruthy();
+    expect(screen.getByText(LINK)).toBeTruthy();
+  });
+
+  it("lays out the not-joined state in order, pre-filled from the pending code", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({}),
+      getPointsPendingInvite: () => "PENDING1",
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+    const field = (await screen.findByLabelText(/Invite code/)) as HTMLInputElement;
+    await waitFor(() => expect(field.value).toBe("PENDING1"));
+
+    const line = screen.getByText(/Earn points every day for the AR and AO you hold/);
+    const future = screen.getByRole("link", { name: "What could points become?" });
+    const join = screen.getByRole("button", { name: "Join Gleam Points" });
+    const note = screen.getByText(/Joining links this wallet's address to this browser/);
+    expect(future.getAttribute("href")).toBe(FUTURE_URL);
+    for (const [before, after] of [[line, future], [future, field], [field, join], [join, note]] as const) {
+      expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+
+    fireEvent.click(join);
+    await waitFor(() =>
+      expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id, inviteCode: "PENDING1" } }),
+    );
+  });
+
+  it("lays out the joined state in order with the founding marker, stats and invite", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+    expect(await screen.findByText("Founding member #7")).toBeTruthy();
+    expect(screen.getByText("Top 12%")).toBeTruthy();
+    expect(screen.queryByText(/Original founder/)).toBeNull();
+
+    const stats = within(screen.getByText("Today's rate").closest("dl")!);
+    expect(stats.getByText("Today's rate")).toBeTruthy();
+    expect(stats.getByText("Friends joined").nextElementSibling?.textContent).toBe("3");
+    expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("3");
+
+    expect(screen.getByRole("heading", { name: "You have 3 invites" })).toBeTruthy();
+    const share = screen.getByRole("link", { name: "Share on X" });
+    expect(share.getAttribute("href")).toBe(
+      `https://x.com/intent/post?text=${encodeURIComponent(`I'm Founding Gleam #7. Early to a new wallet for AO. I have 3 invites: ${LINK}`)}`,
+    );
+
+    const futureLinks = screen.getAllByRole("link", { name: "What could points become?" });
+    expect(futureLinks.map((a) => a.getAttribute("href"))).toEqual([FUTURE_URL]);
+    expect(screen.getByRole("link", { name: "How points work" }).getAttribute("href")).toBe(
+      "https://gleam-permaweb.vercel.app/points.html",
+    );
+
+    const sections = [
+      screen.getByRole("region", { name: "Standing" }),
+      screen.getByText("Today's rate").closest("dl")!,
+      screen.getByRole("region", { name: "Invite" }),
+      screen.getByRole("region", { name: "Where points are going" }),
+      screen.getByRole("contentinfo"),
+    ];
+    for (let i = 1; i < sections.length; i += 1) {
+      expect(sections[i - 1]!.compareDocumentPosition(sections[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it("marks an original founder in Standing", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({ ...SCORES, wallets: [{ ...SCORES.wallets[0]!, originalFounder: true }] }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByText("Original founder · +10%")).toBeTruthy();
+  });
+
+  it("leaves the founding number and invite slots empty until the server reports them", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({
+        ...SCORES,
+        wallets: [{ ...SCORES.wallets[0]!, foundingNumber: null, seatsLeft: null }],
+      }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+    expect(await screen.findByText("Top 12%")).toBeTruthy();
+
+    expect(screen.queryByText(/Founding member/)).toBeNull();
+    expect(screen.queryByText(/You have .* invites?/)).toBeNull();
+    const stats = within(screen.getByText("Today's rate").closest("dl")!);
+    expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("");
+    const href = screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!;
+    expect(decodeURIComponent(href)).toContain(`Early to a new wallet for AO. ${LINK}`);
+  });
+
+  it("says there are no invites left at zero seats", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({ ...SCORES, wallets: [{ ...SCORES.wallets[0]!, seatsLeft: 0 }] }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: "You have no invites left" })).toBeTruthy();
+  });
+
+  it("renders the banner slot at the top of the Invite section", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} banner={<p>Share prompt</p>} />);
+
+    const invite = within(await screen.findByRole("region", { name: "Invite" }));
+    expect(invite.getByText("Share prompt")).toBeTruthy();
+    expect(invite.getByText("Share prompt").compareDocumentPosition(invite.getByRole("link", { name: "Share on X" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows why a join failed", async () => {

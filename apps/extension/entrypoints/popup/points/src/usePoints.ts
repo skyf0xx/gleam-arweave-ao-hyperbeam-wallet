@@ -8,10 +8,21 @@ import { useBalances } from "../../activity/src/useBalances";
 export const pointsQueryKeys = {
   memberships: () => ["points", "memberships"] as const,
   scores: () => ["points", "scores"] as const,
+  pendingInvite: () => ["points", "pendingInvite"] as const,
 };
 
 /** Scores change once a day, so a popup session reads them once. */
 const SCORES_STALE_MS = 5 * 60_000;
+
+/** The member invite code joining will apply, or null. */
+export function usePendingInvite(runtime: RuntimePort) {
+  return useQuery({
+    queryKey: pointsQueryKeys.pendingInvite(),
+    queryFn: () => runtime.send<undefined, string | null>({ type: "getPointsPendingInvite", payload: undefined }),
+    staleTime: Infinity,
+    retry: false,
+  });
+}
 
 export function usePointsMemberships(runtime: RuntimePort, options: { enabled?: boolean; retry?: false } = {}) {
   return useQuery({

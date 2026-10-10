@@ -23,3 +23,19 @@ export function foundingPost(opts: { foundingNumber: number | null; seats: numbe
   parts.push(opts.link);
   return parts.join(" ");
 }
+
+export function invitesLine(seats: number): string {
+  if (seats <= 0) return "You have no invites left";
+  return `You have ${seats} ${seats === 1 ? "invite" : "invites"}`;
+}
+
+/**
+ * The always-available post (POINTS.md § Share prompts, "Any time"). A part
+ * the server hasn't reported is left out of the sentence rather than guessed.
+ */
+export function invitePost(opts: { foundingNumber: number | null; seats: number | null; link: string }): string {
+  const lead = opts.foundingNumber !== null ? `I'm Founding Gleam #${opts.foundingNumber}. Early` : "Early";
+  const hasSeats = opts.seats !== null && opts.seats > 0;
+  const invites = hasSeats ? ` I have ${opts.seats} ${opts.seats === 1 ? "invite" : "invites"}:` : "";
+  return `${lead} to a new wallet for AO.${invites} ${opts.link}`;
+}
