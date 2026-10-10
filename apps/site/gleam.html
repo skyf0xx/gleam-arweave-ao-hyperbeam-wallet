@@ -91,6 +91,7 @@
           <li data-tick><strong>Inviting.</strong> Invite a friend and you both earn more.<span
               class="v-sig v-sig-invite" aria-hidden="true"><i></i><i></i></span></li>
         </ul>
+        <p class="v-jump"><a href="#get-in" data-umami-event="gleam-jump-get-in">Get in early</a></p>
       </div>
     </section>
 
@@ -313,30 +314,45 @@
     <div class="v-stake-end" aria-hidden="true"></div>
 
 
-    <section class="points-final v-final">
+    <section class="points-final v-final" id="get-in">
       <div class="wrap">
         <div class="beam v-start reveal" aria-hidden="true">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
         <h2 class="heading">Get in Early.</h2>
-        <p class="vision-lead">Gleam is invite-only for now. Get an invite from someone who's in.</p>
-        <div class="vision-ctas">
-          <div class="vision-cta">
-            <h3>Have an invite code?</h3>
-            <p>Install Gleam and enter your code to get in.</p>
-            <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
-              data-umami-event="gleam-add-to-chrome">Install Gleam</a>
-          </div>
-          <div class="vision-cta">
-            <h3>No code yet?</h3>
-            <p>Post what you think a wallet should be, and someone with a seat may send you one.</p>
+
+        <div class="get-in" data-for="cold">
+          <p class="vision-lead">Gleam is invite-only. Ask on X, and someone who's in can send you a code.</p>
+          <p class="cta">
             <a class="button"
               href="https://x.com/intent/post?text=AO%20is%20the%20computer.%20Arweave%20is%20the%20memory.%20Gleam%20is%20your%20window%20into%20both.%0A%0AAnyone%20have%20a%20%40gleam_wallet%20invite%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer"
               target="_blank" rel="noopener" data-umami-event="gleam-ask-on-x" data-ask-on-x>Ask for an invite on X</a>
-            <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener"
-                data-umami-event="gleam-follow-on-x">Follow @gleam_wallet for code drops</a></p>
-          </div>
+          </p>
+          <p class="small">Have a code? <a
+              href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
+              data-umami-event="gleam-add-to-chrome">Install Gleam</a> and enter it.</p>
         </div>
+
+        <div class="get-in" data-for="code" hidden>
+          <p class="vision-lead">Your invite <strong data-saved-code></strong> is saved. Install Gleam and it's applied
+            for you.</p>
+          <p class="cta">
+            <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
+              data-umami-event="gleam-add-to-chrome">Install Gleam</a>
+          </p>
+        </div>
+
+        <div class="get-in" data-for="installed" hidden>
+          <p class="vision-lead">You've got Gleam. Now you need a code. Ask on X, then paste it into Gleam.</p>
+          <p class="cta">
+            <a class="button"
+              href="https://x.com/intent/post?text=AO%20is%20the%20computer.%20Arweave%20is%20the%20memory.%20Gleam%20is%20your%20window%20into%20both.%0A%0AAnyone%20have%20a%20%40gleam_wallet%20invite%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer"
+              target="_blank" rel="noopener" data-umami-event="gleam-ask-on-x" data-ask-on-x>Ask for an invite on X</a>
+          </p>
+        </div>
+
+        <p class="small" data-for="cold installed"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener"
+            data-umami-event="gleam-follow-on-x">Follow @gleam_wallet for code drops</a></p>
         <p class="vision-note">The full rules are on the <a href="points.html#rules">Gleam Points page</a> and in our <a
             href="terms.html">terms</a>.</p>
       </div>

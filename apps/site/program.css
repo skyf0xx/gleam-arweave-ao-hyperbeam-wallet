@@ -43,7 +43,7 @@
 .ink .button { background: var(--on-ink); color: var(--ink); }
 .ink .button:hover { background: #E8E8E8; }
 .ink .small, .ink .line { color: var(--on-ink-muted); }
-.ink .small a { color: var(--on-ink); }
+.ink .small a, .ink .small strong, .ink .line strong { color: var(--on-ink); }
 
 /* Section breaks. Each SVG stretches to the full width; its strokes keep their
    weight so the beam stays a hairline at any aspect ratio. */
@@ -127,3 +127,6 @@
 @media (prefers-reduced-motion: reduce) {
   .od-s { transition: none; }
 }
+
+/* Per-visitor CTAs (pages.js); the attribute must beat a block's own display */
+[data-for][hidden] { display: none; }

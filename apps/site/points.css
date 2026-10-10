@@ -107,6 +107,10 @@
 
 .p-calc { margin-top: clamp(72px, 12vh, 128px); }
 
+/* Right after the result is when the +10% means most */
+.p-calc-cta { margin: 20px 0 0; color: var(--muted); }
+.p-calc-cta a, .p-calc-cta strong { color: var(--fg); font-weight: 600; text-underline-offset: 3px; }
+
 /* The scoreboard: the result side of the calculator, on ink */
 
 .p .calc { border-color: #DCDCDC; }

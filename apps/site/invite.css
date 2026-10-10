@@ -23,6 +23,7 @@
 .i-title { font-size: clamp(3.25rem, 13vw, 8rem); line-height: .92; letter-spacing: -0.06em; }
 .i-hero .line { max-width: 28em; }
 .i-cta { margin: 32px 0 0; }
+.ink .i-bonus { margin: 24px 0 0; color: var(--on-ink); font-weight: 600; }
 .i-hero .invite-sub { margin-top: 36px; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.03em; }
 .i-hero .small strong { color: var(--on-ink); font-family: var(--mono); letter-spacing: .04em; }
 .i-notfound { color: var(--beam-red) !important; font-weight: 600; }

@@ -58,12 +58,17 @@
           <p class="points-kicker">Gleam Points</p>
           <h1 class="display p-title">Earn by using Gleam.</h1>
           <p class="line">Hold AR and AO to earn Gleam points, every day. Bring friends and you both earn more.</p>
-          <div class="cta">
+          <div class="cta" data-for="cold">
+            <a class="button" href="#get-in" data-umami-event="points-get-invite">Get an invite</a>
+            <p class="small">Gleam is invite-only. Have a code? <a href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
+                data-umami-event="points-add-to-chrome">Install Gleam</a></p>
+          </div>
+          <div class="cta" data-for="code" hidden>
             <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
               data-umami-event="points-add-to-chrome">Install Gleam</a>
+            <p class="small">Your invite <strong data-saved-code></strong> is saved.</p>
           </div>
-          <p class="small">Gleam is currently invite-only.</p>
-          <p class="small"><a href="invite.html">Get an invite</a>.</p>
+          <p class="small" data-for="installed" hidden>Open Gleam and tap <strong>Gleam Points</strong> to join.</p>
           <p class="small points-vision-link"><a href="gleam.html">What are GLEAM points?</a></p>
         </div>
         <div class="dial" data-dial>
@@ -171,6 +176,10 @@
               </div>
             </div>
           </form>
+          <p class="p-calc-cta" data-for="cold">A friend's code adds 10% to your points every day. <a href="#get-in"
+              data-umami-event="points-calc-get-invite">Get an invite</a></p>
+          <p class="p-calc-cta" data-for="code" hidden>Your invite <strong data-saved-code></strong> is saved. <a
+              href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-calc-add-to-chrome">Install Gleam</a></p>
         </div>
       </div>
     </section>
@@ -378,17 +387,32 @@
       </svg>
     </div>
 
-    <section class="ink p-final">
+    <section class="ink p-final" id="get-in">
       <div class="wrap">
         <div class="beam p-stack p-start reveal" aria-hidden="true">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
         <h2 class="heading">Start earning today.</h2>
-        <p class="line">Your first points land at the next daily count.</p>
-        <div class="cta">
-          <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
-            data-umami-event="points-add-to-chrome-final">Install Gleam</a>
+        <div data-for="cold">
+          <p class="line">Gleam is invite-only. Ask on X, and someone who's in can send you a code.</p>
+          <div class="cta">
+            <a class="button" href="https://x.com/intent/post?text=Looking%20for%20a%20%40gleam_wallet%20invite.%20Anyone%20have%20one%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer" target="_blank" rel="noopener" data-umami-event="points-ask-on-x"
+              data-ask-on-x>Ask for an invite on X</a>
+            <p class="small">Have a code? <a href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome-final">Install
+                Gleam</a> and enter it.</p>
+            <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener"
+                data-umami-event="points-follow-on-x">Follow @gleam_wallet for code drops</a></p>
+          </div>
         </div>
+        <div data-for="code" hidden>
+          <p class="line">Your invite <strong data-saved-code></strong> is saved. Your first points land at the next
+            daily count.</p>
+          <div class="cta">
+            <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome-final">Install Gleam</a>
+          </div>
+        </div>
+        <p class="line" data-for="installed" hidden>Open Gleam and tap <strong>Gleam Points</strong> to join. Your
+          first points land at the next daily count.</p>
       </div>
     </section>
   </main>

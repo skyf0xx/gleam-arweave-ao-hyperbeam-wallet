@@ -82,18 +82,26 @@
     if (notFoundEl) notFoundEl.hidden = !notFound;
   }
 
-  function handOverInvite() {
+  // The code invite.html saved, or null if there's none or it's too old.
+  function readSavedInvite() {
     var saved = null;
     try {
       saved = JSON.parse(localStorage.getItem(INVITE_KEY) || "null");
     } catch {
-      saved = null;
+      return null;
     }
     if (
       !saved ||
       !INVITE_CODE.test(saved.code) ||
       Date.now() - saved.savedAt > INVITE_MAX_AGE_MS
-    ) {
+    )
+      return null;
+    return saved;
+  }
+
+  function handOverInvite() {
+    var saved = readSavedInvite();
+    if (!saved) {
       showWelcome("none");
       return;
     }
@@ -276,6 +284,9 @@
         tagKind(kind);
         trackOnce("gleam-invite-code-kind", { kind: kind });
       }
+      // Only a member's code carries the referral bonus; a drop code doesn't.
+      var bonus = document.querySelector("[data-member-bonus]");
+      if (bonus) bonus.hidden = kind !== "member";
       if (res.seatsLeft === 0) {
         show("full");
         return;
@@ -390,6 +401,27 @@
     // lines are added or cut.
     link.setAttribute("data-umami-event-line", line);
   });
+
+  // gleam.html and points.html show the CTA that fits the visitor
+  // (POINTS.md § Site): "installed" when the extension opened the page (it
+  // always passes ?v=), "code" when invite.html saved a code here, and
+  // "cold" otherwise. The markup shows the cold CTAs until this runs.
+  var forVisitor = document.querySelectorAll("[data-for]");
+  if (forVisitor.length) {
+    var savedInvite = readSavedInvite();
+    var visitor = version ? "installed" : savedInvite ? "code" : "cold";
+    forVisitor.forEach(function (el) {
+      el.hidden = el.getAttribute("data-for").split(" ").indexOf(visitor) < 0;
+    });
+    if (savedInvite) {
+      document.querySelectorAll("[data-saved-code]").forEach(function (el) {
+        el.textContent = savedInvite.code;
+      });
+    }
+    document.querySelectorAll("[data-umami-event]").forEach(function (el) {
+      el.setAttribute("data-umami-event-visitor", visitor);
+    });
+  }
 
   var calc = document.querySelector("form[data-points-calc]");
   if (calc) setUpCalculator(calc);

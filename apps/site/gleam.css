@@ -1249,26 +1249,43 @@ html:not(.motion) .tl-card {
   line-height: 0.94;
   letter-spacing: -0.055em;
 }
-.v-final .heading + .vision-lead {
+.v-final .get-in {
   margin-top: 24px;
 }
 .v-final .vision-lead {
   color: var(--on-ink-muted);
 }
 
-.v-final .vision-ctas {
-  border-color: var(--ink-line);
-  background: var(--ink-line);
+.v-final .cta {
+  margin-top: 32px;
 }
-.v-final .vision-cta {
-  background: var(--ink-2);
-}
-.v-final .vision-cta p {
+.v-final .small {
+  margin: 16px 0 0;
   color: var(--on-ink-muted);
 }
-.v-final .vision-cta .small a {
+.v-final .small a,
+.v-final .vision-lead strong {
   color: var(--on-ink);
 }
+.v-final .get-in + .small {
+  margin-top: 8px;
+}
+
+/* The page is long; this is the way down to the CTA for whoever's ready early */
+
+.v-jump {
+  margin: clamp(24px, 4vh, 40px) 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.v-jump a {
+  color: var(--fg);
+  text-underline-offset: 4px;
+}
+.v-jump a::after {
+  content: " \2193";
+}
+
 .v-final .button {
   background: var(--on-ink);
   color: var(--ink);

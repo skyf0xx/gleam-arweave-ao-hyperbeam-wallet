@@ -138,6 +138,8 @@ a { color: inherit; }
 
 .cta .small { margin: 14px 0 0; }
 
+.cta .small a { color: var(--fg); text-underline-offset: 3px; }
+
 /* Images: the render's backdrop fades into the page, the card stays opaque */
 
 .shot { position: relative; }
