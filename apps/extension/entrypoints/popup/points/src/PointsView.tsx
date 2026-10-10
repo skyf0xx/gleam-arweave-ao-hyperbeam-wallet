@@ -191,7 +191,7 @@ function JoinedView({
           <p className="text-label text-muted">You get another when a friend you invited joins Points.</p>
         ) : (
           <>
-            <p className="text-label text-muted">Friends earn 10% more every day. You also earn 10% of what they earn.</p>
+            <p className="text-label text-muted">Earn more points by inviting friends.</p>
             <div className="mt-1 flex flex-col items-center gap-3">
               <Button asChild>
                 <a href={xIntentUrl(post)} target="_blank" rel="noreferrer" onClick={() => prompt?.finish()}>
