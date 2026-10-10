@@ -173,7 +173,7 @@ describe("PointsView", () => {
     expect(screen.getByRole("heading", { name: "You have 3 invites" })).toBeTruthy();
     const share = screen.getByRole("link", { name: "Share on X" });
     expect(share.getAttribute("href")).toBe(
-      `https://x.com/intent/post?text=${encodeURIComponent(`I'm Founding Gleam #7. Early to a new wallet for AO. I have 3 invites: ${LINK}`)}`,
+      `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet, a new wallet for AO. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
     );
 
     const futureLinks = screen.getAllByRole("link", { name: "What could points become?" });
@@ -224,7 +224,7 @@ describe("PointsView", () => {
     const stats = within(screen.getByText("Today's rate").closest("dl")!);
     expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("");
     const href = screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!;
-    expect(decodeURIComponent(href)).toContain(`Early to a new wallet for AO. ${LINK}`);
+    expect(decodeURIComponent(href)).toContain(`Just joined @gleam_wallet, a new wallet for AO.\n${LINK}`);
   });
 
   it("says there are no invites left at zero seats", async () => {

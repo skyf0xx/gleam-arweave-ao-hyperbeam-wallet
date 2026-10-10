@@ -113,7 +113,7 @@ describe("SharePrompt", () => {
     const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
     expect(prompt.getByText("Someone you invited joined. You have another invite.")).toBeTruthy();
     expect(prompt.getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
-      intent(`Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it? ${LINK}`),
+      intent(`Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
     expect(prompt.getByRole("button", { name: "Copy link" })).toBeTruthy();
     await waitFor(() =>
@@ -141,7 +141,9 @@ describe("SharePrompt", () => {
 
     const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
     const share = prompt.getByRole("link", { name: "Share on X" });
-    expect(share.getAttribute("href")).toBe(intent("Last @gleam_wallet invite. Reply if you want it and I'll send it over."));
+    expect(share.getAttribute("href")).toBe(
+      intent("I've got one @gleam_wallet invite left. Reply if you want it and I'll send it over.\n@ArweaveEco @aoTheComputer"),
+    );
     expect(prompt.queryByRole("button", { name: "Copy link" })).toBeNull();
     fireEvent.click(share);
 
@@ -156,7 +158,7 @@ describe("SharePrompt", () => {
     const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
     expect(prompt.getByText("You joined as Founding member #184.")).toBeTruthy();
     expect(prompt.getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
-      intent(`Just got into @gleam_wallet, the new wallet for AO. I'm Founding #184 and I have 3 invites. ${LINK}`),
+      intent(`Just got into @gleam_wallet, a new wallet for AO. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
     fireEvent.click(prompt.getByRole("button", { name: "Dismiss" }));
 

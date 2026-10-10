@@ -59,7 +59,7 @@ function promptContent(kind: SharePromptKind, score: PointsWalletScore, link: st
     case "joined":
       return {
         text: `You joined as Founding member #${score.foundingNumber}.`,
-        post: foundingPost({ foundingNumber: score.foundingNumber, seats: score.seatsLeft, link }),
+        post: foundingPost({ seats: score.seatsLeft, link }),
         link,
       };
   }

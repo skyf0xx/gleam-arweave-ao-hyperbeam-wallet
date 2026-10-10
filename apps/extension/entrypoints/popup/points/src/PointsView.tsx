@@ -110,7 +110,7 @@ function JoinedView({
   const inviteLink = inviteLinkFor(standing.membership.inviteCode);
   const { copied, copy } = useCopy(inviteLink);
   const seatsLeft = score?.seatsLeft ?? null;
-  const shareHref = xIntentUrl(invitePost({ foundingNumber: score?.foundingNumber ?? null, seats: seatsLeft, link: inviteLink }));
+  const shareHref = xIntentUrl(invitePost({ seats: seatsLeft, link: inviteLink }));
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-7">

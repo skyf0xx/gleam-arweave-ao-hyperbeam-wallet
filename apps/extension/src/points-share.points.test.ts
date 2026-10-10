@@ -4,37 +4,36 @@ import { foundingPost, gainedSeatPost, invitePost, invitesLine, lastSeatPost, xI
 vi.mock("wxt/browser", () => ({ browser: {} }));
 
 const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
+const TAGS = "@ArweaveEco @aoTheComputer";
 
 describe("share post builders", () => {
   it("builds the founding post", () => {
-    expect(foundingPost({ foundingNumber: 184, seats: 3, link: LINK })).toBe(
-      `Just got into @gleam_wallet, the new wallet for AO. I'm Founding #184 and I have 3 invites. ${LINK}`,
+    expect(foundingPost({ seats: 3, link: LINK })).toBe(
+      `Just got into @gleam_wallet, a new wallet for AO. I have 3 invites if you want to get in early.\n${LINK}\n${TAGS}`,
     );
-    expect(foundingPost({ foundingNumber: 184, seats: 1, link: LINK })).toContain("I have 1 invite.");
+    expect(foundingPost({ seats: 1, link: LINK })).toContain("I have 1 invite if you want to get in early.");
   });
 
   it("leaves out what the server hasn't reported", () => {
-    expect(foundingPost({ foundingNumber: null, seats: null, link: LINK })).toBe(
-      `Just got into @gleam_wallet, the new wallet for AO. ${LINK}`,
-    );
-    expect(foundingPost({ foundingNumber: 184, seats: 0, link: LINK })).toContain("I'm Founding #184.");
+    expect(foundingPost({ seats: null, link: LINK })).toBe(`Just got into @gleam_wallet, a new wallet for AO.\n${LINK}\n${TAGS}`);
+    expect(foundingPost({ seats: 0, link: LINK })).toBe(`Just got into @gleam_wallet, a new wallet for AO.\n${LINK}\n${TAGS}`);
   });
 
   it("builds the gained-seat post with the invite link", () => {
     expect(gainedSeatPost({ link: LINK })).toBe(
-      `Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it? ${LINK}`,
+      `Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n${TAGS}`,
     );
   });
 
   it("builds the one-seat-left post without a link", () => {
     const post = lastSeatPost();
-    expect(post).toBe("Last @gleam_wallet invite. Reply if you want it and I'll send it over.");
+    expect(post).toBe(`I've got one @gleam_wallet invite left. Reply if you want it and I'll send it over.\n${TAGS}`);
     expect(post).not.toMatch(/https?:/);
   });
 
   it("builds the any-time post", () => {
-    expect(invitePost({ foundingNumber: 184, seats: 3, link: LINK })).toBe(
-      `I'm Founding Gleam #184. Early to a new wallet for AO. I have 3 invites: ${LINK}`,
+    expect(invitePost({ seats: 3, link: LINK })).toBe(
+      `Just joined @gleam_wallet, a new wallet for AO. I have 3 invites if you want to get in early.\n${LINK}\n${TAGS}`,
     );
   });
 

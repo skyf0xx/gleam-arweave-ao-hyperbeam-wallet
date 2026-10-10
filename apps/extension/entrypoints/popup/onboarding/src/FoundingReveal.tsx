@@ -18,7 +18,7 @@ export interface FoundingRevealProps {
 
 export function FoundingReveal({ foundingNumber, seatsLeft, inviteCode, onDone }: FoundingRevealProps) {
   const shareHref = inviteCode
-    ? xIntentUrl(foundingPost({ foundingNumber, seats: seatsLeft, link: inviteLinkFor(inviteCode) }))
+    ? xIntentUrl(foundingPost({ seats: seatsLeft, link: inviteLinkFor(inviteCode) }))
     : null;
 
   return (
