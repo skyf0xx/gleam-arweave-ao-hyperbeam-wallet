@@ -34,7 +34,7 @@ function setup({ pending = ["w1"], memberships = {} }: { pending?: string[]; mem
   const runtime = { send, onMessage: vi.fn(() => () => {}) } as unknown as RuntimePort;
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PendingClaim runtime={runtime} wallet={WALLET} phase="founding">
+      <PendingClaim runtime={runtime} wallet={WALLET}>
         <div>home</div>
       </PendingClaim>
     </QueryClientProvider>,
@@ -45,7 +45,7 @@ function setup({ pending = ["w1"], memberships = {} }: { pending?: string[]; mem
 describe("PendingClaim", () => {
   it("brings back a claim step the popup closed on", async () => {
     setup({});
-    expect(await screen.findByText("Become a founding member")).toBeTruthy();
+    expect(await screen.findByText("Start earning Gleam Points")).toBeTruthy();
     expect(screen.queryByText("home")).toBeNull();
   });
 
@@ -58,7 +58,7 @@ describe("PendingClaim", () => {
 
   it("hands over to the home screen once the wallet joins", async () => {
     const { send } = setup({});
-    fireEvent.click(await screen.findByRole("button", { name: "Join as a founder" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
     expect(await screen.findByText("home")).toBeTruthy();
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: "w1" } }));
   });

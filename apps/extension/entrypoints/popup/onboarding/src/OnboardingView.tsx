@@ -248,7 +248,6 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         <ClaimStep
           runtime={runtime}
           walletId={step.wallet.id}
-          phase={claim ?? "open"}
           onClaimed={(membership) =>
             claim === "founding"
               ? setStep({ kind: "reveal", wallet: step.wallet, inviteCode: membership.inviteCode })

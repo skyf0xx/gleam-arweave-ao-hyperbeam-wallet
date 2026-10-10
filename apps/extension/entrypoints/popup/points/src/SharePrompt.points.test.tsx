@@ -156,7 +156,7 @@ describe("SharePrompt", () => {
     const runtime = setup({ revealSeen: [] });
 
     const prompt = within(await screen.findByRole("region", { name: "Share prompt" }));
-    expect(prompt.getByText("You joined as OG #184.")).toBeTruthy();
+    expect(prompt.getByText("You're in and earning GLEAM.")).toBeTruthy();
     expect(prompt.getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
       intent(`Just got into @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );

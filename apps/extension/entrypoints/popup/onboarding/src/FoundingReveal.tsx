@@ -9,14 +9,12 @@ import { usePointsScores } from "../../points/src/usePoints";
 export const REVEAL_SEEN_QUERY_KEY = ["points", "revealSeen"] as const;
 
 export interface FoundingRevealProps {
-  /** Null while the server hasn't reported it: the slot stays empty. */
-  foundingNumber: number | null;
   seatsLeft: number | null;
   inviteCode: string | null;
   onDone: () => void;
 }
 
-export function FoundingReveal({ foundingNumber, seatsLeft, inviteCode, onDone }: FoundingRevealProps) {
+export function FoundingReveal({ seatsLeft, inviteCode, onDone }: FoundingRevealProps) {
   const shareHref = inviteCode
     ? xIntentUrl(foundingPost({ seats: seatsLeft, link: inviteLinkFor(inviteCode) }))
     : null;
@@ -24,19 +22,13 @@ export function FoundingReveal({ foundingNumber, seatsLeft, inviteCode, onDone }
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
       <div className="mt-12 flex flex-col items-center gap-1 text-center">
-        <h1 className="text-label font-semibold text-muted">OG</h1>
-        <div
-          aria-live="polite"
-          className="h-[72px] text-[64px] font-semibold leading-[72px] tracking-tight tabular-nums text-foreground"
-        >
-          {foundingNumber !== null ? `#${foundingNumber}` : null}
-        </div>
+        <h1 className="text-h2 font-semibold tracking-tight text-foreground">You&apos;re in</h1>
+        <p className="text-body text-muted">You&apos;re now earning GLEAM.</p>
       </div>
       <Beam className="gleam-beam-sweep mt-4 w-24" />
 
       <div className="mt-8 flex min-h-[48px] flex-col items-center gap-1 text-center">
         {seatsLeft !== null ? <p className="text-h3 font-semibold text-foreground">{invitesLine(seatsLeft)}</p> : null}
-        <p className="text-caption text-faint">Your number never changes.</p>
       </div>
 
       <div className="mt-auto flex w-full flex-col gap-3 pt-6">
@@ -91,7 +83,6 @@ export function FoundingRevealScreen({ runtime, walletId, address, inviteCode, o
   if (skip) return null;
   return (
     <FoundingReveal
-      foundingNumber={foundingNumber}
       seatsLeft={score?.seatsLeft ?? null}
       inviteCode={score?.inviteCode ?? inviteCode ?? null}
       onDone={() => {

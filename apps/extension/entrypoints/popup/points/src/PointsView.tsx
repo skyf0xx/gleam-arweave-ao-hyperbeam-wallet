@@ -7,7 +7,6 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { inviteLinkFor, invitePost, invitesLine, xIntentUrl } from "@/src/points-share";
 import { sitePageUrl } from "@/src/site-pages";
 import { HOW_IT_WORKS_URL, JoinNote } from "./JoinNote";
-import { ShareCard } from "./ShareCard";
 import { SharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
@@ -116,9 +115,6 @@ function JoinedView({
     <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-7">
       <section aria-label="Standing" className="flex flex-col items-center gap-1 text-center">
         <span className="text-h2 font-semibold tabular-nums text-foreground">{formatPoints(standing.estimateAtomic)}</span>
-        {score?.foundingNumber != null ? (
-          <span className="text-label font-semibold text-foreground">OG #{score.foundingNumber}</span>
-        ) : null}
         {score?.originalFounder ? <span className="text-label text-muted">Original founder · +10%</span> : null}
         <span className="text-label text-muted">
           {score?.topPercent != null ? `Top ${score.topPercent}%` : "Your rank appears after the next daily snapshot"}
@@ -145,7 +141,6 @@ function JoinedView({
           <SharePrompt runtime={runtime} wallet={wallet} inviteCode={standing.membership.inviteCode} score={score} />
         )}
         {seatsLeft !== null ? <h2 className="text-h3 font-semibold text-foreground">{invitesLine(seatsLeft)}</h2> : null}
-        {score?.foundingNumber != null ? <ShareCard foundingNumber={score.foundingNumber} seatsLeft={seatsLeft} /> : null}
         <Button asChild>
           <a href={shareHref} target="_blank" rel="noreferrer">
             Share on X

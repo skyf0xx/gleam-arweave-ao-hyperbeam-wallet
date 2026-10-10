@@ -1,15 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
-import { FOUNDING_GATE } from "@/src/founding-gate";
 import { usePointsMemberships } from "../../points/src/usePoints";
-import { CLAIM_PENDING_QUERY_KEY, ClaimStep, type ClaimPhase } from "./ClaimStep";
+import { CLAIM_PENDING_QUERY_KEY, ClaimStep } from "./ClaimStep";
 
 export interface PendingClaimProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
-  /** Defaults to the build's phase from `FOUNDING_GATE`. */
-  phase?: ClaimPhase;
   children: ReactNode;
 }
 
@@ -20,7 +17,7 @@ export interface PendingClaimProps {
  * picks up the new member. A failed read shows `children`: the claim is
  * an offer, never a gate.
  */
-export function PendingClaim({ runtime, wallet, phase = FOUNDING_GATE ? "founding" : "open", children }: PendingClaimProps) {
+export function PendingClaim({ runtime, wallet, children }: PendingClaimProps) {
   const pending = useQuery({
     queryKey: CLAIM_PENDING_QUERY_KEY,
     queryFn: () => runtime.send<undefined, string[]>({ type: "getPointsClaimPending", payload: undefined }),
@@ -32,5 +29,5 @@ export function PendingClaim({ runtime, wallet, phase = FOUNDING_GATE ? "foundin
   const waiting = pending.data?.includes(wallet.id) === true && memberships.data?.[wallet.id] === undefined;
   if (!waiting) return <>{children}</>;
 
-  return <ClaimStep runtime={runtime} walletId={wallet.id} phase={phase} onClaimed={() => {}} onSkip={() => {}} />;
+  return <ClaimStep runtime={runtime} walletId={wallet.id} onClaimed={() => {}} onSkip={() => {}} />;
 }

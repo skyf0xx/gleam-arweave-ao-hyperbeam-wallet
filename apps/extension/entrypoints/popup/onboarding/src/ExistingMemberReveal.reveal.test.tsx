@@ -61,9 +61,9 @@ function setup(
 }
 
 describe("ExistingMemberReveal", () => {
-  it("shows an existing member their number, and marks it seen only on Done", async () => {
+  it("shows an existing member the reveal, and marks it seen only on Done", async () => {
     const { send } = setup({});
-    expect(await screen.findByText("#12")).toBeTruthy();
+    expect(await screen.findByText("You're in")).toBeTruthy();
     expect(screen.getByText("You have 3 invites")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Share on X" })).toBeTruthy();
     expect(screen.queryByText("home")).toBeNull();

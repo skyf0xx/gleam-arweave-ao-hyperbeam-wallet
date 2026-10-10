@@ -92,28 +92,27 @@ describe("claim step", () => {
     expect(send).toHaveBeenCalledWith({ type: "setPointsClaimPending", payload: { walletId: "w1", pending: true } });
   });
 
-  it("offers the founding number in Phase 1, with the pending code and the join note", async () => {
+  it("offers Gleam Points in Phase 1, with the pending code and the join note", async () => {
     const { onComplete } = setup("founding", { pending: "FRIEND42" });
     await reachClaim();
-    expect(await screen.findByText("Become a founding member")).toBeTruthy();
+    expect(await screen.findByText("Start earning Gleam Points")).toBeTruthy();
     expect(await screen.findByText("FRIEND42")).toBeTruthy();
     expect(screen.getByText(/Joining links this wallet's address to this browser/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Join as a founder" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Join Gleam Points" })).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
   });
 
   it("omits the code line when none is pending", async () => {
     setup("founding");
     await reachClaim();
-    await screen.findByText("Become a founding member");
+    await screen.findByText("Start earning Gleam Points");
     expect(screen.queryByText(/will be applied/)).toBeNull();
   });
 
-  it("offers Gleam Points without founding numbers in Phase 2, and no reveal after joining", async () => {
+  it("offers Gleam Points in Phase 2, and no reveal after joining", async () => {
     const { send, onComplete } = setup("open");
     await reachClaim();
     expect(await screen.findByText("Start earning Gleam Points")).toBeTruthy();
-    expect(screen.queryByText("Become a founding member")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Join Gleam Points" }));
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
@@ -133,7 +132,7 @@ describe("claim step", () => {
   it("shows a join failure and stays on the step", async () => {
     const { onComplete } = setup("founding", { joinError: "Couldn't join Gleam Points: Invite required." });
     await reachClaim();
-    fireEvent.click(await screen.findByRole("button", { name: "Join as a founder" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
     expect(await screen.findByText("Couldn't join Gleam Points: Invite required.")).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
   });
@@ -142,14 +141,14 @@ describe("claim step", () => {
 describe("founding reveal after a claim", () => {
   async function claim() {
     await reachClaim();
-    fireEvent.click(await screen.findByRole("button", { name: "Join as a founder" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
   }
 
-  it("shows the number, the invites and a Share on X link with the invite link, then Done closes", async () => {
+  it("shows the welcome, the invites and a Share on X link with the invite link, then Done closes", async () => {
     const { onComplete, send } = setup("founding");
     await claim();
-    expect(await screen.findByText("#184")).toBeTruthy();
-    expect(screen.getByText("You have 3 invites")).toBeTruthy();
+    expect(await screen.findByText("You're in")).toBeTruthy();
+    expect(await screen.findByText("You have 3 invites")).toBeTruthy();
     const share = screen.getByRole("link", { name: "Share on X" });
     const post = decodeURIComponent(share.getAttribute("href")!);
     expect(post).toContain("https://x.com/intent/post?text=");
@@ -163,11 +162,10 @@ describe("founding reveal after a claim", () => {
     );
   });
 
-  it("leaves the slots empty when the server hasn't answered", async () => {
+  it("leaves the invites slot empty when the server hasn't answered", async () => {
     const { send } = setup("founding", { scores: new Error("offline") });
     await claim();
     expect(await screen.findByRole("button", { name: "Done" })).toBeTruthy();
-    expect(screen.queryByText(/#\d/)).toBeNull();
     expect(screen.queryByText(/You have/)).toBeNull();
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsRevealSeen" }));
   });
@@ -184,7 +182,7 @@ describe("founding reveal after a claim", () => {
   it("leaves the invites slot empty when the server reports no seat count", async () => {
     setup("founding", { scores: { settledAt: null, wallets: [score({ seatsLeft: null })] } });
     await claim();
-    expect(await screen.findByText("#184")).toBeTruthy();
+    expect(await screen.findByText("You're in")).toBeTruthy();
     expect(screen.queryByText(/You have/)).toBeNull();
     expect(decodeURIComponent(screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!)).toContain(
       "Just got into @gleam_wallet and I'm now earning GLEAM.",

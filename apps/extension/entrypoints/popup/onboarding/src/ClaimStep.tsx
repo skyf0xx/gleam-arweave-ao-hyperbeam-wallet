@@ -7,13 +7,12 @@ import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
 
 export const CLAIM_PENDING_QUERY_KEY = ["points", "claimPending"] as const;
 
-/** `founding` is the Phase 1 build, where joining earns a founding number. */
+/** `founding` is the Phase 1 build, where a claim is followed by the reveal. */
 export type ClaimPhase = "founding" | "open";
 
 export interface ClaimStepProps {
   runtime: RuntimePort;
   walletId: string;
-  phase: ClaimPhase;
   onClaimed: (membership: PointsMembership) => void;
   onSkip: () => void;
 }
@@ -23,10 +22,9 @@ export interface ClaimStepProps {
  * or skip. It stays pending until one of the two, so it comes back on the
  * home screen if the popup closes first.
  */
-export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: ClaimStepProps) {
+export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepProps) {
   const join = useJoinPoints(runtime);
   const pending = usePendingInvite(runtime);
-  const founding = phase === "founding";
   const queryClient = useQueryClient();
   const skip = useMutation({
     mutationFn: () =>
@@ -49,7 +47,7 @@ export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: Claim
 
       <div className="mt-7 flex flex-col items-center gap-2 text-center">
         <h1 className="text-h2 font-semibold tracking-tight text-foreground">
-          {founding ? "Become a founding member" : "Start earning Gleam Points"}
+          Start earning Gleam Points
         </h1>
         <p className="text-body text-muted">
           Earn points every day for the AR and AO you hold. Invite friends and you both earn more.
@@ -67,7 +65,7 @@ export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: Claim
           disabled={join.isPending}
           onClick={() => join.mutate({ walletId }, { onSuccess: onClaimed })}
         >
-          {join.isPending ? "Joining…" : founding ? "Join as a founder" : "Join Gleam Points"}
+          {join.isPending ? "Joining…" : "Join Gleam Points"}
         </Button>
         <Button variant="secondary" disabled={join.isPending || skip.isPending} onClick={() => skip.mutate()}>
           Not now

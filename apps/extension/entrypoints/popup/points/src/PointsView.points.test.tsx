@@ -153,7 +153,7 @@ describe("PointsView", () => {
     );
   });
 
-  it("lays out the joined state in order with the founding marker, stats and invite", async () => {
+  it("lays out the joined state in order with the standing, stats and invite", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
@@ -161,8 +161,8 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    expect(await screen.findByText("OG #7")).toBeTruthy();
-    expect(screen.getByText("Top 12%")).toBeTruthy();
+    expect(await screen.findByText("Top 12%")).toBeTruthy();
+    expect(screen.queryByText(/OG/)).toBeNull();
     expect(screen.queryByText(/Original founder/)).toBeNull();
 
     const stats = within(screen.getByText("Today's rate").closest("dl")!);
@@ -206,7 +206,7 @@ describe("PointsView", () => {
     expect(await screen.findByText("Original founder · +10%")).toBeTruthy();
   });
 
-  it("leaves the founding number and invite slots empty until the server reports them", async () => {
+  it("leaves the invite slots empty until the server reports them", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
@@ -219,7 +219,6 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     expect(await screen.findByText("Top 12%")).toBeTruthy();
 
-    expect(screen.queryByText(/^OG #/)).toBeNull();
     expect(screen.queryByText(/You have .* invites?/)).toBeNull();
     const stats = within(screen.getByText("Today's rate").closest("dl")!);
     expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("");
