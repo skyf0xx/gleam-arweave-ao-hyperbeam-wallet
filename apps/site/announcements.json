@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": "welcome-2026-10",
+    "level": "info",
+    "text": "Welcome to Gleam. Follow @gleam_wallet for news and code drops.",
+    "url": "https://x.com/gleam_wallet"
+  }
+]
