@@ -31,7 +31,7 @@ Constraints:
 - **No framework, no bundler, no build step, no npm dependencies.** Hand-written HTML, CSS and JS only.
 - `apps/site/` must **not** become a pnpm workspace package. Don't give it a `package.json`.
 - **Zero third-party requests.** No Google Fonts, CDNs, analytics or embeds. The privacy policy states this, so the site has to be true to it.
-- **Relative URLs everywhere** (`img/…`, `privacy.html`). The site is served from a sub-path: `https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/`.
+- **Relative URLs everywhere** (`img/…`, `privacy.html`). The site is served from `https://gleam-permaweb.vercel.app/`.
 - **Light theme only.** Set `<meta name="color-scheme" content="light">` and `color-scheme: light`. The product renders are all lit on white, and a dark page around them breaks the look.
 
 ## 2. Assets already prepared (don't regenerate)
@@ -149,7 +149,7 @@ Nothing on the right.
 **Footer** (one quiet row, small, muted, a 1px `--line` rule above it; it wraps on mobile)
 `gleam` wordmark (text only, no mark) · Privacy (`privacy.html`) · Terms (`terms.html`) · GitHub (`https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet`) · X (`https://x.com/gleam_wallet`) · © 2026 Gleam
 
-**`<head>`**: `<title>Gleam: crypto without the clutter</title>`, meta description "Gleam is a wallet for AO and Arweave. Open it, do the thing, done.", the three favicon links, a `theme-color` of `#F7F7F7`, and Open Graph plus Twitter tags (`summary_large_image`, `twitter:site` `@gleam_wallet`, image `img/og.jpg`). Use the absolute Pages URL for `og:image` and `og:url`: `https://skyf0xx.github.io/gleam-arweave-ao-hyperbeam-wallet/`. Use semantic landmarks (`header`, `main`, `section` with `aria-labelledby`, `footer`).
+**`<head>`**: `<title>Gleam: crypto without the clutter</title>`, meta description "Gleam is a wallet for AO and Arweave. Open it, do the thing, done.", the three favicon links, a `theme-color` of `#F7F7F7`, and Open Graph plus Twitter tags (`summary_large_image`, `twitter:site` `@gleam_wallet`, image `img/og.jpg`). Use the absolute site URL for `og:image` and `og:url`: `https://gleam-permaweb.vercel.app/`. Use semantic landmarks (`header`, `main`, `section` with `aria-labelledby`, `footer`).
 
 ## 5. Copy rules (for anything you have to write yourself)
 
