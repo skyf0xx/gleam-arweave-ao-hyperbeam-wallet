@@ -133,7 +133,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         <p className="text-body text-muted">
           Become a founding member and earn{" "}
           <a
-            href={sitePageUrl("future", browser.runtime.getManifest().version)}
+            href={sitePageUrl("gleam", browser.runtime.getManifest().version)}
             target="_blank"
             rel="noreferrer"
             className="font-semibold text-foreground underline underline-offset-2"

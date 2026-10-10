@@ -7,7 +7,7 @@ import { PointsView } from "./PointsView";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
-const FUTURE_URL = "https://gleam-permaweb.vercel.app/future.html?v=1.2.3";
+const GLEAM_URL = "https://gleam-permaweb.vercel.app/gleam.html?v=1.2.3";
 const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
 
 afterEach(() => {
@@ -142,7 +142,7 @@ describe("PointsView", () => {
     const future = screen.getByRole("link", { name: "What could points become?" });
     const join = screen.getByRole("button", { name: "Join Gleam Points" });
     const note = screen.getByText(/Joining links this wallet's address to this browser/);
-    expect(future.getAttribute("href")).toBe(FUTURE_URL);
+    expect(future.getAttribute("href")).toBe(GLEAM_URL);
     for (const [before, after] of [[line, future], [future, field], [field, join], [join, note]] as const) {
       expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
@@ -161,7 +161,7 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    expect(await screen.findByText("Founding member #7")).toBeTruthy();
+    expect(await screen.findByText("OG #7")).toBeTruthy();
     expect(screen.getByText("Top 12%")).toBeTruthy();
     expect(screen.queryByText(/Original founder/)).toBeNull();
 
@@ -177,7 +177,7 @@ describe("PointsView", () => {
     );
 
     const futureLinks = screen.getAllByRole("link", { name: "What could points become?" });
-    expect(futureLinks.map((a) => a.getAttribute("href"))).toEqual([FUTURE_URL]);
+    expect(futureLinks.map((a) => a.getAttribute("href"))).toEqual([GLEAM_URL]);
     expect(screen.getByRole("link", { name: "How points work" }).getAttribute("href")).toBe(
       "https://gleam-permaweb.vercel.app/points.html",
     );
@@ -219,7 +219,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     expect(await screen.findByText("Top 12%")).toBeTruthy();
 
-    expect(screen.queryByText(/Founding member/)).toBeNull();
+    expect(screen.queryByText(/^OG #/)).toBeNull();
     expect(screen.queryByText(/You have .* invites?/)).toBeNull();
     const stats = within(screen.getByText("Today's rate").closest("dl")!);
     expect(stats.getByText("Invites left").nextElementSibling?.textContent).toBe("");

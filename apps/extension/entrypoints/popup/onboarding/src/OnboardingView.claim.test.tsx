@@ -153,7 +153,7 @@ describe("founding reveal after a claim", () => {
     const share = screen.getByRole("link", { name: "Share on X" });
     const post = decodeURIComponent(share.getAttribute("href")!);
     expect(post).toContain("https://x.com/intent/post?text=");
-    expect(post).toContain("I'm Founding #184 and I have 3 invites.");
+    expect(post).toContain("I have 3 invites if you want to get in early.");
     expect(post).toContain("invite.html?c=MYCODE22");
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsRevealSeen" }));
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
@@ -187,7 +187,7 @@ describe("founding reveal after a claim", () => {
     expect(await screen.findByText("#184")).toBeTruthy();
     expect(screen.queryByText(/You have/)).toBeNull();
     expect(decodeURIComponent(screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!)).toContain(
-      "I'm Founding #184.",
+      "Just got into @gleam_wallet, a new wallet for AO.",
     );
   });
 });

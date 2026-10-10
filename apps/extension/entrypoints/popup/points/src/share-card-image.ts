@@ -39,7 +39,7 @@ export function renderShareCardPng(content: ShareCardContent): Promise<Blob> {
   ctx.textAlign = "left";
   ctx.fillStyle = "#737373";
   ctx.font = `600 38px ${FONT}`;
-  ctx.fillText("Founding Gleam", 84, 168);
+  ctx.fillText("OG", 84, 168);
   ctx.fillStyle = "#111111";
   ctx.font = `700 220px ${FONT}`;
   ctx.fillText(`#${content.foundingNumber}`, 76, 372);
@@ -50,18 +50,24 @@ export function renderShareCardPng(content: ShareCardContent): Promise<Blob> {
   }
   ctx.fillStyle = "#a3a3a3";
   ctx.font = `400 30px ${FONT}`;
-  ctx.fillText("Founding numbers never change.", 84, 556);
+  ctx.fillText("You are early", 84, 556);
   ctx.textAlign = "right";
   ctx.fillStyle = "#111111";
   ctx.font = `700 38px ${FONT}`;
   ctx.fillText("Gleam", WIDTH - 84, 556);
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Couldn't save the image."))), "image/png");
+    canvas.toBlob(
+      (blob) =>
+        blob ? resolve(blob) : reject(new Error("Couldn't save the image.")),
+      "image/png",
+    );
   });
 }
 
-export async function saveShareCardImage(content: ShareCardContent): Promise<void> {
+export async function saveShareCardImage(
+  content: ShareCardContent,
+): Promise<void> {
   const blob = await renderShareCardPng(content);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

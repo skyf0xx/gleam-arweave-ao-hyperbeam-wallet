@@ -24,7 +24,7 @@ export function FoundingReveal({ foundingNumber, seatsLeft, inviteCode, onDone }
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
       <div className="mt-12 flex flex-col items-center gap-1 text-center">
-        <h1 className="text-label font-semibold text-muted">Founding member</h1>
+        <h1 className="text-label font-semibold text-muted">OG</h1>
         <div
           aria-live="polite"
           className="h-[72px] text-[64px] font-semibold leading-[72px] tracking-tight tabular-nums text-foreground"

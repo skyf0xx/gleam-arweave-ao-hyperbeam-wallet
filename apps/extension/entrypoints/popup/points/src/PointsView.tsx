@@ -27,7 +27,7 @@ const NOTE_TEXT =
 function FutureLink({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <a
-      href={sitePageUrl("future", browser.runtime.getManifest().version)}
+      href={sitePageUrl("gleam", browser.runtime.getManifest().version)}
       target="_blank"
       rel="noreferrer"
       className={className ?? "text-label text-muted underline hover:text-foreground"}
@@ -117,7 +117,7 @@ function JoinedView({
       <section aria-label="Standing" className="flex flex-col items-center gap-1 text-center">
         <span className="text-h2 font-semibold tabular-nums text-foreground">{formatPoints(standing.estimateAtomic)}</span>
         {score?.foundingNumber != null ? (
-          <span className="text-label font-semibold text-foreground">Founding member #{score.foundingNumber}</span>
+          <span className="text-label font-semibold text-foreground">OG #{score.foundingNumber}</span>
         ) : null}
         {score?.originalFounder ? <span className="text-label text-muted">Original founder · +10%</span> : null}
         <span className="text-label text-muted">

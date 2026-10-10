@@ -49,7 +49,7 @@ describe("GatedOnboarding", () => {
     expect(screen.getByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeTruthy();
     expect(screen.queryByText("What are Gleam Points?")).toBeNull();
     expect(screen.getByRole("link", { name: "GLEAM" }).getAttribute("href")).toBe(
-      "https://gleam-permaweb.vercel.app/future.html?v=1.2.3",
+      "https://gleam-permaweb.vercel.app/gleam.html?v=1.2.3",
     );
   });
 
