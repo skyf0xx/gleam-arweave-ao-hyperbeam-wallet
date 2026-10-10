@@ -5,7 +5,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { inviteLinkFor, invitePost, invitesLine, xIntentUrl } from "@/src/points-share";
-import { howItWorksUrl, JoinNote } from "./JoinNote";
+import { gleamUrl, howItWorksUrl, JoinNote } from "./JoinNote";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
@@ -19,6 +19,13 @@ export interface PointsViewProps {
 
 /** The seats a member code starts with (POINTS.md § Invites). */
 const MEMBER_SEATS = 3;
+
+/**
+ * Rank shows only in the top half. Below that, and for the last-placed or
+ * only ranked wallet that the server reports as "Top 100%", it reads as a
+ * put-down rather than a reason to invite.
+ */
+const RANK_SHOWN_MAX_PERCENT = 50;
 
 const BEAM_COLORS = [
   "var(--color-beam-red)",
@@ -153,6 +160,9 @@ function JoinedView({
   const prompt = useSharePrompt({ runtime, wallet, inviteCode, score });
   const post = prompt?.post ?? invitePost({ seats: seatsLeft, link: inviteLink });
   const heading = prompt?.text ?? (seatsLeft !== null ? invitesLine(seatsLeft) : "Invite friends");
+  // A full code sends friends to a "full" invite page, so there's nothing to share.
+  const full = seatsLeft !== null && seatsLeft <= 0;
+  const topPercent = score?.topPercent ?? null;
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-5">
@@ -164,13 +174,9 @@ function JoinedView({
           ) : null}
         </div>
         <dl className="grid grid-cols-3 gap-3 border-t border-ink-line pt-3">
-          <InkStat label="Today">+{formatPoints(standing.dailyRateAtomic)}</InkStat>
+          <InkStat label="Per day">+{formatPoints(standing.dailyRateAtomic)}</InkStat>
           <InkStat label="Rank">
-            {score?.topPercent != null ? (
-              `Top ${score.topPercent}%`
-            ) : (
-              <span className="text-caption font-normal text-on-ink-muted">After the next count</span>
-            )}
+            {topPercent !== null && topPercent <= RANK_SHOWN_MAX_PERCENT ? `Top ${topPercent}%` : "—"}
           </InkStat>
           <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
         </dl>
@@ -181,30 +187,41 @@ function JoinedView({
           <h2 className="text-h3 font-semibold text-foreground">{heading}</h2>
           {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
         </div>
-        <p className="text-label text-muted">Friends get 10% extra every day, and you get 10% of their points.</p>
-        <div className="mt-1 flex flex-col items-center gap-3">
-          <Button asChild>
-            <a href={xIntentUrl(post)} target="_blank" rel="noreferrer" onClick={() => prompt?.finish()}>
-              Share on X
-            </a>
-          </Button>
-          <button
-            type="button"
-            className="text-label font-semibold text-muted hover:text-foreground"
-            onClick={() => {
-              copy();
-              prompt?.finish();
-            }}
-          >
-            {copied ? "Copied" : "Copy invite link"}
-          </button>
-        </div>
+        {full ? (
+          <p className="text-label text-muted">You get another when a friend you invited joins Points.</p>
+        ) : (
+          <>
+            <p className="text-label text-muted">Friends earn 10% more every day. You also earn 10% of what they earn.</p>
+            <div className="mt-1 flex flex-col items-center gap-3">
+              <Button asChild>
+                <a href={xIntentUrl(post)} target="_blank" rel="noreferrer" onClick={() => prompt?.finish()}>
+                  Invite on X
+                </a>
+              </Button>
+              <button
+                type="button"
+                className="text-label text-muted underline hover:text-foreground"
+                onClick={() => {
+                  copy();
+                  prompt?.finish();
+                }}
+              >
+                {copied ? "Copied" : "Copy invite link"}
+              </button>
+            </div>
+          </>
+        )}
       </section>
 
-      <footer className="mt-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
-        <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="text-label text-muted underline hover:text-foreground">
-          How points work
-        </a>
+      <footer className="mt-auto flex flex-col items-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="text-label text-muted underline hover:text-foreground">
+            How points work
+          </a>
+          <a href={gleamUrl()} target="_blank" rel="noreferrer" className="text-label text-muted underline hover:text-foreground">
+            What is GLEAM?
+          </a>
+        </div>
         <LeaveControl runtime={runtime} wallet={wallet} points={formatPoints(standing.estimateAtomic)} />
       </footer>
     </div>

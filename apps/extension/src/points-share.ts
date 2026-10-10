@@ -22,7 +22,7 @@ export function foundingPost(opts: { seats: number | null; link: string }): stri
 }
 
 export function invitesLine(seats: number): string {
-  if (seats <= 0) return "You have no invites left";
+  if (seats <= 0) return "All your invites are used";
   return `You have ${seats} ${seats === 1 ? "invite" : "invites"}`;
 }
 

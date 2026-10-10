@@ -25,7 +25,7 @@ export interface SharePromptState {
 /**
  * Picks the one prompt to show. A new invite comes first because it is
  * news and time-bound, then the last seat, then the join moment, which the
- * always-available Share on X also covers. The join prompt is skipped when
+ * always-available Invite on X also covers. The join prompt is skipped when
  * the founding reveal already offered the same post.
  */
 export function pickSharePrompt({ score, shareSeen, seatsSeen, revealSeen }: SharePromptState): SharePromptKind | null {
@@ -69,7 +69,7 @@ export interface ActiveSharePrompt extends PromptContent {
 /**
  * The Invite section's one-time news (POINTS.md § Share prompts): at most
  * one prompt, which takes over the section's heading and the post behind
- * its Share on X. Opening the screen records the seat count as seen, which
+ * its Invite on X. Opening the screen records the seat count as seen, which
  * clears the toolbar dot; the prompt stays for this visit, and a named
  * prompt returns until the member shares or copies from it.
  */

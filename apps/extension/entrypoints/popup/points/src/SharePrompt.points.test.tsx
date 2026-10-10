@@ -113,7 +113,7 @@ describe("share prompts on the Points screen", () => {
     const runtime = setup({ seatsSeen: { [WALLET.id]: 2 } });
 
     expect(await screen.findByRole("heading", { name: "A friend joined. You got another invite." })).toBeTruthy();
-    expect(invite().getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
+    expect(invite().getByRole("link", { name: "Invite on X" }).getAttribute("href")).toBe(
       intent(`Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
     await waitFor(() =>
@@ -129,7 +129,7 @@ describe("share prompts on the Points screen", () => {
     const runtime = setup({ score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 1 } });
 
     expect(await screen.findByRole("heading", { name: "Your last invite" })).toBeTruthy();
-    expect(invite().getByRole("link", { name: "Share on X" }).getAttribute("href")).toBe(
+    expect(invite().getByRole("link", { name: "Invite on X" }).getAttribute("href")).toBe(
       intent("I've got one @gleam_wallet invite left. Reply if you want it and I'll send it over.\n@ArweaveEco @aoTheComputer"),
     );
     fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
@@ -144,7 +144,7 @@ describe("share prompts on the Points screen", () => {
     const runtime = setup({ revealSeen: [] });
 
     expect(await screen.findByRole("heading", { name: "You're in and earning GLEAM." })).toBeTruthy();
-    const share = invite().getByRole("link", { name: "Share on X" });
+    const share = invite().getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       intent(`Just got into @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );

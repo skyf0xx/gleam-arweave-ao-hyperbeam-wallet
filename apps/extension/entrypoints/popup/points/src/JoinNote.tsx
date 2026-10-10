@@ -6,6 +6,11 @@ export function howItWorksUrl(): string {
   return sitePageUrl("points", browser.runtime.getManifest().version);
 }
 
+/** gleam.html, what points convert to; it too drops its install CTAs for ?v= visitors. */
+export function gleamUrl(): string {
+  return sitePageUrl("gleam", browser.runtime.getManifest().version);
+}
+
 /** The disclosure shown wherever joining Gleam Points is offered. */
 export function JoinNote() {
   return (

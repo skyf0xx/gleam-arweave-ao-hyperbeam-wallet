@@ -44,7 +44,7 @@ describe("share post builders", () => {
   });
 
   it("words the invite count", () => {
-    expect(invitesLine(0)).toBe("You have no invites left");
+    expect(invitesLine(0)).toBe("All your invites are used");
     expect(invitesLine(1)).toBe("You have 1 invite");
     expect(invitesLine(3)).toBe("You have 3 invites");
   });
