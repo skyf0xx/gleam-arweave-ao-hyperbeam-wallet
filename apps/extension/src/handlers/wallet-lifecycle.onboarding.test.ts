@@ -87,9 +87,9 @@ describe("WalletLifecycleHandler: createWallet", () => {
     handler = new WalletLifecycleHandler(storage);
   });
 
-  it("rejects a password shorter than 10 characters", async () => {
+  it("rejects a password shorter than 8 characters", async () => {
     await expect(handler.createWallet({ name: "Main", password: "short1!" })).rejects.toThrow(
-      /at least 10 characters/i,
+      /at least 8 characters/i,
     );
   });
 
@@ -171,7 +171,7 @@ describe("WalletLifecycleHandler: importWallet", () => {
   it("rejects a weak password even with a valid keyfile", async () => {
     await expect(
       handler.importWallet({ jwk: validJWK(), name: "Imported", password: "short" }),
-    ).rejects.toThrow(/at least 10 characters/i);
+    ).rejects.toThrow(/at least 8 characters/i);
   });
 
   it("imports a structurally valid JWK and stores it encrypted-only", async () => {

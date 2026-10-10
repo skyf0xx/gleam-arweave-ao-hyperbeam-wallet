@@ -49,8 +49,8 @@ describe("ui/onboarding: StepDots", () => {
 
 describe("ui/onboarding: PasswordField", () => {
   it("toggles reveal state on button click", () => {
-    render(<PasswordField label="Password" placeholder="At least 10 characters" />);
-    const input = screen.getByPlaceholderText("At least 10 characters") as HTMLInputElement;
+    render(<PasswordField label="Password" placeholder="At least 8 characters" />);
+    const input = screen.getByPlaceholderText("At least 8 characters") as HTMLInputElement;
     expect(input.type).toBe("password");
     fireEvent.click(screen.getByRole("button", { name: "Show password" }));
     expect(input.type).toBe("text");

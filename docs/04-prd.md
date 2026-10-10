@@ -76,7 +76,7 @@ are **not** mined into intents here.
 Create a new RSA-JWK Wallet (generate keyfile, prompt backup) or import an
 existing JWK keyfile, gated behind setting a Vault password.
 - FR — Consequences (testable):
-  - Password must be ≥10 characters and rejected if it matches a
+  - Password must be ≥8 characters and rejected if it matches a
     common/breached-password blocklist check.
   - A generated JWK is immediately encrypted into the Vault envelope
     before touching any storage; plaintext key material is never

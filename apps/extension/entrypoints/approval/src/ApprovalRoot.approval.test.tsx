@@ -275,7 +275,7 @@ describe("ApprovalRoot: no wallet yet", () => {
     render(<ApprovalRoot requestId="req-1" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Create a wallet" }));
-    fireEvent.change(screen.getByPlaceholderText("At least 10 characters"), {
+    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
       target: { value: "correct horse battery staple" },
     });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {

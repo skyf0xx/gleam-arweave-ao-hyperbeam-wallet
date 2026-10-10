@@ -69,7 +69,7 @@ function setup(claim: ClaimPhase | undefined, backend: Backend = {}) {
 
 async function reachClaim() {
   fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
-  fireEvent.change(screen.getByPlaceholderText("At least 10 characters"), { target: { value: PASSWORD } });
+  fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), { target: { value: PASSWORD } });
   fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), { target: { value: PASSWORD } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   await screen.findByText("Your wallet is ready");
@@ -87,7 +87,7 @@ describe("claim step", () => {
   it("marks the claim pending as soon as the wallet exists, so closing the popup can't lose it", async () => {
     const { send } = setup("founding");
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
-    fireEvent.change(screen.getByPlaceholderText("At least 10 characters"), { target: { value: PASSWORD } });
+    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), { target: { value: PASSWORD } });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), { target: { value: PASSWORD } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByText("Your wallet is ready");

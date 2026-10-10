@@ -1,6 +1,6 @@
 import { COMMON_PASSWORDS } from "./common-passwords";
 
-const MIN_LENGTH = 10;
+const MIN_LENGTH = 8;
 
 const COMMON_PASSWORD_SET = new Set(
   COMMON_PASSWORDS.map((password) => password.toLowerCase()),
@@ -11,7 +11,7 @@ export type PasswordValidationResult =
   | { valid: false; reason: string };
 
 /**
- * Password policy for vault encryption: minimum 10 characters, rejected
+ * Password policy for vault encryption: minimum 8 characters, rejected
  * if it matches a common/breached password. Callers must run this
  * before `encryptToEnvelope` — the envelope layer itself does not
  * re-check policy, since re-encryption (e.g. re-deriving on unlock) must

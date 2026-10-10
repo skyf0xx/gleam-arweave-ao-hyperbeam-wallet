@@ -78,7 +78,7 @@ export function CreatePassword({
         <div className="flex flex-col gap-2">
           <PasswordField
             label="Password"
-            placeholder="At least 10 characters"
+            placeholder="At least 8 characters"
             autoFocus
             autoComplete="new-password"
             value={password}

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { validatePassword } from "./password-policy";
 
 describe("validatePassword", () => {
-  it("rejects passwords shorter than 10 characters", () => {
+  it("rejects passwords shorter than 8 characters", () => {
     const result = validatePassword("short1!");
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.reason).toMatch(/at least 10 characters/i);
+      expect(result.reason).toMatch(/at least 8 characters/i);
     }
   });
 
@@ -29,12 +29,12 @@ describe("validatePassword", () => {
   });
 
   it("accepts a password exactly at the minimum length boundary", () => {
-    const result = validatePassword("Xk9#mQ2!vL");
+    const result = validatePassword("Xk9#mQ2!");
     expect(result.valid).toBe(true);
   });
 
   it("rejects a password one character under the minimum length boundary", () => {
-    const result = validatePassword("Xk9#mQ2!v");
+    const result = validatePassword("Xk9#mQ2");
     expect(result.valid).toBe(false);
   });
 });
