@@ -9,14 +9,14 @@ const TAGS = "@ArweaveEco @aoTheComputer";
 describe("share post builders", () => {
   it("builds the founding post", () => {
     expect(foundingPost({ seats: 3, link: LINK })).toBe(
-      `Just got into @gleam_wallet, a new wallet for AO. I have 3 invites if you want to get in early.\n${LINK}\n${TAGS}`,
+      `Just got into @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n${TAGS}`,
     );
     expect(foundingPost({ seats: 1, link: LINK })).toContain("I have 1 invite if you want to get in early.");
   });
 
   it("leaves out what the server hasn't reported", () => {
-    expect(foundingPost({ seats: null, link: LINK })).toBe(`Just got into @gleam_wallet, a new wallet for AO.\n${LINK}\n${TAGS}`);
-    expect(foundingPost({ seats: 0, link: LINK })).toBe(`Just got into @gleam_wallet, a new wallet for AO.\n${LINK}\n${TAGS}`);
+    expect(foundingPost({ seats: null, link: LINK })).toBe(`Just got into @gleam_wallet and I'm now earning GLEAM.\n${LINK}\n${TAGS}`);
+    expect(foundingPost({ seats: 0, link: LINK })).toBe(`Just got into @gleam_wallet and I'm now earning GLEAM.\n${LINK}\n${TAGS}`);
   });
 
   it("builds the gained-seat post with the invite link", () => {
@@ -33,7 +33,7 @@ describe("share post builders", () => {
 
   it("builds the any-time post", () => {
     expect(invitePost({ seats: 3, link: LINK })).toBe(
-      `Just joined @gleam_wallet, a new wallet for AO. I have 3 invites if you want to get in early.\n${LINK}\n${TAGS}`,
+      `Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n${TAGS}`,
     );
   });
 

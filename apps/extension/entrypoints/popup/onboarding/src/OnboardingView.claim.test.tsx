@@ -187,7 +187,7 @@ describe("founding reveal after a claim", () => {
     expect(await screen.findByText("#184")).toBeTruthy();
     expect(screen.queryByText(/You have/)).toBeNull();
     expect(decodeURIComponent(screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!)).toContain(
-      "Just got into @gleam_wallet, a new wallet for AO.",
+      "Just got into @gleam_wallet and I'm now earning GLEAM.",
     );
   });
 });

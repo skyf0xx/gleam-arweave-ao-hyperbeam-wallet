@@ -6,12 +6,10 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { browser } from "wxt/browser";
-import { xIntentUrl } from "@/src/points-share";
+import { askInvitePost, fullInvitePost, xIntentUrl } from "@/src/points-share";
 import { sitePageUrl } from "@/src/site-pages";
 
 const X_PROFILE_URL = "https://x.com/gleam_wallet";
-const ASK_POST = "Looking for a @gleam_wallet invite. Anyone have one to spare? It's the new wallet for AO.";
-const FULL_POST = "Tried a @gleam_wallet invite and it was already full. Anyone have a spare?";
 
 const MESSAGES: Record<Exclude<InviteRedeemResult, "ok">, string> = {
   full: "That code is full. Its seats have all been taken.",
@@ -204,7 +202,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         {showAsk ? (
           <div id="founding-gate-ask" className="flex w-full flex-col items-center gap-3">
             <Button asChild variant={full ? "primary" : "secondary"}>
-              <a href={xIntentUrl(full ? FULL_POST : ASK_POST)} target="_blank" rel="noreferrer">
+              <a href={xIntentUrl(full ? fullInvitePost() : askInvitePost())} target="_blank" rel="noreferrer">
                 Ask for an invite on X
               </a>
             </Button>
