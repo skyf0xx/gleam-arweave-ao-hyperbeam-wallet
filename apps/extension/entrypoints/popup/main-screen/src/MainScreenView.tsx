@@ -19,6 +19,7 @@ import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
+import { MainScreenNotice } from "./MainScreenNotice";
 import { PointsTokenRow } from "../../points/index.tsx";
 
 /**
@@ -377,6 +378,8 @@ export function MainScreenView({
           <SettingsIcon />
         </button>
       </div>
+
+      <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
 
       {/*
         Fades the chart block toward invisible on scroll. Its

@@ -33,6 +33,7 @@ import { ContactsHandler } from "@/src/handlers/contacts";
 import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
+import { AnnouncementsHandler } from "@/src/handlers/announcements";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
@@ -114,6 +115,8 @@ const points = new PointsHandler({
   badge: actionBadge,
 });
 registerPointsHeartbeatAlarm(points);
+
+const announcements = new AnnouncementsHandler({ storage });
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
 // the worker idles out (~30s), not only on browser shutdown, so clearing
@@ -682,6 +685,9 @@ onExtensionMessage("getPointsShareSeen", () => points.getShareSeen());
 onExtensionMessage("markPointsShareSeen", (message) => points.markShareSeen(message.data));
 onExtensionMessage("getPointsSeatsSeen", () => points.getSeatsSeen());
 onExtensionMessage("markPointsSeatsSeen", (message) => points.markSeatsSeen(message.data));
+onExtensionMessage("getAnnouncements", () => announcements.fetchAnnouncements());
+onExtensionMessage("getDismissedAnnouncements", () => announcements.getDismissed());
+onExtensionMessage("dismissAnnouncement", (message) => announcements.dismiss(message.data));
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {

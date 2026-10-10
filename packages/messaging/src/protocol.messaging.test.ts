@@ -65,6 +65,13 @@ describe("ProtocolMap", () => {
     expect(methodNames).toHaveLength(16);
   });
 
+  it("declares announcement methods", () => {
+    const methodNames: Array<keyof ProtocolMap> = ["getAnnouncements", "getDismissedAnnouncements", "dismissAnnouncement"];
+    expect(new Set(methodNames).size).toBe(3);
+    expectTypeOf<Parameters<ProtocolMap["dismissAnnouncement"]>[0]>().toEqualTypeOf<{ id: string }>();
+    expectTypeOf<ReturnType<ProtocolMap["getDismissedAnnouncements"]>>().toEqualTypeOf<string[]>();
+  });
+
   it("keys the seat and share-prompt state by wallet id", () => {
     expectTypeOf<ReturnType<ProtocolMap["getPointsSeatsSeen"]>>().toEqualTypeOf<Record<string, number>>();
     expectTypeOf<Parameters<ProtocolMap["markPointsSeatsSeen"]>[0]>().toEqualTypeOf<{ walletId: string; seats: number }>();

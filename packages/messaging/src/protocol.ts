@@ -1,5 +1,6 @@
 import type {
   ActivityPage,
+  Announcement,
   ApprovalRequest,
   Contact,
   FeeEstimate,
@@ -186,6 +187,15 @@ export interface ProtocolMap {
   getPointsSeatsSeen(): Record<string, number>;
   /** Records that the member has seen `seats` invites; clears the toolbar dot once no wallet has a newer count. */
   markPointsSeatsSeen(req: { walletId: string; seats: number }): void;
+
+  /**
+   * The site's announcements, validated: malformed entries and links off
+   * the host allowlist are dropped, and any failure yields an empty list.
+   */
+  getAnnouncements(): Announcement[];
+  /** Ids of the announcements the user has dismissed. */
+  getDismissedAnnouncements(): string[];
+  dismissAnnouncement(req: { id: string }): void;
 
   /**
    * The single relay point for every page-originated provider call

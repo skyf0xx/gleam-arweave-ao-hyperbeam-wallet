@@ -19,6 +19,7 @@ export type {
   PointsScores,
   PointsWalletScore,
 } from "./points";
+export type { Announcement } from "./announcement";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";
 export type {

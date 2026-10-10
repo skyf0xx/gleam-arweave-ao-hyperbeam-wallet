@@ -61,6 +61,7 @@
         <li>HyperBEAM peers, <code>state.forward.computer</code> by default, plus any peer you add: AO balance reads.</li>
         <li><code>api.coingecko.com</code> and <code>api.coinpaprika.com</code>: AR and AO prices, for USD values and the balance chart. These requests only name the token. They don't include your address.</li>
         <li><code>lunar.arweave.net</code>: a block explorer. It opens in a new tab only when you click a transaction or address.</li>
+        <li><code>gleam-permaweb.vercel.app</code>: when you open the extension, it fetches <code>announcements.json</code> from this site, a static file of short notices from the Gleam team. It's a plain request that sends nothing about you or your wallet.</li>
         <li><code>gleam-points.up.railway.app</code>: the Gleam Points server. The extension contacts it only when you redeem an invite code or join, as described below.</li>
       </ul>
       <p>Each of these services receives your IP address, as with any web request. Gateways and AO nodes also receive your public address when looking up your balances and activity, because that's how public blockchains work. Transactions you send are public and permanent on Arweave and AO.</p>
