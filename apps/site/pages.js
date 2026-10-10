@@ -255,6 +255,9 @@
       var text = seatsText(kind, res.seatsLeft);
       if (seatsEl && text) {
         seatsEl.textContent = text;
+        // invite.html draws one seat per member-code seat from these
+        seatsEl.setAttribute("data-left", String(res.seatsLeft));
+        if (kind === "member") seatsEl.setAttribute("data-total", String(MEMBER_SEATS));
         seatsEl.hidden = false;
       }
       if (kind === "drop") showCountdown();
@@ -292,6 +295,16 @@
       form.querySelector('[data-out="day"]').textContent = format.format(perDay);
       form.querySelector('[data-out="month"]').textContent = format.format(perDay * 30);
       form.querySelector('[data-out="year"]').textContent = format.format(perDay * 365);
+      // points.html draws its scoreboard from this; the text above stays for
+      // screen readers and for when that script is missing
+      form.gleamEstimate = {
+        held: read("ar") + read("ao"),
+        hold: balance,
+        bonus: bonus,
+        friends: fromFriends,
+        perDay: perDay,
+      };
+      form.dispatchEvent(new window.CustomEvent("estimate"));
     }
 
     form.addEventListener("submit", function (e) {

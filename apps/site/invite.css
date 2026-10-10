@@ -1,0 +1,166 @@
+/* invite.html. The ticket is the invite: the code resolves onto it character
+   by character, its seats are the code's real seats, and it gets stamped when
+   Gleam takes it or when it's full. */
+
+.i-hero { position: relative; overflow: hidden; isolation: isolate; }
+
+.i-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 75% 50%, #000, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 70% at 75% 50%, #000, transparent 75%);
+}
+
+.i-hero-in { display: grid; gap: 40px; padding-top: clamp(28px, 7vh, 88px); padding-bottom: 32px; }
+
+.i-stack.beam { width: 120px; height: 10px; flex-direction: column; margin: 0 0 28px; }
+.i-title { font-size: clamp(3.25rem, 13vw, 8rem); line-height: .92; letter-spacing: -0.06em; }
+.i-hero .line { max-width: 28em; }
+.i-cta { margin: 32px 0 0; }
+.i-hero .invite-sub { margin-top: 36px; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.03em; }
+.i-hero .small strong { color: var(--on-ink); font-family: var(--mono); letter-spacing: .04em; }
+.i-notfound { color: var(--beam-red) !important; font-weight: 600; }
+
+.i-hero .invite-meta { margin: 0; padding-bottom: clamp(40px, 8vh, 80px); }
+.i-hero .vision-count { border-color: var(--ink-line); background: var(--ink-2); color: var(--on-ink-muted); }
+.i-hero .vision-count strong { color: var(--on-ink); font-family: var(--mono); }
+
+/* The ticket */
+
+.ticket {
+  --notch: 14px;
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 420px);
+  margin: 0 auto;
+  padding: 26px 26px 34px;
+  border-radius: 18px;
+  filter: drop-shadow(0 30px 40px rgba(0, 0, 0, .7));
+  transform: rotate(-3deg);
+}
+
+/* Only the card is notched, so the stamp and the burst can spill past it */
+.ticket::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(160deg, #1B1B1B, #0F0F0F 60%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+  -webkit-mask: radial-gradient(circle var(--notch) at 0 62%, transparent 98%, #000) left / 51% 100% no-repeat,
+                radial-gradient(circle var(--notch) at 100% 62%, transparent 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle var(--notch) at 0 62%, transparent 98%, #000) left / 51% 100% no-repeat,
+        radial-gradient(circle var(--notch) at 100% 62%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+html:not(.js) .ticket { display: none; }
+
+.ticket-top { display: flex; align-items: center; justify-content: space-between; }
+.ticket-kicker { font: 600 .75rem/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--on-ink-muted); }
+.ticket-mark img { display: block; }
+
+.ticket-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .08em;
+  min-height: 1.2em;
+  margin: 36px 0 30px;
+  font: 700 clamp(2rem, 9.5vw, 3.25rem)/1.2 var(--mono);
+  letter-spacing: .02em;
+  color: var(--on-ink);
+}
+.ticket-code span { display: inline-block; min-width: .62em; text-align: center; }
+.ticket-code span.spin { color: var(--on-ink-muted); opacity: .6; }
+.ticket-code span.lock { animation: tk-lock .38s cubic-bezier(.2, .8, .2, 1); }
+.ticket-code.empty span { color: #3A3A3A; }
+.ticket-code.void { text-decoration: line-through 3px var(--beam-red); }
+
+@keyframes tk-lock {
+  0% { color: var(--hit); transform: translateY(-.25em) scale(1.25); text-shadow: -.05em 0 var(--beam-red), .05em 0 var(--beam-sky); }
+  60% { color: var(--hit); transform: none; text-shadow: none; }
+  100% { color: var(--on-ink); }
+}
+
+/* Above the notch line: a perforation, then the seats */
+.ticket-seats { display: flex; flex-wrap: wrap; gap: 10px; min-height: 22px; padding-top: 22px; border-top: 2px dashed rgba(255, 255, 255, .12); }
+.ticket-seats i { position: relative; width: 22px; height: 22px; border-radius: 6px 6px 3px 3px; border: 2px solid #3A3A3A; }
+.ticket-seats i::after { content: ""; position: absolute; left: 3px; right: 3px; bottom: -6px; height: 3px; border-radius: 2px; background: #3A3A3A; }
+.ticket-seats i.open { border-color: var(--c); box-shadow: 0 0 14px -2px var(--c); }
+.ticket-seats i.open::after { background: var(--c); }
+.ticket-seats i.open { animation: tk-seat .5s cubic-bezier(.3, 1.6, .5, 1) backwards; animation-delay: calc(var(--i) * 90ms + .2s); }
+@keyframes tk-seat { from { transform: scale(0); } }
+
+.ticket-beam { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; height: 10px; overflow: hidden; border-radius: 0 0 18px 18px; }
+.ticket-beam span { flex: 1; }
+.ticket-beam span:nth-child(1) { background: var(--beam-red); }
+.ticket-beam span:nth-child(2) { background: var(--beam-purple); }
+.ticket-beam span:nth-child(3) { background: var(--beam-sky); }
+.ticket-beam span:nth-child(4) { background: var(--beam-yellow); }
+.ticket-beam span:nth-child(5) { background: var(--beam-green); }
+
+.ticket-stamp {
+  position: absolute;
+  right: 18px;
+  top: 58px;
+  padding: 6px 12px;
+  border: 3px solid currentColor;
+  border-radius: 8px;
+  font: 800 1.125rem/1 var(--sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--beam-green);
+  opacity: 0;
+  transform: rotate(-12deg);
+  pointer-events: none;
+}
+.ticket-stamp:empty { display: none; }
+.ticket.stamped .ticket-stamp { opacity: 1; animation: tk-stamp .5s cubic-bezier(.2, 1.4, .4, 1); }
+.ticket[data-look="full"] .ticket-stamp, .ticket[data-look="void"] .ticket-stamp { color: var(--beam-red); }
+.ticket[data-look="full"], .ticket[data-look="void"] { filter: saturate(.4); }
+.ticket[data-look="empty"] .ticket-beam { opacity: .35; }
+
+@keyframes tk-stamp {
+  0% { opacity: 0; transform: rotate(-24deg) scale(2.6); }
+  60% { opacity: 1; transform: rotate(-10deg) scale(.92); }
+  100% { transform: rotate(-12deg) scale(1); }
+}
+
+/* Gleam took the code: a shockwave off the ticket */
+.ticket::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--beam-green);
+  opacity: 0;
+  pointer-events: none;
+}
+.ticket.burst::after { animation: tk-burst .8s ease-out; }
+@keyframes tk-burst { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.18); } }
+
+@media (min-width: 900px) {
+  .i-hero-in { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); grid-template-rows: auto 1fr; column-gap: 56px; row-gap: 0; align-items: start; min-height: calc(86svh - 62px); }
+  .i-copy { grid-column: 1; grid-row: 1; }
+  .i-states { grid-column: 1; grid-row: 2; }
+  .ticket { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+  .ticket { margin-right: 0; transform: rotate(-5deg); }
+}
+
+/* Below the cut */
+
+.i-band { padding: clamp(40px, 8vh, 88px) 0 clamp(64px, 12vh, 120px); background: var(--paper); color: var(--fg); }
+.i .invite-facts { margin-top: 0; max-width: none; }
+.i .invite-facts li { padding: clamp(22px, 4vh, 36px) 0; border-color: #DCDCDC; font-size: clamp(1.125rem, 2.2vw, 1.625rem); line-height: 1.3; letter-spacing: -0.015em; }
+.i .invite-facts strong { display: block; margin-bottom: 8px; font-size: clamp(2rem, 6vw, 3.75rem); line-height: 1; letter-spacing: -0.045em; }
+.i .links { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 40px; font-size: .9375rem; }
+.i .links a { text-underline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-code span.lock, .ticket-seats i.open, .ticket.stamped .ticket-stamp, .ticket.burst::after { animation: none; }
+}

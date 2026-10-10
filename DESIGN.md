@@ -188,12 +188,13 @@ Motion reinforces the brand's sense of responsiveness and care. Every animation 
 
 ---
 
-### Vision page (`gleam.html`)
+### Points program (`gleam.html`, `points.html`, `invite.html`)
 
-The Vision page is the one surface where the beam runs at full power. It
-breaks several rules above on purpose. Everything else stays quiet.
-Styles are in `apps/site/gleam.css` and behaviour is in
-`apps/site/gleam.js`.
+The Gleam Points pages are the one place where the beam runs at full power.
+They break several rules above on purpose, and the rest of the site stays
+quiet. Shared pieces are in `apps/site/program.css` and `program.js`: ink
+bands, section cuts, the odometer, the ping and the sound toggle. Each page
+adds its own `<page>.css` and `<page>.js`.
 
 - **Ink bands.** The hero, the timeline and the CTA sit on ink `#0A0A0A`,
   with white text and muted `#A3A3A3`. The light bands (`#F7F7F7` and
@@ -232,6 +233,31 @@ Styles are in `apps/site/gleam.css` and behaviour is in
 - **Reduced motion.** The canvas, the pulses, the punch and the
   scroll-driven timeline all drop out. The counters still tick, and the
   timeline becomes a plain horizontal scroller parked at "you are here".
+
+- **Per page, the motion is the rule it shows:**
+  - `gleam.html` is the example accelerator and the AO timeline, described
+    above.
+  - `points.html`:
+    - A dial fills with the UTC day toward the real daily count at
+      00:00 UTC.
+    - The stats roll in from zero.
+    - The calculator's results are an ink scoreboard. Its odometers roll,
+      a breakdown bar shows where the points come from, and a ping plays
+      once the inputs settle.
+    - The invite pulse is the bonus paid to both wallets, every day.
+    - The how-it-works beam fills as you read.
+    - The whale-curve chart puts your calculator balance on the curve.
+  - `invite.html`:
+    - The invite is a ticket. The code resolves onto it like a slot
+      machine.
+    - Each seat glyph is a real seat on the code.
+    - A stamp records the outcome: "In Gleam", "Full" or "Not found".
+- **Charts in the program** use ink for the series and a dashed grey line
+  for the reference. Labels sit on the lines, the axes stay faint, and a
+  hover crosshair and a hidden table back the chart up. The breakdown bar
+  uses beam sky, red and yellow. As a set they pass the colour-blindness
+  checks but not the lightness band, so every segment also has a gap and a
+  labelled value.
 
 ### Things Not to Say
 

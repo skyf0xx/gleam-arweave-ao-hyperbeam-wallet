@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#F7F7F7">
+  <meta name="theme-color" content="#0A0A0A">
   <title>Gleam Points</title>
   <meta name="description" content="Earn by using Gleam. Your AR and AO earn Gleam Points every day, and you get a 10% daily bonus for every friend you invite.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -19,50 +19,80 @@
   <meta name="twitter:site" content="@gleam_wallet">
   <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="program.css">
+  <link rel="stylesheet" href="points.css">
+  <script>document.documentElement.classList.add("js")</script>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5" data-domains="gleam-permaweb.vercel.app"></script>
   <script defer src="pages.js"></script>
+  <script defer src="program.js"></script>
+  <script defer src="points.js"></script>
 </head>
-<body>
+<body class="program points-page">
   <header class="site-header">
     <div class="wrap">
       <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
     </div>
   </header>
 
-  <main class="wrap">
-    <div class="points">
-      <section class="points-hero">
-        <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <p class="points-kicker">Gleam Points</p>
-        <h1 class="display points-title">Earn by using Gleam.</h1>
-        <p class="line">Your AR and AO earn Gleam Points every day.</p>
-        <p class="small">Gleam is invite-only during Phase 1. <a href="invite.html">Get an invite</a>.</p>
-        <p class="small points-vision-link"><a href="gleam.html">What could points become?</a></p>
-        <div class="cta">
-          <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome">Install Gleam</a>
+  <main class="p">
+    <section class="ink p-hero">
+      <div class="wrap p-hero-in">
+        <div class="p-hero-copy">
+          <div class="beam p-stack" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <p class="points-kicker">Gleam Points</p>
+          <h1 class="display p-title">Earn by using Gleam.</h1>
+          <p class="line">Your AR and AO earn Gleam Points every day. Bring friends and you both earn more.</p>
+          <div class="cta">
+            <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome">Install Gleam</a>
+          </div>
+          <p class="small">Gleam is invite-only during Phase 1. <a href="invite.html">Get an invite</a>.</p>
+          <p class="small points-vision-link"><a href="gleam.html">What could points become?</a></p>
         </div>
-      </section>
+        <div class="dial" data-dial>
+          <div class="dial-ring" aria-hidden="true"></div>
+          <div class="dial-head" aria-hidden="true"></div>
+          <div class="dial-face">
+            <span class="dial-label">Next daily count</span>
+            <span class="dial-time" data-dial-time aria-hidden="true">--:--:--</span>
+            <span class="dial-sub">Around 00:00 UTC, every day</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-      <section class="points-stats" aria-label="How points add up">
-        <div class="stat">
-          <span class="stat-value">1</span>
-          <span class="stat-label">Point / day</span>
-          <span class="stat-sub">per AR or AO you hold</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">+10%</span>
-          <span class="stat-label">Daily bonus</span>
-          <span class="stat-sub">on your points, if you join through an invite or were a member before launch</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">+10%</span>
-          <span class="stat-label">Daily invite bonus</span>
-          <span class="stat-sub">for every friend you invite, based on how much they hold</span>
-        </div>
-      </section>
+    <div class="cut cut-angle" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points="0,0 100,0 0,100" fill="#0A0A0A"/>
+        <line x1="0" y1="92" x2="100" y2="-8" stroke="#FF1717"/>
+        <line x1="0" y1="96" x2="100" y2="-4" stroke="#8B12FF"/>
+        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8"/>
+        <line x1="0" y1="104" x2="100" y2="4" stroke="#FFE45C"/>
+        <line x1="0" y1="108" x2="100" y2="8" stroke="#28F02D"/>
+      </svg>
+    </div>
 
-      <section class="points-section">
-        <h2 class="points-h2">What could your points look like?</h2>
+    <section class="p-band p-stats-band">
+      <div class="wrap">
+        <section class="points-stats reveal" aria-label="How points add up">
+          <div class="stat">
+            <span class="stat-value" data-roll="1">1</span>
+            <span class="stat-label">Point / day</span>
+            <span class="stat-sub">per AR or AO you hold</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" data-roll="10" data-prefix="+" data-suffix="%">+10%</span>
+            <span class="stat-label">Daily bonus</span>
+            <span class="stat-sub">on your points, if you join through an invite or were a member before launch</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" data-roll="10" data-prefix="+" data-suffix="%">+10%</span>
+            <span class="stat-label">Daily invite bonus</span>
+            <span class="stat-sub">for every friend you invite, based on how much they hold</span>
+          </div>
+        </section>
+
+        <div class="p-calc">
+          <h2 class="points-h2">What could your points look like?</h2>
         <form class="calc" data-points-calc>
           <div class="calc-inputs">
             <div class="calc-line">
@@ -88,52 +118,87 @@
               <span>A friend invited me (+10%)</span>
             </label>
           </div>
-          <div class="calc-results" aria-live="polite">
+          <div class="calc-results ink" aria-live="polite">
             <div class="calc-result">
               <span class="calc-period">Per day</span>
-              <span class="calc-value" data-out="day">188</span>
+              <span class="calc-value" data-out="day">188</span><span class="calc-od" data-od="day" aria-hidden="true"></span>
             </div>
             <div class="calc-result">
               <span class="calc-period">30 days</span>
-              <span class="calc-value" data-out="month">5,653</span>
+              <span class="calc-value" data-out="month">5,653</span><span class="calc-od" data-od="month" aria-hidden="true"></span>
             </div>
             <div class="calc-result calc-result-main">
               <span class="calc-period">1 year</span>
-              <span class="calc-value" data-out="year">68,778</span>
+              <span class="calc-value" data-out="year">68,778</span><span class="calc-od" data-od="year" aria-hidden="true"></span>
+            </div>
+            <div class="calc-mix" data-mix aria-hidden="true">
+              <div class="mix-bar"><i data-mix-part="hold"></i><i data-mix-part="bonus"></i><i data-mix-part="friends"></i></div>
+              <ul class="mix-key">
+                <li data-mix-key="hold">Holding <b data-mix-val="hold">0</b></li>
+                <li data-mix-key="bonus">Your bonus <b data-mix-val="bonus">0</b></li>
+                <li data-mix-key="friends">From friends <b data-mix-val="friends">0</b></li>
+              </ul>
             </div>
           </div>
         </form>
-      </section>
+        </div>
+      </div>
+    </section>
 
-      <section class="points-section">
+    <div class="cut cut-to-ink" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points="0,100 100,0 100,100" fill="#0A0A0A"/>
+        <line x1="0" y1="108" x2="100" y2="8" stroke="#FF1717"/>
+        <line x1="0" y1="104" x2="100" y2="4" stroke="#8B12FF"/>
+        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8"/>
+        <line x1="0" y1="96" x2="100" y2="-4" stroke="#FFE45C"/>
+        <line x1="0" y1="92" x2="100" y2="-8" stroke="#28F02D"/>
+      </svg>
+    </div>
+
+    <section class="ink p-band p-ref" data-gate="ref">
+      <div class="wrap">
         <h2 class="points-h2">Bring a friend. Both wallets earn more.</h2>
         <div class="referral">
           <ol class="referral-flow" aria-label="How an invite works">
             <li>You</li>
-            <li class="referral-arrow" aria-hidden="true"></li>
+            <li class="referral-arrow" aria-hidden="true"><i></i></li>
             <li>Invite</li>
-            <li class="referral-arrow" aria-hidden="true"></li>
+            <li class="referral-arrow" aria-hidden="true"><i></i></li>
             <li>Friend</li>
           </ol>
           <div class="referral-gets">
-            <div>
+            <div data-ref-side="friend">
               <span class="referral-who">Your friend gets</span>
               <span class="referral-value">+10%</span>
               <span class="referral-what">daily bonus on their own points</span>
             </div>
-            <div>
+            <div data-ref-side="you">
               <span class="referral-who">You get</span>
               <span class="referral-value">+10%</span>
               <span class="referral-what">daily bonus, based on how much they hold</span>
             </div>
           </div>
-          <p class="referral-note">An invite isn't a one-off bonus. It keeps paying for as long as you both stay, and there's no limit on how many friends you invite.</p>
+          <p class="referral-note">An invite isn't a one-off bonus. It pays out every day for as long as you both stay, and there's no limit on how many friends you invite.</p>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="points-section">
+    <div class="cut cut-angle" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points="0,0 100,0 0,100" fill="#0A0A0A"/>
+        <line x1="0" y1="92" x2="100" y2="-8" stroke="#FF1717"/>
+        <line x1="0" y1="96" x2="100" y2="-4" stroke="#8B12FF"/>
+        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8"/>
+        <line x1="0" y1="104" x2="100" y2="4" stroke="#FFE45C"/>
+        <line x1="0" y1="108" x2="100" y2="8" stroke="#28F02D"/>
+      </svg>
+    </div>
+
+    <section class="p-band p-how">
+      <div class="wrap">
         <h2 class="points-h2">How it works</h2>
-        <ol class="steps">
+        <ol class="steps p-steps" data-steps>
           <li>
             <h2>Join from your wallet</h2>
             <p>Open Gleam and tap <strong>Gleam Points</strong> in your tokens. If a friend sent you an invite code, paste it in.</p>
@@ -151,9 +216,27 @@
             <p>The Points screen shows your total and your rank, updated daily. Only you can see your rank. There's no public leaderboard.</p>
           </li>
         </ol>
-      </section>
+      </div>
+    </section>
 
-      <section class="points-section points-rules" id="rules">
+    <div class="cut cut-curve" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="beam-h" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stop-color="#FF1717"/><stop offset=".2" stop-color="#FF1717"/>
+            <stop offset=".2" stop-color="#8B12FF"/><stop offset=".4" stop-color="#8B12FF"/>
+            <stop offset=".4" stop-color="#73C9E8"/><stop offset=".6" stop-color="#73C9E8"/>
+            <stop offset=".6" stop-color="#FFE45C"/><stop offset=".8" stop-color="#FFE45C"/>
+            <stop offset=".8" stop-color="#28F02D"/><stop offset="1" stop-color="#28F02D"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,100 Q50,-60 100,100 Z" fill="#FFFFFF"/>
+        <path d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)"/>
+      </svg>
+    </div>
+
+    <section class="p-band p-rules points-rules" id="rules">
+      <div class="wrap">
         <h2 class="points-h2">Rules and eligibility</h2>
         <div class="points-why">
           <div class="why">
@@ -170,9 +253,25 @@
           </div>
         </div>
 
-        <div class="why points-curve">
-          <h3>Protecting the minnows from whales (large balances)</h3>
-          <p>Each AR and AO earns 1 point a day, up to 100. Above that, points grow more slowly, so no single wallet takes most of the pool. Balances are counted per install, so splitting coins across wallets doesn't earn more.</p>
+        <div class="why points-curve p-curve">
+          <div class="p-curve-copy">
+            <h3>Protecting the minnows from whales (large balances)</h3>
+            <p>Each AR and AO earns 1 point a day, up to 100. Above that, points grow more slowly, so no single wallet takes most of the pool. Balances are counted per install, so splitting coins across wallets doesn't earn more.</p>
+          </div>
+          <figure class="curve-fig" data-curve>
+            <figcaption class="curve-cap">Points a day by balance (AR + AO)</figcaption>
+            <div class="curve-plot"></div>
+            <table class="visually-hidden">
+              <caption>Points a day by combined AR and AO balance</caption>
+              <thead><tr><th scope="col">Balance</th><th scope="col">Points a day</th></tr></thead>
+              <tbody>
+                <tr><td>100</td><td>100</td></tr>
+                <tr><td>1,000</td><td>532</td></tr>
+                <tr><td>10,000</td><td>1,900</td></tr>
+                <tr><td>100,000</td><td>6,225</td></tr>
+              </tbody>
+            </table>
+          </figure>
         </div>
 
         <details class="rules-more">
@@ -191,17 +290,32 @@
             <p>What joining shares with the Gleam Points server is in our <a href="privacy.html#points">privacy policy</a>.</p>
           </div>
         </details>
-      </section>
+      </div>
+    </section>
 
-      <section class="points-final">
-        <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="cut cut-curve cut-curve-dark cut-from-white" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path d="M0,100 L0,90 Q50,-40 100,90 L100,100 Z" fill="#0A0A0A"/>
+        <path d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)"/>
+      </svg>
+    </div>
+
+    <section class="ink p-final">
+      <div class="wrap">
+        <div class="beam p-stack p-start reveal" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
         <h2 class="heading">Start earning today.</h2>
+        <p class="line">Your first points land at the next daily count.</p>
         <div class="cta">
           <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="points-add-to-chrome-final">Install Gleam</a>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   </main>
+
+  <button class="v-sound" type="button" aria-pressed="true" hidden>
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4h3l4 3V5L6 8H3z"/><path class="v-sound-on" d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5a7 7 0 0 1 0 10"/><path class="v-sound-off" d="M13.5 8l4 4m0-4l-4 4"/></svg>
+    <span data-sound-label>Sound on</span>
+  </button>
 
   <footer class="site-footer">
     <div class="wrap">

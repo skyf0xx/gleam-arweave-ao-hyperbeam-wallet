@@ -1,19 +1,22 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#0A0A0A">
   <title>Your AO is idle. Make it earn GLEAM.</title>
-  <meta name="description" content="Every AR and AO you hold in Gleam earns points, every day. Stake GLEAM for early access, partner airdrops, lower fees and a share of the fees Gleam earns.">
+  <meta name="description"
+    content="Every AR and AO you hold in Gleam earns points, every day. Stake GLEAM for early access, Projects come to you, lower fees and a share of the fees Gleam earns.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Gleam">
   <meta property="og:title" content="Your AO is idle. Make it earn GLEAM.">
-  <meta property="og:description" content="Every AR and AO you hold in Gleam earns points, every day. Stake GLEAM for early access, partner airdrops, lower fees and a share of the fees Gleam earns.">
+  <meta property="og:description"
+    content="Every AR and AO you hold in Gleam earns points, every day. Stake GLEAM for early access, Projects come to you, lower fees and a share of the fees Gleam earns.">
   <meta property="og:url" content="https://gleam-permaweb.vercel.app/gleam.html">
   <meta property="og:image" content="https://gleam-permaweb.vercel.app/img/og.jpg?v=4">
   <meta property="og:image:width" content="1200">
@@ -22,13 +25,17 @@
   <meta name="twitter:site" content="@gleam_wallet">
   <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="program.css">
   <link rel="stylesheet" href="gleam.css">
   <script>document.documentElement.classList.add("js")</script>
-  <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5" data-domains="gleam-permaweb.vercel.app"></script>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5"
+    data-domains="gleam-permaweb.vercel.app"></script>
   <script defer src="pages.js"></script>
+  <script defer src="program.js"></script>
   <script defer src="gleam.js"></script>
 </head>
-<body class="vision-page">
+
+<body class="program vision-page">
   <header class="site-header">
     <div class="wrap">
       <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
@@ -40,16 +47,17 @@
       <canvas class="v-canvas" aria-hidden="true"></canvas>
       <div class="wrap v-hero-in">
         <p class="points-kicker">The permaweb finally has a good wallet.</p>
-        <h1 class="display v-title">Your AO is idle. Make it earn GLEAM.</h1>
+        <h1 class="display v-title">Your AO is idle. Make it earn <span class="v-gleam"><span
+              class="v-gleam-word">GLEAM</span></span>.</h1>
         <p class="line">Every AR and AO you hold in Gleam earns points, every day.</p>
         <div class="v-track">
-          <div class="beam v-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="beam v-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span>
+          </div>
           <div class="v-meter">
             <div class="gc" aria-hidden="true">
               <span class="gc-num"><span class="gc-int" data-int>0</span></span>
               <span class="gc-side"><span class="gc-dec" data-dec>.00</span><span class="gc-unit">points</span></span>
             </div>
-            <p class="gc-label">Example: 250 AO earns 250 points a day, shown 240× faster</p>
             <p class="visually-hidden" aria-live="polite" data-live></p>
           </div>
         </div>
@@ -58,21 +66,23 @@
 
     <div class="cut cut-angle" aria-hidden="true">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-        <polygon points="0,0 100,0 0,100" fill="#0A0A0A"/>
-        <line x1="0" y1="92" x2="100" y2="-8" stroke="#FF1717"/>
-        <line x1="0" y1="96" x2="100" y2="-4" stroke="#8B12FF"/>
-        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8"/>
-        <line x1="0" y1="104" x2="100" y2="4" stroke="#FFE45C"/>
-        <line x1="0" y1="108" x2="100" y2="8" stroke="#28F02D"/>
+        <polygon points="0,0 100,0 0,100" fill="#0A0A0A" />
+        <line x1="0" y1="92" x2="100" y2="-8" stroke="#FF1717" />
+        <line x1="0" y1="96" x2="100" y2="-4" stroke="#8B12FF" />
+        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8" />
+        <line x1="0" y1="104" x2="100" y2="4" stroke="#FFE45C" />
+        <line x1="0" y1="108" x2="100" y2="8" stroke="#28F02D" />
       </svg>
     </div>
 
     <section class="v-band v-today" data-gate="today">
       <div class="wrap">
-        <h2 class="points-h2">What points are today</h2>
+        <h2 class="points-h2">You earn GLEAM by</h2>
         <ul class="vision-today">
-          <li data-tick><strong>Holding.</strong> Each AR or AO you hold earns 1 point a day.<span class="v-sig v-sig-hold" aria-hidden="true"><i></i></span></li>
-          <li data-tick><strong>Inviting.</strong> Invite a friend and you both earn more.<span class="v-sig v-sig-invite" aria-hidden="true"><i></i><i></i></span></li>
+          <li data-tick><strong>Holding.</strong> Each AR or AO you hold earns 1 point a day.<span
+              class="v-sig v-sig-hold" aria-hidden="true"><i></i></span></li>
+          <li data-tick><strong>Inviting.</strong> Invite a friend and you both earn more.<span
+              class="v-sig v-sig-invite" aria-hidden="true"><i></i><i></i></span></li>
         </ul>
       </div>
     </section>
@@ -81,32 +91,38 @@
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
           <linearGradient id="beam-h" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stop-color="#FF1717"/><stop offset=".2" stop-color="#FF1717"/>
-            <stop offset=".2" stop-color="#8B12FF"/><stop offset=".4" stop-color="#8B12FF"/>
-            <stop offset=".4" stop-color="#73C9E8"/><stop offset=".6" stop-color="#73C9E8"/>
-            <stop offset=".6" stop-color="#FFE45C"/><stop offset=".8" stop-color="#FFE45C"/>
-            <stop offset=".8" stop-color="#28F02D"/><stop offset="1" stop-color="#28F02D"/>
+            <stop offset="0" stop-color="#FF1717" />
+            <stop offset=".2" stop-color="#FF1717" />
+            <stop offset=".2" stop-color="#8B12FF" />
+            <stop offset=".4" stop-color="#8B12FF" />
+            <stop offset=".4" stop-color="#73C9E8" />
+            <stop offset=".6" stop-color="#73C9E8" />
+            <stop offset=".6" stop-color="#FFE45C" />
+            <stop offset=".8" stop-color="#FFE45C" />
+            <stop offset=".8" stop-color="#28F02D" />
+            <stop offset="1" stop-color="#28F02D" />
           </linearGradient>
         </defs>
-        <path d="M0,100 Q50,-60 100,100 Z" fill="#FFFFFF"/>
-        <path d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)"/>
+        <path d="M0,100 Q50,-60 100,100 Z" fill="#FFFFFF" />
+        <path d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)" />
       </svg>
     </div>
 
     <section class="v-band v-wallet">
       <div class="wrap">
-        <h2 class="points-h2">The wallet</h2>
-        <p class="vision-lead v-big" data-lines><span>AO is the computer.</span> <span>Arweave is the memory.</span> <span>Gleam is your window into both.</span></p>
+        <h2 class="points-h2">Gleam Wallet</h2>
+        <p class="vision-lead v-big" data-lines><span>Your wallet for</span> <span>AO and Arweave.</span></p>
         <svg class="v-prism reveal" viewBox="0 0 600 200" aria-hidden="true">
-          <line class="pr-in" x1="0" y1="100" x2="250" y2="100"/>
-          <rect class="pr-pane" x="250" y="30" width="100" height="140" rx="14"/>
-          <line class="pr-out" x1="350" y1="96" x2="600" y2="16" stroke="#FF1717"/>
-          <line class="pr-out" x1="350" y1="98" x2="600" y2="58" stroke="#8B12FF"/>
-          <line class="pr-out" x1="350" y1="100" x2="600" y2="100" stroke="#73C9E8"/>
-          <line class="pr-out" x1="350" y1="102" x2="600" y2="142" stroke="#FFE45C"/>
-          <line class="pr-out" x1="350" y1="104" x2="600" y2="184" stroke="#28F02D"/>
+          <line class="pr-in" x1="0" y1="100" x2="250" y2="100" />
+          <rect class="pr-pane" x="250" y="30" width="100" height="140" rx="14" />
+          <line class="pr-out" x1="350" y1="96" x2="600" y2="16" stroke="#FF1717" />
+          <line class="pr-out" x1="350" y1="98" x2="600" y2="58" stroke="#8B12FF" />
+          <line class="pr-out" x1="350" y1="100" x2="600" y2="100" stroke="#73C9E8" />
+          <line class="pr-out" x1="350" y1="102" x2="600" y2="142" stroke="#FFE45C" />
+          <line class="pr-out" x1="350" y1="104" x2="600" y2="184" stroke="#28F02D" />
         </svg>
-        <p class="vision-lead v-sub">Users call it crisp and clean. Early users tell us what to build next.</p>
+        <p class="vision-lead v-sub">Connect a <b>hardware wallet</b>, import an <b>existing key</b>, or create a <b>new
+            wallet</b>.</p>
       </div>
     </section>
 
@@ -117,39 +133,49 @@
         <div class="tl-viewport">
           <ol class="tl-track">
             <li class="tl-fill" aria-hidden="true"></li>
-            <li class="tl-item" data-year="2018"><div class="tl-card"><time datetime="2018-06-08">Jun 8, 2018</time><span>Arweave mainnet launches</span></div></li>
-            <li class="tl-item" data-year="2024"><div class="tl-card"><time datetime="2024-02-27">Feb 27, 2024</time><span>AO is announced and its public testnet opens</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2024-06-13">Jun 13, 2024</time><span>AO tokenomics are announced</span></div></li>
-            <li class="tl-item" data-year="2025"><div class="tl-card"><time datetime="2025-02-08">Feb 8, 2025</time><span>AO mainnet launches and the AO token becomes transferable</span></div></li>
-            <li class="tl-item" data-year="2026"><div class="tl-card"><time datetime="2026-02-27">Feb 27, 2026</time><span>HyperBEAM becomes an Arweave gateway</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-03-17">Mar 17, 2026</time><span>Naming moves to the protocol level</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-03-21">Mar 21, 2026</time><span>HyperBEAM nodes form a decentralized network</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-03-23">Mar 23, 2026</time><span>PermawebOS introduces self-forking apps</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-03-31">Mar 31, 2026</time><span>Arweave moves toward a cacheless architecture</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-04-02">Apr 2, 2026</time><span>AO gets a decentralized superindexer</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-04-15">Apr 15, 2026</time><span>NASA launches to decentralize Arweave gateways</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-04-24">Apr 24, 2026</time><span>An open bundler network takes shape</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-05-07">May 7, 2026</time><span>AO opens markets for node services</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-05-21">May 21, 2026</time><span>HyperBEAM introduces its modular device architecture</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-05-27">May 27, 2026</time><span>PermawebOS explores verifiable laptop compute</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-06-01">Jun 1, 2026</time><span>Permaweb Names launches</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-06-18">Jun 18, 2026</time><span>The decentralized permaweb architecture is outlined</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-06-25">Jun 25, 2026</time><span>Read, write and search layers are defined</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-07-01">Jul 1, 2026</time><span>Routers, zones and hardware trust shape the network</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-07-21">Jul 21, 2026</time><span>AO targets secure compute on everyday hardware</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-07-27">Jul 27, 2026</time><span>AO's financial layer moves toward HyperBEAM</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-08-03">Aug 3, 2026</time><span>AI infrastructure comes to the permaweb</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-08-13">Aug 13, 2026</time><span>Bazar launches on AO Mainnet 1.0</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-08-24">Aug 24, 2026</time><span>PermawebOS enters public beta</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-09-08">Sep 8, 2026</time><span>Every browser moves toward self-sovereign GraphQL</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-09-24">Sep 24, 2026</time><span>Arweave becomes a real-time database</span></div></li>
-            <li class="tl-item"><div class="tl-card"><time datetime="2026-10-10">Oct 10, 2026</time><span>HyperBEAM nodes generate their own documentation</span></div></li>
+            <li class="tl-item" data-year="2018">
+              <div class="tl-card"><time datetime="2018-06-08">Jun 8, 2018</time><span>Arweave mainnet launches</span>
+              </div>
+            </li>
+            <li class="tl-item" data-year="2024">
+              <div class="tl-card"><time datetime="2024-02-27">Feb 27, 2024</time><span>AO is announced and its public
+                  testnet opens</span></div>
+            </li>
+            <li class="tl-item" data-year="2025">
+              <div class="tl-card"><time datetime="2025-02-08">Feb 8, 2025</time><span>AO mainnet launches and the AO
+                  token becomes transferable</span></div>
+            </li>
+            <li class="tl-item" data-year="2026">
+              <div class="tl-card"><time datetime="2026-02-27">Feb 27, 2026</time><span>HyperBEAM becomes an Arweave
+                  gateway</span></div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-card"><time datetime="2026-03-21">Mar 21, 2026</time><span>HyperBEAM nodes form a
+                  decentralized network</span></div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-card"><time datetime="2026-06-01">Jun 1, 2026</time><span>Permaweb Names launches</span>
+              </div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-card"><time datetime="2026-08-13">Aug 13, 2026</time><span>Bazar launches on AO Mainnet
+                  1.0</span></div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-card"><time datetime="2026-08-24">Aug 24, 2026</time><span>PermawebOS enters public
+                  beta</span></div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-card"><time datetime="2026-09-24">Sep 24, 2026</time><span>Arweave becomes a real-time
+                  database</span></div>
+            </li>
             <li class="tl-now" data-gate="now">
               <span class="tl-now-dot" aria-hidden="true"></span>
               <span class="tl-now-label">You are here</span>
-              <span class="tl-now-count" aria-hidden="true"><b data-mini>0</b><span data-mini-dec>.00</span> points<small>Example: 250 AO</small></span>
+              <span class="tl-now-count" aria-hidden="true"><b data-mini>0</b><span data-mini-dec>.00</span>
+                points</span>
             </li>
-            <li class="tl-next"><span>Next: partners onboarding through Gleam</span></li>
+            <li class="tl-next"><span>GLEAM token launch with AO Mainnet</span></li>
           </ol>
         </div>
       </div>
@@ -157,73 +183,170 @@
 
     <div class="cut cut-angle cut-angle-r" aria-hidden="true">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-        <polygon points="0,0 100,0 100,100" fill="#0A0A0A"/>
-        <line x1="0" y1="-8" x2="100" y2="92" stroke="#FF1717"/>
-        <line x1="0" y1="-4" x2="100" y2="96" stroke="#8B12FF"/>
-        <line x1="0" y1="0" x2="100" y2="100" stroke="#73C9E8"/>
-        <line x1="0" y1="4" x2="100" y2="104" stroke="#FFE45C"/>
-        <line x1="0" y1="8" x2="100" y2="108" stroke="#28F02D"/>
+        <polygon points="0,0 100,0 100,100" fill="#0A0A0A" />
+        <line x1="0" y1="-8" x2="100" y2="92" stroke="#FF1717" />
+        <line x1="0" y1="-4" x2="100" y2="96" stroke="#8B12FF" />
+        <line x1="0" y1="0" x2="100" y2="100" stroke="#73C9E8" />
+        <line x1="0" y1="4" x2="100" y2="104" stroke="#FFE45C" />
+        <line x1="0" y1="8" x2="100" y2="108" stroke="#28F02D" />
       </svg>
     </div>
 
     <section class="v-band v-rewards">
       <div class="wrap">
+        <p class="points-kicker v-rewards-kicker">Tokenomics</p>
         <h2 class="points-h2">Gleam: the Permaweb's reward layer</h2>
-        <p class="vision-lead">Points turn into GLEAM. Stake GLEAM to get the rest.</p>
-        <div class="points-why vision-paths v-cards reveal">
-          <div class="why">
-            <h3>Early access</h3>
-            <p>Get in first on new AO project launches.</p>
-          </div>
-          <div class="why">
-            <h3>Partner airdrops</h3>
-            <p>AO projects send tokens to Gleam users. You opt in to each one and claim it yourself. Gleam never hands partners a list of addresses.</p>
-          </div>
-          <div class="why">
-            <h3>Lower fees</h3>
-            <p>Pay less on the services Gleam runs.</p>
-          </div>
-          <div class="why">
-            <h3>Fee share</h3>
-            <p>Stakers share the fees Gleam earns. Use the wallet. Earn from the wallet.</p>
-          </div>
-        </div>
+        <p class="vision-lead">Points you earn will convert to GLEAM tokens</p>
+        <ol class="v-flow reveal">
+          <li class="v-step">
+            <span class="v-step-n" aria-hidden="true">01</span>
+            <h3>Earn points</h3>
+            <p>Every AR and AO you hold in Gleam earns 1 point a day. Invite a friend and you both earn more. Points
+              build up from the day you join.</p>
+          </li>
+          <li class="v-step">
+            <span class="v-step-n" aria-hidden="true">02</span>
+            <h3>GLEAM launches with AO mainnet</h3>
+            <p>When AO mainnet launches, GLEAM launches with it. Everyone holding Gleam points is airdropped GLEAM in
+              proportion to the points they hold, so the more you've earned, the more you get. The exact ratio is
+              set before launch.</p>
+          </li>
+          <li class="v-step">
+            <span class="v-step-n" aria-hidden="true">03</span>
+            <h3>Stake GLEAM</h3>
+            <p>Staking is where GLEAM does its work. It unlocks four rewards, each worth a closer look.</p>
+          </li>
+        </ol>
       </div>
     </section>
 
     <div class="cut cut-curve cut-curve-dark" aria-hidden="true">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-        <path d="M0,100 L0,90 Q50,-40 100,90 L100,100 Z" fill="#0A0A0A"/>
-        <path d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)"/>
+        <path d="M0,100 L0,90 Q50,-40 100,90 L100,100 Z" fill="#0A0A0A" />
+        <path d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)" />
       </svg>
     </div>
 
+    <section class="v-stake" aria-labelledby="stake-h">
+      <div class="wrap">
+        <p class="points-kicker v-rewards-kicker">03 · Stake GLEAM</p>
+        <h2 class="v-stake-h" id="stake-h">Stake GLEAM.<br>Unlock the permaweb.</h2>
+
+        <article class="perk reveal">
+          <div class="perk-copy">
+            <p class="perk-k">Early access</p>
+            <h3>Be first in line.</h3>
+            <p>When a new AO project launches, stakers get in before it opens to everyone else. No racing a crowd for a
+              spot.</p>
+          </div>
+          <svg class="perk-art art-queue" viewBox="0 0 480 300" aria-hidden="true">
+            <rect class="q-post" x="296" y="70" width="8" height="58" rx="4" />
+            <rect class="q-post" x="296" y="172" width="8" height="58" rx="4" />
+            <circle class="q-dot" cx="60" cy="150" r="11" />
+            <circle class="q-dot" cx="102" cy="150" r="11" />
+            <circle class="q-dot" cx="144" cy="150" r="11" />
+            <circle class="q-dot" cx="186" cy="150" r="11" />
+            <circle class="q-dot" cx="228" cy="150" r="11" />
+            <g class="q-you">
+              <circle cx="262" cy="150" r="13" />
+              <text x="262" y="190" text-anchor="middle">you</text>
+            </g>
+          </svg>
+        </article>
+
+        <article class="perk reveal">
+          <div class="perk-copy">
+            <p class="perk-k">Projects come to you</p>
+            <h3>Get partner airdrops.</h3>
+            <p>AO projects send tokens to Gleam users. You opt in to each one and claim it yourself. Gleam never hands
+              partners a list of addresses.</p>
+          </div>
+          <svg class="perk-art art-drop" viewBox="0 0 480 300" aria-hidden="true">
+            <rect class="d-tok" x="181" y="20" width="18" height="18" rx="3" />
+            <rect class="d-tok" x="231" y="20" width="18" height="18" rx="3" />
+            <rect class="d-tok" x="281" y="20" width="18" height="18" rx="3" />
+            <rect class="d-wallet" x="140" y="200" width="200" height="76" rx="16" />
+            <line class="d-slot" x1="180" y1="200" x2="300" y2="200" />
+          </svg>
+        </article>
+
+        <article class="perk reveal">
+          <div class="perk-copy">
+            <p class="perk-k">Lower fees</p>
+            <h3>Keep more of every move.</h3>
+            <p>Stakers pay less on the services Gleam runs.</p>
+          </div>
+          <svg class="perk-art art-fees" viewBox="0 0 480 300" aria-hidden="true">
+            <text x="40" y="112">Standard</text>
+            <rect class="f-bar" x="150" y="94" width="290" height="26" rx="13" />
+            <text x="40" y="200">Staked</text>
+            <rect class="f-bar f-staked" x="150" y="182" width="290" height="26" rx="13" />
+          </svg>
+        </article>
+
+        <article class="perk reveal">
+          <div class="perk-copy">
+            <p class="perk-k">Fee share</p>
+            <h3>Use the wallet. Earn from the wallet.</h3>
+            <p>Gleam earns fees on the services it runs. Stakers share them.</p>
+          </div>
+          <svg class="perk-art art-loop" viewBox="0 0 480 300" aria-hidden="true">
+            <circle class="l-ring" cx="240" cy="150" r="100" />
+            <circle class="l-node" cx="240" cy="50" r="7" />
+            <circle class="l-node" cx="326.6" cy="200" r="7" />
+            <circle class="l-node" cx="153.4" cy="200" r="7" />
+            <text x="240" y="30" text-anchor="middle">Use</text>
+            <text x="346" y="228">Fees</text>
+            <text x="134" y="228" text-anchor="end">Stakers</text>
+            <g class="l-orbit">
+              <circle cx="240" cy="50" r="9" />
+            </g>
+          </svg>
+        </article>
+      </div>
+    </section>
+
+    <div class="v-stake-end" aria-hidden="true"></div>
+
+
     <section class="points-final v-final">
       <div class="wrap">
-        <div class="beam v-start reveal" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <h2 class="heading">Be here from the start.</h2>
-        <p class="vision-lead">The earlier you're in, the more GLEAM you can earn before the crowd arrives.</p>
+        <div class="beam v-start reveal" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <h2 class="heading">Get in Early.</h2>
+        <p class="vision-lead">Get in early and earn before the crowd arrives.</p>
         <p class="vision-lead">Gleam is invite-only for now. Ask someone who's in.</p>
         <div class="vision-ctas">
           <div class="vision-cta">
             <h3>Have an invite code?</h3>
             <p>Install Gleam and enter your code to get in.</p>
-            <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="gleam-add-to-chrome">Install Gleam</a>
+            <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki"
+              data-umami-event="gleam-add-to-chrome">Install Gleam</a>
           </div>
           <div class="vision-cta">
             <h3>No code yet?</h3>
             <p>Post what you think a wallet should be, and someone with a seat may send you one.</p>
-            <a class="button" href="https://x.com/intent/post?text=%22AO%20is%20the%20computer.%20Arweave%20is%20the%20memory.%20Gleam%20is%20your%20window%20into%20both.%22%0A%0AAnyone%20have%20a%20%40gleam_wallet%20invite%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer" target="_blank" rel="noopener" data-umami-event="gleam-ask-on-x">Share your take to get an invite</a>
-            <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="gleam-follow-on-x">Follow @gleam_wallet for code drops</a></p>
+            <a class="button"
+              href="https://x.com/intent/post?text=%22AO%20is%20the%20computer.%20Arweave%20is%20the%20memory.%20Gleam%20is%20your%20window%20into%20both.%22%0A%0AAnyone%20have%20a%20%40gleam_wallet%20invite%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer"
+              target="_blank" rel="noopener" data-umami-event="gleam-ask-on-x">Share your take to get an invite</a>
+            <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener"
+                data-umami-event="gleam-follow-on-x">Follow @gleam_wallet for code drops</a></p>
           </div>
         </div>
-        <p class="vision-note">The full rules are on the <a href="points.html#rules">Gleam Points page</a> and in our <a href="terms.html">terms</a>.</p>
+        <p class="vision-note">The full rules are on the <a href="points.html#rules">Gleam Points page</a> and in our <a
+            href="terms.html">terms</a>.</p>
       </div>
     </section>
   </main>
 
   <button class="v-sound" type="button" aria-pressed="true" hidden>
-    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4h3l4 3V5L6 8H3z"/><path class="v-sound-on" d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5a7 7 0 0 1 0 10"/><path class="v-sound-off" d="M13.5 8l4 4m0-4l-4 4"/></svg>
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor"
+      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 8v4h3l4 3V5L6 8H3z" />
+      <path class="v-sound-on" d="M13 7.5a3.5 3.5 0 0 1 0 5M15.5 5a7 7 0 0 1 0 10" />
+      <path class="v-sound-off" d="M13.5 8l4 4m0-4l-4 4" />
+    </svg>
     <span data-sound-label>Sound on</span>
   </button>
 
@@ -241,4 +364,5 @@
     </div>
   </footer>
 </body>
+
 </html>

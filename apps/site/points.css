@@ -1,0 +1,297 @@
+/* points.html, the Gleam Points rules page. Same program as gleam.html, but its
+   motion is the rules themselves: the dial is the day filling up to the real
+   daily count, the scoreboard rolls to your estimate, the invite pulse is the
+   bonus paid both ways, and the curve plots what a balance earns. */
+
+.p-band { position: relative; padding: clamp(56px, 10vh, 112px) 0 clamp(72px, 12vh, 140px); color: var(--fg); }
+
+.p .points-h2 { margin: 0 0 clamp(24px, 4vh, 40px); font-size: clamp(2rem, 5vw, 3.75rem); line-height: 1; letter-spacing: -0.045em; max-width: 14em; }
+
+.p-stack.beam { width: 120px; height: 10px; flex-direction: column; }
+
+/* Hero */
+
+.p-hero { position: relative; overflow: hidden; isolation: isolate; }
+
+.p-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 75% 55%, #000, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 70% at 75% 55%, #000, transparent 75%);
+}
+
+.p-hero-in { display: grid; gap: 56px; padding-top: clamp(28px, 7vh, 88px); padding-bottom: clamp(48px, 9vh, 96px); }
+
+.p-hero .beam { margin: 0 0 28px; }
+.p-hero .points-kicker { color: var(--on-ink-muted); }
+.p-title { font-size: clamp(3rem, 10vw, 6.5rem); line-height: .95; letter-spacing: -0.055em; max-width: 9em; }
+.p-hero .cta { margin-top: 32px; }
+.p-hero .small { margin: 16px 0 0; }
+.p-hero .points-vision-link { margin-top: 8px; }
+
+/* The dial: one turn is one day. The beam arc is how much of today has passed
+   since the last count at 00:00 UTC; its head is now. */
+
+.dial { --p: 0; position: relative; display: grid; place-items: center; width: min(84vw, 420px); aspect-ratio: 1; margin: 0 auto; }
+
+.dial::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 255, 255, .28) 0 .6deg, transparent .6deg 15deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 26px), #000 calc(100% - 25px) calc(100% - 18px), transparent calc(100% - 17px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 26px), #000 calc(100% - 25px) calc(100% - 18px), transparent calc(100% - 17px));
+}
+
+.dial-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--beam-red) 0 20%, var(--beam-purple) 0 40%, var(--beam-sky) 0 60%, var(--beam-yellow) 0 80%, var(--beam-green) 0 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px)), conic-gradient(#000 calc(var(--p) * 360deg), transparent 0);
+  -webkit-mask-composite: source-in;
+  mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px)), conic-gradient(#000 calc(var(--p) * 360deg), transparent 0);
+  mask-composite: intersect;
+}
+
+.dial-ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+
+.dial-head { position: absolute; inset: 0; transform: rotate(calc(var(--p) * 360deg)); pointer-events: none; }
+.dial-head::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 14px 4px rgba(255, 255, 255, .6), 0 0 44px 12px rgba(115, 201, 232, .4);
+}
+
+.dial-face { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.dial-label { font-size: .8125rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--on-ink-muted); }
+.dial-time { margin: 10px 0 8px; font: 600 clamp(2.5rem, 11vw, 3.75rem)/1 var(--mono); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.dial-sub { font: 500 .75rem/1.4 var(--mono); color: var(--on-ink-muted); }
+
+.dial.land .dial-ring { animation: dial-flash 1.2s ease-out; }
+.dial.land .dial-time { animation: gc-split .5s steps(6, end); }
+@keyframes dial-flash { 0% { filter: brightness(2.2) drop-shadow(0 0 24px #fff); } 100% { filter: none; } }
+
+@media (min-width: 900px) {
+  .p-hero-in { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; min-height: calc(100svh - 62px); }
+  .dial { margin-right: 0; }
+}
+
+/* Stats and the calculator share the paper band */
+
+.p-stats-band { background: var(--paper); }
+
+.p .points-stats { margin-top: 0; border-color: #DCDCDC; background: #DCDCDC; }
+.p .stat-value { display: inline-flex; font-size: clamp(5rem, 13vw, 8.5rem); font-weight: 720; }
+.p .stat-value.land { animation: gc-land .5s cubic-bezier(.2, .8, .2, 1); }
+.p .stat::before { content: ""; display: block; width: 40px; height: 5px; margin-bottom: 28px; background: var(--c); transform-origin: left; }
+.p .stat:nth-child(1) { --c: var(--beam-sky); }
+.p .stat:nth-child(2) { --c: var(--beam-red); }
+.p .stat:nth-child(3) { --c: var(--beam-yellow); }
+.motion .p .points-stats:not(.in) .stat::before { transform: scaleX(0); }
+.motion .p .stat::before { transition: transform .6s var(--ease-out); }
+
+.p-calc { margin-top: clamp(72px, 12vh, 128px); }
+
+/* The scoreboard: the result side of the calculator, on ink */
+
+.p .calc { border-color: #DCDCDC; }
+.p .calc-results.ink { gap: 20px; padding: 36px 28px 28px; border-left-color: var(--ink); background: var(--ink); }
+.p .calc-results::before { top: 0; width: 120px; height: 5px; }
+.p .calc-period { color: var(--on-ink-muted); }
+.p .calc-result-main { margin-top: 0; padding-top: 18px; border-top-color: var(--ink-line); }
+
+.js .p .calc-value { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+html:not(.js) .calc-od, html:not(.js) .calc-mix { display: none; }
+
+.calc-od { display: inline-flex; font-size: 1.75rem; font-weight: 700; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; transform-origin: 100% 80%; }
+.calc-result-main .calc-od { font-size: clamp(3rem, 9vw, 4.75rem); letter-spacing: -0.05em; }
+.calc-od.land { animation: gc-land .5s cubic-bezier(.2, .8, .2, 1); }
+.calc-od.land .od-s { animation: gc-split .42s steps(6, end); }
+.calc-od { --hit: var(--beam-sky); }
+
+/* Where a day's points come from. Each part has a gap and a labelled value, so
+   colour never carries identity alone. */
+
+.calc-mix { padding-top: 18px; border-top: 1px solid var(--ink-line); }
+.mix-bar { display: flex; gap: 2px; height: 10px; }
+.mix-bar i { flex: var(--w, 0) 1 0; min-width: 0; border-radius: 3px; transition: flex-grow .5s var(--ease-out); }
+[data-mix-part="hold"], [data-mix-key="hold"] { --c: var(--beam-sky); }
+[data-mix-part="bonus"], [data-mix-key="bonus"] { --c: var(--beam-red); }
+[data-mix-part="friends"], [data-mix-key="friends"] { --c: var(--beam-yellow); }
+.mix-bar i { background: var(--c); }
+.mix-key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0 0; padding: 0; list-style: none; font-size: .8125rem; color: var(--on-ink-muted); }
+.mix-key li { display: inline-flex; align-items: center; gap: 7px; }
+.mix-key li::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.mix-key b { color: var(--on-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Cuts: paper into ink, and white into ink */
+
+.cut-to-ink { background: linear-gradient(var(--paper) calc(100% - 3px), var(--ink) calc(100% - 3px)); }
+.cut-from-white { background: linear-gradient(#fff calc(100% - 3px), var(--ink) calc(100% - 3px)); }
+
+/* Referral: the pulse is the bonus, paid both ways, every day */
+
+.p-ref { color: var(--on-ink); }
+.p-ref .referral { border-color: var(--ink-line); background: var(--ink-2); }
+.p-ref .referral-flow { border-bottom-color: var(--ink-line); }
+.p-ref .referral-flow li:not(.referral-arrow) { border-color: var(--on-ink); transition: background-color .2s, color .2s; }
+.p-ref .referral-arrow { overflow: visible; background: rgba(255, 255, 255, .4); }
+.p-ref .referral-arrow::after { border-color: rgba(255, 255, 255, .7); }
+.p-ref .referral-arrow i {
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 28px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--beam-run);
+  box-shadow: 0 0 12px 2px rgba(115, 201, 232, .5);
+  opacity: 0;
+}
+.p-ref .referral-gets { background: var(--ink-line); }
+.p-ref .referral-gets > div { background: var(--ink-2); }
+.p-ref .referral-who, .p-ref .referral-note { color: var(--on-ink-muted); }
+.p-ref .referral-note { border-top-color: var(--ink-line); background: var(--ink); }
+.p-ref .referral-value { display: inline-block; font-size: clamp(4rem, 10vw, 6.5rem); font-weight: 720; transform-origin: 0 80%; }
+
+.p-ref.live .referral-arrow:nth-child(2) i { animation: ref-run 2.8s cubic-bezier(.6, 0, .4, 1) infinite; }
+.p-ref.live .referral-arrow:nth-child(4) i { animation: ref-run 2.8s cubic-bezier(.6, 0, .4, 1) .45s infinite; }
+.p-ref.live .referral-flow li:nth-child(5) { animation: ref-node 2.8s .85s infinite; }
+.p-ref.live .referral-flow li:nth-child(1) { animation: ref-node 2.8s 1.15s infinite; }
+.p-ref.live [data-ref-side="friend"] .referral-value { animation: ref-hit 2.8s .85s infinite; }
+.p-ref.live [data-ref-side="you"] .referral-value { animation: ref-hit 2.8s 1.15s infinite; }
+
+@keyframes ref-run {
+  0% { opacity: 0; left: 0; }
+  8% { opacity: 1; }
+  28% { opacity: 1; left: calc(100% - 28px); }
+  34%, 100% { opacity: 0; left: calc(100% - 28px); }
+}
+@keyframes ref-node { 0%, 14% { background: var(--on-ink); color: var(--ink); } 30%, 100% { background: transparent; color: inherit; } }
+@keyframes ref-hit {
+  0% { transform: none; color: var(--on-ink); }
+  4% { transform: scale(1.12) rotate(-2deg); color: var(--beam-sky); text-shadow: -.04em 0 var(--beam-red), .04em 0 var(--beam-yellow); }
+  14% { transform: scale(.98); text-shadow: none; }
+  24%, 100% { transform: none; color: var(--on-ink); }
+}
+
+/* How it works: big numbered steps on a beam that lights as you read */
+
+.p-how { background: var(--paper); }
+
+.p-steps { --fill: 0; position: relative; margin-top: 0; }
+.p-steps::before, .p-steps::after { content: ""; position: absolute; left: 27px; top: 40px; bottom: 40px; width: 5px; border-radius: 3px; }
+.p-steps::before { background: #DCDCDC; }
+.p-steps::after { left: 25px; width: 10px; border-radius: 0; background: var(--beam-run); transform: scaleY(var(--fill)); transform-origin: top; }
+html:not(.motion) .p-steps { --fill: 1; }
+
+.p .steps li { padding: clamp(28px, 5vh, 48px) 0 clamp(28px, 5vh, 48px) 92px; border-top: 0; }
+.p .steps li::before {
+  top: clamp(24px, 4.5vh, 44px);
+  z-index: 1;
+  width: 60px;
+  height: 60px;
+  background: var(--paper);
+  border: 2px solid #CFCFCF;
+  color: var(--muted);
+  font-size: 1.375rem;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+  transition: background-color .3s, border-color .3s, color .3s;
+}
+.p .steps li.lit::before, html:not(.motion) .p .steps li::before { background: var(--fg); border-color: var(--fg); color: #fff; }
+.p .steps h2 { font-size: clamp(1.5rem, 3.4vw, 2.5rem); letter-spacing: -0.035em; line-height: 1.05; margin: 0 0 10px; }
+.p .steps p { max-width: 38em; font-size: clamp(1rem, 1.4vw, 1.1875rem); }
+
+/* Rules */
+
+.p-rules { background: #fff; }
+.p .points-why .why { padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--radius); }
+.p .points-why { gap: 16px; }
+
+.p-curve { display: grid; gap: 32px; max-width: none; margin-top: 16px; padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--radius); }
+.p-curve h3 { font-size: clamp(1.25rem, 2.2vw, 1.625rem); letter-spacing: -0.025em; line-height: 1.15; }
+
+@media (min-width: 900px) {
+  .p-curve { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); align-items: center; padding: 36px; }
+}
+
+/* Whale curve chart: one series, a dashed 1:1 reference, recessive axes */
+
+.curve-fig { position: relative; margin: 0; min-width: 0; }
+.curve-cap { margin-bottom: 10px; font-size: .8125rem; font-weight: 600; color: var(--muted); }
+.curve-plot { position: relative; }
+.curve-plot svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+.curve-grid line { stroke: #EBEBEB; stroke-width: 1; }
+.curve-axis text { fill: var(--muted); font: 500 11px var(--sans); font-variant-numeric: tabular-nums; }
+.curve-ref { fill: none; stroke: #B5B5B5; stroke-width: 1.5; stroke-dasharray: 4 4; }
+.curve-line { fill: none; stroke: var(--fg); stroke-width: 2; stroke-linejoin: round; }
+.curve-label { fill: var(--fg); font: 600 12px var(--sans); }
+.curve-label.ref { fill: var(--muted); font-weight: 500; }
+.curve-you circle:first-child { fill: #fff; }
+.curve-you circle:last-child { fill: var(--fg); }
+.curve-you text { fill: var(--fg); font: 600 12px var(--sans); }
+.curve-you line { stroke: var(--fg); stroke-width: 1; stroke-dasharray: 2 3; }
+.curve-hair { stroke: var(--fg); stroke-width: 1; opacity: 0; }
+.curve-hit { fill: transparent; cursor: crosshair; }
+.curve-dot { fill: var(--fg); stroke: #fff; stroke-width: 2; opacity: 0; }
+.curve-plot.hover .curve-hair, .curve-plot.hover .curve-dot { opacity: 1; }
+
+.curve-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: #fff;
+  font-size: .8125rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 12px));
+}
+.curve-tip b { font-variant-numeric: tabular-nums; }
+.curve-plot.hover .curve-tip { opacity: 1; }
+
+.p .rules-more { margin-top: 16px; }
+
+/* Final */
+
+.p-final { padding: clamp(40px, 8vh, 96px) 0 clamp(72px, 14vh, 160px); }
+.p-final .heading { font-size: clamp(3rem, 11vw, 8.5rem); line-height: .94; letter-spacing: -0.055em; }
+.p-final .line { margin-top: 20px; }
+.p-final .p-start.beam { width: calc(50vw - 50% + 120px); max-width: none; margin: 0 0 28px calc(50% - 50vw); transform-origin: left; }
+.motion .p-start:not(.in) { transform: scaleX(0); }
+.motion .p-start { transition: transform 1.1s cubic-bezier(.7, 0, .2, 1); }
+
+@media (max-width: 720px) {
+  .p .calc-results.ink { border-top-color: var(--ink); }
+  .p .steps li { padding-left: 80px; }
+  .p-steps::before { left: 25px; }
+  .p-steps::after { left: 23px; }
+  .p .steps li::before { width: 56px; height: 56px; }
+}
+
+.paused .p-ref * { animation-play-state: paused !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mix-bar i, .p .steps li::before { transition: none; }
+  .dial.land .dial-ring, .dial.land .dial-time, .calc-od.land, .calc-od.land .od-s, .p .stat-value.land { animation: none; }
+}

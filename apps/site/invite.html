@@ -4,17 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#F7F7F7">
+  <meta name="theme-color" content="#0A0A0A">
   <meta name="robots" content="noindex">
   <title>Get in early with Gleam</title>
-  <meta name="description" content="Gleam is building a better wallet for AO. Join the founding network, start earning points, and help shape what comes next.">
+  <meta name="description" content="Gleam is building a better wallet for AO. Get in while it's invite-only, start earning points, and help shape what comes next.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Gleam">
   <meta property="og:title" content="Get in early with Gleam">
-  <meta property="og:description" content="Gleam is building a better wallet for AO. Join the founding network, start earning points, and help shape what comes next.">
+  <meta property="og:description" content="Gleam is building a better wallet for AO. Get in while it's invite-only, start earning points, and help shape what comes next.">
   <meta property="og:url" content="https://gleam-permaweb.vercel.app/invite.html">
   <meta property="og:image" content="https://gleam-permaweb.vercel.app/img/og.jpg?v=4">
   <meta property="og:image:width" content="1200">
@@ -23,71 +23,112 @@
   <meta name="twitter:site" content="@gleam_wallet">
   <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="program.css">
+  <link rel="stylesheet" href="invite.css">
+  <script>document.documentElement.classList.add("js")</script>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5" data-domains="gleam-permaweb.vercel.app"></script>
   <script defer src="pages.js"></script>
+  <script defer src="program.js"></script>
+  <script defer src="invite.js"></script>
 </head>
-<body data-invite>
+<body class="program invite-page" data-invite>
   <header class="site-header">
     <div class="wrap">
       <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
     </div>
   </header>
 
-  <main class="wrap">
-    <div class="page">
-      <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-      <h1 class="heading">Get in early.</h1>
-      <p class="line">Gleam is building a better wallet for AO. Join the founding network, start earning points, and help shape what comes next.</p>
+  <main class="i">
+    <section class="ink i-hero">
+      <div class="wrap i-hero-in">
+        <div class="i-copy">
+          <div class="beam i-stack" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <h1 class="display i-title">Get in early.</h1>
+          <p class="line">Gleam is building a better wallet for AO. Get in while it's invite-only, start earning points, and help shape what comes next.</p>
+        </div>
 
-      <div class="invite-state" data-state="code" hidden>
-        <p style="margin-top: 32px">
-          <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="invite-add-to-chrome">Accept invite</a>
-        </p>
-        <p class="small" data-invite-code hidden>Your invite code is <strong data-invite-code-value></strong>. We'll pick it up automatically if you install it in this browser. Otherwise, enter it when Gleam asks for one.</p>
+        <div class="ticket" data-ticket aria-hidden="true">
+          <div class="ticket-top">
+            <span class="ticket-kicker">Gleam invite</span>
+            <span class="ticket-mark"><img src="favicon.svg" alt="" width="18" height="18"></span>
+          </div>
+          <span class="ticket-code" data-ticket-code></span>
+          <div class="ticket-seats" data-ticket-seats></div>
+          <span class="ticket-stamp" data-ticket-stamp></span>
+          <div class="ticket-beam"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="i-states">
+
+          <div class="invite-state" data-state="code" hidden>
+            <p class="i-cta">
+              <a class="button" href="https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki" data-umami-event="invite-add-to-chrome">Accept invite</a>
+            </p>
+            <p class="small" data-invite-code hidden>Your invite code is <strong data-invite-code-value></strong>. We'll pick it up automatically if you install Gleam in this browser. Otherwise, enter it when Gleam asks for one.</p>
+          </div>
+
+          <div data-invite-ready hidden>
+            <h2 class="invite-sub">Your invite is in Gleam.</h2>
+            <p class="small">Open Gleam from your toolbar to finish.</p>
+          </div>
+
+          <div class="invite-state" data-state="full" hidden>
+            <h2 class="invite-sub">This code is full.</h2>
+            <p class="small">Every seat on it has been taken. Someone who's already in may have a spare.</p>
+            <p class="i-cta">
+              <a class="button" href="https://x.com/intent/post?text=Tried%20a%20%40gleam_wallet%20invite%20and%20it%20was%20already%20full.%20Anyone%20have%20a%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer" target="_blank" rel="noopener" data-umami-event="invite-ask-on-x">Ask for an invite on X</a>
+            </p>
+            <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="invite-follow-on-x">Follow for the next drop</a></p>
+          </div>
+
+          <div class="invite-state" data-state="none" hidden>
+            <p class="small i-notfound" data-not-found hidden>That code wasn't found.</p>
+            <h2 class="invite-sub">Gleam is invite-only for now.</h2>
+            <p class="small">Ask in public. Someone who's already in may have a seat for you.</p>
+            <p class="i-cta">
+              <a class="button" href="https://x.com/intent/post?text=Looking%20for%20a%20%40gleam_wallet%20invite.%20Anyone%20have%20one%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer" target="_blank" rel="noopener" data-umami-event="invite-ask-on-x">Ask for an invite on X</a>
+            </p>
+            <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="invite-follow-on-x">Follow @gleam_wallet for code drops</a></p>
+          </div>
+        </div>
+
       </div>
 
-      <div data-invite-ready hidden>
-        <h2 class="invite-sub">Your invite is in Gleam.</h2>
-        <p class="small">Open Gleam from your toolbar to finish.</p>
+      <div class="wrap">
+        <div class="invite-meta">
+          <span class="vision-count" data-seats hidden></span>
+          <span class="vision-count" data-countdown hidden>Drop closes in <strong data-countdown-text></strong></span>
+        </div>
       </div>
+    </section>
 
-      <div class="invite-state" data-state="full" hidden>
-        <h2 class="invite-sub">This code is full.</h2>
-        <p class="small">Every seat on it has been taken. Someone who's already in may have a spare.</p>
-        <p style="margin-top: 20px">
-          <a class="button" href="https://x.com/intent/post?text=Tried%20a%20%40gleam_wallet%20invite%20and%20it%20was%20already%20full.%20Anyone%20have%20a%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer" target="_blank" rel="noopener" data-umami-event="invite-ask-on-x">Ask for an invite on X</a>
-        </p>
-        <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="invite-follow-on-x">Follow for the next drop</a></p>
-      </div>
-
-      <div class="invite-state" data-state="none" hidden>
-        <p class="small" data-not-found hidden>That code wasn't found.</p>
-        <h2 class="invite-sub">Gleam is invite-only for now.</h2>
-        <p class="small">Ask in public. Someone who's already in may have a seat for you.</p>
-        <p style="margin-top: 20px">
-          <a class="button" href="https://x.com/intent/post?text=Looking%20for%20a%20%40gleam_wallet%20invite.%20Anyone%20have%20one%20to%20spare%3F%0A%40ArweaveEco%20%40aoTheComputer" target="_blank" rel="noopener" data-umami-event="invite-ask-on-x">Ask for an invite on X</a>
-        </p>
-        <p class="small"><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener" data-umami-event="invite-follow-on-x">Follow @gleam_wallet for code drops</a></p>
-      </div>
-
-      <div class="invite-meta">
-        <span class="vision-count" data-seats hidden></span>
-        <span class="vision-count" data-countdown hidden>Drop closes in <strong data-countdown-text></strong></span>
-      </div>
-
-      <ul class="vision-today invite-facts">
-        <li><strong>Early access.</strong> Get in while Gleam is invite-only.</li>
-        <li><strong>Points for holding and inviting.</strong> Every AR and AO you hold earns points, and so do the friends you bring in.</li>
-      </ul>
-
-      <div class="links">
-        <a href="gleam.html">What points could become</a>
-        <a href="points.html">How points work</a>
-        <a href="./">About Gleam</a>
-        <a href="privacy.html">Privacy</a>
-        <a href="terms.html">Terms</a>
-      </div>
+    <div class="cut cut-angle" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points="0,0 100,0 0,100" fill="#0A0A0A"/>
+        <line x1="0" y1="92" x2="100" y2="-8" stroke="#FF1717"/>
+        <line x1="0" y1="96" x2="100" y2="-4" stroke="#8B12FF"/>
+        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8"/>
+        <line x1="0" y1="104" x2="100" y2="4" stroke="#FFE45C"/>
+        <line x1="0" y1="108" x2="100" y2="8" stroke="#28F02D"/>
+      </svg>
     </div>
+
+    <section class="i-band">
+      <div class="wrap">
+        <ul class="vision-today invite-facts">
+          <li><strong>Early access.</strong> Get in while Gleam is invite-only.</li>
+          <li><strong>Points for holding and inviting.</strong> Every AR and AO you hold earns points, and so do the friends you bring in.</li>
+        </ul>
+
+        <div class="links">
+          <a href="gleam.html">What points could become</a>
+          <a href="points.html">How points work</a>
+          <a href="./">About Gleam</a>
+          <a href="privacy.html">Privacy</a>
+          <a href="terms.html">Terms</a>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="site-footer">
