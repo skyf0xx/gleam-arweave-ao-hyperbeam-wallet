@@ -14,3 +14,5 @@ playwright-report/
 .DS_Store
 POINTS.md
 todo.md
+
+.env
