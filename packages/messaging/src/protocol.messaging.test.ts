@@ -51,7 +51,6 @@ describe("ProtocolMap", () => {
       "getPointsScores",
       "getPointsInviteUnlock",
       "redeemPointsInvite",
-      "getFoundingCount",
       "getPointsPendingInvite",
       "getPointsRevealSeen",
       "markPointsRevealSeen",
@@ -62,7 +61,7 @@ describe("ProtocolMap", () => {
       "getPointsSeatsSeen",
       "markPointsSeatsSeen",
     ];
-    expect(methodNames).toHaveLength(16);
+    expect(methodNames).toHaveLength(15);
   });
 
   it("declares announcement methods", () => {

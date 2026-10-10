@@ -161,20 +161,6 @@
       });
   }
 
-  // The founding count stays hidden until the server answers with a real
-  // positive number, so a down server never shows a zero or a placeholder.
-  function showFoundingCount(el) {
-    callPointsApi("/stats").then(function (body) {
-      var n = body && body.foundingMembers;
-      if (typeof n !== "number" || !isFinite(n) || n < 1 || Math.floor(n) !== n) return;
-      el.querySelector("[data-founding-number]").textContent = new Intl.NumberFormat("en-US").format(n);
-      el.hidden = false;
-    });
-  }
-
-  var foundingCount = document.querySelector("[data-founding-count]");
-  if (foundingCount) showFoundingCount(foundingCount);
-
   if (document.body.hasAttribute("data-invite")) setUpInvitePage();
 
   // invite.html (POINTS.md § Messaging). The page opens in the invite state

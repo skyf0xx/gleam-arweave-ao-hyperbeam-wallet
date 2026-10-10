@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { InviteUnlock, RuntimePort } from "@gleam/core";
 import { GatedOnboarding } from "./GatedOnboarding";
@@ -13,14 +13,12 @@ afterEach(() => {
 
 interface Backend {
   unlock?: InviteUnlock | null;
-  count?: number | null;
   redeem?: (code: string) => InviteUnlock | Promise<InviteUnlock>;
 }
 
-function setup({ unlock = null, count = 42, redeem }: Backend = {}, gateEnabled = true) {
+function setup({ unlock = null, redeem }: Backend = {}, gateEnabled = true) {
   const send = vi.fn(async (message: { type: string; payload: unknown }) => {
     if (message.type === "getPointsInviteUnlock") return unlock;
-    if (message.type === "getFoundingCount") return count;
     if (message.type === "redeemPointsInvite") return redeem!((message.payload as { code: string }).code);
     throw new Error(`unexpected ${message.type}`);
   });
@@ -43,7 +41,6 @@ describe("GatedOnboarding", () => {
   it("shows the gate for an install with no unlock", async () => {
     setup();
     expect(await screen.findByText("You're early.")).toBeTruthy();
-    expect(await screen.findByText("42 founding members so far.")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Don't have an invite?" }));
     expect(screen.getByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeTruthy();
@@ -74,13 +71,6 @@ describe("GatedOnboarding", () => {
       </QueryClientProvider>,
     );
     expect(await screen.findByRole("button", { name: "Create a wallet" })).toBeTruthy();
-  });
-
-  it("hides the count line when the count is unavailable", async () => {
-    const { send } = setup({ count: null });
-    await screen.findByText("You're early.");
-    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "getFoundingCount", payload: undefined }));
-    expect(screen.queryByText(/founding members so far/)).toBeNull();
   });
 
   it("uppercases the code as it is typed", async () => {

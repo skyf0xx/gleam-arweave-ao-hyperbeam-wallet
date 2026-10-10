@@ -245,19 +245,6 @@ export class PointsHandler {
     }
   }
 
-  /** The live founding-member count, or null on any failure so the gate hides the line. */
-  async foundingCount(): Promise<number | null> {
-    try {
-      const response = await this.fetchImpl(`${this.deps.apiUrl}/stats`);
-      if (!response.ok) return null;
-      const body = (await response.json()) as { foundingMembers?: unknown };
-      const count = body.foundingMembers;
-      return typeof count === "number" && Number.isInteger(count) && count >= 0 ? count : null;
-    } catch {
-      return null;
-    }
-  }
-
   private async requestRedeem(code: string): Promise<InviteRedeemResult> {
     try {
       const device = await this.deps.deviceKey();

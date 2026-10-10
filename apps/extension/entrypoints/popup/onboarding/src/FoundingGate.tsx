@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import type { InviteRedeemResult, InviteUnlock, RuntimePort } from "@gleam/core";
 import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -58,13 +58,6 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
   const [askOpen, setAskOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const count = useQuery({
-    queryKey: ["points", "foundingCount"],
-    queryFn: () => runtime.send<undefined, number | null>({ type: "getFoundingCount", payload: undefined }),
-    staleTime: 60_000,
-    retry: false,
-  });
-
   const redeem = useMutation({
     mutationFn: (value: string) =>
       runtime.send<{ code: string }, InviteUnlock>({ type: "redeemPointsInvite", payload: { code: value } }),
@@ -101,7 +94,6 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
 
   const checking = redeem.isPending;
   const full = verdict === "full";
-  const foundingMembers = count.data;
 
   const hasCode = code.length > 0;
   // A full code is exactly when someone needs another one, so the ask
@@ -129,7 +121,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
       <div className="mt-7 flex flex-col items-center gap-2 text-center">
         <h1 className="text-h2 font-semibold tracking-tight text-foreground">You&apos;re early.</h1>
         <p className="text-body text-muted">
-          Become a founding member and earn{" "}
+          Join now and earn{" "}
           <a
             href={sitePageUrl("gleam", browser.runtime.getManifest().version)}
             target="_blank"
@@ -142,9 +134,6 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
           <br />
           Invite only
         </p>
-        {typeof foundingMembers === "number" ? (
-          <p className="text-caption text-faint">{foundingMembers.toLocaleString("en-US")} founding members so far.</p>
-        ) : null}
       </div>
 
       <form className="mt-6 flex w-full flex-col gap-3" onSubmit={onSubmit} noValidate>

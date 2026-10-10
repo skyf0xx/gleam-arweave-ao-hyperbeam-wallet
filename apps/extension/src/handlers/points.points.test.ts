@@ -329,37 +329,6 @@ describe("PointsHandler.leave", () => {
   });
 });
 
-describe("PointsHandler.foundingCount", () => {
-  function counter(fetchImpl: typeof fetch) {
-    return new PointsHandler({
-      storage: createFakeStorage(),
-      deviceKey: createDeviceKey,
-      apiUrl: "https://points.test",
-      signingKey: async () => null,
-      badge: createFakeBadge(),
-      fetchImpl,
-      now: () => NOW,
-    });
-  }
-
-  it("reads the count from /stats", async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ foundingMembers: 184 })));
-    expect(await counter(fetchImpl as unknown as typeof fetch).foundingCount()).toBe(184);
-    expect(fetchImpl).toHaveBeenCalledWith("https://points.test/stats");
-  });
-
-  it("returns null on a network error, a bad status or a malformed body", async () => {
-    const failing = vi.fn(async () => {
-      throw new Error("offline");
-    });
-    expect(await counter(failing as unknown as typeof fetch).foundingCount()).toBeNull();
-    const limited = vi.fn(async () => new Response("{}", { status: 429 }));
-    expect(await counter(limited as unknown as typeof fetch).foundingCount()).toBeNull();
-    const malformed = vi.fn(async () => new Response(JSON.stringify({ foundingMembers: "many" })));
-    expect(await counter(malformed as unknown as typeof fetch).foundingCount()).toBeNull();
-  });
-});
-
 describe("PointsHandler.redeemInvite", () => {
   it("keeps a code that unlocked the install as the pending invite for the claim step", async () => {
     const storage = createFakeStorage();

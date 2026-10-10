@@ -163,7 +163,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     expect(await screen.findByText("Top 12%")).toBeTruthy();
     expect(screen.queryByText(/OG/)).toBeNull();
-    expect(screen.queryByText(/Original founder/)).toBeNull();
+    expect(screen.queryByText(/Early member bonus/)).toBeNull();
 
     const stats = within(screen.getByText("Today's rate").closest("dl")!);
     expect(stats.getByText("Today's rate")).toBeTruthy();
@@ -194,7 +194,7 @@ describe("PointsView", () => {
     }
   });
 
-  it("marks an original founder in Standing", async () => {
+  it("shows the early member bonus in Standing", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
@@ -203,7 +203,7 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Original founder · +10%")).toBeTruthy();
+    expect(await screen.findByText("Early member bonus · +10% daily")).toBeTruthy();
   });
 
   it("leaves the invite slots empty until the server reports them", async () => {
