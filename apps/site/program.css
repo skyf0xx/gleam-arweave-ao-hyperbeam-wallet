@@ -89,7 +89,8 @@
   100% { opacity: 0; transform: translateY(-1.8em); }
 }
 
-/* Sound toggle: always on screen, so turning the ping off is one tap away */
+/* Sound toggle: always on screen. Sound starts off, since browsers need a
+   click before they'll play, so the toggle is also the way in */
 
 .v-sound {
   position: fixed;
@@ -115,6 +116,13 @@
 .v-sound:focus-visible { outline: 2px solid var(--beam-sky); outline-offset: 3px; border-radius: 999px; }
 .v-sound[aria-pressed="true"] .v-sound-off, .v-sound[aria-pressed="false"] .v-sound-on { display: none; }
 .v-sound[aria-pressed="false"] { color: var(--on-ink-muted); }
+.v-sound.hint { animation: v-sound-hint 1.1s ease-out; }
+
+@keyframes v-sound-hint {
+  0% { color: var(--on-ink-muted); border-color: rgba(255, 255, 255, .18); box-shadow: 0 0 0 0 transparent; }
+  15% { color: var(--on-ink); border-color: var(--beam-sky); box-shadow: 0 0 18px 2px color-mix(in srgb, var(--beam-sky) 45%, transparent); }
+  100% { color: var(--on-ink-muted); border-color: rgba(255, 255, 255, .18); box-shadow: 0 0 0 0 transparent; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .od-s { transition: none; }

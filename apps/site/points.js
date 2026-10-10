@@ -45,8 +45,8 @@
     // The count just happened: the day wrapped back to a full turn
     if (lastLeft !== null && left > lastLeft) {
       if (program.motion()) program.restart(dial, "land");
-      program.ping(9);
-      program.ping(12, 0.12);
+      program.ping(9, 0, dial);
+      program.ping(12, 0.12, dial);
     }
     lastLeft = left;
   }
@@ -304,7 +304,7 @@
     // A soft two-note ping as each side's bonus lands: friend, then you
     [["friend", 2], ["you", 4]].forEach(function (pair) {
       var value = ref.querySelector('[data-ref-side="' + pair[0] + '"] .referral-value');
-      var play = function () { if (!document.hidden) program.ping(pair[1]); };
+      var play = function () { if (!document.hidden) program.ping(pair[1], 0, value); };
       value.addEventListener("animationstart", play);
       value.addEventListener("animationiteration", play);
     });
