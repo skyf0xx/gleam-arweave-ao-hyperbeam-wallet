@@ -16,8 +16,12 @@
   var INVITE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
   var INVITE_CODE = /^[A-Z0-9]{6,16}$/;
 
+  // Set once an installed Gleam has taken the code, so the page's own
+  // states can't reappear over the "ready" message.
+  var handedOverToInstalled = false;
+
   if (document.body.hasAttribute("data-invite")) {
-    var code = (params.get("c") || "").trim().toUpperCase();
+    var code = (params.get("c") || params.get("code") || "").trim().toUpperCase();
     if (INVITE_CODE.test(code)) {
       try {
         localStorage.setItem(INVITE_KEY, JSON.stringify({ code: code, savedAt: Date.now() }));
@@ -31,7 +35,30 @@
       }
       // Counts invite visits. The code itself is never sent.
       trackOnce("gleam-invite-open", {});
+      handOverToInstalled(code);
     }
+  }
+
+  // If Gleam is already installed in this browser (it's sitting on the
+  // founding gate), hand the code straight to it so nobody has to type it.
+  function handOverToInstalled(code) {
+    var runtime = window.chrome && window.chrome.runtime;
+    if (!runtime || !runtime.sendMessage) return;
+    runtime.sendMessage(EXTENSION_ID, { type: "gleam-points:invite", code: code }, function (reply) {
+      if (runtime.lastError || !reply || !reply.ok || reply.redeem !== "ok") return;
+      try {
+        localStorage.removeItem(INVITE_KEY);
+      } catch {
+        // Nothing to clean up if storage is blocked.
+      }
+      var ready = document.querySelector("[data-invite-ready]");
+      if (!ready) return;
+      handedOverToInstalled = true;
+      document.querySelectorAll(".invite-state").forEach(function (el) {
+        el.hidden = true;
+      });
+      ready.hidden = false;
+    });
   }
 
   // Shows one of welcome.html's Phase 1 states (POINTS.md § Messaging).
@@ -157,7 +184,7 @@
   var MEMBER_SEATS = 3;
 
   function setUpInvitePage() {
-    var inviteCode = (params.get("c") || "").trim().toUpperCase();
+    var inviteCode = (params.get("c") || params.get("code") || "").trim().toUpperCase();
     if (!INVITE_CODE.test(inviteCode)) inviteCode = "";
     var states = {};
     document.querySelectorAll("[data-state]").forEach(function (el) {
@@ -168,6 +195,7 @@
     var notFound = document.querySelector("[data-not-found]");
 
     function show(name) {
+      if (handedOverToInstalled) return;
       Object.keys(states).forEach(function (key) {
         states[key].hidden = key !== name;
       });

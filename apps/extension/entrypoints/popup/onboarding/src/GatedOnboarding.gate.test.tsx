@@ -44,8 +44,11 @@ describe("GatedOnboarding", () => {
     setup();
     expect(await screen.findByText("You're early.")).toBeTruthy();
     expect(await screen.findByText("42 founding members so far.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Don't have an invite?" }));
     expect(screen.getByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "What are Gleam Points?" }).getAttribute("href")).toBe(
+    expect(screen.queryByText("What are Gleam Points?")).toBeNull();
+    expect(screen.getByRole("link", { name: "GLEAM" }).getAttribute("href")).toBe(
       "https://gleam-permaweb.vercel.app/future.html?v=1.2.3",
     );
   });
@@ -87,6 +90,30 @@ describe("GatedOnboarding", () => {
     expect(field().value).toBe("GLEAM12AB");
   });
 
+  it("takes the code out of a pasted invite link, dropping separators", async () => {
+    setup();
+    await screen.findByText("You're early.");
+    type("  https://gleam-permaweb.vercel.app/invite.html?c=k7m2-qx9p ");
+    expect(field().value).toBe("K7M2QX9P");
+    type("gleam-drop 7");
+    expect(field().value).toBe("GLEAMDROP7");
+  });
+
+  it("asks for a code inline when Unlock is tapped with the field empty", async () => {
+    const redeem = vi.fn();
+    setup({ redeem });
+    await screen.findByText("You're early.");
+    const button = screen.getByRole("button", { name: "Unlock Gleam" });
+    expect(button.className).not.toContain("bg-foreground");
+    expect(button.hasAttribute("disabled")).toBe(false);
+    submit();
+    expect(await screen.findByText("Enter your invite code.")).toBeTruthy();
+    expect(redeem).not.toHaveBeenCalled();
+    type("K7M2QX9P");
+    expect(screen.queryByText("Enter your invite code.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock Gleam" }).className).toContain("bg-foreground");
+  });
+
   it("checks the code, then plays You're in and moves on to Welcome", async () => {
     setup({ redeem: (code) => result(code, "ok") });
     await screen.findByText("You're early.");
@@ -124,7 +151,8 @@ describe("GatedOnboarding", () => {
 
   it("keeps Ask secondary with the regular post when no code is full", async () => {
     setup();
-    const ask = await screen.findByRole("link", { name: "Ask for an invite on X" });
+    fireEvent.click(await screen.findByRole("button", { name: "Don't have an invite?" }));
+    const ask = screen.getByRole("link", { name: "Ask for an invite on X" });
     expect(ask.className).not.toContain("bg-foreground");
     expect(decodeURIComponent(ask.getAttribute("href")!)).toContain("Looking for a @gleam_wallet invite");
   });
