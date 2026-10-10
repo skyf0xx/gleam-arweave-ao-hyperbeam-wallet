@@ -1,0 +1,28 @@
+/* Shared frame for the points-program share cards (og-gleam, og-invite, og-points).
+   Each card links the page's own stylesheets, so the ticket, dial and beam are the
+   real components; this file only fixes them into a 1200×630 frame. */
+
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: var(--ink); }
+.og { position: relative; width: 1200px; height: 630px; overflow: hidden; isolation: isolate; color: var(--on-ink); }
+
+.og::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 75% at 78% 50%, #000, transparent 75%);
+  mask-image: radial-gradient(ellipse 60% 75% at 78% 50%, #000, transparent 75%);
+}
+
+.og .wordmark { position: absolute; left: 80px; top: 64px; font-size: 1.75rem; gap: 12px; color: var(--on-ink); }
+.og .wordmark img { width: 30px; height: 30px; }
+
+.copy { position: absolute; left: 80px; top: 150px; width: 600px; }
+.copy .stack.beam { width: 120px; height: 10px; flex-direction: column; margin: 0 0 32px; }
+.copy h1 { margin: 0; font-weight: 600; font-size: 104px; line-height: .94; letter-spacing: -0.055em; }
+.copy p { margin: 28px 0 0; font-size: 26px; line-height: 1.35; color: var(--on-ink-muted); max-width: 22em; }
+.copy p b { color: var(--on-ink); font-weight: 600; }
