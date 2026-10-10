@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { FOUNDING_GATE } from "@/src/founding-gate";
@@ -14,9 +14,9 @@ export interface ExistingMemberRevealProps {
 }
 
 /**
- * Shows the founding reveal once, on the first popup open after the
- * update, to a wallet that joined Gleam Points before founding numbers
- * existed (POINTS.md journey E). Anything that stops it from being
+ * Shows the founding reveal to a member wallet that hasn't tapped Done on
+ * it yet: one that joined before founding numbers existed (POINTS.md
+ * journey E), or one whose popup closed during the reveal after a claim. Anything that stops it from being
  * decided (a failed read, no number yet) shows `children` instead:
  * the reveal is a courtesy, never a gate.
  */
@@ -32,19 +32,12 @@ export function ExistingMemberReveal({ runtime, wallet, enabled = FOUNDING_GATE,
   });
   const unseenMember = membership !== null && seen.isSuccess && !seen.data.includes(wallet.id);
   const scores = usePointsScores(runtime, enabled && unseenMember);
-  // The reveal marks the wallet seen as soon as it shows, which would
-  // otherwise swap it out for `children` mid-view.
-  const revealing = useRef(false);
-
   if (!enabled || dismissed) return <>{children}</>;
-  if (!revealing.current) {
-    if (memberships.isPending || seen.isPending) return null;
-    if (!unseenMember) return <>{children}</>;
-    if (scores.isPending) return null;
-    const score = scores.data?.wallets.find((candidate) => candidate.address === wallet.address);
-    if (score?.foundingNumber == null) return <>{children}</>;
-    revealing.current = true;
-  }
+  if (memberships.isPending || seen.isPending) return null;
+  if (!unseenMember) return <>{children}</>;
+  if (scores.isPending) return null;
+  const score = scores.data?.wallets.find((candidate) => candidate.address === wallet.address);
+  if (score?.foundingNumber == null) return <>{children}</>;
 
   return (
     <FoundingRevealScreen

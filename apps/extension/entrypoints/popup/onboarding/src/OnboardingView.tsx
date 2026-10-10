@@ -102,6 +102,19 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     else onComplete();
   };
 
+  // Recorded as soon as the wallet exists, so closing the popup anywhere
+  // after this (backup, a link on the claim step) still brings the claim
+  // step back on the home screen.
+  const markClaimPending = async (wallet: WalletSummary) => {
+    if (!claim) return;
+    await runtime
+      .send<{ walletId: string; pending: boolean }, void>({
+        type: "setPointsClaimPending",
+        payload: { walletId: wallet.id, pending: true },
+      })
+      .catch(() => {});
+  };
+
   const handleCreatePassword = async (password: string) => {
     setSubmitting(true);
     setServerError(undefined);
@@ -110,6 +123,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         type: "createWallet",
         payload: { name: randomDefaultWalletName(), password },
       });
+      await markClaimPending(summary);
       // `exportWallet` re-decrypts the just-created envelope rather than
       // this view module ever holding the plaintext JWK itself — the
       // password already left this component's state by this point.
@@ -138,6 +152,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         type: "importWallet",
         payload: { jwk, name: randomDefaultWalletName(), password },
       });
+      await markClaimPending(summary);
       finish(summary);
     } catch (error) {
       setServerError(error instanceof Error ? error.message : String(error));

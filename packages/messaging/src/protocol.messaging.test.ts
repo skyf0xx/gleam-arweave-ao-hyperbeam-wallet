@@ -55,12 +55,14 @@ describe("ProtocolMap", () => {
       "getPointsPendingInvite",
       "getPointsRevealSeen",
       "markPointsRevealSeen",
+      "getPointsClaimPending",
+      "setPointsClaimPending",
       "getPointsShareSeen",
       "markPointsShareSeen",
       "getPointsSeatsSeen",
       "markPointsSeatsSeen",
     ];
-    expect(methodNames).toHaveLength(14);
+    expect(methodNames).toHaveLength(16);
   });
 
   it("keys the seat and share-prompt state by wallet id", () => {

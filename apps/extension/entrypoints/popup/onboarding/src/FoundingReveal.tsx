@@ -69,8 +69,8 @@ export interface FoundingRevealScreenProps {
 /**
  * Reads the wallet's standing and shows the reveal. A wallet the server
  * numbers as null (it registered after Phase 1) has nothing to reveal and
- * is skipped. The wallet counts as seen only once its number is on
- * screen, so a failed read shows the reveal again on a later open.
+ * is skipped. The wallet counts as seen only on Done, so closing the
+ * popup first (or a failed read) shows the reveal again on a later open.
  */
 export function FoundingRevealScreen({ runtime, walletId, address, inviteCode, onDone }: FoundingRevealScreenProps) {
   const queryClient = useQueryClient();
@@ -83,13 +83,6 @@ export function FoundingRevealScreen({ runtime, walletId, address, inviteCode, o
     mutationFn: () => runtime.send<{ walletId: string }, void>({ type: "markPointsRevealSeen", payload: { walletId } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: REVEAL_SEEN_QUERY_KEY }),
   });
-  const markSeenRef = markSeen.mutate;
-  useEffect(() => {
-    if (foundingNumber !== null) markSeenRef();
-    // Marking once per number is enough; `mutate` is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [foundingNumber]);
-
   useEffect(() => {
     if (skip) onDone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,7 +94,10 @@ export function FoundingRevealScreen({ runtime, walletId, address, inviteCode, o
       foundingNumber={foundingNumber}
       seatsLeft={score?.seatsLeft ?? null}
       inviteCode={score?.inviteCode ?? inviteCode ?? null}
-      onDone={onDone}
+      onDone={() => {
+        if (foundingNumber !== null) markSeen.mutate();
+        onDone();
+      }}
     />
   );
 }

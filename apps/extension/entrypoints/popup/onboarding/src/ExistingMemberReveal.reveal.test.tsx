@@ -61,18 +61,19 @@ function setup(
 }
 
 describe("ExistingMemberReveal", () => {
-  it("shows an existing member their number once, stays up after it is marked seen, and Done reveals the home", async () => {
+  it("shows an existing member their number, and marks it seen only on Done", async () => {
     const { send } = setup({});
     expect(await screen.findByText("#12")).toBeTruthy();
     expect(screen.getByText("You have 3 invites")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Share on X" })).toBeTruthy();
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "markPointsRevealSeen", payload: { walletId: "w1" } }),
-    );
     expect(screen.queryByText("home")).toBeNull();
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsRevealSeen" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.getByText("home")).toBeTruthy();
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "markPointsRevealSeen", payload: { walletId: "w1" } }),
+    );
   });
 
   it("does not show it again for a wallet already marked seen", async () => {

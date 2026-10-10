@@ -37,6 +37,12 @@ export const POINTS_PENDING_INVITE_KEY = "local:points:pendingInviteCode";
 export const POINTS_INVITE_UNLOCK_KEY = "local:points:inviteUnlock";
 /** Ids of wallets whose founding reveal has been shown, as `{ [walletId]: true }`. */
 export const POINTS_REVEAL_SEEN_KEY = "local:points:foundingRevealSeen";
+/**
+ * Ids of wallets that reached the claim step and haven't claimed or tapped
+ * Not now, as `{ [walletId]: true }`. Kept in storage because the popup
+ * closes on any link click, which would otherwise lose the step.
+ */
+export const POINTS_CLAIM_PENDING_KEY = "local:points:claimPending";
 /** Named share prompts each wallet has dismissed or acted on, as `{ [walletId]: PointsSharePrompt[] }`. */
 export const POINTS_SHARE_SEEN_KEY = "local:points:shareSeen";
 /**
@@ -145,7 +151,21 @@ export class PointsHandler {
       lastHeartbeatAt: this.now(),
     });
     await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
+    await this.setClaimPending({ walletId: req.walletId, pending: false });
     return membership;
+  }
+
+  async getClaimPending(): Promise<string[]> {
+    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_CLAIM_PENDING_KEY);
+    return stored !== null && typeof stored === "object" ? Object.keys(stored) : [];
+  }
+
+  async setClaimPending(req: { walletId: string; pending: boolean }): Promise<void> {
+    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_CLAIM_PENDING_KEY);
+    const next: Record<string, true> = { ...(stored !== null && typeof stored === "object" ? stored : {}) };
+    if (req.pending) next[req.walletId] = true;
+    else delete next[req.walletId];
+    await this.deps.storage.set(POINTS_CLAIM_PENDING_KEY, next);
   }
 
   async getInviteUnlock(): Promise<InviteUnlock | null> {

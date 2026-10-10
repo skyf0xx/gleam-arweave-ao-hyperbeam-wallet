@@ -21,6 +21,7 @@ import {
   POINTS_DEVICE_STATE_KEY,
   POINTS_MEMBERSHIPS_KEY,
   POINTS_PENDING_INVITE_KEY,
+  POINTS_CLAIM_PENDING_KEY,
   POINTS_REVEAL_SEEN_KEY,
   POINTS_SEATS_SEEN_KEY,
   POINTS_SHARE_SEEN_KEY,
@@ -186,10 +187,10 @@ describe("PointsHandler.join", () => {
     ).toBe(true);
   });
 
-  it("stores the membership, turns on the heartbeat and clears the pending code", async () => {
+  it("stores the membership, turns on the heartbeat and clears the pending code and claim", async () => {
     const { handler, storage } = await setup(null, 200, {
       responseBody: joined(),
-      extraStorage: { [POINTS_PENDING_INVITE_KEY]: "FRIEND42" },
+      extraStorage: { [POINTS_PENDING_INVITE_KEY]: "FRIEND42", [POINTS_CLAIM_PENDING_KEY]: { w1: true, w2: true } },
     });
 
     const membership = await handler.join({ walletId: "w1" });
@@ -198,6 +199,7 @@ describe("PointsHandler.join", () => {
     expect(await handler.getMemberships()).toEqual({ w1: membership });
     expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual({ registered: true, lastHeartbeatAt: NOW });
     expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
+    expect(await handler.getClaimPending()).toEqual(["w2"]);
   });
 
   it("prefers a typed invite code, normalized, over the pending one", async () => {
@@ -487,6 +489,18 @@ describe("PointsHandler founding reveal seen", () => {
     await handler.markRevealSeen({ walletId: "w1" });
     expect(await handler.getRevealSeen()).toEqual(["w1", "w2"]);
     expect(storage.store.get(POINTS_REVEAL_SEEN_KEY)).toEqual({ w1: true, w2: true });
+  });
+});
+
+describe("PointsHandler claim pending", () => {
+  it("records and clears each wallet's pending claim", async () => {
+    const { handler, storage } = await setup(null);
+    expect(await handler.getClaimPending()).toEqual([]);
+    await handler.setClaimPending({ walletId: "w1", pending: true });
+    await handler.setClaimPending({ walletId: "w2", pending: true });
+    await handler.setClaimPending({ walletId: "w1", pending: false });
+    expect(await handler.getClaimPending()).toEqual(["w2"]);
+    expect(storage.store.get(POINTS_CLAIM_PENDING_KEY)).toEqual({ w2: true });
   });
 });
 

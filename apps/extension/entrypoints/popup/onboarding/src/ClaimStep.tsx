@@ -1,8 +1,11 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PointsMembership, RuntimePort } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { JoinNote } from "../../points/src/JoinNote";
 import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
+
+export const CLAIM_PENDING_QUERY_KEY = ["points", "claimPending"] as const;
 
 /** `founding` is the Phase 1 build, where joining earns a founding number. */
 export type ClaimPhase = "founding" | "open";
@@ -15,11 +18,28 @@ export interface ClaimStepProps {
   onSkip: () => void;
 }
 
-/** The last onboarding step (POINTS.md § Extension): opt in to Gleam Points, or skip. */
+/**
+ * The last onboarding step (POINTS.md § Extension): opt in to Gleam Points,
+ * or skip. It stays pending until one of the two, so it comes back on the
+ * home screen if the popup closes first.
+ */
 export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: ClaimStepProps) {
   const join = useJoinPoints(runtime);
   const pending = usePendingInvite(runtime);
   const founding = phase === "founding";
+  const queryClient = useQueryClient();
+  const skip = useMutation({
+    mutationFn: () =>
+      runtime.send<{ walletId: string; pending: boolean }, void>({
+        type: "setPointsClaimPending",
+        payload: { walletId, pending: false },
+      }),
+    // Skipping never blocks: if the flag can't be cleared, the step returns next open.
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: CLAIM_PENDING_QUERY_KEY });
+      onSkip();
+    },
+  });
 
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
@@ -29,7 +49,7 @@ export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: Claim
 
       <div className="mt-7 flex flex-col items-center gap-2 text-center">
         <h1 className="text-h2 font-semibold tracking-tight text-foreground">
-          {founding ? "Claim your founding number" : "Start earning Gleam Points"}
+          {founding ? "Become a founding member" : "Start earning Gleam Points"}
         </h1>
         <p className="text-body text-muted">
           Earn points every day for the AR and AO you hold. Invite friends and you both earn more.
@@ -47,9 +67,9 @@ export function ClaimStep({ runtime, walletId, phase, onClaimed, onSkip }: Claim
           disabled={join.isPending}
           onClick={() => join.mutate({ walletId }, { onSuccess: onClaimed })}
         >
-          {join.isPending ? "Joining…" : founding ? "Claim" : "Join Gleam Points"}
+          {join.isPending ? "Joining…" : founding ? "Join as a founder" : "Join Gleam Points"}
         </Button>
-        <Button variant="secondary" disabled={join.isPending} onClick={onSkip}>
+        <Button variant="secondary" disabled={join.isPending || skip.isPending} onClick={() => skip.mutate()}>
           Not now
         </Button>
         <JoinNote />

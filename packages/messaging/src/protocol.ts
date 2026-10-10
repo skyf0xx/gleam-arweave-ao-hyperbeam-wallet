@@ -171,6 +171,9 @@ export interface ProtocolMap {
   /** Ids of wallets whose founding reveal was already shown. */
   getPointsRevealSeen(): string[];
   markPointsRevealSeen(req: { walletId: string }): void;
+  /** Wallets whose claim step is still waiting for Claim or Not now. */
+  getPointsClaimPending(): string[];
+  setPointsClaimPending(req: { walletId: string; pending: boolean }): void;
   /** The named share prompts each wallet has dismissed or acted on, keyed by wallet id. */
   getPointsShareSeen(): Record<string, PointsSharePrompt[]>;
   markPointsShareSeen(req: { walletId: string; prompt: PointsSharePrompt }): void;

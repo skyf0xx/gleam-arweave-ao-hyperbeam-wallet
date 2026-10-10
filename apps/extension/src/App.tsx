@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RuntimePort, ThemeSettings, TokenBalance, WalletState, WalletSummary } from "@gleam/core";
-import { ExistingMemberReveal, GatedOnboarding, OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
+import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
 import { SendView } from "@/entrypoints/popup/send/index.tsx";
@@ -331,18 +331,20 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     );
   } else {
     content = (
-      <ExistingMemberReveal runtime={runtime} wallet={wallet}>
-        <MainScreenView
-          runtime={runtime}
-          wallet={wallet}
-          onSend={() => setSubView({ kind: "send", token: null })}
-          onSendToken={(token) => setSubView({ kind: "send", token })}
-          onReceive={() => setSubView({ kind: "receive" })}
-          onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
-          onOpenSettings={() => setSubView({ kind: "settings-home" })}
-          onOpenPoints={() => setSubView({ kind: "points" })}
-        />
-      </ExistingMemberReveal>
+      <PendingClaim runtime={runtime} wallet={wallet}>
+        <ExistingMemberReveal runtime={runtime} wallet={wallet}>
+          <MainScreenView
+            runtime={runtime}
+            wallet={wallet}
+            onSend={() => setSubView({ kind: "send", token: null })}
+            onSendToken={(token) => setSubView({ kind: "send", token })}
+            onReceive={() => setSubView({ kind: "receive" })}
+            onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
+            onOpenSettings={() => setSubView({ kind: "settings-home" })}
+            onOpenPoints={() => setSubView({ kind: "points" })}
+          />
+        </ExistingMemberReveal>
+      </PendingClaim>
     );
   }
 
