@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PointsMembership, PointsScores, PointsWalletScore, RuntimePort, WalletSummary } from "@gleam/core";
+import type {
+  PointsMembership,
+  PointsScores,
+  PointsSharePrompt,
+  PointsWalletScore,
+  RuntimePort,
+  WalletSummary,
+} from "@gleam/core";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
 import { estimatePoints, ownDailyRate } from "@gleam/core/src/points/index.ts";
 import { useBalances } from "../../activity/src/useBalances";
@@ -9,6 +16,9 @@ export const pointsQueryKeys = {
   memberships: () => ["points", "memberships"] as const,
   scores: () => ["points", "scores"] as const,
   pendingInvite: () => ["points", "pendingInvite"] as const,
+  revealSeen: () => ["points", "revealSeen"] as const,
+  shareSeen: () => ["points", "shareSeen"] as const,
+  seatsSeen: () => ["points", "seatsSeen"] as const,
 };
 
 /** Scores change once a day, so a popup session reads them once. */
@@ -21,6 +31,54 @@ export function usePendingInvite(runtime: RuntimePort) {
     queryFn: () => runtime.send<undefined, string | null>({ type: "getPointsPendingInvite", payload: undefined }),
     staleTime: Infinity,
     retry: false,
+  });
+}
+
+/** Ids of wallets whose founding reveal has been shown. */
+export function usePointsRevealSeen(runtime: RuntimePort, enabled: boolean) {
+  return useQuery({
+    queryKey: pointsQueryKeys.revealSeen(),
+    queryFn: () => runtime.send<undefined, string[]>({ type: "getPointsRevealSeen", payload: undefined }),
+    enabled,
+    retry: false,
+  });
+}
+
+export function usePointsShareSeen(runtime: RuntimePort, enabled: boolean) {
+  return useQuery({
+    queryKey: pointsQueryKeys.shareSeen(),
+    queryFn: () =>
+      runtime.send<undefined, Record<string, PointsSharePrompt[]>>({ type: "getPointsShareSeen", payload: undefined }),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useMarkShareSeen(runtime: RuntimePort) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: { walletId: string; prompt: PointsSharePrompt }) =>
+      runtime.send<typeof req, void>({ type: "markPointsShareSeen", payload: req }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: pointsQueryKeys.shareSeen() }),
+  });
+}
+
+/** The seat count each member wallet has been shown; the notice card reads this too. */
+export function usePointsSeatsSeen(runtime: RuntimePort, enabled: boolean) {
+  return useQuery({
+    queryKey: pointsQueryKeys.seatsSeen(),
+    queryFn: () => runtime.send<undefined, Record<string, number>>({ type: "getPointsSeatsSeen", payload: undefined }),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useMarkSeatsSeen(runtime: RuntimePort) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: { walletId: string; seats: number }) =>
+      runtime.send<typeof req, void>({ type: "markPointsSeatsSeen", payload: req }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: pointsQueryKeys.seatsSeen() }),
   });
 }
 

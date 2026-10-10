@@ -7,14 +7,17 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { inviteLinkFor, invitePost, invitesLine, xIntentUrl } from "@/src/points-share";
 import { sitePageUrl } from "@/src/site-pages";
 import { HOW_IT_WORKS_URL, JoinNote } from "./JoinNote";
+import { ShareCard } from "./ShareCard";
+import { SharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
+import { useCopy } from "./useCopy";
 import { useJoinPoints, useLeavePoints, usePendingInvite, usePointsStanding } from "./usePoints";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
   onBack: () => void;
-  /** Rendered at the top of the Invite section; one-time share prompts go here. */
+  /** Replaces the share prompt at the top of the Invite section. */
   banner?: ReactNode;
 }
 
@@ -103,9 +106,9 @@ function JoinedView({
   standing: Extract<ReturnType<typeof usePointsStanding>, { status: "joined" }>;
   banner?: ReactNode;
 }) {
-  const [copied, setCopied] = useState(false);
   const { score } = standing;
   const inviteLink = inviteLinkFor(standing.membership.inviteCode);
+  const { copied, copy } = useCopy(inviteLink);
   const seatsLeft = score?.seatsLeft ?? null;
   const shareHref = xIntentUrl(invitePost({ foundingNumber: score?.foundingNumber ?? null, seats: seatsLeft, link: inviteLink }));
 
@@ -138,8 +141,11 @@ function JoinedView({
       </dl>
 
       <section aria-label="Invite" className="flex flex-col gap-3">
-        {banner}
+        {banner ?? (
+          <SharePrompt runtime={runtime} wallet={wallet} inviteCode={standing.membership.inviteCode} score={score} />
+        )}
         {seatsLeft !== null ? <h2 className="text-h3 font-semibold text-foreground">{invitesLine(seatsLeft)}</h2> : null}
+        {score?.foundingNumber != null ? <ShareCard foundingNumber={score.foundingNumber} seatsLeft={seatsLeft} /> : null}
         <Button asChild>
           <a href={shareHref} target="_blank" rel="noreferrer">
             Share on X
@@ -151,12 +157,7 @@ function JoinedView({
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => {
-              void navigator.clipboard?.writeText(inviteLink).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-              });
-            }}
+            onClick={copy}
           >
             {copied ? "Copied" : "Copy"}
           </Button>

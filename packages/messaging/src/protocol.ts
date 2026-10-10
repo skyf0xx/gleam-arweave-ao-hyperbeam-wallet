@@ -9,6 +9,7 @@ import type {
   LockSettings,
   NetworkSettings,
   PointsMembership,
+  PointsSharePrompt,
   PointsScores,
   PortfolioHistory,
   PortfolioHistoryRange,
@@ -170,6 +171,18 @@ export interface ProtocolMap {
   /** Ids of wallets whose founding reveal was already shown. */
   getPointsRevealSeen(): string[];
   markPointsRevealSeen(req: { walletId: string }): void;
+  /** The named share prompts each wallet has dismissed or acted on, keyed by wallet id. */
+  getPointsShareSeen(): Record<string, PointsSharePrompt[]>;
+  markPointsShareSeen(req: { walletId: string; prompt: PointsSharePrompt }): void;
+  /**
+   * The seat count each member wallet has been shown, keyed by wallet id.
+   * A wallet is absent until the points API has reported its seats. A
+   * count above this one is a new invite (journey F) and puts a dot on
+   * the toolbar icon until it is marked seen.
+   */
+  getPointsSeatsSeen(): Record<string, number>;
+  /** Records that the member has seen `seats` invites; clears the toolbar dot once no wallet has a newer count. */
+  markPointsSeatsSeen(req: { walletId: string; seats: number }): void;
 
   /**
    * The single relay point for every page-originated provider call

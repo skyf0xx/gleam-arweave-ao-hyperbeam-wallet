@@ -56,6 +56,7 @@ function setup(initial: Record<string, unknown> = {}, reply: () => Response | Pr
     deviceKey: async () => device,
     apiUrl: "https://points.test",
     signingKey: async () => null,
+    badge: { setDot: async () => {} },
     fetchImpl,
     now: () => NOW,
   });

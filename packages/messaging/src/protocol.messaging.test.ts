@@ -55,8 +55,21 @@ describe("ProtocolMap", () => {
       "getPointsPendingInvite",
       "getPointsRevealSeen",
       "markPointsRevealSeen",
+      "getPointsShareSeen",
+      "markPointsShareSeen",
+      "getPointsSeatsSeen",
+      "markPointsSeatsSeen",
     ];
-    expect(methodNames).toHaveLength(10);
+    expect(methodNames).toHaveLength(14);
+  });
+
+  it("keys the seat and share-prompt state by wallet id", () => {
+    expectTypeOf<ReturnType<ProtocolMap["getPointsSeatsSeen"]>>().toEqualTypeOf<Record<string, number>>();
+    expectTypeOf<Parameters<ProtocolMap["markPointsSeatsSeen"]>[0]>().toEqualTypeOf<{ walletId: string; seats: number }>();
+    expectTypeOf<Parameters<ProtocolMap["markPointsShareSeen"]>[0]>().toEqualTypeOf<{
+      walletId: string;
+      prompt: "joined" | "lastSeat";
+    }>();
   });
 
   it("createWallet returns a WalletSummary, never the encrypted keyfile", () => {

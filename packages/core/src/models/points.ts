@@ -45,3 +45,17 @@ export interface InviteUnlock {
   result: InviteRedeemResult;
   at: number;
 }
+
+/**
+ * The one-time share prompts that are keyed by name. The "gains a seat"
+ * prompt is keyed by the seat count instead (see `PointsSeatsSeen`).
+ */
+export type PointsSharePrompt = "joined" | "lastSeat";
+
+/** What the extension remembers about one wallet's seat count. */
+export interface PointsSeatsRecord {
+  /** The count the member has been shown; a higher count is a new invite. */
+  seen: number;
+  /** The newest count the points API reported. */
+  latest: number;
+}

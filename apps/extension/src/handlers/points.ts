@@ -1,12 +1,15 @@
 import { browser } from "wxt/browser";
 import {
   bytesToBase64Url,
+  type BadgePort,
   signMessage,
   type InviteRedeemResult,
   type InviteUnlock,
   type JWKInterface,
   type PointsMembership,
   type PointsScores,
+  type PointsSeatsRecord,
+  type PointsSharePrompt,
   type StoragePort,
 } from "@gleam/core";
 import {
@@ -34,6 +37,15 @@ export const POINTS_PENDING_INVITE_KEY = "local:points:pendingInviteCode";
 export const POINTS_INVITE_UNLOCK_KEY = "local:points:inviteUnlock";
 /** Ids of wallets whose founding reveal has been shown, as `{ [walletId]: true }`. */
 export const POINTS_REVEAL_SEEN_KEY = "local:points:foundingRevealSeen";
+/** Named share prompts each wallet has dismissed or acted on, as `{ [walletId]: PointsSharePrompt[] }`. */
+export const POINTS_SHARE_SEEN_KEY = "local:points:shareSeen";
+/**
+ * Per-wallet seat counts as `{ [walletId]: { seen, latest } }`. `seen` is
+ * the count the member has been shown. Anything that shows a "new invite"
+ * (the Points banner, the toolbar dot, the main-screen notice) compares
+ * the server's count against it.
+ */
+export const POINTS_SEATS_SEEN_KEY = "local:points:seatsSeen";
 
 /**
  * A wallet earns only if its install sent a heartbeat in the 3 days before
@@ -48,6 +60,7 @@ export interface PointsHandlerDeps {
   apiUrl: string;
   /** The unlocked wallet's key from the session cache, or null if it's locked. */
   signingKey: (walletId: string) => Promise<{ jwk: JWKInterface; address: string } | null>;
+  badge: BadgePort;
   fetchImpl?: typeof fetch;
   now?: () => number;
 }
@@ -274,6 +287,14 @@ export class PointsHandler {
     const remaining = { ...(await this.getMemberships()) };
     delete remaining[req.walletId];
     await this.deps.storage.set(POINTS_MEMBERSHIPS_KEY, remaining);
+    // A later rejoin is a new join: its prompts and seat count start over.
+    const shareSeen = await this.readShareSeen();
+    delete shareSeen[req.walletId];
+    await this.deps.storage.set(POINTS_SHARE_SEEN_KEY, shareSeen);
+    const seats = await this.readSeats();
+    delete seats[req.walletId];
+    await this.deps.storage.set(POINTS_SEATS_SEEN_KEY, seats);
+    await this.updateBadge(seats);
     if (Object.keys(remaining).length === 0) {
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
     }
@@ -290,7 +311,73 @@ export class PointsHandler {
     if (!response.ok) throw new Error(`Couldn't load Gleam Points (HTTP ${response.status}).`);
     const body = (await response.json()) as PointsScores;
     if (!Array.isArray(body?.wallets)) throw new Error("The points server sent an unexpected response.");
+    await this.syncSeats(body).catch((error: unknown) => console.error("Gleam Points seat check failed:", error));
     return body;
+  }
+
+  async getShareSeen(): Promise<Record<string, PointsSharePrompt[]>> {
+    return this.readShareSeen();
+  }
+
+  async markShareSeen(req: { walletId: string; prompt: PointsSharePrompt }): Promise<void> {
+    const seen = await this.readShareSeen();
+    const prompts = seen[req.walletId] ?? [];
+    if (!prompts.includes(req.prompt)) seen[req.walletId] = [...prompts, req.prompt];
+    await this.deps.storage.set(POINTS_SHARE_SEEN_KEY, seen);
+  }
+
+  async getSeatsSeen(): Promise<Record<string, number>> {
+    return Object.fromEntries(Object.entries(await this.readSeats()).map(([walletId, record]) => [walletId, record.seen]));
+  }
+
+  async markSeatsSeen(req: { walletId: string; seats: number }): Promise<void> {
+    const seats = await this.readSeats();
+    seats[req.walletId] = { seen: req.seats, latest: Math.max(seats[req.walletId]?.latest ?? 0, req.seats) };
+    await this.deps.storage.set(POINTS_SEATS_SEEN_KEY, seats);
+    await this.updateBadge(seats);
+  }
+
+  /**
+   * Re-reads the seat counts from the points API (journey F) so the
+   * toolbar dot appears without the popup open. Does nothing before a
+   * wallet has joined.
+   */
+  async checkSeats(): Promise<void> {
+    await this.scores();
+  }
+
+  /**
+   * Compares the server's seat counts with what each member has been
+   * shown. A wallet seen for the first time is recorded without a signal,
+   * so existing members don't get a false "new invite". A lower count
+   * (a seat was used) lowers `seen` too, so the seat that comes back
+   * later reads as new. Wallets with no seat limit (Phase 2) are skipped.
+   */
+  private async syncSeats(scores: PointsScores): Promise<void> {
+    const memberships = await this.getMemberships();
+    const seats = await this.readSeats();
+    for (const [walletId, membership] of Object.entries(memberships)) {
+      const latest = scores.wallets.find((wallet) => wallet.address === membership.address)?.seatsLeft;
+      if (typeof latest !== "number") continue;
+      const previous = seats[walletId];
+      seats[walletId] = { seen: previous === undefined ? latest : Math.min(previous.seen, latest), latest };
+    }
+    await this.deps.storage.set(POINTS_SEATS_SEEN_KEY, seats);
+    await this.updateBadge(seats);
+  }
+
+  private async updateBadge(seats: Record<string, PointsSeatsRecord>): Promise<void> {
+    await this.deps.badge.setDot(Object.values(seats).some((record) => record.latest > record.seen));
+  }
+
+  private async readShareSeen(): Promise<Record<string, PointsSharePrompt[]>> {
+    const stored = await this.deps.storage.get<Record<string, PointsSharePrompt[]>>(POINTS_SHARE_SEEN_KEY);
+    return stored !== null && typeof stored === "object" ? { ...stored } : {};
+  }
+
+  private async readSeats(): Promise<Record<string, PointsSeatsRecord>> {
+    const stored = await this.deps.storage.get<Record<string, PointsSeatsRecord>>(POINTS_SEATS_SEEN_KEY);
+    return stored !== null && typeof stored === "object" ? { ...stored } : {};
   }
 
   /**
@@ -355,10 +442,20 @@ export function registerPointsHeartbeatAlarm(handler: PointsHandler): void {
   void runHeartbeat(handler);
 }
 
+/**
+ * The same tick refreshes seat counts, so the toolbar dot rides the
+ * existing schedule instead of a polling loop of its own. It also
+ * restores the dot after a browser restart, which clears badges.
+ */
 async function runHeartbeat(handler: PointsHandler): Promise<void> {
   try {
     await handler.heartbeatIfDue();
   } catch (error) {
     console.error("Gleam Points heartbeat failed:", error);
+  }
+  try {
+    await handler.checkSeats();
+  } catch (error) {
+    console.error("Gleam Points seat check failed:", error);
   }
 }

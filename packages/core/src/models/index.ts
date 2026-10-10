@@ -14,6 +14,8 @@ export type {
   InviteRedeemResult,
   InviteUnlock,
   PointsMembership,
+  PointsSeatsRecord,
+  PointsSharePrompt,
   PointsScores,
   PointsWalletScore,
 } from "./points";

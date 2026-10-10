@@ -10,6 +10,7 @@ export * from "./keys/jwk";
 export type { StoragePort } from "./ports/storage";
 export type { RuntimeMessage, RuntimePort } from "./ports/runtime";
 export type { WindowPort } from "./ports/windows";
+export type { BadgePort } from "./ports/badge";
 export {
   estimateHistoricalPortfolioValue,
   type PricedHistoricalToken,

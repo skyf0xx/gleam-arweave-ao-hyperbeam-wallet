@@ -39,3 +39,16 @@ export function invitePost(opts: { foundingNumber: number | null; seats: number 
   const invites = hasSeats ? ` I have ${opts.seats} ${opts.seats === 1 ? "invite" : "invites"}:` : "";
   return `${lead} to a new wallet for AO.${invites} ${opts.link}`;
 }
+
+/** The post for a seat that came back (POINTS.md § Share prompts, "Gains a seat"). */
+export function gainedSeatPost(opts: { link: string }): string {
+  return `Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it? ${opts.link}`;
+}
+
+/**
+ * The post for the last seat. It carries no link on purpose: replies to a
+ * giveaway spread further than a link the first clicker takes.
+ */
+export function lastSeatPost(): string {
+  return "Last @gleam_wallet invite. Reply if you want it and I'll send it over.";
+}

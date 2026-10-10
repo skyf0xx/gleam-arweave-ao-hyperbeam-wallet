@@ -35,6 +35,7 @@ import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
+import { actionBadge } from "@/src/adapters/badge";
 import { getCachedKey } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
@@ -110,6 +111,7 @@ const points = new PointsHandler({
   deviceKey: loadOrCreateDeviceKey,
   apiUrl: POINTS_API_URL,
   signingKey: getCachedKey,
+  badge: actionBadge,
 });
 registerPointsHeartbeatAlarm(points);
 
@@ -674,6 +676,10 @@ onExtensionMessage("getFoundingCount", () => points.foundingCount());
 onExtensionMessage("getPointsPendingInvite", () => points.pendingInvite());
 onExtensionMessage("getPointsRevealSeen", () => points.getRevealSeen());
 onExtensionMessage("markPointsRevealSeen", (message) => points.markRevealSeen(message.data));
+onExtensionMessage("getPointsShareSeen", () => points.getShareSeen());
+onExtensionMessage("markPointsShareSeen", (message) => points.markShareSeen(message.data));
+onExtensionMessage("getPointsSeatsSeen", () => points.getSeatsSeen());
+onExtensionMessage("markPointsSeatsSeen", (message) => points.markSeatsSeen(message.data));
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {
