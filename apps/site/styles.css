@@ -890,13 +890,15 @@ code { font-family: var(--mono); font-size: 0.9em; }
 
 .vision-lead { margin: 0 0 16px; max-width: 40em; font-size: clamp(1.0625rem, 1.4vw, 1.25rem); line-height: 1.5; text-wrap: pretty; }
 
-.vision-today, .vision-wont { margin: 0; padding: 0; list-style: none; max-width: 44em; }
+.vision-today { margin: 0; padding: 0; list-style: none; max-width: 44em; }
 
-.vision-today li, .vision-wont li { padding: 16px 0; border-top: 1px solid var(--line); }
+.vision-today li { padding: 16px 0; border-top: 1px solid var(--line); }
 
-.vision-today li:last-child, .vision-wont li:last-child { border-bottom: 1px solid var(--line); }
+.vision-today li:last-child { border-bottom: 1px solid var(--line); }
 
-.vision-paths { margin-top: 32px; gap: 32px 32px; }
+.vision-paths { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 44em; margin-top: 32px; gap: 32px 32px; }
+
+.points-final .heading + .vision-lead { margin-top: 16px; }
 
 .vision-note { margin: 24px 0 0; max-width: 44em; color: var(--muted); font-size: 0.9375rem; }
 
@@ -931,7 +933,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .invite-facts { margin-top: 40px; }
 
 @media (max-width: 720px) {
-  .vision-ctas { grid-template-columns: minmax(0, 1fr); }
+  .vision-ctas, .vision-paths { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Motion */
