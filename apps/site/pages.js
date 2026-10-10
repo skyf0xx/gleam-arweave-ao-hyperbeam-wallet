@@ -1,5 +1,5 @@
 // Shared by welcome.html, feedback.html and goodbye.html, the pages the
-// extension opens, and by invite.html, points.html and future.html. The extension passes only its
+// extension opens, and by invite.html, points.html and gleam.html. The extension passes only its
 // version (?v=), never anything about the user or their wallet.
 (function () {
   "use strict";
