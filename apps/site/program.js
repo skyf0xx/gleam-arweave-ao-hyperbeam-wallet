@@ -270,6 +270,32 @@
     });
   }
 
+  // A glass tone gliding from one step to another: time running, not landing
+  function sweep(fromStep, toStep, dur, delay, from) {
+    var level = loudness(from);
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01 + (delay || 0);
+    var f0 = pitch(fromStep) / 2;
+    var f1 = pitch(toStep) / 2;
+    duckPad(at);
+    [[1, 0.07], [2.756, 0.018]].forEach(function (h) {
+      var osc = ctx.createOscillator();
+      osc.frequency.setValueAtTime(f0 * h[0], at);
+      osc.frequency.exponentialRampToValueAtTime(f1 * h[0], at + dur);
+      var env = ctx.createGain();
+      env.gain.setValueAtTime(0, at);
+      env.gain.linearRampToValueAtTime(h[1] * level, at + 0.04);
+      env.gain.setValueAtTime(h[1] * level, at + dur * 0.7);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.15);
+      osc.connect(env);
+      env.connect(audio.master);
+      env.connect(audio.send);
+      osc.start(at);
+      osc.stop(at + dur + 0.2);
+    });
+  }
+
   // A dry ratchet click: a few ms of noise, for things that turn
   function tick(delay, from) {
     var level = loudness(from);
@@ -559,6 +585,7 @@
     enableSound: enableSound,
     soft: soft,
     tick: tick,
+    sweep: sweep,
     pad: function () {
       padWanted = true;
       updatePad(1.2);
