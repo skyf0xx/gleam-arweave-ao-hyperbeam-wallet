@@ -479,8 +479,9 @@
   var seen = {};
   var sim = 0;
   var shown = 0;
-  // "You earn GLEAM by" sounds on its first two points per visit, one line
-  // each, then goes quiet
+  // "You earn GLEAM by" sounds on its first four points per visit, taking
+  // the lines in turn, then goes quiet
+  var TODAY_SOUNDS = 4;
   var todaySounds = 0;
   var lastNow = null;
   var raf = 0;
@@ -523,12 +524,12 @@
     }
     // Loud only while a counter is on screen
     program.ping(point - 1, 0, [gc, seen.now && mini]);
-    // "You earn GLEAM by" has its own voice, and only for two points: a sound
+    // "You earn GLEAM by" has its own voice, and only for four points: a sound
     // on every one there gets wearing. Holding's single signal is one note;
     // Inviting's two are a pair, you then your friend, a third apart.
-    if (seen.today && todaySounds < ticks.length && program.presence(ticks) > 0.5) {
-      var line = ticks[todaySounds];
-      if (todaySounds === 0) {
+    if (seen.today && todaySounds < TODAY_SOUNDS && program.presence(ticks) > 0.5) {
+      var line = ticks[todaySounds % ticks.length];
+      if (todaySounds % ticks.length === 0) {
         program.soft(0, 0, line);
       } else {
         program.soft(2, 0, line);
