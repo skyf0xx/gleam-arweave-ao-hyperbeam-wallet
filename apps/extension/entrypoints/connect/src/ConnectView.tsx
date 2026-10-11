@@ -4,6 +4,8 @@ import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import {
+  CAMERA_UNAVAILABLE_MESSAGE,
+  CameraDeniedNotice,
   decodeKeystoneAccount,
   KEYSTONE_ACCOUNT_UR_TYPE,
   QrScanner,
@@ -27,7 +29,7 @@ type Step =
   | { kind: "done" };
 
 const SCAN_ERROR: Record<Exclude<ScannerError, "camera-denied">, string> = {
-  "camera-unavailable": "No camera was found, or another app is using it. Close other apps that use the camera and try again.",
+  "camera-unavailable": CAMERA_UNAVAILABLE_MESSAGE,
   "wrong-type": "That's not a Keystone Arweave account QR. On the Keystone, open the Arweave wallet and show its connection QR.",
   invalid: "Gleam couldn't read that QR. Hold the Keystone steady and try again.",
 };
@@ -168,14 +170,7 @@ function ScanErrorStep({ error, onRetry }: { error: ScannerError; onRetry: () =>
   return (
     <div className="flex flex-col gap-4">
       {error === "camera-denied" ? (
-        <div role="alert" className="flex flex-col gap-2 text-body leading-relaxed text-warning">
-          <p>Gleam can't use the camera.</p>
-          <p className="text-muted">
-            Click the camera or tune icon at the left of the address bar, set Camera to Allow, then
-            try again. You can also open chrome://settings/content/camera and remove this extension
-            from the blocked list.
-          </p>
-        </div>
+        <CameraDeniedNotice />
       ) : (
         <p role="alert" className="text-body leading-relaxed text-warning">
           {SCAN_ERROR[error]}

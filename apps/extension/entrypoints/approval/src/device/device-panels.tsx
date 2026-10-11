@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { KeystonePanel } from "./KeystonePanel";
 import type { DeviceSigningPayload, DeviceSigningRequest, HardwareWalletMethod } from "@gleam/core";
 
 export type DeviceSigningWallet = Pick<DeviceSigningRequest, "method" | "device" | "address" | "publicKey">;
@@ -41,6 +42,6 @@ function unsupportedPanel(method: HardwareWalletMethod): DeviceSignPanel {
 }
 
 export const DEFAULT_DEVICE_PANELS: DeviceSignPanels = {
-  keystone: unsupportedPanel("keystone"),
+  keystone: KeystonePanel,
   ledger: unsupportedPanel("ledger"),
 };
