@@ -518,9 +518,25 @@ html:not(.motion) .v-big span:last-child {
   letter-spacing: -0.01em;
   color: var(--muted);
 }
+/* Each choice gets its own beam colour, underlined as the sentence passes
+   the reading line. Inline blocks, so a phrase moves as one. */
 .v-sub b {
+  --c: var(--beam-red);
+  display: inline-block;
   font-weight: 600;
   color: var(--fg);
+  background: linear-gradient(var(--c), var(--c)) no-repeat 0 100% / 0% 0.09em;
+  transition: background-size 0.7s var(--ease-out);
+}
+.v-sub b:nth-of-type(2) { --c: var(--beam-sky); }
+.v-sub b:nth-of-type(3) { --c: var(--beam-green); }
+.v-sub b.lit,
+html:not(.motion) .v-sub b {
+  background-size: 100% 0.09em;
+}
+/* Rewound: the line runs back the way it came */
+.v-sub b.back {
+  background-position: 100% 100%;
 }
 
 /* The timeline: history scrolls sideways while the page scrolls down. The lit
@@ -2119,14 +2135,22 @@ html.waking .v-gate-orb {
 
 /* ---- Wallet lines: each pass moves the sentence its own way -------------- */
 
-.v-big span.fx-pop { animation: line-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
-.v-big span.fx-ring { animation: line-glow 0.9s ease-out; }
-.v-big span.fx-prism { animation: line-prism 0.6s steps(1); }
-.v-big span.fx-rise { animation: fx-rise 0.7s cubic-bezier(0.2, 0.8, 0.3, 1); }
-.v-big span.fx-glitch { animation: fx-glitch 0.4s steps(1); }
-.v-big span.fx-implode { animation: fx-shrink 0.55s ease-in-out; }
-.v-big span.fx-smear { animation: fx-smear 0.5s ease-out; }
-.v-big span.fx-flicker { animation: fx-flicker 0.45s steps(1); }
+.v-big span.fx-pop,
+.v-sub b.fx-pop { animation: line-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+.v-big span.fx-ring,
+.v-sub b.fx-ring { animation: line-glow 0.9s ease-out; }
+.v-big span.fx-prism,
+.v-sub b.fx-prism { animation: line-prism 0.6s steps(1); }
+.v-big span.fx-rise,
+.v-sub b.fx-rise { animation: fx-rise 0.7s cubic-bezier(0.2, 0.8, 0.3, 1); }
+.v-big span.fx-glitch,
+.v-sub b.fx-glitch { animation: fx-glitch 0.4s steps(1); }
+.v-big span.fx-implode,
+.v-sub b.fx-implode { animation: fx-shrink 0.55s ease-in-out; }
+.v-big span.fx-smear,
+.v-sub b.fx-smear { animation: fx-smear 0.5s ease-out; }
+.v-big span.fx-flicker,
+.v-sub b.fx-flicker { animation: fx-flicker 0.45s steps(1); }
 
 @keyframes line-pop {
   0% { transform: scale(1.06); }

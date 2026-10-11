@@ -462,6 +462,50 @@
     });
   }
 
+  // ---- The wallet's three ways in: underlined, one after another ----------
+  //
+  // As the sentence crosses the reading line, each choice's underline draws
+  // in with its note: hardware wallet, existing key, new wallet. Going back
+  // up they run out in reverse. Pointing at one plays it.
+
+  var choices = Array.prototype.slice.call(document.querySelectorAll(".v-sub b"));
+  var CHOICE_DEGREES = [0, 2, 4];
+
+  // audible: true only for a scroll
+  function updateChoices(audible) {
+    var mark = window.innerHeight * 0.72;
+    var changed = [];
+    choices.forEach(function (b, i) {
+      var lit = b.getBoundingClientRect().top < mark;
+      if (lit !== b.classList.contains("lit")) changed.push(i);
+    });
+    if (!changed.length) return;
+    var dir = choices[changed[0]].classList.contains("lit") ? -1 : 1;
+    if (dir < 0) changed.reverse();
+    var f = audible ? pass("choices", dir) : null;
+    changed.forEach(function (i, k) {
+      var b = choices[i];
+      var delay = audible ? k * 0.16 : 0;
+      b.style.transitionDelay = delay + "s";
+      b.classList.toggle("back", dir < 0);
+      b.classList.toggle("lit", dir > 0);
+      if (!f) return;
+      program.play(f.voice, f.scale, CHOICE_DEGREES[i], delay, b);
+      b.style.animationDelay = delay + "s";
+      effect(b, f.fx);
+    });
+  }
+
+  choices.forEach(function (b, i) {
+    b.addEventListener("pointerenter", function (e) {
+      if (e.pointerType !== "mouse") return;
+      var f = pass("choices-hover", 1);
+      program.play(f.voice, f.scale, CHOICE_DEGREES[i], 0, b);
+      b.style.animationDelay = "0s";
+      effect(b, "ring");
+    });
+  });
+
   // ---- The rainbow arcs: drawn by the scroll, strummed by the pointer ------
   //
   // Each arc draws itself left to right as it scrolls up the screen, and
@@ -1504,6 +1548,7 @@
     updateAngles();
     requestTimeline();
     updateLines(true);
+    updateChoices(true);
     updateArcs(true);
     scrubTime();
   }
@@ -1512,6 +1557,7 @@
     if (fx) fx.measure();
     layoutTimeline();
     updateLines();
+    updateChoices();
     updateArcs();
   }
 
@@ -1521,6 +1567,7 @@
     document.fonts.ready.then(onResize);
   layoutTimeline();
   updateLines();
+  updateChoices();
   updateArcs();
 
   // Switching reduced motion mid-visit swaps every motion path at once
