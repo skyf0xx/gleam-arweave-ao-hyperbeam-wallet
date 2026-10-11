@@ -616,6 +616,27 @@
     if (speed > 3 && t - lastWhoosh > 1500 && !root.classList.contains("gate")) {
       lastWhoosh = t;
       program.whoosh(scrollDir, Math.min(1, speed / 5));
+      streaks(scrollDir);
+    }
+  }
+
+  // The air made visible: two or three faint threads of beam colour racing
+  // the way the page went, at random places across the screen
+  function streaks(dir) {
+    if (!motion) return;
+    var n = 2 + Math.floor(Math.random() * 2);
+    for (var i = 0; i < n; i++) {
+      var thread = document.createElement("span");
+      thread.className = "v-air" + (dir < 0 ? " up" : "");
+      thread.setAttribute("aria-hidden", "true");
+      thread.style.left = 4 + Math.random() * 92 + "%";
+      thread.style.setProperty("--c", COLORS[Math.floor(Math.random() * 5)]);
+      thread.style.animationDelay = i * 0.06 + Math.random() * 0.05 + "s";
+      thread.style.animationDuration = 0.45 + Math.random() * 0.25 + "s";
+      thread.addEventListener("animationend", function (e) {
+        e.currentTarget.remove();
+      });
+      document.body.appendChild(thread);
     }
   }
 
@@ -718,6 +739,50 @@
     });
   }
 
+  // ---- Tokenomics steps: each return counts 01, 02, 03 in light and sound --
+  //
+  // After the first reveal, coming back to the three steps plays a figure
+  // and lights each number as its note sounds: 01 to 03 going down, 03 to 01
+  // going up.
+
+  var flow = document.querySelector(".v-flow");
+  if (flow && "IntersectionObserver" in window) {
+    var flowSeen = false;
+    var flowAway = false;
+    var flowGap = deckOf([0.12, 0.18, 0.26]);
+    new IntersectionObserver(
+      function (entries) {
+        var entry = entries[entries.length - 1];
+        if (!entry.isIntersecting) {
+          if (flowSeen) flowAway = true;
+          return;
+        }
+        if (!flowSeen) {
+          flowSeen = true;
+          return;
+        }
+        if (!flowAway) return;
+        flowAway = false;
+        var dir = scrollDir;
+        var f = flavour(dir);
+        var gap = flowGap();
+        var nums = Array.prototype.slice.call(flow.querySelectorAll(".v-step-n"));
+        if (dir < 0) nums.reverse();
+        nums.forEach(function (num, i) {
+          var degree = dir > 0 ? [0, 2, 4][i] : [4, 2, 0][i];
+          program.play(f.voice, f.scale, degree, i * gap, num);
+          if (!motion) return;
+          num.style.setProperty("--c", COLORS[[0, 2, 4][i]]);
+          num.style.animationDelay = i * gap + "s";
+          num.classList.remove("count");
+          void num.offsetWidth;
+          num.classList.add("count");
+        });
+      },
+      { threshold: 0.35 },
+    ).observe(flow);
+  }
+
   // ---- One-shot reveals --------------------------------------------------
 
   var reveals = document.querySelectorAll(".reveal");
@@ -736,11 +801,30 @@
     [".v-stake", "B"],
     [".v-final", "E"],
   ];
+  // The drone changing chord is felt more than heard, so the section that
+  // turned it shows it: its heading takes a sweep of light in the chord's
+  // colour (moving the way you're scrolling), breathes, grows a beam bar,
+  // or its kicker tints and opens up. Which one is rolled each time.
+  var padNow = "E";
+  var CHORD_COLOR = { E: 2, "C#m": 1, A: 3, B: 4 };
+  var chordLook = deckOf(["glint", "breathe", "bar", "kicker"]);
+
+  function chordShift(section, chord) {
+    if (!motion || section === hero || !section.querySelector("h2")) return;
+    section.style.setProperty("--c", COLORS[CHORD_COLOR[chord] || 0]);
+    effect(section, "chord-" + chordLook());
+    section.classList.toggle("chord-up", scrollDir < 0);
+  }
+
   if ("IntersectionObserver" in window) {
     var chords = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
-          if (entry.isIntersecting) program.padChord(entry.target._chord);
+          if (!entry.isIntersecting) return;
+          var chord = entry.target._chord;
+          if (chord !== padNow) chordShift(entry.target, chord);
+          padNow = chord;
+          program.padChord(chord);
         });
       },
       { rootMargin: "-50% 0px -50% 0px" },
