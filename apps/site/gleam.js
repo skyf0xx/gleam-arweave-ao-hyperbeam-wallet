@@ -455,6 +455,8 @@
       if (audible && lit !== span.classList.contains("lit")) {
         var f = pass("lines", lit ? 1 : -1);
         program.play(f.voice, f.scale, [2, 5][i % 2], 0, span);
+        span.style.setProperty("--c", COLORS[Math.floor(Math.random() * 5)]);
+        effect(span, f.fx);
       }
       span.classList.toggle("lit", lit);
     });
@@ -593,6 +595,97 @@
       if (program.presence([arc.cut]) > 0.6) glint(arc);
     });
   }, 1000);
+
+  // ---- Scroll direction, and the air it moves -------------------------------
+
+  var scrollDir = 1;
+  var lastY = window.scrollY;
+  var lastYAt = 0;
+  var lastWhoosh = 0;
+
+  // A brisk flick moves air: up or down, each with its own colour
+  function trackScroll() {
+    var t = window.performance.now();
+    var dy = window.scrollY - lastY;
+    var dt = t - lastYAt;
+    lastY = window.scrollY;
+    lastYAt = t;
+    if (dy) scrollDir = dy > 0 ? 1 : -1;
+    if (!dy || dt <= 0 || dt > 120) return;
+    var speed = Math.abs(dy) / dt;
+    if (speed > 3 && t - lastWhoosh > 1500 && !root.classList.contains("gate")) {
+      lastWhoosh = t;
+      program.whoosh(scrollDir, Math.min(1, speed / 5));
+    }
+  }
+
+  // ---- The angled cut under the hero: five strings struck in turn ----------
+  //
+  // Crossing the middle of the screen strikes its five lines one after
+  // another, red first on the way down and green first on the way up.
+
+  var angle = document.querySelector(".cut-angle");
+  var angleSide = 0;
+  var angleStrike = deckOf([0.04, 0.07, 0.11]);
+
+  function updateAngle() {
+    if (!angle) return;
+    var r = angle.getBoundingClientRect();
+    var side = r.top + r.height / 2 < window.innerHeight * 0.5 ? 1 : -1;
+    if (angleSide && side !== angleSide && program.presence([angle]) > 0.3) {
+      var f = pass("angle", side);
+      var gap = angleStrike();
+      for (var i = 0; i < 5; i++) {
+        program.play(f.voice, f.scale, side > 0 ? i : 4 - i, i * gap, angle);
+      }
+      if (motion) {
+        angle.style.setProperty("--gap", gap + "s");
+        angle.classList.remove("strike-down", "strike-up");
+        void angle.offsetWidth;
+        angle.classList.add(side > 0 ? "strike-down" : "strike-up");
+      }
+    }
+    angleSide = side;
+  }
+
+  // ---- Stake cards: after their first reveal, each return is its own -------
+  //
+  // A card coming back into view on the way down lifts in on a rising figure;
+  // on the way up it's rewound, a falling one in a backwards voice.
+
+  var cardFx = { 1: deckOf(["lift", "tilt", "bloom"]), "-1": deckOf(["glitch", "smear", "flicker"]) };
+
+  if ("IntersectionObserver" in window) {
+    var cardsSeen = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          var card = entry.target;
+          if (!entry.isIntersecting) {
+            if (card._seen) card._away = true;
+            return;
+          }
+          // The first sighting is the reveal's own; only returns count
+          if (!card._seen) {
+            card._seen = true;
+            return;
+          }
+          if (!card._away) return;
+          card._away = false;
+          var dir = scrollDir;
+          var f = flavour(dir);
+          (dir > 0 ? [0, 2, 4] : [4, 2, 0]).forEach(function (degree, i) {
+            program.play(f.voice, f.scale, degree, i * 0.09, card);
+          });
+          card.style.setProperty("--c", COLORS[Math.floor(Math.random() * 5)]);
+          effect(card, cardFx[dir]());
+        });
+      },
+      { threshold: 0.4 },
+    );
+    document.querySelectorAll(".perk").forEach(function (card) {
+      cardsSeen.observe(card);
+    });
+  }
 
   // ---- One-shot reveals --------------------------------------------------
 
@@ -1292,6 +1385,8 @@
   }
 
   function onScroll() {
+    trackScroll();
+    updateAngle();
     requestTimeline();
     updateLines(true);
     updateArcs(true);
