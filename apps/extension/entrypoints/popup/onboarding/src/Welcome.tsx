@@ -8,9 +8,10 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 export interface WelcomeProps {
   onCreate: () => void;
   onImport: () => void;
+  onConnectKeystone: () => void;
 }
 
-export function Welcome({ onCreate, onImport }: WelcomeProps) {
+export function Welcome({ onCreate, onImport, onConnectKeystone }: WelcomeProps) {
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-8 pt-7">
       <div className="mt-14 mb-3">
@@ -22,6 +23,9 @@ export function Welcome({ onCreate, onImport }: WelcomeProps) {
         </Button>
         <Button type="button" variant="secondary" onClick={onImport}>
           Import a wallet
+        </Button>
+        <Button type="button" variant="secondary" onClick={onConnectKeystone}>
+          Connect Keystone
         </Button>
       </div>
     </div>

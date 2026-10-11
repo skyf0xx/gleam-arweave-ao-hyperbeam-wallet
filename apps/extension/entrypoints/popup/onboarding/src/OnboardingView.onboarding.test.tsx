@@ -241,3 +241,14 @@ describe("OnboardingView: add-wallet mode", () => {
     });
   });
 });
+
+describe("OnboardingView: Connect Keystone", () => {
+  it.each(["first-run", "add-wallet"] as const)("offers it on the %s start screen", (mode) => {
+    const onConnectKeystone = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode={mode} onConnectKeystone={onConnectKeystone} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Connect Keystone" }));
+    expect(onConnectKeystone).toHaveBeenCalledOnce();
+  });
+});

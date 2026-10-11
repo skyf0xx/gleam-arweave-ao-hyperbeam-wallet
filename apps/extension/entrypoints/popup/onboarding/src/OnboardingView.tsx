@@ -5,6 +5,7 @@ import { CreatePassword } from "./CreatePassword";
 import { Backup } from "./Backup";
 import { Import } from "./Import";
 import { AddWalletStart } from "./AddWalletStart";
+import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
 import { VaultPassword } from "./VaultPassword";
 import { ClaimStep, type ClaimPhase } from "./ClaimStep";
 import { FoundingRevealScreen } from "./FoundingReveal";
@@ -44,6 +45,8 @@ export interface OnboardingViewProps {
    * backup or import.
    */
   claim?: ClaimPhase;
+  /** Opens the Keystone connect page. Defaults to a new browser tab. */
+  onConnectKeystone?: () => void;
 }
 
 const DEFAULT_WALLET_NAMES = [
@@ -91,7 +94,7 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone = () => void openKeystoneConnect() }: OnboardingViewProps) {
   const addingWallet = mode === "add-wallet";
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [submitting, setSubmitting] = useState(false);
@@ -169,6 +172,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
             onBack={() => onCancel?.()}
             onCreate={() => setStep({ kind: "create-password" })}
             onImport={() => setStep({ kind: "import" })}
+            onConnectKeystone={onConnectKeystone}
           />
         );
       }
@@ -176,6 +180,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         <Welcome
           onCreate={() => setStep({ kind: "create-password" })}
           onImport={() => setStep({ kind: "import" })}
+          onConnectKeystone={onConnectKeystone}
         />
       );
 

@@ -2,16 +2,17 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
- * Start of the add-wallet flow from the wallet switcher. Same two choices
+ * Start of the add-wallet flow from the wallet switcher. Same choices
  * as `Welcome`, without its brand hero, which belongs to first run only.
  */
 export interface AddWalletStartProps {
   onBack: () => void;
   onCreate: () => void;
   onImport: () => void;
+  onConnectKeystone: () => void;
 }
 
-export function AddWalletStart({ onBack, onCreate, onImport }: AddWalletStartProps) {
+export function AddWalletStart({ onBack, onCreate, onImport, onConnectKeystone }: AddWalletStartProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Add wallet" onBack={onBack} />
@@ -29,6 +30,9 @@ export function AddWalletStart({ onBack, onCreate, onImport }: AddWalletStartPro
           </Button>
           <Button type="button" variant="secondary" onClick={onImport}>
             Import a wallet
+          </Button>
+          <Button type="button" variant="secondary" onClick={onConnectKeystone}>
+            Connect Keystone
           </Button>
         </div>
       </div>
