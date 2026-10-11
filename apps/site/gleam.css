@@ -1922,3 +1922,20 @@ html.waking .v-gate-orb {
     animation: echo 7s step-end both;
   }
 }
+
+/* Time moving fast, either way: the counter splits a little into red and
+   sky, like light through a prism held at speed */
+.gc {
+  transition: text-shadow 0.25s;
+}
+.gc.scrub {
+  text-shadow:
+    -0.025em 0 color-mix(in srgb, var(--beam-red) 70%, transparent),
+    0.025em 0 color-mix(in srgb, var(--beam-sky) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc.scrub {
+    text-shadow: none;
+  }
+}

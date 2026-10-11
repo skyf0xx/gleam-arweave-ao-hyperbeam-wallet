@@ -494,9 +494,14 @@
   var todaySounds = 0;
   var lastNow = null;
   var raf = 0;
-  // A welcome-back moment drawn over the hero's particles: draw(e) gets the
-  // seconds since it began; hold freezes the clock underneath while it plays
+  // A welcome-back moment. draw(e) paints over the hero's particles, e being
+  // the seconds since it began; rate(e) sets how fast the clock runs (negative
+  // runs it backwards) and hold stops it; end() runs as it finishes, with
+  // sim0, the clock as the moment began, there to put time right again.
   var overlay = null;
+  // The clock's speed from scrolling, 1 at rest
+  var scrub = 1;
+  var lastNotch = 0;
 
   function running() {
     if (document.hidden || root.classList.contains("gate")) return false;
@@ -561,8 +566,24 @@
     }
     var dt = lastNow === null ? 0 : Math.min(0.05, (t - lastNow) / 1000);
     lastNow = t;
-    if (overlay && overlay.hold) dt = 0;
-    sim += dt;
+    var e = 0;
+    if (overlay) {
+      if (overlay.start === null) {
+        overlay.start = t;
+        overlay.sim0 = sim;
+      }
+      e = (t - overlay.start) / 1000;
+      if (e >= overlay.dur) {
+        if (overlay.end) overlay.end();
+        overlay = null;
+      }
+    }
+    // A flick of the scroll pushes time; it eases back to normal by itself
+    scrub = 1 + (scrub - 1) * Math.exp(-dt / 0.3);
+    var rate = scrub;
+    if (overlay) rate = overlay.hold ? 0 : overlay.rate ? overlay.rate(e) : 1;
+    sim = Math.max(0, sim + dt * rate);
+    if (gc) gc.classList.toggle("scrub", Math.abs(rate) > 2.5);
     var v = sim * PPS;
     var whole = Math.floor(v);
     if (odometer) odometer.set(whole);
@@ -573,17 +594,21 @@
     if (whole > shown) {
       shown = whole;
       land(whole);
+    } else if (whole < shown) {
+      // Running backwards, each point given up sounds the note it landed on.
+      // A moment scores its own rewind, so only a scroll's does this.
+      if (!overlay) program.ping((shown - 1) % 10, 0, gc);
+      shown = whole;
     }
+    // Fast time ratchets, four clicks a point, like tape on a spool
+    var notch = Math.floor(v * 4);
+    if (notch !== lastNotch && Math.abs(rate) > 2.5) program.tick(0, gc);
+    lastNotch = notch;
     if (fx) {
       if (seen.hero) fx.draw(sim);
       else fx.clear();
     }
-    if (overlay && fx && seen.hero) {
-      if (overlay.start === null) overlay.start = t;
-      var e = (t - overlay.start) / 1000;
-      if (e >= overlay.dur) overlay = null;
-      else overlay.draw(e);
-    }
+    if (overlay && overlay.draw && fx && seen.hero) overlay.draw(e);
     raf = requestAnimationFrame(frame);
   }
 
@@ -635,31 +660,60 @@
     fx.line(hx - 180 * dir, y, hx, y, grad, 2.4, alpha);
   }
 
-  // Time runs backwards: the shards leave the counter for the beam's end,
-  // then one pulse rides the beam home to the left edge. Notes step down.
+  // Slow to a stop, then run backwards: the clock really reverses, so the
+  // shards leave the counter for the beam and the count rolls down
+  function slowThenBack(e) {
+    if (e < 0.2) return 1 - e * 5;
+    return e < 1.3 ? -12 : 0;
+  }
+
+  // Rewind, then snap back to the right time with a bright ping
   function rewind() {
     overlay = {
       start: null,
-      dur: 1.5,
-      hold: true,
-      draw: function (e) {
-        var sp = spread();
-        for (var i = 0; i < 24; i++) {
-          var lag = rand(i * 17 + 3) * 0.25;
-          var t = 1 - (e / 0.8 - lag) / (1 - lag);
-          if (t > 0 && t < 1) fx.flight(i * 977 + (i % 5), t, sp, 1.6, 1 - (1 - t) * (1 - t));
-        }
-        var q = (e - 0.6) / 0.8;
-        if (q > 0 && q < 1) {
-          var hx = fx.g.bx * (1 - ease(q));
-          for (var s = 0; s < 5; s++) streak(s, hx, -1, 1 - q * 0.5);
-        }
-        fx.ctx.globalAlpha = 1;
+      dur: 1.6,
+      rate: slowThenBack,
+      end: function () {
+        sim = this.sim0 + this.dur;
+        if (gc) restart(gc, "burst");
+        program.ping(10, 0, gc);
+        program.ping(5, 0.04, gc);
       },
     };
-    [4, 3, 2, 1, 0].forEach(function (step, i) {
-      program.ping(step, i * 0.12, gc);
-    });
+    program.sweep(9, 0, 1.05, 0.2, gc);
+  }
+
+  // Rewind, a beat's pause, then fast-forward back to the right time
+  function rewindCatchUp() {
+    overlay = {
+      start: null,
+      dur: 2.9,
+      rate: function (e) {
+        if (e < 1.6) return slowThenBack(e);
+        // Fast enough to arrive back at the true time just as it ends
+        var behind = this.sim0 + e - sim;
+        return Math.max(1, behind / Math.max(0.05, this.dur - e));
+      },
+      end: function () {
+        sim = this.sim0 + this.dur;
+        program.ping(10, 0, gc);
+      },
+    };
+    program.sweep(9, 0, 1.05, 0.2, gc);
+    program.sweep(0, 10, 1.2, 1.65, gc);
+  }
+
+  // Time spins up to 8x, the count races, then it eases back to normal
+  function fastForward() {
+    overlay = {
+      start: null,
+      dur: 1.9,
+      rate: function (e) {
+        var up = e < 0.3 ? ease(e / 0.3) : e < 1.2 ? 1 : 1 - ease((e - 1.2) / 0.7);
+        return 1 + 7 * up;
+      },
+    };
+    program.sweep(0, 10, 1.3, 0.05, gc);
   }
 
   // The beam is struck like a string: its stripes shake, a little out of
@@ -812,7 +866,17 @@
     }
   }
 
-  var MOMENTS = [rewind, pluck, fiveAtOnce, cascade, spin, constellation, glintStorm];
+  var MOMENTS = [
+    rewind,
+    rewindCatchUp,
+    fastForward,
+    pluck,
+    fiveAtOnce,
+    cascade,
+    spin,
+    constellation,
+    glintStorm,
+  ];
   var deck = [];
   var lastMoment = null;
   var quietUntil = 0;
@@ -992,9 +1056,27 @@
     }
   }
 
+  // Scrolling in the hero drives its clock: a brisk scroll up runs time
+  // backwards, down runs it forwards and fast. A slow scroll barely moves it.
+  var lastScroll = { y: window.scrollY, t: 0 };
+
+  function scrubTime() {
+    var t = window.performance.now();
+    var dt = t - lastScroll.t;
+    var dy = window.scrollY - lastScroll.y;
+    lastScroll = { y: window.scrollY, t: t };
+    if (!motion || !seen.hero || overlay || root.classList.contains("gate")) return;
+    if (dt <= 0 || dt > 250) return;
+    // px/ms: 2 is a brisk flick, worth 10x either way
+    var target = Math.max(-10, Math.min(10, 1 + (5 * dy) / dt));
+    scrub = scrub * 0.5 + target * 0.5;
+    kick();
+  }
+
   function onScroll() {
     requestTimeline();
     updateLines(true);
+    scrubTime();
   }
 
   function onResize() {
