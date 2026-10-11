@@ -131,7 +131,7 @@
     // Notes sit under the drone: quiet enough to be found ("was that me?")
     // rather than announced, so a reader leans in and turns it up
     var master = ctx.createGain();
-    master.gain.value = 0.12;
+    master.gain.value = 0.14;
     master.connect(out);
 
     // A short dark echo gives the glass a room to ring in
