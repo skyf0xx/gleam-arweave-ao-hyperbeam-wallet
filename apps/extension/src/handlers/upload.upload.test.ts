@@ -224,6 +224,29 @@ describe("UploadHandler: submitUpload", () => {
     ).rejects.toThrow(/locked/);
   });
 
+  it("refuses a hardware wallet without contacting the bundler", async () => {
+    mockBundlerFetch();
+    keySessionStore.set("local:wallets", [
+      {
+        id: WALLET_ID,
+        address: "addr-hw",
+        name: "Device",
+        method: "ledger",
+        publicKey: "pub-hw",
+        createdAt: 0,
+        updatedAt: 0,
+        backupConfirmedAt: null,
+        encryptedKeyfile: null,
+        device: { kind: "ledger" },
+      },
+    ]);
+
+    await expect(
+      new UploadHandler(createFakeStorage()).submitUpload({ ...textDraft("hello world"), walletId: WALLET_ID }),
+    ).rejects.toThrow("This wallet can't upload files. Switch to a keyfile wallet.");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it("signs and submits a clean upload, returning a txId", async () => {
     const storage = createFakeStorage();
     const { wallet, jwk } = await createTestWallet();

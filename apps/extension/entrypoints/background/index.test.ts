@@ -995,6 +995,44 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     });
   });
 
+  describe("provider methods the active wallet can't do are refused before any window opens", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+
+    async function seedHardwareWallet(method: "keystone" | "ledger"): Promise<void> {
+      await setItem("local:wallets", [
+        { id: "hw-1", address: "addr-hw", name: "Device", method, publicKey: "pub-hw", createdAt: 0, updatedAt: 0, encryptedKeyfile: null,
+          device: method === "keystone" ? { kind: "keystone", xfp: "0a1b2c3d" } : { kind: "ledger" } },
+      ]);
+      await setItem("local:activeWalletId", "hw-1");
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "hw-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    }
+
+    it.each([
+      ["ledger", "signMessage", "sign messages"],
+      ["keystone", "signature", "sign messages"],
+      ["ledger", "decrypt", "decrypt data"],
+      ["keystone", "privateHash", "create private hashes"],
+    ] as const)("%s refuses %s", async (walletMethod, method, action) => {
+      await seedHardwareWallet(walletMethod);
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+
+      await expect(providerCall({ origin: ORIGIN, method, params })).rejects.toThrow(
+        `This wallet can't ${action}. Switch to a keyfile wallet.`,
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("a hardware wallet still reaches the approval window for what it can sign", async () => {
+      await seedHardwareWallet("ledger");
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]), options: { name: "RSA-OAEP" } });
+      void providerCall({ origin: ORIGIN, method: "encrypt", params }).catch(() => undefined);
+
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    });
+  });
+
   describe("connect() from an origin that already has a grant", () => {
     const ORIGIN = "https://bazar.arweave.net";
 

@@ -1,4 +1,4 @@
-import type { RuntimePort, WalletSummary } from "@gleam/core";
+import { capabilitiesFor, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { TokenRow } from "@gleam/ui/src/components/wallet/TokenRow.tsx";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { formatPoints } from "./formatPoints";
@@ -22,7 +22,9 @@ export function PointsTokenRow({ runtime, wallet, onOpen }: PointsTokenRowProps)
     standing.status === "joined"
       ? `${formatPoints(standing.estimateAtomic)} points`
       : standing.status === "not-joined"
-        ? "Sign up"
+        ? capabilitiesFor(wallet.method).points
+          ? "Sign up"
+          : "Unavailable"
         : "—";
 
   return (

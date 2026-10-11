@@ -37,14 +37,35 @@ export class HardwareWalletSigningError extends Error {
   }
 }
 
-async function isHardwareWallet(walletId: string): Promise<boolean> {
+export interface StoredWalletInfo {
+  id: string;
+  address: string;
+  method: WalletMethod;
+  publicKey: string;
+}
+
+/** The public fields of a stored wallet, or null when no wallet has this id. */
+export async function getStoredWallet(walletId: string): Promise<StoredWalletInfo | null> {
   const wallets = await storagePort.get<unknown>(WALLETS_KEY);
-  if (!Array.isArray(wallets)) return false;
-  const wallet = wallets.find(
-    (candidate): candidate is { id: string; method: WalletMethod } =>
+  if (!Array.isArray(wallets)) return null;
+  const wallet = (wallets as unknown[]).find(
+    (candidate): candidate is Record<string, unknown> =>
       candidate !== null && typeof candidate === "object" && (candidate as { id?: unknown }).id === walletId,
   );
-  return wallet !== undefined && isHardwareWalletMethod(wallet.method);
+  if (!wallet) return null;
+  const { address, method, publicKey } = wallet;
+  if (typeof address !== "string" || typeof method !== "string" || typeof publicKey !== "string") return null;
+  return { id: walletId, address, method: method as WalletMethod, publicKey };
+}
+
+/** The stored wallet's method, or null when no wallet has this id. */
+export async function getWalletMethod(walletId: string): Promise<WalletMethod | null> {
+  return (await getStoredWallet(walletId))?.method ?? null;
+}
+
+async function isHardwareWallet(walletId: string): Promise<boolean> {
+  const method = await getWalletMethod(walletId);
+  return method !== null && isHardwareWalletMethod(method);
 }
 
 const AUTO_LOCK_TIMEOUT_MS: Record<AutoLockTimeout, number | null> = {

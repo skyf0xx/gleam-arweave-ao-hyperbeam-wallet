@@ -5,6 +5,7 @@ import {
   deriveAddress,
   encryptToEnvelope,
   generateJWK,
+  capabilitiesFor,
   isHardwareWalletMethod,
   validateJWKShape,
   validatePassword,
@@ -611,7 +612,7 @@ export class WalletLifecycleHandler {
   async exportWallet(req: { walletId: string; password: string }): Promise<JWKInterface> {
     const wallets = await loadWallets(this.storage);
     const wallet = wallets.find((w) => w.id === req.walletId);
-    if (wallet && isHardwareWalletMethod(wallet.method)) {
+    if (wallet && !capabilitiesFor(wallet.method).exportKey) {
       throw new Error("This wallet's key stays on its device. There's no keyfile to export.");
     }
     if (!wallet || !wallet.encryptedKeyfile) {

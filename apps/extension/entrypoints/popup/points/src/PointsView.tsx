@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { RuntimePort, WalletSummary } from "@gleam/core";
+import { capabilitiesFor, unsupportedOperationMessage, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
@@ -86,6 +86,7 @@ function JoinView({
   const pending = usePendingInvite(runtime);
   const [typed, setTyped] = useState<string | null>(null);
   const inviteCode = typed ?? pending.data ?? "";
+  const canJoin = capabilitiesFor(wallet.method).points;
 
   return (
     <form
@@ -116,16 +117,21 @@ function JoinView({
         autoComplete="off"
         spellCheck={false}
         maxLength={16}
+        disabled={!canJoin}
         errorMessage={
           join.error instanceof Error ? join.error.message : undefined
         }
       />
 
       <div className="mt-auto flex flex-col gap-3">
-        <Button type="submit" disabled={join.isPending}>
+        <Button type="submit" disabled={!canJoin || join.isPending}>
           {join.isPending ? "Joining…" : "Join Gleam Points"}
         </Button>
-        <JoinNote withLink={false} />
+        {canJoin ? (
+          <JoinNote withLink={false} />
+        ) : (
+          <p className="text-center text-caption text-faint">{unsupportedOperationMessage("join Gleam Points")}</p>
+        )}
       </div>
 
       <AboutPoints />

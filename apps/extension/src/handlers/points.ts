@@ -1,6 +1,8 @@
 import { browser } from "wxt/browser";
 import {
   bytesToBase64Url,
+  capabilitiesFor,
+  unsupportedOperationMessage,
   type BadgePort,
   signMessage,
   type InviteRedeemResult,
@@ -11,6 +13,7 @@ import {
   type PointsSeatsRecord,
   type PointsSharePrompt,
   type StoragePort,
+  type WalletMethod,
 } from "@gleam/core";
 import {
   buildDeviceMessage,
@@ -66,6 +69,8 @@ export interface PointsHandlerDeps {
   apiUrl: string;
   /** The unlocked wallet's key from the session cache, or null if it's locked. */
   signingKey: (walletId: string) => Promise<{ jwk: JWKInterface; address: string } | null>;
+  /** The stored wallet's method, or null when it is unknown. */
+  walletMethod: (walletId: string) => Promise<WalletMethod | null>;
   badge: BadgePort;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -100,6 +105,7 @@ export class PointsHandler {
    * successful join. Registering counts as a heartbeat.
    */
   async join(req: { walletId: string; inviteCode?: string }): Promise<PointsMembership> {
+    await this.requirePointsCapability(req.walletId, "join Gleam Points");
     const key = await this.deps.signingKey(req.walletId);
     if (!key) throw new Error("Unlock this wallet to join Gleam Points.");
 
@@ -153,6 +159,14 @@ export class PointsHandler {
     await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
     await this.setClaimPending({ walletId: req.walletId, pending: false });
     return membership;
+  }
+
+  /** Points signs with the keyfile itself, which a hardware wallet doesn't have. */
+  private async requirePointsCapability(walletId: string, action: string): Promise<void> {
+    const method = await this.deps.walletMethod(walletId);
+    if (method !== null && !capabilitiesFor(method).points) {
+      throw new Error(unsupportedOperationMessage(action));
+    }
   }
 
   async getClaimPending(): Promise<string[]> {
@@ -275,6 +289,7 @@ export class PointsHandler {
    * later join reuses it.
    */
   async leave(req: { walletId: string }): Promise<void> {
+    await this.requirePointsCapability(req.walletId, "leave Gleam Points");
     const key = await this.deps.signingKey(req.walletId);
     if (!key) throw new Error("Unlock this wallet to leave Gleam Points.");
 

@@ -2,13 +2,15 @@ import { scanForSecrets, validateTagBytes } from "@gleam/core/src/policy/index.t
 import { submitUploadToBundler } from "@gleam/core/src/arweave/index.ts";
 import {
   base64ToBytes,
+  capabilitiesFor,
   DEFAULT_BUNDLER_URL,
+  unsupportedOperationMessage,
   type ActivityEntry,
   type StoragePort,
   type UploadDraft,
   type UploadReview,
 } from "@gleam/core";
-import { getCachedKey } from "./key-session";
+import { getCachedKey, getWalletMethod } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `reviewUpload`/
@@ -84,6 +86,11 @@ export class UploadHandler {
    * must not be able to bypass the secret scan or tag cap this way.
    */
   async submitUpload(req: SubmitUploadRequest): Promise<{ txId: string }> {
+    const method = await getWalletMethod(req.walletId);
+    if (method !== null && !capabilitiesFor(method).upload) {
+      throw new Error(unsupportedOperationMessage("upload files"));
+    }
+
     const review = this.reviewUpload(req);
     if (review.secretScanMatch !== null) {
       throw new Error(

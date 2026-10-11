@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import type { RuntimePort, WalletSummary } from "@gleam/core";
+import { capabilitiesFor, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { usePointsMemberships } from "../../points/src/usePoints";
 import { CLAIM_PENDING_QUERY_KEY, ClaimStep } from "./ClaimStep";
 
@@ -26,7 +26,10 @@ export function PendingClaim({ runtime, wallet, children }: PendingClaimProps) {
   const memberships = usePointsMemberships(runtime, { retry: false });
 
   if (pending.isPending || memberships.isPending) return null;
-  const waiting = pending.data?.includes(wallet.id) === true && memberships.data?.[wallet.id] === undefined;
+  const waiting =
+    capabilitiesFor(wallet.method).points &&
+    pending.data?.includes(wallet.id) === true &&
+    memberships.data?.[wallet.id] === undefined;
   if (!waiting) return <>{children}</>;
 
   return <ClaimStep runtime={runtime} walletId={wallet.id} onClaimed={() => {}} onSkip={() => {}} />;

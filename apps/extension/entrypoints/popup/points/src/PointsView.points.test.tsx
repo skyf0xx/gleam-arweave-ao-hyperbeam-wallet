@@ -27,6 +27,8 @@ const WALLET: WalletSummary = {
   backupConfirmedAt: null,
 };
 
+const LEDGER_WALLET: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+
 const ONE_POINT = "1000000000000";
 const SETTLED_AT = "2026-10-08T00:05:00.000Z";
 
@@ -89,6 +91,14 @@ describe("PointsTokenRow", () => {
     expect(onOpen).toHaveBeenCalled();
   });
 
+  it("says Points is unavailable for a hardware wallet", async () => {
+    const runtime = fakeRuntime({ ...BALANCES, getPointsMemberships: () => ({}) });
+
+    renderWithQuery(<PointsTokenRow runtime={runtime} wallet={LEDGER_WALLET} onOpen={vi.fn()} />);
+    expect(await screen.findByText("Unavailable")).toBeTruthy();
+    expect(screen.queryByText("Sign up")).toBeNull();
+  });
+
   it("shows a joined wallet's settled total and no USD value", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: Date.parse(SETTLED_AT) });
     const runtime = fakeRuntime({
@@ -126,6 +136,22 @@ describe("PointsView", () => {
     );
     expect(await screen.findByText("Top 12%")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
+  });
+
+  it("disables joining for a hardware wallet and says why", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({}),
+      getPointsPendingInvite: () => null,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={LEDGER_WALLET} onBack={vi.fn()} />);
+
+    const button = await screen.findByRole("button", { name: "Join Gleam Points" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("This wallet can't join Gleam Points. Switch to a keyfile wallet.")).toBeTruthy();
+    fireEvent.click(button);
+    expect(runtime.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "joinPoints" }));
   });
 
   it("lays out the not-joined state in order, pre-filled from the pending code", async () => {

@@ -1,4 +1,5 @@
 import {
+  addressFromOwner,
   base64ToBytes,
   bytesToBase64,
   batchSignDataItem,
@@ -21,6 +22,7 @@ import {
   type DataItemInput,
   type EncryptAlgorithm,
   type Grant,
+  type JWKInterface,
   type PermissionType,
   type SignTransactionInput,
   type SigningApprovalPreview,
@@ -28,7 +30,7 @@ import {
   type WindowPort,
 } from "@gleam/core";
 import { APPROVAL_TIMEOUT_MS, decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
-import { getCachedKey } from "./key-session";
+import { getCachedKey, getStoredWallet } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -639,6 +641,16 @@ export class ApprovalHandler {
     if (!walletId) {
       throw new Error(`Approval request "${entry.request.requestId}" has no wallet to sign with.`);
     }
+    // Encryption needs only the public key, which every wallet kind
+    // stores, so it never touches the key cache.
+    if (input.kind === "encrypt") {
+      if (!input.encryptAlgorithm) {
+        throw new Error("encrypt requires an algorithm.");
+      }
+      const publicJwk = await this.storedPublicJwk(walletId);
+      return encrypt(publicJwk, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
+    }
+
     const cached = await getCachedKey(walletId);
     if (!cached) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
@@ -678,13 +690,6 @@ export class ApprovalHandler {
       case "batchSignDataItem": {
         const signed = await batchSignDataItem(jwk, input.dataItems ?? []);
         return signed.map(toArrayBuffer);
-      }
-
-      case "encrypt": {
-        if (!input.encryptAlgorithm) {
-          throw new Error("encrypt requires an algorithm.");
-        }
-        return encrypt(jwk, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
       }
 
       case "decrypt": {
@@ -748,6 +753,22 @@ export class ApprovalHandler {
       walletId,
     });
     return { id: txId };
+  }
+
+  /**
+   * The wallet's stored public key as an RSA public JWK; Arweave keys
+   * always use e = 65537. The key must hash to the wallet's address, so a
+   * tampered or corrupted record can't redirect what a dApp encrypts.
+   */
+  private async storedPublicJwk(walletId: string): Promise<JWKInterface> {
+    const wallet = await getStoredWallet(walletId);
+    if (!wallet || wallet.publicKey.length === 0) {
+      throw new Error(`No public key stored for wallet "${walletId}".`);
+    }
+    if ((await addressFromOwner(wallet.publicKey)) !== wallet.address) {
+      throw new Error("This wallet's stored public key doesn't match its address. Encryption was refused.");
+    }
+    return { kty: "RSA", n: wallet.publicKey, e: "AQAB" };
   }
 
   /**

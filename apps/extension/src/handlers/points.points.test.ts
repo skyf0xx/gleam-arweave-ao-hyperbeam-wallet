@@ -7,6 +7,7 @@ import {
   type BadgePort,
   type JWKInterface,
   type StoragePort,
+  type WalletMethod,
 } from "@gleam/core";
 import {
   deviceKeyThumbprint,
@@ -80,7 +81,12 @@ beforeAll(async () => {
 async function setup(
   state: PointsDeviceState | null,
   status = 200,
-  options: { responseBody?: unknown; extraStorage?: Record<string, unknown>; locked?: boolean } = {},
+  options: {
+    responseBody?: unknown;
+    extraStorage?: Record<string, unknown>;
+    locked?: boolean;
+    walletMethod?: WalletMethod;
+  } = {},
 ) {
   const storage = createFakeStorage({
     ...(state ? { [POINTS_DEVICE_STATE_KEY]: state } : {}),
@@ -96,6 +102,7 @@ async function setup(
     deviceKey: async () => device,
     apiUrl: "https://points.example",
     signingKey: async (walletId) => (walletId === "w1" && !options.locked ? wallet : null),
+    walletMethod: async () => options.walletMethod ?? "jwk",
     badge,
     fetchImpl: fetchImpl as unknown as typeof fetch,
     now: () => NOW,
@@ -223,6 +230,18 @@ describe("PointsHandler.join", () => {
     expect(locked.fetchImpl).not.toHaveBeenCalled();
   });
 
+  it.each(["keystone", "ledger"] as const)("refuses a %s wallet without calling the server", async (walletMethod) => {
+    const { handler, fetchImpl } = await setup(null, 200, { walletMethod });
+
+    await expect(handler.join({ walletId: "w1" })).rejects.toThrow(
+      "This wallet can't join Gleam Points. Switch to a keyfile wallet.",
+    );
+    await expect(handler.leave({ walletId: "w1" })).rejects.toThrow(
+      "This wallet can't leave Gleam Points. Switch to a keyfile wallet.",
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("surfaces the server's error and stores nothing", async () => {
     const { handler, storage } = await setup(null, 401, { responseBody: { error: "Register message is stale." } });
 
@@ -337,6 +356,7 @@ describe("PointsHandler.redeemInvite", () => {
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
       signingKey: async () => null,
+      walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl: (async () => new Response(JSON.stringify({ result: "ok" }))) as unknown as typeof fetch,
       now: () => NOW,
@@ -352,6 +372,7 @@ describe("PointsHandler.redeemInvite", () => {
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
       signingKey: async () => null,
+      walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl: (async () => new Response(JSON.stringify({ result: "full" }))) as unknown as typeof fetch,
       now: () => NOW,
@@ -368,6 +389,7 @@ describe("PointsHandler.markUnlockedForVault", () => {
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
       signingKey: async () => null,
+      walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl,
       now: () => NOW,
@@ -406,6 +428,7 @@ describe("PointsHandler.pendingInvite", () => {
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
       signingKey: async () => null,
+      walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl,
       now: () => NOW,
@@ -449,6 +472,7 @@ describe("PointsHandler founding reveal seen", () => {
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
       signingKey: async () => null,
+      walletMethod: async () => null,
       badge: createFakeBadge(),
       now: () => NOW,
     });

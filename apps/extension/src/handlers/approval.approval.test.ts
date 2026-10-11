@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { generateJWK, verifyMessage, type StoragePort, type WindowPort } from "@gleam/core";
+import { addressFromOwner, decrypt, generateJWK, verifyMessage, type StoragePort, type WindowPort } from "@gleam/core";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 
@@ -822,30 +822,81 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     ).resolves.toBe(true);
   });
 
+  async function approveCrypto(
+    kind: "encrypt" | "decrypt",
+    payload: Uint8Array,
+    walletId: string,
+    encryptAlgorithm: { name: "RSA-OAEP"; label?: ArrayBuffer } = { name: "RSA-OAEP" },
+  ): Promise<Uint8Array> {
+    const pending = handler.requestApproval({
+      kind,
+      origin: "https://bazar.arweave.net",
+      walletId,
+      payload,
+      encryptAlgorithm,
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
+    const requestId = extractRequestId(windows.opened.pop()!);
+    await handler.resolveApproval({ requestId, approved: true });
+    return (await pending) as Uint8Array;
+  }
+
+  /** Wallet records are read through `key-session.ts`, so they go in its store. */
+  async function storeWallet(walletId: string, publicKey: string, extra: Record<string, unknown> = {}) {
+    const existing = (keySessionStore.get("local:wallets") as Record<string, unknown>[] | undefined) ?? [];
+    keySessionStore.set("local:wallets", [
+      ...existing.filter((wallet) => wallet.id !== walletId),
+      { id: walletId, method: "jwk", address: await addressFromOwner(publicKey), publicKey, ...extra },
+    ]);
+  }
+
   it("encrypt and decrypt survive the storage round trip, including an RSA-OAEP label", async () => {
     const jwk = await generateJWK();
+    await storeWallet(WALLET_ID, jwk.n);
     await cacheKey(WALLET_ID, jwk, "abc-address");
     const plaintext = new TextEncoder().encode("secret");
-    const label = new Uint8Array(12).fill(7);
+    const algorithm = { name: "RSA-OAEP" as const, label: new Uint8Array(12).fill(7).buffer };
 
-    async function approve(kind: "encrypt" | "decrypt", payload: Uint8Array): Promise<Uint8Array> {
-      const pending = handler.requestApproval({
-        kind,
-        origin: "https://bazar.arweave.net",
-        walletId: WALLET_ID,
-        payload,
-        encryptAlgorithm: { name: "RSA-OAEP", label: label.buffer },
-      });
-      await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
-      const requestId = extractRequestId(windows.opened.pop()!);
-      await handler.resolveApproval({ requestId, approved: true });
-      return (await pending) as Uint8Array;
-    }
-
-    const ciphertext = await approve("encrypt", plaintext);
+    const ciphertext = await approveCrypto("encrypt", plaintext, WALLET_ID, algorithm);
     expect(ArrayBuffer.isView(ciphertext)).toBe(true);
-    const decrypted = await approve("decrypt", ciphertext);
+    const decrypted = await approveCrypto("decrypt", ciphertext, WALLET_ID, algorithm);
     expect(new TextDecoder().decode(decrypted)).toBe("secret");
+  });
+
+  it("encrypts to a hardware wallet's stored public key without a cached key", async () => {
+    const deviceKey = await generateJWK();
+    await storeWallet("hw-1", deviceKey.n, {
+      method: "ledger",
+      encryptedKeyfile: null,
+      device: { kind: "ledger" },
+    });
+
+    const ciphertext = await approveCrypto("encrypt", new TextEncoder().encode("secret"), "hw-1");
+
+    // Only the device's private key can open it.
+    const decrypted = await decrypt(deviceKey, ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" });
+    expect(new TextDecoder().decode(decrypted)).toBe("secret");
+  });
+
+  it("refuses to encrypt when the stored public key doesn't match the wallet's address", async () => {
+    const realKey = await generateJWK();
+    const otherKey = await generateJWK();
+    await storeWallet("hw-1", otherKey.n, { method: "ledger", address: await addressFromOwner(realKey.n) });
+
+    const pending = handler.requestApproval({
+      kind: "encrypt",
+      origin: "https://bazar.arweave.net",
+      walletId: "hw-1",
+      payload: new TextEncoder().encode("secret"),
+      encryptAlgorithm: { name: "RSA-OAEP" },
+    });
+    await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
+    const requestId = extractRequestId(windows.opened.pop()!);
+
+    const message = "This wallet's stored public key doesn't match its address. Encryption was refused.";
+    const dappRejected = expect(pending).rejects.toThrow(message);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(message);
+    await dappRejected;
   });
 
   describe("dispatch of a payload large enough to bundle", () => {

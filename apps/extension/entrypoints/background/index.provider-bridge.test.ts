@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { generateJWK, type JWKInterface } from "@gleam/core";
+import { addressFromOwner, generateJWK, type JWKInterface } from "@gleam/core";
 
 /**
  * Drives real `window.arweaveWallet` calls through the injected provider,
@@ -86,6 +86,8 @@ interface Wallet {
 
 const WALLET_ID = "wallet-1";
 let jwk: JWKInterface;
+/** The address the wallet record carries; it must hash from `jwk.n`. */
+let ADDRESS: string;
 let wallet: Wallet;
 let postMessageSpy: ReturnType<typeof vi.spyOn>;
 let addListenerSpy: ReturnType<typeof vi.spyOn>;
@@ -113,6 +115,7 @@ async function approved<T>(call: Promise<unknown>): Promise<{ result: T; request
 
 beforeAll(async () => {
   jwk = await generateJWK();
+  ADDRESS = await addressFromOwner(jwk.n);
 });
 
 beforeEach(async () => {
@@ -140,7 +143,7 @@ beforeEach(async () => {
   wallet = new GleamProvider() as unknown as Wallet;
 
   store.set("local:wallets", [
-    { id: WALLET_ID, address: "addr-1", name: "Main", method: "jwk", publicKey: jwk.n, createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    { id: WALLET_ID, address: ADDRESS, name: "Main", method: "jwk", publicKey: jwk.n, createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
   ]);
   store.set("local:activeWalletId", WALLET_ID);
   store.set("local:grants", [
@@ -153,7 +156,7 @@ beforeEach(async () => {
     unlockedWalletIds: [WALLET_ID],
   });
   const { cacheKey } = await import("@/src/handlers/key-session");
-  await cacheKey(WALLET_ID, jwk, "addr-1");
+  await cacheKey(WALLET_ID, jwk, ADDRESS);
 });
 
 afterEach(() => {
@@ -412,13 +415,13 @@ describe("provider token list methods, end to end", () => {
 
     expect(result).toBeUndefined();
     expect(request.kind).toBe("addToken");
-    expect(request.preview).toEqual({ kind: "addToken", processId: PROCESS_ID, ticker: "TKN", name: "Token", address: "addr-1" });
-    expect(store.get("local:watchedProcessIds:addr-1")).toEqual([PROCESS_ID]);
+    expect(request.preview).toEqual({ kind: "addToken", processId: PROCESS_ID, ticker: "TKN", name: "Token", address: ADDRESS });
+    expect(store.get(`local:watchedProcessIds:${ADDRESS}`)).toEqual([PROCESS_ID]);
     await expect(wallet.isTokenAdded(PROCESS_ID)).resolves.toBe(true);
   });
 
   it("addToken resolves without a window when the token is already listed", async () => {
-    store.set("local:watchedProcessIds:addr-1", [PROCESS_ID]);
+    store.set(`local:watchedProcessIds:${ADDRESS}`, [PROCESS_ID]);
     await expect(wallet.addToken(PROCESS_ID)).resolves.toBeUndefined();
     await expect(wallet.addToken(AO_PROCESS_ID)).resolves.toBeUndefined();
     expect(windowsCreate).not.toHaveBeenCalled();
@@ -434,7 +437,7 @@ describe("provider token list methods, end to end", () => {
     });
 
     await expect(call).rejects.toThrow(/rejected/);
-    expect(store.get("local:watchedProcessIds:addr-1")).toBeUndefined();
+    expect(store.get(`local:watchedProcessIds:${ADDRESS}`)).toBeUndefined();
   });
 
   it("rejects an id that isn't a process id, without opening a window", async () => {
@@ -446,7 +449,7 @@ describe("provider token list methods, end to end", () => {
   it("tokenBalance resolves to the balance string for one process", async () => {
     await expect(wallet.tokenBalance(PROCESS_ID)).resolves.toBe("1000000");
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
-      expect.stringContaining(`/${PROCESS_ID}~process@1.0/compute/balances/addr-1`),
+      expect.stringContaining(`/${PROCESS_ID}~process@1.0/compute/balances/${ADDRESS}`),
     );
   });
 
@@ -456,7 +459,7 @@ describe("provider token list methods, end to end", () => {
   });
 
   it("userTokens lists watched tokens in Wander's shape, with balances only on request", async () => {
-    store.set("local:watchedProcessIds:addr-1", [PROCESS_ID]);
+    store.set(`local:watchedProcessIds:${ADDRESS}`, [PROCESS_ID]);
 
     const plain = (await wallet.userTokens()) as Array<Record<string, unknown>>;
     expect(plain.find((token) => token.processId === PROCESS_ID)).toEqual({

@@ -8,6 +8,8 @@ export type {
   HardwareDevice,
 } from "./wallet";
 export { isHardwareWalletMethod, vaultHasPassword } from "./wallet";
+export type { WalletCapabilities } from "./capabilities";
+export { capabilitiesFor, providerMethodRefusal, unsupportedOperationMessage } from "./capabilities";
 export type {
   Session,
   AutoLockTimeout,

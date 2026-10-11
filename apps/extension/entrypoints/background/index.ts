@@ -8,6 +8,7 @@ import {
   PROVIDER_METHODS,
   bytesToBase64,
   missingPermissions,
+  providerMethodRefusal,
   verifyMessage,
   type ConnectAppInfo,
   type NetworkSettings,
@@ -38,7 +39,7 @@ import { AnnouncementsHandler } from "@/src/handlers/announcements";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
-import { getCachedKey } from "@/src/handlers/key-session";
+import { getCachedKey, getWalletMethod } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -113,6 +114,7 @@ const points = new PointsHandler({
   deviceKey: loadOrCreateDeviceKey,
   apiUrl: POINTS_API_URL,
   signingKey: getCachedKey,
+  walletMethod: getWalletMethod,
   badge: actionBadge,
 });
 registerPointsHeartbeatAlarm(points);
@@ -340,6 +342,11 @@ async function handleProviderCall(
     if (!wallet) throw new Error("No active wallet to sign with.");
     return wallet.id;
   };
+
+  // Refuse what the active wallet can't do before any approval window
+  // opens, rather than after the user has approved it.
+  const refusal = wallet ? providerMethodRefusal(wallet.method, method) : null;
+  if (refusal) throw new Error(refusal);
 
   switch (method) {
     case "getPermissions":

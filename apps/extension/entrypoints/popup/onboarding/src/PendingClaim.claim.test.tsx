@@ -8,10 +8,18 @@ vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ vers
 
 afterEach(cleanup);
 
-const WALLET = { id: "w1", name: "Opal", address: "ADDR1" } as WalletSummary;
+const WALLET = { id: "w1", name: "Opal", address: "ADDR1", method: "jwk" } as WalletSummary;
 const MEMBERSHIP: PointsMembership = { address: "ADDR1", inviteCode: "MYCODE22", referred: false, joinedAt: 1 };
 
-function setup({ pending = ["w1"], memberships = {} }: { pending?: string[]; memberships?: Record<string, PointsMembership> }) {
+function setup({
+  pending = ["w1"],
+  memberships = {},
+  wallet = WALLET,
+}: {
+  pending?: string[];
+  memberships?: Record<string, PointsMembership>;
+  wallet?: WalletSummary;
+}) {
   let pendingNow = pending;
   let membershipsNow = memberships;
   const send = vi.fn(async (message: { type: string; payload: unknown }) => {
@@ -36,7 +44,7 @@ function setup({ pending = ["w1"], memberships = {} }: { pending?: string[]; mem
   const runtime = { send, onMessage: vi.fn(() => () => {}) } as unknown as RuntimePort;
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PendingClaim runtime={runtime} wallet={WALLET}>
+      <PendingClaim runtime={runtime} wallet={wallet}>
         <div>home</div>
       </PendingClaim>
     </QueryClientProvider>,
@@ -68,6 +76,12 @@ describe("PendingClaim", () => {
   it("shows the home screen when nothing is pending", async () => {
     setup({ pending: [] });
     expect(await screen.findByText("home")).toBeTruthy();
+  });
+
+  it("skips the claim step for a wallet that can't join", async () => {
+    setup({ wallet: { ...WALLET, method: "keystone" } });
+    expect(await screen.findByText("home")).toBeTruthy();
+    expect(screen.queryByText("Start earning Gleam Points")).toBeNull();
   });
 
   it("shows the home screen for a wallet that already joined", async () => {
