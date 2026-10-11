@@ -2211,3 +2211,129 @@ html.waking .v-gate-orb {
     animation: none;
   }
 }
+
+/* ---- Chord changes: the section that turned the drone shows it ----------- */
+
+/* A sweep of the chord's colour through the heading. The fill goes
+   transparent so the sweep shows, with currentColor either side of the band
+   keeping the text its own colour. */
+.fx-chord-glint h2 {
+  background: linear-gradient(100deg, currentColor 42%, var(--c) 50%, currentColor 58%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chord-glint 1.4s ease-in-out;
+}
+.fx-chord-glint.chord-up h2 {
+  animation-direction: reverse;
+}
+@keyframes chord-glint {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+.fx-chord-breathe h2 {
+  animation: chord-breathe 1.6s ease-in-out;
+}
+@keyframes chord-breathe {
+  45% {
+    transform: translateY(-3px) scale(1.012);
+    text-shadow: 0 0 24px color-mix(in srgb, var(--c) 35%, transparent);
+  }
+}
+.fx-chord-breathe.chord-up h2 {
+  animation-name: chord-breathe-up;
+}
+@keyframes chord-breathe-up {
+  45% {
+    transform: translateY(3px) scale(1.012);
+    text-shadow: 0 0 24px color-mix(in srgb, var(--c) 35%, transparent);
+  }
+}
+
+.fx-chord-bar h2 {
+  position: relative;
+}
+.fx-chord-bar h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -14px;
+  width: 120px;
+  height: 3px;
+  background: var(--beam-run);
+  transform-origin: left;
+  animation: chord-bar 1.8s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.fx-chord-bar.chord-up h2::after {
+  transform-origin: right;
+}
+@keyframes chord-bar {
+  0% { transform: scaleX(0); opacity: 1; }
+  40% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+.fx-chord-kicker .points-kicker {
+  animation: chord-kicker 1.8s ease-in-out;
+}
+@keyframes chord-kicker {
+  35% {
+    color: var(--c);
+    letter-spacing: 0.32em;
+  }
+}
+
+/* ---- Whoosh threads ------------------------------------------------------- */
+
+.v-air {
+  position: fixed;
+  top: 0;
+  z-index: 15;
+  width: 2px;
+  height: 45vh;
+  border-radius: 1px;
+  background: linear-gradient(to bottom, transparent, var(--c), transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: air-down 0.55s cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+.v-air.up {
+  animation-name: air-up;
+}
+@keyframes air-down {
+  0% { transform: translateY(-50vh); opacity: 0; }
+  30% { opacity: 0.45; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+@keyframes air-up {
+  0% { transform: translateY(110vh); opacity: 0; }
+  30% { opacity: 0.45; }
+  100% { transform: translateY(-50vh); opacity: 0; }
+}
+
+/* ---- Tokenomics step numbers counting in light ---------------------------- */
+
+.v-step-n.count {
+  display: inline-block;
+  animation: step-count 0.7s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+}
+@keyframes step-count {
+  30% {
+    color: var(--c);
+    transform: scale(1.25);
+    text-shadow: 0 0 14px color-mix(in srgb, var(--c) 60%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="fx-chord-"] h2,
+  [class*="fx-chord-"] h2::after,
+  [class*="fx-chord-"] .points-kicker,
+  .v-step-n.count {
+    animation: none;
+  }
+  .v-air {
+    display: none;
+  }
+}
