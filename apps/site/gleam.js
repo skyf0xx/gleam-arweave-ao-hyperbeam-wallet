@@ -1761,17 +1761,130 @@
       orb.style.setProperty("--ly", ly.toFixed(3));
     }
 
+    // The gate is a slot machine with three reels' worth of copy. Each tap
+    // spins the reel to the next perk; the third lands and wakes the hero.
+    // The first tap is also what unlocks the page's sound.
+    var reel = gate.querySelector(".v-reel");
+    var strip = gate.querySelector(".v-reel-strip");
+    var lamps = gate.querySelectorAll(".v-gate-lamps i");
+    var live = document.querySelector("[data-gate-live]");
+    var perks = Array.prototype.slice.call(
+      gate.querySelector(".v-perks").content.querySelectorAll(".v-reel-item"),
+    );
+    var pulls = 0;
+    var spin = null;
+
+    function pull() {
+      if (root.classList.contains("waking") || pulls >= perks.length) return;
+      // A tap mid-spin slams the reel home and spins the next, so every tap
+      // counts and nobody waits on the animation
+      if (spin) spin.land();
+      var n = pulls++;
+      if (n === 0) program.enableSound();
+      if (window.umami) window.umami.track("gleam-gate-" + (n + 1));
+      if (motion) restart(orb, "hit");
+      spin = spinTo(perks[n], n);
+    }
+
+    function spinTo(perk, n) {
+      var current = strip.lastElementChild;
+      var target = perk.cloneNode(true);
+      // A blur of the other perks and GLEAMs between, one more past the
+      // target for the landing to overshoot into
+      var turns = motion ? 9 + n * 3 : 0;
+      var items = [current];
+      for (var i = 0; i < turns; i++) {
+        var filler = i % 3 === 2 ? perks[(n + i) % perks.length].cloneNode(true) : gleamItem(i);
+        items.push(filler);
+      }
+      items.push(target);
+      if (motion) items.push(gleamItem(turns));
+      strip.replaceChildren.apply(strip, items);
+
+      var h = reel.offsetHeight;
+      var dist = items.indexOf(target);
+      var dur = 700 + turns * 45;
+      var start = window.performance.now();
+      var passed = 0;
+      var frame = 0;
+      var done = false;
+
+      function at(pos) {
+        strip.style.transform = "translateY(" + (-pos * h).toFixed(1) + "px)";
+      }
+      function step(now) {
+        var t = Math.min(1, (now - start) / dur);
+        var pos = reelAt(t, dist);
+        var v = (reelAt(Math.min(1, t + 0.02), dist) - pos) / 0.02;
+        strip.style.filter = v > 4 ? "blur(" + Math.min(4, v / 6).toFixed(1) + "px)" : "";
+        at(pos);
+        var p = Math.floor(pos + 0.5);
+        if (p > passed && p < dist) program.tick(0, reel);
+        passed = Math.max(passed, p);
+        if (t < 1) frame = requestAnimationFrame(step);
+        else land();
+      }
+
+      function land() {
+        if (done) return;
+        done = true;
+        cancelAnimationFrame(frame);
+        strip.replaceChildren(target);
+        strip.style.transform = "";
+        strip.style.filter = "";
+        target.style.setProperty("--c", COLORS[n * 2]);
+        lamps[n].style.setProperty("--c", COLORS[n * 2]);
+        lamps[n].classList.add("on");
+        if (motion) restart(target, "hit");
+        if (live) live.textContent = target.textContent;
+        if (spin && spin.land === land) spin = null;
+        if (n === perks.length - 1) {
+          window.setTimeout(wake, motion ? 650 : 900);
+        } else {
+          program.ping(n * 2, 0, reel);
+          program.soft(n * 2, 0.02, reel);
+        }
+      }
+
+      if (motion) frame = requestAnimationFrame(step);
+      else window.setTimeout(land, 0);
+      return { land: land };
+    }
+
+    function gleamItem(i) {
+      var item = document.createElement("span");
+      item.className = "v-reel-item";
+      var word = document.createElement("b");
+      word.textContent = "GLEAM";
+      word.style.color = COLORS[i % COLORS.length];
+      item.appendChild(document.createElement("span")).appendChild(word);
+      return item;
+    }
+
+    // Where the reel sits, in items, t of the way through a spin of dist:
+    // it runs a quarter item past its mark, then settles back like it has
+    // weight
+    function reelAt(t, dist) {
+      var over = 0.25;
+      if (t < 0.8) {
+        var u = 1 - t / 0.8;
+        return (dist + over) * (1 - u * u * u);
+      }
+      var s = (t - 0.8) / 0.2;
+      return dist + over * (1 - s * s * (3 - 2 * s));
+    }
+
     // The nav stays usable, so only Enter or Space with nothing else focused
     function onKey(e) {
       if (e.key !== "Enter" && e.key !== " ") return;
       if (document.activeElement && document.activeElement !== document.body &&
           document.activeElement !== gate) return;
       e.preventDefault();
-      wake();
+      pull();
     }
 
     gate.addEventListener("pointermove", lean);
-    gate.addEventListener("click", wake);
+    gate.addEventListener("click", pull);
     document.addEventListener("keydown", onKey);
 
     function wake() {

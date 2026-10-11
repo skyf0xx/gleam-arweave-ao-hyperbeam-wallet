@@ -1361,8 +1361,9 @@ html:not(.motion) .tl-card {
 /* The gate: every visit opens on an idle orb holding 0.00. Every cycle a
    pulse rides a beam in from the left edge, the orb takes the charge, five
    colour rings spill off it and the light runs across GLEAM letter by
-   letter. Tapping anywhere wakes the hero: the rings burst, the orb flies to
-   the counter and becomes it, and the page unlocks. */
+   letter. Under it, a slot reel: each tap spins it to the next thing GLEAM
+   gets you and lights a lamp. The third wakes the hero: the rings burst, the
+   orb flies to the counter and becomes it, and the page unlocks. */
 
 .v-gate {
   display: none;
@@ -1531,11 +1532,70 @@ html.gate .v-meter {
 .v-gate-waves i:nth-child(5) { color: var(--beam-green); animation-delay: 0.24s; }
 
 .v-gate-cta {
-  font-size: clamp(1.5rem, 4.5vw, 2.25rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 36em);
+  font-size: clamp(1.375rem, 4.2vw, 2.125rem);
   font-weight: 760;
   letter-spacing: -0.03em;
   color: var(--on-ink-muted);
   animation: gate-rise 0.8s 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* The reel's window is one item tall, two lines so the longest perk can
+   wrap on a phone, and fades at the top and bottom like a slot's glass */
+.v-reel {
+  --item: 2.4em;
+  display: block;
+  width: 100%;
+  height: var(--item);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+}
+.v-reel-strip {
+  display: block;
+  will-change: transform;
+}
+.v-reel-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--item);
+  line-height: 1.12;
+  text-align: center;
+  text-wrap: balance;
+}
+.v-reel-item b {
+  font-weight: inherit;
+  color: var(--on-ink);
+}
+.v-reel-item.hit b {
+  animation: reel-hit 0.9s ease-out both;
+}
+
+/* One lamp per pull, each in its perk's beam colour once it's won */
+.v-gate-lamps {
+  display: flex;
+  gap: 10px;
+}
+.v-gate-lamps i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--on-ink-muted);
+  transition: background 0.2s, box-shadow 0.3s;
+}
+.v-gate-lamps i.on {
+  background: var(--c);
+  box-shadow: 0 0 0 1.5px var(--c), 0 0 12px var(--c);
+}
+
+/* Each pull knocks the orb */
+.v-gate-orb.hit {
+  animation: gate-hit 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
 /* GLEAM takes the light one letter at a time, each in its own beam colour */
@@ -1559,6 +1619,22 @@ html.gate .v-meter {
     opacity: 0.8;
   }
   .v-gate:hover .v-gate-cta {
+    color: var(--on-ink);
+  }
+}
+
+@keyframes gate-hit {
+  35% {
+    scale: 0.94;
+  }
+}
+
+@keyframes reel-hit {
+  25% {
+    color: var(--c);
+    text-shadow: 0 0 22px var(--c);
+  }
+  100% {
     color: var(--on-ink);
   }
 }
