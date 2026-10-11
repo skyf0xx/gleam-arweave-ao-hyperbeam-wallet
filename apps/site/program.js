@@ -123,8 +123,10 @@
     var out = ctx.createDynamicsCompressor();
     out.threshold.value = -18;
     out.connect(ctx.destination);
+    // Notes sit just above the drone: quiet enough to be found ("was that
+    // me?") rather than announced, so a reader leans in and turns it up
     var master = ctx.createGain();
-    master.gain.value = 0.42;
+    master.gain.value = 0.2;
     master.connect(out);
 
     // A short dark echo gives the glass a room to ring in
