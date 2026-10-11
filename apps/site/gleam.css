@@ -1152,6 +1152,21 @@ html:not(.motion) .tl-card {
 .l-orbit {
   transform-origin: 240px 150px;
 }
+/* A stop lights in the value's colour as it passes */
+.l-node {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.l-node.hit {
+  animation: l-hit 0.9s ease-out;
+}
+@keyframes l-hit {
+  15% {
+    fill: var(--c);
+    transform: scale(1.6);
+    filter: drop-shadow(0 0 6px var(--c));
+  }
+}
 
 .motion .q-you {
   transform: none;
