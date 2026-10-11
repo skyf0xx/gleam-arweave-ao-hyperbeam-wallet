@@ -213,12 +213,17 @@
 
   // The glass ping: bright and struck, for points and light
   function ping(step, delay, from) {
+    glass(pitch(step), delay, from);
+  }
+
+  // The glass at any pitch. short: a music box's tine, not a bar.
+  function glass(f, delay, from, short) {
     var level = loudness(from);
     if (!level) return;
     var ctx = audio.ctx;
     var at = ctx.currentTime + 0.01 + (delay || 0);
-    var f = pitch(step);
-    if (f > 6000) f /= 4;
+    var ring = short ? 0.35 : 1;
+    while (f > 6000) f /= 4;
     duckPad(at);
 
     // Glass click: a few ms of filtered noise
@@ -237,11 +242,11 @@
     click.start(at);
 
     // The ring: a fundamental plus the inharmonic partials a struck glass bar has
-    partial(f, 0.2 * level, 0.9, at);
-    partial(f * 2.756, 0.07 * level, 0.34, at);
-    partial(f * 5.404, 0.03 * level, 0.13, at);
+    partial(f, 0.2 * level, 0.9 * ring, at);
+    partial(f * 2.756, 0.07 * level, 0.34 * ring, at);
+    partial(f * 5.404, 0.03 * level, 0.13 * ring, at);
     // A detuned octave a beat later makes it shimmer
-    partial(f * 2.008, 0.045 * level, 1.3, at + 0.035);
+    partial(f * 2.008, 0.045 * level, 1.3 * ring, at + 0.035);
     // A whisper of body underneath so it lands rather than floats
     partial(f / 4, 0.05 * level, 0.08, at, "triangle");
   }
@@ -249,11 +254,14 @@
   // The soft voice: two octaves under the ping, no strike, a slow swell. For
   // things arriving rather than sparkling, so the glass stays special.
   function soft(step, delay, from) {
+    swell(pitch(step) / 4, delay, from);
+  }
+
+  function swell(f, delay, from) {
     var level = loudness(from);
     if (!level) return;
     var ctx = audio.ctx;
     var at = ctx.currentTime + 0.01 + (delay || 0);
-    var f = pitch(step) / 4;
     duckPad(at);
     [[1, 0.14, 0.7], [2, 0.03, 0.35], [3, 0.012, 0.2]].forEach(function (h) {
       var osc = ctx.createOscillator();
@@ -268,6 +276,111 @@
       osc.start(at);
       osc.stop(at + h[2] + 0.05);
     });
+  }
+
+  // A plucked string: a bright attack that darkens fast, an octave under
+  // the glass, for things snapping into place
+  function pluck(f, delay, from) {
+    var level = loudness(from);
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01 + (delay || 0);
+    duckPad(at);
+    var tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.Q.value = 2;
+    tone.frequency.setValueAtTime(f * 8, at);
+    tone.frequency.exponentialRampToValueAtTime(f * 1.2, at + 0.35);
+    tone.connect(audio.master);
+    tone.connect(audio.send);
+    [["sawtooth", 1, 0.09], ["triangle", 2, 0.05]].forEach(function (v) {
+      var osc = ctx.createOscillator();
+      osc.type = v[0];
+      osc.frequency.value = f * v[1];
+      var env = ctx.createGain();
+      env.gain.setValueAtTime(0, at);
+      env.gain.linearRampToValueAtTime(v[2] * level, at + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, at + 0.6);
+      osc.connect(env);
+      env.connect(tone);
+      osc.start(at);
+      osc.stop(at + 0.65);
+    });
+  }
+
+  // A note played backwards: it swells out of nothing and cuts dead. The
+  // sound of a tape running the wrong way.
+  function reversed(f, delay, from) {
+    var level = loudness(from);
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01 + (delay || 0);
+    var rise = 0.32;
+    duckPad(at + rise);
+    [[1, 0.13], [2.756, 0.035], [2.008, 0.03]].forEach(function (h) {
+      var osc = ctx.createOscillator();
+      osc.frequency.value = f * h[0];
+      var env = ctx.createGain();
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(h[1] * level, at + rise);
+      env.gain.linearRampToValueAtTime(0, at + rise + 0.015);
+      osc.connect(env);
+      env.connect(audio.master);
+      osc.start(at);
+      osc.stop(at + rise + 0.05);
+    });
+  }
+
+  // ---- Voices and scales: the same melody, played many ways ---------------
+  //
+  // A section that sounds as it's passed picks a voice and a scale for each
+  // pass, so a milestone rung twice never quite sounds the same.
+
+  var VOICES = {
+    glass: function (f, d, from) {
+      glass(f, d, from);
+    },
+    box: function (f, d, from) {
+      glass(f * 2, d, from, true);
+    },
+    strum: function (f, d, from) {
+      [1, 1.26, 1.498].forEach(function (m, i) {
+        glass(f * m, d + i * 0.035, from);
+      });
+    },
+    bell: function (f, d, from) {
+      glass(f, d, from);
+      swell(f / 2, d, from);
+    },
+    swell: function (f, d, from) {
+      swell(f / 4, d, from);
+    },
+    pluck: function (f, d, from) {
+      pluck(f / 2, d, from);
+    },
+    reversed: function (f, d, from) {
+      reversed(f / 2, d, from);
+    },
+  };
+
+  // Semitones above E. All start on E, so every one sits on the pad.
+  var SCALES = {
+    pentatonic: [0, 2, 4, 7, 9],
+    minor: [0, 3, 5, 7, 10],
+    lydian: [0, 2, 4, 6, 7, 9, 11],
+    wholeTone: [0, 2, 4, 6, 8, 10],
+    exotic: [0, 1, 4, 5, 7, 8, 11],
+    fifths: [0, 7, 14, 21, 28],
+  };
+
+  // degree counts up the scale, climbing an octave each time round it
+  function play(voice, scale, degree, delay, from) {
+    var notes = SCALES[scale] || SCALES.pentatonic;
+    var n = Math.max(0, Math.floor(degree));
+    var semis = notes[n % notes.length] + 12 * Math.floor(n / notes.length);
+    var f = 1318.51 * Math.pow(2, semis / 12);
+    while (f > 5300) f /= 2;
+    (VOICES[voice] || VOICES.glass)(f, delay || 0, from);
   }
 
   // A glass tone gliding from one step to another: time running, not landing
@@ -586,6 +699,9 @@
     soft: soft,
     tick: tick,
     sweep: sweep,
+    play: play,
+    VOICES: Object.keys(VOICES),
+    SCALES: Object.keys(SCALES),
     pad: function () {
       padWanted = true;
       updatePad(1.2);
