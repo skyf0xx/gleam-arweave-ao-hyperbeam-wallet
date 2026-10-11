@@ -383,6 +383,41 @@
     osc.stop(at + 0.5 + 0.1 * d);
   }
 
+  // An explosion: a burst of noise, bright at the crack and closing down to
+  // a rumble. size 1 is a pop; 2 and up fills the room.
+  function boom(delay, size) {
+    var level = loudness();
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01 + (delay || 0);
+    var z = size || 1;
+    var tail = 0.35 + 0.35 * z;
+    if (!audio.rumble) {
+      var len = Math.ceil(ctx.sampleRate * 1.6);
+      audio.rumble = ctx.createBuffer(1, len, ctx.sampleRate);
+      var d = audio.rumble.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    duckPad(at);
+    var src = ctx.createBufferSource();
+    src.buffer = audio.rumble;
+    var tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.Q.value = 0.8;
+    tone.frequency.setValueAtTime(1800 + 1400 * z, at);
+    tone.frequency.exponentialRampToValueAtTime(90, at + tail);
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0, at);
+    env.gain.linearRampToValueAtTime(Math.min(1, 0.45 + 0.2 * z) * level, at + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + tail);
+    src.connect(tone);
+    tone.connect(env);
+    env.connect(out());
+    env.connect(audio.send);
+    src.start(at);
+    src.stop(at + tail + 0.05);
+  }
+
   // ---- Voices and scales: the same melody, played many ways ---------------
   //
   // A section that sounds as it's passed picks a voice and a scale for each
@@ -819,6 +854,7 @@
     tick: tick,
     loud: loud,
     thump: thump,
+    boom: boom,
     sweep: sweep,
     play: play,
     whoosh: whoosh,

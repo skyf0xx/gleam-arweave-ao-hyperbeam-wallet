@@ -1772,6 +1772,73 @@
       gate.querySelector(".v-perks").content.children,
     );
     var charge = 0;
+    var flash = document.querySelector(".v-gate-flash");
+    var sparks = document.querySelector(".v-gate-sparks");
+    var pen = sparks && sparks.getContext("2d");
+    var flying = [];
+    var sparking = 0;
+
+    // Sparks thrown off the orb's edge, streaking out and slowing as they
+    // burn down. power scales how far they fly.
+    function burst(count, power, colors) {
+      if (!pen) return;
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
+      var area = sparks.getBoundingClientRect();
+      if (sparks.width !== Math.round(area.width * dpr)) {
+        sparks.width = Math.round(area.width * dpr);
+        sparks.height = Math.round(area.height * dpr);
+      }
+      pen.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var o = orb.getBoundingClientRect();
+      var cx = o.left + o.width / 2 - area.left;
+      var cy = o.top + o.height / 2 - area.top;
+      var r = o.width / 2;
+      for (var i = 0; i < count; i++) {
+        var a = Math.random() * Math.PI * 2;
+        var v = (6 + Math.random() * 16) * power;
+        flying.push({
+          x: cx + Math.cos(a) * r,
+          y: cy + Math.sin(a) * r,
+          vx: Math.cos(a) * v,
+          vy: Math.sin(a) * v,
+          life: 1,
+          fade: 0.012 + Math.random() * 0.025,
+          width: 1.5 + Math.random() * 2.5,
+          color: Math.random() < 0.25 ? "#fff" : colors[i % colors.length],
+        });
+      }
+      if (!sparking) sparking = requestAnimationFrame(fly);
+    }
+
+    function fly() {
+      var w = sparks.width;
+      var h = sparks.height;
+      pen.save();
+      pen.setTransform(1, 0, 0, 1, 0, 0);
+      pen.clearRect(0, 0, w, h);
+      pen.restore();
+      pen.globalCompositeOperation = "lighter";
+      pen.lineCap = "round";
+      flying = flying.filter(function (p) {
+        var x = p.x;
+        var y = p.y;
+        p.vx *= 0.92;
+        p.vy = p.vy * 0.92 + 0.12;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.fade;
+        if (p.life <= 0) return false;
+        pen.globalAlpha = p.life;
+        pen.strokeStyle = p.color;
+        pen.lineWidth = p.width * p.life;
+        pen.beginPath();
+        pen.moveTo(x - p.vx * 1.5, y - p.vy * 1.5);
+        pen.lineTo(p.x, p.y);
+        pen.stroke();
+        return true;
+      });
+      sparking = flying.length ? requestAnimationFrame(fly) : 0;
+    }
 
     function pull() {
       if (root.classList.contains("waking") || charge >= perks.length) return;
@@ -1783,6 +1850,7 @@
       gate.classList.add("charging");
       gate.style.setProperty("--level", String(charge));
       gate.style.setProperty("--c", c);
+      if (flash) flash.style.setProperty("--c", c);
       segs[n].classList.add("on");
       line.replaceChildren(perks[n].cloneNode(true));
       if (live) live.textContent = line.textContent;
@@ -1790,6 +1858,9 @@
         restart(orb, "hit");
         restart(shock, "go");
         restart(line, "slam");
+        restart(gate, "shake");
+        restart(flash, "go");
+        burst(40 + n * 45, 1 + n * 0.5, [c]);
       }
       if (last) gate.classList.add("full");
       if (navigator.vibrate) navigator.vibrate(last ? [30, 40, 60] : 25 + n * 10);
@@ -1807,6 +1878,7 @@
           program.ping(n * 2 + k, i * 0.025);
         });
         program.soft(n * 2, 0);
+        program.boom(0, 0.6 + n * 0.5);
       }, 0.5);
     }
 
@@ -1840,6 +1912,10 @@
       var zy = zero.top + zero.height / 2 - ly * 10;
       root.classList.add("waking");
       if (motion) {
+        gate.classList.remove("full");
+        restart(gate, "blast");
+        restart(flash, "white");
+        burst(260, 2.2, COLORS);
         orb.style.translate =
           to.left + to.width / 2 - cx - k * (zx - cx) + "px " +
           (to.top + to.height / 2 - cy - k * (zy - cy)) + "px";
@@ -1851,6 +1927,7 @@
       program.enableSound(function () {
         program.loud(function () {
           program.thump(0, 4);
+          program.boom(0, 2.6);
           program.soft(0, 0);
           [0, 1, 2, 3, 4].forEach(function (step, i) {
             program.ping(step, i * 0.06);
