@@ -19,11 +19,7 @@ export async function deviceKeyThumbprint(jwk: DevicePublicJwk): Promise<string>
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
-/** Arweave address of an RSA public key given as its base64url modulus (`n`). */
-export async function addressFromOwner(publicKeyModulus: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", base64UrlToBytes(publicKeyModulus));
-  return bytesToBase64Url(new Uint8Array(digest));
-}
+export { addressFromOwner } from "../keys/address";
 
 const COORDINATE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 

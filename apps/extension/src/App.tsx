@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { RuntimePort, ThemeSettings, TokenBalance, WalletState, WalletSummary } from "@gleam/core";
+import { vaultHasPassword, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
@@ -287,7 +287,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <SettingsHomeView
         runtime={runtime}
         onBack={() => setSubView({ kind: "home" })}
-        onOpenLockSettings={() => setSubView({ kind: "lock-settings" })}
+        onOpenLockSettings={vaultHasPassword(wallets) ? () => setSubView({ kind: "lock-settings" }) : undefined}
         onOpenConnectedApps={() => setSubView({ kind: "connected-apps" })}
         onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}

@@ -110,6 +110,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     for (const method of [
       "createWallet",
       "importWallet",
+      "addHardwareWallet",
       "exportWallet",
       "getState",
       "resetAllWallets",

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { JWKInterface, RuntimePort, WalletSummary } from "@gleam/core";
+import { isHardwareWalletMethod, type JWKInterface, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
@@ -12,6 +12,7 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
   jwk: "JWK",
   ethereum: "ETH",
   ledger: "LEDGER",
+  keystone: "KEYSTONE",
 };
 
 function truncateAddress(address: string): string {
@@ -130,10 +131,13 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
     }
   };
 
+  const hardware = isHardwareWalletMethod(wallet.method);
+
   if (step.kind === "remove-confirm") {
     return (
       <RemoveConfirmStep
         walletName={wallet.name}
+        hardware={hardware}
         backedUp={backupConfirmedAt !== null}
         onBack={() => setStep({ kind: "detail" })}
         onConfirm={() => void handleRemove()}
@@ -210,31 +214,35 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
           errorMessage={nameError ?? undefined}
         />
 
-        <div className="overflow-hidden rounded-lg border border-line">
-          <div className="flex items-center gap-2.5 px-3.5 py-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-label font-semibold text-foreground">Keyfile backup</span>
-              <span className="text-caption text-muted">
-                {backupConfirmedAt !== null ? formatBackupDate(backupConfirmedAt) : "No backup on record"}
-              </span>
+        {hardware ? null : (
+          <>
+            <div className="overflow-hidden rounded-lg border border-line">
+              <div className="flex items-center gap-2.5 px-3.5 py-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-label font-semibold text-foreground">Keyfile backup</span>
+                  <span className="text-caption text-muted">
+                    {backupConfirmedAt !== null ? formatBackupDate(backupConfirmedAt) : "No backup on record"}
+                  </span>
+                </div>
+                <span
+                  className={`flex-shrink-0 text-caption font-semibold ${
+                    backupConfirmedAt !== null ? "text-positive" : "text-muted"
+                  }`}
+                >
+                  {backupConfirmedAt !== null ? "Backed up" : "Not backed up"}
+                </span>
+              </div>
             </div>
-            <span
-              className={`flex-shrink-0 text-caption font-semibold ${
-                backupConfirmedAt !== null ? "text-positive" : "text-muted"
-              }`}
-            >
-              {backupConfirmedAt !== null ? "Backed up" : "Not backed up"}
-            </span>
-          </div>
-        </div>
 
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => setStep({ kind: "export-password", submitting: false })}
-        >
-          Back up keyfile
-        </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setStep({ kind: "export-password", submitting: false })}
+            >
+              Back up keyfile
+            </Button>
+          </>
+        )}
 
         <Button
           type="button"
@@ -250,6 +258,7 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
 
 function RemoveConfirmStep({
   walletName,
+  hardware,
   backedUp,
   onBack,
   onConfirm,
@@ -257,6 +266,7 @@ function RemoveConfirmStep({
   serverError,
 }: {
   walletName: string;
+  hardware: boolean;
   backedUp: boolean;
   onBack: () => void;
   onConfirm: () => void;
@@ -272,7 +282,11 @@ function RemoveConfirmStep({
           this browser.
         </p>
 
-        {!backedUp ? (
+        {hardware ? (
+          <p className="text-body leading-relaxed text-muted">
+            The key stays on your device, so you can add this wallet again later.
+          </p>
+        ) : !backedUp ? (
           <RiskNotice>
             You haven&apos;t backed up this wallet&apos;s keyfile. Once removed, there&apos;s no
             way to recover it and access is lost permanently.

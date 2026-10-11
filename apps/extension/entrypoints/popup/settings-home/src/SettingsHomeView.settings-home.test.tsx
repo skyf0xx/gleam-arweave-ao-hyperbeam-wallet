@@ -74,6 +74,13 @@ describe("SettingsHomeView", () => {
     expect(onOpenLockSettings).toHaveBeenCalled();
   });
 
+  it("hides the Auto-lock row when there is no lock to open (vault without a password)", async () => {
+    renderSettingsHome({ onOpenLockSettings: undefined });
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    expect(screen.queryByText("Auto-lock")).toBeNull();
+  });
+
   it("calls onOpenConnectedApps when the Connected apps row is pressed", async () => {
     const onOpenConnectedApps = vi.fn();
     renderSettingsHome({ onOpenConnectedApps });

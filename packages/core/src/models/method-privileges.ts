@@ -45,7 +45,7 @@ export const KEY_METHODS = [
   "createWallet",
   "importWallet",
   "exportWallet",
-  "addLedgerWallet",
+  "addHardwareWallet",
   "resetAllWallets",
 ] as const;
 

@@ -1,21 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { deriveAddress, generateJWK } from "../keys/jwk";
 import {
-  addressFromOwner,
   deviceKeyThumbprint,
   isDevicePublicJwk,
   signDeviceMessage,
   verifyDeviceSignature,
   type DevicePublicJwk,
 } from "./identity";
-
-describe("addressFromOwner", () => {
-  it("matches arweave-js's address for the same key", async () => {
-    const jwk = await generateJWK();
-
-    expect(await addressFromOwner(jwk.n)).toBe(await deriveAddress(jwk));
-  }, 30_000);
-});
 
 describe("deviceKeyThumbprint", () => {
   it("is a stable 43-character digest that ignores member order and extra members", async () => {

@@ -1,12 +1,17 @@
 import {
+  addressFromOwner,
+  base64UrlToBytes,
   decryptFromEnvelope,
   deriveAddress,
   encryptToEnvelope,
   generateJWK,
+  isHardwareWalletMethod,
   validateJWKShape,
   validatePassword,
   zeroize,
   type AutoLockTimeout,
+  type HardwareDevice,
+  type HardwareWalletMethod,
   type JWKInterface,
   type LockSettings,
   type Session,
@@ -24,6 +29,7 @@ import {
   isValidSession,
   removeCachedKey,
   SESSION_KEY,
+  WALLETS_KEY,
 } from "./key-session";
 
 /**
@@ -67,7 +73,6 @@ import {
  * signing handlers never go through `getState`.
  */
 
-const WALLETS_KEY = "local:wallets";
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const LOCK_SETTINGS_KEY = "local:lockSettings";
 const THEME_SETTINGS_KEY = "local:themeSettings";
@@ -98,7 +103,42 @@ function toSummary(wallet: Wallet): WalletSummary {
     createdAt: wallet.createdAt,
     updatedAt: wallet.updatedAt,
     backupConfirmedAt: wallet.backupConfirmedAt,
+    ...(wallet.device ? { device: wallet.device } : {}),
   };
+}
+
+/** An RSA-4096 modulus, the only key size Arweave addresses are made from. */
+const RSA_MODULUS_BYTES = 512;
+const KEYSTONE_XFP_PATTERN = /^[0-9a-fA-F]{8}$/;
+const HARDWARE_METHOD_NAME: Record<HardwareWalletMethod, string> = {
+  keystone: "Keystone",
+  ledger: "Ledger",
+};
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function isValidDevice(value: unknown): value is HardwareDevice {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.kind === "keystone") {
+    return typeof candidate.xfp === "string" && KEYSTONE_XFP_PATTERN.test(candidate.xfp);
+  }
+  if (candidate.kind === "ledger") {
+    return isOptionalString(candidate.model) && isOptionalString(candidate.appVersion);
+  }
+  return false;
+}
+
+/** Hardware wallets need no decrypted key, so they are usable whenever Gleam is unlocked. */
+function hardwareWalletIds(wallets: Wallet[]): string[] {
+  return wallets.filter((wallet) => isHardwareWalletMethod(wallet.method)).map((wallet) => wallet.id);
+}
+
+/** A vault has a password exactly when some wallet holds a keyfile encrypted under it. */
+function hasVaultPassword(wallets: Wallet[]): boolean {
+  return wallets.some((wallet) => wallet.encryptedKeyfile !== null);
 }
 
 /**
@@ -116,7 +156,10 @@ function isValidWallet(value: unknown): value is Wallet {
     typeof candidate.address === "string" &&
     candidate.address.length > 0 &&
     typeof candidate.name === "string" &&
-    (candidate.method === "jwk" || candidate.method === "ethereum" || candidate.method === "ledger") &&
+    (candidate.method === "jwk" ||
+      candidate.method === "ethereum" ||
+      candidate.method === "ledger" ||
+      candidate.method === "keystone") &&
     typeof candidate.publicKey === "string" &&
     typeof candidate.createdAt === "number" &&
     typeof candidate.updatedAt === "number" &&
@@ -126,7 +169,12 @@ function isValidWallet(value: unknown): value is Wallet {
     // confirmed" (normalized below), not as a reason to drop the wallet.
     (candidate.backupConfirmedAt === undefined ||
       candidate.backupConfirmedAt === null ||
-      typeof candidate.backupConfirmedAt === "number")
+      typeof candidate.backupConfirmedAt === "number") &&
+    (isHardwareWalletMethod(candidate.method as Wallet["method"])
+      ? candidate.encryptedKeyfile === null &&
+        isValidDevice(candidate.device) &&
+        candidate.device.kind === candidate.method
+      : candidate.device === undefined)
   );
 }
 
@@ -186,12 +234,35 @@ async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
  * on the same path so an expired session can never be used to sign even
  * if some caller reached a handler method without going through
  * `getState` first.
+ *
+ * Hardware wallets have no key to cache, so every one of them is listed
+ * whenever the session exists. A vault holding only hardware wallets has
+ * no password to unlock with, so it always has a session and never
+ * auto-locks.
  */
 async function loadSession(
   storage: StoragePort,
   wallets: Wallet[],
 ): Promise<Session | null> {
   const raw = await storage.get<unknown>(SESSION_KEY);
+  const hardwareIds = hardwareWalletIds(wallets);
+
+  if (!hasVaultPassword(wallets)) {
+    if (hardwareIds.length === 0) return null;
+    if (isValidSession(raw) && sameIds(raw.unlockedWalletIds, hardwareIds)) return raw;
+    const now = Date.now();
+    const session: Session = isValidSession(raw)
+      ? { ...raw, unlockedWalletIds: hardwareIds }
+      : {
+          unlockedAt: now,
+          lastActivityAt: now,
+          autoLockTimeout: (await loadLockSettings(storage)).autoLockTimeout,
+          unlockedWalletIds: hardwareIds,
+        };
+    await saveSession(storage, session);
+    return session;
+  }
+
   if (!isValidSession(raw)) return null;
   if (isSessionExpired(raw.lastActivityAt, raw.autoLockTimeout)) {
     await clearKeyCache();
@@ -200,24 +271,29 @@ async function loadSession(
   }
   // Filter unlockedWalletIds against the current wallet set, same
   // untrusted-input treatment as activeWalletId.
-  const knownIds = raw.unlockedWalletIds.filter((id) =>
-    wallets.some((wallet) => wallet.id === id),
+  const knownIds = raw.unlockedWalletIds.filter(
+    (id) => wallets.some((wallet) => wallet.id === id) && !hardwareIds.includes(id),
   );
   // A wallet whose key is gone can't sign, so it is locked whatever the
   // session record says. Persist the pruned list so getCachedKey and the
-  // UI agree.
+  // UI agree. Hardware wallets alone never keep a password-protected
+  // vault unlocked.
   const keyPresent = await Promise.all(knownIds.map((id) => isKeyStored(id)));
-  const validIds = knownIds.filter((_, index) => keyPresent[index]);
-  if (validIds.length < knownIds.length) {
-    if (validIds.length === 0) {
-      await clearKeyCache();
-      await saveSession(storage, null);
-      return null;
-    }
-    await saveSession(storage, { ...raw, unlockedWalletIds: validIds });
+  const keyedIds = knownIds.filter((_, index) => keyPresent[index]);
+  if (keyedIds.length === 0) {
+    await clearKeyCache();
+    await saveSession(storage, null);
+    return null;
   }
-  if (validIds.length === 0) return null;
-  return { ...raw, unlockedWalletIds: validIds };
+  const validIds = [...keyedIds, ...hardwareIds];
+  if (sameIds(raw.unlockedWalletIds, validIds)) return raw;
+  const session = { ...raw, unlockedWalletIds: validIds };
+  await saveSession(storage, session);
+  return session;
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, index) => b[index] === id);
 }
 
 async function saveSession(storage: StoragePort, session: Session | null): Promise<void> {
@@ -236,13 +312,21 @@ function jwkToBytes(jwk: JWKInterface): Uint8Array<ArrayBuffer> {
  * Extends (or starts) the unlocked session to include a just-created/
  * imported wallet: the new wallet is immediately usable without a second
  * unlock prompt, since the password was just typed to set it.
+ *
+ * The session is loaded before the key is cached. loadSession may clear
+ * the key cache (an expired session, or a session that listed only
+ * hardware wallets before this keyfile gave the vault a password), and
+ * that must not take the new key with it.
  */
-async function addUnlockedWalletToSession(
+async function unlockNewWallet(
   storage: StoragePort,
-  walletId: string,
   wallets: Wallet[],
+  walletId: string,
+  jwk: JWKInterface,
+  address: string,
 ): Promise<void> {
   const existing = await loadSession(storage, wallets);
+  await cacheKey(walletId, jwk, address);
   const lockSettings = await loadLockSettings(storage);
   const now = Date.now();
 
@@ -339,10 +423,7 @@ export class WalletLifecycleHandler {
     wallets.push(wallet);
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-    // Cache the key first: loadSession treats a listed wallet with no key
-    // as locked.
-    await cacheKey(wallet.id, jwk, address);
-    await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
+    await unlockNewWallet(this.storage, wallets, wallet.id, jwk, address);
 
     return toSummary(wallet);
   }
@@ -366,10 +447,12 @@ export class WalletLifecycleHandler {
     // second row that would share one address across two wallet ids, which
     // would fork the activity log and token list the address is keyed by.
     const existing = wallets.find((wallet) => wallet.address === address);
+    if (existing && isHardwareWalletMethod(existing.method)) {
+      throw new Error(`This address is already in Gleam as the hardware wallet "${existing.name}".`);
+    }
     if (existing) {
       await this.storage.set(ACTIVE_WALLET_ID_KEY, existing.id);
-      await cacheKey(existing.id, shapeCheck.jwk, address);
-      await addUnlockedWalletToSession(this.storage, existing.id, wallets);
+      await unlockNewWallet(this.storage, wallets, existing.id, shapeCheck.jwk, address);
       return toSummary(existing);
     }
 
@@ -398,10 +481,75 @@ export class WalletLifecycleHandler {
     wallets.push(wallet);
     await saveWallets(this.storage, wallets);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-    // Cache the key first: loadSession treats a listed wallet with no key
-    // as locked.
-    await cacheKey(wallet.id, shapeCheck.jwk, address);
-    await addUnlockedWalletToSession(this.storage, wallet.id, wallets);
+    await unlockNewWallet(this.storage, wallets, wallet.id, shapeCheck.jwk, address);
+
+    return toSummary(wallet);
+  }
+
+  /**
+   * Adds a wallet whose key lives on a Keystone or Ledger. Only the public
+   * key and device details are stored. No password is asked for, so a
+   * vault that has one must already be unlocked: otherwise this would add
+   * a wallet to a locked Gleam.
+   */
+  async addHardwareWallet(req: {
+    method: HardwareWalletMethod;
+    publicKey: string;
+    device: HardwareDevice;
+    name?: string;
+  }): Promise<WalletSummary> {
+    if (!isHardwareWalletMethod(req.method)) {
+      throw new Error(`"${String(req.method)}" isn't a hardware wallet type.`);
+    }
+    if (!isValidDevice(req.device) || req.device.kind !== req.method) {
+      throw new Error("The device details don't match this wallet type.");
+    }
+    let modulus: Uint8Array;
+    try {
+      modulus = base64UrlToBytes(req.publicKey);
+    } catch {
+      throw new Error("The device sent a public key that isn't valid base64url.");
+    }
+    if (modulus.length !== RSA_MODULUS_BYTES) {
+      throw new Error(
+        `The device sent a ${modulus.length}-byte public key. An Arweave key is ${RSA_MODULUS_BYTES} bytes.`,
+      );
+    }
+
+    const wallets = await loadWallets(this.storage);
+    if (hasVaultPassword(wallets) && (await loadSession(this.storage, wallets)) === null) {
+      throw new Error("Unlock Gleam before adding a hardware wallet.");
+    }
+
+    const address = await addressFromOwner(req.publicKey);
+    const existing = wallets.find((wallet) => wallet.address === address);
+    if (existing) {
+      throw new Error(`This address is already in Gleam as "${existing.name}".`);
+    }
+
+    const label = HARDWARE_METHOD_NAME[req.method];
+    const sameMethodCount = wallets.filter((wallet) => wallet.method === req.method).length;
+    const name = req.name?.trim() || `${label} ${sameMethodCount + 1}`;
+    const now = Date.now();
+    const wallet: Wallet = {
+      id: crypto.randomUUID(),
+      address,
+      name,
+      method: req.method,
+      publicKey: req.publicKey,
+      createdAt: now,
+      updatedAt: now,
+      encryptedKeyfile: null,
+      backupConfirmedAt: null,
+      device: req.device,
+    };
+
+    wallets.push(wallet);
+    await saveWallets(this.storage, wallets);
+    await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
+    // loadSession lists every hardware wallet, so this adds the new one to
+    // an unlocked session, or starts one for a vault without a password.
+    await loadSession(this.storage, wallets);
 
     return toSummary(wallet);
   }
@@ -463,6 +611,9 @@ export class WalletLifecycleHandler {
   async exportWallet(req: { walletId: string; password: string }): Promise<JWKInterface> {
     const wallets = await loadWallets(this.storage);
     const wallet = wallets.find((w) => w.id === req.walletId);
+    if (wallet && isHardwareWalletMethod(wallet.method)) {
+      throw new Error("This wallet's key stays on its device. There's no keyfile to export.");
+    }
     if (!wallet || !wallet.encryptedKeyfile) {
       throw new Error(`No exportable key material for wallet "${req.walletId}".`);
     }
@@ -545,10 +696,16 @@ export class WalletLifecycleHandler {
       }
     }
 
-    if (unlockedWalletIds.length === 0) {
+    // A vault of only hardware wallets has no password, so there is
+    // nothing to check it against.
+    if (unlockedWalletIds.length === 0 && hasVaultPassword(wallets)) {
       throw new Error(
         "That password didn't work. Try again, or use your recovery method.",
       );
+    }
+    unlockedWalletIds.push(...hardwareWalletIds(ordered));
+    if (unlockedWalletIds.length === 0) {
+      throw new Error("There's no wallet to unlock.");
     }
 
     const now = Date.now();

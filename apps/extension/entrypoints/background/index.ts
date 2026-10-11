@@ -13,6 +13,7 @@ import {
   type NetworkSettings,
   type PermissionType,
   type WalletSummary,
+  vaultHasPassword,
 } from "@gleam/core";
 import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gateway.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
@@ -561,6 +562,9 @@ async function addWallet(add: () => Promise<WalletSummary>): Promise<WalletSumma
 }
 onExtensionMessage("createWallet", (message) => addWallet(() => lifecycle.createWallet(message.data)));
 onExtensionMessage("importWallet", (message) => addWallet(() => lifecycle.importWallet(message.data)));
+onExtensionMessage("addHardwareWallet", (message) =>
+  addWallet(() => lifecycle.addHardwareWallet(message.data)),
+);
 onExtensionMessage("deleteWallet", async (message) => {
   const { walletId } = message.data;
   const before = await lifecycle.getState();
@@ -599,7 +603,8 @@ onExtensionMessage("exportWallet", (message) => lifecycle.exportWallet(message.d
 onExtensionMessage("confirmWalletBackup", (message) => lifecycle.confirmWalletBackup(message.data));
 onExtensionMessage("lockWallet", async () => {
   await lifecycle.lockWallet();
-  void setLockedIcon(true);
+  // A vault of only hardware wallets has no password and stays unlocked.
+  if (vaultHasPassword((await lifecycle.getState()).wallets)) void setLockedIcon(true);
 });
 onExtensionMessage("unlockWallet", async (message) => {
   const result = await lifecycle.unlockWallet(message.data);

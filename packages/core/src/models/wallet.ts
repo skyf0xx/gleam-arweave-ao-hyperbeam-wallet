@@ -1,11 +1,35 @@
 export type { JWKInterface } from "arweave/web/lib/wallet";
 
 /**
- * A stored key record. Only `jwk` is currently produced; `ethereum`/
- * `ledger` are modeled now so the discriminated union stays stable for
- * callers once those methods land.
+ * A stored key record. `jwk` wallets hold an encrypted keyfile.
+ * `keystone`/`ledger` are hardware wallets: Gleam stores only the public
+ * key and signing happens on the device. `ethereum` is modeled but not
+ * produced yet.
  */
-export type WalletMethod = "jwk" | "ethereum" | "ledger";
+export type WalletMethod = "jwk" | "ethereum" | "ledger" | "keystone";
+
+export type HardwareWalletMethod = "keystone" | "ledger";
+
+/**
+ * What Gleam remembers about the device behind a hardware wallet. `xfp`
+ * is the Keystone master fingerprint (8 hex characters), which a later
+ * sign request must carry so the device can match it to its seed.
+ */
+export type HardwareDevice =
+  | { kind: "keystone"; xfp: string }
+  | { kind: "ledger"; model?: string; appVersion?: string };
+
+export function isHardwareWalletMethod(method: WalletMethod): method is HardwareWalletMethod {
+  return method === "keystone" || method === "ledger";
+}
+
+/**
+ * Whether Gleam has a password to lock behind. Only keyfile wallets are
+ * encrypted under one; a vault of hardware wallets has nothing to lock.
+ */
+export function vaultHasPassword(wallets: readonly { method: WalletMethod }[]): boolean {
+  return wallets.some((wallet) => !isHardwareWalletMethod(wallet.method));
+}
 
 export interface Wallet {
   id: string;
@@ -17,7 +41,7 @@ export interface Wallet {
   updatedAt: number;
   /**
    * The encrypted Vault envelope wrapping this Wallet's key material.
-   * Absent for `ledger` wallets, which store no key material at all.
+   * `null` for hardware wallets, which store no key material at all.
    */
   encryptedKeyfile: VaultEnvelope | null;
   /**
@@ -26,6 +50,8 @@ export interface Wallet {
    * every record stored before this field existed.
    */
   backupConfirmedAt: number | null;
+  /** Set only on hardware wallets. */
+  device?: HardwareDevice;
 }
 
 /**
@@ -42,6 +68,7 @@ export interface WalletSummary {
   createdAt: number;
   updatedAt: number;
   backupConfirmedAt: number | null;
+  device?: HardwareDevice;
 }
 
 /**

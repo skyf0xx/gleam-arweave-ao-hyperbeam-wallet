@@ -1,4 +1,13 @@
-export type { Wallet, WalletMethod, WalletSummary, VaultEnvelope, JWKInterface } from "./wallet";
+export type {
+  Wallet,
+  WalletMethod,
+  WalletSummary,
+  VaultEnvelope,
+  JWKInterface,
+  HardwareWalletMethod,
+  HardwareDevice,
+} from "./wallet";
+export { isHardwareWalletMethod, vaultHasPassword } from "./wallet";
 export type {
   Session,
   AutoLockTimeout,

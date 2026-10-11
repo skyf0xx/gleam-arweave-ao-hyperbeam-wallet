@@ -48,6 +48,17 @@ describe("WalletDetailView", () => {
     expect(screen.getByDisplayValue("Wallet One")).toBeTruthy();
   });
 
+  it("hides keyfile backup for a hardware wallet and labels its method", () => {
+    const keystone: WalletSummary = { ...WALLET, method: "keystone", device: { kind: "keystone", xfp: "1a2b3c4d" } };
+    render(
+      <WalletDetailView runtime={fakeRuntime()} wallet={keystone} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+    );
+
+    expect(screen.getByText("KEYSTONE")).toBeTruthy();
+    expect(screen.queryByText("Back up keyfile")).toBeNull();
+    expect(screen.queryByText("Keyfile backup")).toBeNull();
+  });
+
   it("shows 'Not backed up' when backupConfirmedAt is null", () => {
     const send = vi.fn();
     render(

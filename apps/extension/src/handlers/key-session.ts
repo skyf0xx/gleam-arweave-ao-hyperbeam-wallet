@@ -1,4 +1,4 @@
-import type { AutoLockTimeout, JWKInterface, Session } from "@gleam/core";
+import { isHardwareWalletMethod, type AutoLockTimeout, type JWKInterface, type Session, type WalletMethod } from "@gleam/core";
 import { storagePort } from "../adapters/storage";
 
 /**
@@ -22,6 +22,30 @@ const KEY_PREFIX = "session:key:";
 const CACHED_WALLET_IDS_KEY = "session:cachedWalletIds";
 /** Written by `wallet-lifecycle.ts`; read here so every key read can enforce auto-lock. */
 export const SESSION_KEY = "session:unlockedSession";
+/** Written by `wallet-lifecycle.ts`; read here to tell a hardware wallet from a locked one. */
+export const WALLETS_KEY = "local:wallets";
+
+/**
+ * Thrown instead of reporting "locked" when a caller asks for the key of
+ * a hardware wallet: there is no key to unlock, and telling the user to
+ * unlock would send them in a circle.
+ */
+export class HardwareWalletSigningError extends Error {
+  constructor() {
+    super("This wallet signs on its device. Signing with a hardware wallet isn't supported yet.");
+    this.name = "HardwareWalletSigningError";
+  }
+}
+
+async function isHardwareWallet(walletId: string): Promise<boolean> {
+  const wallets = await storagePort.get<unknown>(WALLETS_KEY);
+  if (!Array.isArray(wallets)) return false;
+  const wallet = wallets.find(
+    (candidate): candidate is { id: string; method: WalletMethod } =>
+      candidate !== null && typeof candidate === "object" && (candidate as { id?: unknown }).id === walletId,
+  );
+  return wallet !== undefined && isHardwareWalletMethod(wallet.method);
+}
 
 const AUTO_LOCK_TIMEOUT_MS: Record<AutoLockTimeout, number | null> = {
   never: null,
@@ -100,9 +124,12 @@ export function isValidSession(value: unknown): value is Session {
  * locked. Handlers read keys without going through `getState`, so the
  * auto-lock timeout is enforced here too: an expired session wipes every
  * cached key and the session record before anything can sign with them.
- * A key with no session listing its wallet is treated as locked.
+ * A key with no session listing its wallet is treated as locked. Throws
+ * `HardwareWalletSigningError` for a hardware wallet, which never has a
+ * key here.
  */
 export async function getCachedKey(walletId: string): Promise<CachedKey | null> {
+  if (await isHardwareWallet(walletId)) throw new HardwareWalletSigningError();
   const session = await storagePort.get<unknown>(SESSION_KEY);
   if (!isValidSession(session)) return null;
   if (isSessionExpired(session.lastActivityAt, session.autoLockTimeout)) {

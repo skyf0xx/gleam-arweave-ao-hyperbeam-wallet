@@ -60,6 +60,12 @@ describe("method privilege tiers", () => {
     );
   });
 
+  it("KEY_METHODS lists every trusted-UI wallet method", () => {
+    expect([...KEY_METHODS].sort()).toEqual(
+      ["addHardwareWallet", "createWallet", "exportWallet", "importWallet", "resetAllWallets"].sort(),
+    );
+  });
+
   it("each set has no duplicate entries", () => {
     for (const set of [PROVIDER_METHODS, APPROVAL_METHODS, KEY_METHODS]) {
       expect(new Set(set).size).toBe(set.length);

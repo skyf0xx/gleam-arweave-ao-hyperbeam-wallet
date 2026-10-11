@@ -8,6 +8,7 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
   jwk: "JWK",
   ethereum: "ETH",
   ledger: "LEDGER",
+  keystone: "KEYSTONE",
 };
 
 function truncateAddress(address: string): string {

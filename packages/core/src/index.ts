@@ -7,6 +7,7 @@ export * from "./vault/signing";
 export * from "./vault/encryption";
 export * from "./vault/message-signing";
 export * from "./keys/jwk";
+export * from "./keys/address";
 export type { StoragePort } from "./ports/storage";
 export type { RuntimeMessage, RuntimePort } from "./ports/runtime";
 export type { WindowPort } from "./ports/windows";

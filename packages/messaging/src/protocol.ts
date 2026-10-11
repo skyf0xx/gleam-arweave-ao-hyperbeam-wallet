@@ -5,6 +5,8 @@ import type {
   Contact,
   FeeEstimate,
   Grant,
+  HardwareDevice,
+  HardwareWalletMethod,
   InviteUnlock,
   JWKInterface,
   LockSettings,
@@ -39,6 +41,17 @@ export interface ProtocolMap {
   // wallet lifecycle
   createWallet(req: { name: string; password: string }): WalletSummary;
   importWallet(req: { jwk: JWKInterface; name: string; password: string }): WalletSummary;
+  /**
+   * Adds a Keystone or Ledger wallet from the public key the device
+   * reported (base64url RSA modulus). No key material is stored. Needs
+   * Gleam unlocked when the vault has a password.
+   */
+  addHardwareWallet(req: {
+    method: HardwareWalletMethod;
+    publicKey: string;
+    device: HardwareDevice;
+    name?: string;
+  }): WalletSummary;
   deleteWallet(req: { walletId: string }): void;
   renameWallet(req: { walletId: string; name: string }): void;
   switchWallet(req: { walletId: string }): void;

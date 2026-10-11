@@ -29,7 +29,8 @@ function gatewayHostname(gatewayUrl: string): string {
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
   onBack: () => void;
-  onOpenLockSettings: () => void;
+  /** Omitted when the vault has no password, which hides the auto-lock row. */
+  onOpenLockSettings?: () => void;
   onOpenConnectedApps: () => void;
   onOpenNetworkPeers: () => void;
   onOpenManageTokens: () => void;
@@ -110,12 +111,14 @@ export function SettingsHomeView({
 
       <div className="flex flex-1 flex-col gap-8 px-6 pb-6 pt-9">
         <SettingsSection title="Wallet">
-          <SettingsRow
-            title="Auto-lock"
-            subtitle="When the wallet locks itself"
-            value={state.loading ? undefined : state.lockSettings ? TIMEOUT_LABELS[state.lockSettings.autoLockTimeout] : "—"}
-            onClick={onOpenLockSettings}
-          />
+          {onOpenLockSettings ? (
+            <SettingsRow
+              title="Auto-lock"
+              subtitle="When the wallet locks itself"
+              value={state.loading ? undefined : state.lockSettings ? TIMEOUT_LABELS[state.lockSettings.autoLockTimeout] : "—"}
+              onClick={onOpenLockSettings}
+            />
+          ) : null}
           <SettingsRow
             title="Connected apps"
             subtitle="Manage sites with an active grant"
