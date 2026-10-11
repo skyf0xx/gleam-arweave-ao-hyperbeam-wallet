@@ -1,4 +1,5 @@
 import type { PermissionType } from "./permission";
+import type { HardwareDevice, HardwareWalletMethod } from "./wallet";
 
 export type ApprovalKind =
   | "connect"
@@ -12,7 +13,8 @@ export type ApprovalKind =
   | "signature"
   | "signMessage"
   | "privateHash"
-  | "addToken";
+  | "addToken"
+  | "transfer";
 
 /**
  * A dApp's self-reported identity, passed to `connect()` per the ArConnect
@@ -65,7 +67,8 @@ export interface SigningApprovalPreview {
     | "transferAoTokens"
     | "signature"
     | "signMessage"
-    | "privateHash";
+    | "privateHash"
+    | "transfer";
   recipient: string | null;
   amount: string | null;
   fee: string | null;
@@ -106,6 +109,68 @@ export interface AddTokenApprovalPreview {
 export type ApprovalPreview = ConnectApprovalPreview | SigningApprovalPreview | AddTokenApprovalPreview;
 
 /**
+ * The origin of a request Gleam makes for itself: a send from the popup
+ * by a hardware wallet, which signs in the approval window like a dApp's
+ * request does.
+ */
+export const WALLET_APPROVAL_ORIGIN = "gleam:wallet";
+
+/**
+ * One thing the device signs, as it crosses the messaging boundary. A
+ * transaction is the unsigned format-2 JSON (`signature` and `id` empty);
+ * a data item is the unsigned ANS-104 bytes, base64url.
+ */
+export type DeviceSigningPayload =
+  | {
+      kind: "transaction";
+      transaction: {
+        format: number;
+        id: string;
+        last_tx: string;
+        owner: string;
+        tags: Array<{ name: string; value: string }>;
+        target: string;
+        quantity: string;
+        data: string;
+        data_size: string;
+        data_root: string;
+        reward: string;
+        signature: string;
+      };
+    }
+  | { kind: "dataItem"; raw: string };
+
+/**
+ * What a device payload actually says, decoded by the background from the
+ * payload itself, so the user confirms the fee and amounts that get
+ * signed rather than the estimates the preview showed. Amounts are
+ * atomic strings: Winston for a transaction, the token's unit for an AO
+ * transfer.
+ */
+export type DeviceSigningSummary =
+  | { kind: "transaction"; recipient: string | null; quantity: string; fee: string; dataSize: string }
+  | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
+  | { kind: "dataItem"; target: string | null; dataSize: number };
+
+/**
+ * What the approval window needs to drive a hardware wallet once the user
+ * has approved the preview. The page answers with one base64url
+ * signature per payload, in order.
+ */
+export interface DeviceSigningRequest {
+  method: HardwareWalletMethod;
+  device: HardwareDevice | null;
+  address: string;
+  /** The wallet's stored owner (base64url RSA modulus); every payload names it. */
+  publicKey: string;
+  payloads: DeviceSigningPayload[];
+  /** One per payload, in the same order. */
+  summaries: DeviceSigningSummary[];
+  /** Epoch ms after which the request times out unless the page reports device activity. */
+  deadline: number;
+}
+
+/**
  * A pending action awaiting user sign-off in its own window: a Grant
  * request (connection) or a signing request.
  */
@@ -115,4 +180,6 @@ export interface ApprovalRequest {
   origin: string;
   createdAt: number;
   preview: ApprovalPreview;
+  /** Set once a hardware wallet's request is approved and waits for the device's signatures. */
+  device?: DeviceSigningRequest;
 }

@@ -1,7 +1,7 @@
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
 import {
   APPROVAL_GATED_METHODS,
-  APPROVAL_TIMEOUT_MS,
+  APPROVAL_MAX_MS,
   EVENT,
   REQUEST,
   RESPONSE,
@@ -55,7 +55,7 @@ import { version as WALLET_VERSION } from "../../package.json";
  */
 const REQUEST_TIMEOUT_MS = 60_000;
 /** Leaves time to sign or post once the user approves at the last moment. */
-const APPROVAL_REQUEST_TIMEOUT_MS = APPROVAL_TIMEOUT_MS + 60_000;
+const APPROVAL_REQUEST_TIMEOUT_MS = APPROVAL_MAX_MS + 60_000;
 
 function timeoutFor(method: ProviderSurfaceMethod): number {
   return APPROVAL_GATED_METHODS.includes(method) ? APPROVAL_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS;

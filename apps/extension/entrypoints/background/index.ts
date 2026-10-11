@@ -92,10 +92,16 @@ const windows = new WxtWindowPort(storage);
 
 const lifecycle = new WalletLifecycleHandler(storage);
 const reads = new ReadsHandler(storage);
-const transfer = new TransferHandler(storage);
+// `approval` is declared below; hardware sends reach it only at call time.
+const transfer: TransferHandler = new TransferHandler(storage, {
+  requestTransfer: async (req): Promise<{ txId: string }> => {
+    const metadata = req.token === null ? {} : await resolveTokenDenominationAndTicker(await walletAddress(req.walletId), req.token);
+    return approval.requestWalletTransfer({ ...req, ...metadata });
+  },
+});
 const upload = new UploadHandler(storage);
 const contacts = new ContactsHandler(storage);
-const approval = new ApprovalHandler(
+const approval: ApprovalHandler = new ApprovalHandler(
   storage,
   windows,
   transfer,
@@ -237,6 +243,12 @@ function arweaveConfigFromGatewayUrl(gatewayUrl: string): { protocol: string; ho
  */
 const TOKEN_METADATA_LOOKUP_TIMEOUT_MS = 3_000;
 
+async function walletAddress(walletId: string): Promise<string> {
+  const wallet = (await lifecycle.getState()).wallets.find((candidate) => candidate.id === walletId);
+  if (!wallet) throw new Error(`No stored wallet with id "${walletId}".`);
+  return wallet.address;
+}
+
 async function resolveTokenDenominationAndTicker(
   address: string,
   processId: string,
@@ -371,10 +383,10 @@ async function handleProviderCall(
     case "dispatch": {
       const transaction = readTransaction(params.transaction, method);
       const { gatewayUrl } = await reads.getNetworkSettings();
-      // The dApp's reward is the fee actually charged; only fall back to a
-      // fresh quote (matching `signTransaction`/`dispatchTransaction`'s own
-      // arweave-js default) when it left the field out, so the preview
-      // never shows a fee different from what gets signed.
+      // The dApp's reward is the fee actually charged. Without one, the
+      // preview shows a fresh quote, and the transaction fetches its own
+      // reward when it is built after approval, so the two can differ. A
+      // hardware wallet's device step shows the reward actually signed.
       const fee =
         transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
       return approval.requestApproval({
@@ -665,6 +677,8 @@ onExtensionMessage("submitUpload", (message) => upload.submitUpload(requireWalle
 // approvals
 onExtensionMessage("getApproval", (message) => approval.getApproval(message.data));
 onExtensionMessage("resolveApproval", (message) => approval.resolveApproval(message.data));
+onExtensionMessage("submitDeviceSignature", (message) => approval.submitDeviceSignature(message.data));
+onExtensionMessage("deviceActivity", (message) => approval.deviceActivity(message.data));
 
 // settings
 onExtensionMessage("getNetworkSettings", () => reads.getNetworkSettings());

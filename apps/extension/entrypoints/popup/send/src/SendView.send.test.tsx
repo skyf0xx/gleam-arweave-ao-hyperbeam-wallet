@@ -640,3 +640,22 @@ describe("SendView address book: save this address (AO-SEND-UI-WALLET-CORE)", ()
     );
   });
 });
+
+describe("SendView with a hardware wallet", () => {
+  it("points to the approval window while the device send is pending", async () => {
+    const hardware: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+    const routed = routedSend({ getState: () => ({ wallets: [hardware], activeWalletId: hardware.id, session: null }) });
+    const send = vi.fn((message: { type: string; payload: unknown }) =>
+      message.type === "submitTransfer" ? new Promise(() => {}) : routed(message as never),
+    ) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: hardware, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "0.1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign and send" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Approve on your device in the window that opened.");
+    expect(screen.getByRole("button", { name: "Waiting for approval…" })).toBeTruthy();
+  });
+});

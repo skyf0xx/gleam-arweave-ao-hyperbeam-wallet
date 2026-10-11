@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { SigningApprovalPreview } from "@gleam/core";
+import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
 afterEach(() => {
@@ -245,5 +245,30 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
 
     expect(screen.getByText("—")).toBeTruthy();
+  });
+});
+
+describe("SigningApprovalScreen: a send from the wallet itself", () => {
+  const WALLET_SEND_PREVIEW: SigningApprovalPreview = {
+    ...TRANSFER_PREVIEW,
+    kind: "transfer",
+    decodedData: "",
+    tags: [],
+    payloadHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  };
+
+  it("shows Gleam, the send's amount, recipient and fee, and no empty payload sections", () => {
+    render(
+      <SigningApprovalScreen origin={WALLET_APPROVAL_ORIGIN} preview={WALLET_SEND_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
+    );
+
+    expect(screen.getByText("Gleam")).toBeTruthy();
+    expect(screen.getAllByText("Send").length).toBeGreaterThan(0);
+    expect(screen.getByText(WALLET_SEND_PREVIEW.recipient!)).toBeTruthy();
+    expect(screen.getByText("Fee")).toBeTruthy();
+    expect(screen.queryByText("Decoded data")).toBeNull();
+    expect(screen.queryByText("Tags")).toBeNull();
+    expect(screen.queryByText(/Signing payload/)).toBeNull();
+    expect(screen.queryByText(WALLET_SEND_PREVIEW.payloadHash)).toBeNull();
   });
 });

@@ -30,6 +30,8 @@ describe("ProtocolMap", () => {
       "submitUpload",
       "getApproval",
       "resolveApproval",
+      "submitDeviceSignature",
+      "deviceActivity",
       "setNetworkSettings",
       "setLockSettings",
       "getThemePreference",
@@ -39,7 +41,7 @@ describe("ProtocolMap", () => {
       "saveContact",
       "deleteContact",
     ];
-    expect(methodNames.length).toBe(27);
+    expect(methodNames.length).toBe(29);
     expect(new Set(methodNames).size).toBe(methodNames.length);
   });
 

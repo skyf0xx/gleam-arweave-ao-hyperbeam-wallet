@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
-  APPROVAL_TIMEOUT_MS,
+  APPROVAL_MAX_MS,
   REQUEST,
   RESPONSE,
 } from "@gleam/messaging/src/page-protocol.ts";
@@ -140,7 +140,7 @@ describe("provider.ts: GleamProvider bridge", () => {
       () => (settled = true),
       () => (settled = true),
     );
-    await vi.advanceTimersByTimeAsync(APPROVAL_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(APPROVAL_MAX_MS);
     expect(settled).toBe(false);
   });
 
@@ -309,7 +309,7 @@ describe("provider.ts: GleamProvider bridge", () => {
     await assertion;
   });
 
-  it("an approval-gated call outlives the background's approval timeout, then still times out", async () => {
+  it("an approval-gated call outlives the longest approval, then still times out", async () => {
     vi.useFakeTimers();
     const callPromise = provider.sign({ some: "tx" });
     const envelope = lastRequestEnvelope();
@@ -319,7 +319,7 @@ describe("provider.ts: GleamProvider bridge", () => {
       () => (settled = true),
     );
 
-    await vi.advanceTimersByTimeAsync(APPROVAL_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(APPROVAL_MAX_MS);
     expect(settled).toBe(false);
 
     postResponse({ type: RESPONSE, id: envelope.id, result: { id: "signed" } });
@@ -327,7 +327,7 @@ describe("provider.ts: GleamProvider bridge", () => {
 
     const connectPromise = provider.connect(["ACCESS_ADDRESS"]);
     const assertion = expect(connectPromise).rejects.toThrow(/timed out/i);
-    await vi.advanceTimersByTimeAsync(APPROVAL_TIMEOUT_MS + 60_000);
+    await vi.advanceTimersByTimeAsync(APPROVAL_MAX_MS + 60_000);
     await assertion;
   });
 

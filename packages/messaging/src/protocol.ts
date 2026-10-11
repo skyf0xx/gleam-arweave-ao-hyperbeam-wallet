@@ -136,8 +136,23 @@ export interface ProtocolMap {
    *
    * Throws when an approved request fails (locked wallet, network error).
    * The dApp is rejected with the same error either way.
+   *
+   * A hardware wallet's approved request isn't finished here: it returns
+   * the request with `device` set (its unsigned payloads), and the window
+   * answers with `submitDeviceSignature`. Rejecting still works while the
+   * request waits for the device.
    */
-  resolveApproval(req: { requestId: string; approved: boolean }): void;
+  resolveApproval(req: { requestId: string; approved: boolean }): ApprovalRequest | void;
+  /**
+   * The device's signatures (base64url, one per `device.payloads` entry,
+   * in order) for a request waiting on a hardware wallet. Each is checked
+   * against the wallet's stored public key first: a bad one throws and
+   * leaves the request waiting, so the user can sign again. Otherwise the
+   * request completes as `resolveApproval` would for a keyfile wallet.
+   */
+  submitDeviceSignature(req: { requestId: string; signatures: string[] }): void;
+  /** Heartbeat while the window talks to the device; pushes the timeout back, up to `APPROVAL_MAX_MS`. */
+  deviceActivity(req: { requestId: string }): { deadline: number };
 
   // settings
   setNetworkSettings(req: NetworkSettings): void;

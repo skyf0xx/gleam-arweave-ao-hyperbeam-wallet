@@ -213,6 +213,59 @@ function parseDataItem(raw: Uint8Array): DataItemParts {
   return { owner, target, anchor, tags, data };
 }
 
+/** Reads one Avro zigzag-varint `long` at `offset`. Returns the value and the offset after it. */
+function readAvroLong(bytes: Uint8Array, offset: number): [number, number] {
+  let zigzag = 0;
+  let scale = 1;
+  let position = offset;
+  for (;;) {
+    if (position >= bytes.byteLength) throw new Error("Not a valid ANS-104 data item: truncated tags.");
+    const byte = bytes[position]!;
+    position += 1;
+    zigzag += (byte & 127) * scale;
+    if ((byte & 128) === 0) break;
+    scale *= 128;
+  }
+  return [zigzag % 2 === 0 ? zigzag / 2 : -(zigzag + 1) / 2, position];
+}
+
+const decoder = new TextDecoder("utf-8", { fatal: true });
+
+/** The inverse of `encodeTags`, for the single-block arrays every ANS-104 encoder writes. */
+function decodeTags(bytes: Uint8Array): DataItemTag[] {
+  if (bytes.byteLength === 0) return [];
+  const tags: DataItemTag[] = [];
+  let [count, offset] = readAvroLong(bytes, 0);
+  while (count !== 0) {
+    if (count < 0) throw new Error("Not a valid ANS-104 data item: sized tag blocks aren't supported.");
+    for (let index = 0; index < count; index += 1) {
+      const fields: string[] = [];
+      for (let field = 0; field < 2; field += 1) {
+        const [length, start] = readAvroLong(bytes, offset);
+        if (length < 0 || start + length > bytes.byteLength) {
+          throw new Error("Not a valid ANS-104 data item: truncated tags.");
+        }
+        fields.push(decoder.decode(bytes.slice(start, start + length)));
+        offset = start + length;
+      }
+      tags.push({ name: fields[0]!, value: fields[1]! });
+    }
+    [count, offset] = readAvroLong(bytes, offset);
+  }
+  return tags;
+}
+
+/** What an item says, decoded: its target (empty when absent), anchor, tags and data. */
+export function readDataItemFields(raw: Uint8Array): { target: string; anchor: string; tags: DataItemTag[]; data: Bytes } {
+  const { target, anchor, tags, data } = parseDataItem(raw);
+  return {
+    target: target.byteLength === 0 ? "" : bytesToBase64Url(target),
+    anchor: new TextDecoder().decode(anchor),
+    tags: decodeTags(tags),
+    data,
+  };
+}
+
 /** The deep hash a signer signs, recomputed from the item's own bytes. */
 export async function dataItemSignatureData(raw: Uint8Array): Promise<Bytes> {
   const { owner, target, anchor, tags, data } = parseDataItem(raw);

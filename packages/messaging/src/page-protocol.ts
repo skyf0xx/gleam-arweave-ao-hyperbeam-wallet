@@ -48,8 +48,16 @@ export type ProviderSurfaceMethod = (typeof PROVIDER_SURFACE_METHODS)[number];
 export const APPROVAL_TIMEOUT_MS = 5 * 60_000;
 
 /**
+ * The longest an approval can stay open, counted from when it was
+ * created. A hardware wallet's request waits past `APPROVAL_TIMEOUT_MS`
+ * while the page reports device activity, since a Ledger app can take
+ * minutes to open the first time.
+ */
+export const APPROVAL_MAX_MS = 15 * 60_000;
+
+/**
  * Methods that can open an approval window. The page must wait at least
- * as long as the background does for them: a shorter page timeout would
+ * as long as the background can (`APPROVAL_MAX_MS`) for them: a shorter page timeout would
  * report a failure to the dApp while an approval that still signs, or
  * `dispatch` still posts, is open.
  */

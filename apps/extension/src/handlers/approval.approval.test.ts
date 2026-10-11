@@ -713,7 +713,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     keySessionStore.set("session:unlockedSession", {
       unlockedAt: Date.now(),
       lastActivityAt: Date.now(),
-      autoLockTimeout: "5min",
+      autoLockTimeout: "immediate",
       unlockedWalletIds: [WALLET_ID],
     });
     await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
@@ -727,7 +727,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await vi.waitFor(() => expect(windows.opened.length).toBe(1));
       const requestId = extractRequestId(windows.opened[0]!);
 
-      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      vi.advanceTimersByTime(60 * 1000 + 1);
       const dappRejected = expect(pending).rejects.toThrow(/locked/i);
       await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
       await dappRejected;

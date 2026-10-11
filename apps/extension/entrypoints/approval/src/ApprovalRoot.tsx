@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { ApprovalRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
+import type { ApprovalRequest, DeviceSigningRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
+import { AwaitingDeviceView } from "./AwaitingDeviceView";
+import { DEFAULT_DEVICE_PANELS, type DeviceSignPanels } from "./device/device-panels";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
@@ -26,10 +28,16 @@ import { SigningApprovalScreen } from "./SigningApprovalScreen";
  * including the dispatcher not yet registering the method) so the
  * two surfaces apply identically instead of reimplementing the read
  * differently.
+ *
+ * A hardware wallet's request goes on to `AwaitingDeviceView` once
+ * approved (or straight there if the window reopens on it), which drives
+ * the device with the `DeviceSignPanel` for the wallet's method.
  */
 export interface ApprovalRootProps {
   requestId: string | null;
   runtime?: RuntimePort;
+  /** Replaces the device panels, which tests use to drive the device step. */
+  devicePanels?: DeviceSignPanels;
 }
 
 type LoadState =
@@ -37,6 +45,7 @@ type LoadState =
   | { kind: "no-wallet"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "locked"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest }
+  | { kind: "awaiting-device"; runtime: RuntimePort; request: ApprovalRequest; device: DeviceSigningRequest }
   | { kind: "error"; message: string }
   | { kind: "done"; message: string }
   | { kind: "failed"; message: string };
@@ -59,7 +68,7 @@ function hostnameOf(origin: string): string {
   }
 }
 
-export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootProps) {
+export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = DEFAULT_DEVICE_PANELS }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
 
@@ -84,7 +93,9 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
         payload: { requestId: id },
       });
       const walletState = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
-      if (walletState.wallets.length === 0) {
+      if (request.device) {
+        setState({ kind: "awaiting-device", runtime, request, device: request.device });
+      } else if (walletState.wallets.length === 0) {
         setState({ kind: "no-wallet", runtime, request });
       } else if (needsUnlock(walletState)) {
         setState({ kind: "locked", runtime, request });
@@ -121,6 +132,17 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId]);
 
+  const rejectRequest = async (runtime: RuntimePort, request: ApprovalRequest) => {
+    try {
+      await runtime.send<{ requestId: string; approved: boolean }, void>({
+        type: "resolveApproval",
+        payload: { requestId: request.requestId, approved: false },
+      });
+    } finally {
+      setState({ kind: "done", message: "Request rejected." });
+    }
+  };
+
   let content: ReactNode;
 
   if (state.kind === "loading") {
@@ -148,28 +170,55 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
         onResetComplete={() => setState({ kind: "done", message: "Gleam was reset. The request was rejected." })}
       />
     );
+  } else if (state.kind === "awaiting-device") {
+    const { runtime, request, device } = state;
+    content = (
+      <AwaitingDeviceView
+        origin={request.origin}
+        device={device}
+        Panel={devicePanels[device.method]}
+        token={
+          request.preview.kind !== "connect" && request.preview.kind !== "addToken" && request.preview.token !== null
+            ? {
+                processId: request.preview.token,
+                denomination: request.preview.tokenDenomination,
+                ticker: request.preview.tokenTicker,
+              }
+            : undefined
+        }
+        onSubmit={async (signatures) => {
+          await runtime.send<{ requestId: string; signatures: string[] }, void>({
+            type: "submitDeviceSignature",
+            payload: { requestId: request.requestId, signatures },
+          });
+          setState({ kind: "done", message: "Signed." });
+        }}
+        onCancel={() => void rejectRequest(runtime, request)}
+        onActivity={() =>
+          runtime.send<{ requestId: string }, { deadline: number }>({
+            type: "deviceActivity",
+            payload: { requestId: request.requestId },
+          })
+        }
+      />
+    );
   } else {
     const { runtime, request } = state;
 
-    const handleReject = async () => {
-      try {
-        await runtime.send<{ requestId: string; approved: boolean }, void>({
-          type: "resolveApproval",
-          payload: { requestId: request.requestId, approved: false },
-        });
-      } finally {
-        setState({ kind: "done", message: "Request rejected." });
-      }
-    };
+    const handleReject = () => rejectRequest(runtime, request);
 
     // A failed approval has already rejected the dApp and dropped the
     // request, so there's nothing to retry: show the error and stop.
     const handleApprove = async (doneMessage: string, failurePrefix: string) => {
       try {
-        await runtime.send<{ requestId: string; approved: boolean }, void>({
+        const next = await runtime.send<{ requestId: string; approved: boolean }, ApprovalRequest | undefined>({
           type: "resolveApproval",
           payload: { requestId: request.requestId, approved: true },
         });
+        if (next?.device) {
+          setState({ kind: "awaiting-device", runtime, request: next, device: next.device });
+          return;
+        }
         setState({ kind: "done", message: doneMessage });
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);

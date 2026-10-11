@@ -1,4 +1,11 @@
-import { isHardwareWalletMethod, type AutoLockTimeout, type JWKInterface, type Session, type WalletMethod } from "@gleam/core";
+import {
+  isHardwareWalletMethod,
+  type AutoLockTimeout,
+  type HardwareDevice,
+  type JWKInterface,
+  type Session,
+  type WalletMethod,
+} from "@gleam/core";
 import { storagePort } from "../adapters/storage";
 
 /**
@@ -42,6 +49,8 @@ export interface StoredWalletInfo {
   address: string;
   method: WalletMethod;
   publicKey: string;
+  /** Present on hardware wallets. */
+  device?: HardwareDevice;
 }
 
 /** The public fields of a stored wallet, or null when no wallet has this id. */
@@ -53,9 +62,11 @@ export async function getStoredWallet(walletId: string): Promise<StoredWalletInf
       candidate !== null && typeof candidate === "object" && (candidate as { id?: unknown }).id === walletId,
   );
   if (!wallet) return null;
-  const { address, method, publicKey } = wallet;
+  const { address, method, publicKey, device } = wallet;
   if (typeof address !== "string" || typeof method !== "string" || typeof publicKey !== "string") return null;
-  return { id: walletId, address, method: method as WalletMethod, publicKey };
+  const info: StoredWalletInfo = { id: walletId, address, method: method as WalletMethod, publicKey };
+  if (device !== null && typeof device === "object") info.device = device as HardwareDevice;
+  return info;
 }
 
 /** The stored wallet's method, or null when no wallet has this id. */

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { explorerUrlFor, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -399,6 +399,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         step={step}
         contact={contactFor(step.recipient)}
         ownWallet={ownWalletFor(step.recipient)}
+        signsOnDevice={isHardwareWalletMethod(wallet.method)}
         onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient })}
         onSign={() => void handleSign()}
       />
@@ -646,6 +647,7 @@ function ReviewStep({
   step,
   contact,
   ownWallet,
+  signsOnDevice,
   onBack,
   onSign,
 }: {
@@ -655,6 +657,8 @@ function ReviewStep({
   contact: Contact | undefined;
   /** One of the vault's own other wallets, if `step.recipient` is its address — same known-recipient treatment as a saved contact. */
   ownWallet: WalletSummary | undefined;
+  /** A hardware wallet signs in the approval window the background opens; the popup may close when it takes focus. */
+  signsOnDevice: boolean;
   onBack: () => void;
   onSign: () => void;
 }) {
@@ -719,6 +723,12 @@ function ReviewStep({
           </div>
         ) : null}
 
+        {step.submitting && signsOnDevice ? (
+          <p role="status" className="text-label leading-snug text-muted">
+            Approve on your device in the window that opened.
+          </p>
+        ) : null}
+
         <Button
           type="button"
           variant={irreversible ? "destructive" : "primary"}
@@ -727,7 +737,7 @@ function ReviewStep({
           onClick={onSign}
           className="mt-auto"
         >
-          {step.submitting ? "Signing…" : "Sign and send"}
+          {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Signing…") : "Sign and send"}
         </Button>
       </div>
     </div>

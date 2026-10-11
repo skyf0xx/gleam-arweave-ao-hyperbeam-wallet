@@ -55,8 +55,12 @@ export type {
   ApprovalRequest,
   ConnectAppInfo,
   ConnectApprovalPreview,
+  DeviceSigningPayload,
+  DeviceSigningRequest,
+  DeviceSigningSummary,
   SigningApprovalPreview,
 } from "./approval";
+export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
 export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";

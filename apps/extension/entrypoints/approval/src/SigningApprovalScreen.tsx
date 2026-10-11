@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SigningApprovalPreview } from "@gleam/core";
+import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
@@ -35,6 +35,7 @@ const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
   signature: "Sign data",
   signMessage: "Sign message",
   privateHash: "Generate hash",
+  transfer: "Send",
 };
 
 function actionCopy(preview: SigningApprovalPreview): string {
@@ -118,6 +119,7 @@ function formatTotal(
 }
 
 function hostnameOf(origin: string): string {
+  if (origin === WALLET_APPROVAL_ORIGIN) return "Gleam";
   try {
     return new URL(origin).hostname;
   } catch {
@@ -231,7 +233,10 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
               </div>
             ) : null}
 
-            <AddrBlock label="Signing payload (SHA-256)" value={preview.payloadHash} />
+            {/* A wallet send has no payload of its own; its device step shows what is signed. */}
+            {preview.kind !== "transfer" ? (
+              <AddrBlock label="Signing payload (SHA-256)" value={preview.payloadHash} />
+            ) : null}
           </>
         )}
 

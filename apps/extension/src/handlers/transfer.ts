@@ -1,19 +1,30 @@
-import { estimateFee, submitTransfer as submitArweaveTransfer } from "@gleam/core/src/arweave/transfer.ts";
+import {
+  estimateFee,
+  finishTransfer as finishArweaveTransfer,
+  prepareTransfer as prepareArweaveTransfer,
+  submitTransfer as submitArweaveTransfer,
+} from "@gleam/core/src/arweave/transfer.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
-import { submitTransfer as submitAoTransfer } from "@gleam/core/src/ao/transfer.ts";
+import {
+  finishTransfer as finishAoTransfer,
+  prepareTransfer as prepareAoTransfer,
+  submitTransfer as submitAoTransfer,
+} from "@gleam/core/src/ao/transfer.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import {
   DEFAULT_HYPERBEAM_PEER_URLS,
+  isHardwareWalletMethod,
   type ActivityEntry,
   type FeeEstimate,
   type JWKInterface,
   type NetworkSettings,
   type StoragePort,
   type TransferDraft,
+  type UnsignedPayload,
   type Wallet,
   type Winston,
 } from "@gleam/core";
-import { getCachedKey } from "./key-session";
+import { getCachedKey, getWalletMethod } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -29,6 +40,12 @@ import { getCachedKey } from "./key-session";
  * back to asking for, so the UI's job is to route the user back to the
  * unlock screen when it sees that error, not to retry with a prompt here.
  *
+ * A hardware wallet signs in the approval window, never here: its
+ * `submitTransfer` opens that window through `DeviceTransferApprovals`
+ * and resolves once the device-signed transfer is posted. The approval
+ * handler builds and posts it with `prepareDeviceTransfer`/
+ * `finishDeviceTransfer`, which write the same activity entry.
+ *
  * Storage schema this handler owns:
  * - `local:activityLog:{address}` — see `ReadsHandler`'s doc comment;
  *   this handler is the writer, `ReadsHandler` the reader.
@@ -38,6 +55,11 @@ export interface SubmitTransferRequest extends TransferDraft {
 }
 
 export type EstimateTransferRequest = SubmitTransferRequest;
+
+/** Opens the approval window for a hardware wallet's send; `ApprovalHandler.requestWalletTransfer` behind the scenes. */
+export interface DeviceTransferApprovals {
+  requestTransfer(req: SubmitTransferRequest): Promise<{ txId: string }>;
+}
 
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const WALLETS_KEY = "local:wallets";
@@ -69,7 +91,10 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
 }
 
 export class TransferHandler {
-  constructor(private readonly storage: StoragePort) {}
+  constructor(
+    private readonly storage: StoragePort,
+    private readonly approvals?: DeviceTransferApprovals,
+  ) {}
 
   private async loadNetworkSettings(): Promise<NetworkSettings> {
     const raw = await this.storage.get<unknown>(NETWORK_SETTINGS_KEY);
@@ -164,6 +189,12 @@ export class TransferHandler {
    * `core/ao/transfer.ts`'s doc comment for the full distinction.
    */
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
+    const method = await getWalletMethod(req.walletId);
+    if (method !== null && isHardwareWalletMethod(method)) {
+      if (!this.approvals) throw new Error("Hardware wallet sends aren't wired to the approval window.");
+      return this.approvals.requestTransfer(req);
+    }
+
     const settings = await this.loadNetworkSettings();
     const { jwk, address } = await this.signingKeyFor(req.walletId);
 
@@ -185,6 +216,11 @@ export class TransferHandler {
       throw error;
     }
 
+    await this.recordSend(address, req, txId);
+    return { txId };
+  }
+
+  private async recordSend(address: string, req: SubmitTransferRequest, txId: string): Promise<void> {
     await this.appendActivityLog(address, {
       txId,
       type: "send",
@@ -195,7 +231,39 @@ export class TransferHandler {
       timestamp: Date.now(),
       token: req.token,
     });
+  }
 
+  /** The unsigned AR transaction or AO `Transfer` item `ownerB64Url` signs on its device. */
+  async prepareDeviceTransfer(req: SubmitTransferRequest, ownerB64Url: string): Promise<UnsignedPayload> {
+    if (req.token === null) {
+      const settings = await this.loadNetworkSettings();
+      const transaction = await prepareArweaveTransfer(settings.gatewayUrl, ownerB64Url, req.recipient, req.amount);
+      return { kind: "transaction", transaction };
+    }
+    return { kind: "dataItem", raw: prepareAoTransfer(ownerB64Url, req.token, req.recipient, req.amount) };
+  }
+
+  /** Applies the device's signature, posts the transfer, and writes the same activity entry `submitTransfer` does. */
+  async finishDeviceTransfer(
+    req: SubmitTransferRequest,
+    unsigned: UnsignedPayload,
+    signature: Uint8Array,
+    expectedOwner: string,
+  ): Promise<{ txId: string }> {
+    const wallet = await this.loadWallet(req.walletId);
+    let txId: string;
+    try {
+      if (unsigned.kind === "transaction") {
+        const settings = await this.loadNetworkSettings();
+        ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned.transaction, signature, expectedOwner));
+      } else {
+        ({ messageId: txId } = await finishAoTransfer(unsigned.raw, signature, expectedOwner));
+      }
+    } catch (error) {
+      console.error(`Device transfer failed (token=${req.token ?? "AR"}):`, error);
+      throw error;
+    }
+    await this.recordSend(wallet.address, req, txId);
     return { txId };
   }
 }

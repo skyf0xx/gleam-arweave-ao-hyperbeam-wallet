@@ -1,19 +1,33 @@
 import {
   addressFromOwner,
   base64ToBytes,
+  base64UrlToBytes,
   bytesToBase64,
+  bytesToBase64Url,
   batchSignDataItem,
   capabilitiesFor,
   decrypt,
   DEFAULT_BUNDLER_URL,
   dispatchTransaction,
   encrypt,
+  finishDataItem,
+  finishDataItems,
+  finishDispatch,
+  finishSignTransaction,
+  isHardwareWalletMethod,
+  prepareDataItem,
+  prepareDataItems,
+  prepareDispatch,
+  prepareSignTransaction,
   privateHash as vaultPrivateHash,
+  readDataItemFields,
   signDataItem,
   signMessage as vaultSignMessage,
   signTransaction,
   signature as vaultSignature,
+  verifyDeviceSignature,
   PERMISSION_TYPES,
+  WALLET_APPROVAL_ORIGIN,
   type AddTokenApprovalPreview,
   type ApprovalKind,
   type ApprovalPreview,
@@ -21,17 +35,28 @@ import {
   type ConnectAppInfo,
   type ConnectApprovalPreview,
   type DataItemInput,
+  type DeviceSigningPayload,
+  type DeviceSigningSummary,
   type EncryptAlgorithm,
   type Grant,
+  type HardwareDevice,
+  type HardwareWalletMethod,
   type JWKInterface,
   type PermissionType,
   type SignTransactionInput,
   type SigningApprovalPreview,
   type StoragePort,
+  type UnsignedPayload,
   type WindowPort,
 } from "@gleam/core";
-import { APPROVAL_TIMEOUT_MS, decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
+import {
+  APPROVAL_MAX_MS,
+  APPROVAL_TIMEOUT_MS,
+  decodeTaggedBinary,
+  encodeTaggedBinary,
+} from "@gleam/messaging/src/page-protocol.ts";
 import { getCachedKey, getStoredWallet, getWalletMethod } from "./key-session";
+import type { SubmitTransferRequest } from "./transfer";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -77,6 +102,23 @@ import { getCachedKey, getStoredWallet, getWalletMethod } from "./key-session";
  * rejection: `WindowPort.onApprovalWindowClosed` writes a rejected outcome
  * the same way `resolveApproval` does, so the dApp hears back at once
  * instead of after `APPROVAL_TIMEOUT_MS`.
+ *
+ * Hardware wallets: the service worker can't reach the camera or WebHID,
+ * so every hardware signature is made in the approval window. Approving
+ * a hardware wallet's request builds the unsigned payloads from the
+ * wallet's stored public key and moves the record to "awaiting device"
+ * (`PendingApprovalRecord.device`) instead of finishing it. The window
+ * then sends `submitDeviceSignature`, which verifies each signature
+ * against that key before anything is returned or posted. A signature
+ * that fails verification leaves the request waiting so the user can
+ * sign again. While waiting, the timeout follows `device.deadline`,
+ * which `deviceActivity` pushes back up to `APPROVAL_MAX_MS` from the
+ * request's creation.
+ *
+ * Deadlines are also enforced on read, since an evicted service worker
+ * loses its timers: a record past its deadline (`device.deadline`, or
+ * `APPROVAL_TIMEOUT_MS` after creation while in review) is hidden from
+ * every read and pruned on the next write, unless it is being resolved.
  */
 const GRANTS_KEY = "local:grants";
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
@@ -187,15 +229,35 @@ export interface AoTransferSigningInput {
 
 /**
  * The subset of `TransferHandler` this handler needs to finalize an
- * approved `transferAoTokens` request — injected rather than imported
- * directly, so `ApprovalHandler` doesn't need to know how a transfer is
- * actually submitted (mirrors the existing `StoragePort`/`WindowPort`
- * ports-style injection this class already uses). Optional constructor
- * param: every existing call site/test that never exercises
- * `transferAoTokens` is unaffected.
+ * approved `transferAoTokens` (or wallet `transfer`) request — injected
+ * rather than imported directly, so `ApprovalHandler` doesn't need to know
+ * how a transfer is actually submitted (mirrors the existing
+ * `StoragePort`/`WindowPort` ports-style injection this class already
+ * uses). Optional constructor param: every existing call site/test that
+ * never exercises a transfer is unaffected.
  */
 export interface AoTransferSubmitter {
-  submitTransfer(req: { token: string; recipient: string; amount: string; fee: null; walletId: string }): Promise<{ txId: string }>;
+  submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }>;
+}
+
+/** The `TransferHandler` steps a hardware wallet's transfer is split into around the device signature. */
+export interface DeviceTransferSubmitter {
+  prepareDeviceTransfer(req: SubmitTransferRequest, ownerB64Url: string): Promise<UnsignedPayload>;
+  /** Posts the transfer and writes its activity entry. */
+  finishDeviceTransfer(
+    req: SubmitTransferRequest,
+    unsigned: UnsignedPayload,
+    signature: Uint8Array,
+    expectedOwner: string,
+  ): Promise<{ txId: string }>;
+}
+
+export type TransferSubmitter = AoTransferSubmitter & Partial<DeviceTransferSubmitter>;
+
+/** A wallet send handed to the approval window, with the token metadata its preview shows. */
+export interface WalletTransferRequest extends SubmitTransferRequest {
+  tokenDenomination?: number | null;
+  tokenTicker?: string | null;
 }
 
 /** The subset of `ReadsHandler` an approved `addToken` request writes through. */
@@ -252,6 +314,202 @@ interface PendingApprovalRecord {
   signingInput: unknown;
   /** Set by `resolveApproval` immediately before the record is removed. */
   outcome?: ApprovalOutcome;
+  /** Set once a hardware wallet's request is approved and waits for the device. */
+  device?: PendingDeviceSigning;
+}
+
+interface PendingDeviceSigning {
+  /** Tagged-binary encoded `UnsignedPayload[]`. */
+  payloads: unknown;
+  /** Epoch ms. */
+  deadline: number;
+}
+
+interface HardwareWalletInfo {
+  method: HardwareWalletMethod;
+  device: HardwareDevice | null;
+  address: string;
+  publicKey: string;
+}
+
+/** Signing kinds a hardware wallet completes with device signatures. */
+const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
+  "sign",
+  "dispatch",
+  "signDataItem",
+  "batchSignDataItem",
+  "transferAoTokens",
+  "transfer",
+]);
+
+const TIMED_OUT = "Approval request timed out — the approval window was not resolved in time.";
+
+/** How soon a timeout looks again at a request that was being resolved when it fired. */
+const RESOLVING_RECHECK_MS = 5_000;
+
+const textDecoder = new TextDecoder();
+
+function decodeTransactionTag(tag: { name: string; value: string }): { name: string; value: string } {
+  return { name: textDecoder.decode(base64UrlToBytes(tag.name)), value: textDecoder.decode(base64UrlToBytes(tag.value)) };
+}
+
+function tagValue(tags: Array<{ name: string; value: string }>, name: string): string | undefined {
+  return tags.find((tag) => tag.name === name)?.value;
+}
+
+function summarize(payload: UnsignedPayload): DeviceSigningSummary {
+  if (payload.kind === "transaction") {
+    const { target, quantity, reward, data_size } = payload.transaction;
+    return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
+  }
+  const { target, tags, data } = readDataItemFields(payload.raw);
+  const recipient = tagValue(tags, "Recipient");
+  const quantity = tagValue(tags, "Quantity");
+  if (tagValue(tags, "Data-Protocol") === "ao" && tagValue(tags, "Action") === "Transfer" && target && recipient && quantity) {
+    return { kind: "aoTransfer", process: target, recipient, quantity };
+  }
+  return { kind: "dataItem", target: target || null, dataSize: data.byteLength };
+}
+
+function sameTags(actual: Array<{ name: string; value: string }>, expected: Array<{ name: string; value: string }>): boolean {
+  return (
+    actual.length === expected.length &&
+    actual.every((tag, index) => tag.name === expected[index]!.name && tag.value === expected[index]!.value)
+  );
+}
+
+function normalizedQuantity(quantity: string | undefined): string {
+  const trimmed = quantity?.trim() ?? "";
+  return trimmed === "" ? "0" : trimmed;
+}
+
+function mismatch(field: string): never {
+  throw new Error(`The prepared ${field} doesn't match the request, so nothing was sent to the device.`);
+}
+
+interface ExpectedTransaction {
+  target: string;
+  quantity: string;
+  tags: Array<{ name: string; value: string }>;
+  data: Uint8Array;
+  reward?: string;
+}
+
+function checkTransaction(payload: UnsignedPayload | undefined, expected: ExpectedTransaction): void {
+  const transaction = transactionOf(payload).transaction;
+  if (transaction.target !== expected.target) mismatch("recipient");
+  if (normalizedQuantity(transaction.quantity) !== normalizedQuantity(expected.quantity)) mismatch("amount");
+  if (!sameTags(transaction.tags.map(decodeTransactionTag), expected.tags)) mismatch("tags");
+  if (transaction.data !== bytesToBase64Url(expected.data)) mismatch("data");
+  if (expected.reward !== undefined && transaction.reward !== expected.reward) mismatch("fee");
+}
+
+interface ExpectedDataItem {
+  target: string;
+  tags: Array<{ name: string; value: string }>;
+  data: Uint8Array;
+  anchor?: string;
+}
+
+function checkDataItem(payload: UnsignedPayload | undefined, expected: ExpectedDataItem): void {
+  const fields = readDataItemFields(dataItemOf(payload));
+  if (fields.target !== expected.target) mismatch("target");
+  if (!sameTags(fields.tags, expected.tags)) mismatch("tags");
+  if (bytesToBase64Url(fields.data) !== bytesToBase64Url(expected.data)) mismatch("data");
+  if (expected.anchor !== undefined && fields.anchor !== expected.anchor) mismatch("anchor");
+}
+
+function plainTags(tags: SigningRequestInput["tags"]): Array<{ name: string; value: string }> {
+  return (tags ?? []).map(({ name, value }) => ({ name, value }));
+}
+
+/**
+ * Re-reads what was prepared against the request the user approved. The
+ * transaction builder fetches the anchor and, when the request has none,
+ * the reward after approval; everything else must come out exactly as
+ * requested.
+ */
+function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPayload[]): void {
+  switch (input.kind) {
+    case "sign":
+    case "dispatch": {
+      const [payload] = payloads;
+      if (payload?.kind === "dataItem") {
+        checkDataItem(payload, { target: input.target ?? "", tags: plainTags(input.tags), data: input.payload });
+      } else {
+        checkTransaction(payload, {
+          target: input.target ?? "",
+          quantity: input.quantity ?? "0",
+          tags: plainTags(input.tags),
+          data: input.payload,
+          reward: input.reward,
+        });
+      }
+      return;
+    }
+    case "signDataItem":
+    case "batchSignDataItem": {
+      const items = input.kind === "signDataItem" ? (input.dataItems ?? []).slice(0, 1) : (input.dataItems ?? []);
+      if (payloads.length !== items.length) mismatch("item count");
+      items.forEach((item, index) =>
+        checkDataItem(payloads[index], {
+          target: item.target ?? "",
+          tags: plainTags(item.tags),
+          data: base64ToBytes(item.data),
+          anchor: item.anchor ?? "",
+        }),
+      );
+      return;
+    }
+    case "transferAoTokens":
+    case "transfer": {
+      const [payload] = payloads;
+      if (input.token == null) {
+        checkTransaction(payload, {
+          target: input.recipient ?? "",
+          quantity: input.amount ?? "",
+          tags: [],
+          data: new Uint8Array(),
+        });
+        return;
+      }
+      const summary = summarize(payload!);
+      if (summary.kind !== "aoTransfer") mismatch("AO transfer");
+      if (summary.process !== input.token) mismatch("token");
+      if (summary.recipient !== input.recipient) mismatch("recipient");
+      if (summary.quantity !== input.amount) mismatch("amount");
+      return;
+    }
+    default:
+      return;
+  }
+}
+
+function toWirePayload(payload: UnsignedPayload): DeviceSigningPayload {
+  return payload.kind === "transaction"
+    ? { kind: "transaction", transaction: payload.transaction }
+    : { kind: "dataItem", raw: bytesToBase64Url(payload.raw) };
+}
+
+function transactionOf(payload: UnsignedPayload | undefined): UnsignedPayload & { kind: "transaction" } {
+  if (payload?.kind !== "transaction") throw new Error("Expected an unsigned transaction to finish.");
+  return payload;
+}
+
+function dataItemOf(payload: UnsignedPayload | undefined): Uint8Array {
+  if (payload?.kind !== "dataItem") throw new Error("Expected an unsigned data item to finish.");
+  return payload.raw;
+}
+
+function transactionInputOf(input: SigningRequestInput): SignTransactionInput {
+  return {
+    data: bytesToBase64(input.payload),
+    target: input.target,
+    quantity: input.quantity,
+    tags: input.tags,
+    reward: input.reward,
+    last_tx: input.last_tx,
+  };
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -348,7 +606,7 @@ export class ApprovalHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly windows: WindowPort,
-    private readonly transfers?: AoTransferSubmitter,
+    private readonly transfers?: TransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
     private readonly activeWalletId: () => Promise<string | null> = async () => null,
     private readonly tokens?: TokenWatchList,
@@ -368,7 +626,23 @@ export class ApprovalHandler {
     await this.storage.set(GRANTS_KEY, grants);
   }
 
+  /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
+  private pastDeadline(entry: PendingApprovalRecord): boolean {
+    if (entry.outcome) return false;
+    const deadline = entry.device?.deadline ?? entry.request.createdAt + APPROVAL_TIMEOUT_MS;
+    return Date.now() > deadline;
+  }
+
+  private isStale(entry: PendingApprovalRecord): boolean {
+    return !this.resolving.has(entry.request.requestId) && this.pastDeadline(entry);
+  }
+
+  /** Live records only; see the class comment on deadlines. */
   private async loadPending(): Promise<PendingApprovalRecord[]> {
+    return (await this.loadAllPending()).filter((entry) => !this.isStale(entry));
+  }
+
+  private async loadAllPending(): Promise<PendingApprovalRecord[]> {
     const raw = await this.storage.get<unknown>(PENDING_APPROVALS_KEY);
     if (!Array.isArray(raw)) return [];
     return raw.filter(
@@ -383,14 +657,16 @@ export class ApprovalHandler {
 
   /**
    * The only way to write pending approvals. `update` sees the current
-   * records and returns the new ones, or `null` to leave storage untouched.
+   * records, stale ones included so a timeout can attach its outcome, and
+   * returns the new ones, or `null` to leave storage untouched. Stale
+   * records are pruned from what is written.
    */
   private updatePending(
     update: (pending: PendingApprovalRecord[]) => PendingApprovalRecord[] | null,
   ): Promise<void> {
     const run = this.pendingQueue.then(async () => {
-      const next = update(await this.loadPending());
-      if (next) await this.storage.set(PENDING_APPROVALS_KEY, next);
+      const next = update(await this.loadAllPending());
+      if (next) await this.storage.set(PENDING_APPROVALS_KEY, next.filter((entry) => !this.isStale(entry)));
     });
     this.pendingQueue = run.catch(() => {});
     return run;
@@ -457,12 +733,29 @@ export class ApprovalHandler {
    */
   private async awaitResolution(requestId: string): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      let timeout: ReturnType<typeof setTimeout>;
+      const expireAt = (at: number) => {
+        timeout = setTimeout(() => void expire(), Math.max(0, at - Date.now()));
+      };
+      // A request waiting on a device runs to its own, extendable deadline.
+      const expire = async () => {
+        if (this.resolving.has(requestId)) {
+          expireAt(Date.now() + RESOLVING_RECHECK_MS);
+          return;
+        }
+        const entry = (await this.loadAllPending()).find((candidate) => candidate.request.requestId === requestId);
+        if (entry?.outcome) return;
+        const deadline = entry?.device?.deadline;
+        if (deadline !== undefined && deadline > Date.now()) {
+          expireAt(deadline);
+          return;
+        }
         unwatch();
         void this.dropPending(requestId);
         void this.windows.closeApprovalWindow(requestId);
-        reject(new Error("Approval request timed out — the approval window was not resolved in time."));
-      }, APPROVAL_TIMEOUT_MS);
+        reject(new Error(TIMED_OUT));
+      };
+      expireAt(Date.now() + APPROVAL_TIMEOUT_MS);
 
       const unwatch = this.storage.watch<PendingApprovalRecord[]>(PENDING_APPROVALS_KEY, (value) => {
         const entry = (value ?? []).find((candidate) => candidate.request.requestId === requestId);
@@ -502,14 +795,62 @@ export class ApprovalHandler {
     return this.updatePending((pending) => pending.filter((entry) => entry.request.requestId !== requestId));
   }
 
+  private async findPending(requestId: string): Promise<PendingApprovalRecord> {
+    const pending = await this.loadPending();
+    const entry = pending.find((candidate) => candidate.request.requestId === requestId);
+    if (!entry) {
+      throw new Error(`No pending approval request with id "${requestId}".`);
+    }
+    return entry;
+  }
+
+  /**
+   * Like `findPending`, but a record past its deadline is timed out here,
+   * rejecting whoever still awaits it, rather than just hidden. `owned`
+   * is set when the caller has already claimed the request in `resolving`.
+   */
+  private async findLive(requestId: string, owned: boolean): Promise<PendingApprovalRecord> {
+    const entry = (await this.loadAllPending()).find((candidate) => candidate.request.requestId === requestId);
+    if (!entry || entry.outcome) {
+      throw new Error(`No pending approval request with id "${requestId}".`);
+    }
+    if (this.pastDeadline(entry) && (owned || !this.resolving.has(requestId))) {
+      await this.timeOut(requestId);
+    }
+    return entry;
+  }
+
+  private async timeOut(requestId: string): Promise<never> {
+    const outcome: ApprovalOutcome = { approved: false, error: TIMED_OUT };
+    await this.updatePending((current) =>
+      current.map((candidate) =>
+        candidate.request.requestId === requestId && !candidate.outcome ? { ...candidate, outcome } : candidate,
+      ),
+    );
+    await this.dropPending(requestId);
+    await this.windows.closeApprovalWindow(requestId);
+    throw new Error(TIMED_OUT);
+  }
+
   /** `ProtocolMap.getApproval` — read-only, called by the approval window on mount. */
   async getApproval(req: { requestId: string }): Promise<ApprovalRequest> {
-    const pending = await this.loadPending();
-    const entry = pending.find((candidate) => candidate.request.requestId === req.requestId);
-    if (!entry) {
-      throw new Error(`No pending approval request with id "${req.requestId}".`);
-    }
-    return entry.request;
+    return this.requestView(await this.findPending(req.requestId));
+  }
+
+  /** The request as the window sees it: with the device's payloads once it waits on one. */
+  private async requestView(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
+    if (!entry.device || !entry.walletId) return entry.request;
+    const wallet = await this.hardwareWallet(entry.walletId);
+    const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
+    return {
+      ...entry.request,
+      device: {
+        ...wallet,
+        payloads: payloads.map(toWirePayload),
+        summaries: payloads.map(summarize),
+        deadline: entry.device.deadline,
+      },
+    };
   }
 
   /**
@@ -527,15 +868,13 @@ export class ApprovalHandler {
    * is rejected with that error and this call throws it too. The window
    * stays open so the user sees why instead of a success message.
    */
-  async resolveApproval(req: { requestId: string; approved: boolean }): Promise<void> {
-    const pending = await this.loadPending();
-    const entry = pending.find((candidate) => candidate.request.requestId === req.requestId);
-    if (!entry) {
-      throw new Error(`No pending approval request with id "${req.requestId}".`);
-    }
-
+  async resolveApproval(req: { requestId: string; approved: boolean }): Promise<ApprovalRequest | void> {
+    const entry = await this.findPending(req.requestId);
     if (this.resolving.has(req.requestId)) {
       throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
+    }
+    if (req.approved && entry.device) {
+      throw new Error("This request is already approved. Sign it on your device.");
     }
     this.resolving.add(req.requestId);
     try {
@@ -544,26 +883,284 @@ export class ApprovalHandler {
         outcome = { approved: false };
       } else {
         try {
+          if (await this.signsOnDevice(entry)) return await this.startDeviceSigning(entry);
           outcome = { approved: true, result: encodeTaggedBinary(await this.finalizeApproval(entry)) };
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
         }
       }
-
-      // Written in two steps (outcome attached, then removed) so a watcher
-      // observing this key sees the outcome at least once before the record
-      // disappears — see this class's doc comment.
-      await this.updatePending((current) =>
-        current.map((candidate) =>
-          candidate.request.requestId === req.requestId ? { ...candidate, outcome } : candidate,
-        ),
-      );
-      await this.dropPending(req.requestId);
-      if (outcome.error !== undefined) throw new Error(outcome.error);
-      await this.windows.closeApprovalWindow(req.requestId);
+      await this.complete(req.requestId, outcome);
     } finally {
       this.resolving.delete(req.requestId);
     }
+  }
+
+  /**
+   * Hands the outcome to whoever awaits the request, drops it, and closes
+   * its window. A failed outcome throws instead, leaving the window open
+   * to show why.
+   */
+  private async complete(requestId: string, outcome: ApprovalOutcome): Promise<void> {
+    // Written in two steps (outcome attached, then removed) so a watcher
+    // observing this key sees the outcome at least once before the record
+    // disappears — see this class's doc comment.
+    await this.updatePending((current) =>
+      current.map((candidate) => (candidate.request.requestId === requestId ? { ...candidate, outcome } : candidate)),
+    );
+    await this.dropPending(requestId);
+    if (outcome.error !== undefined) throw new Error(outcome.error);
+    await this.windows.closeApprovalWindow(requestId);
+  }
+
+  private async signsOnDevice(entry: PendingApprovalRecord): Promise<boolean> {
+    if (!entry.walletId || !DEVICE_SIGNED_KINDS.has(entry.request.kind)) return false;
+    const method = await getWalletMethod(entry.walletId);
+    return method !== null && isHardwareWalletMethod(method);
+  }
+
+  /** The earliest of another idle window from now and the request's hard cap. */
+  private deviceDeadline(createdAt: number): number {
+    return Math.min(Date.now() + APPROVAL_TIMEOUT_MS, createdAt + APPROVAL_MAX_MS);
+  }
+
+  private async startDeviceSigning(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
+    const input = this.signingInputOf(entry);
+    const walletId = entry.walletId!;
+    const wallet = await this.hardwareWallet(walletId);
+    const payloads = await this.prepareDevicePayloads(walletId, wallet, input);
+    assertPreparedMatches(input, payloads);
+    const device: PendingDeviceSigning = {
+      payloads: encodeTaggedBinary(payloads),
+      deadline: this.deviceDeadline(entry.request.createdAt),
+    };
+    const requestId = entry.request.requestId;
+    let stillPending = false;
+    await this.updatePending((current) => {
+      stillPending = current.some((candidate) => candidate.request.requestId === requestId && !candidate.outcome);
+      if (!stillPending) return null;
+      return current.map((candidate) => (candidate.request.requestId === requestId ? { ...candidate, device } : candidate));
+    });
+    if (!stillPending) {
+      throw new Error("This request ended while it was being prepared for your device. Start again from the app.");
+    }
+    return this.requestView({ ...entry, device });
+  }
+
+  /** `ProtocolMap.deviceActivity`. */
+  async deviceActivity(req: { requestId: string }): Promise<{ deadline: number }> {
+    const entry = await this.findLive(req.requestId, false);
+    if (!entry.device) {
+      throw new Error(`Approval request "${req.requestId}" isn't waiting for a device.`);
+    }
+    const deadline = this.deviceDeadline(entry.request.createdAt);
+    await this.updatePending((current) =>
+      current.map((candidate) =>
+        candidate.request.requestId === req.requestId && candidate.device
+          ? { ...candidate, device: { ...candidate.device, deadline } }
+          : candidate,
+      ),
+    );
+    return { deadline };
+  }
+
+  /**
+   * `ProtocolMap.submitDeviceSignature`. Every signature is verified
+   * before any is applied, so a wrong one throws with nothing posted and
+   * the request still waiting. Once they verify, the request completes:
+   * a later failure (a gateway refusing the transaction) rejects the
+   * dApp, as it does for a keyfile wallet.
+   */
+  async submitDeviceSignature(req: { requestId: string; signatures: string[] }): Promise<void> {
+    if (this.resolving.has(req.requestId)) {
+      throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
+    }
+    this.resolving.add(req.requestId);
+    try {
+      const entry = await this.findLive(req.requestId, true);
+      if (!entry.device || !entry.walletId) {
+        throw new Error(`Approval request "${req.requestId}" isn't waiting for a device signature.`);
+      }
+      const walletId = entry.walletId;
+      const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
+      const wallet = await this.hardwareWallet(walletId);
+      const signatures = await this.verifiedSignatures(payloads, req.signatures, wallet.publicKey);
+
+      let outcome: ApprovalOutcome;
+      try {
+        const result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
+        outcome = { approved: true, result: encodeTaggedBinary(result) };
+      } catch (error) {
+        outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
+      }
+      await this.complete(req.requestId, outcome);
+    } finally {
+      this.resolving.delete(req.requestId);
+    }
+  }
+
+  private async verifiedSignatures(
+    payloads: UnsignedPayload[],
+    encoded: string[],
+    publicKey: string,
+  ): Promise<Uint8Array[]> {
+    if (!Array.isArray(encoded) || encoded.length !== payloads.length) {
+      throw new Error(`Expected ${payloads.length} signature(s) from the device, got ${encoded?.length ?? 0}.`);
+    }
+    const signatures = encoded.map((value) => {
+      if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value)) {
+        throw new Error("The device returned a signature that isn't base64url.");
+      }
+      return base64UrlToBytes(value);
+    });
+    for (const [index, payload] of payloads.entries()) {
+      if (!(await verifyDeviceSignature(payload, signatures[index]!, publicKey))) {
+        throw new Error(
+          "The signature doesn't match this wallet. Check that the right device and account signed, then try again.",
+        );
+      }
+    }
+    return signatures;
+  }
+
+  private signingInputOf(entry: PendingApprovalRecord): SigningRequestInput {
+    const input = decodeTaggedBinary(entry.signingInput) as SigningRequestInput | null;
+    if (!input) {
+      throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
+    }
+    return input;
+  }
+
+  /**
+   * The hardware wallet's public fields. Its stored key must hash to its
+   * address, so a tampered record can't make the device sign as, or
+   * verify against, some other owner.
+   */
+  private async hardwareWallet(walletId: string): Promise<HardwareWalletInfo> {
+    const wallet = await getStoredWallet(walletId);
+    if (!wallet || !isHardwareWalletMethod(wallet.method) || wallet.publicKey.length === 0) {
+      throw new Error(`Wallet "${walletId}" isn't a hardware wallet with a stored public key.`);
+    }
+    if ((await addressFromOwner(wallet.publicKey)) !== wallet.address) {
+      throw new Error("This wallet's stored public key doesn't match its address. Signing was refused.");
+    }
+    return { method: wallet.method, device: wallet.device ?? null, address: wallet.address, publicKey: wallet.publicKey };
+  }
+
+  private async prepareDevicePayloads(
+    walletId: string,
+    wallet: HardwareWalletInfo,
+    input: SigningRequestInput,
+  ): Promise<UnsignedPayload[]> {
+    const owner = wallet.publicKey;
+    switch (input.kind) {
+      case "sign":
+        return [
+          {
+            kind: "transaction",
+            transaction: await prepareSignTransaction(this.requireGatewayUrl(input), owner, transactionInputOf(input)),
+          },
+        ];
+      case "dispatch": {
+        const { dispatchViaBundler: viaBundler } = capabilitiesFor(wallet.method);
+        return [await prepareDispatch(this.requireGatewayUrl(input), owner, transactionInputOf(input), { viaBundler })];
+      }
+      case "signDataItem": {
+        const [dataItem] = input.dataItems ?? [];
+        if (!dataItem) throw new Error("signDataItem requires a data item.");
+        return [{ kind: "dataItem", raw: prepareDataItem(owner, dataItem) }];
+      }
+      case "batchSignDataItem": {
+        const items = input.dataItems ?? [];
+        if (items.length === 0) throw new Error("batchSignDataItem requires at least one data item.");
+        return prepareDataItems(owner, items).map((raw) => ({ kind: "dataItem", raw }));
+      }
+      case "transferAoTokens":
+      case "transfer":
+        return [await this.deviceTransfers().prepareDeviceTransfer(this.transferRequestOf(walletId, input), owner)];
+      default:
+        throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
+    }
+  }
+
+  private async finishDeviceSigning(
+    walletId: string,
+    wallet: HardwareWalletInfo,
+    input: SigningRequestInput,
+    payloads: UnsignedPayload[],
+    signatures: Uint8Array[],
+  ): Promise<unknown> {
+    const owner = wallet.publicKey;
+    const [payload] = payloads;
+    const [signature] = signatures;
+    switch (input.kind) {
+      case "sign":
+        return finishSignTransaction(transactionOf(payload).transaction, signature!, owner);
+      case "dispatch":
+        return finishDispatch(this.requireGatewayUrl(input), this.bundlerUrl, payload!, signature!, owner);
+      case "signDataItem":
+        return toArrayBuffer(await finishDataItem(dataItemOf(payload), signature!, owner));
+      case "batchSignDataItem":
+        return (await finishDataItems(payloads.map(dataItemOf), signatures, owner)).map(toArrayBuffer);
+      case "transferAoTokens":
+      case "transfer": {
+        const { txId } = await this.deviceTransfers().finishDeviceTransfer(
+          this.transferRequestOf(walletId, input),
+          payload!,
+          signature!,
+          owner,
+        );
+        // A dApp's transferAoTokens resolves to `{ id }`; a wallet send to `submitTransfer`'s `{ txId }`.
+        return input.kind === "transfer" ? { txId } : { id: txId };
+      }
+      default:
+        throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
+    }
+  }
+
+  private deviceTransfers(): DeviceTransferSubmitter {
+    const transfers = this.transfers;
+    if (!transfers?.prepareDeviceTransfer || !transfers.finishDeviceTransfer) {
+      throw new Error("Hardware wallet transfers aren't wired. ApprovalHandler was constructed without them.");
+    }
+    return transfers as DeviceTransferSubmitter;
+  }
+
+  private transferRequestOf(walletId: string, input: SigningRequestInput): SubmitTransferRequest {
+    if (input.recipient == null || input.amount == null) {
+      throw new Error(`A ${input.kind} approval is missing its recipient or amount.`);
+    }
+    if (input.kind === "transferAoTokens" && input.token == null) {
+      throw new Error("A transferAoTokens approval is missing its token.");
+    }
+    return {
+      token: input.token ?? null,
+      recipient: input.recipient,
+      amount: input.amount,
+      fee: input.kind === "transfer" ? (input.fee ?? null) : null,
+      walletId,
+    };
+  }
+
+  /**
+   * A send from the popup by a hardware wallet: reviewed and signed in the
+   * approval window like a dApp's request, with Gleam as the origin.
+   * Resolves to `submitTransfer`'s `{ txId }` once the transfer is posted.
+   */
+  async requestWalletTransfer(req: WalletTransferRequest): Promise<{ txId: string }> {
+    const result = await this.requestApproval({
+      kind: "transfer",
+      origin: WALLET_APPROVAL_ORIGIN,
+      walletId: req.walletId,
+      recipient: req.recipient,
+      amount: req.amount,
+      fee: req.fee,
+      token: req.token,
+      tokenDenomination: req.tokenDenomination ?? null,
+      tokenTicker: req.tokenTicker ?? null,
+      payload: new Uint8Array(),
+      tags: [],
+    });
+    return result as { txId: string };
   }
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {
@@ -633,10 +1230,7 @@ export class ApprovalHandler {
    * the request, so this only fires if the wallet locks in between.
    */
   private async performSigning(entry: PendingApprovalRecord): Promise<unknown> {
-    const input = decodeTaggedBinary(entry.signingInput) as SigningRequestInput | null;
-    if (!input) {
-      throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
-    }
+    const input = this.signingInputOf(entry);
 
     const { walletId } = entry;
     if (!walletId) {
@@ -658,18 +1252,11 @@ export class ApprovalHandler {
     }
     const { jwk } = cached;
 
-    if (input.kind === "transferAoTokens") {
-      return this.performAoTransfer(walletId, input);
+    if (input.kind === "transferAoTokens" || input.kind === "transfer") {
+      return this.performTransfer(walletId, input);
     }
 
-    const transaction: SignTransactionInput = {
-      data: bytesToBase64(input.payload),
-      target: input.target,
-      quantity: input.quantity,
-      tags: input.tags,
-      reward: input.reward,
-      last_tx: input.last_tx,
-    };
+    const transaction = transactionInputOf(input);
 
     switch (input.kind) {
       case "sign": {
@@ -737,25 +1324,15 @@ export class ApprovalHandler {
    * shape (`{ id }`), mirroring `submitTransfer`'s `{ txId }` under the
    * ArConnect-compatible `dispatch()`-style field name the dApp expects.
    */
-  private async performAoTransfer(walletId: string, input: SigningRequestInput): Promise<{ id: string }> {
+  private async performTransfer(walletId: string, input: SigningRequestInput): Promise<{ id: string } | { txId: string }> {
     if (!this.transfers) {
       throw new Error(
-        "transferAoTokens is not wired to a transfer submitter — ApprovalHandler was constructed " +
+        `${input.kind} is not wired to a transfer submitter — ApprovalHandler was constructed ` +
           "without an AoTransferSubmitter.",
       );
     }
-    if (input.token == null || input.recipient == null || input.amount == null) {
-      throw new Error("A transferAoTokens approval is missing token/recipient/amount.");
-    }
-
-    const { txId } = await this.transfers.submitTransfer({
-      token: input.token,
-      recipient: input.recipient,
-      amount: input.amount,
-      fee: null,
-      walletId,
-    });
-    return { id: txId };
+    const { txId } = await this.transfers.submitTransfer(this.transferRequestOf(walletId, input));
+    return input.kind === "transfer" ? { txId } : { id: txId };
   }
 
   /**

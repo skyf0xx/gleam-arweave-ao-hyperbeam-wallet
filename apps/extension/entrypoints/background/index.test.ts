@@ -116,6 +116,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "resetAllWallets",
       "getApproval",
       "resolveApproval",
+      "submitDeviceSignature",
+      "deviceActivity",
       "getLockSettings",
       "setLockSettings",
       "getNetworkSettings",
@@ -1305,7 +1307,16 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     it("every other method is rejected from a content script, before its handler runs", async () => {
       const guarded = [...rawHandlers.keys()].filter((method) => method !== "providerCall");
-      expect(guarded).toEqual(expect.arrayContaining(["exportWallet", "createWallet", "resolveApproval", "getApproval"]));
+      expect(guarded).toEqual(
+        expect.arrayContaining([
+          "exportWallet",
+          "createWallet",
+          "resolveApproval",
+          "getApproval",
+          "submitDeviceSignature",
+          "deviceActivity",
+        ]),
+      );
       for (const method of guarded) {
         await expect(call(method, { walletId: "wallet-1", requestId: "r", approved: true }, contentSender(ORIGIN)), method)
           .rejects.toThrow(/can only be called from the Gleam extension/);

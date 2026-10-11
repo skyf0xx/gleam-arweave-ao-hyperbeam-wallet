@@ -7,6 +7,7 @@ import {
   buildUnsignedDataItem,
   createSignedDataItem,
   dataItemSignatureData,
+  readDataItemFields,
   signDataItemWithJwk,
   verifyDataItemSignature,
   type DataItemFields,
@@ -58,6 +59,19 @@ describe("buildUnsignedDataItem", () => {
 
     expect(Buffer.from(raw).equals(reference.getRaw())).toBe(true);
     expect(id).toBe(reference.id);
+  });
+
+  it.each(CASES)("readDataItemFields decodes what was built (%s)", (_, fields) => {
+    const read = readDataItemFields(buildUnsignedDataItem(jwk.n, fields));
+    expect(read.target).toBe(fields.target ?? "");
+    expect(read.anchor).toBe(fields.anchor ?? "");
+    expect(read.tags).toEqual(fields.tags ?? []);
+    expect(Array.from(read.data)).toEqual(Array.from(fields.data));
+  });
+
+  it("readDataItemFields decodes arbundles' tag encoding too", () => {
+    const tags = Array.from({ length: 70 }, (_, index) => ({ name: `Name-${index}`, value: "v".repeat(index) }));
+    expect(readDataItemFields(arbundlesItem({ data: utf8("x"), tags }).getRaw()).tags).toEqual(tags);
   });
 
   it("rejects an owner that isn't a 512-byte modulus", () => {
