@@ -1939,3 +1939,141 @@ html.waking .v-gate-orb {
     text-shadow: none;
   }
 }
+
+/* ---- Flavours: how a milestone moves as a pass goes over it ------------- */
+/* Forward: the milestone arrives. --c is its beam colour. */
+
+.tl-item.fx-pop::after {
+  animation: fx-pop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.tl-item.fx-ring::after {
+  animation: fx-ring 0.9s ease-out;
+}
+.tl-item.fx-prism::after {
+  animation: fx-prism 0.6s steps(1) both;
+}
+.tl-item.fx-prism .tl-card {
+  animation: fx-prism-card 0.9s ease-out;
+}
+.tl-item.fx-rise .tl-card {
+  animation: fx-rise 0.7s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes fx-pop {
+  0% {
+    transform: scale(2.6);
+    background: var(--c);
+    box-shadow: 0 0 22px 6px var(--c);
+  }
+}
+@keyframes fx-ring {
+  0% {
+    box-shadow: 0 0 0 0 var(--c);
+  }
+  100% {
+    box-shadow: 0 0 0 26px transparent;
+  }
+}
+@keyframes fx-prism {
+  0% { background: var(--beam-red); }
+  20% { background: var(--beam-purple); }
+  40% { background: var(--beam-sky); }
+  60% { background: var(--beam-yellow); }
+  80% { background: var(--beam-green); }
+}
+@keyframes fx-prism-card {
+  0% {
+    border-left-color: var(--c);
+    box-shadow: -6px 0 18px -8px var(--c);
+  }
+}
+@keyframes fx-rise {
+  0% {
+    transform: translateY(12px);
+    text-shadow: 0 0 14px var(--c);
+  }
+}
+
+/* Back: the milestone is undone, the way a tape runs backwards */
+
+.tl-item.fx-glitch .tl-card {
+  animation: fx-glitch 0.4s steps(1);
+}
+.tl-item.fx-implode::after {
+  animation: fx-implode 0.55s ease-in-out;
+}
+.tl-item.fx-implode .tl-card {
+  animation: fx-shrink 0.55s ease-in-out;
+}
+.tl-item.fx-smear .tl-card {
+  animation: fx-smear 0.5s ease-out;
+}
+.tl-item.fx-flicker .tl-card {
+  animation: fx-flicker 0.45s steps(1);
+}
+
+@keyframes fx-glitch {
+  0% {
+    transform: translateX(-5px);
+    text-shadow: 3px 0 var(--beam-red), -3px 0 var(--beam-sky);
+  }
+  25% {
+    transform: translateX(4px);
+    text-shadow: -2px 0 var(--beam-red), 2px 0 var(--beam-sky);
+  }
+  50% {
+    transform: translateX(-2px);
+    text-shadow: 1px 0 var(--beam-purple);
+  }
+  75% {
+    transform: none;
+  }
+}
+@keyframes fx-implode {
+  30% {
+    transform: scale(1.9);
+    background: var(--c);
+  }
+  65% {
+    transform: scale(0.2);
+  }
+}
+@keyframes fx-shrink {
+  50% {
+    transform: scale(0.96);
+    filter: blur(1px);
+  }
+}
+@keyframes fx-smear {
+  0% {
+    transform: skewX(-14deg) translateX(18px);
+    filter: blur(3px);
+  }
+}
+@keyframes fx-flicker {
+  0% { opacity: 1; }
+  15% { opacity: 0.1; }
+  30% { opacity: 0.9; }
+  45% { opacity: 0.2; }
+  60% { opacity: 0.7; }
+}
+
+/* The closing beam flares as its chord lands */
+.beam.fx-closing {
+  animation: fx-closing 1.2s ease-out;
+}
+
+@keyframes fx-closing {
+  12% {
+    filter: brightness(1.7) saturate(1.3);
+    transform: scaleY(1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-item[class*="fx-"]::after,
+  .tl-item[class*="fx-"] .tl-card,
+  .beam.fx-closing {
+    animation: none;
+  }
+}

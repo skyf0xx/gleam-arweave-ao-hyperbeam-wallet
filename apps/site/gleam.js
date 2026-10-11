@@ -257,6 +257,77 @@
     };
   }
 
+  // ---- Flavours: each pass through a section sounds and moves its own way --
+  //
+  // A pass is a run of scrolling one way through a section. Each new pass
+  // draws a voice, a scale and a visual effect from shuffled decks, so going
+  // over the same ground never plays the same twice running. Going back
+  // draws from backwards voices and effects: notes that swell and cut, glitches.
+
+  function shuffled(items) {
+    var d = items.slice();
+    for (var i = d.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var swap = d[i];
+      d[i] = d[j];
+      d[j] = swap;
+    }
+    return d;
+  }
+
+  // Draws from items in a shuffled order, reshuffling when it runs out, and
+  // never the same one twice in a row across a reshuffle
+  function deckOf(items) {
+    var d = [];
+    var last = null;
+    return function () {
+      if (!d.length) {
+        d = shuffled(items);
+        if (d.length > 1 && d[d.length - 1] === last) {
+          d[d.length - 1] = d[0];
+          d[0] = last;
+        }
+      }
+      last = d.pop();
+      return last;
+    };
+  }
+
+  var forwardVoice = deckOf(["glass", "box", "strum", "bell", "pluck", "swell"]);
+  var backVoice = deckOf(["reversed", "reversed", "pluck", "box", "swell"]);
+  var anyScale = deckOf(program.SCALES);
+  var forwardFx = deckOf(["pop", "ring", "prism", "rise"]);
+  var backFx = deckOf(["glitch", "implode", "smear", "flicker"]);
+
+  function flavour(dir) {
+    return {
+      voice: dir > 0 ? forwardVoice() : backVoice(),
+      scale: anyScale(),
+      fx: dir > 0 ? forwardFx() : backFx(),
+    };
+  }
+
+  var passes = {};
+
+  // The flavour for this section's current pass: a new one when the
+  // direction turns or after a pause
+  function pass(key, dir) {
+    var now = Date.now();
+    var p = passes[key];
+    if (!p || p.dir !== dir || now - p.at > 1500) {
+      p = passes[key] = { dir: dir, flavour: flavour(dir) };
+    }
+    p.at = now;
+    return p.flavour;
+  }
+
+  function effect(el, fx) {
+    if (!motion) return;
+    el.className = el.className.replace(/\s*\bfx-\S+/g, "");
+    void el.offsetWidth;
+    el.classList.add("fx-" + fx);
+  }
+
   // ---- Timeline: page scroll drives history sideways ---------------------
 
   var tl = document.querySelector("[data-tl]");
@@ -317,13 +388,17 @@
     track.style.transform = "translate3d(" + -shift + "px,0,0)";
     track.style.setProperty("--fill", head.toFixed(1) + "px");
     // Each milestone the beam reaches rings one step higher, so history
-    // climbs a scale. Only on the way forward; a fast scroll lighting several
-    // at once rolls them, capped so it never turns into a run.
+    // climbs a scale, and rewinding through it walks back down. Each pass
+    // plays in its own voice and scale with its own effect. A fast scroll
+    // changing several at once rolls them, capped so it never turns into a run.
     var rung = 0;
     tlItems.forEach(function (li, i) {
       var lit = li._x <= head + 1;
-      if (audible && lit && !li.classList.contains("lit") && rung < 3) {
-        program.ping(i, rung * 0.07, li.querySelector(".tl-card") || li);
+      if (audible && lit !== li.classList.contains("lit") && rung < 3) {
+        var f = pass("tl", lit ? 1 : -1);
+        program.play(f.voice, f.scale, i, rung * 0.07, li.querySelector(".tl-card") || li);
+        li.style.setProperty("--c", COLORS[i % 5]);
+        effect(li, f.fx);
         rung++;
       }
       li.classList.toggle("lit", lit);
@@ -331,16 +406,30 @@
     var on = p >= 0.995;
     if (on !== now.classList.contains("on")) {
       now.classList.toggle("on", on);
-      // Arriving at "You are here" lands on an E major chord, an octave over
-      // where the timeline's scale began
-      if (on && audible) {
-        var dot = now.querySelector(".tl-now-dot") || now;
-        [5, 7, 8].forEach(function (step) {
-          program.ping(step, 0.05, dot);
-        });
-      }
+      // Arriving at "You are here" lands on a chord, an octave over where
+      // the timeline's scale began, voiced and rolled its own way each time.
+      // Backing off the present rewinds it in one falling sweep.
+      var dot = now.querySelector(".tl-now-dot") || now;
+      if (on && audible) arrive(dot);
+      if (!on && audible) program.sweep(8, 0, 0.7, 0, dot);
       kick();
     }
+  }
+
+  var ROLLS = [
+    [0.05, 0.05, 0.05],
+    [0, 0.08, 0.16],
+    [0.16, 0.08, 0],
+    [0, 0.22, 0.44],
+  ];
+  var arrivalRoll = deckOf(ROLLS);
+
+  function arrive(dot) {
+    var f = flavour(1);
+    var roll = arrivalRoll();
+    [5, 7, 8].forEach(function (degree, i) {
+      program.play(f.voice, "pentatonic", degree, roll[i], dot);
+    });
   }
 
   function requestTimeline() {
@@ -357,13 +446,16 @@
   );
 
   // audible: true only for a scroll. Each sentence lighting on the way down
-  // swells a soft note, the second higher than the first.
+  // sounds a note, the second higher than the first; going back up plays
+  // them out backwards. Each pass picks its own voice and scale.
   function updateLines(audible) {
     var mark = window.innerHeight * 0.72;
     lines.forEach(function (span, i) {
       var lit = span.getBoundingClientRect().top < mark;
-      if (audible && lit && !span.classList.contains("lit"))
-        program.soft([2, 5][i % 2], 0, span);
+      if (audible && lit !== span.classList.contains("lit")) {
+        var f = pass("lines", lit ? 1 : -1);
+        program.play(f.voice, f.scale, [2, 5][i % 2], 0, span);
+      }
       span.classList.toggle("lit", lit);
     });
   }
@@ -461,17 +553,25 @@
 
   // ---- Closing chord: the final beam resolves the page, once per visit ---
 
+  // E major from the ping's own scale, coming home. Every arrival voices
+  // and rolls it differently: up, down, all at once, or slow and wide.
+  var closingRoll = deckOf([
+    [0, 0.08, 0.16, 0.24, 0.4],
+    [0.24, 0.16, 0.08, 0, 0.4],
+    [0, 0, 0, 0, 0.3],
+    [0, 0.2, 0.4, 0.6, 0.95],
+  ]);
   var finalBeam = document.querySelector(".v-final .beam");
   if (finalBeam && "IntersectionObserver" in window) {
     var closing = new IntersectionObserver(
       function (entries) {
         if (!entries[0].isIntersecting) return;
-        closing.disconnect();
-        // E major, rolled up from the root: the ping's own scale coming home
-        [0, 2, 3, 5].forEach(function (step, i) {
-          program.ping(step, i * 0.08, finalBeam);
+        var f = flavour(1);
+        var roll = closingRoll();
+        [0, 2, 3, 5, 10].forEach(function (step, i) {
+          program.play(i === 4 ? "glass" : f.voice, "pentatonic", step, roll[i], finalBeam);
         });
-        program.ping(10, 0.4, finalBeam);
+        if (motion) restart(finalBeam, "fx-closing");
       },
       // Wait until it's well up the screen: at the bottom edge the ping's
       // on-screen fade would play it silently, and this only fires once
@@ -492,6 +592,7 @@
   // the lines in turn, then goes quiet
   var TODAY_SOUNDS = 4;
   var todaySounds = 0;
+  var todayFlavour = null;
   var lastNow = null;
   var raf = 0;
   // A welcome-back moment. draw(e) paints over the hero's particles, e being
@@ -546,11 +647,13 @@
     // Inviting's two are a pair, you then your friend, a third apart.
     if (seen.today && todaySounds < TODAY_SOUNDS && program.presence(ticks) > 0.5) {
       var line = ticks[todaySounds % ticks.length];
+      // One voice for the visit's four, so they read as a set
+      if (!todayFlavour) todayFlavour = flavour(1);
       if (todaySounds % ticks.length === 0) {
-        program.soft(0, 0, line);
+        program.play(todayFlavour.voice, todayFlavour.scale, 0, 0, line);
       } else {
-        program.soft(2, 0, line);
-        program.soft(3, 0.14, line);
+        program.play(todayFlavour.voice, todayFlavour.scale, 2, 0, line);
+        program.play(todayFlavour.voice, todayFlavour.scale, 3, 0.14, line);
       }
       todaySounds++;
     }
@@ -622,6 +725,7 @@
     var gates = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         seen[entry.target.getAttribute("data-gate")] = entry.isIntersecting;
+        if (!seen.today) todayFlavour = null;
       });
       kick();
     });
@@ -877,29 +981,9 @@
     constellation,
     glintStorm,
   ];
-  var deck = [];
-  var lastMoment = null;
+  var nextMoment = deckOf(MOMENTS);
   var quietUntil = 0;
   var returns = 0;
-
-  function nextMoment() {
-    if (!deck.length) {
-      deck = MOMENTS.slice();
-      for (var i = deck.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var swap = deck[i];
-        deck[i] = deck[j];
-        deck[j] = swap;
-      }
-      // Never the same one twice running across a reshuffle
-      if (deck[deck.length - 1] === lastMoment) {
-        deck[deck.length - 1] = deck[0];
-        deck[0] = lastMoment;
-      }
-    }
-    lastMoment = deck.pop();
-    return lastMoment;
-  }
 
   // The fifth return of a visit, once ever, gets a line instead of a moment
   function echo() {
