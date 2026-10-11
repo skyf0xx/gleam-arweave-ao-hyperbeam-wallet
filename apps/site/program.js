@@ -345,6 +345,44 @@
     });
   }
 
+  // Runs fn with its notes sent past the quiet master at gain, for the few
+  // moments that should land with weight rather than be found
+  function loud(fn, gain) {
+    if (!audio) return;
+    var bus = audio.ctx.createGain();
+    bus.gain.value = gain;
+    bus.connect(audio.out);
+    var prev = route;
+    route = bus;
+    try {
+      fn();
+    } finally {
+      route = prev;
+    }
+  }
+
+  // A low thump, a sine dropping out from under itself, felt more than
+  // heard. depth 1 is a knock; higher is a bigger hit.
+  function thump(delay, depth) {
+    var level = loudness();
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01 + (delay || 0);
+    var d = depth || 1;
+    duckPad(at);
+    var osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(140 + 30 * d, at);
+    osc.frequency.exponentialRampToValueAtTime(38, at + 0.18 + 0.06 * d);
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0, at);
+    env.gain.linearRampToValueAtTime(0.9 * level, at + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + 0.3 + 0.1 * d);
+    osc.connect(env);
+    env.connect(out());
+    osc.start(at);
+    osc.stop(at + 0.5 + 0.1 * d);
+  }
+
   // ---- Voices and scales: the same melody, played many ways ---------------
   //
   // A section that sounds as it's passed picks a voice and a scale for each
@@ -779,6 +817,8 @@
     enableSound: enableSound,
     soft: soft,
     tick: tick,
+    loud: loud,
+    thump: thump,
     sweep: sweep,
     play: play,
     whoosh: whoosh,
