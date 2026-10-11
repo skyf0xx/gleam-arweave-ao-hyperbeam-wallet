@@ -1867,7 +1867,7 @@
 
       if (n === 0) program.enableSound(function () { hitSound(n); });
       else hitSound(n);
-      if (last) window.setTimeout(wake, motion ? 900 : 1200);
+      if (last) window.setTimeout(wake, motion ? 2400 : 2700);
     }
 
     // A thump and a struck chord, each a step up the scale from the last
