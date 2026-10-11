@@ -132,7 +132,11 @@
           </linearGradient>
         </defs>
         <path d="M0,100 Q50,-60 100,100 Z" fill="#FFFFFF" />
-        <path d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)" />
+        <clipPath id="arc-draw-1" clipPathUnits="userSpaceOnUse"><rect x="-5" y="-60" width="110" height="200" /></clipPath>
+        <clipPath id="arc-glint-1" clipPathUnits="userSpaceOnUse"><rect x="-10" y="-60" width="0" height="200" /></clipPath>
+        <path class="arc" d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)" clip-path="url(#arc-draw-1)" />
+        <g class="arc-glint-glow"><path d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)" clip-path="url(#arc-glint-1)" /></g>
+        <path class="arc-glint" d="M0,100 Q50,-60 100,100" fill="none" stroke="url(#beam-h)" clip-path="url(#arc-glint-1)" />
       </svg>
     </div>
 
@@ -250,7 +254,11 @@
     <div class="cut cut-curve cut-curve-dark" aria-hidden="true">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
         <path d="M0,100 L0,90 Q50,-40 100,90 L100,100 Z" fill="#0A0A0A" />
-        <path d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)" />
+        <clipPath id="arc-draw-2" clipPathUnits="userSpaceOnUse"><rect x="-5" y="-60" width="110" height="200" /></clipPath>
+        <clipPath id="arc-glint-2" clipPathUnits="userSpaceOnUse"><rect x="-10" y="-60" width="0" height="200" /></clipPath>
+        <path class="arc" d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)" clip-path="url(#arc-draw-2)" />
+        <g class="arc-glint-glow"><path d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)" clip-path="url(#arc-glint-2)" /></g>
+        <path class="arc-glint" d="M0,90 Q50,-40 100,90" fill="none" stroke="url(#beam-h)" clip-path="url(#arc-glint-2)" />
       </svg>
     </div>
 
