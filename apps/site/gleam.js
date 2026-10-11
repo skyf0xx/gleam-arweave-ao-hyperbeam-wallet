@@ -1761,117 +1761,125 @@
       orb.style.setProperty("--ly", ly.toFixed(3));
     }
 
-    // The gate is a slot machine with three reels' worth of copy. Each tap
-    // spins the reel to the next perk; the third lands and wakes the hero.
-    // The first tap is also what unlocks the page's sound.
-    var reel = gate.querySelector(".v-reel");
-    var strip = gate.querySelector(".v-reel-strip");
-    var lamps = gate.querySelectorAll(".v-gate-lamps i");
+    // Three taps charge the orb, a third of its ring each, and each puts one
+    // thing GLEAM gets you under it. The third overcharges it and wakes the
+    // hero. The first tap is also what unlocks the page's sound.
+    var line = gate.querySelector(".v-gate-line");
+    var shock = gate.querySelector(".v-gate-shock");
+    var segs = gate.querySelectorAll(".v-gate-charge .fill");
     var live = document.querySelector("[data-gate-live]");
     var perks = Array.prototype.slice.call(
-      gate.querySelector(".v-perks").content.querySelectorAll(".v-reel-item"),
+      gate.querySelector(".v-perks").content.children,
     );
-    var pulls = 0;
-    var spin = null;
+    var charge = 0;
+    var flash = document.querySelector(".v-gate-flash");
+    var sparks = document.querySelector(".v-gate-sparks");
+    var pen = sparks && sparks.getContext("2d");
+    var flying = [];
+    var sparking = 0;
+
+    // Sparks thrown off the orb's edge, streaking out and slowing as they
+    // burn down. power scales how far they fly.
+    function burst(count, power, colors) {
+      if (!pen) return;
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
+      var area = sparks.getBoundingClientRect();
+      if (sparks.width !== Math.round(area.width * dpr)) {
+        sparks.width = Math.round(area.width * dpr);
+        sparks.height = Math.round(area.height * dpr);
+      }
+      pen.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var o = orb.getBoundingClientRect();
+      var cx = o.left + o.width / 2 - area.left;
+      var cy = o.top + o.height / 2 - area.top;
+      var r = o.width / 2;
+      for (var i = 0; i < count; i++) {
+        var a = Math.random() * Math.PI * 2;
+        var v = (6 + Math.random() * 16) * power;
+        flying.push({
+          x: cx + Math.cos(a) * r,
+          y: cy + Math.sin(a) * r,
+          vx: Math.cos(a) * v,
+          vy: Math.sin(a) * v,
+          life: 1,
+          fade: 0.012 + Math.random() * 0.025,
+          width: 1.5 + Math.random() * 2.5,
+          color: Math.random() < 0.25 ? "#fff" : colors[i % colors.length],
+        });
+      }
+      if (!sparking) sparking = requestAnimationFrame(fly);
+    }
+
+    function fly() {
+      var w = sparks.width;
+      var h = sparks.height;
+      pen.save();
+      pen.setTransform(1, 0, 0, 1, 0, 0);
+      pen.clearRect(0, 0, w, h);
+      pen.restore();
+      pen.globalCompositeOperation = "lighter";
+      pen.lineCap = "round";
+      flying = flying.filter(function (p) {
+        var x = p.x;
+        var y = p.y;
+        p.vx *= 0.92;
+        p.vy = p.vy * 0.92 + 0.12;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.fade;
+        if (p.life <= 0) return false;
+        pen.globalAlpha = p.life;
+        pen.strokeStyle = p.color;
+        pen.lineWidth = p.width * p.life;
+        pen.beginPath();
+        pen.moveTo(x - p.vx * 1.5, y - p.vy * 1.5);
+        pen.lineTo(p.x, p.y);
+        pen.stroke();
+        return true;
+      });
+      sparking = flying.length ? requestAnimationFrame(fly) : 0;
+    }
 
     function pull() {
-      if (root.classList.contains("waking") || pulls >= perks.length) return;
-      // A tap mid-spin slams the reel home and spins the next, so every tap
-      // counts and nobody waits on the animation
-      if (spin) spin.land();
-      var n = pulls++;
-      if (n === 0) program.enableSound();
-      if (window.umami) window.umami.track("gleam-gate-" + (n + 1));
-      if (motion) restart(orb, "hit");
-      spin = spinTo(perks[n], n);
+      if (root.classList.contains("waking") || charge >= perks.length) return;
+      var n = charge++;
+      var c = COLORS[n * 2];
+      var last = n === perks.length - 1;
+      if (window.umami) window.umami.track("gleam-gate-" + charge);
+
+      gate.classList.add("charging");
+      gate.style.setProperty("--level", String(charge));
+      gate.style.setProperty("--c", c);
+      if (flash) flash.style.setProperty("--c", c);
+      segs[n].classList.add("on");
+      line.replaceChildren(perks[n].cloneNode(true));
+      if (live) live.textContent = line.textContent;
+      if (motion) {
+        restart(orb, "hit");
+        restart(shock, "go");
+        restart(line, "slam");
+        restart(gate, "shake");
+        restart(flash, "go");
+        burst(40 + n * 45, 1 + n * 0.5, [c]);
+      }
+      if (last) gate.classList.add("full");
+      if (navigator.vibrate) navigator.vibrate(last ? [30, 40, 60] : 25 + n * 10);
+
+      if (n === 0) program.enableSound(function () { hitSound(n); });
+      else hitSound(n);
+      if (last) window.setTimeout(wake, motion ? 900 : 1200);
     }
 
-    function spinTo(perk, n) {
-      var current = strip.lastElementChild;
-      var target = perk.cloneNode(true);
-      // A blur of the other perks and GLEAMs between, one more past the
-      // target for the landing to overshoot into
-      var turns = motion ? 9 + n * 3 : 0;
-      var items = [current];
-      for (var i = 0; i < turns; i++) {
-        var filler = i % 3 === 2 ? perks[(n + i) % perks.length].cloneNode(true) : gleamItem(i);
-        items.push(filler);
-      }
-      items.push(target);
-      if (motion) items.push(gleamItem(turns));
-      strip.replaceChildren.apply(strip, items);
-
-      var h = reel.offsetHeight;
-      var dist = items.indexOf(target);
-      var dur = 700 + turns * 45;
-      var start = window.performance.now();
-      var passed = 0;
-      var frame = 0;
-      var done = false;
-
-      function at(pos) {
-        strip.style.transform = "translateY(" + (-pos * h).toFixed(1) + "px)";
-      }
-      function step(now) {
-        var t = Math.min(1, (now - start) / dur);
-        var pos = reelAt(t, dist);
-        var v = (reelAt(Math.min(1, t + 0.02), dist) - pos) / 0.02;
-        strip.style.filter = v > 4 ? "blur(" + Math.min(4, v / 6).toFixed(1) + "px)" : "";
-        at(pos);
-        var p = Math.floor(pos + 0.5);
-        if (p > passed && p < dist) program.tick(0, reel);
-        passed = Math.max(passed, p);
-        if (t < 1) frame = requestAnimationFrame(step);
-        else land();
-      }
-
-      function land() {
-        if (done) return;
-        done = true;
-        cancelAnimationFrame(frame);
-        strip.replaceChildren(target);
-        strip.style.transform = "";
-        strip.style.filter = "";
-        target.style.setProperty("--c", COLORS[n * 2]);
-        lamps[n].style.setProperty("--c", COLORS[n * 2]);
-        lamps[n].classList.add("on");
-        if (motion) restart(target, "hit");
-        if (live) live.textContent = target.textContent;
-        if (spin && spin.land === land) spin = null;
-        if (n === perks.length - 1) {
-          window.setTimeout(wake, motion ? 650 : 900);
-        } else {
-          program.ping(n * 2, 0, reel);
-          program.soft(n * 2, 0.02, reel);
-        }
-      }
-
-      if (motion) frame = requestAnimationFrame(step);
-      else window.setTimeout(land, 0);
-      return { land: land };
-    }
-
-    function gleamItem(i) {
-      var item = document.createElement("span");
-      item.className = "v-reel-item";
-      var word = document.createElement("b");
-      word.textContent = "GLEAM";
-      word.style.color = COLORS[i % COLORS.length];
-      item.appendChild(document.createElement("span")).appendChild(word);
-      return item;
-    }
-
-    // Where the reel sits, in items, t of the way through a spin of dist:
-    // it runs a quarter item past its mark, then settles back like it has
-    // weight
-    function reelAt(t, dist) {
-      var over = 0.25;
-      if (t < 0.8) {
-        var u = 1 - t / 0.8;
-        return (dist + over) * (1 - u * u * u);
-      }
-      var s = (t - 0.8) / 0.2;
-      return dist + over * (1 - s * s * (3 - 2 * s));
+    // A thump and a struck chord, each a step up the scale from the last
+    function hitSound(n) {
+      program.loud(function () {
+        program.thump(0, 1 + n);
+        [0, 2, 4].forEach(function (k, i) {
+          program.ping(n * 2 + k, i * 0.025);
+        });
+        program.soft(n * 2, 0);
+        program.boom(0, 0.6 + n * 0.5);
+      }, 0.5);
     }
 
     // The nav stays usable, so only Enter or Space with nothing else focused
@@ -1904,20 +1912,29 @@
       var zy = zero.top + zero.height / 2 - ly * 10;
       root.classList.add("waking");
       if (motion) {
+        gate.classList.remove("full");
+        restart(gate, "blast");
+        restart(flash, "white");
+        burst(260, 2.2, COLORS);
         orb.style.translate =
           to.left + to.width / 2 - cx - k * (zx - cx) + "px " +
           (to.top + to.height / 2 - cy - k * (zy - cy)) + "px";
         orb.style.scale = String(k);
       }
 
-      // The rings burst up the scale as GLEAM scatters, then a low swell as
-      // the orb lands and the count begins
+      // The rings burst up the scale as the orb lets go, then a second hit as
+      // it lands and the count begins
       program.enableSound(function () {
-        program.soft(0, 0);
-        [0, 1, 2, 3, 4].forEach(function (step, i) {
-          program.ping(step, i * 0.06);
-        });
-        program.ping(5, 0.95);
+        program.loud(function () {
+          program.thump(0, 4);
+          program.boom(0, 2.6);
+          program.soft(0, 0);
+          [0, 1, 2, 3, 4].forEach(function (step, i) {
+            program.ping(step, i * 0.06);
+          });
+          program.thump(0.95, 2);
+          program.ping(5, 0.95);
+        }, 0.5);
       });
 
       window.setTimeout(function () {

@@ -66,20 +66,29 @@
           <span class="v-gate-beam"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="v-gate-waves"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="v-gate-ring"></span>
+          <span class="v-gate-shock"></span>
+          <svg class="v-gate-charge" viewBox="0 0 100 100">
+            <circle class="track" cx="50" cy="50" r="48" transform="rotate(-87 50 50)" />
+            <circle class="track" cx="50" cy="50" r="48" transform="rotate(33 50 50)" />
+            <circle class="track" cx="50" cy="50" r="48" transform="rotate(153 50 50)" />
+            <circle class="fill" cx="50" cy="50" r="48" transform="rotate(-87 50 50)" style="--c: #FF1717" />
+            <circle class="fill" cx="50" cy="50" r="48" transform="rotate(33 50 50)" style="--c: #73C9E8" />
+            <circle class="fill" cx="50" cy="50" r="48" transform="rotate(153 50 50)" style="--c: #28F02D" />
+          </svg>
           <span class="v-gate-num"><b>0</b><small>.00</small></span>
         </span>
         <span class="v-gate-cta">
           <span class="visually-hidden">Get GLEAM</span>
-          <span class="v-reel" aria-hidden="true"><span class="v-reel-strip"><span class="v-reel-item"><span>Get <span
-                    class="v-gate-word"><i>G</i><i>L</i><i>E</i><i>A</i><i>M</i></span></span></span></span></span>
-          <span class="v-gate-lamps" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="v-gate-line" aria-hidden="true">Get <span class="v-gate-word"><i>G</i><i>L</i><i>E</i><i>A</i><i>M</i></span></span>
         </span>
         <template class="v-perks">
-          <span class="v-reel-item"><span>Get <b>early access</b> to ecosystem launches</span></span>
-          <span class="v-reel-item"><span>Get <b>airdrops</b> sent directly to you</span></span>
-          <span class="v-reel-item"><span>Get a share of <b>Gleam's revenue</b></span></span>
+          <span>Get <b>early access</b> to ecosystem launches</span>
+          <span>Get <b>airdrops</b> sent directly to you</span>
+          <span>Get a share of <b>Gleam's revenue</b></span>
         </template>
       </button>
+      <canvas class="v-gate-sparks" aria-hidden="true"></canvas>
+      <div class="v-gate-flash" aria-hidden="true"></div>
       <p class="visually-hidden" aria-live="polite" data-gate-live></p>
       <div class="wrap v-hero-in">
         <p class="points-kicker">Finally. A great wallet</p>

@@ -1361,9 +1361,9 @@ html:not(.motion) .tl-card {
 /* The gate: every visit opens on an idle orb holding 0.00. Every cycle a
    pulse rides a beam in from the left edge, the orb takes the charge, five
    colour rings spill off it and the light runs across GLEAM letter by
-   letter. Under it, a slot reel: each tap spins it to the next thing GLEAM
-   gets you and lights a lamp. The third wakes the hero: the rings burst, the
-   orb flies to the counter and becomes it, and the page unlocks. */
+   letter. Each tap charges a third of the arc round it and says one thing
+   GLEAM gets you. The third overcharges it and wakes the hero: the rings
+   burst, the orb flies to the counter and becomes it, and the page unlocks. */
 
 .v-gate {
   display: none;
@@ -1532,70 +1532,13 @@ html.gate .v-meter {
 .v-gate-waves i:nth-child(5) { color: var(--beam-green); animation-delay: 0.24s; }
 
 .v-gate-cta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
+  display: block;
   width: min(100%, 36em);
   font-size: clamp(1.375rem, 4.2vw, 2.125rem);
   font-weight: 760;
   letter-spacing: -0.03em;
   color: var(--on-ink-muted);
   animation: gate-rise 0.8s 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
-}
-
-/* The reel's window is one item tall, two lines so the longest perk can
-   wrap on a phone, and fades at the top and bottom like a slot's glass */
-.v-reel {
-  --item: 2.4em;
-  display: block;
-  width: 100%;
-  height: var(--item);
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
-  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
-}
-.v-reel-strip {
-  display: block;
-  will-change: transform;
-}
-.v-reel-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--item);
-  line-height: 1.12;
-  text-align: center;
-  text-wrap: balance;
-}
-.v-reel-item b {
-  font-weight: inherit;
-  color: var(--on-ink);
-}
-.v-reel-item.hit b {
-  animation: reel-hit 0.9s ease-out both;
-}
-
-/* One lamp per pull, each in its perk's beam colour once it's won */
-.v-gate-lamps {
-  display: flex;
-  gap: 10px;
-}
-.v-gate-lamps i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1.5px var(--on-ink-muted);
-  transition: background 0.2s, box-shadow 0.3s;
-}
-.v-gate-lamps i.on {
-  background: var(--c);
-  box-shadow: 0 0 0 1.5px var(--c), 0 0 12px var(--c);
-}
-
-/* Each pull knocks the orb */
-.v-gate-orb.hit {
-  animation: gate-hit 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
 /* GLEAM takes the light one letter at a time, each in its own beam colour */
@@ -1614,6 +1557,140 @@ html.gate .v-meter {
 .v-gate-word i:nth-child(4) { --c: var(--beam-yellow); animation-delay: 0.31s; }
 .v-gate-word i:nth-child(5) { --c: var(--beam-green); animation-delay: 0.38s; }
 
+.v-gate-line {
+  display: block;
+  min-height: 2.3em;
+  line-height: 1.12;
+  text-align: center;
+  text-wrap: balance;
+}
+.v-gate-line b {
+  font-weight: inherit;
+  color: var(--c);
+  text-shadow: 0 0 24px var(--c);
+}
+/* Once charging starts the copy speaks up: full white, not the idle grey */
+.v-gate.charging .v-gate-cta {
+  color: var(--on-ink);
+}
+.v-gate-line.slam {
+  animation: gate-slam 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* The charge: three arcs round the orb, a third each, drawn in a tap at a
+   time in their beam colour */
+.v-gate-charge {
+  position: absolute;
+  inset: -20px;
+  width: calc(100% + 40px);
+  height: calc(100% + 40px);
+  overflow: visible;
+  fill: none;
+  pointer-events: none;
+}
+.v-gate-charge circle {
+  stroke-dasharray: 95.5 400;
+  stroke-linecap: round;
+}
+.v-gate-charge .track {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 2;
+}
+.v-gate-charge .fill {
+  stroke: var(--c);
+  stroke-width: 3.5;
+  stroke-dashoffset: 95.5;
+  filter: drop-shadow(0 0 4px var(--c));
+  transition: stroke-dashoffset 0.32s cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.v-gate-charge .fill.on {
+  stroke-dashoffset: 0;
+}
+
+/* The pulse quickens and the glow climbs with each third of charge */
+html.gate .v-gate.charging {
+  --cycle: calc(3.2s / (1 + var(--level) * 1.2));
+}
+.v-gate.charging .v-gate-ring::after {
+  filter: blur(calc(14px + var(--level) * 6px));
+  opacity: calc(0.45 + var(--level) * 0.18);
+}
+.v-gate.charging .v-gate-beam i {
+  opacity: calc(0.55 + var(--level) * 0.15);
+}
+
+/* Each tap: the orb takes a knock and a ring of the tap's colour blasts off */
+.v-gate-orb.hit {
+  animation: gate-hit 0.5s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.v-gate-orb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--c, #fff), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+.v-gate-orb.hit::before {
+  animation: gate-flash 0.5s ease-out;
+}
+.v-gate-shock {
+  position: absolute;
+  inset: 0;
+  border: 6px solid var(--c, #fff);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+.v-gate-shock.go {
+  animation: gate-shock 0.7s cubic-bezier(0.1, 0.7, 0.3, 1);
+}
+
+/* The blast around each tap: sparks on a canvas over the hero, a flash of
+   the tap's colour, and the whole gate kicked, harder each time */
+.v-gate-sparks,
+.v-gate-flash {
+  display: none;
+}
+html.gate .v-gate-sparks,
+html.gate .v-gate-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+html.gate .v-gate-flash {
+  background: radial-gradient(circle at 50% 45%, var(--c, #fff), transparent 75%);
+  opacity: 0;
+}
+.v-gate-flash.go {
+  animation: gate-flash-screen 0.35s ease-out;
+}
+.v-gate-flash.white {
+  --c: #fff;
+  animation: gate-flash-screen 0.6s ease-out;
+}
+html.gate .v-gate.shake {
+  --kick: calc(4px + var(--level, 1) * 4px);
+  animation: gate-shake 0.38s cubic-bezier(0.3, 0, 0.3, 1);
+}
+html.gate .v-gate.blast {
+  --kick: 22px;
+  animation: gate-shake 0.55s cubic-bezier(0.3, 0, 0.3, 1);
+}
+
+/* Full: the orb strains against the charge until it lets go */
+.v-gate.full .v-gate-orb {
+  animation: gate-strain 0.09s linear infinite;
+}
+.v-gate.full .v-gate-orb.hit {
+  animation: gate-hit 0.5s cubic-bezier(0.3, 1.5, 0.5, 1), gate-strain 0.09s 0.5s linear infinite;
+}
+
 @media (hover: hover) {
   .v-gate:hover .v-gate-ring::after {
     opacity: 0.8;
@@ -1624,18 +1701,79 @@ html.gate .v-meter {
 }
 
 @keyframes gate-hit {
-  35% {
-    scale: 0.94;
+  15% {
+    scale: 0.8;
+  }
+  45% {
+    scale: 1.14;
   }
 }
 
-@keyframes reel-hit {
-  25% {
-    color: var(--c);
-    text-shadow: 0 0 22px var(--c);
+@keyframes gate-flash {
+  0% {
+    opacity: 0.55;
   }
   100% {
-    color: var(--on-ink);
+    opacity: 0;
+  }
+}
+
+@keyframes gate-shock {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+    border-width: 1px;
+  }
+}
+
+@keyframes gate-slam {
+  0% {
+    opacity: 0;
+    transform: scale(1.7);
+    filter: blur(8px);
+  }
+  55% {
+    transform: scale(0.96);
+  }
+}
+
+@keyframes gate-flash-screen {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes gate-shake {
+  10% {
+    translate: calc(var(--kick) * -1) calc(var(--kick) * 0.6);
+  }
+  25% {
+    translate: var(--kick) calc(var(--kick) * -0.8);
+  }
+  40% {
+    translate: calc(var(--kick) * -0.6) calc(var(--kick) * 0.4);
+  }
+  60% {
+    translate: calc(var(--kick) * 0.3) calc(var(--kick) * -0.2);
+  }
+  80% {
+    translate: calc(var(--kick) * -0.1) 0;
+  }
+}
+
+@keyframes gate-strain {
+  25% {
+    rotate: 1.2deg;
+  }
+  75% {
+    rotate: -1.2deg;
   }
 }
 
@@ -1813,7 +1951,8 @@ html.waking .v-beam {
   opacity: 1;
   animation: gate-ignite 0.8s 0.4s cubic-bezier(0.6, 0, 0.2, 1) both;
 }
-html.waking .v-gate-orb {
+html.waking .v-gate-orb,
+html.waking .v-gate.full .v-gate-orb {
   animation: gate-out 0.2s 0.95s both;
 }
 
