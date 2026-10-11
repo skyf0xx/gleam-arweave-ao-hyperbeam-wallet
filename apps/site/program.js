@@ -98,15 +98,10 @@
 
   // ---- Sound: a crystalline ping, made from scratch with Web Audio --------
 
-  var SOUND_KEY = "gleam:sound";
-  // Off until asked for: browsers won't start audio before a click or key
-  // press, so the button's own click is what unlocks it
+  // Off at the start of every visit, even one that had it on last time:
+  // browsers hold audio until a click anyway, so "on" would be silent until
+  // then. The button's own click is what turns it on and unlocks it.
   var soundOn = false;
-  try {
-    soundOn = localStorage.getItem(SOUND_KEY) === "on";
-  } catch {
-    // Storage blocked: sound stays off for this visit.
-  }
 
   var audio = null;
   // Major pentatonic from E6, one step per beam colour, so five points in a
@@ -471,11 +466,6 @@
     });
     soundButton.addEventListener("click", function () {
       soundOn = !soundOn;
-      try {
-        localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
-      } catch {
-        // Storage blocked: the choice lasts for this visit only.
-      }
       showSound();
       soundButton.classList.remove("hint");
       // armAudio already ran on pointerdown/keydown; this confirms it works
@@ -496,11 +486,6 @@
   // Audio.
   function enableSound(then) {
     soundOn = true;
-    try {
-      localStorage.setItem(SOUND_KEY, "on");
-    } catch {
-      // Storage blocked: on for this visit only.
-    }
     if (soundButton) showSound();
     armAudio();
     if (!audio) {

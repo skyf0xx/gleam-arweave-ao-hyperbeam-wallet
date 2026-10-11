@@ -89,8 +89,9 @@
   100% { opacity: 0; transform: translateY(-1.8em); }
 }
 
-/* Sound toggle: always on screen. Sound starts off, since browsers need a
-   click before they'll play, so the toggle is also the way in */
+/* Sound toggle: always on screen. Sound starts off each visit, since
+   browsers need a click before they'll play, so the toggle is also the way
+   in. It glows whenever a sound plays silently, to invite that click. */
 
 .v-sound {
   position: fixed;
