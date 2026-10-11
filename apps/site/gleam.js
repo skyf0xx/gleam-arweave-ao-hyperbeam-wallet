@@ -1344,8 +1344,8 @@
   // ---- Welcome back: a different moment each time the hero comes round -----
   //
   // Once the gate is behind them, a visitor who scrolls back up to the hero
-  // (after a few seconds away), or loads the page again, gets one short
-  // moment drawn from a shuffled deck, so none repeats until all have played.
+  // after a few seconds away gets one short moment drawn from a shuffled
+  // deck, so none repeats until all have played.
 
   function ease(t) {
     t = Math.min(1, Math.max(0, t));
@@ -1643,14 +1643,7 @@
     ).observe(hero);
   }
 
-  // A returning visitor's load is a return too
-  if (!root.classList.contains("gate")) {
-    window.setTimeout(function () {
-      if (seen.hero) welcomeBack();
-    }, 900);
-  }
-
-  // ---- The gate: a first visit's hero, held until it's tapped ------------
+  // ---- The gate: the hero, held until it's tapped -------------------------
 
   var gate = document.querySelector(".v-gate");
   if (gate && root.classList.contains("gate")) holdGate();
@@ -1695,11 +1688,6 @@
       if (root.classList.contains("waking")) return;
       gate.removeEventListener("pointermove", lean);
       document.removeEventListener("keydown", onKey);
-      try {
-        localStorage.setItem("gleam:awake", "1");
-      } catch {
-        // Storage blocked: the gate shows again next visit.
-      }
 
       // Fly the orb so its 0 lands on the counter's 0. The orb scales about
       // its own centre, so the 0's offset from that centre scales with it.

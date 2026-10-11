@@ -38,14 +38,11 @@
   <link rel="stylesheet" href="gleam.css">
   <script>
     document.documentElement.classList.add("js");
-    // A first visit opens on the gate: the hero is held until it's tapped.
-    // Set here, before paint, so the page never flashes unlocked first.
-    try {
-      if (!location.hash && !localStorage.getItem("gleam:awake"))
-        document.documentElement.classList.add("gate");
-    } catch (e) {
-      // Storage blocked: no way to remember the tap, so no gate.
-    }
+    // Every visit opens on the gate: the hero is held until it's tapped, and
+    // that tap is what lets the browser play the page's sound. A link to a
+    // section skips it. Set here, before paint, so the page never flashes
+    // unlocked first.
+    if (!location.hash) document.documentElement.classList.add("gate");
   </script>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5"
     data-domains="gleam-permaweb.vercel.app"></script>

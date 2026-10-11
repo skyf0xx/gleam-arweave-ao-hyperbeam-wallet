@@ -1343,7 +1343,7 @@ html:not(.motion) .tl-card {
   }
 }
 
-/* The gate: a first visit opens on an idle orb holding 0.00. Every cycle a
+/* The gate: every visit opens on an idle orb holding 0.00. Every cycle a
    pulse rides a beam in from the left edge, the orb takes the charge, five
    colour rings spill off it and the light runs across GLEAM letter by
    letter. Tapping anywhere wakes the hero: the rings burst, the orb flies to
