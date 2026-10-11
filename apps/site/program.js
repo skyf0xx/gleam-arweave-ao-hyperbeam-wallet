@@ -153,6 +153,13 @@
     });
   }
 
+  // Where a voice's notes go: the master, or a panner while play() places a
+  // note in the stereo field. Set and cleared around one synchronous call.
+  var route = null;
+  function out() {
+    return route || audio.master;
+  }
+
   function partial(freq, peak, decay, at, type) {
     // A high note's upper partials can land past hearing (and past what the
     // oscillator can play)
@@ -166,7 +173,7 @@
     env.gain.linearRampToValueAtTime(peak, at + 0.003);
     env.gain.exponentialRampToValueAtTime(0.0001, at + decay);
     osc.connect(env);
-    env.connect(audio.master);
+    env.connect(out());
     env.connect(audio.send);
     osc.start(at);
     osc.stop(at + decay + 0.05);
@@ -238,7 +245,7 @@
     clickEnv.gain.exponentialRampToValueAtTime(0.0001, at + 0.018);
     click.connect(band);
     band.connect(clickEnv);
-    clickEnv.connect(audio.master);
+    clickEnv.connect(out());
     click.start(at);
 
     // The ring: a fundamental plus the inharmonic partials a struck glass bar has
@@ -271,7 +278,7 @@
       env.gain.linearRampToValueAtTime(h[1] * level, at + 0.025);
       env.gain.exponentialRampToValueAtTime(0.0001, at + h[2]);
       osc.connect(env);
-      env.connect(audio.master);
+      env.connect(out());
       env.connect(audio.send);
       osc.start(at);
       osc.stop(at + h[2] + 0.05);
@@ -291,7 +298,7 @@
     tone.Q.value = 2;
     tone.frequency.setValueAtTime(f * 8, at);
     tone.frequency.exponentialRampToValueAtTime(f * 1.2, at + 0.35);
-    tone.connect(audio.master);
+    tone.connect(out());
     tone.connect(audio.send);
     [["sawtooth", 1, 0.09], ["triangle", 2, 0.05]].forEach(function (v) {
       var osc = ctx.createOscillator();
@@ -325,7 +332,7 @@
       env.gain.exponentialRampToValueAtTime(h[1] * level, at + rise);
       env.gain.linearRampToValueAtTime(0, at + rise + 0.015);
       osc.connect(env);
-      env.connect(audio.master);
+      env.connect(out());
       osc.start(at);
       osc.stop(at + rise + 0.05);
     });
@@ -373,14 +380,79 @@
     fifths: [0, 7, 14, 21, 28],
   };
 
-  // degree counts up the scale, climbing an octave each time round it
+  // degree counts up the scale, climbing an octave each time round it. Each
+  // note sits in the stereo field where its element is on screen, a few
+  // cents off true and a hair off the beat, so no two plays are identical.
   function play(voice, scale, degree, delay, from) {
     var notes = SCALES[scale] || SCALES.pentatonic;
     var n = Math.max(0, Math.floor(degree));
     var semis = notes[n % notes.length] + 12 * Math.floor(n / notes.length);
-    var f = 1318.51 * Math.pow(2, semis / 12);
+    var f = 1318.51 * Math.pow(2, (semis + (Math.random() - 0.5) * 0.2) / 12);
     while (f > 5300) f /= 2;
-    (VOICES[voice] || VOICES.glass)(f, delay || 0, from);
+    var d = (delay || 0) + Math.random() * 0.015;
+    var panner = null;
+    if (audio && audio.ctx.createStereoPanner && audio.ctx.state === "running") {
+      panner = audio.ctx.createStereoPanner();
+      panner.pan.value = panFor(from);
+      panner.connect(audio.master);
+    }
+    route = panner;
+    try {
+      (VOICES[voice] || VOICES.glass)(f, d, from);
+    } finally {
+      route = null;
+    }
+  }
+
+  function panFor(from) {
+    var el = from && [].concat(from)[0];
+    var x = 0;
+    if (el && el.getBoundingClientRect) {
+      var r = el.getBoundingClientRect();
+      x = ((r.left + r.width / 2) / (window.innerWidth || 1)) * 2 - 1;
+    }
+    return Math.max(-0.8, Math.min(0.8, x * 0.7 + (Math.random() - 0.5) * 0.2));
+  }
+
+  // Air moving past: a band of noise swept up for a scroll down, down for a
+  // scroll up. Its colour and length are rolled fresh each time.
+  function whoosh(dir, strength) {
+    var level = loudness();
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01;
+    var dur = 0.35 + Math.random() * 0.3;
+    var lo = 300 + Math.random() * 500;
+    var hi = 2400 + Math.random() * 3000;
+    if (!audio.air) {
+      var buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      var data = buf.getChannelData(0);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      audio.air = buf;
+    }
+    var src = ctx.createBufferSource();
+    src.buffer = audio.air;
+    var band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.Q.value = 0.8 + Math.random() * 2.5;
+    band.frequency.setValueAtTime(dir > 0 ? lo : hi, at);
+    band.frequency.exponentialRampToValueAtTime(dir > 0 ? hi : lo, at + dur);
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(0.09 * strength * level, at + dur * 0.4);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    src.connect(band);
+    band.connect(env);
+    if (ctx.createStereoPanner) {
+      var pan = ctx.createStereoPanner();
+      pan.pan.value = (Math.random() - 0.5) * 0.8;
+      env.connect(pan);
+      pan.connect(audio.master);
+    } else {
+      env.connect(audio.master);
+    }
+    src.start(at);
+    src.stop(at + dur + 0.05);
   }
 
   // A glass tone gliding from one step to another: time running, not landing
@@ -402,7 +474,7 @@
       env.gain.setValueAtTime(h[1] * level, at + dur * 0.7);
       env.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.15);
       osc.connect(env);
-      env.connect(audio.master);
+      env.connect(out());
       env.connect(audio.send);
       osc.start(at);
       osc.stop(at + dur + 0.2);
@@ -426,7 +498,7 @@
     env.gain.exponentialRampToValueAtTime(0.0001, at + 0.012);
     click.connect(band);
     band.connect(env);
-    env.connect(audio.master);
+    env.connect(out());
     click.start(at);
   }
 
@@ -700,6 +772,7 @@
     tick: tick,
     sweep: sweep,
     play: play,
+    whoosh: whoosh,
     VOICES: Object.keys(VOICES),
     SCALES: Object.keys(SCALES),
     pad: function () {
