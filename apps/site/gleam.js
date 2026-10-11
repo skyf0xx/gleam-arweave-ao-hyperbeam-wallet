@@ -12,6 +12,7 @@
   var PER_DAY = 250;
   var SPEED = 120;
   var PPS = (PER_DAY * SPEED) / 86400;
+  var root = document.documentElement;
   var program = window.GleamProgram;
   var COLORS = program.COLORS;
   var colorFor = program.colorFor;
@@ -485,7 +486,7 @@
   var raf = 0;
 
   function running() {
-    if (document.hidden) return false;
+    if (document.hidden || root.classList.contains("gate")) return false;
     return (
       seen.hero ||
       seen.today ||
@@ -588,6 +589,98 @@
   }
 
   document.addEventListener("visibilitychange", kick);
+
+  // ---- The gate: a first visit's hero, held until it's tapped ------------
+
+  var gate = document.querySelector(".v-gate");
+  if (gate && root.classList.contains("gate")) holdGate();
+
+  function holdGate() {
+    var orb = gate.querySelector(".v-gate-orb");
+    var behind = Array.prototype.slice.call(
+      document.querySelectorAll("main > :not(.v-hero), .site-footer"),
+    );
+    behind.forEach(function (el) {
+      el.inert = true;
+    });
+    if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+
+    // The orb leans a little toward the pointer, as if it's watching. 10px
+    // at the screen's edge, matching the CSS.
+    var lx = 0;
+    var ly = 0;
+    function lean(e) {
+      var r = gate.getBoundingClientRect();
+      lx = (e.clientX - r.left) / r.width - 0.5;
+      ly = (e.clientY - r.top) / r.height - 0.5;
+      orb.style.setProperty("--lx", lx.toFixed(3));
+      orb.style.setProperty("--ly", ly.toFixed(3));
+    }
+
+    // The nav stays usable, so only Enter or Space with nothing else focused
+    function onKey(e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (document.activeElement && document.activeElement !== document.body &&
+          document.activeElement !== gate) return;
+      e.preventDefault();
+      wake();
+    }
+
+    gate.addEventListener("pointermove", lean);
+    gate.addEventListener("click", wake);
+    document.addEventListener("keydown", onKey);
+
+    function wake() {
+      if (root.classList.contains("waking")) return;
+      gate.removeEventListener("pointermove", lean);
+      document.removeEventListener("keydown", onKey);
+      try {
+        localStorage.setItem("gleam:awake", "1");
+      } catch {
+        // Storage blocked: the gate shows again next visit.
+      }
+
+      // Fly the orb so its 0 lands on the counter's 0. The orb scales about
+      // its own centre, so the 0's offset from that centre scales with it.
+      var box = orb.getBoundingClientRect();
+      var zero = gate.querySelector(".v-gate-num b").getBoundingClientRect();
+      var to = document.querySelector(".gc-num").getBoundingClientRect();
+      var k = to.height / zero.height;
+      var cx = box.left + box.width / 2 - lx * 10;
+      var cy = box.top + box.height / 2 - ly * 10;
+      var zx = zero.left + zero.width / 2 - lx * 10;
+      var zy = zero.top + zero.height / 2 - ly * 10;
+      root.classList.add("waking");
+      if (motion) {
+        orb.style.translate =
+          to.left + to.width / 2 - cx - k * (zx - cx) + "px " +
+          (to.top + to.height / 2 - cy - k * (zy - cy)) + "px";
+        orb.style.scale = String(k);
+      }
+
+      // The rings burst up the scale as GLEAM scatters, then a low swell as
+      // the orb lands and the count begins
+      program.enableSound(function () {
+        program.soft(0, 0);
+        [0, 1, 2, 3, 4].forEach(function (step, i) {
+          program.ping(step, i * 0.06);
+        });
+        program.ping(5, 0.95);
+      });
+
+      window.setTimeout(function () {
+        root.classList.remove("gate", "waking");
+        behind.forEach(function (el) {
+          el.inert = false;
+        });
+        if (gate.contains(document.activeElement)) document.activeElement.blur();
+        if (fx) fx.measure();
+        if (gc && motion) restart(gc, "land");
+        kick();
+      }, motion ? 1300 : 300);
+    }
+  }
 
   function onScroll() {
     requestTimeline();

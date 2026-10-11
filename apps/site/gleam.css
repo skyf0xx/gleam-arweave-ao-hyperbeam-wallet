@@ -1326,3 +1326,458 @@ html:not(.motion) .tl-card {
     transition: none;
   }
 }
+
+/* The gate: a first visit opens on an idle orb holding 0.00. Every cycle a
+   pulse rides a beam in from the left edge, the orb takes the charge, five
+   colour rings spill off it and the light runs across GLEAM letter by
+   letter. Tapping anywhere wakes the hero: the rings burst, the orb flies to
+   the counter and becomes it, and the page unlocks. */
+
+.v-gate {
+  display: none;
+}
+
+html.gate,
+html.gate body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html.gate .v-sound {
+  display: none;
+}
+
+html.gate .v-gate {
+  --cycle: 3.2s;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(28px, 5vh, 44px);
+  padding: 0 16px 48px;
+  border: 0;
+  background: none;
+  color: var(--on-ink);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.gate .v-gate:focus-visible {
+  outline: none;
+}
+html.gate .v-gate:focus-visible .v-gate-cta {
+  outline: 2px solid var(--beam-sky);
+  outline-offset: 8px;
+  border-radius: 6px;
+}
+
+/* Held behind the gate, still laid out so the orb knows where to land */
+html.gate .v-hero-in > *,
+html.gate .v-beam,
+html.gate .v-meter {
+  opacity: 0;
+}
+
+.v-gate-orb {
+  --size: clamp(184px, 48vw, 288px);
+  --lx: 0;
+  --ly: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #161616, var(--ink) 70%);
+  translate: calc(var(--lx) * 10px) calc(var(--ly) * 10px);
+  transition: translate 0.6s cubic-bezier(0.25, 0.8, 0.3, 1);
+  animation: gate-in 1s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* The ring is the beam bent closed: five hard-edged arcs, slowly turning */
+.v-gate-ring,
+.v-gate-ring::after {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--beam-red) 0 20%,
+    var(--beam-purple) 0 40%,
+    var(--beam-sky) 0 60%,
+    var(--beam-yellow) 0 80%,
+    var(--beam-green) 0
+  );
+  -webkit-mask: radial-gradient(circle, transparent calc(70.7% - 4px), #000 calc(70.7% - 3px));
+  mask: radial-gradient(circle, transparent calc(70.7% - 4px), #000 calc(70.7% - 3px));
+  animation: gate-spin 16s linear infinite;
+}
+.v-gate-ring::after {
+  content: "";
+  filter: blur(14px);
+  opacity: 0.45;
+  animation: gate-charge var(--cycle) ease-out infinite;
+}
+
+.v-gate-num {
+  display: flex;
+  align-items: flex-end;
+  font-size: calc(var(--size) * 0.36);
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+  animation: gate-num var(--cycle) ease-out infinite;
+}
+.v-gate-num b {
+  font-weight: inherit;
+}
+.v-gate-num small {
+  padding-bottom: 0.1em;
+  font-size: 0.3em;
+  font-weight: inherit;
+  letter-spacing: -0.02em;
+  color: var(--on-ink-muted);
+}
+
+/* The feed: the hero's beam, cut to run from the screen's left edge into the
+   orb, with a white pulse riding it that lands at 40% of each cycle */
+.v-gate-beam {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  display: flex;
+  flex-direction: column;
+  width: 50vw;
+  height: 10px;
+  margin-top: -5px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%);
+  mask-image: linear-gradient(90deg, transparent, #000 30%);
+}
+.v-gate-beam i {
+  flex: 1;
+  opacity: 0.55;
+}
+.v-gate-beam i:nth-child(1) { background: var(--beam-red); }
+.v-gate-beam i:nth-child(2) { background: var(--beam-purple); }
+.v-gate-beam i:nth-child(3) { background: var(--beam-sky); }
+.v-gate-beam i:nth-child(4) { background: var(--beam-yellow); }
+.v-gate-beam i:nth-child(5) { background: var(--beam-green); }
+.v-gate-beam::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 160px;
+  height: 4px;
+  margin: -2px 0 0 -160px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #fff);
+  box-shadow: 0 0 14px 2px rgba(255, 255, 255, 0.5);
+  animation: gate-pulse var(--cycle) cubic-bezier(0.55, 0, 0.9, 0.6) infinite;
+}
+
+/* Five rings, one per beam colour, spill off as the charge lands */
+.v-gate-waves {
+  position: absolute;
+  inset: 0;
+}
+.v-gate-waves i {
+  position: absolute;
+  inset: 0;
+  border: 2px solid;
+  border-radius: 50%;
+  opacity: 0;
+  animation: gate-wave var(--cycle) cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+.v-gate-waves i:nth-child(1) { color: var(--beam-red); animation-delay: 0s; }
+.v-gate-waves i:nth-child(2) { color: var(--beam-purple); animation-delay: 0.06s; }
+.v-gate-waves i:nth-child(3) { color: var(--beam-sky); animation-delay: 0.12s; }
+.v-gate-waves i:nth-child(4) { color: var(--beam-yellow); animation-delay: 0.18s; }
+.v-gate-waves i:nth-child(5) { color: var(--beam-green); animation-delay: 0.24s; }
+
+.v-gate-cta {
+  font-size: clamp(1.5rem, 4.5vw, 2.25rem);
+  font-weight: 760;
+  letter-spacing: -0.03em;
+  color: var(--on-ink-muted);
+  animation: gate-rise 0.8s 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* GLEAM takes the light one letter at a time, each in its own beam colour */
+.v-gate-word {
+  display: inline-flex;
+  margin-left: 0.15em;
+  color: var(--on-ink);
+}
+.v-gate-word i {
+  font-style: normal;
+  animation: gate-letter var(--cycle) ease-out infinite;
+}
+.v-gate-word i:nth-child(1) { --c: var(--beam-red); animation-delay: 0.1s; }
+.v-gate-word i:nth-child(2) { --c: var(--beam-purple); animation-delay: 0.17s; }
+.v-gate-word i:nth-child(3) { --c: var(--beam-sky); animation-delay: 0.24s; }
+.v-gate-word i:nth-child(4) { --c: var(--beam-yellow); animation-delay: 0.31s; }
+.v-gate-word i:nth-child(5) { --c: var(--beam-green); animation-delay: 0.38s; }
+
+@media (hover: hover) {
+  .v-gate:hover .v-gate-ring::after {
+    opacity: 0.8;
+  }
+  .v-gate:hover .v-gate-cta {
+    color: var(--on-ink);
+  }
+}
+
+@keyframes gate-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes gate-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes gate-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes gate-pulse {
+  0%,
+  8% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateX(50vw);
+    opacity: 1;
+  }
+  41%,
+  100% {
+    transform: translateX(50vw);
+    opacity: 0;
+  }
+}
+
+@keyframes gate-charge {
+  0%,
+  38% {
+    opacity: 0.45;
+  }
+  42% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes gate-num {
+  0%,
+  39% {
+    transform: scale(1);
+  }
+  43% {
+    transform: scale(1.06);
+    text-shadow: 0 0 24px rgba(255, 255, 255, 0.55);
+  }
+  60%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes gate-wave {
+  0%,
+  40% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  41% {
+    opacity: 0.7;
+  }
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes gate-letter {
+  0%,
+  44% {
+    color: inherit;
+    transform: none;
+  }
+  48% {
+    color: var(--c);
+    transform: translateY(-0.12em);
+    text-shadow: 0 0 18px var(--c);
+  }
+  62%,
+  100% {
+    color: inherit;
+    transform: none;
+  }
+}
+
+/* ---- Waking: added on the tap, gone with the gate a second and a bit on -- */
+
+html.waking .v-gate {
+  cursor: default;
+  pointer-events: none;
+}
+html.waking .v-gate-orb {
+  transition:
+    translate 0.95s cubic-bezier(0.7, 0, 0.2, 1),
+    scale 0.95s cubic-bezier(0.7, 0, 0.2, 1);
+}
+html.waking .v-gate-beam,
+html.waking .v-gate-ring::after,
+html.waking .v-gate-num,
+html.waking .v-gate-word i {
+  animation: none;
+}
+html.waking .v-gate-beam {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+html.waking .v-gate-ring {
+  animation: gate-spin 0.9s cubic-bezier(0.5, 0, 0.3, 1) both, gate-out 0.5s 0.35s both;
+}
+html.waking .v-gate-waves i {
+  animation: gate-burst 1s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+}
+html.waking .v-gate-waves i:nth-child(n) {
+  animation-delay: calc(var(--n, 0) * 0.06s);
+}
+html.waking .v-gate-waves i:nth-child(2) { --n: 1; }
+html.waking .v-gate-waves i:nth-child(3) { --n: 2; }
+html.waking .v-gate-waves i:nth-child(4) { --n: 3; }
+html.waking .v-gate-waves i:nth-child(5) { --n: 4; }
+html.waking .v-gate-num small {
+  animation: gate-out 0.4s 0.2s both;
+}
+html.waking .v-gate-cta {
+  animation: none;
+}
+html.waking .v-gate-word i {
+  color: var(--c);
+  animation: gate-scatter 0.7s cubic-bezier(0.3, 0, 0.6, 1) both;
+  animation-delay: calc(var(--n, 0) * 0.05s);
+}
+html.waking .v-gate-word i:nth-child(2) { --n: 1; }
+html.waking .v-gate-word i:nth-child(3) { --n: 2; }
+html.waking .v-gate-word i:nth-child(4) { --n: 3; }
+html.waking .v-gate-word i:nth-child(5) { --n: 4; }
+html.waking .v-gate-cta {
+  transition: color 0.3s, opacity 0.4s 0.2s;
+  opacity: 0;
+}
+
+/* The hero comes up behind the orb in reading order; the beam lights from
+   the left edge as if the orb had just left it */
+html.waking .v-hero-in > *,
+html.waking .v-meter {
+  opacity: 1;
+  animation: gate-rise 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+html.waking .points-kicker { animation-delay: 0.3s; }
+html.waking .v-title { animation-delay: 0.38s; }
+html.waking .v-hero .line { animation-delay: 0.46s; }
+html.waking .v-track { animation: none; }
+html.waking .v-meter {
+  animation: gate-land 0.25s 0.95s both;
+}
+html.waking .v-beam {
+  opacity: 1;
+  animation: gate-ignite 0.8s 0.4s cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+html.waking .v-gate-orb {
+  animation: gate-out 0.2s 0.95s both;
+}
+
+@keyframes gate-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes gate-land {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes gate-burst {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+    border-width: 3px;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(5);
+    border-width: 1px;
+  }
+}
+
+@keyframes gate-scatter {
+  30% {
+    transform: translateY(-0.3em);
+    text-shadow: 0 0 22px var(--c);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-1.4em) scale(0.6);
+  }
+}
+
+@keyframes gate-ignite {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-gate-orb,
+  .v-gate-ring,
+  .v-gate-ring::after,
+  .v-gate-num,
+  .v-gate-beam::after,
+  .v-gate-waves i,
+  .v-gate-cta,
+  .v-gate-word i,
+  html.waking .v-gate-ring,
+  html.waking .v-gate-waves i,
+  html.waking .v-gate-word i,
+  html.waking .v-hero-in > *,
+  html.waking .v-beam,
+  html.waking .v-meter {
+    animation: none;
+  }
+  .v-gate-beam::after,
+  .v-gate-waves i {
+    display: none;
+  }
+  html.waking .v-gate-orb {
+    transition: none;
+    animation: gate-out 0.3s both;
+  }
+}

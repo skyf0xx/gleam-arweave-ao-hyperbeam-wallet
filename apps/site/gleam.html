@@ -36,7 +36,17 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="program.css">
   <link rel="stylesheet" href="gleam.css">
-  <script>document.documentElement.classList.add("js")</script>
+  <script>
+    document.documentElement.classList.add("js");
+    // A first visit opens on the gate: the hero is held until it's tapped.
+    // Set here, before paint, so the page never flashes unlocked first.
+    try {
+      if (!location.hash && !localStorage.getItem("gleam:awake"))
+        document.documentElement.classList.add("gate");
+    } catch (e) {
+      // Storage blocked: no way to remember the tap, so no gate.
+    }
+  </script>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5"
     data-domains="gleam-permaweb.vercel.app"></script>
   <script defer src="pages.js"></script>
@@ -54,6 +64,15 @@
   <main class="v">
     <section class="v-hero" data-gate="hero">
       <canvas class="v-canvas" aria-hidden="true"></canvas>
+      <button class="v-gate" type="button" data-umami-event="gleam-gate">
+        <span class="v-gate-orb" aria-hidden="true">
+          <span class="v-gate-beam"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="v-gate-waves"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="v-gate-ring"></span>
+          <span class="v-gate-num"><b>0</b><small>.00</small></span>
+        </span>
+        <span class="v-gate-cta">Get <span class="v-gate-word"><i>G</i><i>L</i><i>E</i><i>A</i><i>M</i></span></span>
+      </button>
       <div class="wrap v-hero-in">
         <p class="points-kicker">Finally. A great wallet</p>
         <h1 class="display v-title">Your AO is idle. Make it earn <span class="v-gleam"><span

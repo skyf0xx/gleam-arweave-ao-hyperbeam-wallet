@@ -422,7 +422,7 @@
 
   window.addEventListener("scroll", function () {
     markActive();
-    var now = performance.now();
+    var now = window.performance.now();
     var dt = now - lastScroll.t;
     var speed = dt > 0 && dt < 250 ? Math.abs(window.scrollY - lastScroll.y) / dt : 0;
     lastScroll = { y: window.scrollY, t: now };
@@ -491,6 +491,28 @@
     });
   }
 
+  // Sound on from a click the page itself asked for (the Vision page's gate).
+  // then runs once audio is actually playing, or straight away without Web
+  // Audio.
+  function enableSound(then) {
+    soundOn = true;
+    try {
+      localStorage.setItem(SOUND_KEY, "on");
+    } catch {
+      // Storage blocked: on for this visit only.
+    }
+    if (soundButton) showSound();
+    armAudio();
+    if (!audio) {
+      if (then) then();
+      return;
+    }
+    audio.ctx.resume().then(function () {
+      updatePad(1.2);
+      if (then) then();
+    });
+  }
+
   // ---- One-shot reveals: .reveal gains .in the first time it's on screen --
 
   function reveal(els, threshold) {
@@ -528,6 +550,7 @@
     restart: restart,
     odometer: odometer,
     ping: ping,
+    enableSound: enableSound,
     soft: soft,
     pad: function () {
       padWanted = true;
