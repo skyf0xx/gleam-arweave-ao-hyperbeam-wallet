@@ -124,7 +124,7 @@
     out.threshold.value = -18;
     out.connect(ctx.destination);
     var master = ctx.createGain();
-    master.gain.value = 0.5;
+    master.gain.value = 0.42;
     master.connect(out);
 
     // A short dark echo gives the glass a room to ring in
@@ -508,8 +508,8 @@
   // a slow filter, swells a little while you scroll, dips under each note, and
   // fades away once you've stopped scrolling for a while.
 
-  var PAD_REST = 0.03;
-  var PAD_SWELL = 0.04;
+  var PAD_REST = 0.045;
+  var PAD_SWELL = 0.045;
   var PAD_IDLE_MS = 45000;
   // Voicings kept low and close so a change moves as little as it can: E3
   // holds through E, C#m and A, and B sits on its fifth so it leans home
@@ -569,7 +569,7 @@
     airGain.connect(duck);
     air.start();
 
-    var built = { level: level, duck: duck, filter: filter, chord: null };
+    var built = { level: level, duck: duck, filter: filter, chord: null, duckedUntil: 0 };
     built.chord = voice(built, CHORDS[padChord], 1);
     return built;
   }
@@ -632,12 +632,14 @@
     pad.level.gain.setTargetAtTime(padLevel(), audio.ctx.currentTime, tc);
   }
 
-  // Make room for a note: a quick dip, then back over half a second
+  // Make room for a note: a shallow dip, then back over half a second. One
+  // dip at a time, so a run of notes can't hold the drone down under them.
   function duckPad(at) {
-    if (!pad) return;
+    if (!pad || at < pad.duckedUntil) return;
+    pad.duckedUntil = at + 0.4;
     var g = pad.duck.gain;
     g.cancelScheduledValues(at);
-    g.setTargetAtTime(0.5, at, 0.02);
+    g.setTargetAtTime(0.75, at, 0.02);
     g.setTargetAtTime(1, at + 0.12, 0.35);
   }
 
