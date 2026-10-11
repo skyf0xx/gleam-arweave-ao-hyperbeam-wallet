@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { KeystonePanel } from "./KeystonePanel";
+import { LedgerPanel } from "./LedgerPanel";
 import type { DeviceSigningPayload, DeviceSigningRequest, HardwareWalletMethod } from "@gleam/core";
 
 export type DeviceSigningWallet = Pick<DeviceSigningRequest, "method" | "device" | "address" | "publicKey">;
@@ -31,17 +32,7 @@ export const DEVICE_NAMES: Record<HardwareWalletMethod, string> = {
   ledger: "Ledger",
 };
 
-function unsupportedPanel(method: HardwareWalletMethod): DeviceSignPanel {
-  return function UnsupportedDevicePanel() {
-    return (
-      <p className="text-center text-label leading-snug text-muted">
-        Signing with {DEVICE_NAMES[method]} isn&apos;t supported yet.
-      </p>
-    );
-  };
-}
-
 export const DEFAULT_DEVICE_PANELS: DeviceSignPanels = {
   keystone: KeystonePanel,
-  ledger: unsupportedPanel("ledger"),
+  ledger: LedgerPanel,
 };

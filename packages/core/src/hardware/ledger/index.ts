@@ -6,6 +6,7 @@ export {
   ledgerMaxPayloadBytes,
   parseLedgerAppInfo,
   LEDGER_MAX_PAYLOAD_BYTES,
+  LEDGER_PERMAWEB_REQUIRED_MESSAGE,
   LEDGER_NANO_S_MAX_PAYLOAD_BYTES,
   LEDGER_NANO_S_TARGET_ID,
   type LedgerAccount,

@@ -9,7 +9,7 @@ import {
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
-import { connectLedger, LedgerTransportError } from "@/src/hardware/ledger";
+import { connectLedger, LedgerCancelled, ledgerErrorText, waitForLedgerApp } from "@/src/hardware/ledger";
 import { backgroundErrorText, ConnectedNotice, ConnectShell, truncateAddress } from "./connect-shared";
 
 export interface LedgerConnectViewProps {
@@ -38,29 +38,6 @@ interface LedgerDetails {
   owner: string;
   address: string;
   device: { kind: "ledger"; model?: string; appVersion: string; app?: LedgerArweaveApp };
-}
-
-class Cancelled extends Error {}
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) return reject(new Cancelled());
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        reject(new Cancelled());
-      },
-      { once: true },
-    );
-  });
-}
-
-function ledgerErrorText(error: unknown): string {
-  if (error instanceof LedgerError || error instanceof LedgerTransportError) return error.message;
-  const message = error instanceof Error ? error.message : String(error);
-  return message || "Something went wrong talking to the Ledger.";
 }
 
 function addWalletErrorText(error: unknown): string {
@@ -101,40 +78,18 @@ export function LedgerConnectView({
       transport = opened;
       // Closing is what interrupts an exchange the user is still confirming on the device.
       signal.addEventListener("abort", () => void opened.close().catch(() => undefined), { once: true });
-      if (signal.aborted) throw new Cancelled();
+      if (signal.aborted) throw new LedgerCancelled();
       const client = new LedgerArweaveClient(transport);
 
-      let deadline = Date.now() + appTimeoutMs;
-      let keyWait = false;
-      let version;
-      for (;;) {
-        try {
-          version = await client.getVersion();
-          break;
-        } catch (e) {
-          if (!(e instanceof LedgerError)) throw e;
-          if (e.code === "key-not-ready") {
-            if (!keyWait) {
-              keyWait = true;
-              deadline = Date.now() + keyTimeoutMs;
-            }
-            setStep({ kind: "waiting", reason: "key" });
-          } else if (e.code === "app-not-open" || e.code === "device-locked") {
-            if (!keyWait) setStep({ kind: "waiting", reason: "app" });
-          } else {
-            throw e;
-          }
-          if (Date.now() >= deadline) {
-            throw keyWait
-              ? e
-              : new LedgerError(
-                  e.code,
-                  "Gleam couldn't find the Arweave app. Unlock your Ledger, open the Arweave app (or Permaweb) and try again.",
-                );
-          }
-          await sleep(pollMs, signal);
-        }
-      }
+      const version = await waitForLedgerApp(client, {
+        signal,
+        pollMs,
+        appTimeoutMs,
+        keyTimeoutMs,
+        onWaiting: (reason) => setStep({ kind: "waiting", reason }),
+        appTimeoutMessage:
+          "Gleam couldn't find the Arweave app. Unlock your Ledger, open the Arweave app (or Permaweb) and try again.",
+      });
 
       let app: LedgerArweaveApp | undefined;
       try {
@@ -144,10 +99,10 @@ export function LedgerConnectView({
       }
 
       const address = await client.getAddress();
-      if (signal.aborted) throw new Cancelled();
+      if (signal.aborted) throw new LedgerCancelled();
       setStep({ kind: "verify", address });
       const account = await client.getAccount({ verify: true });
-      if (signal.aborted) throw new Cancelled();
+      if (signal.aborted) throw new LedgerCancelled();
 
       setStep({
         kind: "name",
@@ -163,7 +118,7 @@ export function LedgerConnectView({
         },
       });
     } catch (e) {
-      if (e instanceof Cancelled || signal.aborted) {
+      if (e instanceof LedgerCancelled || signal.aborted) {
         setStep({ kind: "start" });
       } else {
         setStep({ kind: "error", message: ledgerErrorText(e) });

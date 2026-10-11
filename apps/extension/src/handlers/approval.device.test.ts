@@ -241,6 +241,32 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     expect(calls).toContain(`POST ${GATEWAY}:443/tx`);
   });
 
+  it("dispatch: a Ledger signs a payload large enough to bundle as an L1 transaction", async () => {
+    const wallets = (keySessionStore.get("local:wallets") as Record<string, unknown>[]).map((wallet) => ({
+      ...wallet,
+      name: "Ledger",
+      method: "ledger",
+      device: { kind: "ledger" },
+    }));
+    keySessionStore.set("local:wallets", wallets);
+    await storage.set("local:wallets", wallets);
+    const calls = mockNetwork();
+    const { pending, requestId, device } = await approveOnDevice({
+      kind: "dispatch",
+      payload: new Uint8Array(150 * 1024).fill(1),
+      gatewayUrl: GATEWAY,
+      reward: "5000",
+      last_tx: "b".repeat(64),
+    });
+    expect(device.method).toBe("ledger");
+    expect(device.payloads.map((payload) => payload.kind)).toEqual(["transaction"]);
+
+    await handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) });
+
+    await expect(pending).resolves.toMatchObject({ type: "BASE" });
+    expect(calls.some((call) => call.includes("bundler.example"))).toBe(false);
+  });
+
   it("signDataItem: resolves to the raw signed item", async () => {
     const { pending, requestId, device } = await approveOnDevice({
       kind: "signDataItem",

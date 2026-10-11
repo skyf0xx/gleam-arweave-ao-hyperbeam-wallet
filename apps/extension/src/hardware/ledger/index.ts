@@ -9,3 +9,11 @@ export {
   type HidLike,
   type LedgerTransportFailure,
 } from "./webhid-transport";
+export {
+  abortableSleep,
+  LedgerCancelled,
+  ledgerErrorText,
+  waitForLedgerApp,
+  type LedgerWaitReason,
+  type WaitForLedgerAppOptions,
+} from "./wait-for-app";
