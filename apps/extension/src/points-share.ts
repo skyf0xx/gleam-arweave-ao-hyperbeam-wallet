@@ -26,6 +26,12 @@ export function invitesLine(seats: number): string {
   return `You have ${seats} ${seats === 1 ? "invite" : "invites"}`;
 }
 
+/** The Points screen's count, where "remaining" fits because seats run down as friends use them. */
+export function invitesRemainingLine(seats: number): string {
+  if (seats <= 0) return "All your invites are used";
+  return `${seats} ${seats === 1 ? "invite" : "invites"} remaining`;
+}
+
 /**
  * The always-available post (POINTS.md § Share prompts, "Any time"). A part
  * the server hasn't reported is left out of the sentence rather than guessed.

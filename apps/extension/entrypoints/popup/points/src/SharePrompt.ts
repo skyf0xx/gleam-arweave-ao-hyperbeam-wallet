@@ -50,7 +50,7 @@ function promptContent(kind: SharePromptKind, score: PointsWalletScore, link: st
     case "lastSeat":
       return { text: "Your last invite", post: lastSeatPost() };
     case "joined":
-      return { text: "You're in and earning GLEAM.", post: foundingPost({ seats: score.seatsLeft, link }) };
+      return { text: "You're in and earning Gleam Points.", post: foundingPost({ seats: score.seatsLeft, link }) };
   }
 }
 

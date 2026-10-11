@@ -143,7 +143,7 @@ describe("share prompts on the Points screen", () => {
   it("offers the join post once for a wallet that never saw the reveal, and marks it seen when shared", async () => {
     const runtime = setup({ revealSeen: [] });
 
-    expect(await screen.findByRole("heading", { name: "You're in and earning GLEAM." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "You're in and earning Gleam Points." })).toBeTruthy();
     const share = invite().getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       intent(`Just got into @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`),
@@ -166,7 +166,7 @@ describe("share prompts on the Points screen", () => {
 
     await screen.findByText("Top 12%");
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith(expect.objectContaining({ type: "getPointsRevealSeen" })));
-    expect(screen.getByRole("heading", { name: "You have 1 invite" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "1 invite remaining" })).toBeTruthy();
   });
 
   it("shows no prompt when seats are not limited", async () => {

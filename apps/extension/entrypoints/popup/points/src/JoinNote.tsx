@@ -11,14 +11,22 @@ export function gleamUrl(): string {
   return sitePageUrl("gleam", browser.runtime.getManifest().version);
 }
 
-/** The disclosure shown wherever joining Gleam Points is offered. */
-export function JoinNote() {
+/**
+ * The disclosure shown wherever joining Gleam Points is offered. The
+ * Points screen drops the link because its About section carries it.
+ */
+export function JoinNote({ withLink = true }: { withLink?: boolean }) {
   return (
     <p className="text-center text-caption text-faint">
-      Joining links this wallet's address to this browser on the Gleam Points server.{" "}
-      <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="underline hover:text-muted">
-        How points work
-      </a>
+      Joining links this wallet's address to this browser on the Gleam Points server.
+      {withLink ? (
+        <>
+          {" "}
+          <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="underline hover:text-muted">
+            How to earn points
+          </a>
+        </>
+      ) : null}
     </p>
   );
 }

@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import type { InviteRedeemResult, InviteUnlock, RuntimePort } from "@gleam/core";
 import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { browser } from "wxt/browser";
@@ -218,17 +219,3 @@ function CheckIcon() {
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      className={cn("transition-transform", open && "rotate-180")}
-    >
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

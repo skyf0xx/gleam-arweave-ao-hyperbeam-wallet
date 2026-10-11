@@ -139,11 +139,15 @@ describe("PointsView", () => {
     const field = (await screen.findByLabelText(/Invite code/)) as HTMLInputElement;
     await waitFor(() => expect(field.value).toBe("PENDING1"));
 
-    const line = screen.getByText(/Earn points every day for the AR and AO you hold/);
+    const line = screen.getByText("Earn Gleam Points every day");
     const join = screen.getByRole("button", { name: "Join Gleam Points" });
     const note = screen.getByText(/Joining links this wallet's address to this browser/);
-    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual([POINTS_URL]);
-    for (const [before, after] of [[line, field], [field, join], [join, note]] as const) {
+    expect(screen.queryAllByRole("link")).toEqual([]);
+    const about = screen.getByRole("button", { name: "About Gleam Points" });
+    fireEvent.click(about);
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual([POINTS_URL, GLEAM_URL]);
+    expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
+    for (const [before, after] of [[line, field], [field, join], [join, note], [note, about]] as const) {
       expect(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
 
@@ -163,22 +167,30 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     expect(await screen.findByText("Top 12%")).toBeTruthy();
     expect(screen.queryByText(/OG/)).toBeNull();
-    expect(screen.queryByText(/Early member bonus/)).toBeNull();
+    expect(screen.queryByText(/Early member/)).toBeNull();
 
     const standing = within(screen.getByRole("region", { name: "Standing" }));
     expect(standing.getByText(/^[\d.,]+ points$/)).toBeTruthy();
     expect(standing.getByText("Per day").nextElementSibling?.textContent).toBe("+1.00");
     expect(standing.getByText("Friends joined").nextElementSibling?.textContent).toBe("3");
 
-    expect(screen.getByRole("heading", { name: "You have 3 invites" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "3 invites remaining" })).toBeTruthy();
+    expect(screen.getByText("Invite friends to earn more Gleam Points.")).toBeTruthy();
     const share = screen.getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
     );
 
-    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X", "How points work", "What is GLEAM?"]);
-    expect(screen.getByRole("link", { name: "How points work" }).getAttribute("href")).toBe(POINTS_URL);
-    expect(screen.getByRole("link", { name: "What is GLEAM?" }).getAttribute("href")).toBe(GLEAM_URL);
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X"]);
+    expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
+    const about = screen.getByRole("button", { name: "About Gleam Points" });
+    expect(about.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(about);
+    expect(about.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("link", { name: /How to earn points/ }).getAttribute("href")).toBe(POINTS_URL);
+    expect(screen.getByRole("link", { name: /The future of Gleam/ }).getAttribute("href")).toBe(GLEAM_URL);
+    const leave = screen.getByRole("button", { name: "Leave Gleam Points" });
+    expect(screen.getByRole("link", { name: /The future of Gleam/ }).compareDocumentPosition(leave) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     const sections = [
       screen.getByRole("region", { name: "Standing" }),
@@ -199,7 +211,7 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Early member bonus · +10% daily")).toBeTruthy();
+    expect(await screen.findByText("Earning 10% more as an early member")).toBeTruthy();
   });
 
   it("leaves the invite slots empty until the server reports them", async () => {
@@ -215,7 +227,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     expect(await screen.findByText("Top 12%")).toBeTruthy();
 
-    expect(screen.queryByText(/You have .* invites?/)).toBeNull();
+    expect(screen.queryByText(/invites? remaining/)).toBeNull();
     expect(screen.getByRole("heading", { name: "Invite friends" })).toBeTruthy();
     const href = screen.getByRole("link", { name: "Invite on X" }).getAttribute("href")!;
     expect(decodeURIComponent(href)).toContain(`Just joined @gleam_wallet and I'm now earning GLEAM.\n${LINK}`);
@@ -307,7 +319,8 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Leave Gleam Points" }));
+    fireEvent.click(await screen.findByRole("button", { name: "About Gleam Points" }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave Gleam Points" }));
     expect(screen.getByText(/can't be undone/)).toBeTruthy();
     expect(runtime.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "leavePoints" }));
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
@@ -326,7 +339,8 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Leave Gleam Points" }));
+    fireEvent.click(await screen.findByRole("button", { name: "About Gleam Points" }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave Gleam Points" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByText(/can't be undone/)).toBeNull();

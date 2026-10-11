@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { foundingPost, gainedSeatPost, invitePost, invitesLine, lastSeatPost, xIntentUrl } from "./points-share";
+import { foundingPost, gainedSeatPost, invitePost, invitesLine, invitesRemainingLine, lastSeatPost, xIntentUrl } from "./points-share";
 
 vi.mock("wxt/browser", () => ({ browser: {} }));
 
@@ -47,5 +47,8 @@ describe("share post builders", () => {
     expect(invitesLine(0)).toBe("All your invites are used");
     expect(invitesLine(1)).toBe("You have 1 invite");
     expect(invitesLine(3)).toBe("You have 3 invites");
+    expect(invitesRemainingLine(0)).toBe("All your invites are used");
+    expect(invitesRemainingLine(1)).toBe("1 invite remaining");
+    expect(invitesRemainingLine(3)).toBe("3 invites remaining");
   });
 });
