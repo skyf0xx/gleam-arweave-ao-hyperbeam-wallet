@@ -270,6 +270,27 @@
     });
   }
 
+  // A dry ratchet click: a few ms of noise, for things that turn
+  function tick(delay, from) {
+    var level = loudness(from);
+    if (!level) return;
+    var ctx = audio.ctx;
+    var at = ctx.currentTime + 0.01 + (delay || 0);
+    var click = ctx.createBufferSource();
+    click.buffer = audio.noise;
+    var band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = 3200;
+    band.Q.value = 2;
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.12 * level, at);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + 0.012);
+    click.connect(band);
+    band.connect(env);
+    env.connect(audio.master);
+    click.start(at);
+  }
+
   // ---- The pad: a quiet E drone under everything, for pages that ask ------
   //
   // Root and fifth in the pings' key, so every note sits on it. It breathes on
@@ -537,6 +558,7 @@
     ping: ping,
     enableSound: enableSound,
     soft: soft,
+    tick: tick,
     pad: function () {
       padWanted = true;
       updatePad(1.2);
