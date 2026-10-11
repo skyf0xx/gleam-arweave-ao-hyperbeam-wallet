@@ -2162,22 +2162,44 @@ html.waking .v-gate-orb {
   25% { box-shadow: 0 0 60px -10px var(--c); }
 }
 
-/* ---- The angled cut: its lines struck in turn, down or up ----------------- */
+/* ---- The angled cuts: struck lines, a different look each pass ----------- */
+/* Each line's animation-delay is set from script to match its note. */
 
-.cut-angle.strike-down line,
-.cut-angle.strike-up line {
-  animation: strike 0.5s ease-out both;
+.cut-angle[class*="strike-"] line {
+  animation-duration: 0.55s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
 }
-.cut-angle.strike-down line:nth-of-type(2), .cut-angle.strike-up line:nth-of-type(4) { animation-delay: var(--gap); }
-.cut-angle.strike-down line:nth-of-type(3), .cut-angle.strike-up line:nth-of-type(3) { animation-delay: calc(var(--gap) * 2); }
-.cut-angle.strike-down line:nth-of-type(4), .cut-angle.strike-up line:nth-of-type(2) { animation-delay: calc(var(--gap) * 3); }
-.cut-angle.strike-down line:nth-of-type(5), .cut-angle.strike-up line:nth-of-type(1) { animation-delay: calc(var(--gap) * 4); }
+.cut-angle.strike-flare line { animation-name: strike-flare; }
+.cut-angle.strike-slide line { animation-name: strike-slide; }
+.cut-angle.strike-flash line { animation-name: strike-flash; animation-timing-function: steps(1); }
+.cut-angle.strike-jolt line { animation-name: strike-jolt; }
 
-@keyframes strike {
+@keyframes strike-flare {
   20% {
     stroke-width: 6;
     filter: drop-shadow(0 0 4px currentColor);
   }
+}
+/* Slides along its own length, the way the scroll is going */
+@keyframes strike-slide {
+  25% {
+    transform: translateX(calc(var(--dir, 1) * 28px));
+    stroke-width: 4;
+  }
+}
+@keyframes strike-flash {
+  0% { opacity: 0.1; }
+  25% { opacity: 1; stroke-width: 5; }
+  50% { opacity: 0.3; }
+  75% { opacity: 1; }
+}
+/* Knocked off its line and settling back, like a plucked string */
+@keyframes strike-jolt {
+  15% { transform: translateY(calc(var(--dir, 1) * 5px)); }
+  35% { transform: translateY(calc(var(--dir, 1) * -3px)); }
+  55% { transform: translateY(calc(var(--dir, 1) * 1.5px)); }
+  75% { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
