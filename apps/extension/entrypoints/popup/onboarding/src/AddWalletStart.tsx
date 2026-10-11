@@ -10,9 +10,10 @@ export interface AddWalletStartProps {
   onCreate: () => void;
   onImport: () => void;
   onConnectKeystone: () => void;
+  onConnectLedger: () => void;
 }
 
-export function AddWalletStart({ onBack, onCreate, onImport, onConnectKeystone }: AddWalletStartProps) {
+export function AddWalletStart({ onBack, onCreate, onImport, onConnectKeystone, onConnectLedger }: AddWalletStartProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Add wallet" onBack={onBack} />
@@ -33,6 +34,9 @@ export function AddWalletStart({ onBack, onCreate, onImport, onConnectKeystone }
           </Button>
           <Button type="button" variant="secondary" onClick={onConnectKeystone}>
             Connect Keystone
+          </Button>
+          <Button type="button" variant="secondary" onClick={onConnectLedger}>
+            Connect Ledger
           </Button>
         </div>
       </div>

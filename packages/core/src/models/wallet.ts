@@ -17,7 +17,13 @@ export type HardwareWalletMethod = "keystone" | "ledger";
  */
 export type HardwareDevice =
   | { kind: "keystone"; xfp: string }
-  | { kind: "ledger"; model?: string; appVersion?: string };
+  | {
+      kind: "ledger";
+      model?: string;
+      appVersion?: string;
+      /** Which Arweave app was open when connected. Informational only. */
+      app?: "Arweave" | "Permaweb";
+    };
 
 export function isHardwareWalletMethod(method: WalletMethod): method is HardwareWalletMethod {
   return method === "keystone" || method === "ledger";

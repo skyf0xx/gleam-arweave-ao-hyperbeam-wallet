@@ -9,9 +9,10 @@ export interface WelcomeProps {
   onCreate: () => void;
   onImport: () => void;
   onConnectKeystone: () => void;
+  onConnectLedger: () => void;
 }
 
-export function Welcome({ onCreate, onImport, onConnectKeystone }: WelcomeProps) {
+export function Welcome({ onCreate, onImport, onConnectKeystone, onConnectLedger }: WelcomeProps) {
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-8 pt-7">
       <div className="mt-14 mb-3">
@@ -26,6 +27,9 @@ export function Welcome({ onCreate, onImport, onConnectKeystone }: WelcomeProps)
         </Button>
         <Button type="button" variant="secondary" onClick={onConnectKeystone}>
           Connect Keystone
+        </Button>
+        <Button type="button" variant="secondary" onClick={onConnectLedger}>
+          Connect Ledger
         </Button>
       </div>
     </div>

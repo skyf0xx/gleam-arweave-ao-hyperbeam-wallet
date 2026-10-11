@@ -1,6 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { addressFromOwner, type RuntimePort, type WalletSummary } from "@gleam/core";
-import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import {
@@ -13,6 +12,7 @@ import {
   type QrScannerProps,
   type ScannerError,
 } from "@/src/hardware/keystone";
+import { backgroundErrorText, ConnectedNotice, ConnectShell, truncateAddress } from "./connect-shared";
 
 export interface ConnectViewProps {
   runtime: RuntimePort;
@@ -33,19 +33,6 @@ const SCAN_ERROR: Record<Exclude<ScannerError, "camera-denied">, string> = {
   "wrong-type": "That's not a Keystone Arweave account QR. On the Keystone, open the Arweave wallet and show its connection QR.",
   invalid: "Gleam couldn't read that QR. Hold the Keystone steady and try again.",
 };
-
-function truncateAddress(address: string): string {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 5)}…${address.slice(-4)}`;
-}
-
-function errorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/unlock/i.test(message)) {
-    return "Gleam is locked. Click the Gleam icon in the toolbar, unlock it, then press Connect again.";
-  }
-  return message;
-}
 
 export function ConnectView({
   runtime,
@@ -72,49 +59,34 @@ export function ConnectView({
   };
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-10 text-foreground">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-lg border border-line bg-background p-6">
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight">Connect Keystone</h1>
-          <Beam />
-        </div>
-        {step.kind === "scan" ? (
-          <ScanStep
-            percent={step.percent}
-            Scanner={Scanner}
-            attempt={step.attempt}
-            onProgress={(percent) => setStep((s) => (s.kind === "scan" ? { ...s, percent } : s))}
-            onComplete={(ur) => void handleComplete(ur)}
-            onError={(error) => setStep({ kind: "scan-error", error })}
-          />
-        ) : null}
-        {step.kind === "scan-error" ? (
-          <ScanErrorStep
-            error={step.error}
-            onRetry={() => setStep({ kind: "scan", attempt: Date.now(), percent: 0 })}
-          />
-        ) : null}
-        {step.kind === "confirm" ? (
-          <ConfirmStep
-            runtime={runtime}
-            account={step.account}
-            address={step.address}
-            onConnected={() => setStep({ kind: "done" })}
-            onRescan={() => setStep({ kind: "scan", attempt: Date.now(), percent: 0 })}
-          />
-        ) : null}
-        {step.kind === "done" ? (
-          <div className="flex flex-col gap-4">
-            <p role="status" className="text-body leading-relaxed">
-              Keystone connected. You can close this tab.
-            </p>
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Close tab
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </main>
+    <ConnectShell title="Connect Keystone">
+    {step.kind === "scan" ? (
+      <ScanStep
+        percent={step.percent}
+        Scanner={Scanner}
+        attempt={step.attempt}
+        onProgress={(percent) => setStep((s) => (s.kind === "scan" ? { ...s, percent } : s))}
+        onComplete={(ur) => void handleComplete(ur)}
+        onError={(error) => setStep({ kind: "scan-error", error })}
+      />
+    ) : null}
+    {step.kind === "scan-error" ? (
+      <ScanErrorStep
+        error={step.error}
+        onRetry={() => setStep({ kind: "scan", attempt: Date.now(), percent: 0 })}
+      />
+    ) : null}
+    {step.kind === "confirm" ? (
+      <ConfirmStep
+        runtime={runtime}
+        account={step.account}
+        address={step.address}
+        onConnected={() => setStep({ kind: "done" })}
+        onRescan={() => setStep({ kind: "scan", attempt: Date.now(), percent: 0 })}
+      />
+    ) : null}
+    {step.kind === "done" ? <ConnectedNotice device="Keystone" onClose={onClose} /> : null}
+    </ConnectShell>
   );
 }
 
@@ -218,7 +190,7 @@ function ConfirmStep({
       });
       onConnected();
     } catch (e) {
-      setError(errorText(e));
+      setError(backgroundErrorText(e));
     } finally {
       setSubmitting(false);
     }

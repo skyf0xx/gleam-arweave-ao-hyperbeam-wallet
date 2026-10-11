@@ -127,7 +127,11 @@ function isValidDevice(value: unknown): value is HardwareDevice {
     return typeof candidate.xfp === "string" && KEYSTONE_XFP_PATTERN.test(candidate.xfp);
   }
   if (candidate.kind === "ledger") {
-    return isOptionalString(candidate.model) && isOptionalString(candidate.appVersion);
+    return (
+      isOptionalString(candidate.model) &&
+      isOptionalString(candidate.appVersion) &&
+      (candidate.app === undefined || candidate.app === "Arweave" || candidate.app === "Permaweb")
+    );
   }
   return false;
 }

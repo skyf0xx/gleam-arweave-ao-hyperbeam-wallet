@@ -252,3 +252,14 @@ describe("OnboardingView: Connect Keystone", () => {
     expect(onConnectKeystone).toHaveBeenCalledOnce();
   });
 });
+
+describe("OnboardingView: Connect Ledger", () => {
+  it.each(["first-run", "add-wallet"] as const)("offers it on the %s start screen", (mode) => {
+    const onConnectLedger = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode={mode} onConnectLedger={onConnectLedger} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Connect Ledger" }));
+    expect(onConnectLedger).toHaveBeenCalledOnce();
+  });
+});

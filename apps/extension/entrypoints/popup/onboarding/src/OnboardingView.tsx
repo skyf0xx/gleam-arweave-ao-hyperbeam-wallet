@@ -6,6 +6,7 @@ import { Backup } from "./Backup";
 import { Import } from "./Import";
 import { AddWalletStart } from "./AddWalletStart";
 import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
+import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
 import { VaultPassword } from "./VaultPassword";
 import { ClaimStep, type ClaimPhase } from "./ClaimStep";
 import { FoundingRevealScreen } from "./FoundingReveal";
@@ -47,6 +48,8 @@ export interface OnboardingViewProps {
   claim?: ClaimPhase;
   /** Opens the Keystone connect page. Defaults to a new browser tab. */
   onConnectKeystone?: () => void;
+  /** Opens the Ledger connect page. Defaults to a new browser tab. */
+  onConnectLedger?: () => void;
 }
 
 const DEFAULT_WALLET_NAMES = [
@@ -94,7 +97,7 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone = () => void openKeystoneConnect() }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone = () => void openKeystoneConnect(), onConnectLedger = () => void openLedgerConnect() }: OnboardingViewProps) {
   const addingWallet = mode === "add-wallet";
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [submitting, setSubmitting] = useState(false);
@@ -173,6 +176,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
             onCreate={() => setStep({ kind: "create-password" })}
             onImport={() => setStep({ kind: "import" })}
             onConnectKeystone={onConnectKeystone}
+          onConnectLedger={onConnectLedger}
           />
         );
       }
@@ -181,6 +185,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
           onCreate={() => setStep({ kind: "create-password" })}
           onImport={() => setStep({ kind: "import" })}
           onConnectKeystone={onConnectKeystone}
+          onConnectLedger={onConnectLedger}
         />
       );
 
