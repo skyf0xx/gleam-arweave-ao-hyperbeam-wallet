@@ -61,15 +61,26 @@
   <main class="v">
     <section class="v-hero" data-gate="hero">
       <canvas class="v-canvas" aria-hidden="true"></canvas>
-      <button class="v-gate" type="button" data-umami-event="gleam-gate">
+      <button class="v-gate" type="button">
         <span class="v-gate-orb" aria-hidden="true">
           <span class="v-gate-beam"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="v-gate-waves"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="v-gate-ring"></span>
           <span class="v-gate-num"><b>0</b><small>.00</small></span>
         </span>
-        <span class="v-gate-cta">Get <span class="v-gate-word"><i>G</i><i>L</i><i>E</i><i>A</i><i>M</i></span></span>
+        <span class="v-gate-cta">
+          <span class="visually-hidden">Get GLEAM</span>
+          <span class="v-reel" aria-hidden="true"><span class="v-reel-strip"><span class="v-reel-item"><span>Get <span
+                    class="v-gate-word"><i>G</i><i>L</i><i>E</i><i>A</i><i>M</i></span></span></span></span></span>
+          <span class="v-gate-lamps" aria-hidden="true"><i></i><i></i><i></i></span>
+        </span>
+        <template class="v-perks">
+          <span class="v-reel-item"><span>Get <b>early access</b> to ecosystem launches</span></span>
+          <span class="v-reel-item"><span>Get <b>airdrops</b> sent directly to you</span></span>
+          <span class="v-reel-item"><span>Get a share of <b>Gleam's revenue</b></span></span>
+        </template>
       </button>
+      <p class="visually-hidden" aria-live="polite" data-gate-live></p>
       <div class="wrap v-hero-in">
         <p class="points-kicker">Finally. A great wallet</p>
         <h1 class="display v-title">Your AO is idle. Make it earn <span class="v-gleam"><span
