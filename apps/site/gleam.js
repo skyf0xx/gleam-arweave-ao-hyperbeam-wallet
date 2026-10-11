@@ -985,48 +985,60 @@
     });
   }
 
-  // ---- Tokenomics steps: each return counts 01, 02, 03 in light and sound --
+  // ---- Tokenomics steps: each one plays as it's passed, either way --------
   //
-  // After the first reveal, coming back to the three steps plays a figure
-  // and lights each number as its note sounds: 01 to 03 going down, 03 to 01
-  // going up.
+  // Each step crossing the reading line sounds its note and its heading
+  // takes the pass's effect. Going down, its number lights in its beam
+  // colour and keeps a ring; going up, the ring clears on a falling note. A
+  // spark rides the rail to the furthest step passed, and back up with you.
 
   var flow = document.querySelector(".v-flow");
-  if (flow && "IntersectionObserver" in window) {
-    var flowSeen = false;
-    var flowAway = false;
-    var flowGap = deckOf([0.12, 0.18, 0.26]);
-    new IntersectionObserver(
-      function (entries) {
-        var entry = entries[entries.length - 1];
-        if (!entry.isIntersecting) {
-          if (flowSeen) flowAway = true;
-          return;
-        }
-        if (!flowSeen) {
-          flowSeen = true;
-          return;
-        }
-        if (!flowAway) return;
-        flowAway = false;
-        var dir = scrollDir;
-        var f = flavour(dir);
-        var gap = flowGap();
-        var nums = Array.prototype.slice.call(flow.querySelectorAll(".v-step-n"));
-        if (dir < 0) nums.reverse();
-        nums.forEach(function (num, i) {
-          var degree = dir > 0 ? [0, 2, 4][i] : [4, 2, 0][i];
-          program.play(f.voice, f.scale, degree, i * gap, num);
-          if (!motion) return;
-          num.style.setProperty("--c", COLORS[[0, 2, 4][i]]);
-          num.style.animationDelay = i * gap + "s";
-          num.classList.remove("count");
-          void num.offsetWidth;
-          num.classList.add("count");
-        });
-      },
-      { threshold: 0.35 },
-    ).observe(flow);
+  var steps = flow ? Array.prototype.slice.call(flow.querySelectorAll(".v-step")) : [];
+  var STEP_COLORS = [0, 2, 4];
+  var STEP_DEGREES = [0, 2, 4];
+  var railSpark = null;
+
+  if (flow) {
+    steps.forEach(function (step, i) {
+      step.style.setProperty("--c", COLORS[STEP_COLORS[i]]);
+    });
+    railSpark = document.createElement("span");
+    railSpark.className = "v-flow-spark";
+    railSpark.setAttribute("aria-hidden", "true");
+    flow.appendChild(railSpark);
+  }
+
+  // audible: true only for a scroll
+  function updateSteps(audible) {
+    if (!flow) return;
+    var mark = window.innerHeight * 0.62;
+    var shown = flow.classList.contains("in");
+    var furthest = -1;
+    steps.forEach(function (step, i) {
+      var num = step.querySelector(".v-step-n");
+      var r = num.getBoundingClientRect();
+      var past = r.top + r.height / 2 < mark;
+      var was = step.classList.contains("passed");
+      step.classList.toggle("passed", past);
+      if (past) furthest = i;
+      if (!audible || !shown || past === was) return;
+      var dir = past ? 1 : -1;
+      var f = pass("steps", dir);
+      program.play(f.voice, f.scale, STEP_DEGREES[i], 0, num);
+      effect(step.querySelector("h3"), f.fx);
+      if (!motion) return;
+      num.style.animationDelay = "0s";
+      num.classList.remove("count");
+      void num.offsetWidth;
+      num.classList.add("count");
+    });
+    if (!railSpark) return;
+    railSpark.classList.toggle("on", furthest >= 0 && shown);
+    if (furthest >= 0) {
+      var node = steps[furthest].querySelector(".v-step-n");
+      railSpark.style.top = steps[furthest].offsetTop + node.offsetHeight / 2 + "px";
+      railSpark.style.setProperty("--c", COLORS[STEP_COLORS[furthest]]);
+    }
   }
 
   // ---- One-shot reveals --------------------------------------------------
@@ -1755,6 +1767,7 @@
     updateRows(true);
     updatePrism();
     updateStakeHead();
+    updateSteps(true);
     updateConvert();
     updateChoices(true);
     updateArcs(true);
@@ -1767,6 +1780,7 @@
     updateLines();
     updateRows();
     updateChoices();
+    updateSteps();
     updateArcs();
   }
 
