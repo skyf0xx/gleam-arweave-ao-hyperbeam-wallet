@@ -1781,3 +1781,144 @@ html.waking .v-gate-orb {
     animation: gate-out 0.3s both;
   }
 }
+
+/* ---- Welcome back: one moment each time the hero comes round ------------ */
+
+.v-title {
+  position: relative;
+}
+
+/* Pluck: the stripes shake a little out of step, as a struck string does */
+.v-beam.pluck span {
+  animation: pluck 1s cubic-bezier(0.3, 0.6, 0.4, 1) both;
+}
+.v-beam.pluck span:nth-child(2) { animation-delay: 0.025s; }
+.v-beam.pluck span:nth-child(3) { animation-delay: 0.05s; }
+.v-beam.pluck span:nth-child(4) { animation-delay: 0.075s; }
+.v-beam.pluck span:nth-child(5) { animation-delay: 0.1s; }
+
+@keyframes pluck {
+  10% {
+    transform: translateY(-6px);
+    filter: brightness(1.6);
+  }
+  22% { transform: translateY(5px); }
+  34% { transform: translateY(-3.5px); }
+  46% { transform: translateY(2.5px); }
+  58% { transform: translateY(-1.5px); }
+  70% { transform: translateY(0.75px); }
+  82%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Five at once: the landing splits the counter into all five colours */
+.gc.burst {
+  animation: gc-burst 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes gc-burst {
+  15% {
+    transform: scale(1.07);
+    text-shadow:
+      -0.03em 0 var(--beam-red),
+      -0.015em 0 var(--beam-purple),
+      0 0.015em var(--beam-sky),
+      0.015em 0 var(--beam-yellow),
+      0.03em 0 var(--beam-green);
+  }
+}
+
+/* Spin: each digit rolls on to its own place again, a full turn. The roll
+   is on `translate`, so it rides on top of the odometer's own transform. */
+.gc.spin .od-s {
+  animation: od-spin 0.9s cubic-bezier(0.5, 0, 0.25, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@keyframes od-spin {
+  0% { translate: 0 0; }
+  49.99% { translate: 0 var(--a); }
+  50% { translate: 0 var(--b); }
+  100% { translate: 0 0; }
+}
+
+/* Cascade: a coloured copy of GLEAM laid exactly over the word */
+.v-cascade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.v-cascade i {
+  font-style: normal;
+  color: var(--c);
+  animation: cascade 1.1s ease-out both;
+}
+
+@keyframes cascade {
+  0% {
+    opacity: 0;
+    transform: translateY(0.12em);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-0.06em);
+    text-shadow: 0 0 0.25em var(--c);
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* The fifth return's line, once ever */
+.v-echo {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--on-ink);
+  animation: echo 7s ease both;
+}
+
+@media (min-width: 900px) {
+  .v-echo {
+    left: auto;
+    right: 0;
+  }
+}
+
+@keyframes echo {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  8%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-beam.pluck span,
+  .gc.burst,
+  .gc.spin .od-s,
+  .v-cascade i {
+    animation: none;
+  }
+  .v-echo {
+    animation: echo 7s step-end both;
+  }
+}
