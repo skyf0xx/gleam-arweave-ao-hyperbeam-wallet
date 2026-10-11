@@ -9,10 +9,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dha-team/arbundles": "^1.0.3",
     "arweave": "^2.1.0"
   },
   "devDependencies": {
+    "@dha-team/arbundles": "^1.0.3",
     "typescript": "^5.9.3"
   }
 }

@@ -156,13 +156,13 @@ importers:
 
   packages/core:
     dependencies:
-      '@dha-team/arbundles':
-        specifier: ^1.0.3
-        version: 1.0.4(supports-color@7.2.0)
       arweave:
         specifier: ^2.1.0
         version: 2.1.0
     devDependencies:
+      '@dha-team/arbundles':
+        specifier: ^1.0.3
+        version: 1.0.4(supports-color@7.2.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

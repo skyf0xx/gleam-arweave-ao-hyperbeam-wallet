@@ -2,7 +2,16 @@ import { describe, expect, it, vi, beforeAll, afterEach } from "vitest";
 import { DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
-import { AO_LEGACY_MU_URL, AO_TRANSFER_HAS_NO_FEE, createSignedDataItem, submitTransfer } from "./transfer";
+import {
+  AO_LEGACY_MU_URL,
+  AO_TRANSFER_HAS_NO_FEE,
+  createSignedDataItem,
+  finishTransfer,
+  prepareTransfer,
+  submitTransfer,
+} from "./transfer";
+import { dataItemSignatureData } from "../arweave/data-item";
+import { signRsaPss } from "../arweave/rsa-pss";
 
 const PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
 const RECIPIENT = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
@@ -144,5 +153,38 @@ describe("AO submitTransfer", () => {
 describe("AO_TRANSFER_HAS_NO_FEE", () => {
   it("is explicit that AO transfers have no sender-side fee quote, unlike AR", () => {
     expect(AO_TRANSFER_HAS_NO_FEE).toBe(true);
+  });
+});
+
+describe("AO prepareTransfer / finishTransfer", () => {
+  it("posts an item signed from the owner's public key alone, and refuses a signature for another item", async () => {
+    const fetchMock = stubMu();
+    const unsigned = prepareTransfer(jwk.n, PROCESS_ID, RECIPIENT, "42");
+    const signature = await signRsaPss(jwk, await dataItemSignatureData(unsigned));
+
+    const { messageId } = await finishTransfer(unsigned, signature, jwk.n);
+
+    const item = postedItem(fetchMock);
+    expect(item.id).toBe(messageId);
+    expect(await verifies(item)).toBe(true);
+    expect(Buffer.from(item.getRaw().subarray(514)).equals(Buffer.from(unsigned.subarray(514)))).toBe(true);
+
+    const other = prepareTransfer(jwk.n, PROCESS_ID, RECIPIENT, "43");
+    await expect(finishTransfer(other, signature, jwk.n)).rejects.toThrow(/doesn't match/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an item built for and signed by another key", async () => {
+    const fetchMock = stubMu();
+    const other = await generateJWK();
+    const foreign = prepareTransfer(other.n, PROCESS_ID, RECIPIENT, "42");
+    const signature = await signRsaPss(other, await dataItemSignatureData(foreign));
+
+    await expect(finishTransfer(foreign, signature, jwk.n)).rejects.toThrow(/doesn't match/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a process id that isn't a 32-byte Arweave id", () => {
+    expect(() => prepareTransfer(jwk.n, "not-an-id", RECIPIENT, "1")).toThrow(/32-byte Arweave id/);
   });
 });

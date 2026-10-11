@@ -19,3 +19,13 @@ export function resolveArweaveClass(mod: ArweaveClass | { default: ArweaveClass 
 /** Import `Arweave` from here, never from `"arweave"` directly. */
 export const Arweave: ArweaveClass = resolveArweaveClass(ArweaveImport);
 export type Arweave = InstanceType<ArweaveClass>;
+
+/** An arweave-js client for `gatewayUrl`. arweave-js fetches through the ambient `fetch`, with no override hook. */
+export function clientForGateway(gatewayUrl: string): Arweave {
+  const url = new URL(gatewayUrl);
+  return Arweave.init({
+    host: url.hostname,
+    port: url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80,
+    protocol: url.protocol.replace(":", ""),
+  });
+}

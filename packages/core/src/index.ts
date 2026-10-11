@@ -4,6 +4,7 @@ export * from "./vault/password-policy";
 export * from "./vault/zeroize";
 export * from "./vault/base64";
 export * from "./vault/signing";
+export type { ArweaveTransactionJson } from "./arweave/transaction";
 export * from "./vault/encryption";
 export * from "./vault/message-signing";
 export * from "./keys/jwk";

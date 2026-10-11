@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Arweave from "arweave";
-import { estimateFee, submitTransfer } from "./transfer";
+import { estimateFee, finishTransfer, prepareTransfer, submitTransfer } from "./transfer";
 
 const jwk = await Arweave.init({}).wallets.generate();
 
@@ -69,5 +69,59 @@ describe("submitTransfer", () => {
       submitTransfer("https://arweave.net", jwk, "recipientAddr", "1000000000000"),
     ).rejects.toThrow(/must be an Arweave address/);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("prepareTransfer / finishTransfer", () => {
+  const TARGET = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
+
+  function recordFetch() {
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("tx_anchor")) return new Response("b".repeat(64), { status: 200 });
+      if (url.includes("price")) return new Response("1234567", { status: 200 });
+      return new Response("OK", { status: 200 });
+    });
+    return () =>
+      spy.mock.calls.map(([input, init]) => {
+        const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined;
+        if (body) {
+          delete body.id;
+          delete body.signature;
+        }
+        return { url: String(input instanceof Request ? input.url : input), method: init?.method ?? "GET", body };
+      });
+  }
+
+  it("makes the same requests and posts the same transaction as arweave-js's JWK path", async () => {
+    const referenceCalls = recordFetch();
+    const client = Arweave.init({ host: "arweave.net", port: 443, protocol: "https" });
+    const reference = await client.createTransaction({ target: TARGET, quantity: "1000" }, jwk);
+    await client.transactions.sign(reference, jwk, { saltLength: 32 });
+    await client.transactions.post(reference);
+    const expected = referenceCalls();
+    vi.restoreAllMocks();
+
+    const calls = recordFetch();
+    const { txId } = await submitTransfer("https://arweave.net", jwk, TARGET, "1000");
+
+    expect(expected.map((call) => call.method)).toEqual(["GET", "GET", "POST"]);
+    expect(expected[2]!.body).toMatchObject({ owner: jwk.n, target: TARGET, quantity: "1000", reward: "1234567" });
+    expect(calls()).toEqual(expected);
+    expect(txId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("posts a transfer whose signature came from elsewhere, and refuses a wrong one", async () => {
+    const calls = recordFetch();
+    const unsigned = await prepareTransfer("https://arweave.net", jwk.n, TARGET, "1000");
+    const reference = Arweave.init({}).transactions.fromRaw({ ...unsigned });
+    await Arweave.init({}).transactions.sign(reference, jwk, { saltLength: 32 });
+    const signature = reference.get("signature", { decode: true, string: false });
+
+    await expect(finishTransfer("https://arweave.net", unsigned, signature, jwk.n)).resolves.toEqual({ txId: reference.id });
+    await expect(finishTransfer("https://arweave.net", { ...unsigned, quantity: "1001" }, signature, jwk.n)).rejects.toThrow(
+      /doesn't match/,
+    );
+    expect(calls().filter((call) => call.method === "POST")).toHaveLength(1);
   });
 });

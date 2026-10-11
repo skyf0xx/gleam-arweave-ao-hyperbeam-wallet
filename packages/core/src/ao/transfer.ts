@@ -1,4 +1,7 @@
 import type { JWKInterface } from "../models/wallet";
+import { applyDataItemSignature, buildUnsignedDataItem, signDataItemWithJwk } from "../arweave/data-item";
+
+export { createSignedDataItem } from "../arweave/data-item";
 
 /**
  * An AO `Transfer` is a signed ANS-104 data item posted to the legacynet
@@ -11,8 +14,8 @@ import type { JWKInterface } from "../models/wallet";
  * (`Data-Protocol`/`Variant`/`Type`/`Action`/`Recipient`/`Quantity`,
  * capitalized) that AO token processes' `Transfer` handler matches on.
  *
- * The data item is built, signed, and posted here with plain `Uint8Array`s
- * and WebCrypto rather than through `@permaweb/aoconnect`: aoconnect's
+ * The data item is built and signed by `arweave/data-item.ts` with plain
+ * `Uint8Array`s and WebCrypto rather than through `@permaweb/aoconnect`: aoconnect's
  * browser build re-verifies every signed item through its bundled
  * arbundles `ArweaveSigner.verify`, which hands the owner's raw bytes to
  * `crypto.subtle.importKey("jwk", { n: <Uint8Array> })` instead of a
@@ -37,158 +40,9 @@ export interface SubmittedAoTransfer {
  */
 export const AO_TRANSFER_HAS_NO_FEE = true;
 
-interface Tag {
-  name: string;
-  value: string;
-}
-
-/** ANS-104 signature type 1: Arweave RSA-PSS 4096. */
-const SIGNATURE_TYPE = 1;
-const SIGNATURE_LENGTH = 512;
-const OWNER_LENGTH = 512;
-const MAX_TAG_BYTES = 4096;
-
 type Bytes = Uint8Array<ArrayBuffer>;
 
 const encoder = new TextEncoder();
-
-function base64UrlToBytes(value: string): Bytes {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const binary = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function concat(...parts: Bytes[]): Bytes {
-  const out = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.byteLength;
-  }
-  return out;
-}
-
-/** Unsigned little-endian integer of `width` bytes, as ANS-104's header fields are encoded. */
-function littleEndian(value: number, width: number): Bytes {
-  const out = new Uint8Array(width);
-  let remaining = value;
-  for (let i = 0; i < width; i += 1) {
-    out[i] = remaining % 256;
-    remaining = Math.floor(remaining / 256);
-  }
-  return out;
-}
-
-/** Avro zigzag-varint `long`, the length prefix ANS-104's tag encoding uses. */
-function avroLong(value: number): number[] {
-  let zigzag = value * 2;
-  const out: number[] = [];
-  do {
-    let byte = zigzag % 128;
-    zigzag = Math.floor(zigzag / 128);
-    if (zigzag > 0) byte |= 128;
-    out.push(byte);
-  } while (zigzag > 0);
-  return out;
-}
-
-/** Avro array-of-`{name, value}`-bytes encoding of `tags`, per ANS-104. */
-function encodeTags(tags: Tag[]): Bytes {
-  if (tags.length === 0) return new Uint8Array();
-  const out = avroLong(tags.length);
-  for (const { name, value } of tags) {
-    for (const field of [encoder.encode(name), encoder.encode(value)]) {
-      out.push(...avroLong(field.byteLength), ...field);
-    }
-  }
-  out.push(...avroLong(0));
-  if (out.length > MAX_TAG_BYTES) {
-    throw new Error(`AO message tags encode to ${out.length} bytes, over ANS-104's ${MAX_TAG_BYTES}-byte limit.`);
-  }
-  return new Uint8Array(out);
-}
-
-async function sha384(data: Bytes): Promise<Bytes> {
-  return new Uint8Array(await crypto.subtle.digest("SHA-384", data));
-}
-
-/** Arweave's deep hash over a list of blobs (no nested lists — ANS-104 never needs them). */
-async function deepHash(chunks: Bytes[]): Promise<Bytes> {
-  let accumulator = await sha384(encoder.encode(`list${chunks.length}`));
-  for (const chunk of chunks) {
-    const blobHash = await sha384(concat(await sha384(encoder.encode(`blob${chunk.byteLength}`)), await sha384(chunk)));
-    accumulator = await sha384(concat(accumulator, blobHash));
-  }
-  return accumulator;
-}
-
-async function signRsaPss(jwk: JWKInterface, message: Bytes): Promise<Bytes> {
-  const { kty, n, e, d, p, q, dp, dq, qi } = jwk;
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    { kty, n, e, d, p, q, dp, dq, qi, ext: true },
-    { name: "RSA-PSS", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return new Uint8Array(await crypto.subtle.sign({ name: "RSA-PSS", saltLength: 32 }, key, message));
-}
-
-/**
- * Builds and signs an ANS-104 data item with signature type 1 (Arweave
- * RSA-PSS), no anchor. Returns the raw item bytes and its id.
- */
-export async function createSignedDataItem(
-  jwk: JWKInterface,
-  { data, target, tags }: { data: Bytes; target: string; tags: Tag[] },
-): Promise<{ id: string; raw: Bytes }> {
-  const owner = base64UrlToBytes(jwk.n);
-  if (owner.byteLength !== OWNER_LENGTH) {
-    throw new Error(`Expected a ${OWNER_LENGTH}-byte RSA modulus for the signing key, got ${owner.byteLength} bytes.`);
-  }
-  if (!/^[A-Za-z0-9_-]{43}$/.test(target)) {
-    throw new Error(`AO message target must be a 32-byte Arweave id (43 base64url characters), got "${target}".`);
-  }
-  const targetBytes = base64UrlToBytes(target);
-  const anchor = new Uint8Array();
-  const tagBytes = encodeTags(tags);
-
-  const signatureData = await deepHash([
-    encoder.encode("dataitem"),
-    encoder.encode("1"),
-    encoder.encode(String(SIGNATURE_TYPE)),
-    owner,
-    targetBytes,
-    anchor,
-    tagBytes,
-    data,
-  ]);
-  const signature = await signRsaPss(jwk, signatureData);
-  if (signature.byteLength !== SIGNATURE_LENGTH) {
-    throw new Error(`Expected a ${SIGNATURE_LENGTH}-byte RSA-PSS signature, got ${signature.byteLength} bytes.`);
-  }
-
-  const raw = concat(
-    littleEndian(SIGNATURE_TYPE, 2),
-    signature,
-    owner,
-    new Uint8Array([1]),
-    targetBytes,
-    new Uint8Array([0]),
-    littleEndian(tags.length, 8),
-    littleEndian(tagBytes.byteLength, 8),
-    tagBytes,
-    data,
-  );
-  const id = bytesToBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", signature)));
-  return { id, raw };
-}
 
 /**
  * Builds, signs, and posts an AO `Transfer` message to `processId` via the
@@ -210,7 +64,16 @@ export async function submitTransfer(
   recipient: string,
   amount: string,
 ): Promise<SubmittedAoTransfer> {
-  const { id, raw } = await createSignedDataItem(jwk, {
+  const unsigned = prepareTransfer(jwk.n, processId, recipient, amount);
+  return finishTransfer(unsigned, await signDataItemWithJwk(unsigned, jwk), jwk.n);
+}
+
+/** The unsigned `Transfer` data item `ownerB64Url` will sign. */
+export function prepareTransfer(ownerB64Url: string, processId: string, recipient: string, amount: string): Bytes {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(processId)) {
+    throw new Error(`AO message target must be a 32-byte Arweave id (43 base64url characters), got "${processId}".`);
+  }
+  return buildUnsignedDataItem(ownerB64Url, {
     // A tag-only message still carries a non-empty body, as other AO
     // wallets send it, rather than relying on the MU accepting empty data.
     data: encoder.encode(" "),
@@ -225,7 +88,15 @@ export async function submitTransfer(
       { name: "Content-Type", value: "text/plain" },
     ],
   });
+}
 
+/** Applies `expectedOwner`'s signature to a `prepareTransfer` item and posts it to the MU. */
+export async function finishTransfer(
+  unsigned: Uint8Array,
+  signature: Uint8Array,
+  expectedOwner: string,
+): Promise<SubmittedAoTransfer> {
+  const { id, raw } = await applyDataItemSignature(unsigned, signature, expectedOwner);
   const response = await fetch(AO_LEGACY_MU_URL, {
     method: "POST",
     headers: { "content-type": "application/octet-stream", accept: "application/json" },

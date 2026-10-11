@@ -3,6 +3,7 @@ import {
   base64ToBytes,
   bytesToBase64,
   batchSignDataItem,
+  capabilitiesFor,
   decrypt,
   DEFAULT_BUNDLER_URL,
   dispatchTransaction,
@@ -30,7 +31,7 @@ import {
   type WindowPort,
 } from "@gleam/core";
 import { APPROVAL_TIMEOUT_MS, decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
-import { getCachedKey, getStoredWallet } from "./key-session";
+import { getCachedKey, getStoredWallet, getWalletMethod } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -676,7 +677,9 @@ export class ApprovalHandler {
       }
 
       case "dispatch": {
-        return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, jwk, transaction);
+        // A cached key means a keyfile wallet even if its record can't be read.
+        const { dispatchViaBundler: viaBundler } = capabilitiesFor((await getWalletMethod(walletId)) ?? "jwk");
+        return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, jwk, transaction, { viaBundler });
       }
 
       case "signDataItem": {

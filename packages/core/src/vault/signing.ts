@@ -1,5 +1,3 @@
-import { Arweave } from "../arweave/client";
-import { ArweaveSigner, createData } from "@dha-team/arbundles/web";
 import type { JWKInterface } from "../models/wallet";
 import type {
   SignTransactionInput,
@@ -8,22 +6,90 @@ import type {
   DispatchResult,
 } from "../models/signing";
 import { postDataItemToBundler } from "../arweave/upload";
+import {
+  applyTransactionSignature,
+  buildUnsignedTransaction,
+  postTransaction,
+  signTransactionWithJwk,
+  verifyTransactionSignature,
+  type ArweaveTransactionJson,
+} from "../arweave/transaction";
+import {
+  applyDataItemSignature,
+  buildUnsignedDataItem,
+  signDataItemWithJwk,
+  verifyDataItemSignature,
+} from "../arweave/data-item";
 import { base64ToBytes } from "./base64";
 
 /**
  * `core/vault`'s share of the provider-signing-crypto surface: the actual
  * cryptographic operations behind `sign`/`dispatch`/`signDataItem`/
- * `batchSignDataItem`. Mirrors `core/arweave/transfer.ts` and
- * `core/arweave/upload.ts`'s boundary — every function here accepts an
- * already-decrypted `JWKInterface` and never imports `core/vault`'s own
- * envelope decryption or touches storage; resolving that JWK from the
+ * `batchSignDataItem`. Every function here accepts an already-decrypted
+ * `JWKInterface` or only the owner's public key, and never touches
+ * `core/vault`'s envelope or storage; resolving the key from the
  * unlocked-session cache (`getCachedKey(walletId)`) is the dispatch
  * layer's job.
  *
- * Imports `@dha-team/arbundles/web` (not the package root) for the same
- * reason `upload.ts` documents: the Node entry pulls in an undeclared
- * `axios` dependency via its streamed-file helpers.
+ * Each operation comes in three parts so keyfile and hardware wallets
+ * share one pipeline: `prepare*` builds the unsigned payload from the
+ * owner alone, the key signs its deep hash (`signPayloadWithJwk` here, or
+ * a device), and `finish*` applies the signature, checks it, and
+ * submits. The keyfile entry points (`signTransaction`,
+ * `dispatchTransaction`, `signDataItem`, `batchSignDataItem`) are those
+ * three steps run back to back.
  */
+
+type Bytes = Uint8Array<ArrayBuffer>;
+
+/** What a signer signs: an unsigned format-2 transaction, or the raw bytes of an unsigned ANS-104 item. */
+export type UnsignedPayload =
+  | { kind: "transaction"; transaction: ArweaveTransactionJson }
+  | { kind: "dataItem"; raw: Bytes };
+
+export type SignedPayload =
+  | { kind: "transaction"; id: string; transaction: ArweaveTransactionJson }
+  | { kind: "dataItem"; id: string; raw: Bytes };
+
+/**
+ * True only when `signature` is a valid RSA-PSS (SHA-256, salt 32)
+ * signature by `ownerB64Url` over the payload's deep hash, which is
+ * recomputed here, and the payload names that same owner.
+ */
+export async function verifyDeviceSignature(
+  unsigned: UnsignedPayload,
+  signature: Uint8Array,
+  ownerB64Url: string,
+): Promise<boolean> {
+  return unsigned.kind === "transaction"
+    ? verifyTransactionSignature(unsigned.transaction, signature, ownerB64Url)
+    : verifyDataItemSignature(unsigned.raw, signature, ownerB64Url);
+}
+
+/**
+ * Applies a raw 512-byte signature. Throws unless the payload names
+ * `expectedOwner` (the wallet's stored public key) and the signature
+ * verifies against it.
+ */
+export async function applySignature(
+  unsigned: UnsignedPayload,
+  signature: Uint8Array,
+  expectedOwner: string,
+): Promise<SignedPayload> {
+  if (unsigned.kind === "transaction") {
+    const { id, transaction } = await applyTransactionSignature(unsigned.transaction, signature, expectedOwner);
+    return { kind: "transaction", id, transaction };
+  }
+  const { id, raw } = await applyDataItemSignature(unsigned.raw, signature, expectedOwner);
+  return { kind: "dataItem", id, raw };
+}
+
+/** Signs the payload's deep hash with a keyfile. Returns the raw 512-byte signature. */
+export async function signPayloadWithJwk(unsigned: UnsignedPayload, jwk: JWKInterface): Promise<Bytes> {
+  return unsigned.kind === "transaction"
+    ? signTransactionWithJwk(unsigned.transaction, jwk)
+    : signDataItemWithJwk(unsigned.raw, jwk);
+}
 
 /** Threshold (bytes) above which `dispatch()` bundles rather than posts as a base AR tx. Below it, dispatch posts directly to the gateway as a `BASE` transaction. */
 const DISPATCH_BUNDLE_THRESHOLD_BYTES = 100 * 1024;
@@ -33,59 +99,46 @@ function transfersAr(quantity: string | undefined): boolean {
   return !/^0*$/.test(quantity?.trim() ?? "");
 }
 
-function buildClient(gatewayUrl: string): Arweave {
-  const url = new URL(gatewayUrl);
-  return Arweave.init({
-    host: url.hostname,
-    port: url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80,
-    protocol: url.protocol.replace(":", ""),
-  });
+function transactionAttributes(input: SignTransactionInput, data: Uint8Array) {
+  return {
+    data,
+    target: input.target ?? "",
+    quantity: input.quantity ?? "0",
+    reward: input.reward,
+    last_tx: input.last_tx,
+  };
 }
 
-type Transaction = Awaited<ReturnType<Arweave["createTransaction"]>>;
-
-async function buildTransaction(
-  client: Arweave,
-  jwk: JWKInterface,
-  input: SignTransactionInput,
-  data: Uint8Array,
-): Promise<Transaction> {
-  const transaction = await client.createTransaction(
-    {
-      data,
-      target: input.target ?? "",
-      quantity: input.quantity ?? "0",
-      reward: input.reward,
-      last_tx: input.last_tx,
-    },
-    jwk,
-  );
-  for (const tag of input.tags ?? []) {
-    transaction.addTag(tag.name, tag.value);
-  }
-  return transaction;
+function plainTags(tags: DataItemInput["tags"]) {
+  return tags?.map((tag) => ({ name: tag.name, value: tag.value }));
 }
 
 /**
- * Signs the dApp's transaction without posting it. `gatewayUrl` is only
- * used to fetch `last_tx` and `reward` when the dApp left them out.
+ * The dApp's transaction, unsigned. `gatewayUrl` is only used to fetch
+ * `last_tx` and `reward` when the dApp left them out.
  */
-export async function signTransaction(
+export async function prepareSignTransaction(
   gatewayUrl: string,
-  jwk: JWKInterface,
+  ownerB64Url: string,
   input: SignTransactionInput,
-): Promise<SignedTransaction> {
-  const client = buildClient(gatewayUrl);
+): Promise<ArweaveTransactionJson> {
   const data = input.data ? base64ToBytes(input.data) : new Uint8Array(0);
-  const transaction = await buildTransaction(client, jwk, input, data);
-  await client.transactions.sign(transaction, jwk);
+  return buildUnsignedTransaction(gatewayUrl, ownerB64Url, transactionAttributes(input, data), input.tags);
+}
 
+/** Applies the signature to a `prepareSignTransaction` result, without posting it. */
+export async function finishSignTransaction(
+  unsigned: ArweaveTransactionJson,
+  signature: Uint8Array,
+  expectedOwner: string,
+): Promise<SignedTransaction> {
+  const { transaction } = await applyTransactionSignature(unsigned, signature, expectedOwner);
   return {
     format: transaction.format,
     id: transaction.id,
     last_tx: transaction.last_tx,
     owner: transaction.owner,
-    tags: transaction.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+    tags: transaction.tags,
     target: transaction.target,
     quantity: transaction.quantity,
     data_size: transaction.data_size,
@@ -95,73 +148,143 @@ export async function signTransaction(
   };
 }
 
+/** Signs the dApp's transaction with a keyfile without posting it. */
+export async function signTransaction(
+  gatewayUrl: string,
+  jwk: JWKInterface,
+  input: SignTransactionInput,
+): Promise<SignedTransaction> {
+  const unsigned = await prepareSignTransaction(gatewayUrl, jwk.n, input);
+  return finishSignTransaction(unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n);
+}
+
+export interface DispatchOptions {
+  /** `capabilitiesFor(method).dispatchViaBundler`. When false, every dispatch goes to the gateway on L1. */
+  viaBundler: boolean;
+}
+
 /**
- * Signs a transaction and submits it. Payloads over
- * `DISPATCH_BUNDLE_THRESHOLD_BYTES` are signed as an ANS-104 data item
- * and posted to `bundlerUrl` (`BUNDLED`); smaller ones are posted to the
- * gateway as a base transaction (`BASE`). Throws if either post is
- * rejected, so the dApp never gets an id for data that wasn't stored.
+ * Builds what `dispatch` will sign. Payloads over
+ * `DISPATCH_BUNDLE_THRESHOLD_BYTES` become an ANS-104 data item for the
+ * bundler (`BUNDLED`) when the wallet can sign one for it; everything
+ * else is a base transaction for the gateway (`BASE`).
  *
  * A data item has no `quantity` field, so bundling a transaction that
  * sends AR would store the data and quietly drop the transfer. Those
  * always go to the gateway as a base transaction, whatever their size.
  */
-export async function dispatchTransaction(
+export async function prepareDispatch(
   gatewayUrl: string,
-  bundlerUrl: string,
-  jwk: JWKInterface,
+  ownerB64Url: string,
   input: SignTransactionInput,
-): Promise<DispatchResult> {
+  { viaBundler }: DispatchOptions,
+): Promise<UnsignedPayload> {
   const payloadBytes = input.data ? base64ToBytes(input.data) : new Uint8Array(0);
 
-  if (payloadBytes.byteLength > DISPATCH_BUNDLE_THRESHOLD_BYTES && !transfersAr(input.quantity)) {
-    const signer = new ArweaveSigner(jwk);
-    const dataItem = createData(payloadBytes, signer, {
-      tags: input.tags?.map((tag) => ({ name: tag.name, value: tag.value })),
+  if (viaBundler && payloadBytes.byteLength > DISPATCH_BUNDLE_THRESHOLD_BYTES && !transfersAr(input.quantity)) {
+    const raw = buildUnsignedDataItem(ownerB64Url, {
+      data: payloadBytes,
+      tags: plainTags(input.tags),
       target: input.target,
     });
-    await dataItem.sign(signer);
-    await postDataItemToBundler(bundlerUrl, new Uint8Array(dataItem.getRaw()));
-    return { id: dataItem.id, type: "BUNDLED" };
+    return { kind: "dataItem", raw };
   }
 
-  const client = buildClient(gatewayUrl);
-  const transaction = await buildTransaction(client, jwk, input, payloadBytes);
-  await client.transactions.sign(transaction, jwk);
+  const transaction = await buildUnsignedTransaction(
+    gatewayUrl,
+    ownerB64Url,
+    transactionAttributes(input, payloadBytes),
+    input.tags,
+  );
+  return { kind: "transaction", transaction };
+}
 
-  const response = await client.transactions.post(transaction);
+/**
+ * Applies the signature to a `prepareDispatch` payload and submits it.
+ * Throws if the bundler or gateway rejects it, so the dApp never gets an
+ * id for data that wasn't stored.
+ */
+export async function finishDispatch(
+  gatewayUrl: string,
+  bundlerUrl: string,
+  unsigned: UnsignedPayload,
+  signature: Uint8Array,
+  expectedOwner: string,
+): Promise<DispatchResult> {
+  const signed = await applySignature(unsigned, signature, expectedOwner);
+  if (signed.kind === "dataItem") {
+    await postDataItemToBundler(bundlerUrl, signed.raw);
+    return { id: signed.id, type: "BUNDLED" };
+  }
+
+  const response = await postTransaction(gatewayUrl, signed.transaction);
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
       `Failed to dispatch transaction to ${gatewayUrl} (HTTP ${response.status}: ${response.statusText}).`,
     );
   }
-
-  return { id: transaction.id, type: "BASE" };
+  return { id: signed.id, type: "BASE" };
 }
 
-/**
- * Signs one ANS-104 data item and returns its raw bytes. `input.data` is
- * standard base64 and tags are plain text.
- */
-export async function signDataItem(jwk: JWKInterface, input: DataItemInput): Promise<Uint8Array<ArrayBuffer>> {
-  const signer = new ArweaveSigner(jwk);
-  const dataItem = createData(base64ToBytes(input.data), signer, {
-    tags: input.tags?.map((tag) => ({ name: tag.name, value: tag.value })),
+/** Signs a transaction with a keyfile and submits it; see `prepareDispatch` for where it goes. */
+export async function dispatchTransaction(
+  gatewayUrl: string,
+  bundlerUrl: string,
+  jwk: JWKInterface,
+  input: SignTransactionInput,
+  options: DispatchOptions,
+): Promise<DispatchResult> {
+  const unsigned = await prepareDispatch(gatewayUrl, jwk.n, input, options);
+  return finishDispatch(gatewayUrl, bundlerUrl, unsigned, await signPayloadWithJwk(unsigned, jwk), jwk.n);
+}
+
+/** The unsigned item for a dApp's `signDataItem`. `input.data` is standard base64 and tags are plain text. */
+export function prepareDataItem(ownerB64Url: string, input: DataItemInput): Bytes {
+  return buildUnsignedDataItem(ownerB64Url, {
+    data: base64ToBytes(input.data),
+    tags: plainTags(input.tags),
     target: input.target,
     anchor: input.anchor,
   });
-  await dataItem.sign(signer);
-  return new Uint8Array(dataItem.getRaw());
 }
 
-/** Signs each item in order with the same key. */
-export async function batchSignDataItem(
-  jwk: JWKInterface,
-  inputs: DataItemInput[],
-): Promise<Array<Uint8Array<ArrayBuffer>>> {
-  const results: Array<Uint8Array<ArrayBuffer>> = [];
-  for (const input of inputs) {
-    results.push(await signDataItem(jwk, input));
+/** Applies the signature to a `prepareDataItem` result and returns the raw signed item. */
+export async function finishDataItem(unsigned: Uint8Array, signature: Uint8Array, expectedOwner: string): Promise<Bytes> {
+  return (await applyDataItemSignature(unsigned, signature, expectedOwner)).raw;
+}
+
+/** Signs one ANS-104 data item with a keyfile and returns its raw bytes. */
+export async function signDataItem(jwk: JWKInterface, input: DataItemInput): Promise<Bytes> {
+  const unsigned = prepareDataItem(jwk.n, input);
+  return finishDataItem(unsigned, await signDataItemWithJwk(unsigned, jwk), jwk.n);
+}
+
+export function prepareDataItems(ownerB64Url: string, inputs: DataItemInput[]): Bytes[] {
+  return inputs.map((input) => prepareDataItem(ownerB64Url, input));
+}
+
+/** One signature per unsigned item, in the same order. */
+export async function finishDataItems(
+  unsigned: Uint8Array[],
+  signatures: Uint8Array[],
+  expectedOwner: string,
+): Promise<Bytes[]> {
+  if (unsigned.length !== signatures.length) {
+    throw new Error(`Expected ${unsigned.length} signatures, got ${signatures.length}.`);
+  }
+  const results: Bytes[] = [];
+  for (const [index, item] of unsigned.entries()) {
+    results.push(await finishDataItem(item, signatures[index]!, expectedOwner));
   }
   return results;
+}
+
+/** Signs each item in order with the same keyfile. */
+export async function batchSignDataItem(jwk: JWKInterface, inputs: DataItemInput[]): Promise<Bytes[]> {
+  const unsigned = prepareDataItems(jwk.n, inputs);
+  const signatures: Bytes[] = [];
+  for (const item of unsigned) {
+    signatures.push(await signDataItemWithJwk(item, jwk));
+  }
+  return finishDataItems(unsigned, signatures, jwk.n);
 }

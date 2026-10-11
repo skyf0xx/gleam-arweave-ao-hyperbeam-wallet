@@ -1,17 +1,11 @@
-import { ArweaveSigner, createData } from "@dha-team/arbundles/web";
 import type { JWKInterface } from "../models/wallet";
+import { createSignedDataItem } from "./data-item";
 import type { UploadTag } from "../models/upload";
 
 /**
  * This module never decrypts anything itself — it accepts an
  * already-decrypted `JWKInterface` and never imports `core/vault`,
  * matching `core/arweave/transfer.ts`'s signing-capability boundary.
- *
- * Imports from `@dha-team/arbundles/web`, not the package root: the
- * root's Node build pulls in streamed-upload helpers that import
- * `axios`, an undeclared dependency this project doesn't need (uploads
- * here are in-memory `Uint8Array` payloads). The `/web` subpath is the
- * browser-safe entry point that resolves in an MV3 service worker.
  */
 
 const BUNDLER_TX_ENDPOINT_SUFFIX = "/tx";
@@ -38,21 +32,16 @@ export async function submitUploadToBundler(
   tags: UploadTag[],
   licenseTag: UploadTag | null,
 ): Promise<SubmittedUpload> {
-  const signer = new ArweaveSigner(jwk);
   const allTags: UploadTag[] = [
     { name: "Content-Type", value: contentType },
     ...tags,
     ...(licenseTag ? [licenseTag] : []),
   ];
 
-  const dataItem = createData(data, signer, { tags: allTags });
-  await dataItem.sign(signer);
+  const { id, raw } = await createSignedDataItem(jwk, { data, tags: allTags });
+  await postDataItemToBundler(bundlerUrl, raw);
 
-  // getRaw() is typed as a Node Buffer even via the /web entry point;
-  // copy into a plain Uint8Array to satisfy fetch's BodyInit typing.
-  await postDataItemToBundler(bundlerUrl, new Uint8Array(dataItem.getRaw()));
-
-  return { txId: dataItem.id };
+  return { txId: id };
 }
 
 /**
