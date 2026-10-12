@@ -113,6 +113,9 @@ interface DefaultTokenRow {
  */
 const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
 
+// The rest of the history is one click away through "View all".
+const ACTIVITY_PREVIEW_LIMIT = 6;
+
 function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null, amount: number): string | undefined {
   const price = prices?.find((entry) => entry.processId === processId)?.usd;
   return typeof price === "number" ? formatUsd(amount * price) : undefined;
@@ -563,7 +566,7 @@ export function MainScreenView({
               ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
                 <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
               ) : (
-                activityQuery.data.entries.slice(0, 10).map((entry) => (
+                activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => (
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}

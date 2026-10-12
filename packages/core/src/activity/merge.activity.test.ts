@@ -43,6 +43,24 @@ describe("mergeActivity", () => {
     expect(page.entries[0]?.status).toBe("failed");
   });
 
+  it("keeps a CU-settled local status when the gateway has the item but no block yet", () => {
+    const local = [entry({ txId: "tx-1", timestamp: 100, status: "confirmed" })];
+    const gateway = [entry({ txId: "tx-1", timestamp: 0, status: "pending" })];
+
+    const page = mergeActivity(local, gateway, 10);
+
+    expect(page.entries[0]).toMatchObject({ status: "confirmed", timestamp: 100 });
+  });
+
+  it("keeps the local timestamp when the gateway entry has none", () => {
+    const local = [entry({ txId: "tx-1", timestamp: 100, status: "pending" })];
+    const gateway = [entry({ txId: "tx-1", timestamp: 0, status: "confirmed" })];
+
+    const page = mergeActivity(local, gateway, 10);
+
+    expect(page.entries[0]).toMatchObject({ status: "confirmed", timestamp: 100 });
+  });
+
   it("keeps a local-only pending entry the gateway hasn't indexed yet", () => {
     const local = [entry({ txId: "still-pending", timestamp: 300, status: "pending" })];
     const gateway: ActivityEntry[] = [];

@@ -109,7 +109,7 @@ function ScanStep({
     <>
       <ol className="flex list-decimal flex-col gap-1 pl-5 text-body leading-relaxed text-muted">
         <li>On the Keystone, open the Arweave wallet, or choose Connect Software Wallet.</li>
-        <li>Choose Gleam, or a generic option if Gleam isn't listed.</li>
+        <li>Choose Wander or Beacon.</li>
         <li>Hold the QR it shows up to the camera.</li>
       </ol>
       <Scanner

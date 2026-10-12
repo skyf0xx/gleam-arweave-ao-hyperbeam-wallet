@@ -11,12 +11,22 @@ function fakeGraphQLFetch(edges: unknown[], ok = true): typeof fetch {
   })) as unknown as typeof fetch;
 }
 
+/** Answers the owners-side query with `sent` and the recipients-side query with `received`. */
+function fakeSidedFetch(sent: unknown[], received: unknown[]): typeof fetch {
+  return vi.fn(async (_url: string, init: RequestInit) => {
+    const { query } = JSON.parse(init.body as string) as { query: string };
+    const edges = query.includes("owners:") ? sent : received;
+    return { ok: true, status: 200, json: async () => ({ data: { transactions: { edges } } }) };
+  }) as unknown as typeof fetch;
+}
+
 function edge(overrides: {
   id: string;
   ownerAddress: string;
   recipient: string | null;
   winston: string;
   timestamp: number | null;
+  tags?: Array<{ name: string; value: string }>;
 }) {
   return {
     cursor: overrides.id,
@@ -25,7 +35,7 @@ function edge(overrides: {
       owner: { address: overrides.ownerAddress },
       recipient: overrides.recipient,
       quantity: { winston: overrides.winston },
-      tags: [{ name: "App-Name", value: "Gleam" }],
+      tags: overrides.tags ?? [{ name: "App-Name", value: "Gleam" }],
       block: overrides.timestamp === null ? null : { timestamp: overrides.timestamp },
     },
   };
@@ -66,7 +76,7 @@ describe("queryActivityTransactions", () => {
     expect(typeof entry?.amount).toBe("string");
   });
 
-  it("posts to {gateway}/graphql with owners/recipients set to the address", async () => {
+  it("queries the owners and recipients sides separately, since the gateway ANDs them", async () => {
     const fetchImpl = fakeGraphQLFetch([]);
     await queryActivityTransactions(ADDRESS, "https://arweave.net/", 25, fetchImpl);
 
@@ -74,10 +84,64 @@ describe("queryActivityTransactions", () => {
       "https://arweave.net/graphql",
       expect.objectContaining({ method: "POST" }),
     );
-    const call = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0]!;
-    const body = JSON.parse(call[1].body);
-    expect(body.variables.address).toEqual([ADDRESS]);
-    expect(body.variables.first).toBe(25);
+    const bodies = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls.map((call) => JSON.parse(call[1].body));
+    expect(bodies).toHaveLength(2);
+    for (const body of bodies) {
+      expect(body.variables.address).toEqual([ADDRESS]);
+      expect(body.variables.first).toBe(25);
+      expect(body.query.includes("owners:") && body.query.includes("recipients:")).toBe(false);
+    }
+  });
+
+  it("returns both what the address sent and what it received", async () => {
+    const fetchImpl = fakeSidedFetch(
+      [edge({ id: "out", ownerAddress: ADDRESS, recipient: "otherAddr", winston: "5", timestamp: 2 })],
+      [edge({ id: "in", ownerAddress: "otherAddr", recipient: ADDRESS, winston: "7", timestamp: 1 })],
+    );
+
+    const entries = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entries.map((entry) => [entry.txId, entry.type])).toEqual(
+      expect.arrayContaining([
+        ["out", "send"],
+        ["in", "receive"],
+      ]),
+    );
+    expect(entries).toHaveLength(2);
+  });
+
+  it("leaves AO messages and zero-AR transactions out of the AR feed", async () => {
+    const aoTags = [{ name: "Data-Protocol", value: "ao" }];
+    const fetchImpl = fakeSidedFetch(
+      [edge({ id: "aoOut", ownerAddress: ADDRESS, recipient: "process", winston: "0", timestamp: 1, tags: aoTags })],
+      [
+        edge({ id: "notice", ownerAddress: "mu", recipient: ADDRESS, winston: "0", timestamp: 1, tags: aoTags }),
+        edge({ id: "dataItem", ownerAddress: "otherAddr", recipient: ADDRESS, winston: "0", timestamp: 1 }),
+      ],
+    );
+
+    expect(await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl)).toEqual([]);
+  });
+
+  it("classifies a targetless zero-AR transaction the address signed as an upload", async () => {
+    const fetchImpl = fakeSidedFetch(
+      [edge({ id: "up", ownerAddress: ADDRESS, recipient: "", winston: "0", timestamp: 1 })],
+      [],
+    );
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry).toMatchObject({ txId: "up", type: "upload", address: ADDRESS, amount: null });
+  });
+
+  it("keeps a self-send once, as a send", async () => {
+    const self = edge({ id: "self", ownerAddress: ADDRESS, recipient: ADDRESS, winston: "3", timestamp: 1 });
+    const fetchImpl = fakeSidedFetch([self], [self]);
+
+    const entries = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.type).toBe("send");
   });
 
   it("throws when the gateway response is not ok", async () => {
@@ -99,12 +163,13 @@ describe("queryActivityTransactions", () => {
     ).rejects.toThrow(/bad query/);
   });
 
-  it("treats a null block as timestamp 0 (not-yet-mined edge case)", async () => {
+  it("reports a transaction with no block yet as pending, timestamp 0", async () => {
     const fetchImpl = fakeGraphQLFetch([
       edge({ id: "tx4", ownerAddress: ADDRESS, recipient: "x", winston: "1", timestamp: null }),
     ]);
     const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
     expect(entry?.timestamp).toBe(0);
+    expect(entry?.status).toBe("pending");
   });
 
   it("falls through to the next gateway when the first one fails", async () => {
@@ -121,7 +186,8 @@ describe("queryActivityTransactions", () => {
     const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
 
     expect(entry?.txId).toBe("tx5");
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    // Each of the two queries fails over once.
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
   it("throws only after every candidate gateway fails", async () => {
@@ -141,6 +207,7 @@ function aoEdge(overrides: {
   id: string;
   ownerAddress: string;
   recipient: string | null;
+  action?: string;
   quantity: string;
   timestamp: number | null;
   extraTags?: Array<{ name: string; value: string }>;
@@ -152,7 +219,7 @@ function aoEdge(overrides: {
       owner: { address: overrides.ownerAddress },
       recipient: overrides.recipient,
       tags: [
-        { name: "Action", value: "Transfer" },
+        { name: "Action", value: overrides.action ?? "Transfer" },
         { name: "Data-Protocol", value: "ao" },
         { name: "Quantity", value: overrides.quantity },
         ...(overrides.extraTags ?? []),
@@ -162,42 +229,86 @@ function aoEdge(overrides: {
   };
 }
 
-function fakeAoFetch(edges: unknown[], ok = true): typeof fetch {
-  return vi.fn(async () => ({
-    ok,
-    status: ok ? 200 : 500,
-    json: async () => ({ data: { transactions: { edges } } }),
-  })) as unknown as typeof fetch;
+const PROCESS = "tokenProcess";
+
+function sentTransfer(id: string, payee: string, quantity: string) {
+  return aoEdge({
+    id,
+    ownerAddress: ADDRESS,
+    recipient: PROCESS,
+    quantity,
+    timestamp: 100,
+    extraTags: [{ name: "Recipient", value: payee }],
+  });
+}
+
+function creditNotice(id: string, payer: string, quantity: string) {
+  return aoEdge({
+    id,
+    ownerAddress: "muSigner",
+    recipient: ADDRESS,
+    action: "Credit-Notice",
+    quantity,
+    timestamp: 100,
+    extraTags: [
+      { name: "Sender", value: payer },
+      { name: "From-Process", value: PROCESS },
+    ],
+  });
 }
 
 describe("queryAoTransferActivity", () => {
-  it("parses an AO transfer with the raw Quantity tag as a plain integer string (not winston-shaped)", async () => {
-    const fetchImpl = fakeAoFetch([
-      aoEdge({ id: "msg1", ownerAddress: "senderAddr", recipient: ADDRESS, quantity: "1500000", timestamp: 100 }),
-    ]);
+  it("reads a send from a Transfer the address signed: payee from the Recipient tag, token from its target", async () => {
+    const fetchImpl = fakeSidedFetch([sentTransfer("msg1", "payee", "1500000")], []);
 
     const [entry] = await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
 
-    expect(entry?.amount).toBe("1500000");
-    expect(entry?.type).toBe("receive");
-    expect(entry?.token).toBe(ADDRESS);
-    expect(entry?.status).toBe("confirmed");
+    expect(entry).toMatchObject({
+      txId: "msg1",
+      type: "send",
+      status: "confirmed",
+      address: "payee",
+      amount: "1500000",
+      token: PROCESS,
+    });
   });
 
-  it("classifies a transfer where address is the message owner as a send", async () => {
-    const fetchImpl = fakeAoFetch([
-      aoEdge({ id: "msg2", ownerAddress: ADDRESS, recipient: "processId", quantity: "10", timestamp: 100 }),
-    ]);
+  it("reads a receive from a Credit-Notice: payer from Sender, token from From-Process", async () => {
+    const fetchImpl = fakeSidedFetch([], [creditNotice("notice1", "payer", "42")]);
 
     const [entry] = await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
 
-    expect(entry?.type).toBe("send");
+    expect(entry).toMatchObject({
+      txId: "notice1",
+      type: "receive",
+      status: "confirmed",
+      address: "payer",
+      amount: "42",
+      token: PROCESS,
+    });
+  });
+
+  it("filters sends by owner and receives by the Credit-Notice action", async () => {
+    const fetchImpl = fakeSidedFetch([], []);
+    await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    const queries = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => (JSON.parse(call[1].body) as { query: string }).query,
+    );
+    expect(queries.find((query) => query.includes("owners:"))).toContain('values: ["Transfer"]');
+    expect(queries.find((query) => query.includes("recipients:"))).toContain('values: ["Credit-Notice"]');
+  });
+
+  it("drops a Credit-Notice with no From-Process, since its token is unknown", async () => {
+    const notice = creditNotice("notice2", "payer", "1");
+    notice.node.tags = notice.node.tags.filter((tag) => tag.name !== "From-Process");
+    const fetchImpl = fakeSidedFetch([], [notice]);
+
+    expect(await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl)).toEqual([]);
   });
 
   it("carries the Data-Protocol: ao tag through so merge.ts can detect failure", async () => {
-    const fetchImpl = fakeAoFetch([
-      aoEdge({ id: "msg3", ownerAddress: "senderAddr", recipient: ADDRESS, quantity: "1", timestamp: 1 }),
-    ]);
+    const fetchImpl = fakeSidedFetch([sentTransfer("msg3", "payee", "1")], []);
 
     const [entry] = await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
 
@@ -205,14 +316,13 @@ describe("queryAoTransferActivity", () => {
   });
 
   it("falls through to the next gateway on a first-gateway failure", async () => {
-    const goodEdges = [
-      aoEdge({ id: "msg4", ownerAddress: "senderAddr", recipient: ADDRESS, quantity: "1", timestamp: 1 }),
-    ];
-    const fetchImpl = vi.fn(async (url: string) => {
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
       if (url.startsWith("https://arweave.net")) {
         return { ok: false, status: 502, json: async () => ({}) };
       }
-      return { ok: true, status: 200, json: async () => ({ data: { transactions: { edges: goodEdges } } }) };
+      const { query } = JSON.parse(init.body as string) as { query: string };
+      const edges = query.includes("owners:") ? [sentTransfer("msg4", "payee", "1")] : [];
+      return { ok: true, status: 200, json: async () => ({ data: { transactions: { edges } } }) };
     }) as unknown as typeof fetch;
 
     const [entry] = await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);

@@ -1,5 +1,4 @@
 import type { ActivityEntry } from "../models/activity";
-import { isRegisteredProcessId, resolveUnregisteredTokenMetadata } from "../pricing/token-sources";
 
 /**
  * Minimal shape of the gateway's GraphQL transaction connection response
@@ -89,11 +88,27 @@ async function postGraphQLWithFailover<T>(
   throw lastError ?? new Error("Gateway GraphQL query failed against every candidate gateway.");
 }
 
+const TRANSACTION_FIELDS = `
+  edges {
+    cursor
+    node {
+      id
+      owner { address }
+      recipient
+      quantity { winston }
+      tags { name value }
+      block { timestamp }
+    }
+  }
+`;
+
 /**
- * One page of gateway GraphQL transaction results for `address`, queried
- * as owner (sent) union recipient (received) — combined by the
- * `activity` layer's merge logic with the local action log. Falls
- * through to `FALLBACK_GATEWAYS` if `gatewayUrl` fails — see
+ * One page of AR activity for `address`: what it sent, uploaded and
+ * received. The gateway ANDs `owners` with `recipients`, so the two
+ * sides are separate queries. AO messages are left to
+ * `queryAoTransferActivity`, and a zero-AR transaction to `address` (an
+ * AO notice, a data item) is not a receive. Falls through to
+ * `FALLBACK_GATEWAYS` if `gatewayUrl` fails — see
  * `postGraphQLWithFailover`.
  */
 export async function queryActivityTransactions(
@@ -102,48 +117,60 @@ export async function queryActivityTransactions(
   limit: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ActivityEntry[]> {
-  const query = `
-    query ($address: [String!], $first: Int!) {
-      transactions(owners: $address, recipients: $address, first: $first, sort: HEIGHT_DESC) {
-        edges {
-          cursor
-          node {
-            id
-            owner { address }
-            recipient
-            quantity { winston }
-            tags { name value }
-            block { timestamp }
-          }
-        }
-      }
+  const describe = (gw: string, detail: string) =>
+    `Gateway GraphQL query for "${address}" against "${gw}" failed: ${detail}`;
+  const run = async (query: string) => {
+    const body = await postGraphQLWithFailover<GraphQLTransactionsResponse>(
+      gatewayUrl,
+      query,
+      { address: [address], first: limit },
+      fetchImpl,
+      describe,
+    );
+    return (body.data?.transactions?.edges ?? []).map(({ node }) => node).filter((node) => !isAoMessage(node.tags));
+  };
+
+  const [sent, received] = await Promise.all([
+    run(`query ($address: [String!], $first: Int!) {
+      transactions(owners: $address, first: $first, sort: HEIGHT_DESC) { ${TRANSACTION_FIELDS} }
+    }`),
+    run(`query ($address: [String!], $first: Int!) {
+      transactions(recipients: $address, first: $first, sort: HEIGHT_DESC) { ${TRANSACTION_FIELDS} }
+    }`),
+  ]);
+
+  // Keyed by id: gateways can return the same node twice, and a self-send
+  // shows up on both sides (kept as the send).
+  const byId = new Map<string, ActivityEntry>();
+  for (const node of received) {
+    if (node.owner.address !== address && BigInt(node.quantity.winston || "0") > 0n) {
+      byId.set(node.id, toActivityEntry(node, address));
     }
-  `;
+  }
+  for (const node of sent) {
+    if (node.owner.address === address) byId.set(node.id, toActivityEntry(node, address));
+  }
+  return [...byId.values()];
+}
 
-  const body = await postGraphQLWithFailover<GraphQLTransactionsResponse>(
-    gatewayUrl,
-    query,
-    { address: [address], first: limit },
-    fetchImpl,
-    (gw, detail) => `Gateway GraphQL query for "${address}" against "${gw}" failed: ${detail}`,
-  );
-
-  const edges = body.data?.transactions?.edges ?? [];
-
-  return edges.map(({ node }) => toActivityEntry(node, address));
+function isAoMessage(tags: GraphQLTag[]): boolean {
+  return tagValue(tags, "Data-Protocol")?.toLowerCase() === "ao";
 }
 
 function toActivityEntry(node: GraphQLTransactionNode, address: string): ActivityEntry {
-  const type = node.owner.address === address ? "send" : "receive";
+  const sent = node.owner.address === address;
+  // A transaction the wallet signed with no target and no AR is a data
+  // upload, which the local log records as "upload".
+  const isUpload = sent && !node.recipient && BigInt(node.quantity.winston || "0") === 0n;
+  const type = isUpload ? "upload" : sent ? "send" : "receive";
   return {
     txId: node.id,
     type,
-    // Gateway-indexed means already included in a block; Arweave has no
-    // post-inclusion failure state, so this is always "confirmed" — only
-    // the local optimistic log ever produces "pending".
-    status: "confirmed",
-    address: type === "send" ? (node.recipient ?? "") : node.owner.address,
-    amount: node.quantity.winston,
+    // No block yet means accepted but not mined (or its bundle not yet
+    // mined). Arweave has no failure state after a block includes it.
+    status: node.block ? "confirmed" : "pending",
+    address: isUpload ? address : sent ? (node.recipient ?? "") : node.owner.address,
+    amount: isUpload ? null : node.quantity.winston,
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
   };
@@ -176,19 +203,30 @@ function tagValue(tags: GraphQLTag[], name: string): string | null {
   return tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase())?.value ?? null;
 }
 
+const AO_TRANSFER_FIELDS = `
+  edges {
+    cursor
+    node {
+      id
+      owner { address }
+      recipient
+      tags { name value }
+      block { timestamp }
+    }
+  }
+`;
+
 /**
- * One page of AO transfer activity for `address`, read from the same
- * gateway `/graphql` endpoint `queryActivityTransactions` uses, filtered
- * by AO's transfer-message tag convention. Only the recipient-side query
- * is issued: an AO transfer message has exactly one recipient named by
- * its `Recipient` tag, and `owner` on that same message identifies the
- * sender, so one tag-filtered query recovers both directions.
+ * One page of AO token activity for `address`, from the same gateway
+ * `/graphql` endpoint `queryActivityTransactions` uses. Two queries:
  *
- * Denomination is resolved once per distinct process id per page (not
- * once per entry) to avoid a metadata lookup per transfer. A transfer
- * whose process id can't be resolved is still returned with its raw
- * `Quantity` tag value as `amount` and no `token` set, rather than
- * dropped.
+ * - Sends are the `Transfer` messages `address` signed. Their target
+ *   (`recipient`) is the token process; the payee is the `Recipient` tag.
+ * - Receives are the `Credit-Notice` messages a token process pushes to
+ *   `address` once a transfer executes. The payer is the `Sender` tag and
+ *   the token is `From-Process`. A `Transfer` naming `address` in its
+ *   `Recipient` tag is only a request the process may still reject, so
+ *   it is not used as the receive.
  */
 export async function queryAoTransferActivity(
   address: string,
@@ -196,75 +234,74 @@ export async function queryAoTransferActivity(
   limit: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ActivityEntry[]> {
-  const query = `
-    query ($recipients: [String!], $first: Int!) {
-      transactions(recipients: $recipients, first: $first, sort: HEIGHT_DESC, tags: [
+  const describe = (gw: string, detail: string) =>
+    `Gateway AO-transfer GraphQL query for "${address}" against "${gw}" failed: ${detail}`;
+  const run = async (query: string) => {
+    const body = await postGraphQLWithFailover<GraphQLAoTransferResponse>(
+      gatewayUrl,
+      query,
+      { address: [address], first: limit },
+      fetchImpl,
+      describe,
+    );
+    return (body.data?.transactions?.edges ?? []).map(({ node }) => node);
+  };
+
+  const [sent, received] = await Promise.all([
+    run(`query ($address: [String!], $first: Int!) {
+      transactions(owners: $address, first: $first, sort: HEIGHT_DESC, tags: [
+        { name: "Data-Protocol", values: ["ao"] },
         { name: "Action", values: ["Transfer"] }
-      ]) {
-        edges {
-          cursor
-          node {
-            id
-            owner { address }
-            recipient
-            tags { name value }
-            block { timestamp }
-          }
-        }
-      }
-    }
-  `;
+      ]) { ${AO_TRANSFER_FIELDS} }
+    }`),
+    run(`query ($address: [String!], $first: Int!) {
+      transactions(recipients: $address, first: $first, sort: HEIGHT_DESC, tags: [
+        { name: "Data-Protocol", values: ["ao"] },
+        { name: "Action", values: ["Credit-Notice"] }
+      ]) { ${AO_TRANSFER_FIELDS} }
+    }`),
+  ]);
 
-  const body = await postGraphQLWithFailover<GraphQLAoTransferResponse>(
-    gatewayUrl,
-    query,
-    { recipients: [address], first: limit },
-    fetchImpl,
-    (gw, detail) => `Gateway AO-transfer GraphQL query for "${address}" against "${gw}" failed: ${detail}`,
-  );
-
-  const edges = body.data?.transactions?.edges ?? [];
-
-  const processIds = new Set(edges.map(({ node }) => node.recipient).filter((id): id is string => id !== null));
-  const denominationByProcessId = new Map<string, number>();
-  await Promise.all(
-    [...processIds].map(async (processId) => {
-      if (isRegisteredProcessId(processId)) return;
-      const metadata = await resolveUnregisteredTokenMetadata(processId, gatewayUrl, fetchImpl);
-      if (metadata?.denomination !== null && metadata?.denomination !== undefined) {
-        denominationByProcessId.set(processId, metadata.denomination);
-      }
-    }),
-  );
-
-  return edges.map(({ node }) => toAoActivityEntry(node, address, denominationByProcessId));
+  const byId = new Map<string, ActivityEntry>();
+  for (const node of sent) {
+    if (node.owner.address === address) byId.set(node.id, toAoSendEntry(node));
+  }
+  for (const node of received) {
+    const entry = toAoReceiveEntry(node);
+    if (entry) byId.set(node.id, entry);
+  }
+  return [...byId.values()];
 }
 
-function toAoActivityEntry(
-  node: GraphQLAoTransferNode,
-  address: string,
-  denominationByProcessId: Map<string, number>,
-): ActivityEntry {
-  const type = node.owner.address === address ? "send" : "receive";
-  const processId = node.recipient;
-  const quantity = tagValue(node.tags, "Quantity") ?? "0";
-
-  // amount stays a raw atomic-integer string here, matching every other
-  // ActivityEntry producer; a caller needing a human-scaled value
-  // resolves denomination itself (see withUnregisteredMetadata in reads.ts).
-  void denominationByProcessId;
-
+function toAoSendEntry(node: GraphQLAoTransferNode): ActivityEntry {
   return {
     txId: node.id,
-    type,
+    type: "send",
     // Reached the AO process, whether or not its handler accepted it;
     // failed-transfer detection is merge.ts's concern, not this parser's.
     status: "confirmed",
-    address: type === "send" ? (node.recipient ?? "") : node.owner.address,
-    amount: quantity,
+    address: tagValue(node.tags, "Recipient") ?? "",
+    amount: tagValue(node.tags, "Quantity") ?? "0",
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
-    token: processId,
+    token: node.recipient,
+  };
+}
+
+function toAoReceiveEntry(node: GraphQLAoTransferNode): ActivityEntry | null {
+  const token = tagValue(node.tags, "From-Process");
+  if (!token) return null;
+  return {
+    txId: node.id,
+    type: "receive",
+    // A Credit-Notice exists only once the token process has executed the
+    // transfer.
+    status: "confirmed",
+    address: tagValue(node.tags, "Sender") ?? "",
+    amount: tagValue(node.tags, "Quantity") ?? "0",
+    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+    timestamp: node.block ? node.block.timestamp * 1000 : 0,
+    token,
   };
 }
 

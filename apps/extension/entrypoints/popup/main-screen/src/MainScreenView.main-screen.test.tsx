@@ -573,14 +573,14 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     },
   );
 
-  it("caps the Activity tab at the 10 most recent entries even when more exist", async () => {
+  it("caps the Activity tab at the 6 most recent entries even when more exist", async () => {
     const send = sendWith({ activity: manyEntries(15) });
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
-    await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBe(10));
+    await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBe(6));
   });
 
   it("clicking the Activity tab's View all action opens lunar.arweave.net for the wallet address", async () => {

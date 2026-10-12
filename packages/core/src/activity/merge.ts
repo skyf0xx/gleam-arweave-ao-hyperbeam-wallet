@@ -6,10 +6,10 @@ import type { ActivityEntry, ActivityPage } from "../models/activity";
  * deduplicated, most-recent-N `ActivityPage`.
  *
  * Dedup rule: entries are keyed by `txId`. When both sources report the
- * same `txId`, the gateway entry wins — it carries a real `status`
- * ("confirmed", since GraphQL only indexes settled transactions) where
- * the local entry may still say "pending". The local entry survives only
- * for `txId`s the gateway hasn't indexed yet.
+ * same `txId`, the gateway entry wins once it is in a block — it carries
+ * a real `"confirmed"` where the local entry may still say "pending". A
+ * gateway entry with no block yet keeps the local entry's status. The
+ * local entry survives alone for `txId`s the gateway hasn't indexed yet.
  *
  * Exception: a local entry already settled as `"failed"` stays failed. The
  * gateway indexing a message only proves it reached the network; a local
@@ -30,10 +30,20 @@ export function mergeActivity(
     // Gateway entries win on conflict — see doc comment.
     const settled = withFailedAoTransferDetection(entry);
     const local = byTxId.get(entry.txId);
-    byTxId.set(
-      entry.txId,
-      local?.status === "failed" ? { ...settled, status: "failed", error: local.error ?? settled.error } : settled,
-    );
+    if (!local) {
+      byTxId.set(entry.txId, settled);
+      continue;
+    }
+    const timestamp = settled.timestamp > 0 ? settled.timestamp : local.timestamp;
+    if (local.status === "failed") {
+      byTxId.set(entry.txId, { ...settled, timestamp, status: "failed", error: local.error ?? settled.error });
+    } else if (settled.status === "pending") {
+      // Indexed but not yet in a block says nothing new; keep the local
+      // status, which the CU result may already have settled.
+      byTxId.set(entry.txId, { ...local, timestamp });
+    } else {
+      byTxId.set(entry.txId, { ...settled, timestamp });
+    }
   }
 
   const merged = [...byTxId.values()].sort((a, b) => b.timestamp - a.timestamp);
