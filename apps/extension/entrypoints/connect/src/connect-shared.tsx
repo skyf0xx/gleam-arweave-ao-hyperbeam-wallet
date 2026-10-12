@@ -19,7 +19,7 @@ export function backgroundErrorText(error: unknown): string {
 export function ConnectShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="min-h-screen bg-canvas px-4 py-10 text-foreground">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-lg border border-line bg-background p-6">
+      <div className="mx-auto flex w-full max-w-(--container-md) flex-col gap-5 rounded-lg border border-line bg-background p-6">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-h3 font-semibold tracking-tight">{title}</h1>
           <Beam />
