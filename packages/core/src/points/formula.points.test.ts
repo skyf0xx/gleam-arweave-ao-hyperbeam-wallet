@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { curve } from "./curve";
 import { computeDailyPoints, estimatePoints, ownDailyRate, type WalletSnapshot } from "./formula";
 
 const ONE = "1000000000000";
 
 function wallet(address: string, overrides: Partial<WalletSnapshot> = {}): WalletSnapshot {
-  return { address, arAtomic: "0", aoAtomic: "0", live: true, referredBy: null, originalFounder: false, ...overrides };
+  return { address, deviceId: address, arAtomic: "0", aoAtomic: "0", live: true, referredBy: null, originalFounder: false, ...overrides };
 }
 
 describe("computeDailyPoints", () => {
@@ -127,14 +128,57 @@ describe("estimatePoints", () => {
   });
 });
 
+describe("whale curve", () => {
+  const AR = 10n ** 12n;
+
+  it("curves a lone wallet's balance", () => {
+    const points = computeDailyPoints([wallet("a", { arAtomic: (1_000n * AR).toString() })]);
+    expect(BigInt(points.get("a")!.holdingAtomic) / AR).toBe(532n);
+  });
+
+  it("applies the curve once to an install's combined balance and splits it by balance", () => {
+    const points = computeDailyPoints([
+      wallet("a", { deviceId: "d", arAtomic: (750n * AR).toString() }),
+      wallet("b", { deviceId: "d", aoAtomic: (250n * AR).toString() }),
+    ]);
+    const a = BigInt(points.get("a")!.holdingAtomic);
+    const b = BigInt(points.get("b")!.holdingAtomic);
+    expect((a + b) / AR).toBe(532n);
+    expect(a / b).toBe(3n);
+  });
+
+  it("does not combine wallets on different installs", () => {
+    const points = computeDailyPoints([
+      wallet("a", { deviceId: "d1", arAtomic: (500n * AR).toString() }),
+      wallet("b", { deviceId: "d2", arAtomic: (500n * AR).toString() }),
+    ]);
+    expect(points.get("a")!.holdingAtomic).toBe(points.get("b")!.holdingAtomic);
+    expect(BigInt(points.get("a")!.holdingAtomic)).toBeGreaterThan(curve(1_000n * AR) / 2n);
+  });
+
+  it("pays referral bonuses on the curved base", () => {
+    const points = computeDailyPoints([
+      wallet("referrer"),
+      wallet("whale", { arAtomic: (10_000n * AR).toString(), referredBy: "referrer" }),
+    ]);
+    expect(BigInt(points.get("referrer")!.referrerBonusAtomic) / AR).toBe(190n);
+  });
+});
+
 describe("ownDailyRate", () => {
   it("adds the referee bonus only when referred", () => {
-    expect(ownDailyRate("100", "50", false)).toBe("150");
-    expect(ownDailyRate("100", "50", true)).toBe("165");
+    expect(ownDailyRate("150", "150", false)).toBe("150");
+    expect(ownDailyRate("150", "150", true)).toBe("165");
   });
 
   it("adds it for an original founder, once", () => {
-    expect(ownDailyRate("100", "50", false, true)).toBe("165");
-    expect(ownDailyRate("100", "50", true, true)).toBe("165");
+    expect(ownDailyRate("150", "150", false, true)).toBe("165");
+    expect(ownDailyRate("150", "150", true, true)).toBe("165");
+  });
+
+  it("takes the wallet's share of its install's curved balance", () => {
+    const AR = 10n ** 12n;
+    const rate = BigInt(ownDailyRate((250n * AR).toString(), (1_000n * AR).toString(), false));
+    expect(rate / AR).toBe(133n);
   });
 });

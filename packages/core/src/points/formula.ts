@@ -4,8 +4,12 @@
  * is already its daily holding points and no conversion is needed.
  */
 
+import { curve } from "./curve";
+
 export interface WalletSnapshot {
   address: string;
+  /** Wallets of one install share a curve, so they share a device id. */
+  deviceId: string;
   arAtomic: string;
   aoAtomic: string;
   /** Whether the wallet's install sent a heartbeat inside the liveness window. */
@@ -26,10 +30,18 @@ export interface DailyPoints {
 
 const BONUS_DIVISOR = 10n;
 
-/** A live wallet's holding points for one day; 0 when it isn't live. */
-export function basePoints(snapshot: Pick<WalletSnapshot, "arAtomic" | "aoAtomic" | "live">): bigint {
-  if (!snapshot.live) return 0n;
-  return parseAtomic(snapshot.arAtomic) + parseAtomic(snapshot.aoAtomic);
+/** A wallet's AR + AO, before the curve. */
+export function rawBalance(arAtomic: string, aoAtomic: string): bigint {
+  return parseAtomic(arAtomic) + parseAtomic(aoAtomic);
+}
+
+/**
+ * A wallet's holding points: the curve applied once to its install's
+ * combined balance, then split by each wallet's share of that balance.
+ */
+export function sharedBase(ownRaw: bigint, deviceRaw: bigint): bigint {
+  if (deviceRaw === 0n) return 0n;
+  return (curve(deviceRaw) * ownRaw) / deviceRaw;
 }
 
 /**
@@ -51,8 +63,17 @@ export function computeDailyPoints(snapshots: readonly WalletSnapshot[]): Map<st
     byAddress.set(snapshot.address, snapshot);
   }
 
+  const raw = new Map<string, bigint>();
+  const deviceRaw = new Map<string, bigint>();
+  for (const snapshot of snapshots) {
+    const own = snapshot.live ? rawBalance(snapshot.arAtomic, snapshot.aoAtomic) : 0n;
+    raw.set(snapshot.address, own);
+    deviceRaw.set(snapshot.deviceId, (deviceRaw.get(snapshot.deviceId) ?? 0n) + own);
+  }
   const base = new Map<string, bigint>();
-  for (const snapshot of snapshots) base.set(snapshot.address, basePoints(snapshot));
+  for (const snapshot of snapshots) {
+    base.set(snapshot.address, sharedBase(raw.get(snapshot.address)!, deviceRaw.get(snapshot.deviceId)!));
+  }
 
   const referrerBonus = new Map<string, bigint>();
   const refereeBonus = new Map<string, bigint>();
@@ -113,12 +134,18 @@ export function estimatePoints(input: PointsEstimateInput): string {
 }
 
 /**
- * Daily rate from a wallet's own balances and whether it was referred.
- * The referrer share depends on other wallets' balances, so callers add
- * the server-reported `referrerBonusAtomic` to this.
+ * Daily rate from a wallet's own balance, its install's combined balance
+ * and whether it was referred. The referrer share depends on other
+ * wallets' balances, so callers add the server-reported
+ * `referrerBonusAtomic` to this.
  */
-export function ownDailyRate(arAtomic: string, aoAtomic: string, referred: boolean, originalFounder = false): string {
-  const base = parseAtomic(arAtomic) + parseAtomic(aoAtomic);
+export function ownDailyRate(
+  ownAtomic: string,
+  deviceAtomic: string,
+  referred: boolean,
+  originalFounder = false,
+): string {
+  const base = sharedBase(parseAtomic(ownAtomic), parseAtomic(deviceAtomic));
   return (referred || originalFounder ? base + base / BONUS_DIVISOR : base).toString();
 }
 

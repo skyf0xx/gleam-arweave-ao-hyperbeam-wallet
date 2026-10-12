@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   PointsMembership,
   PointsScores,
@@ -9,8 +9,8 @@ import type {
   WalletSummary,
 } from "@gleam/core";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
-import { estimatePoints, ownDailyRate } from "@gleam/core/src/points/index.ts";
-import { useBalances } from "../../activity/src/useBalances";
+import { estimatePoints, ownDailyRate, rawBalance } from "@gleam/core/src/points/index.ts";
+import { balancesQuery, type WalletBalances } from "../../activity/src/useBalances";
 
 export const pointsQueryKeys = {
   memberships: () => ["points", "memberships"] as const,
@@ -143,7 +143,8 @@ export function usePointsStanding(runtime: RuntimePort, wallet: WalletSummary): 
   const memberships = usePointsMemberships(runtime);
   const membership = memberships.data?.[wallet.id] ?? null;
   const scores = usePointsScores(runtime, membership !== null);
-  const balances = useBalances(runtime, wallet.address);
+  const joinedAddresses = [...new Set([wallet.address, ...Object.values(memberships.data ?? {}).map((m) => m.address)])];
+  const balances = useQueries({ queries: joinedAddresses.map((address) => balancesQuery(runtime, address)) });
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -156,9 +157,11 @@ export function usePointsStanding(runtime: RuntimePort, wallet: WalletSummary): 
   if (!membership) return { status: "not-joined" };
 
   const score = scores.data?.wallets.find((candidate) => candidate.address === wallet.address) ?? null;
-  const ao = balances.data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
-  const aoAtomic = ao && ao.available !== false ? ao.quantity : "0";
-  const ownRate = ownDailyRate(balances.data?.arBalance ?? "0", aoAtomic, membership.referred, score?.originalFounder);
+  // The curve runs on the install's combined balance, so every joined wallet's balance counts.
+  const raws = joinedAddresses.map((address, i) => ({ address, raw: rawOf(balances[i]?.data) }));
+  const ownRaw = raws[0]!.raw;
+  const deviceRaw = raws.reduce((sum, { raw }) => sum + raw, 0n);
+  const ownRate = ownDailyRate(ownRaw.toString(), deviceRaw.toString(), membership.referred, score?.originalFounder);
   const dailyRateAtomic = (BigInt(ownRate) + BigInt(score?.lastDay?.referrerBonusAtomic ?? "0")).toString();
 
   const settledAt = scores.data?.settledAt ? Date.parse(scores.data.settledAt) : null;
@@ -171,4 +174,9 @@ export function usePointsStanding(runtime: RuntimePort, wallet: WalletSummary): 
   });
 
   return { status: "joined", membership, score, estimateAtomic, dailyRateAtomic };
+}
+
+function rawOf(balances: WalletBalances | undefined): bigint {
+  const ao = balances?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
+  return rawBalance(balances?.arBalance ?? "0", ao && ao.available !== false ? ao.quantity : "0");
 }

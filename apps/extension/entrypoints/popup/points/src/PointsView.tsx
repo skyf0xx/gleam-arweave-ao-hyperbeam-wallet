@@ -110,7 +110,7 @@ function JoinView({
           Earn Gleam Points every day
         </p>
         <p className="text-label text-on-ink-muted">
-          For the AR and AO you hold.
+          Every AR and AO you hold earns points daily. Bigger balances (whales) earn on a curve, so points stay fair.
         </p>
       </InkCard>
 
