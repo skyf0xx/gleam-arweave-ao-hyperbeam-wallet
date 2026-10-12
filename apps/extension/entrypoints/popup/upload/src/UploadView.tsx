@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import {
+  bytesToBase64,
   explorerUrlFor,
   type RuntimePort,
   type UploadReview,
@@ -83,14 +84,6 @@ interface SuccessState {
 }
 
 type Step = ComposeState | ReviewState | SuccessState;
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
-  }
-  return btoa(binary);
-}
 
 function tagBytes(tags: UploadTag[]): number {
   return tags.reduce(
