@@ -2,11 +2,14 @@ import {
   buildDeviceMessage,
   buildLeaveMessage,
   buildRedeemMessage,
+  buildOwnershipTransaction,
   buildRegisterMessage,
   deviceKeyThumbprint,
   signDeviceMessage,
   type DevicePublicJwk,
+  type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
+import { signTransactionWithJwk } from "@gleam/core/src/arweave/transaction.ts";
 import { deriveAddress, generateJWK } from "@gleam/core/src/keys/jwk.ts";
 import { bytesToBase64Url } from "@gleam/core/src/vault/base64.ts";
 import { signMessage } from "@gleam/core/src/vault/message-signing.ts";
@@ -35,21 +38,30 @@ export async function createTestDevice(): Promise<TestDevice> {
   return { id: await deviceKeyThumbprint(publicKey), publicKey, privateKey: pair.privateKey };
 }
 
+/** A `message` proof as a keyfile signs it, or a `transaction` proof as a hardware wallet does. */
+async function signProof(wallet: TestWallet, message: string, proof: PointsProofKind): Promise<string> {
+  const signature =
+    proof === "transaction"
+      ? await signTransactionWithJwk(await buildOwnershipTransaction(wallet.jwk.n, message), wallet.jwk)
+      : new Uint8Array(await signMessage(wallet.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer));
+  return bytesToBase64Url(signature);
+}
+
 export async function registerBody(
   wallet: TestWallet,
   device: TestDevice,
-  options: { inviteCode?: string | null; issuedAt: number },
+  options: { inviteCode?: string | null; issuedAt: number; proof?: PointsProofKind },
 ) {
   const message = buildRegisterMessage({
     deviceKeyThumbprint: device.id,
     inviteCode: options.inviteCode ?? null,
     issuedAt: options.issuedAt,
   });
-  const signature = await signMessage(wallet.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
   return {
     owner: wallet.jwk.n,
     message,
-    signature: bytesToBase64Url(new Uint8Array(signature)),
+    signature: await signProof(wallet, message, options.proof ?? "message"),
+    ...(options.proof === "transaction" ? { proof: "transaction" } : {}),
     devicePublicKey: device.publicKey,
   };
 }
@@ -59,10 +71,19 @@ export async function deviceBody(device: TestDevice, kind: "heartbeat" | "me", i
   return { deviceId: device.id, message, signature: await signDeviceMessage(device.privateKey, message) };
 }
 
-export async function leaveBody(wallet: TestWallet, issuedAt: number, address = wallet.address) {
+export async function leaveBody(
+  wallet: TestWallet,
+  issuedAt: number,
+  address = wallet.address,
+  proof: PointsProofKind = "message",
+) {
   const message = buildLeaveMessage(address, issuedAt);
-  const signature = await signMessage(wallet.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
-  return { owner: wallet.jwk.n, message, signature: bytesToBase64Url(new Uint8Array(signature)) };
+  return {
+    owner: wallet.jwk.n,
+    message,
+    signature: await signProof(wallet, message, proof),
+    ...(proof === "transaction" ? { proof: "transaction" } : {}),
+  };
 }
 
 export async function redeemBody(device: TestDevice, code: string, issuedAt: number) {

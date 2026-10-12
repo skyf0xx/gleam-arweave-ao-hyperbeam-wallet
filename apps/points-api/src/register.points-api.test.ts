@@ -95,6 +95,30 @@ describe("POST /register", () => {
     expect(rows[0]?.device_id).toBe(reinstall.id);
   });
 
+  it("registers a hardware wallet that signed the ownership transaction", async () => {
+    const db = await createTestDb();
+    const device = await admittedDevice(db);
+
+    const { status, json } = await post(
+      setup(db),
+      await registerBody(alice, device, { issuedAt: NOW_SECONDS, proof: "transaction" }),
+    );
+
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ address: alice.address });
+  });
+
+  it("rejects a proof signed in the other form, and an unknown form", async () => {
+    const device = await createTestDevice();
+    const message = await registerBody(alice, device, { issuedAt: NOW_SECONDS });
+    const transaction = await registerBody(alice, device, { issuedAt: NOW_SECONDS, proof: "transaction" });
+    const app = setup(await createTestDb());
+
+    expect((await post(app, { ...message, proof: "transaction" })).status).toBe(401);
+    expect((await post(app, { ...transaction, proof: "message" })).status).toBe(401);
+    expect((await post(app, { ...message, proof: "data-item" })).status).toBe(400);
+  });
+
   it("rejects a signature from another wallet", async () => {
     const body = await registerBody(alice, await createTestDevice(), { issuedAt: NOW_SECONDS });
 

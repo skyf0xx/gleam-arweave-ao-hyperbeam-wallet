@@ -24,3 +24,5 @@ export {
 export type { DevicePublicJwk } from "./identity";
 export { basePoints, computeDailyPoints, estimatePoints, ownDailyRate } from "./formula";
 export type { WalletSnapshot, DailyPoints, PointsEstimateInput } from "./formula";
+export { POINTS_PROOF_TAG, buildOwnershipTransaction, verifyPointsProof } from "./ownership";
+export type { PointsProofKind } from "./ownership";

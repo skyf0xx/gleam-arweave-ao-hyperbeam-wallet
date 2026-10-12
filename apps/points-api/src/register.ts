@@ -4,16 +4,18 @@ import {
   isDevicePublicJwk,
   isFreshIssuedAt,
   parseRegisterMessage,
+  verifyPointsProof,
   type DevicePublicJwk,
+  type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
-import { base64UrlToBytes } from "@gleam/core/src/vault/base64.ts";
-import { verifyMessage } from "@gleam/core/src/vault/message-signing.ts";
 import type { Db, Queryable } from "./db";
 
 export interface RegisterRequest {
   owner: string;
   message: string;
   signature: string;
+  /** `transaction` for a hardware wallet; see `core/points/ownership.ts`. */
+  proof: PointsProofKind;
   devicePublicKey: DevicePublicJwk;
 }
 
@@ -37,12 +39,13 @@ const MAX_INVITE_CODE_ATTEMPTS = 5;
 
 export function parseRegisterRequest(body: unknown): RegisterRequest | null {
   if (body === null || typeof body !== "object") return null;
-  const { owner, message, signature, devicePublicKey } = body as Record<string, unknown>;
+  const { owner, message, signature, proof = "message", devicePublicKey } = body as Record<string, unknown>;
   if (typeof owner !== "string" || owner.length > MAX_OWNER_LENGTH || !BASE64URL.test(owner)) return null;
   if (typeof message !== "string" || message.length > 200) return null;
   if (typeof signature !== "string" || signature.length > 1000 || !BASE64URL.test(signature)) return null;
+  if (proof !== "message" && proof !== "transaction") return null;
   if (!isDevicePublicJwk(devicePublicKey)) return null;
-  return { owner, message, signature, devicePublicKey };
+  return { owner, message, signature, proof, devicePublicKey };
 }
 
 /**
@@ -78,17 +81,7 @@ export async function register(
     return { ok: false, status: 400, error: "Device key doesn't match the signed thumbprint." };
   }
 
-  let signatureValid = false;
-  try {
-    signatureValid = await verifyMessage(
-      request.owner,
-      new TextEncoder().encode(request.message).buffer as ArrayBuffer,
-      base64UrlToBytes(request.signature).buffer,
-    );
-  } catch {
-    // An owner that isn't a usable RSA modulus fails verification.
-  }
-  if (!signatureValid) return { ok: false, status: 401, error: "Wallet signature is invalid." };
+  if (!(await verifyPointsProof(request.proof, request.owner, request.message, request.signature))) return { ok: false, status: 401, error: "Wallet signature is invalid." };
 
   const address = await addressFromOwner(request.owner);
   const deviceId = message.deviceKeyThumbprint;

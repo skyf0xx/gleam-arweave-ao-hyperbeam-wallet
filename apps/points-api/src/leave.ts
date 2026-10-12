@@ -1,12 +1,18 @@
-import { addressFromOwner, isFreshIssuedAt, parseLeaveMessage } from "@gleam/core/src/points/index.ts";
-import { base64UrlToBytes } from "@gleam/core/src/vault/base64.ts";
-import { verifyMessage } from "@gleam/core/src/vault/message-signing.ts";
+import {
+  addressFromOwner,
+  isFreshIssuedAt,
+  parseLeaveMessage,
+  verifyPointsProof,
+  type PointsProofKind,
+} from "@gleam/core/src/points/index.ts";
 import type { Db } from "./db";
 
 export interface LeaveRequest {
   owner: string;
   message: string;
   signature: string;
+  /** `transaction` for a hardware wallet; see `core/points/ownership.ts`. */
+  proof: PointsProofKind;
 }
 
 export type LeaveOutcome = { ok: true } | { ok: false; status: 400 | 401; error: string };
@@ -15,11 +21,12 @@ const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
 export function parseLeaveRequest(body: unknown): LeaveRequest | null {
   if (body === null || typeof body !== "object") return null;
-  const { owner, message, signature } = body as Record<string, unknown>;
+  const { owner, message, signature, proof = "message" } = body as Record<string, unknown>;
   if (typeof owner !== "string" || owner.length > 700 || !BASE64URL.test(owner)) return null;
   if (typeof message !== "string" || message.length > 200) return null;
   if (typeof signature !== "string" || signature.length > 1000 || !BASE64URL.test(signature)) return null;
-  return { owner, message, signature };
+  if (proof !== "message" && proof !== "transaction") return null;
+  return { owner, message, signature, proof };
 }
 
 /**
@@ -35,19 +42,13 @@ export async function leave(db: Db, request: LeaveRequest, now: Date): Promise<L
     return { ok: false, status: 401, error: "Leave message is stale." };
   }
 
-  let signatureValid = false;
+  let ownsAddress = false;
   try {
-    signatureValid =
-      (await addressFromOwner(request.owner)) === message.address &&
-      (await verifyMessage(
-        request.owner,
-        new TextEncoder().encode(request.message).buffer as ArrayBuffer,
-        base64UrlToBytes(request.signature).buffer,
-      ));
+    ownsAddress = (await addressFromOwner(request.owner)) === message.address;
   } catch {
-    // An owner that isn't a usable RSA modulus fails verification.
+    // An owner that isn't base64url names no address.
   }
-  if (!signatureValid) return { ok: false, status: 401, error: "Wallet signature is invalid." };
+  if (!ownsAddress || !(await verifyPointsProof(request.proof, request.owner, request.message, request.signature))) return { ok: false, status: 401, error: "Wallet signature is invalid." };
 
   await db.transaction(async (tx) => {
     const deleted = await tx.query<{ device_id: string }>(

@@ -62,6 +62,13 @@ describe("POST /leave", () => {
     expect(await count(db, "devices WHERE id = $1", [devices.alice.id])).toBe(0);
   });
 
+  it("lets a hardware wallet leave with the ownership transaction", async () => {
+    const { db, post } = await setup();
+
+    expect((await post("/leave", await leaveBody(alice, NOW_SECONDS, alice.address, "transaction"))).status).toBe(200);
+    expect(await count(db, "wallets WHERE address = $1", [alice.address])).toBe(0);
+  });
+
   it("keeps a device another wallet still uses", async () => {
     const { db, devices, post } = await setup();
 
