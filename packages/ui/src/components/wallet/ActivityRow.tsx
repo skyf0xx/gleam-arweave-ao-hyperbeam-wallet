@@ -79,7 +79,7 @@ export function ActivityRow({
           aria-label="Pending confirmation"
           className="relative h-[3px] overflow-hidden rounded-sm bg-line"
         >
-          <div className="gleam-beam-divider absolute inset-0 w-2/5 animate-[beam-sweep_1.4s_ease-in-out_infinite] motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-50" />
+          <div className="gleam-beam-divider absolute inset-0 w-2/5 animate-[gleam-pending-sweep_1.4s_ease-in-out_infinite] motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-50" />
         </div>
       ) : null}
     </Component>

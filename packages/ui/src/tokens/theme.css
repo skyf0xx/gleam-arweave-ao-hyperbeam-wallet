@@ -258,6 +258,20 @@ select,
 }
 
 /*
+ * A pending activity row's beam segment, crossing its track from off the
+ * left edge to off the right. The segment is 2/5 of the track, so 250% of
+ * its own width clears the far edge.
+ */
+@keyframes gleam-pending-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/*
  * Shimmer sweep keyframe — slides the gradient's 200%-wide background
  * across the element's own box by animating `background-position` alone
  * (never `background`/`transform`), so the moving highlight stays a
