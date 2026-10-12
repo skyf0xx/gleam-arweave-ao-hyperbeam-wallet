@@ -6,24 +6,38 @@ import type { ActiveSite, PermissionType, RuntimePort } from "@gleam/core";
 export const activeSiteKey = ["activeSite"] as const;
 
 /**
+ * The background keeps each tab's other-wallet report in session storage
+ * under `session:siteWallet:tab:<id>` (`handlers/site-wallet.ts`). In the
+ * session area itself the key has no `session:` prefix.
+ */
+const TAB_REPORT_KEY_PREFIX = "siteWallet:tab:";
+
+/**
  * The site in the active tab. The side panel stays open across tabs, so
- * this reads again whenever the active tab changes or navigates.
+ * this reads again whenever the active tab changes or navigates, and when
+ * a page reports another wallet, which happens after its URL changed.
  */
 export function useActiveSite(runtime: RuntimePort) {
   const queryClient = useQueryClient();
   useEffect(() => {
     // Absent outside a real extension page, such as under tests.
-    const tabs = (browser as typeof browser | undefined)?.tabs;
-    if (!tabs?.onActivated || !tabs.onUpdated) return;
+    const api = browser as typeof browser | undefined;
+    const tabs = api?.tabs;
+    const storageChanges = api?.storage?.onChanged;
     const refresh = () => void queryClient.invalidateQueries({ queryKey: activeSiteKey });
     const onUpdated = (_tabId: number, change: { url?: string }) => {
       if (change.url) refresh();
     };
-    tabs.onActivated.addListener(refresh);
-    tabs.onUpdated.addListener(onUpdated);
+    const onStorageChanged = (changes: Record<string, unknown>, area: string) => {
+      if (area === "session" && Object.keys(changes).some((key) => key.startsWith(TAB_REPORT_KEY_PREFIX))) refresh();
+    };
+    tabs?.onActivated?.addListener(refresh);
+    tabs?.onUpdated?.addListener(onUpdated);
+    storageChanges?.addListener(onStorageChanged);
     return () => {
-      tabs.onActivated.removeListener(refresh);
-      tabs.onUpdated.removeListener(onUpdated);
+      tabs?.onActivated?.removeListener(refresh);
+      tabs?.onUpdated?.removeListener(onUpdated);
+      storageChanges?.removeListener(onStorageChanged);
     };
   }, [queryClient]);
 
