@@ -399,6 +399,7 @@ describe("provider.ts: GleamProvider bridge", () => {
 
 describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
   let teardown: (() => void) | undefined;
+  const listeners: Array<[string, () => void]> = [];
   let postMessageSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -408,6 +409,7 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
   afterEach(() => {
     teardown?.();
     teardown = undefined;
+    for (const [event, listener] of listeners.splice(0)) window.removeEventListener(event, listener);
     postMessageSpy.mockRestore();
     vi.useRealTimers();
     // @ts-expect-error -- test cleanup of a global this suite installs
@@ -461,18 +463,83 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     expect(PACKAGE_VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it("announces itself with arweaveWalletLoaded", () => {
-    const onLoaded = vi.fn();
-    window.addEventListener("arweaveWalletLoaded", onLoaded);
+  function listen(event: string) {
+    const listener = vi.fn();
+    window.addEventListener(event, listener);
+    listeners.push([event, listener]);
+    return listener;
+  }
+
+  it("announces Gleam with arweaveWalletLoaded only once other wallets have had the chance to install", async () => {
+    vi.useFakeTimers();
+    const onLoaded = listen("arweaveWalletLoaded");
     teardown = install();
-    window.removeEventListener("arweaveWalletLoaded", onLoaded);
+    expect(onLoaded).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(150);
     expect(onLoaded).toHaveBeenCalledTimes(1);
   });
 
-  it("calls Gleam straight away when no other wallet is on the page", () => {
+  it("announces window.gleam with gleamWalletLoaded straight away", () => {
+    const onGleam = listen("gleamWalletLoaded");
+    teardown = install();
+    expect(onGleam).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for DOMContentLoaded before settling on a page that is still loading", async () => {
+    vi.useFakeTimers();
+    const readyState = vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
+    try {
+      const onLoaded = listen("arweaveWalletLoaded");
+      teardown = install();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(onLoaded).not.toHaveBeenCalled();
+      window.dispatchEvent(new Event("DOMContentLoaded"));
+      await vi.advanceTimersByTimeAsync(150);
+      expect(onLoaded).toHaveBeenCalledTimes(1);
+    } finally {
+      readyState.mockRestore();
+    }
+  });
+
+  it("calls Gleam once no other wallet has shown up", async () => {
+    vi.useFakeTimers();
     teardown = install();
     void current()!.connect!(["ACCESS_ADDRESS"]);
+    expect(gleamRequests()).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(150);
     expect(gleamRequests()).toHaveLength(1);
+    void current()!.connect!(["ACCESS_ADDRESS"]);
+    expect(gleamRequests()).toHaveLength(2);
+  });
+
+  it("forwards a call made before a later wallet installs to that wallet", async () => {
+    vi.useFakeTimers();
+    teardown = install();
+    const pending = current()!.connect!(["ACCESS_ADDRESS"]);
+
+    const other = wander();
+    (window as unknown as { arweaveWallet: unknown }).arweaveWallet = other;
+    sendSiteMode(false);
+
+    await expect(pending).resolves.toBe("wander-connected");
+    expect(gleamRequests()).toHaveLength(0);
+  });
+
+  it("announces a wallet that installed first straight away", () => {
+    installOther(wander());
+    const onLoaded = listen("arweaveWalletLoaded");
+    teardown = install();
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't announce again a later wallet that announced itself", async () => {
+    vi.useFakeTimers();
+    teardown = install();
+    const onLoaded = listen("arweaveWalletLoaded");
+    installOther(wander());
+    window.dispatchEvent(new CustomEvent("arweaveWalletLoaded"));
+    await vi.advanceTimersByTimeAsync(150);
+    expect(onLoaded).toHaveBeenCalledTimes(1);
   });
 
   it("forwards to a wallet installed first once the site turns out not to use Gleam", async () => {
@@ -533,10 +600,23 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
   }
 
   it("never asks for the site mode on a page where Gleam is the only wallet", async () => {
+    vi.useFakeTimers();
     teardown = install();
     void current()!.connect!();
-    window.dispatchEvent(new Event("DOMContentLoaded"));
+    await vi.advanceTimersByTimeAsync(150);
     expect(modeRequests()).toHaveLength(0);
+  });
+
+  it("announces PermawebOS when it loads after the page settled on Gleam", async () => {
+    vi.useFakeTimers();
+    teardown = install();
+    await vi.advanceTimersByTimeAsync(150);
+    const onLoaded = listen("arweaveWalletLoaded");
+    permawebOS();
+    window.dispatchEvent(new CustomEvent("permawebConnectLoaded"));
+    window.dispatchEvent(new CustomEvent("permawebConnectLoaded"));
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+    expect(modeRequests()).toHaveLength(1);
   });
 
   it("asks for the site mode once, as soon as another wallet shows up", () => {
@@ -621,15 +701,25 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     expect(other.connect).toHaveBeenCalled();
   });
 
-  it("finds PermawebOS at window.permawebConnect when it skipped the taken slot", async () => {
-    teardown = install();
+  function permawebOS() {
     const permaweb = { walletName: "ArConnect", connect: vi.fn().mockResolvedValue("permaweb-connected") };
     (window as unknown as { permawebConnect: unknown }).permawebConnect = permaweb;
-    window.dispatchEvent(new Event("DOMContentLoaded"));
+    return permaweb;
+  }
+
+  it("finds PermawebOS at window.permawebConnect when it skipped the taken slot, and announces it", async () => {
+    vi.useFakeTimers();
+    teardown = install();
+    const onLoaded = listen("arweaveWalletLoaded");
+    const pending = current()!.connect!();
+    permawebOS();
+    await vi.advanceTimersByTimeAsync(150);
     expect(modeRequests()).toHaveLength(1);
+    expect(onLoaded).toHaveBeenCalledTimes(1);
     sendSiteMode(false);
 
-    await expect(current()!.connect!()).resolves.toBe("permaweb-connected");
+    await expect(pending).resolves.toBe("permaweb-connected");
+    expect(gleamRequests()).toHaveLength(0);
     expect(otherWalletReports()).toEqual([
       { type: OTHER_WALLET, walletName: "PermawebOS", used: false },
       { type: OTHER_WALLET, walletName: "PermawebOS", used: true },
