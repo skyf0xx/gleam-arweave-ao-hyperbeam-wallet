@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
@@ -53,7 +54,7 @@ function actionCopy(preview: SigningApprovalPreview): string {
  * rather than fabricating a symbol.
  */
 function shortenProcessId(processId: string): string {
-  return processId.length > 12 ? `${processId.slice(0, 6)}…${processId.slice(-4)}` : processId;
+  return truncateAddress(processId, 6);
 }
 
 /**

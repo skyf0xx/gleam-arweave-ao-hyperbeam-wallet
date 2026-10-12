@@ -2,11 +2,6 @@ import type { ReactNode } from "react";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
-export function truncateAddress(address: string): string {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 5)}…${address.slice(-4)}`;
-}
-
 /** Rewrites the background's refusals into copy for the connect page. */
 export function backgroundErrorText(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

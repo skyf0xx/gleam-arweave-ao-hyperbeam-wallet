@@ -15,11 +15,11 @@ import {
   ledgerErrorText,
   waitForLedgerApp,
 } from "@/src/hardware/ledger";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import {
   backgroundErrorText,
   ConnectedNotice,
   ConnectShell,
-  truncateAddress,
 } from "./connect-shared";
 
 export interface LedgerConnectViewProps {

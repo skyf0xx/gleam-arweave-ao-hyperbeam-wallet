@@ -12,8 +12,9 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
-import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, truncateAddress } from "./formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
@@ -371,7 +372,7 @@ export function MainScreenView({
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="truncate text-label">{wallet.name}</span>
           <span className="truncate font-mono text-label text-faint">
-            {truncateAddress(wallet.address)}
+            {truncateAddress(wallet.address, 6)}
           </span>
         </button>
 
@@ -575,7 +576,7 @@ export function MainScreenView({
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}
-                    title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address)}`}
+                    title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address, 6)}`}
                     subtitle={
                       entry.status === "pending"
                         ? "Pending confirmation"

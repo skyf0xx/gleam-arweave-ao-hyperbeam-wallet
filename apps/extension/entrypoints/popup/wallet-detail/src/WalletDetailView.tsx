@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { isHardwareWalletMethod, type JWKInterface, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -14,11 +15,6 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
   ledger: "LEDGER",
   keystone: "KEYSTONE",
 };
-
-function truncateAddress(address: string): string {
-  if (address.length <= 13) return address;
-  return `${address.slice(0, 8)}…${address.slice(-6)}`;
-}
 
 function formatBackupDate(timestamp: number): string {
   const days = Math.floor((Date.now() - timestamp) / (24 * 60 * 60 * 1000));
@@ -193,7 +189,7 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
                 {WALLET_METHOD_LABEL[wallet.method]}
               </span>
             </div>
-            <span className="truncate font-mono text-caption text-faint">{truncateAddress(wallet.address)}</span>
+            <span className="truncate font-mono text-caption text-faint">{truncateAddress(wallet.address, 8, 6)}</span>
           </div>
         </div>
 
