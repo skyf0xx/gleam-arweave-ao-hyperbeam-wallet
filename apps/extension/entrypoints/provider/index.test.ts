@@ -666,6 +666,19 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     ]);
   });
 
+  it("doesn't count a call outside the wallet API as use", () => {
+    const other = { ...wander(), helper: vi.fn() };
+    installOther(other);
+    teardown = install();
+    sendSiteMode(false);
+    String(current());
+    (current() as unknown as { helper: () => void }).helper();
+    Object.prototype.hasOwnProperty.call(current(), "connect");
+    current()!.valueOf();
+
+    expect(otherWalletReports()).toEqual([{ type: OTHER_WALLET, walletName: "Wander", used: false }]);
+  });
+
   it("offers Gleam's methods before the site mode is known, and calls them on Gleam if the site uses it", async () => {
     const other = wander();
     installOther(other);

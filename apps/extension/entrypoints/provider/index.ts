@@ -411,6 +411,9 @@ function install(): () => void {
   let modeTimeout: ReturnType<typeof setTimeout> | undefined;
   let settleTimeout: ReturnType<typeof setTimeout> | undefined;
 
+  const isSurfaceMethod = (prop: PropertyKey): boolean =>
+    typeof prop === "string" && (PROVIDER_SURFACE_METHODS as readonly string[]).includes(prop);
+
   const other = (): WalletLike | null => {
     if (captured) return captured;
     const permaweb = walletWindow.permawebConnect;
@@ -475,7 +478,10 @@ function install(): () => void {
     if (typeof method !== "function") {
       throw new TypeError(`window.arweaveWallet.${String(prop)} is not a function.`);
     }
-    if (wallet !== gleam) report(true);
+    // Only a wallet API call counts as the site using the wallet. Any script
+    // can call `toString` or poke the other wallet's own helpers, and the
+    // popup would then offer Gleam on pages that never touch a wallet.
+    if (wallet !== gleam && isSurfaceMethod(prop)) report(true);
     return (method as (...rest: unknown[]) => unknown).apply(wallet, args);
   };
 
@@ -500,9 +506,7 @@ function install(): () => void {
   // `walletName` can't wait, so it comes from the likelier wallet: the
   // other one when it is on the page, since a site uses Gleam only once
   // the user picks it there.
-  const eitherHasMethod = (prop: PropertyKey): boolean =>
-    (typeof prop === "string" && (PROVIDER_SURFACE_METHODS as readonly string[]).includes(prop)) ||
-    typeof other()?.[prop] === "function";
+  const eitherHasMethod = (prop: PropertyKey): boolean => isSurfaceMethod(prop) || typeof other()?.[prop] === "function";
 
   const router = new Proxy(Object.create(null) as WalletLike, {
     get(_shell, prop) {
