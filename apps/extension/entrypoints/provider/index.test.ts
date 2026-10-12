@@ -666,6 +666,35 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     ]);
   });
 
+  it("offers Gleam's methods before the site mode is known, and calls them on Gleam if the site uses it", async () => {
+    const other = wander();
+    installOther(other);
+    teardown = install();
+
+    expect(current()?.walletName).toBe("Wander");
+    expect("signMessage" in current()!).toBe(true);
+    expect(typeof current()!.signMessage).toBe("function");
+
+    const signMessage = current()!.signMessage as () => Promise<unknown>;
+    void signMessage();
+    expect(gleamRequests()).toHaveLength(0);
+    sendSiteMode(true);
+    await vi.waitFor(() => expect(gleamRequests()).toHaveLength(1));
+    expect(current()?.walletName).toBe("Gleam");
+  });
+
+  it("rejects a held call the site's wallet turns out not to have", async () => {
+    installOther(wander());
+    teardown = install();
+    const pending = (current()!.signMessage as () => Promise<unknown>)();
+    sendSiteMode(false);
+
+    await expect(pending).rejects.toThrow(TypeError);
+    expect("signMessage" in current()!).toBe(false);
+    expect(current()!.signMessage).toBeUndefined();
+    expect(gleamRequests()).toHaveLength(0);
+  });
+
   it("passes non-function properties of the other wallet through", () => {
     const other = wander();
     installOther(other);

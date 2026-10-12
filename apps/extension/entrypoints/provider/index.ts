@@ -494,14 +494,27 @@ function install(): () => void {
     return method;
   };
 
+  // Until the site's wallet is known, a feature check such as
+  // `"signMessage" in arweaveWallet` sees every method either wallet has,
+  // and the method waits to call the right one. A sync value such as
+  // `walletName` can't wait, so it comes from the likelier wallet: the
+  // other one when it is on the page, since a site uses Gleam only once
+  // the user picks it there.
+  const eitherHasMethod = (prop: PropertyKey): boolean =>
+    (typeof prop === "string" && (PROVIDER_SURFACE_METHODS as readonly string[]).includes(prop)) ||
+    typeof other()?.[prop] === "function";
+
   const router = new Proxy(Object.create(null) as WalletLike, {
     get(_shell, prop) {
       if (prop === ROUTER_MARK) return true;
       const value = Reflect.get(target(), prop);
-      return typeof value === "function" ? methodFor(prop) : value;
+      if (typeof value === "function" || (value === undefined && !decided() && eitherHasMethod(prop))) {
+        return methodFor(prop);
+      }
+      return value;
     },
     has(_shell, prop) {
-      return prop in target();
+      return prop in target() || (!decided() && eitherHasMethod(prop));
     },
     set(_shell, prop, value) {
       return Reflect.set(target(), prop, value);
