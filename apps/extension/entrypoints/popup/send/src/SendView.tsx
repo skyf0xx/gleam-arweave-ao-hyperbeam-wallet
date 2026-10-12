@@ -575,7 +575,7 @@ function ComposeStep({
         </div>
 
         {unsupported ? (
-          <p role="status" className="rounded-md border border-line bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
+          <p role="status" className="rounded-md border border-l-[3px] border-line border-l-warning bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
             {unsupported}
           </p>
         ) : null}
