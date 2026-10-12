@@ -41,14 +41,21 @@ no changes.
 ### Detect Gleam
 
 Gleam installs before your scripts run in most cases. To be safe, check
-again when the wallet announces itself:
+again when Gleam announces itself with `gleamWalletLoaded`. Other
+wallets don't fire that event. `arweaveWalletLoaded` is fired by every
+wallet, so a listener on it has to wait until `window.gleam` exists:
 
 ```js
 function whenGleamReady(callback) {
   if (window.gleam) return callback(window.gleam);
-  window.addEventListener("arweaveWalletLoaded", () => {
-    if (window.gleam) callback(window.gleam);
-  }, { once: true });
+  const onLoaded = () => {
+    if (!window.gleam) return;
+    window.removeEventListener("gleamWalletLoaded", onLoaded);
+    window.removeEventListener("arweaveWalletLoaded", onLoaded);
+    callback(window.gleam);
+  };
+  window.addEventListener("gleamWalletLoaded", onLoaded);
+  window.addEventListener("arweaveWalletLoaded", onLoaded);
 }
 
 whenGleamReady(() => {
@@ -118,6 +125,7 @@ open stays open.
 
 Gleam dispatches these events on `window`:
 
+- `gleamWalletLoaded`: once, as soon as `window.gleam` exists.
 - `connect`: after `connect()` succeeds. `detail.activeAddress` is the
   connected address.
 - `disconnect`: when your site's access ends, whether you called
