@@ -1,4 +1,8 @@
-import { LedgerError, type LedgerAppVersion, type LedgerArweaveClient } from "@gleam/core";
+import {
+  LedgerError,
+  type LedgerAppVersion,
+  type LedgerArweaveClient,
+} from "@gleam/core";
 import { LedgerTransportError } from "./webhid-transport";
 
 /** Thrown when the caller's signal aborts a Ledger flow. */
@@ -25,7 +29,8 @@ export function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 export function ledgerErrorText(error: unknown): string {
-  if (error instanceof LedgerError || error instanceof LedgerTransportError) return error.message;
+  if (error instanceof LedgerError || error instanceof LedgerTransportError)
+    return error.message;
   const message = error instanceof Error ? error.message : String(error);
   return message || "Something went wrong talking to the Ledger.";
 }
@@ -45,14 +50,21 @@ export interface WaitForLedgerAppOptions {
 }
 
 /**
- * Polls GET_VERSION until the Arweave (or Permaweb) app answers. A locked
+ * Polls GET_VERSION until the Arweave app answers. A locked
  * device or the dashboard means the app isn't open yet; 0x6987 means the
  * app is still generating its RSA key, which can take minutes on first
  * launch.
  */
 export async function waitForLedgerApp(
   client: LedgerArweaveClient,
-  { signal, pollMs, appTimeoutMs, keyTimeoutMs, onWaiting, appTimeoutMessage }: WaitForLedgerAppOptions,
+  {
+    signal,
+    pollMs,
+    appTimeoutMs,
+    keyTimeoutMs,
+    onWaiting,
+    appTimeoutMessage,
+  }: WaitForLedgerAppOptions,
 ): Promise<LedgerAppVersion> {
   let deadline = Date.now() + appTimeoutMs;
   let keyWait = false;
@@ -68,7 +80,10 @@ export async function waitForLedgerApp(
           deadline = Date.now() + keyTimeoutMs;
         }
         onWaiting("key");
-      } else if (error.code === "app-not-open" || error.code === "device-locked") {
+      } else if (
+        error.code === "app-not-open" ||
+        error.code === "device-locked"
+      ) {
         if (!keyWait) onWaiting("app");
       } else {
         throw error;

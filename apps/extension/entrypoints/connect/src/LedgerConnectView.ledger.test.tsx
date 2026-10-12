@@ -77,7 +77,7 @@ describe("LedgerConnectView", () => {
   it("shows instructions, polls until the app opens, verifies, then adds the wallet", async () => {
     const send = vi.fn().mockResolvedValue({ id: "w1" });
     const fake = await renderView({ versions: [sw(0x6e00), sw(0x6e00), VERSION_OK] }, send as never);
-    expect(screen.getByText(/open the Arweave app \(or Permaweb\)/)).toBeTruthy();
+    expect(screen.getByText(/Open the Arweave app/)).toBeTruthy();
 
     fireEvent.click(connectButton());
     await screen.findByText(/Waiting for the Arweave app/);
@@ -130,7 +130,7 @@ describe("LedgerConnectView", () => {
     fireEvent.click(connectButton());
     await screen.findByText(/Waiting for the Arweave app/);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await screen.findByText(/Plug in your Ledger/);
+    await screen.findByText(/Plug in your Ledger and unlock it/);
     expect(fake.close).toHaveBeenCalled();
   });
 
