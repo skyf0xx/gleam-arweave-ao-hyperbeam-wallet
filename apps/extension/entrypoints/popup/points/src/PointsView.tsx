@@ -24,6 +24,7 @@ import { gleamUrl, howItWorksUrl, JoinNote } from "./JoinNote";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
+import { useCountUp } from "./useCountUp";
 import {
   useJoinPoints,
   useLeavePoints,
@@ -159,14 +160,17 @@ function JoinView({
 }
 
 /** The total the way the site draws it: whole points large, decimals and unit beside them. */
-function PointsTotal({ value }: { value: string }) {
+function PointsTotal({ value, highlighted }: { value: string; highlighted: boolean }) {
   const [whole, decimals] = value.split(".");
   return (
     <p className="flex items-end gap-1 leading-none">
       <span className="sr-only">{value} points</span>
       <span
         aria-hidden="true"
-        className="text-[44px] font-bold tracking-[-0.05em] tabular-nums"
+        className={cn(
+          "text-[44px] font-bold tracking-[-0.05em] tabular-nums transition-colors duration-700 motion-reduce:transition-none",
+          highlighted && "text-positive",
+        )}
       >
         {whole}
       </span>
@@ -229,6 +233,7 @@ function JoinedView({
   standing: Extract<ReturnType<typeof usePointsStanding>, { status: "joined" }>;
 }) {
   const { score } = standing;
+  const total = useCountUp(standing.estimateAtomic, score?.totalAtomic ?? null);
   const inviteCode = standing.membership.inviteCode;
   const inviteLink = inviteLinkFor(inviteCode);
   const { copied, copy } = useCopy(inviteLink);
@@ -247,7 +252,7 @@ function JoinedView({
     <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-5">
       <InkCard label="Standing">
         <div className="flex flex-col gap-2">
-          <PointsTotal value={formatPoints(standing.estimateAtomic)} />
+          <PointsTotal value={formatPoints(total.shown)} highlighted={total.highlighted} />
           {score?.originalFounder ? (
             <span className="text-label text-on-ink-muted">
               Earning 10% more as an early member
