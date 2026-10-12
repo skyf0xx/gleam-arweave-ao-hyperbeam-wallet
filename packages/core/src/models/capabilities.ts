@@ -23,7 +23,11 @@ export interface WalletCapabilities {
   encrypt: boolean;
   /** Tagged Arweave uploads from the Upload screen. */
   upload: boolean;
-  /** Join or leave Gleam Points, which signs with `signMessage` and the keyfile's owner. */
+  /**
+   * Join or leave Gleam Points. A keyfile proves ownership with
+   * `signMessage`, a hardware wallet by signing a 0-AR transaction that is
+   * never posted (`points/ownership.ts`).
+   */
   points: boolean;
 }
 
@@ -62,6 +66,7 @@ const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
     dispatchViaBundler: true,
     signDataItem: true,
     encrypt: true,
+    points: true,
   },
   // The Ledger Arweave app has no data-item command, so AO sends and
   // `signDataItem` are off and `dispatch` stays on L1. The client can still
@@ -71,6 +76,7 @@ const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
     ...NONE,
     signTransaction: true,
     encrypt: true,
+    points: true,
   },
   // Modeled but never produced: no Arweave operation applies.
   ethereum: NONE,

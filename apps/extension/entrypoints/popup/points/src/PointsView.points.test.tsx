@@ -28,6 +28,8 @@ const WALLET: WalletSummary = {
 };
 
 const LEDGER_WALLET: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+/** Modeled but never produced; it has no Arweave key to prove ownership with. */
+const ETHEREUM_WALLET: WalletSummary = { ...WALLET, method: "ethereum" };
 
 const ONE_POINT = "1000000000000";
 const SETTLED_AT = "2026-10-08T00:05:00.000Z";
@@ -91,10 +93,17 @@ describe("PointsTokenRow", () => {
     expect(onOpen).toHaveBeenCalled();
   });
 
-  it("says Points is unavailable for a hardware wallet", async () => {
+  it("offers a hardware wallet Sign up too", async () => {
     const runtime = fakeRuntime({ ...BALANCES, getPointsMemberships: () => ({}) });
 
     renderWithQuery(<PointsTokenRow runtime={runtime} wallet={LEDGER_WALLET} onOpen={vi.fn()} />);
+    expect(await screen.findByText("Sign up")).toBeTruthy();
+  });
+
+  it("says Points is unavailable for a wallet that can't join", async () => {
+    const runtime = fakeRuntime({ ...BALANCES, getPointsMemberships: () => ({}) });
+
+    renderWithQuery(<PointsTokenRow runtime={runtime} wallet={ETHEREUM_WALLET} onOpen={vi.fn()} />);
     expect(await screen.findByText("Unavailable")).toBeTruthy();
     expect(screen.queryByText("Sign up")).toBeNull();
   });
@@ -138,14 +147,31 @@ describe("PointsView", () => {
     expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
   });
 
-  it("disables joining for a hardware wallet and says why", async () => {
+  it("lets a hardware wallet join and points to the approval window while its device signs", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({}),
+      getPointsPendingInvite: () => null,
+      joinPoints: () => new Promise(() => {}),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={LEDGER_WALLET} onBack={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Approve on your device in the window that opened.");
+    expect(runtime.send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "joinPoints", payload: expect.objectContaining({ walletId: LEDGER_WALLET.id }) }),
+    );
+  });
+
+  it("disables joining for a wallet that can't join and says why", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({}),
       getPointsPendingInvite: () => null,
     });
 
-    renderWithQuery(<PointsView runtime={runtime} wallet={LEDGER_WALLET} onBack={vi.fn()} />);
+    renderWithQuery(<PointsView runtime={runtime} wallet={ETHEREUM_WALLET} onBack={vi.fn()} />);
 
     const button = await screen.findByRole("button", { name: "Join Gleam Points" });
     expect((button as HTMLButtonElement).disabled).toBe(true);

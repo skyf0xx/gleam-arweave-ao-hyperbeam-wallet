@@ -79,7 +79,7 @@ describe("PendingClaim", () => {
   });
 
   it("skips the claim step for a wallet that can't join", async () => {
-    setup({ wallet: { ...WALLET, method: "keystone" } });
+    setup({ wallet: { ...WALLET, method: "ethereum" } });
     expect(await screen.findByText("home")).toBeTruthy();
     expect(screen.queryByText("Start earning Gleam Points")).toBeNull();
   });

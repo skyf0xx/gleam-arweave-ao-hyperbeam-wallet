@@ -39,7 +39,7 @@ import { AnnouncementsHandler } from "@/src/handlers/announcements";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
-import { getCachedKey, getWalletMethod } from "@/src/handlers/key-session";
+import { getCachedKey, getStoredWallet, getWalletMethod } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -121,6 +121,12 @@ const points = new PointsHandler({
   apiUrl: POINTS_API_URL,
   signingKey: getCachedKey,
   walletMethod: getWalletMethod,
+  deviceProof: async ({ walletId, message }) => {
+    const wallet = await getStoredWallet(walletId);
+    if (!wallet) throw new Error(`Wallet "${walletId}" doesn't exist.`);
+    const text = message(wallet.address);
+    return { ...(await approval.requestPointsProof({ walletId, message: text })), message: text };
+  },
   badge: actionBadge,
 });
 registerPointsHeartbeatAlarm(points);

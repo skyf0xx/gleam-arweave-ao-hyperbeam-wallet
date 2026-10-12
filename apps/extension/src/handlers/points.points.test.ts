@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   base64UrlToBytes,
+  bytesToBase64Url,
   deriveAddress,
   generateJWK,
   verifyMessage,
@@ -9,12 +10,15 @@ import {
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
+import { signTransactionWithJwk } from "@gleam/core/src/arweave/transaction.ts";
 import {
+  buildOwnershipTransaction,
   deviceKeyThumbprint,
   parseDeviceMessage,
   parseLeaveMessage,
   parseRegisterMessage,
   verifyDeviceSignature,
+  verifyPointsProof,
   type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
 import type { DeviceKey } from "../adapters/device-key";
@@ -86,6 +90,7 @@ async function setup(
     extraStorage?: Record<string, unknown>;
     locked?: boolean;
     walletMethod?: WalletMethod;
+    deviceProof?: ConstructorParameters<typeof PointsHandler>[0]["deviceProof"];
   } = {},
 ) {
   const storage = createFakeStorage({
@@ -103,6 +108,7 @@ async function setup(
     apiUrl: "https://points.example",
     signingKey: async (walletId) => (walletId === "w1" && !options.locked ? wallet : null),
     walletMethod: async () => options.walletMethod ?? "jwk",
+    deviceProof: options.deviceProof,
     badge,
     fetchImpl: fetchImpl as unknown as typeof fetch,
     now: () => NOW,
@@ -230,8 +236,8 @@ describe("PointsHandler.join", () => {
     expect(locked.fetchImpl).not.toHaveBeenCalled();
   });
 
-  it.each(["keystone", "ledger"] as const)("refuses a %s wallet without calling the server", async (walletMethod) => {
-    const { handler, fetchImpl } = await setup(null, 200, { walletMethod });
+  it("refuses a wallet with no Arweave key without calling the server", async () => {
+    const { handler, fetchImpl } = await setup(null, 200, { walletMethod: "ethereum" });
 
     await expect(handler.join({ walletId: "w1" })).rejects.toThrow(
       "This wallet can't join Gleam Points. Switch to a keyfile wallet.",
@@ -240,6 +246,48 @@ describe("PointsHandler.join", () => {
       "This wallet can't leave Gleam Points. Switch to a keyfile wallet.",
     );
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(["keystone", "ledger"] as const)("joins a %s wallet with the ownership transaction its device signs", async (walletMethod) => {
+    // Stands in for the approval window: the "device" signs with the test wallet's key.
+    const deviceProof = vi.fn(async ({ message }: { walletId: string; message: (address: string) => string }) => {
+      const text = message(wallet.address);
+      const signature = await signTransactionWithJwk(await buildOwnershipTransaction(wallet.jwk.n, text), wallet.jwk);
+      return { owner: wallet.jwk.n, address: wallet.address, message: text, signature: bytesToBase64Url(signature) };
+    });
+    const { handler, fetchImpl } = await setup(null, 200, {
+      walletMethod,
+      deviceProof,
+      locked: true,
+      responseBody: { address: wallet.address, inviteCode: "MYCODE22", referred: false },
+    });
+
+    expect(await handler.join({ walletId: "w1" })).toMatchObject({ address: wallet.address });
+
+    const body = JSON.parse(fetchImpl.mock.calls[0]![1]!.body as string) as Record<string, string>;
+    expect(body.proof).toBe("transaction");
+    expect(await verifyPointsProof("transaction", body.owner!, body.message!, body.signature!)).toBe(true);
+    expect(deviceProof).toHaveBeenCalledWith(expect.objectContaining({ walletId: "w1" }));
+  });
+
+  it("leaves a hardware wallet with a device-signed leave message for its own address", async () => {
+    const deviceProof = vi.fn(async ({ message }: { walletId: string; message: (address: string) => string }) => {
+      const text = message(wallet.address);
+      const signature = await signTransactionWithJwk(await buildOwnershipTransaction(wallet.jwk.n, text), wallet.jwk);
+      return { owner: wallet.jwk.n, address: wallet.address, message: text, signature: bytesToBase64Url(signature) };
+    });
+    const { handler, fetchImpl } = await setup({ registered: true, lastHeartbeatAt: NOW }, 200, {
+      walletMethod: "ledger",
+      deviceProof,
+      locked: true,
+      responseBody: { ok: true },
+    });
+
+    await handler.leave({ walletId: "w1" });
+
+    const body = JSON.parse(fetchImpl.mock.calls[0]![1]!.body as string) as Record<string, string>;
+    expect(parseLeaveMessage(body.message!)).toEqual({ address: wallet.address, issuedAt: NOW / 1000 });
+    expect(await verifyPointsProof("transaction", body.owner!, body.message!, body.signature!)).toBe(true);
   });
 
   it("surfaces the server's error and stores nothing", async () => {

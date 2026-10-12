@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { capabilitiesFor, unsupportedOperationMessage, type RuntimePort, type WalletSummary } from "@gleam/core";
+import {
+  capabilitiesFor,
+  isHardwareWalletMethod,
+  unsupportedOperationMessage,
+  type RuntimePort,
+  type WalletSummary,
+} from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
@@ -127,6 +133,7 @@ function JoinView({
         <Button type="submit" disabled={!canJoin || join.isPending}>
           {join.isPending ? "Joining…" : "Join Gleam Points"}
         </Button>
+        {join.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
         {canJoin ? (
           <JoinNote withLink={false} />
         ) : (
@@ -437,6 +444,16 @@ function LeaveControl({
           {leave.isPending ? "Leaving…" : "Leave"}
         </Button>
       </div>
+      {leave.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
     </div>
+  );
+}
+
+/** A hardware wallet proves ownership on the device, in the approval window the background opens. */
+function DeviceApprovalNote() {
+  return (
+    <p role="status" className="text-center text-caption text-muted">
+      Approve on your device in the window that opened.
+    </p>
   );
 }

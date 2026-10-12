@@ -18,7 +18,7 @@ describe("capabilitiesFor", () => {
       exportKey: false,
       encrypt: true,
       upload: false,
-      points: false,
+      points: true,
     });
   });
 
@@ -33,7 +33,7 @@ describe("capabilitiesFor", () => {
       exportKey: false,
       encrypt: true,
       upload: false,
-      points: false,
+      points: true,
     });
   });
 

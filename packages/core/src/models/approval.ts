@@ -14,7 +14,8 @@ export type ApprovalKind =
   | "signMessage"
   | "privateHash"
   | "addToken"
-  | "transfer";
+  | "transfer"
+  | "pointsProof";
 
 /**
  * A dApp's self-reported identity, passed to `connect()` per the ArConnect
@@ -68,7 +69,8 @@ export interface SigningApprovalPreview {
     | "signature"
     | "signMessage"
     | "privateHash"
-    | "transfer";
+    | "transfer"
+    | "pointsProof";
   recipient: string | null;
   amount: string | null;
   fee: string | null;

@@ -14,6 +14,7 @@ import {
 } from "@gleam/core";
 import { dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
+import { verifyPointsProof } from "@gleam/core/src/points/index.ts";
 import { ApprovalHandler, type SigningRequestInput } from "./approval";
 import { TransferHandler } from "./transfer";
 
@@ -547,6 +548,27 @@ describe("Transfers from a hardware wallet sign in the approval window", () => {
     ).rejects.toThrow(/failed \(500\)/);
     await assertion;
     expect(await activityLog()).toEqual([]);
+  });
+});
+
+describe("Gleam Points ownership proofs sign in the approval window", () => {
+  const MESSAGE = "gleam-points:leave:v1:" + "a".repeat(43) + ":1700000000";
+
+  it("the device signs a 0-AR transaction carrying the message, and the proof verifies", async () => {
+    const calls = mockNetwork();
+    const { pending, view, requestId, device } = await approveOnDevice(() =>
+      handler.requestPointsProof({ walletId: HW_ID, message: MESSAGE }),
+    );
+
+    expect(view).toMatchObject({ kind: "pointsProof", origin: WALLET_APPROVAL_ORIGIN, preview: { decodedData: MESSAGE } });
+    expect(device.summaries).toEqual([{ kind: "transaction", recipient: null, quantity: "0", fee: "0", dataSize: "0" }]);
+
+    await handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) });
+
+    const proof = (await pending) as { owner: string; address: string; signature: string };
+    expect(proof).toMatchObject({ owner: deviceKey.n, address });
+    expect(await verifyPointsProof("transaction", proof.owner, MESSAGE, proof.signature)).toBe(true);
+    expect(calls).toEqual([]);
   });
 });
 

@@ -36,6 +36,7 @@ const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
   signMessage: "Sign message",
   privateHash: "Generate hash",
   transfer: "Send",
+  pointsProof: "Prove ownership",
 };
 
 function actionCopy(preview: SigningApprovalPreview): string {
@@ -166,6 +167,13 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4.5">
         <div className="text-center text-body font-bold text-foreground">{actionCopy(preview)}</div>
+
+        {preview.kind === "pointsProof" ? (
+          <p className="text-center text-label leading-relaxed text-muted">
+            To use Gleam Points, your device signs a 0 AR transaction that proves you own this wallet. It is never
+            posted and moves no AR.
+          </p>
+        ) : null}
 
         {isTransfer ? (
           <>

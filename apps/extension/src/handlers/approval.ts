@@ -55,6 +55,7 @@ import {
   decodeTaggedBinary,
   encodeTaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
+import { buildOwnershipTransaction, POINTS_PROOF_TAG } from "@gleam/core/src/points/index.ts";
 import { getCachedKey, getStoredWallet, getWalletMethod } from "./key-session";
 import type { SubmitTransferRequest } from "./transfer";
 
@@ -254,6 +255,13 @@ export interface DeviceTransferSubmitter {
 
 export type TransferSubmitter = AoTransferSubmitter & Partial<DeviceTransferSubmitter>;
 
+/** A hardware wallet's verified signature over the Gleam Points ownership transaction. */
+export interface PointsDeviceProof {
+  owner: string;
+  address: string;
+  signature: string;
+}
+
 /** A wallet send handed to the approval window, with the token metadata its preview shows. */
 export interface WalletTransferRequest extends SubmitTransferRequest {
   tokenDenomination?: number | null;
@@ -340,6 +348,7 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "batchSignDataItem",
   "transferAoTokens",
   "transfer",
+  "pointsProof",
 ]);
 
 const TIMED_OUT = "Approval request timed out — the approval window was not resolved in time.";
@@ -480,6 +489,15 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
       if (summary.quantity !== input.amount) mismatch("amount");
       return;
     }
+    case "pointsProof":
+      checkTransaction(payloads[0], {
+        target: "",
+        quantity: "0",
+        tags: [{ name: POINTS_PROOF_TAG, value: textDecoder.decode(input.payload) }],
+        data: new Uint8Array(),
+        reward: "0",
+      });
+      return;
     default:
       return;
   }
@@ -1077,6 +1095,8 @@ export class ApprovalHandler {
       case "transferAoTokens":
       case "transfer":
         return [await this.deviceTransfers().prepareDeviceTransfer(this.transferRequestOf(walletId, input), owner)];
+      case "pointsProof":
+        return [{ kind: "transaction", transaction: await buildOwnershipTransaction(owner, textDecoder.decode(input.payload)) }];
       default:
         throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
     }
@@ -1112,6 +1132,8 @@ export class ApprovalHandler {
         // A dApp's transferAoTokens resolves to `{ id }`; a wallet send to `submitTransfer`'s `{ txId }`.
         return input.kind === "transfer" ? { txId } : { id: txId };
       }
+      case "pointsProof":
+        return { owner, address: wallet.address, signature: bytesToBase64Url(signature!) } satisfies PointsDeviceProof;
       default:
         throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
     }
@@ -1161,6 +1183,22 @@ export class ApprovalHandler {
       tags: [],
     });
     return result as { txId: string };
+  }
+
+  /**
+   * Has a hardware wallet sign the Gleam Points ownership transaction for
+   * `message` (`core/points/ownership.ts`) in the approval window. Resolves
+   * once the device's signature has verified against the wallet's key.
+   */
+  async requestPointsProof(req: { walletId: string; message: string }): Promise<PointsDeviceProof> {
+    const result = await this.requestApproval({
+      kind: "pointsProof",
+      origin: WALLET_APPROVAL_ORIGIN,
+      walletId: req.walletId,
+      payload: new TextEncoder().encode(req.message),
+      tags: [],
+    });
+    return result as PointsDeviceProof;
   }
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {
@@ -1300,6 +1338,10 @@ export class ApprovalHandler {
       case "privateHash": {
         return new Uint8Array(await vaultPrivateHash(jwk, toArrayBuffer(input.payload), input.hashAlgorithm));
       }
+
+      // A keyfile proves ownership with signMessage in PointsHandler and never reaches here.
+      case "pointsProof":
+        throw new Error("Only a hardware wallet proves ownership through the approval window.");
 
       default: {
         const exhaustiveCheck: never = input.kind;

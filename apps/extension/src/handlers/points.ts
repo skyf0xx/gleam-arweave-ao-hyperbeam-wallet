@@ -2,6 +2,7 @@ import { browser } from "wxt/browser";
 import {
   bytesToBase64Url,
   capabilitiesFor,
+  isHardwareWalletMethod,
   unsupportedOperationMessage,
   type BadgePort,
   signMessage,
@@ -23,6 +24,7 @@ import {
   isValidInviteCode,
   normalizeInviteCode,
   signDeviceMessage,
+  type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
 import type { DeviceKey } from "../adapters/device-key";
 
@@ -63,6 +65,15 @@ export const POINTS_SEATS_SEEN_KEY = "local:points:seatsSeen";
  */
 const HEARTBEAT_INTERVAL_MS = 20 * 3_600_000;
 
+/** A wallet's signed proof that it owns its address, in the body shape `/register` and `/leave` take. */
+interface OwnershipProof {
+  owner: string;
+  address: string;
+  message: string;
+  signature: string;
+  proof: PointsProofKind;
+}
+
 export interface PointsHandlerDeps {
   storage: StoragePort;
   deviceKey: () => Promise<DeviceKey>;
@@ -71,6 +82,15 @@ export interface PointsHandlerDeps {
   signingKey: (walletId: string) => Promise<{ jwk: JWKInterface; address: string } | null>;
   /** The stored wallet's method, or null when it is unknown. */
   walletMethod: (walletId: string) => Promise<WalletMethod | null>;
+  /**
+   * A hardware wallet's signature over the ownership transaction for the
+   * message built from its address, made on the device in the approval
+   * window.
+   */
+  deviceProof?: (req: {
+    walletId: string;
+    message: (address: string) => string;
+  }) => Promise<{ owner: string; address: string; signature: string; message: string }>;
   badge: BadgePort;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -106,9 +126,6 @@ export class PointsHandler {
    */
   async join(req: { walletId: string; inviteCode?: string }): Promise<PointsMembership> {
     await this.requirePointsCapability(req.walletId, "join Gleam Points");
-    const key = await this.deps.signingKey(req.walletId);
-    if (!key) throw new Error("Unlock this wallet to join Gleam Points.");
-
     const typed = req.inviteCode?.trim() ? normalizeInviteCode(req.inviteCode) : null;
     if (typed !== null && !isValidInviteCode(typed)) throw new Error("That invite code isn't valid.");
     const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
@@ -120,16 +137,11 @@ export class PointsHandler {
       inviteCode,
       issuedAt: Math.floor(this.now() / 1000),
     });
-    const signature = await signMessage(key.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
+    const proof = await this.proveOwnership(req.walletId, "join", () => message);
     const response = await this.fetchImpl(`${this.deps.apiUrl}/register`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        owner: key.jwk.n,
-        message,
-        signature: bytesToBase64Url(new Uint8Array(signature)),
-        devicePublicKey: device.publicKey,
-      }),
+      body: JSON.stringify({ ...proofBody(proof), devicePublicKey: device.publicKey }),
     });
     const body = (await response.json().catch(() => null)) as {
       address?: unknown;
@@ -141,12 +153,12 @@ export class PointsHandler {
       const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
       throw new Error(`Couldn't join Gleam Points: ${reason}`);
     }
-    if (body?.address !== key.address || typeof body.inviteCode !== "string" || typeof body.referred !== "boolean") {
+    if (body?.address !== proof.address || typeof body.inviteCode !== "string" || typeof body.referred !== "boolean") {
       throw new Error("The points server sent an unexpected response.");
     }
 
     const membership: PointsMembership = {
-      address: key.address,
+      address: proof.address,
       inviteCode: body.inviteCode,
       referred: body.referred,
       joinedAt: this.now(),
@@ -161,12 +173,39 @@ export class PointsHandler {
     return membership;
   }
 
-  /** Points signs with the keyfile itself, which a hardware wallet doesn't have. */
   private async requirePointsCapability(walletId: string, action: string): Promise<void> {
     const method = await this.deps.walletMethod(walletId);
     if (method !== null && !capabilitiesFor(method).points) {
       throw new Error(unsupportedOperationMessage(action));
     }
+  }
+
+  /**
+   * A keyfile signs `message` with `signMessage`. A hardware wallet can't
+   * sign messages, so it signs the ownership transaction on the device
+   * instead (`core/points/ownership.ts`).
+   */
+  private async proveOwnership(
+    walletId: string,
+    action: "join" | "leave",
+    buildMessage: (address: string) => string,
+  ): Promise<OwnershipProof> {
+    const method = await this.deps.walletMethod(walletId);
+    if (method !== null && isHardwareWalletMethod(method)) {
+      if (!this.deps.deviceProof) throw new Error(unsupportedOperationMessage(`${action} Gleam Points`));
+      return { ...(await this.deps.deviceProof({ walletId, message: buildMessage })), proof: "transaction" };
+    }
+    const key = await this.deps.signingKey(walletId);
+    if (!key) throw new Error(`Unlock this wallet to ${action} Gleam Points.`);
+    const message = buildMessage(key.address);
+    const signature = await signMessage(key.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
+    return {
+      owner: key.jwk.n,
+      address: key.address,
+      message,
+      signature: bytesToBase64Url(new Uint8Array(signature)),
+      proof: "message",
+    };
   }
 
   async getClaimPending(): Promise<string[]> {
@@ -290,15 +329,12 @@ export class PointsHandler {
    */
   async leave(req: { walletId: string }): Promise<void> {
     await this.requirePointsCapability(req.walletId, "leave Gleam Points");
-    const key = await this.deps.signingKey(req.walletId);
-    if (!key) throw new Error("Unlock this wallet to leave Gleam Points.");
-
-    const message = buildLeaveMessage(key.address, Math.floor(this.now() / 1000));
-    const signature = await signMessage(key.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
+    const issuedAt = Math.floor(this.now() / 1000);
+    const proof = await this.proveOwnership(req.walletId, "leave", (address) => buildLeaveMessage(address, issuedAt));
     const response = await this.fetchImpl(`${this.deps.apiUrl}/leave`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ owner: key.jwk.n, message, signature: bytesToBase64Url(new Uint8Array(signature)) }),
+      body: JSON.stringify(proofBody(proof)),
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
@@ -441,6 +477,11 @@ export class PointsHandler {
       }),
     });
   }
+}
+
+/** A keyfile's body omits `proof`, which the server reads as `message`. */
+function proofBody({ owner, message, signature, proof }: OwnershipProof): Record<string, string> {
+  return proof === "message" ? { owner, message, signature } : { owner, message, signature, proof };
 }
 
 const POINTS_HEARTBEAT_ALARM_NAME = "points-heartbeat";
