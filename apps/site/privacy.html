@@ -39,7 +39,7 @@
   <main class="wrap">
     <article class="prose">
       <h1>Privacy</h1>
-      <p class="updated small">Last updated: 9 October 2026</p>
+      <p class="updated small">Last updated: 12 October 2026</p>
 
       <h2>What Gleam is</h2>
       <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam account. Gleam runs one server, for Gleam Points, and it's optional: the extension sends it nothing unless you redeem an invite code or join.</p>
@@ -62,7 +62,7 @@
         <li><code>api.coingecko.com</code> and <code>api.coinpaprika.com</code>: AR and AO prices, for USD values and the balance chart. These requests only name the token. They don't include your address.</li>
         <li><code>lunar.arweave.net</code>: a block explorer. It opens in a new tab only when you click a transaction or address.</li>
         <li><code>gleam-permaweb.vercel.app</code>: when you open the extension, it fetches <code>announcements.json</code> from this site, a static file of short notices from the Gleam team. It's a plain request that sends nothing about you or your wallet.</li>
-        <li><code>gleam-points.up.railway.app</code>: the Gleam Points server. The extension contacts it only when you redeem an invite code or join, as described below.</li>
+        <li><code>gleam-points.up.railway.app</code>: the Gleam Points server. The extension contacts it only when you redeem an invite code or join, and after you join, for the regular check-ins described below.</li>
       </ul>
       <p>Each of these services receives your IP address, as with any web request. Gateways and AO nodes also receive your public address when looking up your balances and activity, because that's how public blockchains work. Transactions you send are public and permanent on Arweave and AO.</p>
 
@@ -72,6 +72,7 @@
         <li>Your install creates a device key, which stays in the browser. It only proves that requests come from the same install. It can't sign transactions or reach your funds.</li>
         <li>The wallet signs a message linking its public address to that device key, and the server stores the address, the device key's public half, the wallet's invite code, and who invited it, if anyone.</li>
         <li>About once a day, the extension sends a signed check-in so the server knows Gleam is still installed. The server stores when it last heard from your install.</li>
+        <li>Every 6 hours, the extension asks the server for your points and how many invite seats are left, so the toolbar can show a dot when you have a new seat to share. This request carries the device key's ID and a signed timestamp, and nothing about what you do in the wallet.</li>
         <li>Once a day, the server reads each joined wallet's AR and AO balance from public Arweave and AO nodes and stores it with that day's points.</li>
       </ul>
       <p>While Gleam is invite-only, a new install needs an invite code before it can create or import a wallet. When you enter one, your install creates its device key and sends the code and the key's public half to the server. If the code is accepted, the server stores the key's public half and the redemption: which code it used, and when. If it isn't, nothing is stored. Checking a code on the invite page sends only the code, which isn't stored.</p>
@@ -84,7 +85,7 @@
       <p>A site sees only what you grant it, such as your address. Every signing request opens its own approval window. You can revoke a site's access at any time in Connected apps.</p>
 
       <h2>No tracking in the wallet</h2>
-      <p>The extension has no analytics, cookies or ads, and it never reports what you do in it. The only exception is the daily Gleam Points check-in, which tells the points server Gleam is still installed. It's sent only after you join, and it carries nothing about what you do in the wallet.</p>
+      <p>The extension has no analytics, cookies or ads, and it never reports what you do in it. The only exception is the Gleam Points check-in, which tells the points server Gleam is still installed, and the 6-hourly request for your points and invite seats. Both are sent only after you join, and they carry nothing about what you do in the wallet.</p>
       <p>It does open three pages on this website. The welcome page opens once, when you install Gleam. The goodbye page opens when you uninstall it. The feedback page opens when you choose "Send us a message" in Settings. The only thing the extension adds to these links is its version number.</p>
 
       <h2>Install counts</h2>
