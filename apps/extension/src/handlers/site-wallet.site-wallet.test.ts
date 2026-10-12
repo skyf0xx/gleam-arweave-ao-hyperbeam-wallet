@@ -56,7 +56,7 @@ describe("SiteWalletHandler", () => {
     const sites = handler();
     await sites.setUseGleam(ORIGIN, true);
     await sites.setUseGleam("https://other.example", true);
-    await sites.forgetGleamSites();
+    await expect(sites.forgetGleamSites()).resolves.toEqual([ORIGIN, "https://other.example"]);
     expect(await sites.mode(ORIGIN)).toEqual({ useGleam: false });
     expect(await sites.mode("https://other.example")).toEqual({ useGleam: false });
   });

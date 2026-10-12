@@ -98,9 +98,15 @@ export class SiteWalletHandler {
     await this.deps.storage.set(GLEAM_SITES_KEY, useGleam ? [...sites, origin] : sites);
   }
 
-  /** For when the last wallet goes: with no wallet, every site goes back to the other one. */
-  async forgetGleamSites(): Promise<void> {
+  /**
+   * For when the last wallet goes: with no wallet, every site goes back to
+   * the other one. Resolves to the sites that were on Gleam, so their open
+   * tabs can be told.
+   */
+  async forgetGleamSites(): Promise<string[]> {
+    const sites = await this.loadOrigins(GLEAM_SITES_KEY);
     await this.deps.storage.remove(GLEAM_SITES_KEY);
+    return sites;
   }
 
   /** A use stays recorded across reloads of the same origin, and clears on navigating elsewhere. */

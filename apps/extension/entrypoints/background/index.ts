@@ -201,6 +201,18 @@ async function announceAccessEnded(origin: string): Promise<void> {
   await pushSiteWalletMode(origin, false);
 }
 
+/**
+ * For when the last wallet goes. Sites with a grant hear `disconnect` as
+ * well; the rest were chosen in the popup and only switch back.
+ */
+async function announceGleamSitesForgotten(revoked: string[]): Promise<void> {
+  const forgotten = await siteWallet.forgetGleamSites();
+  for (const origin of revoked) void announceAccessEnded(origin);
+  for (const origin of forgotten) {
+    if (!revoked.includes(origin)) void pushSiteWalletMode(origin, false);
+  }
+}
+
 async function pushSiteWalletMode(origin: string, useGleam: boolean): Promise<void> {
   const tabIds = await findTabsForOrigin(origin);
   await Promise.all(
@@ -658,8 +670,7 @@ onExtensionMessage("deleteWallet", async (message) => {
     await approval.rejectWalletApprovals(walletId);
   }
   await lifecycle.deleteWallet(message.data);
-  if (isLastWallet) await siteWallet.forgetGleamSites();
-  for (const origin of revoked) void announceAccessEnded(origin);
+  if (isLastWallet) await announceGleamSitesForgotten(revoked);
 
   const after = await lifecycle.getState();
   if (after.activeWalletId !== before.activeWalletId) {
@@ -696,8 +707,7 @@ onExtensionMessage("resetAllWallets", async () => {
   // removal that fails part-way must not leave a dApp connected to nothing.
   const revoked = await approval.revokeAllAccess();
   await lifecycle.resetAllWallets();
-  await siteWallet.forgetGleamSites();
-  for (const origin of revoked) void announceAccessEnded(origin);
+  await announceGleamSitesForgotten(revoked);
 });
 
 // reads

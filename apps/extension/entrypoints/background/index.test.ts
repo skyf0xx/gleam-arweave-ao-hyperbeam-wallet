@@ -1381,6 +1381,26 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
     });
 
+    async function chooseGleamWithoutGrant(): Promise<void> {
+      await registeredHandlers.get("useGleamOnSite")!({ data: { origin: ORIGIN, permissions: [] } });
+      await rawHandlers.get("providerCall")!({ data: { method: "disconnect", params: {} }, sender: contentSender(ORIGIN) });
+      sendMessage.mockClear();
+    }
+
+    it("resetting the vault switches back open tabs of a chosen site that holds no grant", async () => {
+      await chooseGleamWithoutGrant();
+      await registeredHandlers.get("resetAllWallets")!({ data: undefined });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), expect.anything());
+    });
+
+    it("deleting the last wallet switches back open tabs of a chosen site that holds no grant", async () => {
+      await chooseGleamWithoutGrant();
+      await registeredHandlers.get("deleteWallet")!({ data: { walletId: "wallet-1" } });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
+    });
+
     it("revoking from Connected apps hands open tabs back to the other wallet", async () => {
       await setItem("local:grants", [
         { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
