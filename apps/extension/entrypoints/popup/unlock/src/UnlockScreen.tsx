@@ -14,6 +14,15 @@ export interface UnlockScreenProps {
   onForgotPassword: () => void;
   /** Line under the wordmark. The approval window says why it's asking. */
   tagline?: string;
+  /** Present when a passkey is set up. It becomes the primary way in, with the password one tap away. */
+  passkey?: PasskeyUnlockProps;
+}
+
+export interface PasskeyUnlockProps {
+  onUnlock: () => void;
+  busy: boolean;
+  /** Why the last passkey attempt didn't unlock. A cancel is `muted`, not an error. */
+  notice?: { text: string; tone: "muted" | "error" };
 }
 
 export function UnlockScreen({
@@ -22,7 +31,9 @@ export function UnlockScreen({
   errorMessage,
   onForgotPassword,
   tagline = "Simple. Fast. Easy.",
+  passkey,
 }: UnlockScreenProps) {
+  const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
 
@@ -43,47 +54,62 @@ export function UnlockScreen({
         <BeamMark tagline={tagline} />
       </div>
 
-      <form
-        className="mt-12 flex w-full flex-col gap-2.5"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!unlocking && password.length > 0) onUnlock(password);
-        }}
-      >
-        <PasswordField
-          label="Password"
-          placeholder="Enter your password"
-          autoFocus
-          autoComplete="current-password"
-          value={password}
+      {passkey && !usePassword ? (
+        <PasskeyUnlock
+          {...passkey}
           disabled={unlocking}
-          onChange={(event) => setPassword(event.target.value)}
-          onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-          capsLockOn={capsLockOn}
-          errorMessage={errorMessage}
+          onUsePassword={() => setUsePassword(true)}
         />
-
-        <Button
-          type="submit"
-          disabled={unlocking || password.length === 0}
-          aria-busy={unlocking}
-          className="mt-1.5"
+      ) : (
+        <form
+          className="mt-12 flex w-full flex-col gap-2.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!unlocking && password.length > 0) onUnlock(password);
+          }}
         >
-          {unlocking ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-background/35 border-t-background motion-reduce:animate-none"
-              />
-              <span>Unlocking&hellip;</span>
-            </>
-          ) : (
-            "Unlock"
-          )}
-        </Button>
-      </form>
+          <PasswordField
+            label="Password"
+            placeholder="Enter your password"
+            autoFocus
+            autoComplete="current-password"
+            value={password}
+            disabled={unlocking}
+            onChange={(event) => setPassword(event.target.value)}
+            onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
+            capsLockOn={capsLockOn}
+            errorMessage={errorMessage}
+          />
 
-      <div className="mt-3.5 flex justify-center">
+          <Button
+            type="submit"
+            disabled={unlocking || password.length === 0}
+            aria-busy={unlocking}
+            className="mt-1.5"
+          >
+            {unlocking ? (
+              <>
+                <Spinner />
+                <span>Unlocking&hellip;</span>
+              </>
+            ) : (
+              "Unlock"
+            )}
+          </Button>
+        </form>
+      )}
+
+      <div className="mt-3.5 flex justify-center gap-4">
+        {passkey && usePassword ? (
+          <button
+            type="button"
+            disabled={unlocking}
+            onClick={() => setUsePassword(false)}
+            className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
+          >
+            Use passkey
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={unlocking}
@@ -94,5 +120,62 @@ export function UnlockScreen({
         </button>
       </div>
     </div>
+  );
+}
+
+function PasskeyUnlock({
+  onUnlock,
+  busy,
+  notice,
+  disabled,
+  onUsePassword,
+}: PasskeyUnlockProps & { disabled: boolean; onUsePassword: () => void }) {
+  return (
+    <div className="mt-12 flex w-full flex-col gap-2.5">
+      <Button type="button" autoFocus disabled={busy || disabled} aria-busy={busy} onClick={onUnlock}>
+        {busy ? (
+          <>
+            <Spinner />
+            <span>Waiting for passkey&hellip;</span>
+          </>
+        ) : (
+          <>
+            <PasskeyIcon />
+            <span>Unlock with passkey</span>
+          </>
+        )}
+      </Button>
+      {notice ? (
+        <p
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={notice.tone === "error" ? "text-center text-caption text-warning" : "text-center text-caption text-muted"}
+        >
+          {notice.text}
+        </p>
+      ) : null}
+      <Button type="button" variant="secondary" disabled={busy || disabled} onClick={onUsePassword}>
+        Use password instead
+      </Button>
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-background/35 border-t-background motion-reduce:animate-none"
+    />
+  );
+}
+
+export function PasskeyIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="9" cy="8" r="4" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M3 20a6 6 0 0 1 9.5-4.9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <circle cx="17.5" cy="14.5" r="2.5" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M17.5 17v4m0-2h1.75" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
   );
 }

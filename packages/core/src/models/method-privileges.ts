@@ -47,6 +47,7 @@ export const KEY_METHODS = [
   "exportWallet",
   "addHardwareWallet",
   "resetAllWallets",
+  "enrollPasskey",
 ] as const;
 
 export type ProviderMethod = (typeof PROVIDER_METHODS)[number];

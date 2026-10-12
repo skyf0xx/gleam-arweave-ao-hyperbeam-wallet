@@ -62,7 +62,7 @@ describe("method privilege tiers", () => {
 
   it("KEY_METHODS lists every trusted-UI wallet method", () => {
     expect([...KEY_METHODS].sort()).toEqual(
-      ["addHardwareWallet", "createWallet", "exportWallet", "importWallet", "resetAllWallets"].sort(),
+      ["addHardwareWallet", "createWallet", "enrollPasskey", "exportWallet", "importWallet", "resetAllWallets"].sort(),
     );
   });
 

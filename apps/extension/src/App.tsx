@@ -20,6 +20,7 @@ import { UseGleamOnSiteView } from "@/entrypoints/popup/site-wallet/index.tsx";
 import { browser } from "wxt/browser";
 import { FOUNDING_GATE } from "@/src/founding-gate";
 import { sitePageUrl } from "@/src/site-pages";
+import { openPasskeyWindow } from "@/src/passkey/open-window";
 
 /**
  * The one shared shell mounted from every surface (popup, sidepanel, and
@@ -217,6 +218,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onUnlocked={() => void refresh(runtime)}
         onResetComplete={() => void refresh(runtime)}
+        passkeyMode={layout === "popup" ? "window" : "inline"}
+        openPasskeyWindow={() => openPasskeyWindow("unlock")}
       />
     );
   } else if (!wallet) {
@@ -306,6 +309,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
+        onSetUpPasskey={() => openPasskeyWindow("setup")}
       />
     );
   } else if (subView.kind === "network-peers") {

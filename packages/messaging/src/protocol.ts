@@ -11,6 +11,7 @@ import type {
   InviteUnlock,
   JWKInterface,
   LockSettings,
+  PasskeyStatus,
   NetworkSettings,
   PermissionType,
   PointsMembership,
@@ -68,6 +69,22 @@ export interface ProtocolMap {
    * session.
    */
   resetAllWallets(): void;
+  /** Whether a passkey can unlock Gleam, and the public inputs its ceremony needs. */
+  getPasskeyStatus(): PasskeyStatus;
+  /**
+   * Throws unless `password` opens the vault. Asked before creating a
+   * passkey, so a mistyped password never leaves an unusable passkey in
+   * the user's password manager.
+   */
+  checkVaultPassword(req: { password: string }): void;
+  /**
+   * Stores the vault password wrapped under the passkey's PRF output.
+   * `prfSalt` and `prfOutput` are base64url. Replaces any earlier passkey.
+   */
+  enrollPasskey(req: { password: string; credentialId: string; prfSalt: string; prfOutput: string }): void;
+  /** Unlocks with the PRF output (base64url) of the enrolled passkey. */
+  unlockWithPasskey(req: { credentialId: string; prfOutput: string }): { unlockedWalletIds: string[] };
+  removePasskey(): void;
 
   // reads
   getState(): WalletState;

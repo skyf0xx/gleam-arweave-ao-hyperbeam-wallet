@@ -66,6 +66,7 @@ vi.mock("wxt/browser", () => ({
     runtime: { getURL: (path: string) => `chrome-extension://test${path}`, onSuspend: { addListener: onSuspendAddListener } },
     tabs: { query: tabsQuery, reload: tabsReload, onRemoved: { addListener: vi.fn() } },
     alarms: { create: alarmsCreate, get: vi.fn(async () => undefined), onAlarm: { addListener: alarmsAddListener } },
+    action: { setIcon: vi.fn(async () => undefined) },
   },
 }));
 
@@ -116,6 +117,11 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "exportWallet",
       "getState",
       "resetAllWallets",
+      "getPasskeyStatus",
+      "checkVaultPassword",
+      "enrollPasskey",
+      "unlockWithPasskey",
+      "removePasskey",
       "getApproval",
       "resolveApproval",
       "submitDeviceSignature",
@@ -202,6 +208,24 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     await expect(resetHandler({ data: undefined })).resolves.toBeUndefined();
     await expect(getStateHandler({ data: undefined })).resolves.toMatchObject({ wallets: [] });
+  });
+
+  it("unlocks with an enrolled passkey and forgets it on reset", async () => {
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const password = "correct horse battery staple";
+    const prfOutput = "A".repeat(43);
+
+    await handler("createWallet")({ data: { name: "Wallet 1", password } });
+    await handler("enrollPasskey")({ data: { password, credentialId: "cred-1", prfSalt: "salt", prfOutput } });
+    await handler("lockWallet")({ data: undefined });
+
+    await expect(handler("unlockWithPasskey")({ data: { credentialId: "cred-1", prfOutput } })).resolves.toMatchObject({
+      unlockedWalletIds: [expect.any(String)],
+    });
+    await expect(handler("getState")({ data: undefined })).resolves.toMatchObject({ session: expect.any(Object) });
+
+    await handler("resetAllWallets")({ data: undefined });
+    await expect(handler("getPasskeyStatus")({ data: undefined })).resolves.toEqual({ enrolled: false });
   });
 
   it("rejects a KEY_METHODS name routed through providerCall", () => {

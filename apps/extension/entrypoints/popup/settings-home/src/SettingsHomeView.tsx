@@ -30,7 +30,7 @@ function gatewayHostname(gatewayUrl: string): string {
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
   onBack: () => void;
-  /** Omitted when the vault has no password, which hides the auto-lock row. */
+  /** Omitted when the vault has no password, which hides the lock row. */
   onOpenLockSettings?: () => void;
   onOpenConnectedApps: () => void;
   onOpenNetworkPeers: () => void;
@@ -114,9 +114,9 @@ export function SettingsHomeView({
         <OptionSection title="Wallet">
           {onOpenLockSettings ? (
             <OptionRow
-            divided={false}
-              title="Auto-lock"
-              description="When the wallet locks itself"
+              divided={false}
+              title="Lock & unlock"
+              description="Auto-lock and passkey"
               value={state.loading ? undefined : state.lockSettings ? TIMEOUT_LABELS[state.lockSettings.autoLockTimeout] : "—"}
               onClick={onOpenLockSettings}
             />

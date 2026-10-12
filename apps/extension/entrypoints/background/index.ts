@@ -30,6 +30,7 @@ import {
 import { WxtStoragePort } from "@/src/adapters/storage";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
+import { PasskeyHandler } from "@/src/handlers/passkey";
 import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/reads";
 import { ContactsHandler } from "@/src/handlers/contacts";
 import { TransferHandler } from "@/src/handlers/transfer";
@@ -92,6 +93,7 @@ const storage = new WxtStoragePort();
 const windows = new WxtWindowPort(storage);
 
 const lifecycle = new WalletLifecycleHandler(storage);
+const passkey = new PasskeyHandler(storage, lifecycle);
 const reads = new ReadsHandler(storage);
 // `approval` is declared below; hardware sends reach it only at call time.
 const transfer: TransferHandler = new TransferHandler(storage, {
@@ -702,10 +704,20 @@ onExtensionMessage("unlockWallet", async (message) => {
   void setLockedIcon(false);
   return result;
 });
+onExtensionMessage("getPasskeyStatus", () => passkey.getPasskeyStatus());
+onExtensionMessage("checkVaultPassword", (message) => lifecycle.checkVaultPassword(message.data));
+onExtensionMessage("enrollPasskey", (message) => passkey.enrollPasskey(message.data));
+onExtensionMessage("unlockWithPasskey", async (message) => {
+  const result = await passkey.unlockWithPasskey(message.data);
+  void setLockedIcon(false);
+  return result;
+});
+onExtensionMessage("removePasskey", () => passkey.removePasskey());
 onExtensionMessage("resetAllWallets", async () => {
   // Grants go first, here and when deleteWallet removes the last wallet: a
   // removal that fails part-way must not leave a dApp connected to nothing.
   const revoked = await approval.revokeAllAccess();
+  await passkey.removePasskey();
   await lifecycle.resetAllWallets();
   await announceGleamSitesForgotten(revoked);
 });
