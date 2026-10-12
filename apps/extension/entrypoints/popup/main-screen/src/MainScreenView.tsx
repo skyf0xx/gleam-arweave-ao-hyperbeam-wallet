@@ -83,11 +83,10 @@ export interface MainScreenViewProps {
 }
 
 /**
- * A default (AR/AO) row carries enough to render a `TokenRow` and, for AO,
- * to be clicked into the send flow the same as any other `TokenBalance` —
- * `sendToken` is `null` for AR, since the top-level "Send" action (not a
- * per-row click) is AR's entry point today, matching `TokenRow`'s existing
- * `onClick` no-op precedent elsewhere on this screen.
+ * A default (AR/AO) row carries enough to render a `TokenRow` and to be
+ * clicked into the send flow: `"ar"` opens it for AR, a `TokenBalance`
+ * for that AO token, and `null` leaves the row unclickable (an AO balance
+ * that isn't loaded or couldn't be read).
  */
 interface DefaultTokenRow {
   key: string;
@@ -95,7 +94,7 @@ interface DefaultTokenRow {
   name: string;
   amount: string;
   usdValue: string | undefined;
-  sendToken: TokenBalance | null;
+  send: "ar" | TokenBalance | null;
 }
 
 /**
@@ -138,7 +137,7 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
       name: DEFAULT_AR_TOKEN.name,
       amount: data?.arBalance !== undefined ? formatWinstonAsAr(data.arBalance) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
       usdValue: data?.arBalance !== undefined ? usdValueFor(prices, null, arAmount) : undefined,
-      sendToken: null,
+      send: "ar",
     },
     {
       key: "default-ao",
@@ -150,7 +149,7 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
           ? UNAVAILABLE_BALANCE_LABEL
           : DEFAULT_AO_TOKEN.defaultDisplayAmount,
       usdValue: aoAvailable ? usdValueFor(prices, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
-      sendToken: aoAvailable ? (aoBalance ?? null) : null,
+      send: aoAvailable ? (aoBalance ?? null) : null,
     },
   ];
 }
@@ -524,7 +523,7 @@ export function MainScreenView({
               </>
             ) : (
               <>
-                {buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map((row) => (
+                {buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map(({ send, ...row }) => (
                   <TokenRow
                     key={row.key}
                     glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
@@ -532,7 +531,7 @@ export function MainScreenView({
                     amount={row.amount}
                     usdValue={row.usdValue}
                     loading={loading}
-                    onClick={row.sendToken ? () => onSendToken(row.sendToken as TokenBalance) : undefined}
+                    onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                   />
                 ))}
                 <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />

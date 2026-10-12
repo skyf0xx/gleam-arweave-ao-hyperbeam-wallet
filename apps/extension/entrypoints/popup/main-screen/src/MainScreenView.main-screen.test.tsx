@@ -396,6 +396,17 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
     expect(screen.getAllByText("PNTS").length).toBeGreaterThan(0);
   });
 
+  it("opens an AR send when the AR default row is clicked", async () => {
+    const onSend = vi.fn();
+    const onSendToken = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWith({ tokenBalances: [] }) }), onSend, onSendToken });
+
+    fireEvent.click(await screen.findByRole("button", { name: /Arweave/ }));
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(onSendToken).not.toHaveBeenCalled();
+  });
+
   it("routes the AO default row's click into onSendToken with the matching TokenBalance", async () => {
     const aoBalance: TokenBalance = {
       address: WALLET.address,
