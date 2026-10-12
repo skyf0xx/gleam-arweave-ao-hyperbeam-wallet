@@ -84,6 +84,18 @@ describe("claim step", () => {
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setPointsClaimPending" }));
   });
 
+  it("shows the claim step when backup's back button is used", async () => {
+    const { onComplete } = setup("founding");
+    fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
+    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), { target: { value: PASSWORD } });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByText("Your wallet is ready");
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByText("Start earning Gleam Points")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   it("marks the claim pending as soon as the wallet exists, so closing the popup can't lose it", async () => {
     const { send } = setup("founding");
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));

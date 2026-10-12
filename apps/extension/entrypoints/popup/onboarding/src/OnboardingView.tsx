@@ -224,8 +224,9 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
       return (
         <Backup
           // The wallet already exists by this step, so going back to the
-          // start would only offer to create another one.
-          onBack={onComplete}
+          // start would only offer to create another one. Back finishes
+          // like Continue does, so the claim step still shows.
+          onBack={() => finish(step.wallet)}
           keyfileContents={step.keyfileContents}
           onDownload={() => downloadKeyfile(step.keyfileContents, step.walletName)}
           onCopy={() => void navigator.clipboard?.writeText(step.keyfileContents)}
