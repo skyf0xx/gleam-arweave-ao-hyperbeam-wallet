@@ -49,6 +49,17 @@ describe("POST /register", () => {
     expect(rows[0]?.last_heartbeat_at.toISOString()).toBe(NOW.toISOString());
   });
 
+  it("stores only the device key's public members", async () => {
+    const db = await createTestDb();
+    const device = await createTestDevice();
+    const body = await registerBody(alice, device, { issuedAt: NOW_SECONDS });
+
+    await post(setup(db, 2), { ...body, devicePublicKey: { ...device.publicKey, ext: true, key_ops: ["verify"] } });
+
+    const { rows } = await db.query<{ public_key_jwk: unknown }>("SELECT public_key_jwk FROM devices");
+    expect(rows[0]?.public_key_jwk).toEqual(device.publicKey);
+  });
+
   it("credits an invite code on the install's first wallet", async () => {
     const db = await createTestDb();
     const app = setup(db);

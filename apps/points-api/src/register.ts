@@ -85,6 +85,7 @@ export async function register(
 
   const address = await addressFromOwner(request.owner);
   const deviceId = message.deviceKeyThumbprint;
+  const { kty, crv, x, y } = request.devicePublicKey;
 
   return db.transaction(async (tx): Promise<RegisterOutcome> => {
     const existing = await tx.query<{ invite_code: string; referred_by: string | null }>(
@@ -98,7 +99,7 @@ export async function register(
     await tx.query(
       `INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ($1, $2, $3)
        ON CONFLICT (id) DO UPDATE SET last_heartbeat_at = EXCLUDED.last_heartbeat_at`,
-      [deviceId, JSON.stringify(request.devicePublicKey), now],
+      [deviceId, JSON.stringify({ kty, crv, x, y }), now],
     );
 
     if (existing.rows[0]) {
