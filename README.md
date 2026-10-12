@@ -57,7 +57,8 @@ whenGleamReady(() => {
 ```
 
 If `window.gleam` never appears, Gleam isn't installed. Link to the
-Chrome Web Store listing instead of showing the button.
+[Chrome Web Store listing](https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki)
+instead of showing the button.
 
 ### Connect
 
