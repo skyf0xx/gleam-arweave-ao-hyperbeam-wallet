@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { isValidInviteCode } from "@gleam/core/src/points/index.ts";
-import { createDropCode, parseDropCodeArgs } from "./drop-codes";
+import { createDropCode, dropLink, formatDropCode, parseDropCodeArgs } from "./drop-codes";
 import { createTestDb } from "./test-db";
 
-const options = { label: "X launch", seats: 50, prefix: "GLEAM" };
+const options = { label: "X launch", seats: 50, prefix: "GLEAM", until: null };
 const suffixes = (...list: string[]) => () => list.shift()!;
 
 describe("createDropCode", () => {
@@ -44,12 +44,19 @@ describe("createDropCode", () => {
 
 describe("parseDropCodeArgs", () => {
   it("parses seats, unlimited and prefix", () => {
-    expect(parseDropCodeArgs(["--label", "X", "--seats", "50"])).toEqual({ label: "X", seats: 50, prefix: "GLEAM" });
+    expect(parseDropCodeArgs(["--label", "X", "--seats", "50"])).toEqual({ label: "X", seats: 50, prefix: "GLEAM", until: null });
     expect(parseDropCodeArgs(["--label", "R", "--unlimited", "--prefix", "rev"])).toEqual({
       label: "R",
       seats: null,
       prefix: "REV",
+      until: null,
     });
+  });
+
+  it("parses --until and rejects a non-date", () => {
+    const parsed = parseDropCodeArgs(["--label", "X", "--seats", "5", "--until", "2026-10-20T18:00:00Z"]);
+    expect(parsed.until?.toISOString()).toBe("2026-10-20T18:00:00.000Z");
+    expect(() => parseDropCodeArgs(["--label", "X", "--seats", "5", "--until", "soon"])).toThrow(/--until/);
   });
 
   it.each([
@@ -63,5 +70,20 @@ describe("parseDropCodeArgs", () => {
     [["--label", "X", "--seats", "5", "--bogus"]],
   ])("rejects %j", (argv) => {
     expect(() => parseDropCodeArgs(argv)).toThrow();
+  });
+});
+
+describe("formatDropCode", () => {
+  const drop = { code: "GLEAMABCDEFGH", seats: 5, label: "X" };
+
+  it("prints an invite link with the close time", () => {
+    const until = new Date("2026-10-20T18:00:00Z");
+    expect(formatDropCode(drop, until, "https://site.test/")).toBe(
+      "GLEAMABCDEFGH  5 seats  X\nhttps://site.test/invite.html?c=GLEAMABCDEFGH&until=2026-10-20T18%3A00%3A00.000Z",
+    );
+  });
+
+  it("omits until when the drop has no end", () => {
+    expect(dropLink("GLEAMABCDEFGH", null, "https://site.test/")).toBe("https://site.test/invite.html?c=GLEAMABCDEFGH");
   });
 });
