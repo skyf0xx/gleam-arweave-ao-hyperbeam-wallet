@@ -132,25 +132,6 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getByRole("button", { name: "Sign on Ledger" })).toBeTruthy();
   });
 
-  it("notes that a Ledger needs the Permaweb app for data items", () => {
-    renderView();
-    expect(screen.getByText("Needs the Permaweb app on your Ledger.")).toBeTruthy();
-  });
-
-  it("has no Permaweb note for a Ledger transaction or another device's data item", () => {
-    renderView({
-      device: {
-        ...DEVICE,
-        payloads: [{ kind: "transaction", transaction: {} as never }],
-        summaries: [{ kind: "transaction", recipient: null, quantity: "0", fee: "1", dataSize: "0" }],
-      },
-    });
-    expect(screen.queryByText("Needs the Permaweb app on your Ledger.")).toBeNull();
-    cleanup();
-    renderView({ device: { ...DEVICE, method: "keystone", device: { kind: "keystone", xfp: "1" } } });
-    expect(screen.queryByText("Needs the Permaweb app on your Ledger.")).toBeNull();
-  });
-
   it("reports activity on its own timer while mounted, and whenever the panel does", async () => {
     vi.useFakeTimers();
     const { props, panel } = renderView();

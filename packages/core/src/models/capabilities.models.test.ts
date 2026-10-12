@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capabilitiesFor, providerMethodRefusal } from "./capabilities";
+import { capabilitiesFor, capabilityRefusal, providerMethodRefusal } from "./capabilities";
 import { PROVIDER_METHODS } from "./method-privileges";
 
 describe("capabilitiesFor", () => {
@@ -22,11 +22,11 @@ describe("capabilitiesFor", () => {
     });
   });
 
-  it("keeps Ledger dispatch on L1", () => {
+  it("lets Ledger sign AR transactions only, with dispatch on L1", () => {
     expect(capabilitiesFor("ledger")).toEqual({
       signTransaction: true,
       dispatchViaBundler: false,
-      signDataItem: true,
+      signDataItem: false,
       signMessage: false,
       decrypt: false,
       privateHash: false,
@@ -65,13 +65,39 @@ describe("providerMethodRefusal", () => {
   it("allows what a hardware wallet can sign", () => {
     for (const method of ["sign", "dispatch", "signDataItem", "batchSignDataItem", "transferAoTokens", "encrypt"] as const) {
       expect(providerMethodRefusal("keystone", method)).toBeNull();
+    }
+    for (const method of ["sign", "dispatch", "encrypt"] as const) {
       expect(providerMethodRefusal("ledger", method)).toBeNull();
     }
+  });
+
+  it("points a Ledger to a Keystone for data items", () => {
+    expect(providerMethodRefusal("ledger", "transferAoTokens")).toBe(
+      "Ledger only supports sending AR for now, so it can't send AO tokens. Use a Keystone instead.",
+    );
+    expect(providerMethodRefusal("ledger", "signDataItem")).toBe(
+      "Ledger only supports sending AR for now, so it can't sign data items. Use a Keystone instead.",
+    );
   });
 
   it("never refuses a method that signs nothing", () => {
     for (const method of ["connect", "getActiveAddress", "verifyMessage", "tokenBalance"] as const) {
       expect(providerMethodRefusal("ethereum", method)).toBeNull();
     }
+  });
+});
+
+describe("capabilityRefusal", () => {
+  it("is null when the wallet has the capability", () => {
+    expect(capabilityRefusal("keystone", "signDataItem", "send AO")).toBeNull();
+  });
+
+  it("names the action for a wallet without it", () => {
+    expect(capabilityRefusal("ledger", "signDataItem", "send AO")).toBe(
+      "Ledger only supports sending AR for now, so it can't send AO. Use a Keystone instead.",
+    );
+    expect(capabilityRefusal("ledger", "upload", "upload files")).toBe(
+      "This wallet can't upload files. Switch to a keyfile wallet.",
+    );
   });
 });

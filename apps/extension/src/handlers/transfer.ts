@@ -12,6 +12,7 @@ import {
 } from "@gleam/core/src/ao/transfer.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import {
+  capabilityRefusal,
   DEFAULT_HYPERBEAM_PEER_URLS,
   isHardwareWalletMethod,
   type ActivityEntry,
@@ -190,6 +191,9 @@ export class TransferHandler {
    */
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
     const method = await getWalletMethod(req.walletId);
+    // An AO send is a data item, which not every hardware wallet can sign.
+    const refusal = req.token !== null && method !== null ? capabilityRefusal(method, "signDataItem", "send AO tokens") : null;
+    if (refusal) throw new Error(refusal);
     if (method !== null && isHardwareWalletMethod(method)) {
       if (!this.approvals) throw new Error("Hardware wallet sends aren't wired to the approval window.");
       return this.approvals.requestTransfer(req);

@@ -53,7 +53,6 @@ export function createLedgerPanel({
     useEffect(() => () => abortRef.current?.abort(), []);
 
     const needsPermaweb = payloads.some((payload) => payload.kind === "dataItem");
-    const appName = needsPermaweb ? "Permaweb" : "Arweave";
     const total = payloads.length;
 
     const run = async () => {
@@ -78,7 +77,7 @@ export function createLedgerPanel({
           appTimeoutMs,
           keyTimeoutMs,
           onWaiting: (reason) => setStep({ kind: "waiting", reason }),
-          appTimeoutMessage: `Gleam couldn't find the ${appName} app. Unlock your Ledger, open the ${appName} app and try again.`,
+          appTimeoutMessage: "Gleam couldn't find the Arweave app. Unlock your Ledger, open the Arweave app and try again.",
         });
 
         if (needsPermaweb) {
@@ -126,7 +125,7 @@ export function createLedgerPanel({
       return (
         <div className="flex flex-col gap-4">
           <p className="text-center text-label leading-snug text-muted">
-            Plug in your Ledger, unlock it and open the {appName} app.
+            Plug in your Ledger, unlock it and open the Arweave app.
           </p>
           <Button type="button" onClick={() => void run()} disabled={busy}>
             {busy ? "Connecting…" : "Sign on Ledger"}
@@ -140,7 +139,7 @@ export function createLedgerPanel({
         <p role="status" className="text-center text-label leading-snug text-muted">
           {step.reason === "key"
             ? "Your Ledger is generating its Arweave key. This happens once per recovery phrase and can take several minutes. Keep it plugged in and the app open."
-            : `Waiting for the ${appName} app. Unlock your Ledger and open the ${appName} app.`}
+            : "Waiting for the Arweave app. Unlock your Ledger and open the Arweave app."}
         </p>
       );
     }

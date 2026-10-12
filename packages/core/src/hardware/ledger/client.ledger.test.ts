@@ -470,8 +470,7 @@ describe("LedgerArweaveClient: signDataItem", () => {
 
   it("needs the Permaweb app: the stock app is refused before any data-item command", async () => {
     const device = new SimulatedLedger();
-    const error = await expectLedgerError(new LedgerArweaveClient(device).signDataItem(item()), "permaweb-app-required");
-    expect(error.message).toMatch(/Permaweb app/);
+    await expectLedgerError(new LedgerArweaveClient(device).signDataItem(item()), "permaweb-app-required");
     expect(insSent(device.log).some((ins) => ins.startsWith("4403"))).toBe(false);
   });
 

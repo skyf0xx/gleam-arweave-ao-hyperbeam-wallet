@@ -63,13 +63,13 @@ const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
     signDataItem: true,
     encrypt: true,
   },
-  // Data items sign only on the Permaweb device app, which the device
-  // reports at signing time, so they are allowed here. The Arweave app
-  // can't sign them, so `dispatch` must stay on L1.
+  // The Ledger Arweave app has no data-item command, so AO sends and
+  // `signDataItem` are off and `dispatch` stays on L1. The client can still
+  // sign data items on the experimental Permaweb app; turn this on once
+  // Gleam can install it.
   ledger: {
     ...NONE,
     signTransaction: true,
-    signDataItem: true,
     encrypt: true,
   },
   // Modeled but never produced: no Arweave operation applies.
@@ -100,12 +100,25 @@ export function unsupportedOperationMessage(action: string): string {
   return `This wallet can't ${action}. Switch to a keyfile wallet.`;
 }
 
+/** Why a wallet of `walletMethod` can't `action`, or null when it has `capability`. */
+export function capabilityRefusal(
+  walletMethod: WalletMethod,
+  capability: keyof WalletCapabilities,
+  action: string,
+): string | null {
+  if (capabilitiesFor(walletMethod)[capability]) return null;
+  // A Keystone signs data items, so it's the hardware wallet to point a Ledger user to.
+  if (walletMethod === "ledger" && capability === "signDataItem") {
+    return `Ledger only supports sending AR for now, so it can't ${action}. Use a Keystone instead.`;
+  }
+  return unsupportedOperationMessage(action);
+}
+
 /**
  * Why a wallet of `walletMethod` can't serve provider `method`, or null
  * when it can (or the method signs nothing).
  */
 export function providerMethodRefusal(walletMethod: WalletMethod, method: ProviderMethod): string | null {
   const requirement = PROVIDER_REQUIREMENTS[method];
-  if (!requirement || capabilitiesFor(walletMethod)[requirement.capability]) return null;
-  return unsupportedOperationMessage(requirement.action);
+  return requirement ? capabilityRefusal(walletMethod, requirement.capability, requirement.action) : null;
 }

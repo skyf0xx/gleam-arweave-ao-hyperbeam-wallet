@@ -274,6 +274,18 @@ describe("TransferHandler: submitTransfer", () => {
     expect(entry?.token).toBe(AO_PROCESS_ID);
   });
 
+  it("refuses a Ledger AO send before opening the approval window", async () => {
+    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", encryptedKeyfile: null }]);
+    const requestTransfer = vi.fn();
+    const handler = new TransferHandler(storage, { requestTransfer });
+
+    await expect(
+      handler.submitTransfer({ walletId: WALLET_ID, recipient: "recipientAoAddr", token: AO_PROCESS_ID, amount: "1", fee: null }),
+    ).rejects.toThrow("Ledger only supports sending AR for now, so it can't send AO tokens. Use a Keystone instead.");
+    expect(requestTransfer).not.toHaveBeenCalled();
+    expect(aoSubmitMock).not.toHaveBeenCalled();
+  });
+
   it("keeps AO amounts as atomic-integer strings end to end, never a float", async () => {
     await storage.set("local:networkSettings", {
       gatewayUrl: "https://arweave.net",

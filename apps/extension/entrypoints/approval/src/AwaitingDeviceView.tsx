@@ -48,8 +48,6 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
   activity.current = onActivity;
   const name = DEVICE_NAMES[device.method];
   const host = hostnameOf(origin);
-  // The stock Arweave Ledger app has no data-item command; only the Permaweb fork signs them.
-  const needsPermaweb = device.method === "ledger" && device.payloads.some((payload) => payload.kind === "dataItem");
 
   const reportActivity = () => void activity.current().catch(() => {});
 
@@ -100,8 +98,6 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
             </div>
           ))}
         </div>
-
-        {needsPermaweb ? <p className="text-caption text-muted">Needs the Permaweb app on your Ledger.</p> : null}
 
         {error ? (
           <div role="alert" className="text-caption leading-snug text-warning">

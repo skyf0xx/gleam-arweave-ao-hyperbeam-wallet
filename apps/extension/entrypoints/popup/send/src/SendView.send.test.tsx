@@ -658,4 +658,29 @@ describe("SendView with a hardware wallet", () => {
     expect((await screen.findByRole("status")).textContent).toBe("Approve on your device in the window that opened.");
     expect(screen.getByRole("button", { name: "Waiting for approval…" })).toBeTruthy();
   });
+
+  it("tells a Ledger user it only sends AR and suggests a Keystone", async () => {
+    const ledger: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+    const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: ledger, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "Ledger only supports sending AR for now, so it can't send ARDRIVE. Use a Keystone instead.",
+    );
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "1" } });
+    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows no notice for a Ledger AR send or a Keystone AO send", () => {
+    const ledger: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+    const send = routedSend({});
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: ledger, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    expect(screen.queryByText(/Ledger only supports sending AR/)).toBeNull();
+    cleanup();
+
+    const keystone: WalletSummary = { ...WALLET, method: "keystone", device: { kind: "keystone", xfp: "1" } };
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: keystone, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+    expect(screen.queryByText(/Ledger only supports sending AR/)).toBeNull();
+  });
 });

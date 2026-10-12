@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
+import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -457,11 +457,14 @@ function ComposeStep({
   savingAddress: boolean;
 }) {
   const denomination = token === null ? 12 : token.denomination;
+  const ticker = tickerFor(token);
+  // Every non-AR send is an AO data item, which a Ledger can't sign yet.
+  const unsupported = token === null ? null : capabilityRefusal(wallet.method, "signDataItem", `send ${ticker}`);
   const canContinue =
     !step.submitting &&
+    unsupported === null &&
     recipientSchema.safeParse(step.recipient).success &&
     amountSchema(denomination).safeParse(step.amountDisplay).success;
-  const ticker = tickerFor(token);
   // For AR, Max is balance minus the rough fee estimate (clamped to 0),
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
@@ -570,6 +573,12 @@ function ComposeStep({
             </div>
           ) : null}
         </div>
+
+        {unsupported ? (
+          <p role="status" className="rounded-md border border-line bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
+            {unsupported}
+          </p>
+        ) : null}
 
         <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
           {step.submitting ? "Checking…" : "Continue"}

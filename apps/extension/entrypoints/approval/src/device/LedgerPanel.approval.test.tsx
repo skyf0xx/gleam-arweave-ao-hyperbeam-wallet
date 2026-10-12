@@ -192,7 +192,6 @@ describe("LedgerPanel", () => {
     const { device, props, view } = await setup([payload]);
     device.app = "Permaweb";
     view();
-    expect(screen.getByText("Plug in your Ledger, unlock it and open the Permaweb app.")).toBeTruthy();
     start();
 
     await waitFor(() => expect(props.onSignatures).toHaveBeenCalledTimes(1));
@@ -207,8 +206,8 @@ describe("LedgerPanel", () => {
     start();
 
     await waitFor(() => expect(props.onError).toHaveBeenCalledWith(LEDGER_PERMAWEB_REQUIRED_MESSAGE));
-    expect(LEDGER_PERMAWEB_REQUIRED_MESSAGE).toMatch(
-      /^AO and data-item signing needs the Permaweb app on your Ledger\. The Arweave app can sign AR transactions only\./,
+    expect(LEDGER_PERMAWEB_REQUIRED_MESSAGE).toBe(
+      "Ledger only supports sending AR for now. To send AO tokens or sign data items, use a Keystone.",
     );
     expect(device.signIns).toEqual([]);
     expect(device.close).toHaveBeenCalled();

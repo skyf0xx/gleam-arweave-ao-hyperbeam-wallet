@@ -308,7 +308,7 @@ function checkPermawebTags(tags: DataItemTag[]): void {
 }
 
 export const LEDGER_PERMAWEB_REQUIRED_MESSAGE =
-  "AO and data-item signing needs the Permaweb app on your Ledger. The Arweave app can sign AR transactions only.";
+  "Ledger only supports sending AR for now. To send AO tokens or sign data items, use a Keystone.";
 
 function permawebRequired(): LedgerError {
   return new LedgerError("permaweb-app-required", LEDGER_PERMAWEB_REQUIRED_MESSAGE);
