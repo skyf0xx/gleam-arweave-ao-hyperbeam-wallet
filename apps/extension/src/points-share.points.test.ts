@@ -21,7 +21,7 @@ describe("share post builders", () => {
 
   it("builds the gained-seat post with the invite link", () => {
     expect(gainedSeatPost({ link: LINK })).toBe(
-      `Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n${TAGS}`,
+      `I've got a Gleam seat. It's yours if you want it.\n${LINK}\n${TAGS}`,
     );
   });
 

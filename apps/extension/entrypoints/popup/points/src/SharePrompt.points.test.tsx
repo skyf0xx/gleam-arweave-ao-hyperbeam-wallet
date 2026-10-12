@@ -114,7 +114,7 @@ describe("share prompts on the Points screen", () => {
 
     expect(await screen.findByRole("heading", { name: "A friend joined. You got another invite." })).toBeTruthy();
     expect(invite().getByRole("link", { name: "Invite on X" }).getAttribute("href")).toBe(
-      intent(`Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n@ArweaveEco @aoTheComputer`),
+      intent(`I've got a Gleam seat. It's yours if you want it.\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsSeatsSeen", payload: { walletId: WALLET.id, seats: 3 } }),
