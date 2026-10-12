@@ -3,7 +3,7 @@ import { foundingPost, gainedSeatPost, invitePost, invitesLine, invitesRemaining
 
 vi.mock("wxt/browser", () => ({ browser: {} }));
 
-const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
+const LINK = "https://gleamwallet.app/invite.html?c=MYCODE22";
 const TAGS = "@ArweaveEco @aoTheComputer";
 
 describe("share post builders", () => {

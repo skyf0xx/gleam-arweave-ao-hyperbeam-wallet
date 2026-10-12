@@ -9,7 +9,7 @@ export const DEFAULT_DROP_PREFIX = "GLEAM";
 export const DROP_SUFFIX_LENGTH = 8;
 const MAX_PREFIX_LENGTH = 16 - DROP_SUFFIX_LENGTH;
 const MAX_ATTEMPTS = 5;
-export const DEFAULT_SITE_URL = "https://gleam-permaweb.vercel.app/";
+export const DEFAULT_SITE_URL = "https://gleamwallet.app/";
 
 export interface DropCodeOptions {
   label: string;

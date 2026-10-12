@@ -46,7 +46,7 @@ describe("GatedOnboarding", () => {
     expect(screen.getByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeTruthy();
     expect(screen.queryByText("What are Gleam Points?")).toBeNull();
     expect(screen.getByRole("link", { name: "GLEAM" }).getAttribute("href")).toBe(
-      "https://gleam-permaweb.vercel.app/gleam.html?v=1.2.3",
+      "https://gleamwallet.app/gleam.html?v=1.2.3",
     );
   });
 
@@ -83,7 +83,7 @@ describe("GatedOnboarding", () => {
   it("takes the code out of a pasted invite link, dropping separators", async () => {
     setup();
     await screen.findByText("You're early.");
-    type("  https://gleam-permaweb.vercel.app/invite.html?c=k7m2-qx9p ");
+    type("  https://gleamwallet.app/invite.html?c=k7m2-qx9p ");
     expect(field().value).toBe("K7M2QX9P");
     type("gleam-drop 7");
     expect(field().value).toBe("GLEAMDROP7");

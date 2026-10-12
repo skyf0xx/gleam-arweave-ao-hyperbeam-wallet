@@ -281,7 +281,7 @@ describe("POST /invite/check", () => {
     expect((await check("ab")).status).toBe(400);
     expect((await check(42)).status).toBe(400);
     expect((await post("/invite/check", null)).status).toBe(400);
-    const cors = await post("/invite/check", { code: "ALICE001" }, { origin: "https://gleam-permaweb.vercel.app" });
+    const cors = await post("/invite/check", { code: "ALICE001" }, { origin: "https://gleamwallet.app" });
     expect(cors.headers.get("access-control-allow-origin")).toBe("*");
   });
 

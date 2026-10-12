@@ -7,7 +7,7 @@ import { pickSharePrompt } from "./SharePrompt";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
-const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
+const LINK = "https://gleamwallet.app/invite.html?c=MYCODE22";
 
 afterEach(cleanup);
 

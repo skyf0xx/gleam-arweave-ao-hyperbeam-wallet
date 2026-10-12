@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
  */
 const extensionPath = fileURLToPath(new URL("../apps/extension/.output/chrome-mv3", import.meta.url));
 const siteDir = fileURLToPath(new URL("../apps/site/", import.meta.url));
-const SITE = "https://gleam-permaweb.vercel.app";
+const SITE = "https://gleamwallet.app";
 const STORE_EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -42,7 +42,7 @@ test.beforeAll(async () => {
   const extensionId = new URL(worker.url()).host;
 
   await context.route("https://cloud.umami.is/**", (route) => route.abort());
-  await context.route("https://gleam-points.up.railway.app/invite/redeem", (route) =>
+  await context.route("https://api.gleamwallet.app/invite/redeem", (route) =>
     route.fulfill({ json: { result: "ok", kind: "member" } }),
   );
   await context.route(`${SITE}/**`, async (route) => {

@@ -7,9 +7,9 @@ import { PointsView } from "./PointsView";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
-const POINTS_URL = "https://gleam-permaweb.vercel.app/points.html?v=1.2.3";
-const GLEAM_URL = "https://gleam-permaweb.vercel.app/gleam.html?v=1.2.3";
-const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
+const POINTS_URL = "https://gleamwallet.app/points.html?v=1.2.3";
+const GLEAM_URL = "https://gleamwallet.app/gleam.html?v=1.2.3";
+const LINK = "https://gleamwallet.app/invite.html?c=MYCODE22";
 
 afterEach(() => {
   cleanup();
@@ -384,7 +384,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: "Copy invite link" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22");
+    expect(writeText).toHaveBeenCalledWith("https://gleamwallet.app/invite.html?c=MYCODE22");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 

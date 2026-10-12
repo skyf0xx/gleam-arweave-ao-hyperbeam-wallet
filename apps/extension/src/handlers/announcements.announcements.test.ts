@@ -26,12 +26,12 @@ describe("parseAnnouncements", () => {
     expect(
       parseAnnouncements([
         OK,
-        { id: "b", level: "critical", text: "Update now", url: "https://gleam-permaweb.vercel.app/update.html" },
+        { id: "b", level: "critical", text: "Update now", url: "https://gleamwallet.app/update.html" },
         { id: "c", level: "info", text: "Thread", url: "https://x.com/gleam/status/1" },
       ]),
     ).toEqual([
       OK,
-      { id: "b", level: "critical", text: "Update now", url: "https://gleam-permaweb.vercel.app/update.html" },
+      { id: "b", level: "critical", text: "Update now", url: "https://gleamwallet.app/update.html" },
       { id: "c", level: "info", text: "Thread", url: "https://x.com/gleam/status/1" },
     ]);
   });
