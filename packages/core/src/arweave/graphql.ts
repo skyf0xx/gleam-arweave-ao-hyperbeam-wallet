@@ -217,6 +217,21 @@ const AO_TRANSFER_FIELDS = `
 `;
 
 /**
+ * Wallets of the AO messenger units (MUs) that sign the messages a
+ * process pushes from its outbox, Credit-Notices included: `fcoN…` on
+ * legacynet until mid-2026, `6qOD…` since. The tags of a data item are
+ * whatever its signer wrote, so anyone can sign a `Credit-Notice` with a
+ * made-up `From-Process` and `Quantity`. The signer is the one part a
+ * forger cannot fake, which makes it the check that a notice came out of
+ * a real process. A new MU wallet must be added here or its receives
+ * disappear from the feed.
+ */
+export const AO_MU_SIGNERS: readonly string[] = [
+  "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY",
+  "6qOD-VYFZBKwYtrOm1Keh2ETif7SDUPAPx-UEu4qlR4",
+];
+
+/**
  * One page of AO token activity for `address`, from the same gateway
  * `/graphql` endpoint `queryActivityTransactions` uses. Two queries:
  *
@@ -226,7 +241,8 @@ const AO_TRANSFER_FIELDS = `
  *   `address` once a transfer executes. The payer is the `Sender` tag and
  *   the token is `From-Process`. A `Transfer` naming `address` in its
  *   `Recipient` tag is only a request the process may still reject, so
- *   it is not used as the receive.
+ *   it is not used as the receive. Only notices signed by an
+ *   `AO_MU_SIGNERS` wallet count.
  */
 export async function queryAoTransferActivity(
   address: string,
@@ -236,11 +252,11 @@ export async function queryAoTransferActivity(
 ): Promise<ActivityEntry[]> {
   const describe = (gw: string, detail: string) =>
     `Gateway AO-transfer GraphQL query for "${address}" against "${gw}" failed: ${detail}`;
-  const run = async (query: string) => {
+  const run = async (query: string, variables: Record<string, unknown> = {}) => {
     const body = await postGraphQLWithFailover<GraphQLAoTransferResponse>(
       gatewayUrl,
       query,
-      { address: [address], first: limit },
+      { address: [address], first: limit, ...variables },
       fetchImpl,
       describe,
     );
@@ -254,12 +270,12 @@ export async function queryAoTransferActivity(
         { name: "Action", values: ["Transfer"] }
       ]) { ${AO_TRANSFER_FIELDS} }
     }`),
-    run(`query ($address: [String!], $first: Int!) {
-      transactions(recipients: $address, first: $first, sort: HEIGHT_DESC, tags: [
+    run(`query ($address: [String!], $signers: [String!], $first: Int!) {
+      transactions(recipients: $address, owners: $signers, first: $first, sort: HEIGHT_DESC, tags: [
         { name: "Data-Protocol", values: ["ao"] },
         { name: "Action", values: ["Credit-Notice"] }
       ]) { ${AO_TRANSFER_FIELDS} }
-    }`),
+    }`, { signers: AO_MU_SIGNERS }),
   ]);
 
   const byId = new Map<string, ActivityEntry>();
@@ -267,6 +283,9 @@ export async function queryAoTransferActivity(
     if (node.owner.address === address) byId.set(node.id, toAoSendEntry(node));
   }
   for (const node of received) {
+    // Checked again here so a gateway that ignores `owners` cannot let a
+    // forged notice through.
+    if (!AO_MU_SIGNERS.includes(node.owner.address)) continue;
     const entry = toAoReceiveEntry(node);
     if (entry) byId.set(node.id, entry);
   }
