@@ -74,7 +74,7 @@ describe("POST /invite/redeem", () => {
     const { status, json } = await redeem(newcomer, "ALICE001");
 
     expect(status).toBe(200);
-    expect(json).toEqual({ result: "ok" });
+    expect(json).toEqual({ result: "ok", kind: "member" });
     expect(await redemptions(db)).toEqual([{ device_id: newcomer.id, code: "ALICE001" }]);
     const device = await db.query<{ public_key_jwk: unknown }>("SELECT public_key_jwk FROM devices WHERE id = $1", [
       newcomer.id,
@@ -91,13 +91,19 @@ describe("POST /invite/redeem", () => {
     const newcomer = await createTestDevice();
     await redeem(newcomer, "ALICE001");
 
-    expect((await redeem(newcomer, "ALICE001")).json).toEqual({ result: "ok" });
-    expect((await redeem(newcomer, "GLEAMDROP7")).json).toEqual({ result: "ok" });
+    expect((await redeem(newcomer, "ALICE001")).json).toEqual({ result: "ok", kind: "member" });
+    expect((await redeem(newcomer, "GLEAMDROP7")).json).toEqual({ result: "ok", kind: "drop" });
     expect((await redeem(newcomer, "NOSUCHCODE")).json).toEqual({ result: "ok" });
 
     expect(await redemptions(db)).toEqual([{ device_id: newcomer.id, code: "ALICE001" }]);
     expect((await check("ALICE001")).json.seatsLeft).toBe(2);
     expect((await check("GLEAMDROP7")).json.seatsLeft).toBe(5);
+  });
+
+  it("reports a drop code as kind drop", async () => {
+    const { db, redeem } = await setup();
+    await addDropCode(db, "GLEAMDROP7", 5);
+    expect((await redeem(await createTestDevice(), "GLEAMDROP7")).json).toEqual({ result: "ok", kind: "drop" });
   });
 
   it("answers full once a member code's 3 seats are taken", async () => {
@@ -106,7 +112,7 @@ describe("POST /invite/redeem", () => {
     for (let i = 0; i < 3; i++) expect((await redeem(await createTestDevice(), "ALICE001")).json.result).toBe("ok");
 
     const late = await createTestDevice();
-    expect((await redeem(late, "ALICE001")).json).toEqual({ result: "full" });
+    expect((await redeem(late, "ALICE001")).json).toEqual({ result: "full", kind: "member" });
     expect((await db.query("SELECT 1 FROM devices WHERE id = $1", [late.id])).rows).toEqual([]);
     expect((await check("ALICE001")).json).toEqual({ exists: true, kind: "member", seatsLeft: 0 });
     expect(await redemptions(db)).toHaveLength(3);
@@ -215,7 +221,7 @@ describe("POST /invite/redeem", () => {
       ...(await redeemBody(device, "ALICE001", NOW_SECONDS)),
       code: " alice001 ",
     });
-    expect(lowercase.json).toEqual({ result: "ok" });
+    expect(lowercase.json).toEqual({ result: "ok", kind: "member" });
     expect(await redemptions(db)).toEqual([{ device_id: device.id, code: "ALICE001" }]);
   });
 

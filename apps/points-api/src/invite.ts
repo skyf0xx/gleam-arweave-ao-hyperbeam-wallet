@@ -47,7 +47,10 @@ export interface RedeemRequest {
   devicePublicKey: DevicePublicJwk;
 }
 
-export type RedeemOutcome = { ok: true; result: RedeemResult } | { ok: false; status: 400 | 401; error: string };
+/** `kind` is absent when the code is unknown. */
+export type RedeemOutcome =
+  | { ok: true; result: RedeemResult; kind?: InviteCodeKind }
+  | { ok: false; status: 400 | 401; error: string };
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const MAX_RAW_CODE_LENGTH = 64;
@@ -101,13 +104,18 @@ export async function redeemInviteCode(
   }
   const deviceId = await deviceKeyThumbprint(request.devicePublicKey);
 
-  const result = await db.transaction(async (tx): Promise<RedeemResult> => {
+  return db.transaction(async (tx): Promise<RedeemOutcome> => {
     const already = await tx.query("SELECT 1 FROM invite_redemptions WHERE device_id = $1", [deviceId]);
-    if (already.rows.length > 0) return "ok";
+    if (already.rows.length > 0) {
+      // The kind is of the code sent now: the client decides from it
+      // whether this code can still earn a referral.
+      const known = await seatsForCode(tx, request.code, pointsPhase, false);
+      return { ok: true, result: "ok", kind: known?.kind };
+    }
 
     const found = await seatsForCode(tx, request.code, pointsPhase, true);
-    if (!found) return "unknown";
-    if (found.seatsLeft === 0) return "full";
+    if (!found) return { ok: true, result: "unknown" };
+    if (found.seatsLeft === 0) return { ok: true, result: "full", kind: found.kind };
 
     // The id is the key's thumbprint, so an existing row already holds this key.
     const { kty, crv, x, y } = request.devicePublicKey;
@@ -121,9 +129,8 @@ export async function redeemInviteCode(
       "INSERT INTO invite_redemptions (device_id, code, redeemed_at) VALUES ($1, $2, $3) ON CONFLICT (device_id) DO NOTHING",
       [deviceId, request.code, now],
     );
-    return "ok";
+    return { ok: true, result: "ok", kind: found.kind };
   });
-  return { ok: true, result };
 }
 
 /**

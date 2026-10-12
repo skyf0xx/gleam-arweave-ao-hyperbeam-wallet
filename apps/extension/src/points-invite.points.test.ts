@@ -73,7 +73,7 @@ describe("acceptSiteInvite", () => {
     const { storage, points } = setup({}, () => json({ result }));
 
     expect(await acceptSiteInvite(INVITE, SITE_ORIGIN, storage, points)).toEqual({ ok: true, redeem: result });
-    expect(storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("FRIEND42");
+    expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(result === "ok");
     expect(storage.store.get(POINTS_INVITE_UNLOCK_KEY)).toEqual({ code: "FRIEND42", result, at: NOW });
   });
 
@@ -81,12 +81,22 @@ describe("acceptSiteInvite", () => {
     ["a network error", () => Promise.reject(new TypeError("fetch failed"))],
     ["a rate limit", () => json({ error: "slow down" }, 429)],
     ["a server error", () => json({ error: "boom" }, 503)],
-  ])("stores offline after %s", async (_label, reply) => {
+  ])("stores offline and keeps the code after %s", async (_label, reply) => {
     const { storage, points } = setup({}, reply);
 
     expect(await acceptSiteInvite(INVITE, SITE_ORIGIN, storage, points)).toEqual({ ok: true, redeem: "offline" });
     expect(storage.store.get(POINTS_INVITE_UNLOCK_KEY)).toEqual({ code: "FRIEND42", result: "offline", at: NOW });
     expect(storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("FRIEND42");
+  });
+
+  it("holds a member code as pending but not a drop code", async () => {
+    const member = setup({}, () => json({ result: "ok", kind: "member" }));
+    await acceptSiteInvite(INVITE, SITE_ORIGIN, member.storage, member.points);
+    expect(member.storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("FRIEND42");
+
+    const drop = setup({}, () => json({ result: "ok", kind: "drop" }));
+    await acceptSiteInvite({ ...INVITE, code: "GLEAMDROP7" }, SITE_ORIGIN, drop.storage, drop.points);
+    expect(drop.storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
   });
 
   it("signs the redeem message with the device key", async () => {

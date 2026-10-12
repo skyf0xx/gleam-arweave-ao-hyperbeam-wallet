@@ -247,11 +247,16 @@ export class PointsHandler {
     const existing = await this.getInviteUnlock();
     if (existing?.result === "ok") return existing;
 
-    const result = await this.requestRedeem(code);
+    const { result, kind } = await this.requestRedeem(code);
     const unlock: InviteUnlock = { code, result, at: this.now() };
     await this.deps.storage.set(POINTS_INVITE_UNLOCK_KEY, unlock);
-    // The claim step applies this code when the first wallet joins.
-    if (result === "ok") await this.deps.storage.set(POINTS_PENDING_INVITE_KEY, code);
+    // The claim step applies this code when the first wallet joins. A drop
+    // code has no referrer, so it never becomes the pending code. A code
+    // whose kind is unknown (an older server, or no answer yet) is kept:
+    // `join` sends it and the server decides.
+    if ((result === "ok" || result === "offline") && kind !== "drop") {
+      await this.deps.storage.set(POINTS_PENDING_INVITE_KEY, code);
+    }
     return unlock;
   }
 
@@ -266,20 +271,10 @@ export class PointsHandler {
     await this.deps.storage.set<InviteUnlock>(POINTS_INVITE_UNLOCK_KEY, { code: "", result: "ok", at: this.now() });
   }
 
-  /**
-   * The code the claim step will apply, or null if there is none. A drop
-   * code has no referrer, so it is dropped here rather than shown as a
-   * code that earns anything. If the server can't say what kind of code
-   * it is, the code is kept: `join` sends it and the server decides.
-   */
+  /** The code the claim step will apply, or null if there is none. */
   async pendingInvite(): Promise<string | null> {
     const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
-    if (typeof pending !== "string" || !isValidInviteCode(pending)) return null;
-    if ((await this.inviteKind(pending)) === "drop") {
-      await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
-      return null;
-    }
-    return pending;
+    return typeof pending === "string" && isValidInviteCode(pending) ? pending : null;
   }
 
   async getRevealSeen(): Promise<string[]> {
@@ -292,22 +287,7 @@ export class PointsHandler {
     await this.deps.storage.set(POINTS_REVEAL_SEEN_KEY, { ...(stored !== null && typeof stored === "object" ? stored : {}), [req.walletId]: true });
   }
 
-  private async inviteKind(code: string): Promise<"member" | "drop" | null> {
-    try {
-      const response = await this.fetchImpl(`${this.deps.apiUrl}/invite/check`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
-      if (!response.ok) return null;
-      const body = (await response.json().catch(() => null)) as { kind?: unknown } | null;
-      return body?.kind === "member" || body?.kind === "drop" ? body.kind : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private async requestRedeem(code: string): Promise<InviteRedeemResult> {
+  private async requestRedeem(code: string): Promise<{ result: InviteRedeemResult; kind?: "member" | "drop" }> {
     try {
       const device = await this.deps.deviceKey();
       const message = buildRedeemMessage(code, Math.floor(this.now() / 1000));
@@ -321,12 +301,13 @@ export class PointsHandler {
           devicePublicKey: device.publicKey,
         }),
       });
-      if (!response.ok) return "offline";
-      const body = (await response.json().catch(() => null)) as { result?: unknown } | null;
+      if (!response.ok) return { result: "offline" };
+      const body = (await response.json().catch(() => null)) as { result?: unknown; kind?: unknown } | null;
       const result = body?.result;
-      return result === "ok" || result === "full" || result === "unknown" ? result : "offline";
+      if (result !== "ok" && result !== "full" && result !== "unknown") return { result: "offline" };
+      return { result, kind: body?.kind === "member" || body?.kind === "drop" ? body.kind : undefined };
     } catch {
-      return "offline";
+      return { result: "offline" };
     }
   }
 
