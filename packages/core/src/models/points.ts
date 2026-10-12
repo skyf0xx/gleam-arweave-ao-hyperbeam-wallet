@@ -18,6 +18,10 @@ export interface PointsWalletScore {
   lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with points; null until the wallet has some. */
   topPercent: number | null;
+  /** 1-based place among wallets with points, ties sharing a place; null until the wallet has some. Never shown as a list. */
+  rank: number | null;
+  /** Atomic points that would put the wallet strictly above the next wallet up; null for the leader or an unranked wallet. */
+  pointsToNextRankAtomic: string | null;
   /** Null for wallets that registered after Phase 1. */
   foundingNumber: number | null;
   /** Backfilled before Phase 1: gets the referee bonus without a code. */

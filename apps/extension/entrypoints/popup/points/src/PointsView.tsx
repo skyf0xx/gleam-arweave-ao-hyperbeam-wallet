@@ -270,6 +270,14 @@ function JoinedView({
           </InkStat>
           <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
         </dl>
+        {score?.rank != null ? (
+          <p className="text-label text-on-ink-muted">
+            Your rank is #{score.rank}
+            {score.pointsToNextRankAtomic !== null
+              ? `. ${formatPoints(score.pointsToNextRankAtomic)} points to pass the next one.`
+              : "."}
+          </p>
+        ) : null}
       </InkCard>
 
       <section aria-label="Invite" className="flex flex-col gap-3">

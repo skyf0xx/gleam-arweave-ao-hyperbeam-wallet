@@ -21,6 +21,8 @@ function score(overrides: Partial<PointsWalletScore> = {}): PointsWalletScore {
     totalAtomic: "0",
     lastDay: null,
     topPercent: null,
+    rank: null,
+    pointsToNextRankAtomic: null,
     foundingNumber: 184,
     originalFounder: false,
     seatsLeft: 3,

@@ -33,6 +33,8 @@ function scoreWith(overrides: Partial<PointsWalletScore>): PointsWalletScore {
     totalAtomic: "0",
     lastDay: null,
     topPercent: 12,
+    rank: 5,
+    pointsToNextRankAtomic: null,
     foundingNumber: 184,
     originalFounder: false,
     seatsLeft: 3,

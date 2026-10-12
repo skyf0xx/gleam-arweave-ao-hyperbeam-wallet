@@ -72,6 +72,8 @@ describe("POST /me", () => {
           totalAtomic: "0",
           lastDay: null,
           topPercent: null,
+          rank: null,
+          pointsToNextRankAtomic: null,
           foundingNumber: 2,
           originalFounder: false,
           seatsLeft: 3,
@@ -84,6 +86,8 @@ describe("POST /me", () => {
           totalAtomic: "0",
           lastDay: null,
           topPercent: null,
+          rank: null,
+          pointsToNextRankAtomic: null,
           foundingNumber: 3,
           originalFounder: false,
           seatsLeft: 3,
@@ -112,6 +116,8 @@ describe("POST /me", () => {
       totalAtomic: "2020",
       lastDay: { holdingAtomic: "1000", refereeBonusAtomic: "0", founderBonusAtomic: "0", referrerBonusAtomic: "10" },
       topPercent: 34,
+      rank: 1,
+      pointsToNextRankAtomic: null,
     });
     const byAddress = Object.fromEntries(
       bobsView.wallets.map((w: { address: string; totalAtomic: string; topPercent: number }) => [
@@ -120,6 +126,10 @@ describe("POST /me", () => {
       ]),
     );
     expect(byAddress).toEqual({ [bob.address]: ["220", 67], [carol.address]: ["20", 100] });
+    expect(bobsView.wallets.map((w: { rank: number | null; pointsToNextRankAtomic: string | null }) => [w.rank, w.pointsToNextRankAtomic])).toEqual([
+      [2, "1801"],
+      [3, "201"],
+    ]);
   });
 
   it("reports the founder flag and counts the founder bonus in the total and last day", async () => {

@@ -52,6 +52,8 @@ const SCORES: PointsScores = {
       totalAtomic: (5n * BigInt(ONE_POINT)).toString(),
       lastDay: { holdingAtomic: ONE_POINT, refereeBonusAtomic: "0", founderBonusAtomic: "0", referrerBonusAtomic: "0" },
       topPercent: 12,
+      rank: 5,
+      pointsToNextRankAtomic: "1801000000000",
       foundingNumber: 7,
       originalFounder: false,
       seatsLeft: 3,
@@ -341,6 +343,33 @@ describe("PointsView", () => {
     await waitFor(() => expect(standing.getByText("Friends joined").nextElementSibling?.textContent).toBe("3"));
     expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("—");
     expect(screen.queryByText(/Top \d+%/)).toBeNull();
+  });
+
+  it("shows the private rank and the points needed to pass the next one", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByText("Your rank is #5. 1.80 points to pass the next one.")).toBeTruthy();
+  });
+
+  it("shows only the rank for the leader", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({
+        ...SCORES,
+        wallets: [{ ...SCORES.wallets[0]!, rank: 1, pointsToNextRankAtomic: null }],
+      }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByText("Your rank is #1.")).toBeTruthy();
   });
 
   it("copies the invite link", async () => {
