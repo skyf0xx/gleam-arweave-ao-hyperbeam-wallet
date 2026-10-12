@@ -7,6 +7,16 @@
 export const REQUEST = "GLEAM_API_CALL";
 export const RESPONSE = "GLEAM_API_RESPONSE";
 export const EVENT = "GLEAM_EVENT";
+/** Content script → page: whether this site uses Gleam over another installed wallet. */
+export const SITE_MODE = "GLEAM_SITE_MODE";
+/**
+ * Page → content script: asks for `SITE_MODE`. Sent only once another
+ * wallet is on the page, so a page with Gleam alone never wakes the
+ * background just by loading.
+ */
+export const SITE_MODE_REQUEST = "GLEAM_SITE_MODE_REQUEST";
+/** Page → content script: another wallet is on the page, and whether the page has called it. */
+export const OTHER_WALLET = "GLEAM_OTHER_WALLET";
 
 /**
  * The ArConnect-compatible method surface injected as
@@ -244,7 +254,33 @@ export interface PageEventEnvelope {
   data: unknown;
 }
 
+export interface PageSiteModeRequestEnvelope {
+  type: typeof SITE_MODE_REQUEST;
+}
+
+export interface PageSiteModeEnvelope {
+  type: typeof SITE_MODE;
+  useGleam: boolean;
+}
+
+/**
+ * Sent once when the provider first sees the other wallet (`used: false`)
+ * and once when the page first calls it (`used: true`). A page can forge
+ * this for itself to make Gleam's popup offer "Use Gleam here" on that
+ * site. Taking the offer is still the user's choice, made in the popup
+ * with the permissions spelled out, and every signature still opens its
+ * own approval window.
+ */
+export interface PageOtherWalletEnvelope {
+  type: typeof OTHER_WALLET;
+  walletName: string;
+  used: boolean;
+}
+
 export type PageMessageEnvelope =
   | PageRequestEnvelope
   | PageResponseEnvelope
-  | PageEventEnvelope;
+  | PageEventEnvelope
+  | PageSiteModeRequestEnvelope
+  | PageSiteModeEnvelope
+  | PageOtherWalletEnvelope;

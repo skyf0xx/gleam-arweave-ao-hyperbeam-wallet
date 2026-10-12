@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { EVENT, REQUEST, RESPONSE } from "@gleam/messaging/src/page-protocol.ts";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { EVENT, OTHER_WALLET, REQUEST, RESPONSE, SITE_MODE, SITE_MODE_REQUEST } from "@gleam/messaging/src/page-protocol.ts";
 
 type Handler = (message: { data: unknown }) => unknown;
 const registeredHandlers = new Map<string, Handler>();
@@ -35,9 +35,27 @@ function postPageRequest(data: unknown): void {
 }
 
 describe("content.ts: page <-> background relay", () => {
+  // Each test imports a fresh copy of the script, so the window listeners
+  // an earlier copy added are removed to keep it from answering too.
+  const added: Array<[string, EventListenerOrEventListenerObject]> = [];
+  const realAddEventListener = window.addEventListener.bind(window);
+
+  beforeEach(() => {
+    vi.spyOn(window, "addEventListener").mockImplementation(((type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
+      added.push([type, listener]);
+      realAddEventListener(type, listener, options);
+    }) as typeof window.addEventListener);
+  });
+
+  afterEach(() => {
+    for (const [type, listener] of added.splice(0)) window.removeEventListener(type, listener);
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.resetModules();
     sendMessage.mockReset();
+    sendMessage.mockResolvedValue(undefined);
     injectScript.mockClear();
     registeredHandlers.clear();
     onMessage.mockClear();
@@ -104,7 +122,7 @@ describe("content.ts: page <-> background relay", () => {
     postPageRequest({ type: REQUEST, id: "req-3", method: "createWallet", params: {} });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalledWith("providerCall", expect.anything());
   });
 
   it("ignores a RESPONSE-typed message (only relays REQUEST envelopes)", async () => {
@@ -114,7 +132,7 @@ describe("content.ts: page <-> background relay", () => {
     postPageRequest({ type: RESPONSE, id: "req-4", result: "x" });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalledWith("providerCall", expect.anything());
   });
 
   /**
@@ -143,5 +161,86 @@ describe("content.ts: page <-> background relay", () => {
     expect(eventSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: EVENT, event: "walletSwitch", data: { address: "addr-1" } }),
     );
+  });
+  function siteModeSpy() {
+    const spy = vi.fn();
+    window.addEventListener("message", (event) => {
+      if ((event.data as { type?: string })?.type === SITE_MODE) spy(event.data);
+    });
+    return spy;
+  }
+
+  it("doesn't wake the background on load", async () => {
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("answers the provider's site mode request once", async () => {
+    sendMessage.mockImplementation(async (type: string) => (type === "getSiteWalletMode" ? { useGleam: true } : undefined));
+    const spy = siteModeSpy();
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    postPageRequest({ type: SITE_MODE_REQUEST });
+    postPageRequest({ type: SITE_MODE_REQUEST });
+
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({ type: SITE_MODE, useGleam: true }));
+    expect(sendMessage.mock.calls.filter(([type]) => type === "getSiteWalletMode")).toHaveLength(1);
+  });
+
+  it("tells the page to use the other wallet when the background can't answer", async () => {
+    sendMessage.mockRejectedValue(new Error("Could not establish connection."));
+    const spy = siteModeSpy();
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    postPageRequest({ type: SITE_MODE_REQUEST });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({ type: SITE_MODE, useGleam: false }));
+  });
+
+  it("relays each kind of other-wallet report only once per page", async () => {
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    for (let i = 0; i < 3; i += 1) {
+      postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: false });
+      postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: true });
+    }
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2));
+    expect(sendMessage).toHaveBeenCalledWith("reportOtherWallet", { walletName: "Wander", used: false });
+    expect(sendMessage).toHaveBeenCalledWith("reportOtherWallet", { walletName: "Wander", used: true });
+  });
+
+  it("relays the background's siteWalletMode push to the page", async () => {
+    const spy = siteModeSpy();
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    registeredHandlers.get("siteWalletMode")!({ data: { useGleam: false } });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({ type: SITE_MODE, useGleam: false }));
+  });
+
+  it("relays an other-wallet report from the page, listening before the provider is injected", async () => {
+    injectScript.mockImplementationOnce(async () => {
+      postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: false });
+      return { script: document.createElement("script") };
+    });
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    await vi.waitFor(() =>
+      expect(sendMessage).toHaveBeenCalledWith("reportOtherWallet", { walletName: "Wander", used: false }),
+    );
+  });
+
+  it("ignores a malformed other-wallet report", async () => {
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    postPageRequest({ type: OTHER_WALLET, walletName: 42, used: "yes" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sendMessage).not.toHaveBeenCalledWith("reportOtherWallet", expect.anything());
   });
 });

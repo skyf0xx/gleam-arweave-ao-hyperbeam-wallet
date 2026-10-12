@@ -36,6 +36,7 @@ import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
 import { AnnouncementsHandler } from "@/src/handlers/announcements";
+import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
@@ -132,6 +133,7 @@ const points = new PointsHandler({
 registerPointsHeartbeatAlarm(points);
 
 const announcements = new AnnouncementsHandler({ storage });
+const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) => approval.findActiveGrant(origin) });
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
 // the worker idles out (~30s), not only on browser shutdown, so clearing
@@ -185,6 +187,54 @@ async function emitProviderEventToOrigin<TName extends ProviderEventName>(
       messenger.sendMessage("providerEvent", { event, data }, tabId).catch(() => undefined),
     ),
   );
+}
+
+/**
+ * For when the user ends a site's access from Gleam: the dApp hears
+ * `disconnect`, and when another wallet is installed the page's
+ * `window.arweaveWallet` goes back to forwarding to it. A dApp's own
+ * `disconnect()` only does the first part.
+ */
+async function announceAccessEnded(origin: string): Promise<void> {
+  await siteWallet.setUseGleam(origin, false);
+  await emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
+  await pushSiteWalletMode(origin, false);
+}
+
+async function pushSiteWalletMode(origin: string, useGleam: boolean): Promise<void> {
+  const tabIds = await findTabsForOrigin(origin);
+  await Promise.all(
+    tabIds.map((tabId) => messenger.sendMessage("siteWalletMode", { useGleam }, tabId).catch(() => undefined)),
+  );
+}
+
+async function activeTab(): Promise<{ id?: number; url?: string; favIconUrl?: string } | undefined> {
+  const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab;
+}
+
+/** Reloads the active tab when it shows `origin`, so the dApp starts over with the wallet just chosen. */
+async function reloadActiveTabFor(origin: string): Promise<void> {
+  const tab = await activeTab();
+  if (typeof tab?.id !== "number" || !tab.url) return;
+  try {
+    if (new URL(tab.url).origin !== origin) return;
+  } catch {
+    return;
+  }
+  await browser.tabs.reload(tab.id).catch(() => undefined);
+}
+
+function requireWebOrigin(origin: unknown): string {
+  if (typeof origin === "string") {
+    try {
+      const url = new URL(origin);
+      if ((url.protocol === "https:" || url.protocol === "http:") && url.origin === origin) return origin;
+    } catch {
+      // Falls through to the error below.
+    }
+  }
+  throw new Error("Expected a web origin such as https://example.com.");
 }
 
 /**
@@ -330,6 +380,10 @@ async function handleProviderCall(
         activeAddress: connectedWallet.address,
       });
     }
+    // A site that connected through `window.gleam` chose Gleam, so its
+    // `window.arweaveWallet` stops forwarding to another installed wallet.
+    await siteWallet.setUseGleam(origin, true);
+    void pushSiteWalletMode(origin, true);
 
     return result;
   }
@@ -604,7 +658,8 @@ onExtensionMessage("deleteWallet", async (message) => {
     await approval.rejectWalletApprovals(walletId);
   }
   await lifecycle.deleteWallet(message.data);
-  for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
+  if (isLastWallet) await siteWallet.forgetGleamSites();
+  for (const origin of revoked) void announceAccessEnded(origin);
 
   const after = await lifecycle.getState();
   if (after.activeWalletId !== before.activeWalletId) {
@@ -641,7 +696,8 @@ onExtensionMessage("resetAllWallets", async () => {
   // removal that fails part-way must not leave a dApp connected to nothing.
   const revoked = await approval.revokeAllAccess();
   await lifecycle.resetAllWallets();
-  for (const origin of revoked) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
+  await siteWallet.forgetGleamSites();
+  for (const origin of revoked) void announceAccessEnded(origin);
 });
 
 // reads
@@ -695,8 +751,23 @@ onExtensionMessage("getThemePreference", () => lifecycle.getThemePreference());
 onExtensionMessage("setThemePreference", (message) => lifecycle.setThemePreference(message.data));
 onExtensionMessage("revokeGrant", async (message) => {
   await approval.revokeGrant(message.data);
-  void emitProviderEventToOrigin(message.data.origin, PROVIDER_EVENT.DISCONNECT, {});
+  void announceAccessEnded(message.data.origin);
 });
+onExtensionMessage("getActiveSite", async () => siteWallet.activeSite(await activeTab()));
+onExtensionMessage("useGleamOnSite", async (message) => {
+  const origin = requireWebOrigin(message.data.origin);
+  await approval.grantSite({ origin, permissions: message.data.permissions });
+  await siteWallet.setUseGleam(origin, true);
+  await pushSiteWalletMode(origin, true);
+  await reloadActiveTabFor(origin);
+});
+onExtensionMessage("stopGleamOnSite", async (message) => {
+  const origin = requireWebOrigin(message.data.origin);
+  await approval.revokeGrant({ origin });
+  await announceAccessEnded(origin);
+  await reloadActiveTabFor(origin);
+});
+onExtensionMessage("dismissSiteSuggestion", (message) => siteWallet.dismiss(requireWebOrigin(message.data.origin)));
 onExtensionMessage("saveContact", (message) => contacts.saveContact(message.data));
 onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.data));
 
@@ -719,6 +790,22 @@ onExtensionMessage("markPointsSeatsSeen", (message) => points.markSeatsSeen(mess
 onExtensionMessage("getAnnouncements", () => announcements.fetchAnnouncements());
 onExtensionMessage("getDismissedAnnouncements", () => announcements.getDismissed());
 onExtensionMessage("dismissAnnouncement", (message) => announcements.dismiss(message.data));
+
+// What a content script may ask about its own tab, besides providerCall.
+// Like providerCall, the origin comes from Chrome's sender.
+messenger.onMessage("getSiteWalletMode", (message) => {
+  const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
+  if (!origin) throw new Error("getSiteWalletMode is only accepted from a web page's content script.");
+  return siteWallet.mode(origin);
+});
+messenger.onMessage("reportOtherWallet", (message) => {
+  const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
+  const tabId = message.sender.tab?.id;
+  if (!origin || typeof tabId !== "number") {
+    throw new Error("reportOtherWallet is only accepted from a web page's content script.");
+  }
+  return siteWallet.report(tabId, origin, message.data);
+});
 
 // The only method a web page can reach, through the content script.
 messenger.onMessage("providerCall", (message) => {
@@ -785,6 +872,10 @@ export default defineBackground(() => {
   browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
     void acceptSiteInvite(message, sender.origin, storage, points).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
+  });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
+    void siteWallet.forgetTab(tabId).catch(() => undefined);
   });
 
   browser.runtime.onInstalled.addListener((details) => {

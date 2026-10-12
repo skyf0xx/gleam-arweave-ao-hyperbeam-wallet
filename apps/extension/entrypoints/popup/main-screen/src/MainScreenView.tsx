@@ -20,6 +20,7 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
+import { SiteWalletCard } from "../../site-wallet/index.tsx";
 import { PointsTokenRow } from "../../points/index.tsx";
 
 /**
@@ -80,6 +81,8 @@ export interface MainScreenViewProps {
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
   onOpenPoints: () => void;
+  /** Opens the permissions screen for a site that was using another wallet. */
+  onUseGleamOnSite: (site: { origin: string; favIconUrl: string | null }) => void;
 }
 
 /**
@@ -238,6 +241,7 @@ export function MainScreenView({
   onOpenWalletSwitcher,
   onOpenSettings,
   onOpenPoints,
+  onUseGleamOnSite,
 }: MainScreenViewProps) {
   const [activeTab, setActiveTab] = useState<"tokens" | "activity">("tokens");
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
@@ -381,6 +385,7 @@ export function MainScreenView({
         </button>
       </div>
 
+      <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
       <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
 
       {/*

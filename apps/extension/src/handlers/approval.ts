@@ -1213,23 +1213,44 @@ export class ApprovalHandler {
 
   private async createGrant(entry: PendingApprovalRecord): Promise<{ granted: PermissionType[] }> {
     const preview = entry.request.preview as ConnectApprovalPreview;
-    const walletId = entry.walletId ?? (await this.activeWalletId());
-    if (!walletId) {
+    return this.mergeGrant(entry.request.origin, entry.walletId, preview.requestedPermissions);
+  }
+
+  /**
+   * Grants `origin` from the popup's "Use Gleam here", where the user
+   * picked the permissions themselves, so no approval window opens.
+   */
+  async grantSite(req: { origin: string; permissions: PermissionType[] }): Promise<Grant> {
+    const permissions = Array.isArray(req.permissions) ? [...new Set(req.permissions.filter(isValidPermissionType))] : [];
+    if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
+    await this.mergeGrant(req.origin, null, permissions);
+    const grant = await this.findActiveGrant(req.origin);
+    if (!grant) throw new Error(`Couldn't save the grant for "${req.origin}".`);
+    return grant;
+  }
+
+  private async mergeGrant(
+    origin: string,
+    walletId: string | null,
+    requested: readonly PermissionType[],
+  ): Promise<{ granted: PermissionType[] }> {
+    const grantWalletId = walletId ?? (await this.activeWalletId());
+    if (!grantWalletId) {
       throw new Error("There is no wallet to connect. Create or import one first.");
     }
     const grants = await this.loadGrants();
-    const withoutExisting = grants.filter((grant) => grant.origin !== entry.request.origin);
+    const withoutExisting = grants.filter((grant) => grant.origin !== origin);
     // A connect from an already-connected origin only asks for what the
     // grant lacks, so approving it adds to the grant instead of narrowing it.
-    const existing = await this.findActiveGrant(entry.request.origin);
+    const existing = await this.findActiveGrant(origin);
     const permissions = [...(existing?.permissions ?? [])];
-    for (const permission of preview.requestedPermissions) {
+    for (const permission of requested) {
       if (!permissions.includes(permission)) permissions.push(permission);
     }
 
     const grant: Grant = {
-      origin: entry.request.origin,
-      walletId,
+      origin,
+      walletId: grantWalletId,
       permissions,
       createdAt: Date.now(),
       expiresAt: null,

@@ -19,6 +19,8 @@ export type {
 export { PERMISSION_TYPES } from "./permission";
 export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
+export type { ActiveSite } from "./site";
+export { UNKNOWN_WALLET_NAME } from "./site";
 export type { ActivityEntry, ActivityType, ActivityStatus, ActivityPage } from "./activity";
 export type { Contact } from "./contact";
 export type {

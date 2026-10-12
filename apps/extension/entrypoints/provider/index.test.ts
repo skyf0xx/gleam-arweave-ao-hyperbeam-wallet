@@ -1,8 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   APPROVAL_MAX_MS,
+  OTHER_WALLET,
   REQUEST,
   RESPONSE,
+  SITE_MODE,
+  SITE_MODE_REQUEST,
 } from "@gleam/messaging/src/page-protocol.ts";
 import { GleamProvider, install, PROVIDER_SURFACE_METHODS } from "./index";
 import { version as PACKAGE_VERSION } from "../../package.json";
@@ -394,19 +397,31 @@ describe("provider.ts: GleamProvider bridge", () => {
   });
 });
 
-describe("provider.ts: install() takes over window.arweaveWallet (point 7)", () => {
+describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
   let teardown: (() => void) | undefined;
+  let postMessageSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    postMessageSpy = vi.spyOn(window, "postMessage");
+  });
 
   afterEach(() => {
     teardown?.();
     teardown = undefined;
+    postMessageSpy.mockRestore();
+    vi.useRealTimers();
     // @ts-expect-error -- test cleanup of a global this suite installs
     delete window.arweaveWallet;
+    // @ts-expect-error -- test cleanup of a global this suite installs
+    delete window.permawebConnect;
+    // @ts-expect-error -- test cleanup of a global this suite installs
+    delete window.gleam;
   });
 
-  function current(): { walletName?: string } | undefined {
-    return (window as unknown as { arweaveWallet?: { walletName?: string } })
-      .arweaveWallet;
+  type Wallet = { walletName?: string; connect?: (...args: unknown[]) => unknown; [key: string]: unknown };
+
+  function current(): Wallet | undefined {
+    return (window as unknown as { arweaveWallet?: Wallet }).arweaveWallet;
   }
 
   function installOther(value: unknown, writable = true): void {
@@ -417,6 +432,24 @@ describe("provider.ts: install() takes over window.arweaveWallet (point 7)", () 
     });
   }
 
+  function wander() {
+    return { walletName: "Wander", connect: vi.fn().mockResolvedValue("wander-connected"), events: { on: vi.fn() } };
+  }
+
+  function sendSiteMode(useGleam: boolean): void {
+    window.dispatchEvent(new MessageEvent("message", { data: { type: SITE_MODE, useGleam }, source: window }));
+  }
+
+  function otherWalletReports() {
+    return postMessageSpy.mock.calls
+      .map(([message]: [unknown]) => message as { type?: string })
+      .filter((message: { type?: string }) => message?.type === OTHER_WALLET);
+  }
+
+  function gleamRequests() {
+    return postMessageSpy.mock.calls.filter(([message]: [unknown]) => (message as { type?: string })?.type === REQUEST);
+  }
+
   it("installs window.arweaveWallet with walletName 'Gleam' when none exists", () => {
     teardown = install();
     expect(current()?.walletName).toBe("Gleam");
@@ -424,8 +457,7 @@ describe("provider.ts: install() takes over window.arweaveWallet (point 7)", () 
 
   it("exposes walletVersion, the extension's own version", () => {
     teardown = install();
-    const wallet = (window as unknown as { arweaveWallet?: { walletVersion?: unknown } }).arweaveWallet;
-    expect(wallet?.walletVersion).toBe(PACKAGE_VERSION);
+    expect(current()?.walletVersion).toBe(PACKAGE_VERSION);
     expect(PACKAGE_VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 
@@ -437,36 +469,204 @@ describe("provider.ts: install() takes over window.arweaveWallet (point 7)", () 
     expect(onLoaded).toHaveBeenCalledTimes(1);
   });
 
-  it("replaces a provider another wallet installed first", () => {
-    installOther({ walletName: "Wander" });
+  it("calls Gleam straight away when no other wallet is on the page", () => {
     teardown = install();
-    expect(current()?.walletName).toBe("Gleam");
+    void current()!.connect!(["ACCESS_ADDRESS"]);
+    expect(gleamRequests()).toHaveLength(1);
   });
 
-  it("replaces a read-only provider another wallet installed first", () => {
-    installOther({ walletName: "Wander" }, false);
+  it("forwards to a wallet installed first once the site turns out not to use Gleam", async () => {
+    const other = wander();
+    installOther(other);
     teardown = install();
-    expect(current()?.walletName).toBe("Gleam");
+    expect(current()?.walletName).toBe("Wander");
+
+    const pending = current()!.connect!(["ACCESS_ADDRESS"]);
+    expect(other.connect).not.toHaveBeenCalled();
+    sendSiteMode(false);
+
+    await expect(pending).resolves.toBe("wander-connected");
+    expect(other.connect).toHaveBeenCalledWith(["ACCESS_ADDRESS"]);
+    expect(gleamRequests()).toHaveLength(0);
   });
 
-  it("ignores a later plain assignment without throwing in strict mode", () => {
+  it("calls the other wallet with itself as this", async () => {
+    const other = {
+      walletName: "Wander",
+      connect(this: unknown) {
+        return Promise.resolve(this === other);
+      },
+    };
+    installOther(other);
     teardown = install();
+    sendSiteMode(false);
+    await expect(current()!.connect!()).resolves.toBe(true);
+  });
+
+  it("uses Gleam on a site that holds a grant, even with another wallet installed", async () => {
+    const other = wander();
+    installOther(other, false);
+    teardown = install();
+    sendSiteMode(true);
+
+    expect(current()?.walletName).toBe("Gleam");
+    void current()!.connect!();
+    await vi.waitFor(() => expect(gleamRequests()).toHaveLength(1));
+    expect(other.connect).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the other wallet when the site mode never arrives", async () => {
+    vi.useFakeTimers();
+    const other = wander();
+    installOther(other);
+    teardown = install();
+
+    const pending = current()!.connect!();
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(other.connect).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toBe("wander-connected");
+  });
+
+  function modeRequests() {
+    return postMessageSpy.mock.calls.filter(([message]: [unknown]) => (message as { type?: string })?.type === SITE_MODE_REQUEST);
+  }
+
+  it("never asks for the site mode on a page where Gleam is the only wallet", async () => {
+    teardown = install();
+    void current()!.connect!();
+    window.dispatchEvent(new Event("DOMContentLoaded"));
+    expect(modeRequests()).toHaveLength(0);
+  });
+
+  it("asks for the site mode once, as soon as another wallet shows up", () => {
+    installOther(wander());
+    teardown = install();
+    void current()!.connect!();
+    expect(modeRequests()).toHaveLength(1);
+  });
+
+  it("enumerates the other wallet's own properties through the router", () => {
+    const other = wander();
+    installOther(other);
+    teardown = install();
+    sendSiteMode(false);
+
+    expect(Object.keys(current()!)).toEqual(Object.keys(other));
+    expect(Object.prototype.hasOwnProperty.call(current(), "connect")).toBe(true);
+    expect({ ...current() }.walletName).toBe("Wander");
+  });
+
+  it("routes a cached method to whichever wallet the site uses at call time", async () => {
+    const other = wander();
+    installOther(other);
+    teardown = install();
+    sendSiteMode(false);
+    const connect = current()!.connect!;
+
+    await connect();
+    expect(other.connect).toHaveBeenCalledTimes(1);
+
+    sendSiteMode(true);
+    void connect();
+    expect(other.connect).toHaveBeenCalledTimes(1);
+    expect(gleamRequests()).toHaveLength(1);
+  });
+
+  it("reports the other wallet once on sight and once on first use", async () => {
+    installOther(wander());
+    teardown = install();
+    sendSiteMode(false);
+    await current()!.connect!();
+    await current()!.connect!();
+
+    expect(otherWalletReports()).toEqual([
+      { type: OTHER_WALLET, walletName: "Wander", used: false },
+      { type: OTHER_WALLET, walletName: "Wander", used: true },
+    ]);
+  });
+
+  it("passes non-function properties of the other wallet through", () => {
+    const other = wander();
+    installOther(other);
+    teardown = install();
+    expect(current()?.events).toBe(other.events);
+    expect("connect" in current()!).toBe(true);
+  });
+
+  it("captures a wallet that assigns the slot later, without throwing in strict mode", async () => {
+    teardown = install();
+    sendSiteMode(false);
+    const other = wander();
     expect(() => {
-      (window as unknown as { arweaveWallet: unknown }).arweaveWallet = {
-        walletName: "Wander",
-      };
+      (window as unknown as { arweaveWallet: unknown }).arweaveWallet = other;
     }).not.toThrow();
-    expect(current()?.walletName).toBe("Gleam");
+
+    expect(current()?.walletName).toBe("Wander");
+    await current()!.connect!();
+    expect(other.connect).toHaveBeenCalled();
   });
 
-  it("takes the slot back when a later wallet redefines it and announces arweaveWalletLoaded", () => {
+  it("keeps the slot and forwards to a wallet that redefines it and announces arweaveWalletLoaded", async () => {
     teardown = install();
-    const gleam = current();
+    sendSiteMode(false);
+    const router = current();
 
-    installOther({ walletName: "Wander" });
+    const other = wander();
+    installOther(other);
     window.dispatchEvent(new CustomEvent("arweaveWalletLoaded"));
 
-    expect(current()).toBe(gleam);
+    expect(current()).toBe(router);
+    await current()!.connect!();
+    expect(other.connect).toHaveBeenCalled();
+  });
+
+  it("finds PermawebOS at window.permawebConnect when it skipped the taken slot", async () => {
+    teardown = install();
+    const permaweb = { walletName: "ArConnect", connect: vi.fn().mockResolvedValue("permaweb-connected") };
+    (window as unknown as { permawebConnect: unknown }).permawebConnect = permaweb;
+    window.dispatchEvent(new Event("DOMContentLoaded"));
+    expect(modeRequests()).toHaveLength(1);
+    sendSiteMode(false);
+
+    await expect(current()!.connect!()).resolves.toBe("permaweb-connected");
+    expect(otherWalletReports()).toEqual([
+      { type: OTHER_WALLET, walletName: "PermawebOS", used: false },
+      { type: OTHER_WALLET, walletName: "PermawebOS", used: true },
+    ]);
+  });
+
+  it("ignores a site mode message posted by another frame", async () => {
+    const other = wander();
+    installOther(other);
+    teardown = install();
+    window.dispatchEvent(new MessageEvent("message", { data: { type: SITE_MODE, useGleam: true }, source: null }));
+    sendSiteMode(false);
+
+    await current()!.connect!();
+    expect(other.connect).toHaveBeenCalled();
+  });
+
+  it("exposes Gleam at window.gleam, which reaches Gleam even while the site uses another wallet", () => {
+    const other = wander();
+    installOther(other);
+    teardown = install();
+    sendSiteMode(false);
+
+    const gleam = (window as unknown as { gleam?: Wallet }).gleam;
+    expect(gleam?.walletName).toBe("Gleam");
+    void gleam!.connect!(["ACCESS_ADDRESS"]);
+    expect(gleamRequests()).toHaveLength(1);
+    expect(other.connect).not.toHaveBeenCalled();
+  });
+
+  it("keeps window.gleam from being replaced by assignment", () => {
+    teardown = install();
+    const gleam = (window as unknown as { gleam?: unknown }).gleam;
+    expect(() => {
+      (window as unknown as { gleam: unknown }).gleam = { walletName: "Imposter" };
+    }).toThrow();
+    expect((window as unknown as { gleam?: unknown }).gleam).toBe(gleam);
   });
 
   it("leaves a non-configurable provider alone instead of throwing", () => {

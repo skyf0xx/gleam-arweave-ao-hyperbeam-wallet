@@ -3,15 +3,20 @@ import {
   APPROVAL_GATED_METHODS,
   APPROVAL_MAX_MS,
   EVENT,
+  OTHER_WALLET,
   REQUEST,
   RESPONSE,
+  SITE_MODE,
+  SITE_MODE_REQUEST,
   PROVIDER_SURFACE_METHODS,
   decodeTaggedBinary,
   encodeTaggedBinary,
   type PageEventEnvelope,
   type PageMessageEnvelope,
+  type PageOtherWalletEnvelope,
   type PageRequestEnvelope,
   type PageResponseEnvelope,
+  type PageSiteModeRequestEnvelope,
   type ProviderSurfaceMethod,
 } from "@gleam/messaging/src/page-protocol.ts";
 // Named so Vite inlines only the version, not the whole package.json. WXT
@@ -45,13 +50,22 @@ import { version as WALLET_VERSION } from "../../package.json";
  * 6. Tagged binary encoding/decoding for `ArrayBuffer`/`Uint8Array`
  *    params and results, since neither survives `postMessage` intact in
  *    every embedding context this provider might run in.
- * 7. Always owns `window.arweaveWallet`, even when another wallet
- *    extension (Wander) is installed. Extension content scripts run in no
- *    guaranteed order, so this replaces a provider that got there first,
- *    ignores later plain assignments, and takes the slot back when a
- *    later `defineProperty` replaces it and announces
- *    `arweaveWalletLoaded`. A dApp that already cached the other object
- *    keeps it.
+ * 7. Owns the `window.arweaveWallet` slot but doesn't always answer
+ *    through it. When another wallet extension (Wander, PermawebOS) is
+ *    on the page, the slot holds a router that forwards each call to
+ *    that wallet unless the user chose Gleam for the site (`SITE_MODE`
+ *    from the content script, asked for only once another wallet shows
+ *    up). The router reports the other wallet to the
+ *    content script, so Gleam's popup can offer to take over on sites
+ *    that actually use a wallet. Extension content scripts run in no
+ *    guaranteed order, so the router captures a wallet that got there
+ *    first, one that assigns the slot later, and one that redefines it
+ *    and announces `arweaveWalletLoaded`. PermawebOS skips installing
+ *    when the slot is taken, so it is also looked up at
+ *    `window.permawebConnect`.
+ * 8. Also exposes Gleam itself at `window.gleam`, which never forwards,
+ *    so a dApp can offer its own "Connect with Gleam" button (README.md
+ *    § For dApp developers).
  */
 const REQUEST_TIMEOUT_MS = 60_000;
 /** Leaves time to sign or post once the user approves at the last moment. */
@@ -316,15 +330,37 @@ class GleamProvider {
   }
 }
 
-type WalletWindow = { arweaveWallet?: unknown };
+type WalletLike = Record<PropertyKey, unknown>;
+type WalletWindow = { arweaveWallet?: unknown; permawebConnect?: unknown };
 
-function claimSlot(api: GleamProvider): boolean {
+/**
+ * How long a call to the other wallet waits to learn whether the site uses
+ * Gleam instead. The content script answers "not Gleam" straight away when
+ * it can't reach the background, so this only covers a reply that never
+ * comes, and is long enough for a service worker's cold start.
+ */
+const SITE_MODE_WAIT_MS = 5_000;
+const ROUTER_MARK = Symbol.for("gleam.arweaveWalletRouter");
+
+function isWalletLike(value: unknown): value is WalletLike {
+  return value !== null && (typeof value === "object" || typeof value === "function");
+}
+
+function isRouter(value: unknown): boolean {
+  try {
+    return isWalletLike(value) && value[ROUTER_MARK] === true;
+  } catch {
+    return false;
+  }
+}
+
+function claimSlot(router: unknown, onAssign: (value: unknown) => void): boolean {
   try {
     Object.defineProperty(window, "arweaveWallet", {
-      get: () => api,
-      // A setter that drops the value keeps `window.arweaveWallet = other`
-      // from throwing in the other wallet's strict-mode script.
-      set: () => undefined,
+      get: () => router,
+      // A wallet that installs by plain assignment is captured rather than
+      // dropped, and its strict-mode script doesn't throw.
+      set: onAssign,
       configurable: true,
       enumerable: true,
     });
@@ -336,19 +372,152 @@ function claimSlot(api: GleamProvider): boolean {
   }
 }
 
-/** Returns a teardown that stops reclaiming the slot, for tests. */
+/** Returns a teardown that stops listening and reclaiming the slot, for tests. */
 function install(): () => void {
-  const api = new GleamProvider();
-  if (!claimSlot(api)) return () => undefined;
+  const gleamProvider = new GleamProvider();
+  const gleam = gleamProvider as unknown as WalletLike;
+  const walletWindow = window as unknown as WalletWindow;
+  try {
+    // Read-only, so a page script or another wallet can't swap it out by
+    // assignment.
+    Object.defineProperty(window, "gleam", { value: gleamProvider, configurable: true, enumerable: true, writable: false });
+  } catch {
+    // Something made `window.gleam` non-configurable first; leave it alone.
+  }
+  let captured: WalletLike | null = null;
+  // Null until the content script says whether this site holds a grant.
+  let useGleam: boolean | null = null;
+  let resolveMode: () => void = () => undefined;
+  const modeKnown = new Promise<void>((resolve) => {
+    resolveMode = resolve;
+  });
+  let reportedPresence = false;
+  let reportedUse = false;
+  let modeTimeout: ReturnType<typeof setTimeout> | undefined;
 
-  const reclaim = () => {
-    if ((window as unknown as WalletWindow).arweaveWallet !== api) {
-      claimSlot(api);
-    }
+  const other = (): WalletLike | null => {
+    if (captured) return captured;
+    const permaweb = walletWindow.permawebConnect;
+    return isWalletLike(permaweb) && !isRouter(permaweb) ? permaweb : null;
   };
+
+  const report = (used: boolean): void => {
+    const wallet = other();
+    if (!wallet || (used ? reportedUse : reportedPresence)) return;
+    reportedPresence = true;
+    if (used) reportedUse = true;
+    const walletName =
+      wallet === walletWindow.permawebConnect ? "PermawebOS" : typeof wallet.walletName === "string" ? wallet.walletName : "";
+    const envelope: PageOtherWalletEnvelope = { type: OTHER_WALLET, walletName, used };
+    window.postMessage(envelope, location.origin);
+  };
+
+  const setMode = (value: boolean): void => {
+    useGleam = value;
+    clearTimeout(modeTimeout);
+    resolveMode();
+  };
+
+  const requestMode = (): void => {
+    if (modeTimeout !== undefined || useGleam !== null) return;
+    modeTimeout = setTimeout(() => {
+      if (useGleam === null) setMode(false);
+    }, SITE_MODE_WAIT_MS);
+    const envelope: PageSiteModeRequestEnvelope = { type: SITE_MODE_REQUEST };
+    window.postMessage(envelope, location.origin);
+  };
+
+  const noteOther = (): void => {
+    if (!other()) return;
+    report(false);
+    requestMode();
+  };
+
+  const target = (): WalletLike => (useGleam === true ? gleam : (other() ?? gleam));
+
+  const invoke = (prop: PropertyKey, args: unknown[]): unknown => {
+    const wallet = target();
+    const method = wallet[prop];
+    if (typeof method !== "function") {
+      throw new TypeError(`window.arweaveWallet.${String(prop)} is not a function.`);
+    }
+    if (wallet !== gleam) report(true);
+    return (method as (...rest: unknown[]) => unknown).apply(wallet, args);
+  };
+
+  // One function per name, so a dApp that cached `arweaveWallet.connect`
+  // still reaches whichever wallet the site uses at call time.
+  const methods = new Map<PropertyKey, (...args: unknown[]) => unknown>();
+  const methodFor = (prop: PropertyKey) => {
+    let method = methods.get(prop);
+    if (!method) {
+      method = (...args: unknown[]) => {
+        if (useGleam !== null || !other()) return invoke(prop, args);
+        noteOther();
+        return modeKnown.then(() => invoke(prop, args));
+      };
+      methods.set(prop, method);
+    }
+    return method;
+  };
+
+  const router = new Proxy(Object.create(null) as WalletLike, {
+    get(_shell, prop) {
+      if (prop === ROUTER_MARK) return true;
+      const value = Reflect.get(target(), prop);
+      return typeof value === "function" ? methodFor(prop) : value;
+    },
+    has(_shell, prop) {
+      return prop in target();
+    },
+    set(_shell, prop, value) {
+      return Reflect.set(target(), prop, value);
+    },
+    ownKeys() {
+      return Reflect.ownKeys(target());
+    },
+    // The shell has no own properties, so each one is reported as
+    // configurable, which a Proxy may do for a property its target lacks.
+    getOwnPropertyDescriptor(_shell, prop) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target(), prop);
+      if (!descriptor) return undefined;
+      const value = typeof descriptor.value === "function" ? methodFor(prop) : descriptor.value;
+      return "value" in descriptor ? { ...descriptor, value, configurable: true } : { ...descriptor, configurable: true };
+    },
+  });
+
+  const capture = (value: unknown): void => {
+    if (!isWalletLike(value) || isRouter(value) || value === gleam) return;
+    captured = value;
+    noteOther();
+  };
+
+  capture(walletWindow.arweaveWallet);
+  if (!claimSlot(router, capture)) return () => undefined;
+
+  const onMessage = (event: MessageEvent): void => {
+    if (event.source !== window) return;
+    const data = event.data as PageMessageEnvelope | undefined;
+    if (data?.type === SITE_MODE && typeof data.useGleam === "boolean") setMode(data.useGleam);
+  };
+  const reclaim = (): void => {
+    const current = walletWindow.arweaveWallet;
+    if (current === router) return;
+    capture(current);
+    claimSlot(router, capture);
+  };
+  window.addEventListener("message", onMessage);
   window.addEventListener("arweaveWalletLoaded", reclaim);
+  // PermawebOS never assigns the slot once it's taken, so it is looked for
+  // again once its injected script has had the chance to run.
+  window.addEventListener("DOMContentLoaded", noteOther, { once: true });
   window.dispatchEvent(new CustomEvent("arweaveWalletLoaded"));
-  return () => window.removeEventListener("arweaveWalletLoaded", reclaim);
+  return () => {
+    clearTimeout(modeTimeout);
+    window.removeEventListener("message", onMessage);
+    window.removeEventListener("arweaveWalletLoaded", reclaim);
+    window.removeEventListener("DOMContentLoaded", noteOther);
+  };
 }
 
 // `defineUnlistedScript` is imported explicitly from `wxt/utils/

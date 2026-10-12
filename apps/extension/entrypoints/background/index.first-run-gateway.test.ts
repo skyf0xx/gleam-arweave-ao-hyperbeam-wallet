@@ -44,7 +44,7 @@ vi.mock("wxt/browser", () => ({
       onInstalled: { addListener: onInstalledAddListener },
       onMessageExternal: { addListener: vi.fn() },
     },
-    tabs: { query: vi.fn().mockResolvedValue([]) },
+    tabs: { query: vi.fn().mockResolvedValue([]), onRemoved: { addListener: vi.fn() } },
     alarms: { create: vi.fn(), get: vi.fn(async () => undefined), onAlarm: { addListener: vi.fn() } },
   },
 }));
