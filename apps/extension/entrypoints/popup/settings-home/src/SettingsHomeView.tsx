@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AutoLockTimeout, LockSettings, NetworkSettings, RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 
 const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
@@ -110,110 +111,66 @@ export function SettingsHomeView({
       <ScreenHeader title="Settings" onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-8 px-6 pb-6 pt-9">
-        <SettingsSection title="Wallet">
+        <OptionSection title="Wallet">
           {onOpenLockSettings ? (
-            <SettingsRow
+            <OptionRow
+            divided={false}
               title="Auto-lock"
-              subtitle="When the wallet locks itself"
+              description="When the wallet locks itself"
               value={state.loading ? undefined : state.lockSettings ? TIMEOUT_LABELS[state.lockSettings.autoLockTimeout] : "—"}
               onClick={onOpenLockSettings}
             />
           ) : null}
-          <SettingsRow
+          <OptionRow
+            divided={false}
             title="Connected apps"
-            subtitle="Manage sites with an active grant"
+            description="Manage sites with an active grant"
             onClick={onOpenConnectedApps}
           />
-          <SettingsRow
+          <OptionRow
+            divided={false}
             title="Manage tokens"
-            subtitle="Add or remove watched AO tokens"
+            description="Add or remove watched AO tokens"
             onClick={onOpenManageTokens}
           />
-          <SettingsRow
+          <OptionRow
+            divided={false}
             title="Contacts"
-            subtitle="Saved addresses for sending"
+            description="Saved addresses for sending"
             onClick={onOpenContacts}
           />
-        </SettingsSection>
+        </OptionSection>
 
-        <SettingsSection title="Network">
-          <SettingsRow
+        <OptionSection title="Network">
+          <OptionRow
+            divided={false}
             title="Network & peers"
-            subtitle="Gateway and AO node endpoints"
+            description="Gateway and AO node endpoints"
             value={
               state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
             }
             onClick={onOpenNetworkPeers}
           />
-        </SettingsSection>
+        </OptionSection>
 
-        <SettingsSection title="Tools">
+        <OptionSection title="Tools">
           {/* Bundler uploads don't yet work reliably with current AO wallets;
               re-enable by restoring onClick={onOpenUpload} below. */}
-          <SettingsRow title="Upload to Arweave" subtitle="Store a file permanently" disabled comingSoon />
-        </SettingsSection>
+          <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
+        </OptionSection>
 
-        <SettingsSection title="General">
+        <OptionSection title="General">
           <ToggleRow
             title="Dark mode"
             checked={theme === "dark"}
             disabled={savingTheme}
             onToggle={() => void handleToggleTheme()}
           />
-        </SettingsSection>
+        </OptionSection>
 
         <FeedbackCard onClick={onOpenFeedback} />
       </div>
     </div>
-  );
-}
-
-function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="border-b border-line pb-2 text-label font-semibold uppercase tracking-[0.04em] text-muted">
-        {title}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-function SettingsRow({
-  title,
-  subtitle,
-  value,
-  onClick,
-  disabled = false,
-  comingSoon = false,
-}: {
-  title: string;
-  subtitle?: string;
-  value?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  comingSoon?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      aria-disabled={disabled}
-      onClick={onClick}
-      className="flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist disabled:cursor-default disabled:opacity-50"
-    >
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-label font-semibold text-foreground">{title}</span>
-        {subtitle ? <span className="text-caption text-muted">{subtitle}</span> : null}
-      </span>
-      {value ? <span className="flex-shrink-0 text-label text-muted">{value}</span> : null}
-      {comingSoon ? <span className="flex-shrink-0 text-caption text-faint">Coming soon</span> : null}
-      {disabled || comingSoon ? null : (
-        <span aria-hidden="true" className="flex-shrink-0 text-faint">
-          <ChevronIcon />
-        </span>
-      )}
-    </button>
   );
 }
 
@@ -287,14 +244,6 @@ function ExternalIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-    </svg>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
