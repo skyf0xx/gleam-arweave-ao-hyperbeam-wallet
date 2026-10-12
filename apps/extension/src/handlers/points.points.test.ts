@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  INVITE_REQUIRED_MESSAGE,
   base64UrlToBytes,
   bytesToBase64Url,
   deriveAddress,
@@ -24,6 +25,7 @@ import {
 import type { DeviceKey } from "../adapters/device-key";
 import {
   POINTS_DEVICE_STATE_KEY,
+  POINTS_INVITE_UNLOCK_KEY,
   POINTS_MEMBERSHIPS_KEY,
   POINTS_PENDING_INVITE_KEY,
   POINTS_CLAIM_PENDING_KEY,
@@ -213,6 +215,16 @@ describe("PointsHandler.join", () => {
     expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual({ registered: true, lastHeartbeatAt: NOW });
     expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
     expect(await handler.getClaimPending()).toEqual(["w2"]);
+  });
+
+  it("turns a Phase 1 invite_required refusal into the invite gate error and drops the stale unlock", async () => {
+    const { handler, storage } = await setup(null, 403, {
+      responseBody: { error: "Invite required.", code: "invite_required" },
+      extraStorage: { [POINTS_INVITE_UNLOCK_KEY]: { code: "", result: "ok", at: 1 } },
+    });
+
+    await expect(handler.join({ walletId: "w1" })).rejects.toThrow(INVITE_REQUIRED_MESSAGE);
+    expect(storage.store.has(POINTS_INVITE_UNLOCK_KEY)).toBe(false);
   });
 
   it("prefers a typed invite code, normalized, over the pending one", async () => {

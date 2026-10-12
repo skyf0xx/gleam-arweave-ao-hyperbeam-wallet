@@ -32,6 +32,7 @@ export type {
   PointsScores,
   PointsWalletScore,
 } from "./points";
+export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";

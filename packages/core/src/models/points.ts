@@ -39,6 +39,13 @@ export interface PointsScores {
  */
 export type InviteRedeemResult = "ok" | "full" | "unknown" | "offline";
 
+/**
+ * The error message `join` throws when the server refuses a Phase 1
+ * registration for lack of an invite. The popup matches on it to open the
+ * invite gate, since errors cross the messaging boundary as plain messages.
+ */
+export const INVITE_REQUIRED_MESSAGE = "An invite is required to join Gleam Points.";
+
 /** An install's install-time redemption, as the extension stores it. */
 export interface InviteUnlock {
   code: string;

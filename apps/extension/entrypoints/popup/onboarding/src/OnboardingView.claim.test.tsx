@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PointsScores, PointsWalletScore, RuntimePort } from "@gleam/core";
+import { INVITE_REQUIRED_MESSAGE, type PointsScores, type PointsWalletScore, type RuntimePort } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
 import type { ClaimPhase } from "./ClaimStep";
 
@@ -132,10 +132,19 @@ describe("claim step", () => {
   });
 
   it("shows a join failure and stays on the step", async () => {
-    const { onComplete } = setup("founding", { joinError: "Couldn't join Gleam Points: Invite required." });
+    const { onComplete } = setup("founding", { joinError: "Couldn't join Gleam Points: server busy." });
     await reachClaim();
     fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
-    expect(await screen.findByText("Couldn't join Gleam Points: Invite required.")).toBeTruthy();
+    expect(await screen.findByText("Couldn't join Gleam Points: server busy.")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("sends an invite-required refusal to the invite gate", async () => {
+    const { onComplete } = setup("founding", { joinError: INVITE_REQUIRED_MESSAGE });
+    await reachClaim();
+    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+    expect(await screen.findByLabelText("Invite code")).toBeTruthy();
+    expect(screen.queryByText(INVITE_REQUIRED_MESSAGE)).toBeNull();
     expect(onComplete).not.toHaveBeenCalled();
   });
 });

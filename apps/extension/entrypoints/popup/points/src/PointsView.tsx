@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   capabilitiesFor,
+  INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
   unsupportedOperationMessage,
   type RuntimePort,
@@ -18,6 +19,7 @@ import {
   invitesRemainingLine,
   xIntentUrl,
 } from "@/src/points-share";
+import { FoundingGate } from "../../onboarding/src/FoundingGate";
 import { gleamUrl, howItWorksUrl, JoinNote } from "./JoinNote";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
@@ -93,6 +95,16 @@ function JoinView({
   const [typed, setTyped] = useState<string | null>(null);
   const inviteCode = typed ?? pending.data ?? "";
   const canJoin = capabilitiesFor(wallet.method).points;
+
+  if (join.error instanceof Error && join.error.message === INVITE_REQUIRED_MESSAGE) {
+    return (
+      <FoundingGate
+        runtime={runtime}
+        initialUnlock={null}
+        onUnlocked={() => join.mutate({ walletId: wallet.id })}
+      />
+    );
+  }
 
   return (
     <form

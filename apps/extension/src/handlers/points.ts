@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import {
   bytesToBase64Url,
+  INVITE_REQUIRED_MESSAGE,
   capabilitiesFor,
   isHardwareWalletMethod,
   unsupportedOperationMessage,
@@ -148,8 +149,16 @@ export class PointsHandler {
       inviteCode?: unknown;
       referred?: unknown;
       error?: unknown;
+      code?: unknown;
     } | null;
     if (!response.ok) {
+      if (body?.code === "invite_required") {
+        // A stored "ok" unlock would make the gate's redeem return early
+        // without a code the server accepts.
+        await this.deps.storage.remove(POINTS_INVITE_UNLOCK_KEY);
+        await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
+        throw new Error(INVITE_REQUIRED_MESSAGE);
+      }
       const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
       throw new Error(`Couldn't join Gleam Points: ${reason}`);
     }
