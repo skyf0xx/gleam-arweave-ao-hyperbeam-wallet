@@ -9,6 +9,7 @@ import { FileDropzone } from "./file-dropzone";
 import { RiskNotice } from "./risk-notice";
 import { EmptyState } from "./empty-state";
 import { StatusDot } from "./status-dot";
+import { OptionRow, OptionSection } from "./option-list";
 
 describe("ui: Button variants", () => {
   it("renders the primary variant by default", () => {
@@ -130,5 +131,21 @@ describe("ui: StatusDot", () => {
   it("never renders a beam color for status", () => {
     const { container } = render(<StatusDot label="offline" tone="warning" />);
     expect(container.innerHTML).not.toContain("beam");
+  });
+});
+
+describe("ui: OptionSection and OptionRow", () => {
+  it("names the row by its title, describes it by its help line, and groups it under the section label", () => {
+    const onClick = vi.fn();
+    render(
+      <OptionSection title="Hardware wallet">
+        <OptionRow title="Ledger" description="Connect over USB" onClick={onClick} />
+      </OptionSection>,
+    );
+
+    const row = screen.getByRole("button", { name: "Ledger", description: "Connect over USB" });
+    expect(screen.getByRole("region", { name: "Hardware wallet" }).contains(row)).toBe(true);
+    fireEvent.click(row);
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });

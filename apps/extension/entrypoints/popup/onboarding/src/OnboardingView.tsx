@@ -5,6 +5,7 @@ import { CreatePassword } from "./CreatePassword";
 import { Backup } from "./Backup";
 import { Import } from "./Import";
 import { AddWalletStart } from "./AddWalletStart";
+import { ExistingWallet } from "./ExistingWallet";
 import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
 import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
 import { VaultPassword } from "./VaultPassword";
@@ -22,6 +23,7 @@ import { FoundingRevealScreen } from "./FoundingReveal";
  */
 type Step =
   | { kind: "welcome" }
+  | { kind: "existing" }
   | { kind: "create-password" }
   | { kind: "backup"; keyfileContents: string; walletName: string; wallet: WalletSummary }
   | { kind: "import" }
@@ -176,13 +178,21 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
             onCreate={() => setStep({ kind: "create-password" })}
             onImport={() => setStep({ kind: "import" })}
             onConnectKeystone={onConnectKeystone}
-          onConnectLedger={onConnectLedger}
+            onConnectLedger={onConnectLedger}
           />
         );
       }
       return (
         <Welcome
           onCreate={() => setStep({ kind: "create-password" })}
+          onExisting={() => setStep({ kind: "existing" })}
+        />
+      );
+
+    case "existing":
+      return (
+        <ExistingWallet
+          onBack={() => setStep({ kind: "welcome" })}
           onImport={() => setStep({ kind: "import" })}
           onConnectKeystone={onConnectKeystone}
           onConnectLedger={onConnectLedger}
@@ -226,7 +236,9 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     case "import":
       return (
         <Import
-          onBack={() => setStep({ kind: "welcome" })}
+          // Add-wallet mode lists the keyfile option on its first screen;
+          // first run reaches it through "I already have a wallet".
+          onBack={() => setStep({ kind: addingWallet ? "welcome" : "existing" })}
           onValidJWK={(jwk) => setStep({ kind: "import-password", jwk })}
         />
       );

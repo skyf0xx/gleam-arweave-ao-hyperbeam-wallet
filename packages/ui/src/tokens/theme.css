@@ -184,6 +184,17 @@ body:has([data-layout="popup"]) {
 [data-layout="popup"] {
   width: 400px;
   min-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * A min-height alone leaves the frame's height indefinite, so a screen's
+ * `min-h-full` would resolve to its content height and `mt-auto` footers
+ * would sit mid-popup. Growing the one screen element fills the 600px.
+ */
+[data-layout="popup"] > * {
+  flex-grow: 1;
 }
 
 /*

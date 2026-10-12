@@ -3,6 +3,7 @@ export { Button, type ButtonProps } from "./primitives/button";
 export { Beam, BeamMark, type BeamProps } from "./primitives/beam";
 export { ScreenHeader, type ScreenHeaderProps } from "./primitives/screen-header";
 export { Card, ListRow, type CardProps, type ListRowProps } from "./primitives/card";
+export { OptionSection, OptionRow, type OptionSectionProps, type OptionRowProps } from "./primitives/option-list";
 export { TextField, type TextFieldProps } from "./primitives/text-field";
 export { FileDropzone, type FileDropzoneProps } from "./primitives/file-dropzone";
 export { RiskNotice, type RiskNoticeProps } from "./primitives/risk-notice";

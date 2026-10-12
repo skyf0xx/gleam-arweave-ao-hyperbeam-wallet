@@ -17,6 +17,11 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 const GOOD_PASSWORD = "correct horse battery staple";
 
+function openKeyfileImport() {
+  fireEvent.click(screen.getByRole("button", { name: "I already have a wallet" }));
+  fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+}
+
 describe("OnboardingView: create flow", () => {
   it("walks welcome -> password -> backup and calls createWallet then exportWallet", async () => {
     const send = vi
@@ -109,7 +114,7 @@ describe("OnboardingView: import flow", () => {
     const runtime = fakeRuntime();
     render(<OnboardingView runtime={runtime} onComplete={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Import a wallet" }));
+    openKeyfileImport();
     fireEvent.change(screen.getByPlaceholderText(/kty/), {
       target: { value: '{"not":"a jwk"}' },
     });
@@ -122,7 +127,7 @@ describe("OnboardingView: import flow", () => {
     const runtime = fakeRuntime();
     render(<OnboardingView runtime={runtime} onComplete={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Import a wallet" }));
+    openKeyfileImport();
     fireEvent.change(screen.getByPlaceholderText(/kty/), {
       target: {
         value: JSON.stringify({
@@ -223,7 +228,7 @@ describe("OnboardingView: add-wallet mode", () => {
       <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" onComplete={onComplete} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Import a wallet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
     fireEvent.change(screen.getByPlaceholderText(/kty/), {
       target: { value: JSON.stringify(VALID_JWK) },
     });
@@ -242,24 +247,59 @@ describe("OnboardingView: add-wallet mode", () => {
   });
 });
 
+describe("OnboardingView: start screens", () => {
+  it("asks only new-or-existing on Welcome, keeping import and hardware a step away", () => {
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} />);
+
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Create a wallet",
+      "I already have a wallet",
+    ]);
+  });
+
+  it("returns from the existing-wallet screen to Welcome, and from import to the existing-wallet screen", () => {
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} />);
+
+    openKeyfileImport();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByText("Use an existing wallet")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("button", { name: "I already have a wallet" })).toBeTruthy();
+  });
+
+  it("returns from import straight to the add-wallet list in add-wallet mode", () => {
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode="add-wallet" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByText("Add a wallet")).toBeTruthy();
+  });
+});
+
+function openHardwareStart(mode: "first-run" | "add-wallet") {
+  if (mode === "first-run") fireEvent.click(screen.getByRole("button", { name: "I already have a wallet" }));
+}
+
 describe("OnboardingView: Connect Keystone", () => {
-  it.each(["first-run", "add-wallet"] as const)("offers it on the %s start screen", (mode) => {
+  it.each(["first-run", "add-wallet"] as const)("offers it from the %s start", (mode) => {
     const onConnectKeystone = vi.fn();
     render(
       <OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode={mode} onConnectKeystone={onConnectKeystone} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Connect Keystone" }));
+    openHardwareStart(mode);
+    fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
     expect(onConnectKeystone).toHaveBeenCalledOnce();
   });
 });
 
 describe("OnboardingView: Connect Ledger", () => {
-  it.each(["first-run", "add-wallet"] as const)("offers it on the %s start screen", (mode) => {
+  it.each(["first-run", "add-wallet"] as const)("offers it from the %s start", (mode) => {
     const onConnectLedger = vi.fn();
     render(
       <OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode={mode} onConnectLedger={onConnectLedger} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Connect Ledger" }));
+    openHardwareStart(mode);
+    fireEvent.click(screen.getByRole("button", { name: "Ledger" }));
     expect(onConnectLedger).toHaveBeenCalledOnce();
   });
 });

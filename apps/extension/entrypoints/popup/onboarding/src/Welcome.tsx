@@ -3,33 +3,27 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
  * Welcome — the only screen with the tagline as hero copy, one primary +
- * one secondary action, nothing else.
+ * one secondary action, nothing else. The first question is only "new or
+ * existing?"; how to bring an existing wallet in is `ExistingWallet`'s job,
+ * so new ways in never crowd this screen.
  */
 export interface WelcomeProps {
   onCreate: () => void;
-  onImport: () => void;
-  onConnectKeystone: () => void;
-  onConnectLedger: () => void;
+  onExisting: () => void;
 }
 
-export function Welcome({ onCreate, onImport, onConnectKeystone, onConnectLedger }: WelcomeProps) {
+export function Welcome({ onCreate, onExisting }: WelcomeProps) {
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-8 pt-7">
-      <div className="mt-14 mb-3">
+      <div className="my-auto">
         <BeamMark tagline="crypto, without the clutter." />
       </div>
-      <div className="mt-auto flex w-full flex-col gap-2.5">
+      <div className="flex w-full flex-col gap-2.5">
         <Button type="button" onClick={onCreate}>
           Create a wallet
         </Button>
-        <Button type="button" variant="secondary" onClick={onImport}>
-          Import a wallet
-        </Button>
-        <Button type="button" variant="secondary" onClick={onConnectKeystone}>
-          Connect Keystone
-        </Button>
-        <Button type="button" variant="secondary" onClick={onConnectLedger}>
-          Connect Ledger
+        <Button type="button" variant="secondary" onClick={onExisting}>
+          I already have a wallet
         </Button>
       </div>
     </div>
