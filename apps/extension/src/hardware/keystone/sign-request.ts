@@ -13,8 +13,15 @@ export const KEYSTONE_FRAGMENT_LENGTH = 400;
  */
 export const KEYSTONE_MAX_FRAMES = 200;
 
-/** One Arweave chunk. Anything larger needs a chunked upload, which the Keystone can't sign through a QR. */
-export const KEYSTONE_MAX_TRANSACTION_DATA = 256 * 1024;
+/**
+ * The transaction travels as JSON with its data base64url-encoded (4/3 the
+ * size), so the frame cap bounds the data well below one Arweave chunk. The
+ * allowance covers owner, signature and tags; the frame check in
+ * `keystoneQrEncoder` stays as the backstop for tag-heavy requests.
+ */
+const TRANSACTION_ENVELOPE_ALLOWANCE = 2 * 1024;
+export const KEYSTONE_MAX_TRANSACTION_DATA =
+  Math.floor((KEYSTONE_MAX_FRAMES * KEYSTONE_FRAGMENT_LENGTH * 3) / 4) - TRANSACTION_ENVELOPE_ALLOWANCE;
 
 export class KeystoneRequestError extends Error {
   constructor(message: string) {
@@ -46,7 +53,7 @@ function payloadBytes(payload: DeviceSigningPayload): { bytes: Buffer; signType:
   const { transaction } = payload;
   if (Number(transaction.data_size) > KEYSTONE_MAX_TRANSACTION_DATA) {
     throw new KeystoneRequestError(
-      "This transaction carries more than 256 KiB of data, which needs a chunked upload. Keystone can't sign it. Try a smaller request.",
+      `This transaction carries more than ${Math.floor(KEYSTONE_MAX_TRANSACTION_DATA / 1000)} KB of data, which is too much to show as a QR for Keystone to sign. Try a smaller request.`,
     );
   }
   // The Keystone parses the transaction's JSON and needs `owner` in it to

@@ -7,6 +7,7 @@ import {
   decodeKeystoneSignature,
   KEYSTONE_FRAGMENT_LENGTH,
   KEYSTONE_MAX_FRAMES,
+  KEYSTONE_MAX_TRANSACTION_DATA,
   keystoneQrEncoder,
   KeystoneRequestError,
   KeystoneSignatureError,
@@ -75,9 +76,25 @@ describe("buildKeystoneSignRequest", () => {
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it("refuses a transaction whose data needs more than one chunk", () => {
-    const big = { ...transaction, transaction: { ...transaction.transaction, data_size: String(256 * 1024 + 1) } };
+  it("refuses a transaction whose data can't fit the frame cap, naming the real limit", () => {
+    const big = {
+      ...transaction,
+      transaction: { ...transaction.transaction, data_size: String(KEYSTONE_MAX_TRANSACTION_DATA + 1) },
+    };
     expect(() => buildKeystoneSignRequest(big, xfp)).toThrow(KeystoneRequestError);
+    expect(() => buildKeystoneSignRequest(big, xfp)).toThrow(
+      `more than ${Math.floor(KEYSTONE_MAX_TRANSACTION_DATA / 1000)} KB`,
+    );
+  });
+
+  it("accepts a transaction with data right at the limit, and it still fits the frame cap", () => {
+    const data = Buffer.alloc(KEYSTONE_MAX_TRANSACTION_DATA, 9).toString("base64url");
+    const full = {
+      ...transaction,
+      transaction: { ...transaction.transaction, data, data_size: String(KEYSTONE_MAX_TRANSACTION_DATA) },
+    };
+    const { ur } = buildKeystoneSignRequest(full, xfp);
+    expect(() => keystoneQrEncoder(ur)).not.toThrow();
   });
 });
 
