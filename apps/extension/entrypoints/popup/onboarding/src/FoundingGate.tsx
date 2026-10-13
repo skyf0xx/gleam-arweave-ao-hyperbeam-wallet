@@ -126,15 +126,8 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
       <div className="mt-7 flex flex-col items-center gap-1.5 text-center">
         <h1 className="text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">You&apos;re early.</h1>
         <p className="text-body text-muted">
-          Get access to start earning{" "}
-          <a
-            href={sitePageUrl("gleam", browser.runtime.getManifest().version)}
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-foreground underline underline-offset-2"
-          >
-            GLEAM
-          </a>
+          Members are earning{" "}
+          <EarningWord href={sitePageUrl("gleam", browser.runtime.getManifest().version)} />
         </p>
       </div>
 
@@ -193,13 +186,13 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         {showAsk ? (
           <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
             <p className="text-center text-caption text-muted">
-              Get an invite from a member or watch for drops on{" "}
+              Get an invite from a member or watch{" "}
               <a
                 href={X_PROFILE_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline underline-offset-2"
-              >
+              >for drops on
                 X
               </a>
             </p>
@@ -216,6 +209,44 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         <ConvergingLines lit={unlocked} />
       </div>
     </div>
+  );
+}
+
+const TICK_MS = 2600;
+
+/**
+ * GLEAM, with a +1 landing on it every few seconds in the next beam colour,
+ * so "are earning" is shown rather than claimed. The word punches as each
+ * point lands; the two punch keyframes alternate so the animation restarts
+ * without remounting the link. Reduced motion keeps only the underline.
+ */
+function EarningWord({ href }: { href: string }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setTick((n) => n + 1), TICK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      data-punch={tick === 0 ? undefined : tick % 2 ? "a" : "b"}
+      className="gleam-earning-word font-bold tracking-[0.02em] text-foreground"
+    >
+      GLEAM
+      {tick > 0 ? (
+        <span
+          key={tick}
+          aria-hidden="true"
+          className="gleam-earning-tick"
+          style={{ color: LINE_COLORS[(tick - 1) % LINE_COLORS.length] }}
+        >
+          +1
+        </span>
+      ) : null}
+    </a>
   );
 }
 
