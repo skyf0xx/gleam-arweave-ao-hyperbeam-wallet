@@ -463,6 +463,13 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     expect(PACKAGE_VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 
+  // dApps compare walletVersion against Wander's version numbers. ArDrive
+  // refuses anything below 1.26.0.
+  it("keeps walletVersion at or above the Wander version dApps require", () => {
+    const [major, minor] = PACKAGE_VERSION.split(".").map(Number);
+    expect(major! > 1 || (major === 1 && minor! >= 26)).toBe(true);
+  });
+
   function listen(event: string) {
     const listener = vi.fn();
     window.addEventListener(event, listener);
