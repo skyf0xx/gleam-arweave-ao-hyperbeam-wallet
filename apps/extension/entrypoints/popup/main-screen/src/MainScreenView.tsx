@@ -404,6 +404,13 @@ export function MainScreenView({
     window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
   };
 
+  /** Scrolling to the top un-collapses the header, which un-docks the list and fades the chart back in. */
+  const returnHome = () => {
+    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    listSectionRef.current?.scrollTo?.({ top: 0 });
+    window.scrollTo({ top: 0, behavior });
+  };
+
   return (
     <div className="flex min-h-full flex-col">
       {loadError ? (
@@ -416,19 +423,31 @@ export function MainScreenView({
       ) : null}
 
       <div className="sticky top-0 z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
-        <button
-          type="button"
-          onClick={onOpenWalletSwitcher}
-          aria-haspopup="dialog"
-          aria-label={`${wallet.name}, address ${wallet.address}, view account details`}
-          className="-ml-3 flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-2 hover:bg-mist"
-        >
-          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
-          <span className="truncate text-label">{wallet.name}</span>
-          <span className="truncate font-mono text-label text-faint">
-            {truncateAddress(wallet.address, 6)}
-          </span>
-        </button>
+        {headerCollapsed ? (
+          // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
+          <button
+            type="button"
+            aria-label="Back"
+            onClick={returnHome}
+            className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
+          >
+            <BackIcon />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenWalletSwitcher}
+            aria-haspopup="dialog"
+            aria-label={`${wallet.name}, address ${wallet.address}, view account details`}
+            className="-ml-3 flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-2 hover:bg-mist"
+          >
+            <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
+            <span className="truncate text-label">{wallet.name}</span>
+            <span className="truncate font-mono text-label text-faint">
+              {truncateAddress(wallet.address, 6)}
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -695,6 +714,14 @@ export function MainScreenView({
         )}
       </div>
     </div>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

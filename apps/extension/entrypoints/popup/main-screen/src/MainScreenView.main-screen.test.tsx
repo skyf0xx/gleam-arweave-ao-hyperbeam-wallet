@@ -488,20 +488,36 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
     setScrollY(0);
   });
 
-  it("fades out and makes the chart/actions block inert once scrolled past the threshold, keeping the avatar's size fixed", async () => {
+  it("fades out and makes the chart/actions block inert once scrolled past the threshold", async () => {
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
-    const pill = screen.getByRole("button", { name: /Wallet One, address/i });
-    expect(within(pill).getByRole("img", { name: /avatar/i }).style.width).toBe("24px");
-
     setScrollY(200);
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Send" }).closest("[inert]")).toBeTruthy(),
     );
-    expect(within(pill).getByRole("img", { name: /avatar/i }).style.width).toBe("24px");
+  });
+
+  it("swaps the account pill for a Back button once collapsed, and Back scrolls home", async () => {
+    const send = successfulSend();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Wallet One, address/i })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+
+    setScrollY(200);
+
+    const back = await screen.findByRole("button", { name: "Back" });
+    expect(screen.queryByRole("button", { name: /Wallet One, address/i })).toBeNull();
+    fireEvent.click(back);
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+
+    setScrollY(0);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Wallet One, address/i })).toBeTruthy());
+    scrollTo.mockRestore();
   });
 
   it("fades the header back in and makes it interactive again once scrolled back near the top", async () => {
