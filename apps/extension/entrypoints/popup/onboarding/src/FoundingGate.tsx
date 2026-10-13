@@ -186,14 +186,14 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         {showAsk ? (
           <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
             <p className="text-center text-caption text-muted">
-              Get an invite from a member or watch for drops on{" "}
+              Get an invite from a member or watch{" "}
               <a
                 href={X_PROFILE_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline underline-offset-2"
               >
-                X
+                for drops on X
               </a>
             </p>
             <Button asChild variant={full ? "primary" : "secondary"}>
