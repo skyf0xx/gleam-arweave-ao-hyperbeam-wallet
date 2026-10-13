@@ -159,6 +159,15 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
       </>
     );
   }
+  if (summary.kind === "collectibleTransfer") {
+    return (
+      <>
+        <Row label="Collectible" value={summary.asset} mono />
+        <Row label="Recipient" value={summary.recipient} mono />
+        <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
+      </>
+    );
+  }
   if (summary.kind === "message") {
     return summary.text !== null ? (
       <Row label="Message" value={summary.text} />

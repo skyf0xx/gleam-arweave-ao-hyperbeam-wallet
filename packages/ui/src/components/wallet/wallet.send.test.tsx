@@ -82,6 +82,21 @@ describe("ActivityRow", () => {
     );
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
+
+  it("shows a collectible's thumbnail in place of the amount", () => {
+    render(
+      <ActivityRow
+        activityType="send"
+        title="Sent · Beam #1"
+        subtitle="1d ago"
+        amountLabel="-4.50 AR"
+        collectible={{ name: "Beam #1", imageUrl: "https://arweave.net/asset" }}
+      />,
+    );
+    expect(screen.getByText("Sent · Beam #1")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Beam #1" }).getAttribute("src")).toBe("https://arweave.net/asset");
+    expect(screen.queryByText("-4.50 AR")).toBeNull();
+  });
 });
 
 describe("EmptyState", () => {

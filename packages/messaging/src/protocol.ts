@@ -3,6 +3,7 @@ import type {
   ActivityPage,
   Announcement,
   Collectible,
+  CollectibleSendDraft,
   ApprovalRequest,
   Contact,
   FeeEstimate,
@@ -148,6 +149,10 @@ export interface ProtocolMap {
   // one until the session is locked or its auto-lock timeout elapses.
   estimateTransfer(req: TransferDraft): FeeEstimate;
   submitTransfer(req: TransferDraft): { txId: string };
+  /** Quotes the AR network fee for sending one collectible; fails when the wallet's AR can't cover it. */
+  estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;
+  /** Sends one collectible as an L1 transaction to its process (`core/ao/collectible-transfer.ts`). */
+  sendCollectible(req: CollectibleSendDraft): { txId: string };
   reviewUpload(req: UploadDraft): UploadReview; // runs the secret scan
   submitUpload(req: UploadDraft): { txId: string };
 

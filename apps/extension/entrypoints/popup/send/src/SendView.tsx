@@ -408,8 +408,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
 
   return (
     <SuccessStep
-      token={selectedToken}
-      step={step}
+      summary={`${formatAmount(step.amountAtomic, selectedToken)} ${tickerFor(selectedToken)} to ${step.recipient}`}
+      txId={step.txId}
       onDone={onDone}
       isSaved={contactFor(step.recipient) !== undefined || ownWalletFor(step.recipient) !== undefined}
       onSaveAddress={(name) => saveContactMutation.mutate({ address: step.recipient, name })}
@@ -490,41 +490,20 @@ function ComposeStep({
           <span className="font-semibold text-foreground">{wallet.name}</span>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-label font-semibold text-muted">To</span>
-            <button
-              type="button"
-              onClick={onOpenSavedAddresses}
-              className="text-label font-medium text-muted hover:text-foreground hover:underline"
-            >
-              Saved addresses
-            </button>
-          </div>
-          <textarea
-            rows={2}
-            value={step.recipient}
-            onChange={(event) => onChange({ recipient: event.target.value })}
-            onBlur={onBlurRecipient}
-            placeholder="Paste an address"
-            className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
-          />
-          {step.recipientError ? (
-            <div role="alert" className="text-label leading-snug text-warning">
-              {step.recipientError}
-            </div>
-          ) : null}
-          {!step.recipientError && recipientSchema.safeParse(step.recipient).success && !hideSaveOption ? (
-            <SaveAddressInline
-              expanded={step.showSaveAddress}
-              name={step.saveAddressName}
-              saving={savingAddress}
-              onToggle={onToggleSaveAddress}
-              onChangeName={onChangeSaveAddressName}
-              onConfirm={onConfirmSaveAddress}
-            />
-          ) : null}
-        </div>
+        <RecipientField
+          recipient={step.recipient}
+          recipientError={step.recipientError}
+          onChangeRecipient={(recipient) => onChange({ recipient })}
+          onBlurRecipient={onBlurRecipient}
+          onOpenSavedAddresses={onOpenSavedAddresses}
+          hideSaveOption={hideSaveOption}
+          showSaveAddress={step.showSaveAddress}
+          saveAddressName={step.saveAddressName}
+          onToggleSaveAddress={onToggleSaveAddress}
+          onChangeSaveAddressName={onChangeSaveAddressName}
+          onConfirmSaveAddress={onConfirmSaveAddress}
+          savingAddress={savingAddress}
+        />
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
@@ -584,6 +563,74 @@ function ComposeStep({
           {step.submitting ? "Checking…" : "Continue"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** The "To" field: address input, the saved-addresses link and the quiet "Save this address" line. */
+export function RecipientField({
+  recipient,
+  recipientError,
+  onChangeRecipient,
+  onBlurRecipient,
+  onOpenSavedAddresses,
+  hideSaveOption,
+  showSaveAddress,
+  saveAddressName,
+  onToggleSaveAddress,
+  onChangeSaveAddressName,
+  onConfirmSaveAddress,
+  savingAddress,
+}: {
+  recipient: string;
+  recipientError: string | undefined;
+  onChangeRecipient: (recipient: string) => void;
+  onBlurRecipient: () => void;
+  onOpenSavedAddresses: () => void;
+  /** True when the current recipient is already a saved contact or one of your own wallets. */
+  hideSaveOption: boolean;
+  showSaveAddress: boolean;
+  saveAddressName: string;
+  onToggleSaveAddress: () => void;
+  onChangeSaveAddressName: (name: string) => void;
+  onConfirmSaveAddress: () => void;
+  savingAddress: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-label font-semibold text-muted">To</span>
+        <button
+          type="button"
+          onClick={onOpenSavedAddresses}
+          className="text-label font-medium text-muted hover:text-foreground hover:underline"
+        >
+          Saved addresses
+        </button>
+      </div>
+      <textarea
+        rows={2}
+        value={recipient}
+        onChange={(event) => onChangeRecipient(event.target.value)}
+        onBlur={onBlurRecipient}
+        placeholder="Paste an address"
+        className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
+      />
+      {recipientError ? (
+        <div role="alert" className="text-label leading-snug text-warning">
+          {recipientError}
+        </div>
+      ) : null}
+      {!recipientError && recipientSchema.safeParse(recipient).success && !hideSaveOption ? (
+        <SaveAddressInline
+          expanded={showSaveAddress}
+          name={saveAddressName}
+          saving={savingAddress}
+          onToggle={onToggleSaveAddress}
+          onChangeName={onChangeSaveAddressName}
+          onConfirm={onConfirmSaveAddress}
+        />
+      ) : null}
     </div>
   );
 }
@@ -753,7 +800,7 @@ function ReviewStep({
   );
 }
 
-function ReviewRow({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
+export function ReviewRow({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 last:border-t last:pt-3">
       <span className="text-muted">{label}</span>
@@ -919,7 +966,7 @@ function SkeletonPickerRow() {
  * not initials in a circle, so an address looks the same wherever it's
  * shown across the extension.
  */
-function SavedAddressesStep({
+export function SavedAddressesStep({
   runtime,
   wallet,
   contacts,
@@ -1033,23 +1080,24 @@ function recentSendRecipients(activity: ActivityPage): string[] {
   return recipients;
 }
 
-function SuccessStep({
-  token,
-  step,
+/** "Signed and sent." with what was sent, the explorer link and "Save as contact". */
+export function SuccessStep({
+  summary,
+  txId,
   onDone,
   isSaved,
   onSaveAddress,
   saving,
 }: {
-  token: TokenBalance | null;
-  step: Extract<Step, { kind: "success" }>;
+  /** What went where, e.g. "1 AR to <address>". */
+  summary: string;
+  txId: string;
   onDone: () => void;
   /** Whether `step.recipient` is already a saved contact — hides "Save as contact" when true. */
   isSaved: boolean;
   onSaveAddress: (name: string) => void;
   saving: boolean;
 }) {
-  const ticker = tickerFor(token);
   const [showSave, setShowSave] = useState(false);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
@@ -1062,15 +1110,13 @@ function SuccessStep({
         </svg>
       </div>
       <h2 className="text-body text-foreground">Signed and sent.</h2>
-      <p className="-mt-2 text-label text-muted">
-        {formatAmount(step.amountAtomic, token)} {ticker} to {step.recipient}
-      </p>
+      <p className="-mt-2 break-words text-label text-muted">{summary}</p>
       <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted">
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
         <span>Pending confirmation</span>
       </div>
       <a
-        href={explorerUrlFor(step.txId)}
+        href={explorerUrlFor(txId)}
         target="_blank"
         rel="noopener noreferrer"
         className="-mt-1 text-label font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"

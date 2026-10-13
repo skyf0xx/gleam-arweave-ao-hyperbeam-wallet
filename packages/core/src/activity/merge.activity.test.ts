@@ -33,6 +33,16 @@ describe("mergeActivity", () => {
     expect(page.entries[0]?.status).toBe("confirmed");
   });
 
+  it("keeps a sent collectible's name and image once the gateway confirms it", () => {
+    const collectible = { id: "asset", name: "Beam #1", imageUrl: "https://arweave.net/asset" };
+    const local = [entry({ txId: "tx-1", timestamp: 100, status: "pending", amount: null, collectible })];
+    const gateway = [entry({ txId: "tx-1", timestamp: 200, status: "confirmed", amount: null, collectible: { id: "asset" } })];
+
+    const [merged] = mergeActivity(local, gateway, 10).entries;
+
+    expect(merged).toMatchObject({ status: "confirmed", timestamp: 200, collectible });
+  });
+
   it("keeps a local entry settled as failed even when the gateway reports it confirmed", () => {
     const local = [entry({ txId: "tx-1", timestamp: 100, status: "failed" })];
     const gateway = [entry({ txId: "tx-1", timestamp: 100, status: "confirmed" })];

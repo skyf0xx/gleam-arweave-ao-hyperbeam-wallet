@@ -1,4 +1,5 @@
 import type { ActivityEntry } from "../models/activity";
+import { COLLECTIBLE_TRANSFER_QUANTITY } from "../ao/collectible-transfer";
 
 /**
  * Minimal shape of the gateway's GraphQL transaction connection response
@@ -163,6 +164,19 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
   // upload, which the local log records as "upload".
   const isUpload = sent && !node.recipient && BigInt(node.quantity.winston || "0") === 0n;
   const type = isUpload ? "upload" : sent ? "send" : "receive";
+  const collectibleRecipient = sent && node.recipient ? collectibleTransferRecipient(node) : null;
+  if (collectibleRecipient !== null && node.recipient) {
+    return {
+      txId: node.id,
+      type: "send",
+      status: node.block ? "confirmed" : "pending",
+      address: collectibleRecipient,
+      amount: null,
+      tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+      timestamp: node.block ? node.block.timestamp * 1000 : 0,
+      collectible: { id: node.recipient },
+    };
+  }
   return {
     txId: node.id,
     type,
@@ -174,6 +188,21 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
   };
+}
+
+/**
+ * The recipient of a collectible send (`ao/collectible-transfer.ts`): a
+ * zero-AR transaction to the asset process whose lowercase tags name the
+ * transfer. Other wallets add their own tags, so extra tags are allowed.
+ * Only says the wallet asked for the transfer; the asset alone decides
+ * whether it moved.
+ */
+function collectibleTransferRecipient(node: GraphQLTransactionNode): string | null {
+  if (BigInt(node.quantity.winston || "0") !== 0n) return null;
+  const exact = (name: string) => node.tags.find((tag) => tag.name === name)?.value;
+  const recipient = exact("recipient");
+  if (exact("action") !== "transfer" || exact("quantity") !== COLLECTIBLE_TRANSFER_QUANTITY) return null;
+  return recipient !== undefined && /^[A-Za-z0-9_-]{43}$/.test(recipient) ? recipient : null;
 }
 
 /**

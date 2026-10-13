@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { explorerUrlFor, type Collectible, type PortfolioHistoryRange, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -206,6 +206,11 @@ function formatActivityAmount(entry: { amount: string | null; token?: string | n
 
   const ticker = match && match.ticker !== entry.token ? match.ticker : entry.token;
   return `${entry.amount} ${displayTicker(ticker)}`;
+}
+
+/** A gateway-only entry knows just the asset's process id. */
+function collectibleLabel(collectible: CollectibleRef): string {
+  return collectible.name ?? "Collectible";
 }
 
 /**
@@ -615,7 +620,7 @@ export function MainScreenView({
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}
-                    title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address, 6)}`}
+                    title={`${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`}
                     subtitle={
                       entry.status === "pending"
                         ? "Pending confirmation"
@@ -631,6 +636,11 @@ export function MainScreenView({
                         : "—"
                     }
                     amountTone={entry.type === "receive" ? "positive" : "neutral"}
+                    collectible={
+                      entry.collectible
+                        ? { name: collectibleLabel(entry.collectible), imageUrl: entry.collectible.imageUrl }
+                        : undefined
+                    }
                     pending={entry.status === "pending"}
                     onClick={() => openInExplorer(entry.txId)}
                   />

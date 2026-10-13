@@ -134,6 +134,39 @@ describe("queryActivityTransactions", () => {
     expect(entry).toMatchObject({ txId: "up", type: "upload", address: ADDRESS, amount: null });
   });
 
+  it("reads a collectible send as a send to the recipient in its tags, with the asset as its collectible", async () => {
+    const recipient = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
+    const fetchImpl = fakeSidedFetch(
+      [
+        edge({
+          id: "nft1",
+          ownerAddress: ADDRESS,
+          recipient: "assetProcess",
+          winston: "0",
+          timestamp: 100,
+          tags: [
+            { name: "App-Name", value: "Other wallet" },
+            { name: "action", value: "transfer" },
+            { name: "recipient", value: recipient },
+            { name: "quantity", value: "1" },
+          ],
+        }),
+      ],
+      [],
+    );
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry).toMatchObject({
+      txId: "nft1",
+      type: "send",
+      status: "confirmed",
+      address: recipient,
+      amount: null,
+      collectible: { id: "assetProcess" },
+    });
+  });
+
   it("keeps a self-send once, as a send", async () => {
     const self = edge({ id: "self", ownerAddress: ADDRESS, recipient: ADDRESS, winston: "3", timestamp: 1 });
     const fetchImpl = fakeSidedFetch([self], [self]);

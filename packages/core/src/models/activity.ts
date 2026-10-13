@@ -1,3 +1,5 @@
+import type { CollectibleRef } from "./collectible";
+
 export type ActivityType = "send" | "receive" | "upload";
 export type ActivityStatus = "pending" | "confirmed" | "failed";
 
@@ -33,6 +35,12 @@ export interface ActivityEntry {
    * one whose reason wasn't captured.
    */
   error?: string | null;
+  /**
+   * Set on a collectible send: an L1 transaction to the asset process that
+   * moves no AR, so the row shows the collectible instead of an amount.
+   * `address` is the recipient named in its tags, not the asset.
+   */
+  collectible?: CollectibleRef | null;
 }
 
 export interface ActivityPage {

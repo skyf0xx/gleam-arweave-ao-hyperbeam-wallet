@@ -79,6 +79,28 @@ const BATCH_PREVIEW: SigningApprovalPreview = {
 };
 
 describe("SigningApprovalScreen (6.2 signing approval)", () => {
+  it("shows a collectible send's thumbnail, name, recipient and network fee instead of an amount", () => {
+    render(
+      <SigningApprovalScreen
+        origin={WALLET_APPROVAL_ORIGIN}
+        preview={{
+          ...TRANSFER_PREVIEW,
+          kind: "transfer",
+          amount: "0",
+          fee: "654321",
+          collectible: { id: "asset", name: "Beam #1", imageUrl: "https://arweave.net/asset" },
+        }}
+        onReject={vi.fn()}
+        onSign={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Beam #1")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
+    expect(screen.getByText(TRANSFER_PREVIEW.recipient!)).toBeTruthy();
+    expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
+    expect(screen.queryByText("Total")).toBeNull();
+  });
+
   it("shows the full recipient address, never truncated", () => {
     render(
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,

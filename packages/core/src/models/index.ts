@@ -36,7 +36,8 @@ export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";
-export type { Collectible } from "./collectible";
+export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collectible";
+export { collectibleSendRefusal } from "./collectible";
 export type {
   TokenMetadata,
   TokenBalanceRequest,

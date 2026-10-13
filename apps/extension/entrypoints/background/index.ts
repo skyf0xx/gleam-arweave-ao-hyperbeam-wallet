@@ -103,7 +103,7 @@ const transfer: TransferHandler = new TransferHandler(storage, {
     const metadata = req.token === null ? {} : await resolveTokenDenominationAndTicker(await walletAddress(req.walletId), req.token);
     return approval.requestWalletTransfer({ ...req, ...metadata });
   },
-});
+}, reads);
 const upload = new UploadHandler(storage);
 const contacts = new ContactsHandler(storage);
 const approval: ApprovalHandler = new ApprovalHandler(
@@ -768,6 +768,8 @@ function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walle
 // actions
 onExtensionMessage("estimateTransfer", (message) => transfer.estimateTransfer(requireWalletId(message.data)));
 onExtensionMessage("submitTransfer", (message) => transfer.submitTransfer(requireWalletId(message.data)));
+onExtensionMessage("estimateCollectibleSend", (message) => transfer.estimateCollectibleSend(requireWalletId(message.data)));
+onExtensionMessage("sendCollectible", (message) => transfer.sendCollectible(requireWalletId(message.data)));
 onExtensionMessage("reviewUpload", (message) => upload.reviewUpload(message.data));
 onExtensionMessage("submitUpload", (message) => upload.submitUpload(requireWalletId(message.data)));
 

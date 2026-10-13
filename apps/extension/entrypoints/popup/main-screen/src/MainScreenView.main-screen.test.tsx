@@ -718,6 +718,45 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     await waitFor(() => expect(screen.getByText("-42 unkn…0000")).toBeTruthy());
   });
 
+  it("shows a collectible send as its name and thumbnail, not an amount", async () => {
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-nft",
+          type: "send",
+          address: "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno",
+          amount: null,
+          status: "pending",
+          tags: [],
+          timestamp: Date.now(),
+          token: null,
+          collectible: { id: "asset", name: "Beam #1", imageUrl: "https://arweave.net/asset" },
+        },
+        {
+          txId: "tx-nft-gateway",
+          type: "send",
+          address: "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno",
+          amount: null,
+          status: "confirmed",
+          tags: [],
+          timestamp: Date.now() - 1000,
+          collectible: { id: "asset-2" },
+        },
+      ],
+      cursor: null,
+    };
+    const send = sendWith({ activity });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getByText("Sent · Beam #1")).toBeTruthy());
+    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
+    expect(screen.getByText("Sent · Collectible")).toBeTruthy();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
   it("still labels a native AR activity entry AR", async () => {
     const activity: ActivityPage = {
       entries: [

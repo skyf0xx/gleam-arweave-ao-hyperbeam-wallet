@@ -1,4 +1,5 @@
 import { cn } from "../../primitives/cn";
+import { CollectibleThumbnail } from "./CollectibleThumbnail";
 
 /**
  * An activity-feed row, reused verbatim on the "all activity" list.
@@ -21,6 +22,8 @@ export interface ActivityRowProps {
   subtitle: string;
   amountLabel: string;
   amountTone?: "positive" | "neutral";
+  /** A collectible transfer shows the collectible's thumbnail where the amount would be. */
+  collectible?: { name: string; imageUrl?: string };
   pending?: boolean;
   onClick?: () => void;
   className?: string;
@@ -38,6 +41,7 @@ export function ActivityRow({
   subtitle,
   amountLabel,
   amountTone = "neutral",
+  collectible,
   pending = false,
   onClick,
   className,
@@ -67,11 +71,15 @@ export function ActivityRow({
           <div className="truncate text-label font-semibold text-foreground">{title}</div>
           <div className="text-caption text-muted">{subtitle}</div>
         </div>
-        <div className="flex-shrink-0 text-label font-semibold tabular-nums text-foreground">
-          <span className={amountTone === "positive" ? "text-positive" : undefined}>
-            {amountLabel}
-          </span>
-        </div>
+        {collectible ? (
+          <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-[30px] flex-shrink-0 rounded-md" />
+        ) : (
+          <div className="flex-shrink-0 text-label font-semibold tabular-nums text-foreground">
+            <span className={amountTone === "positive" ? "text-positive" : undefined}>
+              {amountLabel}
+            </span>
+          </div>
+        )}
       </div>
       {pending ? (
         <div

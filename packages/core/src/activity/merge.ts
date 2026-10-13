@@ -35,14 +35,18 @@ export function mergeActivity(
       continue;
     }
     const timestamp = settled.timestamp > 0 ? settled.timestamp : local.timestamp;
+    // The gateway only knows a sent collectible's process id; the local
+    // entry kept its name and image.
+    const collectible = local.collectible ?? settled.collectible;
+    const extra = collectible ? { timestamp, collectible } : { timestamp };
     if (local.status === "failed") {
-      byTxId.set(entry.txId, { ...settled, timestamp, status: "failed", error: local.error ?? settled.error });
+      byTxId.set(entry.txId, { ...settled, ...extra, status: "failed", error: local.error ?? settled.error });
     } else if (settled.status === "pending") {
       // Indexed but not yet in a block says nothing new; keep the local
       // status, which the CU result may already have settled.
       byTxId.set(entry.txId, { ...local, timestamp });
     } else {
-      byTxId.set(entry.txId, { ...settled, timestamp });
+      byTxId.set(entry.txId, { ...settled, ...extra });
     }
   }
 

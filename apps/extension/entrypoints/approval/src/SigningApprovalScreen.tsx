@@ -2,6 +2,7 @@ import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
@@ -176,7 +177,31 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
           </p>
         ) : null}
 
-        {isTransfer ? (
+        {isTransfer && preview.collectible ? (
+          <>
+            <div className="flex flex-col items-center gap-2 py-1 text-center">
+              <CollectibleThumbnail
+                name={preview.collectible.name ?? "Collectible"}
+                imageUrl={preview.collectible.imageUrl}
+                className="w-24"
+              />
+              <span className="break-words text-body font-semibold text-foreground">
+                {preview.collectible.name ?? truncateAddress(preview.collectible.id, 6)}
+              </span>
+            </div>
+
+            <RiskNotice>
+              <strong className="font-bold">This can&apos;t be undone.</strong> Double-check the recipient
+              before signing.
+            </RiskNotice>
+
+            <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
+
+            <div className="flex flex-col">
+              <ReviewRow label="Network fee" value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
+            </div>
+          </>
+        ) : isTransfer ? (
           <>
             <div className="flex flex-col items-center gap-1 py-1 text-center">
               <span className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">

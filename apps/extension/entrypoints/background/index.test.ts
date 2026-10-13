@@ -241,6 +241,17 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     ).toThrow(/not reachable from a web page/i);
   });
 
+  it("keeps the collectible send methods off the page: not via providerCall, not from a content script", () => {
+    for (const method of ["estimateCollectibleSend", "sendCollectible"]) {
+      expect(() => providerCall({ origin: "https://evil.example", method, params: {} })).toThrow(/not reachable from a web page/i);
+      const handler = rawHandlers.get(method);
+      expect(handler).toBeDefined();
+      expect(() => handler!({ data: {}, sender: contentSender("https://evil.example") })).toThrow(
+        /can only be called from the Gleam extension/,
+      );
+    }
+  });
+
   it("rejects a method name that isn't a real ProtocolMap key at all", () => {
     expect(() =>
       providerCall({ origin: "https://evil.example", method: "deleteWallet", params: {} }),

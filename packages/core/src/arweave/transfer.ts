@@ -8,6 +8,7 @@ import {
 } from "./transaction";
 import type { JWKInterface } from "../models/wallet";
 import type { Winston } from "../models/balance";
+import type { UploadTag } from "../models/upload";
 
 /**
  * This module's public functions accept an already-decrypted
@@ -53,21 +54,24 @@ export interface SubmittedTransfer {
 }
 
 /**
- * Builds the unsigned AR value transfer `ownerB64Url` will sign. Fetches
- * the anchor and the recipient-aware price from the gateway.
+ * Builds the unsigned, data-less transaction to `recipient` that
+ * `ownerB64Url` will sign: an AR value transfer, or with `tags` a message
+ * to a process that reads L1 (a collectible send). Fetches the anchor and
+ * the recipient-aware price from the gateway.
  */
 export async function prepareTransfer(
   gatewayUrl: string,
   ownerB64Url: string,
   recipient: string,
   amount: Winston,
+  tags: UploadTag[] = [],
 ): Promise<ArweaveTransactionJson> {
   // arweave-js decodes `target` with strict base64 and would otherwise
   // throw a bare "Invalid character" DOMException.
   if (!/^[A-Za-z0-9_-]{43}$/.test(recipient)) {
     throw new Error(`Transfer recipient must be an Arweave address (43 base64url characters), got "${recipient}".`);
   }
-  return buildUnsignedTransaction(gatewayUrl, ownerB64Url, { target: recipient, quantity: amount });
+  return buildUnsignedTransaction(gatewayUrl, ownerB64Url, { target: recipient, quantity: amount }, tags);
 }
 
 /** Applies `expectedOwner`'s signature to a `prepareTransfer` result and posts it. */

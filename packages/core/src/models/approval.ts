@@ -1,4 +1,5 @@
 import type { PermissionType } from "./permission";
+import type { CollectibleRef } from "./collectible";
 import type { HardwareDevice, HardwareWalletMethod } from "./wallet";
 
 export type ApprovalKind =
@@ -77,6 +78,8 @@ export interface SigningApprovalPreview {
   token: string | null;
   tokenDenomination: number | null;
   tokenTicker: string | null;
+  /** Set for a wallet `transfer` that sends this collectible; `amount` is then 0 AR. */
+  collectible?: CollectibleRef | null;
   decodedData: string | null;
   tags: Array<{ name: string; value: string }>;
   payloadHash: string;
@@ -154,6 +157,8 @@ export type DeviceSigningPayload =
 export type DeviceSigningSummary =
   | { kind: "transaction"; recipient: string | null; quantity: string; fee: string; dataSize: string }
   | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
+  /** A zero-AR L1 transaction whose tags move one collectible (`ao/collectible-transfer.ts`). */
+  | { kind: "collectibleTransfer"; asset: string; recipient: string; fee: string }
   | { kind: "dataItem"; target: string | null; dataSize: number }
   /** `text` is the message as UTF-8, or null when it isn't valid text. */
   | { kind: "message"; text: string | null; size: number };

@@ -30,6 +30,7 @@ import {
   PERMISSION_TYPES,
   WALLET_APPROVAL_ORIGIN,
   type AddTokenApprovalPreview,
+  type CollectibleRef,
   type ApprovalKind,
   type ApprovalPreview,
   type ApprovalRequest,
@@ -57,6 +58,7 @@ import {
   encodeTaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
 import { buildOwnershipTransaction, POINTS_PROOF_TAG } from "@gleam/core/src/points/index.ts";
+import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { getCachedKey, getStoredWallet, getWalletMethod } from "./key-session";
 import type { SubmitTransferRequest } from "./transfer";
 
@@ -187,6 +189,8 @@ export interface SigningRequestInput {
    * `SigningApprovalPreview.tokenTicker`'s own doc comment).
    */
   tokenTicker?: string | null;
+  /** A wallet `transfer` of this collectible: an L1 transaction to its process carrying the transfer tags. */
+  collectible?: CollectibleRef | null;
   /** Raw bytes this request will sign/encrypt/decrypt, for the payload hash and decoded preview. */
   payload: Uint8Array;
   tags?: Array<{ name: string; value: string }>;
@@ -392,7 +396,11 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
   }
   if (payload.kind === "transaction") {
-    const { target, quantity, reward, data_size } = payload.transaction;
+    const { target, quantity, reward, data_size, tags } = payload.transaction;
+    const collectible = readCollectibleTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
+    if (collectible) {
+      return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
+    }
     return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
@@ -497,6 +505,15 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
     case "transferAoTokens":
     case "transfer": {
       const [payload] = payloads;
+      if (input.collectible) {
+        checkTransaction(payload, {
+          target: input.collectible.id,
+          quantity: "0",
+          tags: collectibleTransferTags(input.recipient ?? ""),
+          data: new Uint8Array(),
+        });
+        return;
+      }
       if (input.token == null) {
         checkTransaction(payload, {
           target: input.recipient ?? "",
@@ -635,6 +652,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     token: input.token ?? null,
     tokenDenomination: input.tokenDenomination ?? null,
     tokenTicker: input.tokenTicker ?? null,
+    ...(input.collectible ? { collectible: input.collectible } : {}),
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
@@ -1204,6 +1222,7 @@ export class ApprovalHandler {
       amount: input.amount,
       fee: input.kind === "transfer" ? (input.fee ?? null) : null,
       walletId,
+      ...(input.kind === "transfer" && input.collectible ? { collectible: input.collectible } : {}),
     };
   }
 
@@ -1223,6 +1242,7 @@ export class ApprovalHandler {
       token: req.token,
       tokenDenomination: req.tokenDenomination ?? null,
       tokenTicker: req.tokenTicker ?? null,
+      collectible: req.collectible ?? null,
       payload: new Uint8Array(),
       tags: [],
     });

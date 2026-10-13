@@ -5,7 +5,7 @@ import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } f
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { CollectibleDetailView } from "@/entrypoints/popup/collectibles/index.tsx";
 import { MainScreenView, type MainScreenTab } from "@/entrypoints/popup/main-screen/index.tsx";
-import { SendView } from "@/entrypoints/popup/send/index.tsx";
+import { SendCollectibleView, SendView } from "@/entrypoints/popup/send/index.tsx";
 import { ReceiveView } from "@/entrypoints/popup/receive/index.tsx";
 import { WalletSwitcherView } from "@/entrypoints/popup/wallet-switcher/index.tsx";
 import { WalletDetailView } from "@/entrypoints/popup/wallet-detail/index.tsx";
@@ -95,6 +95,7 @@ type MainSubView =
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
   | { kind: "collectible"; collectible: Collectible }
+  | { kind: "send-collectible"; collectible: Collectible }
   | { kind: "points" }
   | { kind: "upload" }
   | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null };
@@ -242,8 +243,24 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       />
     );
   } else if (subView.kind === "collectible") {
-    // `onSend` is left out until the collectible send flow exists; the view hides Send without it.
-    content = <CollectibleDetailView collectible={subView.collectible} onBack={() => setSubView({ kind: "home" })} />;
+    content = (
+      <CollectibleDetailView
+        collectible={subView.collectible}
+        onBack={() => setSubView({ kind: "home" })}
+        onSend={(collectible) => setSubView({ kind: "send-collectible", collectible })}
+      />
+    );
+  } else if (subView.kind === "send-collectible") {
+    const { collectible } = subView;
+    content = (
+      <SendCollectibleView
+        runtime={runtime}
+        wallet={wallet}
+        collectible={collectible}
+        onBack={() => setSubView({ kind: "collectible", collectible })}
+        onDone={() => setSubView({ kind: "home" })}
+      />
+    );
   } else if (subView.kind === "points") {
     content = <PointsView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "receive") {

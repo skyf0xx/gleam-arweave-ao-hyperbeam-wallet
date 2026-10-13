@@ -1,4 +1,5 @@
 import type { Winston } from "./balance";
+import type { CollectibleRef } from "./collectible";
 
 /**
  * An in-progress send: recipient address, token, amount, computed fee.
@@ -17,6 +18,12 @@ export interface TransferDraft {
   amount: Winston;
   fee: Winston | null;
   walletId?: string;
+  /**
+   * Set for a collectible send, with `token: null` and `amount: "0"`: the
+   * L1 transaction goes to the asset process and carries the transfer in
+   * its tags (`core/ao/collectible-transfer.ts`).
+   */
+  collectible?: CollectibleRef | null;
 }
 
 /**

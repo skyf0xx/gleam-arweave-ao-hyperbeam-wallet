@@ -300,6 +300,21 @@ export class ReadsHandler {
     return run;
   }
 
+  /**
+   * Drops a collectible the wallet just sent from its cache. Its balance
+   * only moves once the asset process reads the L1 transaction, so a
+   * rediscovery right after the send would still list it.
+   */
+  async forgetCollectible(req: { address: string; id: string }): Promise<void> {
+    const key = `${COLLECTIBLES_KEY_PREFIX}${req.address}`;
+    const raw = await this.storage.get<unknown>(key);
+    if (!isCollectiblesCache(raw)) return;
+    await this.storage.set<CollectiblesCache>(key, {
+      ...raw,
+      collectibles: raw.collectibles.filter((collectible) => collectible.id !== req.id),
+    });
+  }
+
   async getWatchedTokens(req: { address: string }): Promise<string[]> {
     return this.loadWatchedProcessIds(req.address);
   }

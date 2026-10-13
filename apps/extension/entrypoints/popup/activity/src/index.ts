@@ -7,3 +7,4 @@ export {
   type SubmitTransferResult,
 } from "./useSubmitTransfer";
 export { validateSendAmount } from "./validateSendAmount";
+export { useSendCollectible } from "./useSendCollectible";

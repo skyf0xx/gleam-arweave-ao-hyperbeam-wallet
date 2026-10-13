@@ -5,6 +5,9 @@ import {
   submitTransfer as submitArweaveTransfer,
 } from "@gleam/core/src/arweave/transfer.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
+import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
+import { signTransactionWithJwk, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
+import { assertCoversNetworkFee, prepareCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import {
   finishTransfer as finishAoTransfer,
   prepareTransfer as prepareAoTransfer,
@@ -13,9 +16,11 @@ import {
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import {
   capabilityRefusal,
+  collectibleSendRefusal,
   DEFAULT_HYPERBEAM_PEER_URLS,
   isHardwareWalletMethod,
   type ActivityEntry,
+  type CollectibleSendDraft,
   type FeeEstimate,
   type JWKInterface,
   type NetworkSettings,
@@ -91,10 +96,16 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
   return typeof candidate.txId === "string" && typeof candidate.timestamp === "number";
 }
 
+/** The collectibles cache a sent collectible is dropped from; `ReadsHandler` behind the scenes. */
+export interface CollectibleCache {
+  forgetCollectible(req: { address: string; id: string }): Promise<void>;
+}
+
 export class TransferHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly approvals?: DeviceTransferApprovals,
+    private readonly collectibles?: CollectibleCache,
   ) {}
 
   private async loadNetworkSettings(): Promise<NetworkSettings> {
@@ -159,14 +170,7 @@ export class TransferHandler {
   async estimateTransfer(req: EstimateTransferRequest): Promise<FeeEstimate> {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
-
-    const [localLog, gatewayEntries] = await Promise.all([
-      this.loadActivityLog(wallet.address),
-      queryActivityTransactions(wallet.address, settings.gatewayUrl, FIRST_SEEN_LOOKUP_LIMIT).catch(
-        () => [],
-      ),
-    ]);
-    const firstSeenRecipient = isFirstSeenRecipient(req.recipient, localLog, gatewayEntries);
+    const firstSeenRecipient = await this.isFirstSeenRecipient(settings, wallet.address, req.recipient);
 
     if (req.token !== null) {
       return { fee: null, firstSeenRecipient };
@@ -174,6 +178,66 @@ export class TransferHandler {
 
     const { fee } = await estimateFee(settings.gatewayUrl, req.recipient);
     return { fee, firstSeenRecipient };
+  }
+
+  private async isFirstSeenRecipient(settings: NetworkSettings, address: string, recipient: string): Promise<boolean> {
+    const [localLog, gatewayEntries] = await Promise.all([
+      this.loadActivityLog(address),
+      queryActivityTransactions(address, settings.gatewayUrl, FIRST_SEEN_LOOKUP_LIMIT).catch(() => []),
+    ]);
+    return isFirstSeenRecipient(recipient, localLog, gatewayEntries);
+  }
+
+  /**
+   * The review step's quote for sending a collectible: the AR network
+   * reward for a data-less transaction to the asset process. Fails early
+   * when the wallet's AR can't pay it.
+   */
+  async estimateCollectibleSend(req: CollectibleSendDraft): Promise<FeeEstimate> {
+    const settings = await this.loadNetworkSettings();
+    const wallet = await this.loadWallet(req.walletId);
+    refuseCollectibleSend(wallet.address, req.recipient, req.collectible.id);
+    const [{ fee }, balance, firstSeenRecipient] = await Promise.all([
+      estimateFee(settings.gatewayUrl, req.collectible.id),
+      getArBalance(wallet.address, settings.gatewayUrl),
+      this.isFirstSeenRecipient(settings, wallet.address, req.recipient),
+    ]);
+    assertCoversNetworkFee(balance, fee);
+    return { fee, firstSeenRecipient };
+  }
+
+  /** Sends one collectible through `submitTransfer`, so a hardware wallet signs it in the approval window too. */
+  async sendCollectible(req: CollectibleSendDraft): Promise<{ txId: string }> {
+    return this.submitTransfer({
+      walletId: req.walletId,
+      recipient: req.recipient,
+      token: null,
+      amount: "0",
+      fee: null,
+      collectible: {
+        id: req.collectible.id,
+        ...(req.collectible.name !== undefined ? { name: req.collectible.name } : {}),
+        ...(req.collectible.imageUrl !== undefined ? { imageUrl: req.collectible.imageUrl } : {}),
+      },
+    });
+  }
+
+  /**
+   * Builds a collectible send and checks the wallet's AR covers the reward
+   * the gateway actually priced it at, before anything is signed.
+   */
+  private async prepareCollectibleSend(req: SubmitTransferRequest, ownerB64Url: string): Promise<ArweaveTransactionJson> {
+    const collectible = req.collectible;
+    if (!collectible) throw new Error("Not a collectible send.");
+    const settings = await this.loadNetworkSettings();
+    const wallet = await this.loadWallet(req.walletId);
+    refuseCollectibleSend(wallet.address, req.recipient, collectible.id);
+    const [transaction, balance] = await Promise.all([
+      prepareCollectibleTransfer(settings.gatewayUrl, ownerB64Url, collectible.id, req.recipient),
+      getArBalance(wallet.address, settings.gatewayUrl),
+    ]);
+    assertCoversNetworkFee(balance, transaction.reward);
+    return transaction;
   }
 
   /**
@@ -192,7 +256,15 @@ export class TransferHandler {
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
     const method = await getWalletMethod(req.walletId);
     // An AO send is a data item, which not every hardware wallet can sign.
-    const refusal = req.token !== null && method !== null ? capabilityRefusal(method, "signDataItem", "send AO tokens") : null;
+    // A collectible send is an L1 transaction.
+    const refusal =
+      method === null
+        ? null
+        : req.collectible
+          ? capabilityRefusal(method, "signTransaction", "send collectibles")
+          : req.token !== null
+            ? capabilityRefusal(method, "signDataItem", "send AO tokens")
+            : null;
     if (refusal) throw new Error(refusal);
     if (method !== null && isHardwareWalletMethod(method)) {
       if (!this.approvals) throw new Error("Hardware wallet sends aren't wired to the approval window.");
@@ -204,7 +276,10 @@ export class TransferHandler {
 
     let txId: string;
     try {
-      if (req.token === null) {
+      if (req.collectible) {
+        const unsigned = await this.prepareCollectibleSend(req, jwk.n);
+        ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n));
+      } else if (req.token === null) {
         ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount));
       } else {
         const { messageId } = await submitAoTransfer(jwk, req.token, req.recipient, req.amount);
@@ -216,7 +291,7 @@ export class TransferHandler {
       // (popup, or a connected dApp's approval flow) surfaces the error
       // message — without this, the full error/stack is only ever visible
       // by opening this worker's own devtools at the moment of failure.
-      console.error(`submitTransfer failed (token=${req.token ?? "AR"}):`, error);
+      console.error(`submitTransfer failed (${describeSend(req)}):`, error);
       throw error;
     }
 
@@ -225,20 +300,27 @@ export class TransferHandler {
   }
 
   private async recordSend(address: string, req: SubmitTransferRequest, txId: string): Promise<void> {
+    // A collectible send settles like an AR send, through the gateway
+    // index, so it carries no `token` for the AO result check to read.
     await this.appendActivityLog(address, {
       txId,
       type: "send",
       status: "pending",
       address: req.recipient,
-      amount: req.amount,
+      amount: req.collectible ? null : req.amount,
       tags: [],
       timestamp: Date.now(),
-      token: req.token,
+      token: req.collectible ? null : req.token,
+      ...(req.collectible ? { collectible: req.collectible } : {}),
     });
+    if (req.collectible) await this.collectibles?.forgetCollectible({ address, id: req.collectible.id });
   }
 
-  /** The unsigned AR transaction or AO `Transfer` item `ownerB64Url` signs on its device. */
+  /** The unsigned AR transaction, collectible send or AO `Transfer` item `ownerB64Url` signs on its device. */
   async prepareDeviceTransfer(req: SubmitTransferRequest, ownerB64Url: string): Promise<UnsignedPayload> {
+    if (req.collectible) {
+      return { kind: "transaction", transaction: await this.prepareCollectibleSend(req, ownerB64Url) };
+    }
     if (req.token === null) {
       const settings = await this.loadNetworkSettings();
       const transaction = await prepareArweaveTransfer(settings.gatewayUrl, ownerB64Url, req.recipient, req.amount);
@@ -266,10 +348,19 @@ export class TransferHandler {
         throw new Error("A transfer can't finish with a message signature.");
       }
     } catch (error) {
-      console.error(`Device transfer failed (token=${req.token ?? "AR"}):`, error);
+      console.error(`Device transfer failed (${describeSend(req)}):`, error);
       throw error;
     }
     await this.recordSend(wallet.address, req, txId);
     return { txId };
   }
+}
+
+function refuseCollectibleSend(sender: string, recipient: string, assetId: string): void {
+  const refusal = collectibleSendRefusal({ sender, recipient, assetId });
+  if (refusal) throw new Error(refusal);
+}
+
+function describeSend(req: SubmitTransferRequest): string {
+  return req.collectible ? `collectible=${req.collectible.id}` : `token=${req.token ?? "AR"}`;
 }
