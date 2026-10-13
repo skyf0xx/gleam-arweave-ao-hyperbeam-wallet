@@ -14,6 +14,7 @@ overrides:
   source-map-js: ^1.2.2
   shell-quote: ^1.11.0
   pbkdf2: ^3.1.7
+  '@keystonehq/bc-ur-registry-arweave>uuid': ^11.1.1
 
 importers:
 
@@ -4180,9 +4181,8 @@ packages:
   util@0.12.5:
     resolution: {integrity: sha512-kZf/K6hEIrWHI6XqOFUiiMa+79wE/D8Q+NCNAWclkyg3b4d2k7s0QGepNjiABc+aR3N1PAyHL7p6UcLY6LmrnA==}
 
-  uuid@8.3.2:
-    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+  uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
 
   vite-plugin-node-polyfills@0.28.0:
@@ -5141,7 +5141,7 @@ snapshots:
   '@keystonehq/bc-ur-registry-arweave@0.1.6':
     dependencies:
       '@keystonehq/bc-ur-registry': 0.5.4
-      uuid: 8.3.2
+      uuid: 11.1.1
 
   '@keystonehq/bc-ur-registry@0.5.4':
     dependencies:
@@ -8790,7 +8790,7 @@ snapshots:
       is-typed-array: 1.1.15
       which-typed-array: 1.1.22
 
-  uuid@8.3.2: {}
+  uuid@11.1.1: {}
 
   vite-plugin-node-polyfills@0.28.0(rollup@4.63.2)(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)):
     dependencies:

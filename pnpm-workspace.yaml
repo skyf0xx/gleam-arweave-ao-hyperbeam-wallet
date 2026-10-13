@@ -16,3 +16,4 @@ overrides:
   source-map-js: ^1.2.2
   shell-quote: ^1.11.0
   pbkdf2: ^3.1.7
+  "@keystonehq/bc-ur-registry-arweave>uuid": ^11.1.1
