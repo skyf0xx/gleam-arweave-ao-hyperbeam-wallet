@@ -15,6 +15,7 @@ playwright-report/
 POINTS.md
 todo.md
 LEDGER_INSTALLER.md
+LAUNCH.md
 
 .env
 .playwright-mcp

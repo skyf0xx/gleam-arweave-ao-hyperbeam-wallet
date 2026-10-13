@@ -9,7 +9,7 @@ approval window with a decoded preview.
 permawebOS, a working wallet we reverse-engineered, is at
 `~/Downloads/permawebOS/` (minified). Check it when a protocol detail is
 unclear. Visual design rules are in `DESIGN.md`. Remaining work is in
-`todo.md`.
+`todo.md`, and the Gleam Points launch steps are in `LAUNCH.md`.
 
 ## Stack
 
