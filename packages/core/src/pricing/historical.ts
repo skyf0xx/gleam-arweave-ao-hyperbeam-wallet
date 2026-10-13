@@ -150,8 +150,11 @@ export async function getHistoricalUsdPricesWithFallback(
 
 /**
  * Builds a `priceAt` callback from a fetched series by locating the
- * nearest point at-or-before the requested timestamp. A timestamp with
- * no covering data resolves to `0`, never a thrown error.
+ * nearest point at-or-before the requested timestamp. A timestamp before
+ * the series starts takes the earliest price: each coin's series starts
+ * at a slightly different instant, and pricing the gap at `0` dropped
+ * that token from the chart's first point, inflating the period's
+ * %-change by orders of magnitude. Only an empty series resolves to `0`.
  */
 export function buildPriceAtFromSeries(series: HistoricalPricePoint[]): (timestamp: number) => number {
   const sorted = [...series].sort((a, b) => a.timestamp - b.timestamp);
@@ -165,6 +168,6 @@ export function buildPriceAtFromSeries(series: HistoricalPricePoint[]): (timesta
         break;
       }
     }
-    return nearest?.usd ?? 0;
+    return (nearest ?? sorted[0])?.usd ?? 0;
   };
 }

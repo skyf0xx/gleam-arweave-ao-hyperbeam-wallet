@@ -118,12 +118,26 @@ describe("buildPriceAtFromSeries", () => {
     expect(priceAt(3000)).toBe(20);
   });
 
-  it("returns 0 for a timestamp before the series starts or an empty series", () => {
-    const priceAt = buildPriceAtFromSeries([{ timestamp: 2000, usd: 20 }]);
-    expect(priceAt(500)).toBe(0);
+  it("uses the earliest price for a timestamp before the series starts", () => {
+    const priceAt = buildPriceAtFromSeries([
+      { timestamp: 3000, usd: 30 },
+      { timestamp: 2000, usd: 20 },
+    ]);
+    expect(priceAt(500)).toBe(20);
+  });
 
+  it("returns 0 for an empty series", () => {
     const emptyPriceAt = buildPriceAtFromSeries([]);
     expect(emptyPriceAt(1000)).toBe(0);
+  });
+
+  it("keeps a token whose series starts after the timeline's first point in that point's total", () => {
+    // AR's series sets the timeline; AO's starts a few seconds later.
+    const ar = { balance: 1, priceAt: buildPriceAtFromSeries([{ timestamp: 1000, usd: 1 }, { timestamp: 2000, usd: 1 }]) };
+    const ao = { balance: 1, priceAt: buildPriceAtFromSeries([{ timestamp: 1005, usd: 9 }, { timestamp: 2000, usd: 9 }]) };
+    const first = estimateHistoricalPortfolioValue([ar, ao], 1000);
+    const last = estimateHistoricalPortfolioValue([ar, ao], 2000);
+    expect(first).toBe(last);
   });
 });
 
