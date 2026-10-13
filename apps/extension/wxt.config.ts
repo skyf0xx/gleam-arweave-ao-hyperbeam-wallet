@@ -73,12 +73,12 @@ export default defineConfig({
   vite: () => ({
     plugins: [
       tailwindcss(),
-      // @dha-team/arbundles's browser build (arbundles/web) still
-      // statically imports Node's crypto/stream/events in a few internal
-      // files (deepHash.js, DataItem.js, Bundle.js) even though its own
-      // runtime logic uses WebCrypto — polyfilling those three modules is
-      // what actually lets it bundle for a service worker/browser target.
-      nodePolyfills({ include: ['crypto', 'stream', 'events'] }),
+      // The Keystone UR registry hashes through bs58check → create-hash →
+      // cipher-base, which subclasses stream.Transform at import time, so
+      // Keystone pages need `stream` (and the `events` it builds on). The
+      // plugin's default globals also supply the `Buffer` those libraries
+      // and keystone/sign-request.ts use.
+      nodePolyfills({ include: ['stream', 'events'] }),
     ],
     build: {
       // Extension pages are same-origin and load in milliseconds; Vite's
