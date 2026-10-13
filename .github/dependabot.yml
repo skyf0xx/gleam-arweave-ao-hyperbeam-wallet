@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # Hold new releases back a week so a hijacked version is usually pulled
+    # before Dependabot proposes it (and auto-merge ships it).
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     groups:
       # Bundler, extension framework and their plugins arrive together in a
@@ -33,5 +37,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore(ci)
