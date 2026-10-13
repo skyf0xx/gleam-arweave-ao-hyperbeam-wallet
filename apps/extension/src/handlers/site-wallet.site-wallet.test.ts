@@ -79,6 +79,7 @@ describe("SiteWalletHandler", () => {
       favIconUrl: null,
       otherWallet: "Wander",
       otherWalletUsedAt: null,
+      otherWalletPermissions: [],
       grant: null,
       usesGleam: false,
       suggestionDismissed: false,
@@ -96,6 +97,23 @@ describe("SiteWalletHandler", () => {
 
     await sites.report(7, "https://other.example", { walletName: "Wander", used: false });
     expect((await sites.activeSite({ id: 7, url: "https://other.example" }))?.otherWalletUsedAt).toBeNull();
+  });
+
+  it("records the permissions the page asked the other wallet for, keeping only known ones", async () => {
+    const sites = handler();
+    await sites.report(7, ORIGIN, {
+      walletName: "Wander",
+      used: true,
+      permissions: ["ACCESS_ADDRESS", "SIGNATURE", "SIGNATURE", "MAKE_ME_RICH", 42],
+    });
+    expect((await sites.activeSite({ id: 7, url: ORIGIN }))?.otherWalletPermissions).toEqual(["ACCESS_ADDRESS", "SIGNATURE"]);
+
+    // A later report without permissions, as on a reload, keeps them.
+    await sites.report(7, ORIGIN, { walletName: "Wander", used: false });
+    expect((await sites.activeSite({ id: 7, url: ORIGIN }))?.otherWalletPermissions).toEqual(["ACCESS_ADDRESS", "SIGNATURE"]);
+
+    await sites.report(7, "https://other.example", { walletName: "Wander", used: true });
+    expect((await sites.activeSite({ id: 7, url: "https://other.example" }))?.otherWalletPermissions).toEqual([]);
   });
 
   it("doesn't carry a report over to a different site in the same tab", async () => {

@@ -5,6 +5,8 @@ export interface SiteCard {
   kind: "suggest" | "active";
   origin: string;
   favIconUrl: string | null;
+  /** What the site asked the other wallet for, to preselect in "Use Gleam here". */
+  requestedPermissions: PermissionType[];
 }
 
 /**
@@ -13,7 +15,7 @@ export interface SiteCard {
  */
 export function siteCardFor(site: ActiveSite | null | undefined): SiteCard | null {
   if (!site || site.otherWallet === null) return null;
-  const card = { origin: site.origin, favIconUrl: site.favIconUrl };
+  const card = { origin: site.origin, favIconUrl: site.favIconUrl, requestedPermissions: site.otherWalletPermissions };
   if (site.usesGleam) return { kind: "active", ...card };
   if (site.otherWalletUsedAt === null || site.suggestionDismissed) return null;
   return { kind: "suggest", ...card };
@@ -40,8 +42,9 @@ export interface PermissionGroup {
 /**
  * What "Use Gleam here" can grant, in the same plain words as the
  * approval window's connect screen. The defaults cover what most dApps
- * ask for. A dApp that later asks for more gets a normal connect prompt
- * for the rest.
+ * ask for, and apply only when Gleam hasn't seen what this site asks for
+ * (`initialGroupIds`). A dApp that later asks for more gets a normal
+ * connect prompt for the rest.
  */
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
@@ -86,4 +89,18 @@ export function permissionsFor(enabledGroupIds: ReadonlySet<string>): Permission
   return PERMISSION_GROUPS.filter((group) => group.required || enabledGroupIds.has(group.id)).flatMap(
     (group) => group.permissions,
   );
+}
+
+/**
+ * The groups that start switched on: each one covering a permission the
+ * site asked the other wallet for, or the defaults when that's unknown.
+ * Without them, a site such as ArDrive finds a permission missing,
+ * disconnects and asks again.
+ */
+export function initialGroupIds(requested: readonly PermissionType[]): Set<string> {
+  const groups =
+    requested.length > 0
+      ? PERMISSION_GROUPS.filter((group) => group.permissions.some((permission) => requested.includes(permission)))
+      : PERMISSION_GROUPS.filter((group) => group.defaultOn);
+  return new Set(groups.map((group) => group.id));
 }

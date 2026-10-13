@@ -68,8 +68,14 @@ function isOtherWalletEnvelope(value: unknown): value is PageOtherWalletEnvelope
     typeof value === "object" &&
     (value as PageMessageEnvelope).type === OTHER_WALLET &&
     typeof (value as PageOtherWalletEnvelope).walletName === "string" &&
-    typeof (value as PageOtherWalletEnvelope).used === "boolean"
+    typeof (value as PageOtherWalletEnvelope).used === "boolean" &&
+    ((value as PageOtherWalletEnvelope).permissions === undefined ||
+      isStringArray((value as PageOtherWalletEnvelope).permissions))
   );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
 async function relay(envelope: PageRequestEnvelope): Promise<void> {
@@ -106,6 +112,9 @@ export default defineContentScript({
     let modeAsked = false;
     let presenceRelayed = false;
     let useRelayed = false;
+    // Permissions can change on a page (connect after getPermissions), so
+    // each distinct list goes through once.
+    let permissionsRelayed = "";
 
     // Listeners go first: the provider reports another wallet while it
     // installs, before injectScript resolves.
@@ -124,6 +133,13 @@ export default defineContentScript({
           // shouldn't wait for one.
           () => postSiteMode(false),
         );
+      } else if (isOtherWalletEnvelope(data) && data.permissions !== undefined) {
+        const key = data.permissions.join(",");
+        if (key === permissionsRelayed) return;
+        permissionsRelayed = key;
+        messenger
+          .sendMessage("reportOtherWallet", { walletName: data.walletName, used: true, permissions: data.permissions })
+          .catch(() => undefined);
       } else if (isOtherWalletEnvelope(data) && !(data.used ? useRelayed : presenceRelayed)) {
         presenceRelayed = true;
         if (data.used) useRelayed = true;

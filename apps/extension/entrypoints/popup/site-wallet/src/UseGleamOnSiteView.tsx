@@ -1,15 +1,17 @@
 import { useState } from "react";
-import type { RuntimePort } from "@gleam/core";
+import type { PermissionType, RuntimePort } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SiteIcon } from "./SiteWalletCard";
-import { PERMISSION_GROUPS, hostnameOf, permissionsFor } from "./site-card";
+import { PERMISSION_GROUPS, hostnameOf, initialGroupIds, permissionsFor } from "./site-card";
 import { useUseGleamOnSite } from "./useActiveSite";
 
 export interface UseGleamOnSiteViewProps {
   runtime: RuntimePort;
   origin: string;
   favIconUrl: string | null;
+  /** What the site asked the other wallet for. Those groups start on in place of the defaults. */
+  requestedPermissions?: readonly PermissionType[];
   onBack: () => void;
   onDone: () => void;
 }
@@ -19,11 +21,16 @@ export interface UseGleamOnSiteViewProps {
  * The user is already looking at Gleam, so this grants directly instead of
  * opening an approval window. Signing requests still open one each.
  */
-export function UseGleamOnSiteView({ runtime, origin, favIconUrl, onBack, onDone }: UseGleamOnSiteViewProps) {
+export function UseGleamOnSiteView({
+  runtime,
+  origin,
+  favIconUrl,
+  requestedPermissions = [],
+  onBack,
+  onDone,
+}: UseGleamOnSiteViewProps) {
   const host = hostnameOf(origin);
-  const [enabled, setEnabled] = useState<ReadonlySet<string>>(
-    () => new Set(PERMISSION_GROUPS.filter((group) => group.defaultOn).map((group) => group.id)),
-  );
+  const [enabled, setEnabled] = useState<ReadonlySet<string>>(() => initialGroupIds(requestedPermissions));
   const useGleam = useUseGleamOnSite(runtime);
 
   const toggle = (id: string) =>

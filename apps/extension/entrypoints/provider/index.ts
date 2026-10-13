@@ -408,6 +408,8 @@ function install(): () => void {
   let dispatching = false;
   let reportedPresence = false;
   let reportedUse = false;
+  // The last permission list reported, joined, so each change is sent once.
+  let reportedPermissions = "";
   let modeTimeout: ReturnType<typeof setTimeout> | undefined;
   let settleTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -430,14 +432,26 @@ function install(): () => void {
     for (const resolve of ready) resolve();
   };
 
+  const nameOf = (wallet: WalletLike): string =>
+    wallet === walletWindow.permawebConnect ? "PermawebOS" : typeof wallet.walletName === "string" ? wallet.walletName : "";
+
   const report = (used: boolean): void => {
     const wallet = other();
     if (!wallet || (used ? reportedUse : reportedPresence)) return;
     reportedPresence = true;
     if (used) reportedUse = true;
-    const walletName =
-      wallet === walletWindow.permawebConnect ? "PermawebOS" : typeof wallet.walletName === "string" ? wallet.walletName : "";
-    const envelope: PageOtherWalletEnvelope = { type: OTHER_WALLET, walletName, used };
+    const envelope: PageOtherWalletEnvelope = { type: OTHER_WALLET, walletName: nameOf(wallet), used };
+    window.postMessage(envelope, location.origin);
+  };
+
+  const reportPermissions = (value: unknown): void => {
+    const wallet = other();
+    if (!wallet || !Array.isArray(value)) return;
+    const permissions = value.filter((permission): permission is string => typeof permission === "string");
+    const key = permissions.join(",");
+    if (permissions.length === 0 || key === reportedPermissions) return;
+    reportedPermissions = key;
+    const envelope: PageOtherWalletEnvelope = { type: OTHER_WALLET, walletName: nameOf(wallet), used: true, permissions };
     window.postMessage(envelope, location.origin);
   };
 
@@ -481,8 +495,14 @@ function install(): () => void {
     // Only a wallet API call counts as the site using the wallet. Any script
     // can call `toString` or poke the other wallet's own helpers, and the
     // popup would then offer Gleam on pages that never touch a wallet.
-    if (wallet !== gleam && isSurfaceMethod(prop)) report(true);
-    return (method as (...rest: unknown[]) => unknown).apply(wallet, args);
+    const forwarded = wallet !== gleam && isSurfaceMethod(prop);
+    if (forwarded) report(true);
+    if (forwarded && prop === "connect") reportPermissions(args[0]);
+    const result = (method as (...rest: unknown[]) => unknown).apply(wallet, args);
+    if (forwarded && prop === "getPermissions") {
+      Promise.resolve(result).then(reportPermissions, () => undefined);
+    }
+    return result;
   };
 
   // One function per name, so a dApp that cached `arweaveWallet.connect`

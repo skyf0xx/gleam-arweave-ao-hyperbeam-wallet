@@ -673,6 +673,21 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     ]);
   });
 
+  it("reports the permissions the page asks the other wallet for, or reads from it", async () => {
+    const other = { ...wander(), getPermissions: vi.fn().mockResolvedValue(["ACCESS_ADDRESS"]) };
+    installOther(other);
+    teardown = install();
+    sendSiteMode(false);
+    await expect((current()!.getPermissions as () => Promise<unknown>)()).resolves.toEqual(["ACCESS_ADDRESS"]);
+    await current()!.connect!(["ACCESS_ADDRESS", "SIGNATURE"], { name: "ArDrive" });
+    await current()!.connect!(["ACCESS_ADDRESS", "SIGNATURE"]);
+
+    expect(otherWalletReports().filter((report: object) => "permissions" in report)).toEqual([
+      { type: OTHER_WALLET, walletName: "Wander", used: true, permissions: ["ACCESS_ADDRESS"] },
+      { type: OTHER_WALLET, walletName: "Wander", used: true, permissions: ["ACCESS_ADDRESS", "SIGNATURE"] },
+    ]);
+  });
+
   it("doesn't count a call outside the wallet API as use", () => {
     const other = { ...wander(), helper: vi.fn() };
     installOther(other);

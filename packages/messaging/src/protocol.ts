@@ -279,7 +279,7 @@ export interface ProtocolMap {
    */
   getSiteWalletMode(): { useGleam: boolean };
   /** Content script only. Relays a `PageOtherWalletEnvelope` for the sending tab. */
-  reportOtherWallet(req: { walletName: string; used: boolean }): void;
+  reportOtherWallet(req: { walletName: string; used: boolean; permissions?: string[] }): void;
   /** Background → content-script push when a site's grant comes or goes. */
   siteWalletMode(req: { useGleam: boolean }): void;
 

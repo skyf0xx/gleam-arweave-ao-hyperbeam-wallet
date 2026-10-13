@@ -213,6 +213,29 @@ describe("content.ts: page <-> background relay", () => {
     expect(sendMessage).toHaveBeenCalledWith("reportOtherWallet", { walletName: "Wander", used: true });
   });
 
+  it("relays each distinct permission list the page reports once", async () => {
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: true });
+    postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: true, permissions: ["ACCESS_ADDRESS"] });
+    postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: true, permissions: ["ACCESS_ADDRESS"] });
+    postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: true, permissions: ["ACCESS_ADDRESS", "SIGNATURE"] });
+    postPageRequest({ type: OTHER_WALLET, walletName: "Wander", used: true, permissions: [42] });
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(3));
+    expect(sendMessage).toHaveBeenCalledWith("reportOtherWallet", {
+      walletName: "Wander",
+      used: true,
+      permissions: ["ACCESS_ADDRESS"],
+    });
+    expect(sendMessage).toHaveBeenCalledWith("reportOtherWallet", {
+      walletName: "Wander",
+      used: true,
+      permissions: ["ACCESS_ADDRESS", "SIGNATURE"],
+    });
+  });
+
   it("relays the background's siteWalletMode push to the page", async () => {
     const spy = siteModeSpy();
     const contentScript = (await import("./index")).default;

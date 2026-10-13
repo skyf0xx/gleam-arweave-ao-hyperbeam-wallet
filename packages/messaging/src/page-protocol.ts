@@ -270,11 +270,18 @@ export interface PageSiteModeEnvelope {
  * site. Taking the offer is still the user's choice, made in the popup
  * with the permissions spelled out, and every signature still opens its
  * own approval window.
+ *
+ * `permissions` comes with a use when the page asks the other wallet to
+ * `connect`, or reads what it already holds with `getPermissions`. "Use
+ * Gleam here" preselects those, so the site doesn't find a permission
+ * missing and ask for a second connect. A forged list only changes which
+ * switches start on.
  */
 export interface PageOtherWalletEnvelope {
   type: typeof OTHER_WALLET;
   walletName: string;
   used: boolean;
+  permissions?: string[];
 }
 
 export type PageMessageEnvelope =

@@ -1,4 +1,11 @@
-import { UNKNOWN_WALLET_NAME, type ActiveSite, type Grant, type StoragePort } from "@gleam/core";
+import {
+  PERMISSION_TYPES,
+  UNKNOWN_WALLET_NAME,
+  type ActiveSite,
+  type Grant,
+  type PermissionType,
+  type StoragePort,
+} from "@gleam/core";
 
 /**
  * One `SeenOtherWallet` per tab, so tabs reporting at once never overwrite
@@ -24,6 +31,7 @@ interface SeenOtherWallet {
   origin: string;
   walletName: string;
   usedAt: number | null;
+  permissions?: PermissionType[];
 }
 
 export interface SiteTab {
@@ -57,6 +65,12 @@ function safeFavIconUrl(raw: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function knownPermissions(raw: unknown): PermissionType[] {
+  if (!Array.isArray(raw)) return [];
+  const known = raw.filter((entry): entry is PermissionType => (PERMISSION_TYPES as readonly unknown[]).includes(entry));
+  return [...new Set(known)];
 }
 
 export function displayWalletName(raw: string): string {
@@ -110,14 +124,20 @@ export class SiteWalletHandler {
   }
 
   /** A use stays recorded across reloads of the same origin, and clears on navigating elsewhere. */
-  async report(tabId: number, origin: string, req: { walletName: unknown; used: unknown }): Promise<void> {
+  async report(
+    tabId: number,
+    origin: string,
+    req: { walletName: unknown; used: unknown; permissions?: unknown },
+  ): Promise<void> {
     if (typeof req.walletName !== "string" || typeof req.used !== "boolean") return;
     const previous = await this.loadSeen(tabId);
-    const earlierUse = previous?.origin === origin ? previous.usedAt : null;
+    const sameSite = previous?.origin === origin;
+    const permissions = knownPermissions(req.permissions);
     const seen: SeenOtherWallet = {
       origin,
       walletName: displayWalletName(req.walletName),
-      usedAt: req.used ? this.now() : earlierUse,
+      usedAt: req.used ? this.now() : sameSite ? previous.usedAt : null,
+      permissions: permissions.length > 0 ? permissions : sameSite ? knownPermissions(previous.permissions) : [],
     };
     await this.deps.storage.set(otherWalletKey(tabId), seen);
   }
@@ -136,6 +156,7 @@ export class SiteWalletHandler {
       favIconUrl: safeFavIconUrl(tab?.favIconUrl),
       otherWallet: current?.walletName ?? null,
       otherWalletUsedAt: current?.usedAt ?? null,
+      otherWalletPermissions: knownPermissions(current?.permissions),
       ...(await this.usesGleam(origin)),
       suggestionDismissed: (await this.loadOrigins(SUGGESTIONS_DISMISSED_KEY)).includes(origin),
     };

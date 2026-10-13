@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RuntimePort } from "@gleam/core";
+import type { PermissionType, RuntimePort } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
@@ -8,7 +8,7 @@ import { useActiveSite, useDismissSiteSuggestion, useStopGleamOnSite } from "./u
 
 export interface SiteWalletCardProps {
   runtime: RuntimePort;
-  onUseGleam: (site: { origin: string; favIconUrl: string | null }) => void;
+  onUseGleam: (site: { origin: string; favIconUrl: string | null; requestedPermissions: PermissionType[] }) => void;
 }
 
 /**
@@ -58,7 +58,9 @@ export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
           size="sm"
           variant="secondary"
           className="border-[0.5px]"
-          onClick={() => onUseGleam({ origin: card.origin, favIconUrl: card.favIconUrl })}
+          onClick={() =>
+            onUseGleam({ origin: card.origin, favIconUrl: card.favIconUrl, requestedPermissions: card.requestedPermissions })
+          }
         >
           Use Gleam here
         </Button>

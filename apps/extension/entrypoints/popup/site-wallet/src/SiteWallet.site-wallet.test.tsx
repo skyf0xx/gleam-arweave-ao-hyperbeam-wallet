@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { ActiveSite, Grant, RuntimePort } from "@gleam/core";
 import { SiteWalletCard } from "./SiteWalletCard";
 import { UseGleamOnSiteView } from "./UseGleamOnSiteView";
-import { siteCardFor } from "./site-card";
+import { initialGroupIds, siteCardFor } from "./site-card";
 
 afterEach(() => {
   cleanup();
@@ -27,6 +27,7 @@ function site(overrides: Partial<ActiveSite> = {}): ActiveSite {
     favIconUrl: null,
     otherWallet: "Wander",
     otherWalletUsedAt: 1_000,
+    otherWalletPermissions: [],
     grant: null,
     usesGleam: false,
     suggestionDismissed: false,
@@ -49,7 +50,7 @@ function wrap(children: ReactNode) {
 
 describe("siteCardFor", () => {
   it("suggests Gleam once the page has used the other wallet", () => {
-    expect(siteCardFor(site())).toEqual({ kind: "suggest", origin: ORIGIN, favIconUrl: null });
+    expect(siteCardFor(site())).toEqual({ kind: "suggest", origin: ORIGIN, favIconUrl: null, requestedPermissions: [] });
   });
 
   it("stays quiet on a page that has another wallet but never called it", () => {
@@ -67,20 +68,25 @@ describe("siteCardFor", () => {
       kind: "active",
       origin: ORIGIN,
       favIconUrl: null,
+      requestedPermissions: [],
     });
   });
 });
 
 describe("SiteWalletCard", () => {
   it("offers Gleam on a site using another wallet, without naming that wallet", async () => {
-    const { runtime } = runtimeWith({ getActiveSite: site() });
+    const { runtime } = runtimeWith({ getActiveSite: site({ otherWalletPermissions: ["ACCESS_ADDRESS", "SIGNATURE"] }) });
     const onUseGleam = vi.fn();
     const { container } = render(wrap(<SiteWalletCard runtime={runtime} onUseGleam={onUseGleam} />));
 
     await waitFor(() => expect(screen.getByText("bazar.arweave.net")).toBeTruthy());
     expect(container.textContent).not.toMatch(/Wander/);
     fireEvent.click(screen.getByRole("button", { name: "Use Gleam here" }));
-    expect(onUseGleam).toHaveBeenCalledWith({ origin: ORIGIN, favIconUrl: null });
+    expect(onUseGleam).toHaveBeenCalledWith({
+      origin: ORIGIN,
+      favIconUrl: null,
+      requestedPermissions: ["ACCESS_ADDRESS", "SIGNATURE"],
+    });
   });
 
   it("shows the site's favicon, and its first letter when the favicon fails to load", async () => {
@@ -122,7 +128,46 @@ describe("SiteWalletCard", () => {
   });
 });
 
+describe("initialGroupIds", () => {
+  it("starts with the defaults when the site's permissions are unknown", () => {
+    expect([...initialGroupIds([])]).toEqual(["address", "tokens", "sign"]);
+  });
+
+  it("starts with the groups covering what the site asked for, and nothing else", () => {
+    const ardrive = ["ACCESS_ADDRESS", "SIGN_TRANSACTION", "SIGNATURE", "ACCESS_PUBLIC_KEY", "ACCESS_ALL_ADDRESSES"] as const;
+    expect([...initialGroupIds(ardrive)]).toEqual(["address", "sign", "wallets"]);
+  });
+});
+
 describe("UseGleamOnSiteView", () => {
+  it("preselects what the site asked the other wallet for", async () => {
+    const { runtime, send } = runtimeWith({ useGleamOnSite: undefined });
+    render(
+      wrap(
+        <UseGleamOnSiteView
+          runtime={runtime}
+          origin={ORIGIN}
+          favIconUrl={null}
+          requestedPermissions={["ACCESS_ADDRESS", "ACCESS_ALL_ADDRESSES"]}
+          onBack={vi.fn()}
+          onDone={vi.fn()}
+        />,
+      ),
+    );
+
+    expect(screen.getByRole("switch", { name: "See all your wallets" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("switch", { name: "See your token balances" }).getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "Use Gleam here" }));
+
+    await waitFor(() => expect(send).toHaveBeenCalled());
+    expect((send.mock.calls[0]![0] as { payload: { permissions: string[] } }).payload.permissions).toEqual([
+      "ACCESS_ADDRESS",
+      "ACCESS_PUBLIC_KEY",
+      "ACCESS_ARWEAVE_CONFIG",
+      "ACCESS_ALL_ADDRESSES",
+    ]);
+  });
+
   it("grants the default permissions and returns home", async () => {
     const { runtime, send } = runtimeWith({ useGleamOnSite: undefined });
     const onDone = vi.fn();

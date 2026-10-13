@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vaultHasPassword, type Collectible, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
+import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { CollectibleDetailView } from "@/entrypoints/popup/collectibles/index.tsx";
@@ -98,7 +98,7 @@ type MainSubView =
   | { kind: "send-collectible"; collectible: Collectible }
   | { kind: "points" }
   | { kind: "upload" }
-  | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null };
+  | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null; requestedPermissions: PermissionType[] };
 
 function resolveTopView(state: WalletState): TopView {
   if (state.wallets.length === 0) return "onboarding";
@@ -364,6 +364,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         origin={subView.origin}
         favIconUrl={subView.favIconUrl}
+        requestedPermissions={subView.requestedPermissions}
         onBack={() => setSubView({ kind: "home" })}
         onDone={() => setSubView({ kind: "home" })}
       />

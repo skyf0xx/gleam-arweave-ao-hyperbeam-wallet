@@ -24,7 +24,7 @@ import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
-import { SiteWalletCard } from "../../site-wallet/index.tsx";
+import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/index.tsx";
 import { PointsTokenRow } from "../../points/index.tsx";
 
 /**
@@ -88,7 +88,7 @@ export interface MainScreenViewProps {
   onOpenSettings: () => void;
   onOpenPoints: () => void;
   /** Opens the permissions screen for a site that was using another wallet. */
-  onUseGleamOnSite: (site: { origin: string; favIconUrl: string | null }) => void;
+  onUseGleamOnSite: SiteWalletCardProps["onUseGleam"];
   onOpenCollectible: (collectible: Collectible) => void;
   /** The tab to show on mount; the caller keeps it across detail screens that unmount this view. */
   initialTab?: MainScreenTab;
