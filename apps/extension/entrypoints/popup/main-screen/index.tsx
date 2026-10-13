@@ -1,1 +1,1 @@
-export { MainScreenView, type MainScreenViewProps } from "./src/MainScreenView";
+export { MainScreenView, type MainScreenViewProps, type MainScreenTab } from "./src/MainScreenView";

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { explorerUrlFor, type PortfolioHistoryRange, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type Collectible, type PortfolioHistoryRange, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -17,6 +17,8 @@ import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
+import { useCollectibles } from "../../activity/src/useCollectibles";
+import { CollectiblesGrid } from "../../collectibles/index.tsx";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
@@ -67,6 +69,8 @@ import { PointsTokenRow } from "../../points/index.tsx";
  * network & peers, dark mode, and so on) — this component doesn't render
  * an inline settings menu or read/write theme preference itself.
  */
+export type MainScreenTab = "tokens" | "collectibles" | "activity";
+
 export interface MainScreenViewProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
@@ -84,6 +88,10 @@ export interface MainScreenViewProps {
   onOpenPoints: () => void;
   /** Opens the permissions screen for a site that was using another wallet. */
   onUseGleamOnSite: (site: { origin: string; favIconUrl: string | null }) => void;
+  onOpenCollectible: (collectible: Collectible) => void;
+  /** The tab to show on mount; the caller keeps it across detail screens that unmount this view. */
+  initialTab?: MainScreenTab;
+  onTabChange?: (tab: MainScreenTab) => void;
 }
 
 /**
@@ -243,8 +251,14 @@ export function MainScreenView({
   onOpenSettings,
   onOpenPoints,
   onUseGleamOnSite,
+  onOpenCollectible,
+  initialTab = "tokens",
+  onTabChange,
 }: MainScreenViewProps) {
-  const [activeTab, setActiveTab] = useState<"tokens" | "activity">("tokens");
+  const [activeTab, setActiveTab] = useState<MainScreenTab>(initialTab);
+  // Discovery is slow, so it starts on first open rather than with the main screen.
+  const [collectiblesOpened, setCollectiblesOpened] = useState(initialTab === "collectibles");
+  const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [listDocked, setListDocked] = useState(false);
   const collapseRafRef = useRef<number | null>(null);
@@ -337,8 +351,10 @@ export function MainScreenView({
    * has the popup to itself. Once docked, the section scrolls on its own,
    * so the click just brings that inner list back to its top.
    */
-  const selectTab = (tab: "tokens" | "activity") => {
+  const selectTab = (tab: MainScreenTab) => {
     setActiveTab(tab);
+    if (tab === "collectibles") setCollectiblesOpened(true);
+    onTabChange?.(tab);
     const section = listSectionRef.current;
     if (!section) return;
     const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -496,7 +512,7 @@ export function MainScreenView({
       >
         <div
           role="tablist"
-          aria-label="Tokens and activity"
+          aria-label="Tokens, collectibles and activity"
           className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-2"
         >
           <button
@@ -509,6 +525,17 @@ export function MainScreenView({
             }`}
           >
             Tokens
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "collectibles"}
+            onClick={() => selectTab("collectibles")}
+            className={`rounded-md px-2.5 py-1 text-label ${
+              activeTab === "collectibles" ? "text-foreground" : "text-muted hover:text-foreground"
+            }`}
+          >
+            Collectibles
           </button>
           <button
             type="button"
@@ -559,6 +586,18 @@ export function MainScreenView({
                   />
                 ))}
               </>
+            )}
+          </div>
+        ) : activeTab === "collectibles" ? (
+          <div className="min-h-60 border-t border-line pt-3.5">
+            {collectiblesQuery.error && !collectiblesQuery.data ? (
+              <NetworkErrorBanner onRetry={() => void collectiblesQuery.refetch()} />
+            ) : (
+              <CollectiblesGrid
+                items={collectiblesQuery.data}
+                loading={collectiblesQuery.isLoading}
+                onOpen={onOpenCollectible}
+              />
             )}
           </div>
         ) : (

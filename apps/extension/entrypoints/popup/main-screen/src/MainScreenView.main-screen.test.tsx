@@ -87,6 +87,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
         onOpenSettings={vi.fn()}
         onOpenPoints={vi.fn()}
         onUseGleamOnSite={vi.fn()}
+        onOpenCollectible={vi.fn()}
         {...overrides}
       />
     </QueryClientProvider>,
@@ -566,7 +567,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       renderMainScreen({ runtime: fakeRuntime({ send: sendWith({}) }) });
       await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
 
-      const section = screen.getByRole("tablist", { name: "Tokens and activity" }).parentElement as HTMLElement;
+      const section = screen.getByRole("tablist", { name: "Tokens, collectibles and activity" }).parentElement as HTMLElement;
       vi.spyOn(section, "getBoundingClientRect").mockReturnValue({ top: 420 } as DOMRect);
       fireEvent.click(screen.getByRole("tab", { name: tabName }));
 

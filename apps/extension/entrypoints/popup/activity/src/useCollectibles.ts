@@ -7,7 +7,7 @@ import { walletQueryKeys } from "./queryKeys";
  * discovery never holds up the token list. The background caches per
  * wallet, so this only goes stale in the popup after a few minutes.
  */
-export function useCollectibles(runtime: RuntimePort, address: string) {
+export function useCollectibles(runtime: RuntimePort, address: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: walletQueryKeys.collectibles(address),
     queryFn: () =>
@@ -16,5 +16,6 @@ export function useCollectibles(runtime: RuntimePort, address: string) {
         payload: { address },
       }),
     staleTime: 5 * 60_000,
+    enabled: options.enabled ?? true,
   });
 }

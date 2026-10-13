@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vaultHasPassword, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
+import { vaultHasPassword, type Collectible, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
-import { MainScreenView } from "@/entrypoints/popup/main-screen/index.tsx";
+import { CollectibleDetailView } from "@/entrypoints/popup/collectibles/index.tsx";
+import { MainScreenView, type MainScreenTab } from "@/entrypoints/popup/main-screen/index.tsx";
 import { SendView } from "@/entrypoints/popup/send/index.tsx";
 import { ReceiveView } from "@/entrypoints/popup/receive/index.tsx";
 import { WalletSwitcherView } from "@/entrypoints/popup/wallet-switcher/index.tsx";
@@ -93,6 +94,7 @@ type MainSubView =
   | { kind: "connected-apps" }
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
+  | { kind: "collectible"; collectible: Collectible }
   | { kind: "points" }
   | { kind: "upload" }
   | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null };
@@ -114,6 +116,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [wallets, setWallets] = useState<WalletSummary[]>([]);
   const [subView, setSubView] = useState<MainSubView>({ kind: "home" });
+  const [homeTab, setHomeTab] = useState<MainScreenTab>("tokens");
   const [resolvedRuntime, setResolvedRuntime] = useState<RuntimePort | null>(runtimeProp ?? null);
   const [initError, setInitError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
@@ -238,6 +241,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onDone={() => setSubView({ kind: "home" })}
       />
     );
+  } else if (subView.kind === "collectible") {
+    // `onSend` is left out until the collectible send flow exists; the view hides Send without it.
+    content = <CollectibleDetailView collectible={subView.collectible} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "points") {
     content = <PointsView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "receive") {
@@ -359,6 +365,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
             onOpenSettings={() => setSubView({ kind: "settings-home" })}
             onOpenPoints={() => setSubView({ kind: "points" })}
             onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
+            onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
+            initialTab={homeTab}
+            onTabChange={setHomeTab}
           />
         </ExistingMemberReveal>
       </PendingClaim>
