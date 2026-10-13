@@ -2,7 +2,9 @@ import * as React from "react";
 import { cn } from "../../primitives/cn";
 
 /**
- * A full, untruncated, monospace address with a one-tap copy affordance.
+ * A full, untruncated, monospace address; the whole box copies on tap.
+ * The first and last `EDGE_CHARS` are emphasised because that's what
+ * people compare when checking an address against another screen.
  * Used on Receive and the send review screen — anywhere the full address
  * is required, never the truncated list form (`ActivityRow`'s
  * pre-truncated strings are a different, low-stakes context).
@@ -11,6 +13,8 @@ import { cn } from "../../primitives/cn";
  * telemetry); this component only renders the "Copied" affordance for
  * `copiedDurationMs` after each call.
  */
+const EDGE_CHARS = 6;
+
 export interface AddressDisplayProps {
   address: string;
   onCopy: () => void;
@@ -40,29 +44,27 @@ export function AddressDisplay({
     timeoutRef.current = setTimeout(() => setCopied(false), copiedDurationMs);
   };
 
+  const split = address.length > EDGE_CHARS * 2;
+  const head = split ? address.slice(0, EDGE_CHARS) : address;
+  const middle = split ? address.slice(EDGE_CHARS, -EDGE_CHARS) : "";
+  const tail = split ? address.slice(-EDGE_CHARS) : "";
+
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex w-full items-center gap-2 rounded-lg border border-line bg-mist py-3 pl-4 pr-3">
-        <span
-          className="min-w-0 flex-1 font-mono text-label leading-relaxed text-foreground"
-          style={{ wordBreak: "break-all" }}
-        >
-          {address}
-        </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label={copied ? "Address copied" : "Copy address"}
-          className={cn(
-            "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-background",
-            copied
-              ? "border-positive text-positive"
-              : "border-line text-muted hover:border-faint hover:text-foreground",
-          )}
-        >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={copied ? "Address copied" : `Copy address ${address}`}
+        className={cn(
+          "w-full rounded-lg border bg-mist px-4 py-3 text-left font-mono text-label leading-relaxed transition-colors",
+          copied ? "border-positive" : "border-line hover:border-faint",
+        )}
+        style={{ wordBreak: "break-all" }}
+      >
+        <span className="font-semibold text-foreground">{head}</span>
+        <span className="text-muted">{middle}</span>
+        <span className="font-semibold text-foreground">{tail}</span>
+      </button>
       <span
         aria-live="polite"
         className="h-[14px] text-center text-caption font-semibold text-positive"
@@ -70,22 +72,5 @@ export function AddressDisplay({
         {copied ? "Copied to clipboard" : ""}
       </span>
     </div>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }

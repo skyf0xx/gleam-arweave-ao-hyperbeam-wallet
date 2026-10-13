@@ -15,14 +15,14 @@ describe("AddressDisplay", () => {
   it("renders the full, untruncated address", () => {
     const address = "aB3k4f9qP2xR8m1tN6vW3jL7yH0sD9eK5cF9fQx";
     render(<AddressDisplay address={address} onCopy={() => {}} />);
-    expect(screen.getByText(address)).toBeTruthy();
+    expect(screen.getByRole("button").textContent).toBe(address);
   });
 
   it("calls onCopy and shows the copied affordance", () => {
     const onCopy = vi.fn();
     render(<AddressDisplay address="addr123" onCopy={onCopy} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy address" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Copy address/ }));
 
     expect(onCopy).toHaveBeenCalledOnce();
     expect(screen.getByText("Copied to clipboard")).toBeTruthy();
