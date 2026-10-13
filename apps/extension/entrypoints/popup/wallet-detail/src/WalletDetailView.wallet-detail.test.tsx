@@ -38,13 +38,13 @@ describe("WalletDetailView", () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
   });
 
-  it("shows the wallet's name, method and truncated address", () => {
+  it("shows the wallet's name with no method label for a JWK wallet", () => {
     const send = vi.fn();
     render(
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    expect(screen.getByText("JWK")).toBeTruthy();
+    expect(screen.queryByText(/JWK/)).toBeNull();
     expect(screen.getByDisplayValue("Wallet One")).toBeTruthy();
   });
 
@@ -54,19 +54,17 @@ describe("WalletDetailView", () => {
       <WalletDetailView runtime={fakeRuntime()} wallet={keystone} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    expect(screen.getByText("KEYSTONE")).toBeTruthy();
+    expect(screen.getByText(/Keystone/)).toBeTruthy();
     expect(screen.queryByText("Back up keyfile")).toBeNull();
-    expect(screen.queryByText("Keyfile backup")).toBeNull();
   });
 
-  it("shows 'Not backed up' when backupConfirmedAt is null", () => {
+  it("shows 'Not backed up yet' when backupConfirmedAt is null", () => {
     const send = vi.fn();
     render(
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    expect(screen.getByText("Not backed up")).toBeTruthy();
-    expect(screen.getByText("No backup on record")).toBeTruthy();
+    expect(screen.getByText("Not backed up yet")).toBeTruthy();
   });
 
   it("shows 'Backed up' when backupConfirmedAt is set", () => {
@@ -74,7 +72,7 @@ describe("WalletDetailView", () => {
     const wallet = { ...WALLET, backupConfirmedAt: Date.now() };
     render(<WalletDetailView runtime={fakeRuntime({ send })} wallet={wallet} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />);
 
-    expect(screen.getByText("Backed up")).toBeTruthy();
+    expect(screen.getByText("Backed up today")).toBeTruthy();
   });
 
   it("calls renameWallet on blur when the name changed, then onRenamed", async () => {
@@ -133,7 +131,7 @@ describe("WalletDetailView", () => {
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     await waitFor(() => expect(screen.getByText("Enter your password")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery staple" } });
@@ -168,7 +166,7 @@ describe("WalletDetailView", () => {
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery staple" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Your keyfile")).toBeTruthy());
@@ -193,7 +191,7 @@ describe("WalletDetailView", () => {
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery staple" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Your keyfile")).toBeTruthy());
@@ -207,7 +205,7 @@ describe("WalletDetailView", () => {
     expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    await waitFor(() => expect(screen.getByText("Not backed up")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Not backed up yet")).toBeTruthy());
   });
 
   it("shows the server error and lets the user retry the password", async () => {
@@ -216,7 +214,7 @@ describe("WalletDetailView", () => {
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Back up keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "wrong" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -300,7 +298,7 @@ describe("WalletDetailView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(screen.getByText("Not backed up")).toBeTruthy();
+    expect(screen.getByText("Not backed up yet")).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
   });
 });

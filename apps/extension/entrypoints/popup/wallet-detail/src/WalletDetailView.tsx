@@ -9,18 +9,19 @@ import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
 
-const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
-  jwk: "JWK",
-  ethereum: "ETH",
-  ledger: "LEDGER",
-  keystone: "KEYSTONE",
+// JWK is what nearly every wallet is, so only the other methods get a label.
+const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
+  jwk: null,
+  ethereum: "Ethereum",
+  ledger: "Ledger",
+  keystone: "Keystone",
 };
 
 function formatBackupDate(timestamp: number): string {
   const days = Math.floor((Date.now() - timestamp) / (24 * 60 * 60 * 1000));
-  if (days <= 0) return "Confirmed today";
-  if (days === 1) return "Confirmed 1 day ago";
-  return `Confirmed ${days} days ago`;
+  if (days <= 0) return "Backed up today";
+  if (days === 1) return "Backed up 1 day ago";
+  return `Backed up ${days} days ago`;
 }
 
 function downloadKeyfile(contents: string, walletName: string): void {
@@ -128,6 +129,7 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
   };
 
   const hardware = isHardwareWalletMethod(wallet.method);
+  const methodLabel = WALLET_METHOD_LABEL[wallet.method];
 
   if (step.kind === "remove-confirm") {
     return (
@@ -183,13 +185,11 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
         <div className="flex items-center gap-3">
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} className="rounded-2xl" />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex items-center gap-1.5">
-              <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
-              <span className="flex-shrink-0 rounded-md border border-line bg-mist px-1.5 py-0.5 text-[10px] font-semibold text-muted">
-                {WALLET_METHOD_LABEL[wallet.method]}
-              </span>
-            </div>
-            <span className="truncate font-mono text-caption text-faint">{truncateAddress(wallet.address, 8, 6)}</span>
+            <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
+            <span className="truncate text-caption text-faint">
+              <span className="font-mono">{truncateAddress(wallet.address, 8, 6)}</span>
+              {methodLabel ? <> · {methodLabel}</> : null}
+            </span>
           </div>
         </div>
 
@@ -211,44 +211,44 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
         />
 
         {hardware ? null : (
-          <>
-            <div className="overflow-hidden rounded-lg border border-line">
-              <div className="flex items-center gap-2.5 px-3.5 py-3">
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-label font-semibold text-foreground">Keyfile backup</span>
-                  <span className="text-caption text-muted">
-                    {backupConfirmedAt !== null ? formatBackupDate(backupConfirmedAt) : "No backup on record"}
-                  </span>
-                </div>
-                <span
-                  className={`flex-shrink-0 text-caption font-semibold ${
-                    backupConfirmedAt !== null ? "text-positive" : "text-muted"
-                  }`}
-                >
-                  {backupConfirmedAt !== null ? "Backed up" : "Not backed up"}
-                </span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setStep({ kind: "export-password", submitting: false })}
-            >
-              Back up keyfile
-            </Button>
-          </>
+          <button
+            type="button"
+            onClick={() => setStep({ kind: "export-password", submitting: false })}
+            aria-describedby="keyfile-backup-status"
+            className="flex w-full items-center gap-2.5 rounded-lg border border-line px-3.5 py-3 text-left hover:bg-mist"
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-label font-semibold text-foreground">Back up keyfile</span>
+              <span
+                id="keyfile-backup-status"
+                className={`text-caption ${backupConfirmedAt !== null ? "text-muted" : "font-semibold text-warning"}`}
+              >
+                {backupConfirmedAt !== null ? formatBackupDate(backupConfirmedAt) : "Not backed up yet"}
+              </span>
+            </span>
+            <ChevronIcon />
+          </button>
         )}
 
+        {/* The solid destructive button is for the confirm step; this only opens it. */}
         <Button
           type="button"
-          variant="destructive"
+          variant="ghost"
           onClick={() => setStep({ kind: "remove-confirm", removing: false })}
+          className="mt-auto text-warning hover:text-warning"
         >
           Remove wallet
         </Button>
       </div>
     </div>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="flex-shrink-0 text-faint">
+      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
