@@ -7,6 +7,9 @@
  */
 export type PortfolioHistoryRange = "24H" | "7D" | "1M" | "1Y" | "ALL";
 
+/** Whose holdings the chart totals: the active wallet's, or every stored wallet's. */
+export type PortfolioScope = "wallet" | "all";
+
 /** One point on the portfolio-value-over-time chart. */
 export interface PortfolioHistoryPoint {
   timestamp: number;

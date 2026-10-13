@@ -21,6 +21,7 @@ import type {
   PointsScores,
   PortfolioHistory,
   PortfolioHistoryRange,
+  PortfolioScope,
   ThemeSettings,
   TokenBalance,
   TokenPrice,
@@ -117,8 +118,10 @@ export interface ProtocolMap {
    * series to plot and the summary figures already computed. An empty
    * `series` means both price sources were unavailable — the popup falls
    * back to `NetworkErrorBanner` rather than rendering a broken chart.
+   * `scope` defaults to `"wallet"` (the active wallet); `"all"` totals
+   * every stored wallet.
    */
-  getPortfolioHistory(req: { range: PortfolioHistoryRange }): PortfolioHistory;
+  getPortfolioHistory(req: { range: PortfolioHistoryRange; scope?: PortfolioScope }): PortfolioHistory;
   /**
    * Current spot USD price for every token in `core/pricing`'s
    * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the per-row `$` value

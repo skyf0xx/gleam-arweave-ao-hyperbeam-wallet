@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { PortfolioScope } from "@gleam/core";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
@@ -19,6 +21,13 @@ import { NetworkErrorBanner } from "./NetworkErrorBanner";
  * swaps just the value/chart area for `NetworkErrorBanner` — the range
  * tabs always render regardless, so a failed range never strands the
  * user without a way to click back to a previously-cached range.
+ *
+ * Scope toggle: when the caller passes `onToggleScope` (only worth it with
+ * more than one wallet), the chart area itself is the switch between the
+ * active wallet's total and every wallet's. Nothing marks it at rest
+ * beyond a pointer cursor. A click briefly crossfades the period caption
+ * to the view now showing, so the label sits under the figure it
+ * describes rather than floating over the chart like a tooltip.
  *
  * Color rule: reuses `--color-positive` for gains and `--color-negative`
  * for losses — both real `@theme` tokens, never `--color-beam-red`/
@@ -50,6 +59,9 @@ export interface PortfolioChartProps {
    * `NetworkErrorBanner`; the range tabs below stay rendered regardless.
    */
   onRetry?: () => void;
+  scope?: PortfolioScope;
+  /** Makes the chart area toggle `scope`. Leave unset when there's only one wallet. */
+  onToggleScope?: () => void;
   className?: string;
 }
 
@@ -82,11 +94,29 @@ function formatUsd(value: number): string {
   });
 }
 
+const PERCENT_FORMAT = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: "exceptZero",
+});
+
 function formatPercent(fraction: number): string {
-  const percent = fraction * 100;
-  const sign = percent > 0 ? "+" : "";
-  return `${sign}${percent.toFixed(2)}%`;
+  return PERCENT_FORMAT.format(fraction);
 }
+
+const SCOPE_FLASH_MS = 2500;
+
+/** The toggle's accessible name, i.e. what a click does next. */
+const SCOPE_ACTION_LABEL: Record<PortfolioScope, string> = {
+  wallet: "Show all wallets",
+  all: "Show this wallet",
+};
+
+const SCOPE_CONFIRMATION: Record<PortfolioScope, string> = {
+  wallet: "This wallet",
+  all: "All wallets",
+};
 
 /** Maps a series to a `0..CHART_WIDTH x 0..CHART_HEIGHT` SVG polyline's points, flat-lining a single-point or zero-range series at the vertical midpoint rather than dividing by zero. */
 function buildLinePath(points: PortfolioChartPoint[]): string {
@@ -122,8 +152,28 @@ export function PortfolioChart({
   onRangeChange,
   loading = false,
   onRetry,
+  scope = "wallet",
+  onToggleScope,
   className,
 }: PortfolioChartProps) {
+  const [flash, setFlash] = useState<string | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+  // Keeps the scope text through its fade-out instead of blanking first.
+  const lastFlashRef = useRef("");
+  useEffect(() => () => {
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+  }, []);
+
+  const toggleScope = () => {
+    if (!onToggleScope) return;
+    const nextScope: PortfolioScope = scope === "all" ? "wallet" : "all";
+    onToggleScope();
+    setFlash(SCOPE_CONFIRMATION[nextScope]);
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => setFlash(null), SCOPE_FLASH_MS);
+  };
+
+  if (flash) lastFlashRef.current = flash;
   const isPositive = usdChange >= 0;
   const isEmpty = currentUsdValue === 0 && points.every((point) => point.usdValue === 0);
   const linePoints = buildLinePath(isEmpty ? EMPTY_STATE_POINTS : points);
@@ -145,10 +195,26 @@ export function PortfolioChart({
                 {formatPercent(usdChange)}
               </span>
             </div>
-            <div className="text-caption text-muted">{periodLabel || " "}</div>
+            <div className="grid text-caption text-muted">
+              <span
+                aria-hidden={flash ? true : undefined}
+                className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
+              >
+                {periodLabel || " "}
+              </span>
+              <span
+                aria-live="polite"
+                className={cn("col-start-1 row-start-1 transition-opacity duration-300", !flash && "opacity-0")}
+              >
+                {flash ?? lastFlashRef.current}
+              </span>
+            </div>
           </div>
 
-          <div className="h-[80px] w-full">
+          <ChartArea
+            onToggle={onToggleScope ? toggleScope : undefined}
+            scope={scope}
+          >
             {loading ? (
               <div className="h-full w-full gleam-shimmer rounded-md" />
             ) : points.length === 0 ? (
@@ -215,7 +281,7 @@ export function PortfolioChart({
                 />
               </svg>
             )}
-          </div>
+          </ChartArea>
           {isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
         </>
       )}
@@ -240,5 +306,28 @@ export function PortfolioChart({
         ))}
       </div>
     </div>
+  );
+}
+
+interface ChartAreaProps {
+  onToggle?: () => void;
+  scope: PortfolioScope;
+  children: ReactNode;
+}
+
+/** The 80px chart slot: a plain box, or a button over it when the scope toggle is enabled. */
+function ChartArea({ onToggle, scope, children }: ChartAreaProps) {
+  if (!onToggle) return <div className="h-[80px] w-full">{children}</div>;
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={scope === "all"}
+      aria-label={SCOPE_ACTION_LABEL[scope]}
+      className="block h-[80px] w-full cursor-pointer rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+    >
+      {children}
+    </button>
   );
 }

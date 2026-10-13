@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { PortfolioHistory, PortfolioHistoryRange, RuntimePort } from "@gleam/core";
+import type { PortfolioHistory, PortfolioHistoryRange, PortfolioScope, RuntimePort } from "@gleam/core";
 
 /**
  * Shared, cached source of truth for the main screen's portfolio-value
@@ -11,7 +11,7 @@ import type { PortfolioHistory, PortfolioHistoryRange, RuntimePort } from "@glea
  * reads from/invalidates a disjoint cache entry, matching
  * `walletQueryKeys`' pattern in `../../activity/src/queryKeys.ts` (kept
  * local to this file rather than added to that module). `range` is part
- * of the key so every range tab keeps its own cached response and
+ * (and `scope`) of the key so every range tab keeps its own cached response and
  * clicking back to a previously-loaded range shows it instantly rather
  * than re-fetching.
  */
@@ -27,13 +27,20 @@ import type { PortfolioHistory, PortfolioHistoryRange, RuntimePort } from "@glea
  */
 const PORTFOLIO_HISTORY_STALE_TIME_MS = 5 * 60 * 1000;
 
-export function usePortfolioHistory(runtime: RuntimePort, address: string, range: PortfolioHistoryRange) {
+export function usePortfolioHistory(
+  runtime: RuntimePort,
+  address: string,
+  range: PortfolioHistoryRange,
+  scope: PortfolioScope,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
-    queryKey: [address, "portfolioHistory", range] as const,
+    enabled,
+    queryKey: [address, "portfolioHistory", range, scope] as const,
     queryFn: () =>
-      runtime.send<{ range: PortfolioHistoryRange }, PortfolioHistory>({
+      runtime.send<{ range: PortfolioHistoryRange; scope: PortfolioScope }, PortfolioHistory>({
         type: "getPortfolioHistory",
-        payload: { range },
+        payload: { range, scope },
       }),
     staleTime: PORTFOLIO_HISTORY_STALE_TIME_MS,
     // Bounds how long a rate-limited/offline range spends retrying before

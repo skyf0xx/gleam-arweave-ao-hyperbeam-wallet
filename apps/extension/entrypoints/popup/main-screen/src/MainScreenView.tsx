@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -21,6 +21,7 @@ import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGrid } from "../../collectibles/index.tsx";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { usePortfolioHistory } from "./usePortfolioHistory";
+import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
 import { SiteWalletCard } from "../../site-wallet/index.tsx";
@@ -226,6 +227,25 @@ function collectibleLabel(collectible: CollectibleRef): string {
  */
 const PORTFOLIO_RANGE_DEBOUNCE_MS = 400;
 
+// A per-device view preference, so plain localStorage; it can throw or be empty in some contexts.
+const PORTFOLIO_SCOPE_STORAGE_KEY = "gleam:portfolioScope";
+
+function readPortfolioScope(): PortfolioScope {
+  try {
+    return window.localStorage.getItem(PORTFOLIO_SCOPE_STORAGE_KEY) === "all" ? "all" : "wallet";
+  } catch {
+    return "wallet";
+  }
+}
+
+function writePortfolioScope(scope: PortfolioScope): void {
+  try {
+    window.localStorage.setItem(PORTFOLIO_SCOPE_STORAGE_KEY, scope);
+  } catch {
+    // Not persisting only means the next open starts on this wallet.
+  }
+}
+
 /** Scroll distance (px) past which the header collapses to its compact form. */
 const HEADER_COLLAPSE_THRESHOLD_PX = 24;
 
@@ -290,7 +310,20 @@ export function MainScreenView({
     const timer = window.setTimeout(() => setDebouncedRange(selectedRange), PORTFOLIO_RANGE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [selectedRange]);
-  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, debouncedRange);
+  const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
+  const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
+  const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
+  // With a single wallet "all" equals "wallet"; resolving it here keeps one cache entry and no toggle.
+  const portfolioScope: PortfolioScope = hasOtherWallets ? preferredScope : "wallet";
+  const togglePortfolioScope = () => {
+    const next: PortfolioScope = portfolioScope === "all" ? "wallet" : "all";
+    setPreferredScope(next);
+    writePortfolioScope(next);
+  };
+  // Waits for the wallet list so a saved "all" preference doesn't first fetch the single-wallet view.
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, debouncedRange, portfolioScope, {
+    enabled: !otherWalletsQuery.isPending,
+  });
 
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
@@ -427,6 +460,8 @@ export function MainScreenView({
               periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
               activeRange={selectedRange}
               onRangeChange={setSelectedRange}
+              scope={portfolioScope}
+              onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
               /**
                * True for the whole debounce window too (not just while
                * the query itself is in flight) — `selectedRange` moves
@@ -443,7 +478,7 @@ export function MainScreenView({
                * `isLoading` never reflects, so it was leaving the banner
                * on screen through the whole retry with no visible change.
                */
-              loading={debouncedRange !== selectedRange || portfolioHistoryQuery.isFetching}
+              loading={debouncedRange !== selectedRange || portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
               /**
                * `series: []` on a *resolved* response (no thrown query
                * error) is `getPortfolioHistory`'s own signal that both AR

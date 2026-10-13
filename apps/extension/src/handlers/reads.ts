@@ -23,6 +23,7 @@ import type {
   NetworkSettings,
   PortfolioHistory,
   PortfolioHistoryRange,
+  PortfolioScope,
   StoragePort,
   TokenBalance,
   TokenBalanceRequest,
@@ -661,6 +662,13 @@ export class ReadsHandler {
     return active?.address ?? null;
   }
 
+  /** De-duplicated so the same address imported twice isn't counted twice in the all-wallets total. */
+  private async resolvePortfolioAddresses(scope: PortfolioScope): Promise<string[]> {
+    if (scope === "all") return [...new Set(await this.loadTrackedAddresses())];
+    const address = await this.resolveActiveWalletAddress();
+    return address === null ? [] : [address];
+  }
+
   /**
    * Drives the main screen's total-portfolio-value chart
    * (`ProtocolMap.getPortfolioHistory`). Sources each registered token's
@@ -668,7 +676,8 @@ export class ReadsHandler {
    * series via `getHistoricalUsdPricesWithFallback` (CoinGecko, falling
    * back to CoinPaprika) and reduces them through
    * `estimateHistoricalPortfolioValue` at each AR series timestamp against
-   * the wallet's *current* balance of that token — this project models
+   * the *current* balance of that token, either the active wallet's or,
+   * with `scope: "all"`, the sum across every stored wallet — this project models
    * only a current/latest-known balance, not reconstructed historical
    * balances (`estimateHistoricalPortfolioValue`'s own doc comment states
    * this is out of scope), so the chart shows how today's holdings would
@@ -690,20 +699,21 @@ export class ReadsHandler {
    * `NetworkErrorBanner` for that case rather than this handler
    * fabricating a flat line.
    */
-  async getPortfolioHistory(req: { range: PortfolioHistoryRange }): Promise<PortfolioHistory> {
+  async getPortfolioHistory(req: { range: PortfolioHistoryRange; scope?: PortfolioScope }): Promise<PortfolioHistory> {
     if (!PORTFOLIO_HISTORY_RANGES.includes(req.range)) {
       throw new Error(`Unrecognized portfolio history range "${String(req.range)}".`);
     }
 
-    const address = await this.resolveActiveWalletAddress();
     const periodLabel = periodLabelForRange(req.range);
+    const addresses = await this.resolvePortfolioAddresses(req.scope ?? "wallet");
 
-    if (address === null) {
+    if (addresses.length === 0) {
       return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
     }
 
     const settings = await this.loadNetworkSettings();
-    const arBalanceWinston = await getArBalance(address, settings.gatewayUrl);
+    const arBalancesWinston = await Promise.all(addresses.map((address) => getArBalance(address, settings.gatewayUrl)));
+    const arBalanceWinston = arBalancesWinston.reduce((sum, winston) => sum + BigInt(winston), 0n);
     const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
 
     const arPriceSeries = AR_TOKEN.priceSource
@@ -717,28 +727,33 @@ export class ReadsHandler {
     const tokens = [{ balance: arBalance, priceAt: buildPriceAtFromSeries(arPriceSeries) }];
 
     if (AO_TOKEN.priceSource && settings.activePeerUrl !== null) {
-      try {
-        const aoBalance = await getTokenBalance(AO_TOKEN.processId as string, address, settings.activePeerUrl);
-        const aoQuantity = Number(aoBalance.quantity) / 10 ** aoBalance.denomination;
+      const peerUrl = settings.activePeerUrl;
+      // A failed read leaves that wallet's AO out rather than failing the
+      // whole chart whenever a peer hiccups — there's no way to tell whether
+      // the wallet even holds AO.
+      const aoQuantities = await Promise.all(
+        addresses.map(async (address) => {
+          try {
+            const aoBalance = await getTokenBalance(AO_TOKEN.processId as string, address, peerUrl);
+            return Number(aoBalance.quantity) / 10 ** aoBalance.denomination;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const readQuantities = aoQuantities.filter((quantity): quantity is number => quantity !== null);
+
+      if (readQuantities.length > 0) {
+        const aoQuantity = readQuantities.reduce((sum, quantity) => sum + quantity, 0);
         const aoPriceSeries = await getHistoricalUsdPricesWithFallback(AO_TOKEN.priceSource, req.range);
         if (aoPriceSeries.length > 0) {
           tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries) });
         } else if (aoQuantity > 0) {
-          // A held (nonzero) AO balance whose price series is unavailable would
-          // otherwise silently drop out of the total, making an AR-empty/AO-only
-          // wallet's chart render as if the whole portfolio were worth $0 — an
-          // AR-only total is honest, but a total that's missing a token the
-          // wallet actually holds is not. Reported as a failed range like AR's
-          // own empty-price-series case, rather than a fabricated AR-only total.
+          // A held AO balance with no price series would silently drop out of
+          // the total, so an AO-only portfolio would chart as $0. Reported as
+          // a failed range instead, like AR's own empty-series case.
           return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
         }
-      } catch {
-        // Balance read itself failed — see the aoQuantity > 0 branch above for
-        // why a *held* AO balance can't just be silently dropped here either,
-        // but the balance read failing means aoQuantity was never resolved, so
-        // there's no way to tell whether this wallet even holds AO. Falls back
-        // to AR-only, matching this catch's original intent, rather than
-        // failing every chart for every wallet whenever a peer hiccups.
       }
     }
 

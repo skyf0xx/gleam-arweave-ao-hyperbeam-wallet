@@ -13,6 +13,7 @@ import { MainScreenView } from "./MainScreenView";
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
 });
 
 function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
@@ -31,6 +32,7 @@ function successfulSend(overrides: Record<string, unknown> = {}): RuntimePort["s
     if (type === "getPortfolioHistory") return overrides.portfolioHistory ?? PORTFOLIO_HISTORY_7D;
     if (type === "getTokenPrices") return [];
     if (type === "getPointsMemberships") return {};
+    if (type === "getState") return { wallets: overrides.wallets ?? [WALLET], activeWalletId: WALLET.id, session: null };
     if (type === "getNetworkSettings") {
       return overrides.networkSettings ?? { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
     }
@@ -179,7 +181,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet" } }),
     );
     await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
     expect(screen.getByText("+20.00%")).toBeTruthy();
@@ -255,6 +257,53 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
+  });
+  it("formats a large %-change with thousands separators", async () => {
+    const send = successfulSend({ portfolioHistory: { ...PORTFOLIO_HISTORY_7D, usdChange: 27.6866 } });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("+2,768.66%")).toBeTruthy());
+  });
+
+  it("offers no scope toggle with a single wallet", async () => {
+    const send = successfulSend();
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Show all wallets" })).toBeNull();
+  });
+
+  it("clicking the chart with several wallets toggles to the all-wallets total and back", async () => {
+    const otherWallet: WalletSummary = { ...WALLET, id: "wallet-2", address: "other-address", name: "Wallet Two" };
+    const send = successfulSend({ wallets: [WALLET, otherWallet] });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show all wallets" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all" } }),
+    );
+    expect(screen.getByText("All wallets")).toBeTruthy();
+    expect(window.localStorage.getItem("gleam:portfolioScope")).toBe("all");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show this wallet" }));
+    expect(screen.getByText("This wallet")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Show all wallets" }).getAttribute("aria-pressed")).toBe("false"),
+    );
+  });
+
+  it("restores a saved all-wallets preference without first fetching the single-wallet view", async () => {
+    window.localStorage.setItem("gleam:portfolioScope", "all");
+    const otherWallet: WalletSummary = { ...WALLET, id: "wallet-2", address: "other-address", name: "Wallet Two" };
+    const send = successfulSend({ wallets: [WALLET, otherWallet] });
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all" } }),
+    );
+    expect(screen.getByRole("button", { name: "Show this wallet" }).getAttribute("aria-pressed")).toBe("true");
+    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet" } });
   });
 });
 

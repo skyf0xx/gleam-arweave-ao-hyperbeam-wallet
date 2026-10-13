@@ -72,6 +72,7 @@ export type { ThemePreference, ThemeSettings } from "./theme";
 export type { PasskeyEnrollment, PasskeyStatus } from "./passkey";
 export type {
   PortfolioHistoryRange,
+  PortfolioScope,
   PortfolioHistoryPoint,
   PortfolioHistory,
 } from "./portfolio-history";

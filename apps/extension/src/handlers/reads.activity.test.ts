@@ -871,6 +871,36 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     expect(history.usdChange).toBeCloseTo(1); // doubled: (40 - 20) / 20
   });
 
+  it("with scope all, prices the summed AR balance of every stored wallet, counting a repeated address once", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:wallets", [
+      { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      { id: "w2", address: "addr2", name: "Wallet Two", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      { id: "w3", address: "addr1", name: "Wallet One again", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await storage.set("local:activeWalletId", "w1");
+    await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
+      if (url.includes("wallet/addr2/balance")) return { ok: true, status: 200, text: async () => "3000000000000" }; // 3 AR
+      if (url.includes("market_chart")) {
+        return { ok: true, status: 200, json: async () => ({ prices: [[1000, 10], [2000, 20]] }) };
+      }
+      throw new Error(`Unexpected fetch url: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const allWallets = await handler.getPortfolioHistory({ range: "7D", scope: "all" });
+    expect(allWallets.series).toEqual([
+      { timestamp: 1000, usdValue: 50 },
+      { timestamp: 2000, usdValue: 100 },
+    ]);
+
+    const activeOnly = await handler.getPortfolioHistory({ range: "7D", scope: "wallet" });
+    expect(activeOnly.currentUsdValue).toBe(40);
+  });
+
   it("falls back to an empty series (not a thrown error) when both price sources fail", async () => {
     const storage = createFakeStorage();
     await storage.set("local:wallets", [
