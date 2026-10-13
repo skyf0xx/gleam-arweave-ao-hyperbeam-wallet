@@ -41,9 +41,9 @@ describe("GatedOnboarding", () => {
   it("shows the gate for an install with no unlock", async () => {
     setup();
     expect(await screen.findByText("You're early.")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "X" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "for drops on X" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Get an invitation" }));
-    expect(screen.getByRole("link", { name: "X" }).getAttribute("href")).toBe("https://x.com/gleam_wallet");
+    expect(screen.getByRole("link", { name: "for drops on X" }).getAttribute("href")).toBe("https://x.com/gleam_wallet");
     expect(screen.queryByText("What are Gleam Points?")).toBeNull();
     expect(screen.getByRole("link", { name: "GLEAM" }).getAttribute("href")).toBe(
       "https://gleamwallet.app/gleam.html?v=1.2.3",
