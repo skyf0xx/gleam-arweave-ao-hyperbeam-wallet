@@ -65,7 +65,12 @@ a { color: inherit; }
 
 @media (prefers-reduced-transparency: reduce) {
   .site-header { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .site-header.on-ink { background: #0A0A0A; }
 }
+
+.site-header { transition: background-color .3s ease; }
+.site-header.on-ink { background: rgba(10, 10, 10, .72); }
+.site-header.on-ink .wordmark { color: #fff; }
 
 .wordmark {
   display: inline-flex;
@@ -140,6 +145,78 @@ a { color: inherit; }
 
 .cta .small a { color: var(--fg); text-underline-offset: 3px; }
 
+/* Earn: the story hands off to a dark band that previews gleam.html, so the jump
+   to that page feels like stepping further in rather than leaving */
+
+.earn {
+  position: relative;
+  overflow: hidden;
+  padding: 22vh 0;
+  background: #0A0A0A;
+  color: #fff;
+  text-align: center;
+  isolation: isolate;
+}
+
+/* The faint grid gleam.html sits on, fading out toward the edges */
+.earn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgb(255 255 255 / .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / .045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, #000 20%, transparent 75%);
+}
+
+.earn-glow {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  z-index: -1;
+  width: min(900px, 120vw);
+  aspect-ratio: 2;
+  translate: -50% -50%;
+  background: radial-gradient(closest-side, rgb(139 18 255 / .22), rgb(115 201 232 / .08) 55%, transparent);
+  filter: blur(20px);
+}
+
+.earn .beam { margin: 0 auto 40px; }
+
+.earn .display { max-width: 14em; margin: 0 auto; }
+
+.earn .line { margin-left: auto; margin-right: auto; color: rgb(255 255 255 / .65); }
+
+.earn-gleam {
+  background: linear-gradient(90deg, var(--beam-red), var(--beam-purple), var(--beam-sky), var(--beam-green), var(--beam-yellow), var(--beam-red));
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: earn-shimmer 8s linear infinite;
+}
+
+@keyframes earn-shimmer { to { background-position: 300% 0; } }
+
+.earn .cta { margin-top: 44px; }
+
+.button-light { height: 56px; padding: 0 28px; background: #fff; color: var(--fg); font-size: 1.0625rem; box-shadow: 0 0 0 0 rgb(139 18 255 / 0); }
+
+.button-light:hover { background: #fff; box-shadow: 0 8px 40px rgb(139 18 255 / .45); }
+
+.button-light:focus-visible { outline-color: #fff; }
+
+.button .btn-arrow { margin: 0 0 0 10px; transition: transform .2s var(--ease-out); }
+
+.button:hover .btn-arrow { transform: translateX(3px); }
+
+.hyperbeam { padding: 24vh 0 0; text-align: center; }
+
+.hyperbeam .line { margin-left: auto; margin-right: auto; }
+
 /* Images: the render's backdrop fades into the page, the card stays opaque */
 
 .shot { position: relative; }
@@ -166,7 +243,7 @@ main { overflow-x: clip; }
 .story {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: repeat(5, auto);
+  grid-template-rows: repeat(4, auto);
   column-gap: clamp(24px, 4vw, 64px);
 }
 
@@ -175,14 +252,13 @@ main { overflow-x: clip; }
 .step[data-step="1"] { grid-row: 2; }
 .step[data-step="2"] { grid-row: 3; }
 .step[data-step="3"] { grid-row: 4; }
-.step[data-step="4"] { grid-row: 5; min-height: 90svh; }
 
 /* One phrase per line at every width, so "for" never strands at a line end */
 .step-hero .display span { display: block; }
 
 .stage {
   grid-column: 2;
-  grid-row: 1 / 6;
+  grid-row: 1 / 5;
   align-self: start;
   position: sticky;
   top: 0;
@@ -251,8 +327,7 @@ main { overflow-x: clip; }
 .stage[data-step="1"][data-phase="0"] .s-review,
 .stage[data-step="1"][data-phase="1"] .s-signed,
 .stage[data-step="3"][data-phase="0"] .s-lock,
-.stage[data-step="3"][data-phase="1"] .s-locked,
-.stage[data-step="4"] .s-network {
+.stage[data-step="3"][data-phase="1"] .s-locked {
   opacity: 1;
   visibility: visible;
   transform: none;
@@ -982,7 +1057,6 @@ code { font-family: var(--mono); font-size: 0.9em; }
   .card { font-size: min(1.5svh, 3.4vw, 17px); transform: rotateY(-10deg) rotateX(6deg) rotateZ(2deg); }
   .step:not(.step-hero) { min-height: 50svh; align-items: flex-start; padding-top: 24px; }
   .step[data-step="1"] { padding-top: calc(60svh + 24px); min-height: calc(60svh + 50svh); }
-  .step[data-step="4"] { min-height: 55svh; }
   .story .reveal-text { width: 100%; text-align: center; }
   .story .line { margin-left: auto; margin-right: auto; max-width: 22em; text-wrap: balance; }
 }
@@ -1026,5 +1100,6 @@ code { font-family: var(--mono); font-size: 0.9em; }
   .js .refraction { clip-path: none; transition: none; }
   .js .reveal .reveal-text,
   .js .reveal .shot { opacity: 1; transform: none; transition: none; }
-  .button { transition: none; }
+  .button, .button .btn-arrow { transition: none; }
+  .earn-gleam { animation: none; }
 }

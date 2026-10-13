@@ -88,6 +88,27 @@
     }
   }
 
+  // The header's frosted tint flips dark while it sits over the dark earn band
+  var header = document.querySelector(".site-header");
+  var earn = document.querySelector(".earn");
+  var headerFrame = null;
+
+  function updateHeader() {
+    headerFrame = null;
+    var edge = header.offsetHeight / 2;
+    var rect = earn.getBoundingClientRect();
+    header.classList.toggle("on-ink", rect.top <= edge && rect.bottom >= edge);
+  }
+
+  if (header && earn) {
+    var requestHeader = function () {
+      if (headerFrame === null) headerFrame = requestAnimationFrame(updateHeader);
+    };
+    window.addEventListener("scroll", requestHeader, { passive: true });
+    window.addEventListener("resize", requestHeader);
+    updateHeader();
+  }
+
   // Refraction line: follows the cursor by up to ±6px, eased.
   var line = document.querySelector(".refraction");
   var finePointer = window.matchMedia("(pointer: fine)");
