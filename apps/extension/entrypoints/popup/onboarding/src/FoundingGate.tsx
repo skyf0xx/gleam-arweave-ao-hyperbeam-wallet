@@ -58,6 +58,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
   const [emptyPrompt, setEmptyPrompt] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const askRef = useRef<HTMLDivElement>(null);
 
   const redeem = useMutation({
     mutationFn: (value: string) =>
@@ -100,6 +101,11 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
   // A full code is exactly when someone needs another one, so the ask
   // options open by themselves.
   const showAsk = askOpen || full;
+  // The ask options open below the fold in the popup, so bring them up.
+  useEffect(() => {
+    if (askOpen) askRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [askOpen]);
+
   const errorMessage = verdict ? MESSAGES[verdict] : emptyPrompt ? "Enter your invite code." : undefined;
 
   const onSubmit = (event: FormEvent) => {
@@ -114,15 +120,13 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
   };
 
   return (
-    <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
-      <div className="mt-6">
-        <BeamMark animated />
-      </div>
+    <div className="flex min-h-full flex-col items-center px-7 pt-8">
+      <BeamMark animated />
 
-      <div className="mt-7 flex flex-col items-center gap-2 text-center">
-        <h1 className="text-h2 font-semibold tracking-tight text-foreground">You&apos;re early.</h1>
+      <div className="mt-7 flex flex-col items-center gap-1.5 text-center">
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">You&apos;re early.</h1>
         <p className="text-body text-muted">
-          Join now and earn{" "}
+          Get access to start earning{" "}
           <a
             href={sitePageUrl("gleam", browser.runtime.getManifest().version)}
             target="_blank"
@@ -131,13 +135,10 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
           >
             GLEAM
           </a>
-          <br />
-          <br />
-          Invite only
         </p>
       </div>
 
-      <form className="mt-6 flex w-full flex-col gap-3" onSubmit={onSubmit} noValidate>
+      <form className="mt-8 flex w-full flex-col gap-3" onSubmit={onSubmit} noValidate>
         <TextField
           ref={inputRef}
           aria-label="Invite code"
@@ -155,7 +156,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
           className={cn(
             "text-center font-mono tracking-[0.12em] placeholder:font-sans placeholder:tracking-normal",
             hasCode && "uppercase",
-            unlocked && "border-positive",
+            unlocked && "border-positive focus:border-positive",
           )}
           errorMessage={errorMessage}
         />
@@ -178,36 +179,88 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         </span>
       </form>
 
-      <div className="mt-6 flex w-full flex-col items-center gap-3">
+      <div className="mt-5 flex w-full flex-col items-center gap-3">
         <button
           type="button"
           aria-expanded={showAsk}
           aria-controls="founding-gate-ask"
           onClick={() => setAskOpen((open) => !open)}
-          className="flex items-center gap-1 text-caption text-muted hover:text-foreground"
+          className="flex items-center gap-1 text-label font-semibold text-foreground hover:opacity-70"
         >
-          Don&apos;t have an invite?
+          Get an invitation
           <ChevronIcon open={showAsk} />
         </button>
         {showAsk ? (
-          <div id="founding-gate-ask" className="flex w-full flex-col items-center gap-3">
+          <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
+            <p className="text-center text-caption text-muted">
+              Get an invite from a member or {" "}
+              <a
+                href={X_PROFILE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >watch for drops on
+                X
+              </a>
+            </p>
             <Button asChild variant={full ? "primary" : "secondary"}>
               <a href={xIntentUrl(full ? fullInvitePost() : askInvitePost())} target="_blank" rel="noreferrer">
                 Ask for an invite on X
               </a>
             </Button>
-            <a
-              href={X_PROFILE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-caption text-muted underline hover:text-foreground"
-            >
-              Follow @gleam_wallet for code drops
-            </a>
           </div>
         ) : null}
       </div>
+
+      <div role="presentation" className="relative -mx-7 mt-auto h-44 w-[calc(100%+3.5rem)] shrink-0">
+        <ConvergingLines lit={unlocked} />
+      </div>
     </div>
+  );
+}
+
+const LINE_COLORS = ["var(--color-beam-red)", "var(--color-beam-purple)", "var(--color-beam-sky)", "var(--color-beam-yellow)", "var(--color-beam-green)"];
+const LINES_W = 400;
+const LINES_H = 176;
+/** Where the lines aim: the beam mark, about this far above the box. */
+const MARK_ABOVE = 400;
+
+/**
+ * Five beam lines rising from the popup's foot toward the beam mark, each
+ * cut where it leaves the box. Pulses run up them while locked; on unlock
+ * they light and reach further.
+ */
+const LINE_PATHS = [-10, 95, 200, 305, 410].map((x0, i) => {
+  const tipX = LINES_W / 2 + (i - 2) * 8;
+  const y0 = LINES_H + 10;
+  const t = y0 / (y0 + MARK_ABOVE);
+  return `M${x0} ${y0} L${x0 + (tipX - x0) * t} 0`;
+});
+
+function ConvergingLines({ lit }: { lit: boolean }) {
+  return (
+    <svg
+      className="gleam-gate-lines absolute inset-0 h-full w-full"
+      data-lit={lit || undefined}
+      viewBox={`0 0 ${LINES_W} ${LINES_H}`}
+      preserveAspectRatio="none"
+      fill="none"
+      aria-hidden="true"
+    >
+      {LINE_PATHS.map((d, i) => (
+        <g key={d} stroke={LINE_COLORS[i]} vectorEffect="non-scaling-stroke">
+          <path className="gleam-gate-line" d={d} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          <path
+            className="gleam-gate-line-pulse"
+            d={d}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            style={{ animationDelay: `${i * 0.45}s` }}
+          />
+        </g>
+      ))}
+    </svg>
   );
 }
 

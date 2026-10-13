@@ -59,9 +59,9 @@ export function lastSeatPost(): string {
  * copies of these, URL-encoded, since the static site can't import this.
  */
 export function askInvitePost(): string {
-  return `Looking for a @gleam_wallet invite. Anyone have one to spare?\n${TAGS}`;
+  return `Looking for a @gleam_wallet invite. Anyone have one to spare?\n\n${TAGS}`;
 }
 
 export function fullInvitePost(): string {
-  return `Tried a @gleam_wallet invite and it was already full. Anyone have a spare?\n${TAGS}`;
+  return `Tried a @gleam_wallet invite and it was already full. Anyone have a spare?\n\n${TAGS}`;
 }

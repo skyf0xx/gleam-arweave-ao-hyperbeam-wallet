@@ -258,6 +258,70 @@ select,
 }
 
 /*
+ * The Founding gate's converging lines: five beam lines rising toward the
+ * beam mark, fading out before the form. Pulses run up them while locked.
+ * On unlock (`data-lit`) they light and reach further, so the colour
+ * arrives with access.
+ */
+@property --gleam-gate-reach {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 70%;
+}
+
+.gleam-gate-lines {
+  --gleam-gate-reach: 70%;
+  mask-image: linear-gradient(
+    to top,
+    #000 0,
+    #000 calc(var(--gleam-gate-reach) - 45%),
+    transparent var(--gleam-gate-reach)
+  );
+  transition: --gleam-gate-reach 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gleam-gate-line {
+  opacity: 0.22;
+  transition: opacity 0.8s;
+}
+
+.gleam-gate-line-pulse {
+  stroke-dasharray: 34 2000;
+  stroke-dashoffset: 34;
+  animation: gleam-gate-rise 3s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+}
+
+@keyframes gleam-gate-rise {
+  to {
+    stroke-dashoffset: -240;
+  }
+}
+
+.gleam-gate-lines[data-lit] {
+  --gleam-gate-reach: 100%;
+}
+
+.gleam-gate-lines[data-lit] .gleam-gate-line {
+  opacity: 0.85;
+}
+
+.gleam-gate-lines[data-lit] .gleam-gate-line-pulse {
+  animation: none;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-gate-line-pulse {
+    animation: none;
+    opacity: 0;
+  }
+  .gleam-gate-lines,
+  .gleam-gate-line {
+    transition: none;
+  }
+}
+
+/*
  * A pending activity row's beam segment, crossing its track from off the
  * left edge to off the right. The segment is 2/5 of the track, so 250% of
  * its own width clears the far edge.

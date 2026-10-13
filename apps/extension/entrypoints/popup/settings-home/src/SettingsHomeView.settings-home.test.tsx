@@ -64,6 +64,15 @@ describe("SettingsHomeView", () => {
     await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
   });
 
+  it("links to the GitHub source in a new tab", async () => {
+    renderSettingsHome();
+
+    const link = screen.getByRole("link", { name: /Gleam is open source/ });
+    expect(link.getAttribute("href")).toBe("https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet");
+    expect(link.getAttribute("target")).toBe("_blank");
+    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
+  });
+
   it("calls onOpenLockSettings when the Lock & unlock row is pressed", async () => {
     const onOpenLockSettings = vi.fn();
     renderSettingsHome({ onOpenLockSettings });

@@ -41,9 +41,9 @@ describe("GatedOnboarding", () => {
   it("shows the gate for an install with no unlock", async () => {
     setup();
     expect(await screen.findByText("You're early.")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Don't have an invite?" }));
-    expect(screen.getByRole("link", { name: "Follow @gleam_wallet for code drops" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "X" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Get an invitation" }));
+    expect(screen.getByRole("link", { name: "X" }).getAttribute("href")).toBe("https://x.com/gleam_wallet");
     expect(screen.queryByText("What are Gleam Points?")).toBeNull();
     expect(screen.getByRole("link", { name: "GLEAM" }).getAttribute("href")).toBe(
       "https://gleamwallet.app/gleam.html?v=1.2.3",
@@ -141,7 +141,7 @@ describe("GatedOnboarding", () => {
 
   it("keeps Ask secondary with the regular post when no code is full", async () => {
     setup();
-    fireEvent.click(await screen.findByRole("button", { name: "Don't have an invite?" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Get an invitation" }));
     const ask = screen.getByRole("link", { name: "Ask for an invite on X" });
     expect(ask.className).not.toContain("bg-foreground");
     expect(decodeURIComponent(ask.getAttribute("href")!)).toContain("Looking for a @gleam_wallet invite");
