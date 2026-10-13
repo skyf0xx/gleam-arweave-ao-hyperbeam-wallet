@@ -8,7 +8,7 @@ A Chrome browser-extension wallet for Arweave and AO.
 
 ### Works with `window.arweaveWallet`
 
-Gleam implements the ArConnect API.
+Gleam implements the [ArConnect API](https://docs.arconnect.io/api/intro).
 
 Code written for
 `window.arweaveWallet` **works with Gleam unchanged.**
