@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import { getTokenBalance, getTransferOutcome } from "@gleam/core/src/ao/index.ts";
+import { discoverCollectibles, getTokenBalance, getTransferOutcome } from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import { queryActivityTransactions, queryAoTransferActivity } from "@gleam/core/src/arweave/graphql.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
@@ -18,6 +18,7 @@ import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
 import type {
   ActivityEntry,
   ActivityPage,
+  Collectible,
   HyperBeamPeer,
   NetworkSettings,
   PortfolioHistory,
@@ -77,6 +78,10 @@ const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 const TOKEN_METADATA_KEY_PREFIX = "local:tokenMetadata:";
+const COLLECTIBLES_KEY_PREFIX = "local:collectibles:";
+// Holdings change rarely and discovery is dozens of requests, so a popup
+// open within this window reuses the last result.
+const COLLECTIBLES_TTL_MS = 10 * 60 * 1000;
 const ACTIVITY_PAGE_LIMIT = 50;
 const WALLETS_KEY = "local:wallets";
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
@@ -200,7 +205,30 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
   );
 }
 
+interface CollectiblesCache {
+  savedAt: number;
+  collectibles: Collectible[];
+}
+
+function isCollectiblesCache(value: unknown): value is CollectiblesCache {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.savedAt === "number" &&
+    Array.isArray(candidate.collectibles) &&
+    candidate.collectibles.every(
+      (item) =>
+        item !== null &&
+        typeof item === "object" &&
+        typeof (item as Record<string, unknown>).id === "string" &&
+        typeof (item as Record<string, unknown>).name === "string",
+    )
+  );
+}
+
 export class ReadsHandler {
+  private readonly collectiblesInFlight = new Map<string, Promise<Collectible[]>>();
+
   constructor(private readonly storage: StoragePort) {}
 
   async loadNetworkSettings(): Promise<NetworkSettings> {
@@ -229,6 +257,47 @@ export class ReadsHandler {
     const raw = await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`);
     if (!Array.isArray(raw)) return [];
     return raw.filter((id): id is string => typeof id === "string");
+  }
+
+  /**
+   * Cached per wallet in `local:collectibles:{address}`. A failed
+   * rediscovery serves the stale cache instead of an error; with no cache
+   * it throws, so the popup can show its error state. Concurrent calls for
+   * one wallet share one discovery.
+   */
+  async getCollectibles(req: { address: string; refresh?: boolean }): Promise<Collectible[]> {
+    const key = `${COLLECTIBLES_KEY_PREFIX}${req.address}`;
+    const raw = await this.storage.get<unknown>(key);
+    const cached = isCollectiblesCache(raw) ? raw : null;
+    if (cached && req.refresh !== true && Date.now() - cached.savedAt < COLLECTIBLES_TTL_MS) {
+      return cached.collectibles;
+    }
+
+    const running = this.collectiblesInFlight.get(req.address);
+    if (running) return running;
+
+    const run = (async () => {
+      try {
+        const settings = await this.loadNetworkSettings();
+        if (settings.activePeerUrl === null) {
+          throw new Error("No HyperBEAM peer configured. Add one in Network settings to find collectibles.");
+        }
+        const collectibles = await discoverCollectibles({
+          address: req.address,
+          gatewayUrl: settings.gatewayUrl,
+          peerUrl: settings.activePeerUrl,
+        });
+        await this.storage.set<CollectiblesCache>(key, { savedAt: Date.now(), collectibles });
+        return collectibles;
+      } catch (error) {
+        if (cached) return cached.collectibles;
+        throw error;
+      } finally {
+        this.collectiblesInFlight.delete(req.address);
+      }
+    })();
+    this.collectiblesInFlight.set(req.address, run);
+    return run;
   }
 
   async getWatchedTokens(req: { address: string }): Promise<string[]> {

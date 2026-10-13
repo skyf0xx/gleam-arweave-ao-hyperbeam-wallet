@@ -48,7 +48,7 @@ function gatewayCandidates(primaryGatewayUrl: string): string[] {
  * the first successful parsed response. Throws only if every candidate
  * fails, with the last gateway's error message.
  */
-async function postGraphQLWithFailover<T>(
+export async function postGraphQLWithFailover<T>(
   primaryGatewayUrl: string,
   query: string,
   variables: Record<string, unknown>,

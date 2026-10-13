@@ -2,6 +2,7 @@ import type {
   ActiveSite,
   ActivityPage,
   Announcement,
+  Collectible,
   ApprovalRequest,
   Contact,
   FeeEstimate,
@@ -96,6 +97,12 @@ export interface ProtocolMap {
    */
   getArFee(): Winston;
   getTokenBalances(req: { address: string }): TokenBalance[];
+  /**
+   * The AO NFTs `address` holds. Separate from `getTokenBalances` so a slow
+   * discovery never delays the token list. Popup-only. Answers from the
+   * background's per-wallet cache while it is fresh; `refresh` rediscovers.
+   */
+  getCollectibles(req: { address: string; refresh?: boolean }): Collectible[];
   getWatchedTokens(req: { address: string }): string[];
   /** Resolves a process id's ticker/balance without storing it. */
   previewWatchedToken(req: { address: string; processId: string }): TokenBalance;

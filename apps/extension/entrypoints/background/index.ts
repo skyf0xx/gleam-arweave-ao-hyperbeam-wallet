@@ -739,6 +739,7 @@ onExtensionMessage("getState", () => lifecycle.getState());
 onExtensionMessage("getBalance", (message) => reads.getBalance(message.data));
 onExtensionMessage("getArFee", () => transfer.getArFee());
 onExtensionMessage("getTokenBalances", (message) => reads.getTokenBalances(message.data));
+onExtensionMessage("getCollectibles", (message) => reads.getCollectibles(message.data));
 onExtensionMessage("getWatchedTokens", (message) => reads.getWatchedTokens(message.data));
 onExtensionMessage("previewWatchedToken", (message) => reads.previewWatchedToken(message.data));
 onExtensionMessage("addWatchedToken", (message) => reads.addWatchedToken(message.data));

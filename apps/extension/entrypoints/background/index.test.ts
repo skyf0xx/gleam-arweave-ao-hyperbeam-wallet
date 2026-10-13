@@ -135,6 +135,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "revokeGrant",
       "getBalance",
       "getTokenBalances",
+      "getCollectibles",
       "getActivity",
       "getPortfolioHistory",
       "getConnectedApps",
