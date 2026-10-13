@@ -5,11 +5,12 @@ import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/co
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
 
-const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
-  jwk: "JWK",
-  ethereum: "ETH",
-  ledger: "LEDGER",
-  keystone: "KEYSTONE",
+// JWK is what nearly every wallet is, so only the other methods get a label.
+const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
+  jwk: null,
+  ethereum: "Ethereum",
+  ledger: "Ledger",
+  keystone: "Keystone",
 };
 
 /**
@@ -145,6 +146,7 @@ interface WalletSwitcherRowProps {
 
 function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: WalletSwitcherRowProps) {
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+  const methodLabel = WALLET_METHOD_LABEL[wallet.method];
 
   return (
     <div className="flex items-center gap-1 border-b border-line last:border-b-0">
@@ -152,21 +154,21 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         type="button"
         disabled={switching}
         onClick={onSwitch}
+        aria-current={active ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-2.5 py-3 text-left hover:bg-mist disabled:opacity-60"
       >
         <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} className="rounded-2xl" />
         <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
-            <span className="flex-shrink-0 rounded-md border border-line bg-mist px-1.5 py-0.5 text-[10px] font-semibold text-muted">
-              {WALLET_METHOD_LABEL[wallet.method]}
-            </span>
+          <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
+          <span className="truncate text-caption text-faint">
+            <span className="font-mono">{truncateAddress(wallet.address)}</span>
+            {methodLabel ? <> · {methodLabel}</> : null}
           </span>
-          <span className="truncate font-mono text-caption text-faint">{truncateAddress(wallet.address)}</span>
         </span>
         {active ? (
-          <span className="flex-shrink-0 rounded-md bg-foreground/10 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
-            Selected
+          <span className="flex-shrink-0 pr-1 text-foreground">
+            <CheckIcon />
+            <span className="sr-only">Selected</span>
           </span>
         ) : null}
       </button>
@@ -179,6 +181,14 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         <KebabIcon />
       </button>
     </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
