@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { PointsMembership, RuntimePort } from "@gleam/core";
+import { INVITE_REQUIRED_MESSAGE, type PointsMembership, type RuntimePort } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
+import { FoundingGate } from "./FoundingGate";
 import { JoinNote } from "../../points/src/JoinNote";
 import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
 
@@ -38,6 +39,16 @@ export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepPro
       onSkip();
     },
   });
+
+  if (join.error instanceof Error && join.error.message === INVITE_REQUIRED_MESSAGE) {
+    return (
+      <FoundingGate
+        runtime={runtime}
+        initialUnlock={null}
+        onUnlocked={() => join.mutate({ walletId }, { onSuccess: onClaimed })}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">

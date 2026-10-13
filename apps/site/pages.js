@@ -159,7 +159,7 @@
 
   // Calls the points server. Resolves to the parsed body, or null on any
   // failure (down, slow, non-2xx), so callers fall back to showing nothing.
-  var POINTS_API = "https://gleam-points.up.railway.app";
+  var POINTS_API = "https://api.gleamwallet.app";
 
   function callPointsApi(path, body) {
     if (!window.fetch) return Promise.resolve(null);

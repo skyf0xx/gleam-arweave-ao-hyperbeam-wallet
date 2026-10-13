@@ -86,6 +86,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
         onOpenWalletSwitcher={vi.fn()}
         onOpenSettings={vi.fn()}
         onOpenPoints={vi.fn()}
+        onUseGleamOnSite={vi.fn()}
         {...overrides}
       />
     </QueryClientProvider>,

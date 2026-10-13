@@ -28,7 +28,8 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   popup, background, content script and page.
 - `packages/ui`: design tokens, primitives and shared components.
 - `apps/extension/entrypoints/`: `background`, `content`, `provider`
-  (injected into the page), `approval`, `sidepanel`, and `popup/<screen>/`.
+  (injected into the page), `approval`, `passkey`, `sidepanel`, and
+  `popup/<screen>/`.
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway). Spec in `POINTS.md`.
 - `apps/extension/src/handlers/`: background handlers such as
@@ -47,6 +48,13 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `chrome.storage.session` through `handlers/key-session.ts`, keyed by
   wallet id. Handlers get the key from there. Never re-derive it from a
   password.
+- **Passkey unlock** wraps the vault password under the passkey's
+  WebAuthn PRF output (`core/vault/passkey.ts`, `handlers/passkey.ts`),
+  so it unlocks exactly like the password. The RP id is the extension
+  id. The action popup closes when the browser's passkey prompt takes
+  focus, so from the popup every ceremony runs in the `passkey.html`
+  window (`src/passkey/open-window.ts`); the side panel and approval
+  window run it inline.
 - **AO sends** are ANS-104 items built and signed with plain WebCrypto in
   `core/ao/transfer.ts`, then POSTed to `mu.ao-testnet.xyz`. Don't use
   `@permaweb/aoconnect`: its browser build's signature check breaks raw-JWK

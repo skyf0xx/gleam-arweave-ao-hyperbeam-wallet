@@ -12,14 +12,16 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
-import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr, truncateAddress } from "./formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
 import { generateAccountAvatarSvg } from "./generateAccountAvatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
+import { SiteWalletCard } from "../../site-wallet/index.tsx";
 import { PointsTokenRow } from "../../points/index.tsx";
 
 /**
@@ -80,6 +82,8 @@ export interface MainScreenViewProps {
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
   onOpenPoints: () => void;
+  /** Opens the permissions screen for a site that was using another wallet. */
+  onUseGleamOnSite: (site: { origin: string; favIconUrl: string | null }) => void;
 }
 
 /**
@@ -238,6 +242,7 @@ export function MainScreenView({
   onOpenWalletSwitcher,
   onOpenSettings,
   onOpenPoints,
+  onUseGleamOnSite,
 }: MainScreenViewProps) {
   const [activeTab, setActiveTab] = useState<"tokens" | "activity">("tokens");
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
@@ -367,7 +372,7 @@ export function MainScreenView({
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="truncate text-label">{wallet.name}</span>
           <span className="truncate font-mono text-label text-faint">
-            {truncateAddress(wallet.address)}
+            {truncateAddress(wallet.address, 6)}
           </span>
         </button>
 
@@ -381,6 +386,7 @@ export function MainScreenView({
         </button>
       </div>
 
+      <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
       <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
 
       {/*
@@ -570,7 +576,7 @@ export function MainScreenView({
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}
-                    title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address)}`}
+                    title={`${activityVerb(entry.type)} · ${truncateAddress(entry.address, 6)}`}
                     subtitle={
                       entry.status === "pending"
                         ? "Pending confirmation"

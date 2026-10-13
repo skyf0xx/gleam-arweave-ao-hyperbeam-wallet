@@ -1,7 +1,7 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL } from '../../packages/core/src/models/network';
+import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
 
@@ -20,11 +20,13 @@ export default defineConfig({
     // to confirmed once the gateway indexes them.
     permissions: ['storage', 'sidePanel', 'tabs', 'alarms'],
     // MV3 requires an explicit host permission for every origin the
-    // background service worker fetches. The hosts fetched
+    // background service worker fetches, unless that origin answers with
+    // CORS headers (the Gleam Points API does; see POINTS_API_URL). The
+    // hosts fetched
     // unconditionally (Arweave gateway, the up.arweave.net bundler used
     // for uploads — a distinct host from arweave.net under MV3's exact
     // match-pattern rules, not covered by 'https://arweave.net/*' —
-    // CoinGecko, CoinPaprika, the Gleam Points API, and the default
+    // CoinGecko, CoinPaprika, and the default
     // HyperBEAM peers AO balance reads use out of the box, from
     // packages/core's
     // DEFAULT_HYPERBEAM_PEER_URLS) are known at build time and granted
@@ -47,7 +49,6 @@ export default defineConfig({
         'https://up.arweave.net/*',
         'https://api.coingecko.com/*',
         'https://api.coinpaprika.com/*',
-        `${POINTS_API_URL}/*`,
         ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
         ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
         ...GRAPHQL_FALLBACK_GATEWAYS.map((url) => `${url}/*`),
@@ -57,7 +58,7 @@ export default defineConfig({
     // Lets the site's welcome page hand over a Gleam Points invite code
     // (src/points-invite.ts). Only this origin can message the extension.
     externally_connectable: {
-      matches: ['https://gleam-permaweb.vercel.app/*'],
+      matches: ['https://gleamwallet.app/*'],
     },
     // Required for content.ts's injectScript("/provider.js", ...) to
     // resolve at runtime — WXT does not add this automatically (see its

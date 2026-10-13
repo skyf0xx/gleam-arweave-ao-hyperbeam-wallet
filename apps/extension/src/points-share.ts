@@ -43,7 +43,7 @@ export function invitePost(opts: { seats: number | null; link: string }): string
 
 /** The post for a seat that came back (POINTS.md § Share prompts, "Gains a seat"). */
 export function gainedSeatPost(opts: { link: string }): string {
-  return `Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${opts.link}\n${TAGS}`;
+  return `I've got a Gleam seat. It's yours if you want it.\n${opts.link}\n${TAGS}`;
 }
 
 /**

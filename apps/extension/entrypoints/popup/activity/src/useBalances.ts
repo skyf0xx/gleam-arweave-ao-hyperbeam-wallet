@@ -18,8 +18,8 @@ export interface WalletBalances {
  * in-flight request and one cache entry instead of racing independent
  * fetches.
  */
-export function useBalances(runtime: RuntimePort, address: string) {
-  return useQuery({
+export function balancesQuery(runtime: RuntimePort, address: string) {
+  return {
     queryKey: walletQueryKeys.balances(address),
     queryFn: async (): Promise<WalletBalances> => {
       const [arBalance, tokenBalances] = await Promise.all([
@@ -34,5 +34,9 @@ export function useBalances(runtime: RuntimePort, address: string) {
       ]);
       return { arBalance, tokenBalances };
     },
-  });
+  };
+}
+
+export function useBalances(runtime: RuntimePort, address: string) {
+  return useQuery(balancesQuery(runtime, address));
 }

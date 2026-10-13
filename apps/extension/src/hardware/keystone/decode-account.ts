@@ -1,3 +1,4 @@
+import { bytesToBase64Url } from "@gleam/core";
 import { ArweaveCryptoAccount } from "@keystonehq/bc-ur-registry-arweave";
 
 export const KEYSTONE_ACCOUNT_UR_TYPE = "arweave-crypto-account";
@@ -16,18 +17,12 @@ export class WrongKeystoneQrError extends Error {
   }
 }
 
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 /** Reads the account a Keystone shows as an `arweave-crypto-account` UR. */
 export function decodeKeystoneAccount(ur: { type: string; cbor: Buffer }): KeystoneAccount {
   if (ur.type !== KEYSTONE_ACCOUNT_UR_TYPE) throw new WrongKeystoneQrError(ur.type);
   const account = ArweaveCryptoAccount.fromCBOR(ur.cbor);
   return {
-    publicKey: toBase64Url(account.getKeyData()),
+    publicKey: bytesToBase64Url(account.getKeyData()),
     xfp: account.getMasterFingerprint().toString("hex"),
   };
 }

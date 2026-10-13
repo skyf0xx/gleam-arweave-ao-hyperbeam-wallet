@@ -57,11 +57,6 @@ export function formatUsd(value: number): string {
   });
 }
 
-export function truncateAddress(address: string): string {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
 function isValidArweaveAddress(address: string): boolean {
   return /^[A-Za-z0-9_-]{43}$/.test(address);
 }

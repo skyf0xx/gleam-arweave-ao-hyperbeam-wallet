@@ -28,7 +28,7 @@ export interface RegisterResult {
 
 export type RegisterOutcome =
   | { ok: true; result: RegisterResult }
-  | { ok: false; status: 400 | 401; error: string }
+  | { ok: false; status: 400 | 401 | 409; error: string }
   | { ok: false; status: 403; error: string; code: "invite_required" };
 
 const INVITE_REQUIRED = { ok: false, status: 403, error: "Invite required.", code: "invite_required" } as const;
@@ -85,8 +85,12 @@ export async function register(
 
   const address = await addressFromOwner(request.owner);
   const deviceId = message.deviceKeyThumbprint;
+  const { kty, crv, x, y } = request.devicePublicKey;
 
   return db.transaction(async (tx): Promise<RegisterOutcome> => {
+    // Leave deletes a device under this same lock, so the invite check
+    // below can't pass on a device that is about to disappear.
+    await tx.query("SELECT 1 FROM devices WHERE id = $1 FOR UPDATE", [deviceId]);
     const existing = await tx.query<{ invite_code: string; referred_by: string | null }>(
       "SELECT invite_code, referred_by FROM wallets WHERE address = $1 FOR UPDATE",
       [address],
@@ -98,7 +102,7 @@ export async function register(
     await tx.query(
       `INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ($1, $2, $3)
        ON CONFLICT (id) DO UPDATE SET last_heartbeat_at = EXCLUDED.last_heartbeat_at`,
-      [deviceId, JSON.stringify(request.devicePublicKey), now],
+      [deviceId, JSON.stringify({ kty, crv, x, y }), now],
     );
 
     if (existing.rows[0]) {
@@ -109,6 +113,9 @@ export async function register(
 
     const referredBy = message.inviteCode ? await referrerFor(tx, deviceId, message.inviteCode, address) : null;
     const inviteCode = await insertWallet(tx, { address, deviceId, referredBy, now, pointsPhase }, newInviteCode);
+    if (inviteCode === null) {
+      return { ok: false, status: 409, error: "This wallet is being registered elsewhere. Try again." };
+    }
     return { ok: true, result: { address, inviteCode, referred: referredBy !== null } };
   });
 }
@@ -139,18 +146,22 @@ async function insertWallet(
   tx: Queryable,
   wallet: { address: string; deviceId: string; referredBy: string | null; now: Date; pointsPhase: 1 | 2 },
   newInviteCode: () => string,
-): Promise<string> {
+): Promise<string | null> {
   for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt++) {
     const inviteCode = newInviteCode();
     const inserted = await tx.query<{ invite_code: string }>(
       `INSERT INTO wallets (address, device_id, invite_code, referred_by, registered_at, founding_number)
        SELECT $1, $2, $3, $4, $5, CASE WHEN $6::boolean THEN nextval('founding_number_seq')::integer END
         WHERE NOT EXISTS (SELECT 1 FROM drop_codes WHERE code = $3)
-       ON CONFLICT (invite_code) DO NOTHING
+       ON CONFLICT DO NOTHING
        RETURNING invite_code`,
       [wallet.address, wallet.deviceId, inviteCode, wallet.referredBy, wallet.now, wallet.pointsPhase === 1],
     );
     if (inserted.rows[0]) return inserted.rows[0].invite_code;
+    // A concurrent registration of the same new address committed first;
+    // retrying with another invite code would conflict again.
+    const taken = await tx.query("SELECT 1 FROM wallets WHERE address = $1", [wallet.address]);
+    if (taken.rows.length > 0) return null;
   }
   throw new Error("Couldn't generate a unique invite code.");
 }

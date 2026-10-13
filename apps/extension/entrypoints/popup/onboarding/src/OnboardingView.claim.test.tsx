@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PointsScores, PointsWalletScore, RuntimePort } from "@gleam/core";
+import { INVITE_REQUIRED_MESSAGE, type PointsScores, type PointsWalletScore, type RuntimePort } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
 import type { ClaimPhase } from "./ClaimStep";
 
@@ -21,6 +21,8 @@ function score(overrides: Partial<PointsWalletScore> = {}): PointsWalletScore {
     totalAtomic: "0",
     lastDay: null,
     topPercent: null,
+    rank: null,
+    pointsToNextRankAtomic: null,
     foundingNumber: 184,
     originalFounder: false,
     seatsLeft: 3,
@@ -84,6 +86,18 @@ describe("claim step", () => {
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setPointsClaimPending" }));
   });
 
+  it("shows the claim step when backup's back button is used", async () => {
+    const { onComplete } = setup("founding");
+    fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
+    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), { target: { value: PASSWORD } });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByText("Your wallet is ready");
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByText("Start earning Gleam Points")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   it("marks the claim pending as soon as the wallet exists, so closing the popup can't lose it", async () => {
     const { send } = setup("founding");
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
@@ -132,10 +146,19 @@ describe("claim step", () => {
   });
 
   it("shows a join failure and stays on the step", async () => {
-    const { onComplete } = setup("founding", { joinError: "Couldn't join Gleam Points: Invite required." });
+    const { onComplete } = setup("founding", { joinError: "Couldn't join Gleam Points: server busy." });
     await reachClaim();
     fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
-    expect(await screen.findByText("Couldn't join Gleam Points: Invite required.")).toBeTruthy();
+    expect(await screen.findByText("Couldn't join Gleam Points: server busy.")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("sends an invite-required refusal to the invite gate", async () => {
+    const { onComplete } = setup("founding", { joinError: INVITE_REQUIRED_MESSAGE });
+    await reachClaim();
+    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+    expect(await screen.findByLabelText("Invite code")).toBeTruthy();
+    expect(screen.queryByText(INVITE_REQUIRED_MESSAGE)).toBeNull();
     expect(onComplete).not.toHaveBeenCalled();
   });
 });

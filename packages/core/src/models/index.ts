@@ -19,6 +19,8 @@ export type {
 export { PERMISSION_TYPES } from "./permission";
 export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
+export type { ActiveSite } from "./site";
+export { UNKNOWN_WALLET_NAME } from "./site";
 export type { ActivityEntry, ActivityType, ActivityStatus, ActivityPage } from "./activity";
 export type { Contact } from "./contact";
 export type {
@@ -30,6 +32,7 @@ export type {
   PointsScores,
   PointsWalletScore,
 } from "./points";
+export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";
@@ -64,6 +67,7 @@ export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
 export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
+export type { PasskeyEnrollment, PasskeyStatus } from "./passkey";
 export type {
   PortfolioHistoryRange,
   PortfolioHistoryPoint,

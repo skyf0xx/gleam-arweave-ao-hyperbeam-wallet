@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  INVITE_REQUIRED_MESSAGE,
   base64UrlToBytes,
   bytesToBase64Url,
   deriveAddress,
@@ -24,6 +25,7 @@ import {
 import type { DeviceKey } from "../adapters/device-key";
 import {
   POINTS_DEVICE_STATE_KEY,
+  POINTS_INVITE_UNLOCK_KEY,
   POINTS_MEMBERSHIPS_KEY,
   POINTS_PENDING_INVITE_KEY,
   POINTS_CLAIM_PENDING_KEY,
@@ -215,6 +217,16 @@ describe("PointsHandler.join", () => {
     expect(await handler.getClaimPending()).toEqual(["w2"]);
   });
 
+  it("turns a Phase 1 invite_required refusal into the invite gate error and drops the stale unlock", async () => {
+    const { handler, storage } = await setup(null, 403, {
+      responseBody: { error: "Invite required.", code: "invite_required" },
+      extraStorage: { [POINTS_INVITE_UNLOCK_KEY]: { code: "", result: "ok", at: 1 } },
+    });
+
+    await expect(handler.join({ walletId: "w1" })).rejects.toThrow(INVITE_REQUIRED_MESSAGE);
+    expect(storage.store.has(POINTS_INVITE_UNLOCK_KEY)).toBe(false);
+  });
+
   it("prefers a typed invite code, normalized, over the pending one", async () => {
     const { handler, fetchImpl } = await setup(null, 200, {
       responseBody: joined(),
@@ -397,7 +409,7 @@ describe("PointsHandler.leave", () => {
 });
 
 describe("PointsHandler.redeemInvite", () => {
-  it("keeps a code that unlocked the install as the pending invite for the claim step", async () => {
+  async function redeemWith(response: unknown, code = "friend42") {
     const storage = createFakeStorage();
     const handler = new PointsHandler({
       storage,
@@ -406,26 +418,30 @@ describe("PointsHandler.redeemInvite", () => {
       signingKey: async () => null,
       walletMethod: async () => null,
       badge: createFakeBadge(),
-      fetchImpl: (async () => new Response(JSON.stringify({ result: "ok" }))) as unknown as typeof fetch,
+      fetchImpl: (async () => new Response(JSON.stringify(response))) as unknown as typeof fetch,
       now: () => NOW,
     });
-    await handler.redeemInvite("gleamdrop7");
-    expect(storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("GLEAMDROP7");
+    await handler.redeemInvite(code);
+    return storage;
+  }
+
+  it("keeps a member code that unlocked the install as the pending invite", async () => {
+    const storage = await redeemWith({ result: "ok", kind: "member" });
+    expect(storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("FRIEND42");
+  });
+
+  it("does not keep a drop code, which has no referrer", async () => {
+    const storage = await redeemWith({ result: "ok", kind: "drop" }, "gleamdrop7");
+    expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
+  });
+
+  it("keeps the code when the server doesn't name its kind", async () => {
+    const storage = await redeemWith({ result: "ok" });
+    expect(storage.store.get(POINTS_PENDING_INVITE_KEY)).toBe("FRIEND42");
   });
 
   it("does not keep a code that was full", async () => {
-    const storage = createFakeStorage();
-    const handler = new PointsHandler({
-      storage,
-      deviceKey: createDeviceKey,
-      apiUrl: "https://points.test",
-      signingKey: async () => null,
-      walletMethod: async () => null,
-      badge: createFakeBadge(),
-      fetchImpl: (async () => new Response(JSON.stringify({ result: "full" }))) as unknown as typeof fetch,
-      now: () => NOW,
-    });
-    await handler.redeemInvite("GLEAMDROP7");
+    const storage = await redeemWith({ result: "full", kind: "member" });
     expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
   });
 });
@@ -469,46 +485,33 @@ describe("PointsHandler.markUnlockedForVault", () => {
 });
 
 describe("PointsHandler.pendingInvite", () => {
-  function build(initial: Record<string, unknown>, fetchImpl: typeof fetch) {
-    const storage = createFakeStorage(initial);
+  function build(initial: Record<string, unknown>) {
+    const fetchImpl = vi.fn();
     const handler = new PointsHandler({
-      storage,
+      storage: createFakeStorage(initial),
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
       signingKey: async () => null,
       walletMethod: async () => null,
       badge: createFakeBadge(),
-      fetchImpl,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
       now: () => NOW,
     });
-    return { storage, handler };
+    return { handler, fetchImpl };
   }
-  const kind = (value: unknown) => (async () => new Response(JSON.stringify({ kind: value }))) as unknown as typeof fetch;
 
-  it("returns null when there is no pending code, without asking the server", async () => {
-    const fetchImpl = vi.fn();
-    const { handler } = build({}, fetchImpl as unknown as typeof fetch);
-    expect(await handler.pendingInvite()).toBeNull();
+  it("returns null when there is no pending code", async () => {
+    expect(await build({}).handler.pendingInvite()).toBeNull();
+  });
+
+  it("returns the stored code without asking the server", async () => {
+    const { handler, fetchImpl } = build({ [POINTS_PENDING_INVITE_KEY]: "FRIEND42" });
+    expect(await handler.pendingInvite()).toBe("FRIEND42");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("returns a member code", async () => {
-    const { handler } = build({ [POINTS_PENDING_INVITE_KEY]: "FRIEND42" }, kind("member"));
-    expect(await handler.pendingInvite()).toBe("FRIEND42");
-  });
-
-  it("forgets a drop code, which has no referrer", async () => {
-    const { handler, storage } = build({ [POINTS_PENDING_INVITE_KEY]: "GLEAMDROP7" }, kind("drop"));
-    expect(await handler.pendingInvite()).toBeNull();
-    expect(storage.store.has(POINTS_PENDING_INVITE_KEY)).toBe(false);
-  });
-
-  it("keeps the code when the server can't say what kind it is", async () => {
-    const failing = (async () => {
-      throw new Error("offline");
-    }) as unknown as typeof fetch;
-    const { handler } = build({ [POINTS_PENDING_INVITE_KEY]: "FRIEND42" }, failing);
-    expect(await handler.pendingInvite()).toBe("FRIEND42");
+  it("ignores a stored value that isn't a valid code", async () => {
+    expect(await build({ [POINTS_PENDING_INVITE_KEY]: "no good!" }).handler.pendingInvite()).toBeNull();
   });
 });
 

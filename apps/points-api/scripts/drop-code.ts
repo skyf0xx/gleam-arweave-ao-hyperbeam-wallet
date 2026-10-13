@@ -1,6 +1,6 @@
 import pg from "pg";
 import { dbFromPool } from "../src/db";
-import { createDropCode, formatDropCode, parseDropCodeArgs } from "../src/drop-codes";
+import { DEFAULT_SITE_URL, createDropCode, formatDropCode, parseDropCodeArgs } from "../src/drop-codes";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -13,13 +13,19 @@ try {
   options = parseDropCodeArgs(process.argv.slice(2).filter((arg) => arg !== "--"));
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
-  console.error('Usage: drop-code --label "<text>" (--seats <n> | --unlimited) [--prefix <A-Z>]');
+  console.error('Usage: drop-code --label "<text>" (--seats <n> | --unlimited) [--prefix <A-Z>] [--until <ISO date>]');
   process.exit(1);
 }
 
 const pool = new pg.Pool({ connectionString: databaseUrl });
 try {
-  console.log(formatDropCode(await createDropCode(dbFromPool(pool), options)));
+  console.log(
+    formatDropCode(
+      await createDropCode(dbFromPool(pool), options),
+      options.until,
+      process.env.SITE_URL ?? DEFAULT_SITE_URL,
+    ),
+  );
 } finally {
   await pool.end();
 }

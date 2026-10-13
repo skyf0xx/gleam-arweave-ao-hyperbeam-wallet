@@ -3,13 +3,18 @@ import { defineContentScript } from "wxt/utils/define-content-script";
 import { injectScript } from "wxt/utils/inject-script";
 import {
   EVENT,
+  OTHER_WALLET,
   REQUEST,
   RESPONSE,
+  SITE_MODE,
+  SITE_MODE_REQUEST,
   PROVIDER_SURFACE_METHODS,
   type PageEventEnvelope,
   type PageMessageEnvelope,
+  type PageOtherWalletEnvelope,
   type PageRequestEnvelope,
   type PageResponseEnvelope,
+  type PageSiteModeEnvelope,
 } from "@gleam/messaging/src/page-protocol.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 
@@ -25,9 +30,10 @@ import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
  *
  * This relay is the *only* path a page's request can take to reach the
  * background: it always goes through `providerCall`, which is the single
- * choke point `background.ts` enforces `PROVIDER_METHODS` against. This
- * content script has no way to call any other `ProtocolMap` method on
- * the page's behalf — it doesn't expose one.
+ * choke point `background.ts` enforces `PROVIDER_METHODS` against. The
+ * only other calls this script makes are about its own tab:
+ * `getSiteWalletMode` and `reportOtherWallet`, which route the page's
+ * `window.arweaveWallet` between Gleam and another installed wallet.
  *
  * The relayed call carries no origin. The background takes it from
  * Chrome's `sender` for this frame, so a malicious page cannot claim to
@@ -56,6 +62,16 @@ function isPageRequestEnvelope(value: unknown): value is PageRequestEnvelope {
   );
 }
 
+function isOtherWalletEnvelope(value: unknown): value is PageOtherWalletEnvelope {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (value as PageMessageEnvelope).type === OTHER_WALLET &&
+    typeof (value as PageOtherWalletEnvelope).walletName === "string" &&
+    typeof (value as PageOtherWalletEnvelope).used === "boolean"
+  );
+}
+
 async function relay(envelope: PageRequestEnvelope): Promise<void> {
   const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
   try {
@@ -75,13 +91,24 @@ export function postProviderEvent(event: string, data: unknown): void {
   window.postMessage(envelope, location.origin);
 }
 
+function postSiteMode(useGleam: boolean): void {
+  const envelope: PageSiteModeEnvelope = { type: SITE_MODE, useGleam };
+  window.postMessage(envelope, location.origin);
+}
+
 export default defineContentScript({
   matches: ["http://*/*", "https://*/*"],
   runAt: "document_start",
   allFrames: false,
   async main() {
-    await injectScript("/provider.js", { keepInDom: false });
+    // The provider sends each of these once per page; a page posting them
+    // itself gets no further than that.
+    let modeAsked = false;
+    let presenceRelayed = false;
+    let useRelayed = false;
 
+    // Listeners go first: the provider reports another wallet while it
+    // installs, before injectScript resolves.
     window.addEventListener("message", (event: MessageEvent) => {
       // Same origin/source guard as the page-side provider: only ever
       // trust messages this exact window posted to itself.
@@ -89,6 +116,20 @@ export default defineContentScript({
       const data = event.data as PageMessageEnvelope | undefined;
       if (isPageRequestEnvelope(data)) {
         void relay(data);
+      } else if (data?.type === SITE_MODE_REQUEST && !modeAsked) {
+        modeAsked = true;
+        messenger.sendMessage("getSiteWalletMode", undefined).then(
+          ({ useGleam }) => postSiteMode(useGleam),
+          // Without an answer the other wallet keeps the site, so the page
+          // shouldn't wait for one.
+          () => postSiteMode(false),
+        );
+      } else if (isOtherWalletEnvelope(data) && !(data.used ? useRelayed : presenceRelayed)) {
+        presenceRelayed = true;
+        if (data.used) useRelayed = true;
+        messenger
+          .sendMessage("reportOtherWallet", { walletName: data.walletName, used: data.used })
+          .catch(() => undefined);
       }
     });
 
@@ -101,5 +142,10 @@ export default defineContentScript({
     messenger.onMessage("providerEvent", (message) => {
       postProviderEvent(message.data.event, message.data.data);
     });
+    messenger.onMessage("siteWalletMode", (message) => {
+      postSiteMode(message.data.useGleam);
+    });
+
+    await injectScript("/provider.js", { keepInDom: false });
   },
 });

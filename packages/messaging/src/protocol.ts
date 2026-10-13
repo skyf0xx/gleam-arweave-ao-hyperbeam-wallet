@@ -1,4 +1,5 @@
 import type {
+  ActiveSite,
   ActivityPage,
   Announcement,
   ApprovalRequest,
@@ -10,7 +11,9 @@ import type {
   InviteUnlock,
   JWKInterface,
   LockSettings,
+  PasskeyStatus,
   NetworkSettings,
+  PermissionType,
   PointsMembership,
   PointsSharePrompt,
   PointsScores,
@@ -66,6 +69,22 @@ export interface ProtocolMap {
    * session.
    */
   resetAllWallets(): void;
+  /** Whether a passkey can unlock Gleam, and the public inputs its ceremony needs. */
+  getPasskeyStatus(): PasskeyStatus;
+  /**
+   * Throws unless `password` opens the vault. Asked before creating a
+   * passkey, so a mistyped password never leaves an unusable passkey in
+   * the user's password manager.
+   */
+  checkVaultPassword(req: { password: string }): void;
+  /**
+   * Stores the vault password wrapped under the passkey's PRF output.
+   * `prfSalt` and `prfOutput` are base64url. Replaces any earlier passkey.
+   */
+  enrollPasskey(req: { password: string; credentialId: string; prfSalt: string; prfOutput: string }): void;
+  /** Unlocks with the PRF output (base64url) of the enrolled passkey. */
+  unlockWithPasskey(req: { credentialId: string; prfOutput: string }): { unlockedWalletIds: string[] };
+  removePasskey(): void;
 
   // reads
   getState(): WalletState;
@@ -222,6 +241,32 @@ export interface ProtocolMap {
   /** Ids of the announcements the user has dismissed. */
   getDismissedAnnouncements(): string[];
   dismissAnnouncement(req: { id: string }): void;
+
+  // the site in the active tab
+  /** Null when the active tab isn't an http(s) page. */
+  getActiveSite(): ActiveSite | null;
+  /**
+   * Grants `origin` from the popup, so its page uses Gleam instead of the
+   * other installed wallet, and reloads the active tab if it shows that
+   * origin. The user picks `permissions` in the popup; a later `connect()`
+   * asking for more still prompts for the rest. Needs a wallet.
+   */
+  useGleamOnSite(req: { origin: string; permissions: PermissionType[] }): void;
+  /** Revokes the grant, hands the site back to the other wallet, and reloads the active tab if it shows `origin`. */
+  stopGleamOnSite(req: { origin: string }): void;
+  dismissSiteSuggestion(req: { origin: string }): void;
+
+  /**
+   * Content script only. Whether the sending tab's origin uses Gleam over
+   * another installed wallet: true when the user chose Gleam for it or it
+   * holds an active grant. Like `providerCall`, the origin comes from
+   * Chrome's `sender`.
+   */
+  getSiteWalletMode(): { useGleam: boolean };
+  /** Content script only. Relays a `PageOtherWalletEnvelope` for the sending tab. */
+  reportOtherWallet(req: { walletName: string; used: boolean }): void;
+  /** Background → content-script push when a site's grant comes or goes. */
+  siteWalletMode(req: { useGleam: boolean }): void;
 
   /**
    * The single relay point for every page-originated provider call

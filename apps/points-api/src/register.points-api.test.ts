@@ -49,6 +49,42 @@ describe("POST /register", () => {
     expect(rows[0]?.last_heartbeat_at.toISOString()).toBe(NOW.toISOString());
   });
 
+  it("stores only the device key's public members", async () => {
+    const db = await createTestDb();
+    const device = await createTestDevice();
+    const body = await registerBody(alice, device, { issuedAt: NOW_SECONDS });
+
+    await post(setup(db, 2), { ...body, devicePublicKey: { ...device.publicKey, ext: true, key_ops: ["verify"] } });
+
+    const { rows } = await db.query<{ public_key_jwk: unknown }>("SELECT public_key_jwk FROM devices");
+    expect(rows[0]?.public_key_jwk).toEqual(device.publicKey);
+  });
+
+  it("answers 409 when the same new wallet was registered concurrently", async () => {
+    const db = await createTestDb();
+    const device = await admittedDevice(db);
+    const other = await admittedDevice(db);
+    await post(setup(db), await registerBody(alice, other, { issuedAt: NOW_SECONDS }));
+    // Hides the committed row from the existing-wallet lookup, as a
+    // registration still in flight on another connection would be.
+    const racing: Db = {
+      ...db,
+      transaction: (work) =>
+        db.transaction((tx) =>
+          work({
+            query: (text, params) =>
+              text.includes("FROM wallets WHERE address = $1 FOR UPDATE") ? Promise.resolve({ rows: [] }) : tx.query(text, params),
+          }),
+        ),
+    };
+
+    const { status } = await post(setup(racing), await registerBody(alice, device, { issuedAt: NOW_SECONDS }));
+
+    expect(status).toBe(409);
+    const { rows } = await db.query("SELECT 1 FROM wallets");
+    expect(rows).toHaveLength(1);
+  });
+
   it("credits an invite code on the install's first wallet", async () => {
     const db = await createTestDb();
     const app = setup(db);

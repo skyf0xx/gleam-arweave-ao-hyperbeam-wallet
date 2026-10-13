@@ -7,7 +7,7 @@ import { pickSharePrompt } from "./SharePrompt";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
-const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
+const LINK = "https://gleamwallet.app/invite.html?c=MYCODE22";
 
 afterEach(cleanup);
 
@@ -33,6 +33,8 @@ function scoreWith(overrides: Partial<PointsWalletScore>): PointsWalletScore {
     totalAtomic: "0",
     lastDay: null,
     topPercent: 12,
+    rank: 5,
+    pointsToNextRankAtomic: null,
     foundingNumber: 184,
     originalFounder: false,
     seatsLeft: 3,
@@ -114,7 +116,7 @@ describe("share prompts on the Points screen", () => {
 
     expect(await screen.findByRole("heading", { name: "A friend joined. You got another invite." })).toBeTruthy();
     expect(invite().getByRole("link", { name: "Invite on X" }).getAttribute("href")).toBe(
-      intent(`Someone I invited just joined @gleam_wallet, so I got another invite. Who wants it?\n${LINK}\n@ArweaveEco @aoTheComputer`),
+      intent(`I've got a Gleam seat. It's yours if you want it.\n${LINK}\n@ArweaveEco @aoTheComputer`),
     );
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsSeatsSeen", payload: { walletId: WALLET.id, seats: 3 } }),

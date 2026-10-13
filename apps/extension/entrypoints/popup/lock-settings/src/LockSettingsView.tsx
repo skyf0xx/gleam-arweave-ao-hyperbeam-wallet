@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AutoLockTimeout, LockSettings, RuntimePort } from "@gleam/core";
+import type { AutoLockTimeout, LockSettings, PasskeyStatus, RuntimePort } from "@gleam/core";
+import { PasskeyIcon } from "@/entrypoints/popup/unlock/src/UnlockScreen";
+import { forgetPasskey, passkeysAvailable } from "@/src/passkey/webauthn";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 
@@ -21,6 +23,10 @@ export interface LockSettingsViewProps {
   runtime: RuntimePort;
   onBack: () => void;
   onLocked: () => void;
+  /** Opens the passkey window in setup mode. Omitted, the passkey section is hidden. */
+  onSetUpPasskey?: () => Promise<void>;
+  /** Injected for tests; defaults to feature-detecting WebAuthn. */
+  passkeysSupported?: boolean;
 }
 
 interface LoadState {
@@ -29,7 +35,13 @@ interface LoadState {
   error: string | null;
 }
 
-export function LockSettingsView({ runtime, onBack, onLocked }: LockSettingsViewProps) {
+export function LockSettingsView({
+  runtime,
+  onBack,
+  onLocked,
+  onSetUpPasskey,
+  passkeysSupported = passkeysAvailable(),
+}: LockSettingsViewProps) {
   const [state, setState] = useState<LoadState>({ settings: null, loading: true, error: null });
   const [locking, setLocking] = useState(false);
   const [savingTimeout, setSavingTimeout] = useState<AutoLockTimeout | null>(null);
@@ -78,7 +90,7 @@ export function LockSettingsView({ runtime, onBack, onLocked }: LockSettingsView
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Lock & auto-lock" onBack={onBack} />
+      <ScreenHeader title="Lock & unlock" onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
       <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
@@ -102,6 +114,10 @@ export function LockSettingsView({ runtime, onBack, onLocked }: LockSettingsView
             </span>
           </button>
         </div>
+
+        {onSetUpPasskey ? (
+          <PasskeySection runtime={runtime} supported={passkeysSupported} onSetUp={onSetUpPasskey} />
+        ) : null}
 
         <div>
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
@@ -139,7 +155,133 @@ export function LockSettingsView({ runtime, onBack, onLocked }: LockSettingsView
             Gleam stays unlocked until you lock it or this timeout is reached.
           </p>
         </div>
+
       </div>
+    </div>
+  );
+}
+
+type PasskeyState =
+  | { kind: "loading" }
+  | { kind: "ready"; status: PasskeyStatus; busy: boolean; error?: string };
+
+function formatSetUpDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/**
+ * The passkey is set up in its own window, so this section re-reads its
+ * status whenever this view regains focus, as the side panel does once
+ * that window closes.
+ */
+function PasskeySection({
+  runtime,
+  supported,
+  onSetUp,
+}: {
+  runtime: RuntimePort;
+  supported: boolean;
+  onSetUp: () => Promise<void>;
+}) {
+  const [passkey, setPasskey] = useState<PasskeyState>({ kind: "loading" });
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const status = await runtime.send<void, PasskeyStatus>({ type: "getPasskeyStatus", payload: undefined });
+      setPasskey({ kind: "ready", status: status?.enrolled === true ? status : { enrolled: false }, busy: false });
+    } catch (error) {
+      setPasskey({
+        kind: "ready",
+        status: { enrolled: false },
+        busy: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [runtime]);
+
+  useEffect(() => {
+    void loadStatus();
+    const onFocus = () => void loadStatus();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadStatus]);
+
+  const handleSetUp = async () => {
+    if (passkey.kind !== "ready") return;
+    setPasskey({ ...passkey, busy: true, error: undefined });
+    try {
+      await onSetUp();
+    } catch (error) {
+      setPasskey({ ...passkey, busy: false, error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    setPasskey({ ...passkey, busy: false });
+  };
+
+  const handleRemove = async () => {
+    if (passkey.kind !== "ready" || !passkey.status.enrolled) return;
+    const { credentialId } = passkey.status;
+    setPasskey({ ...passkey, busy: true, error: undefined });
+    try {
+      await runtime.send<void, void>({ type: "removePasskey", payload: undefined });
+      forgetPasskey(credentialId);
+      setPasskey({ kind: "ready", status: { enrolled: false }, busy: false });
+    } catch (error) {
+      setPasskey({ ...passkey, busy: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  return (
+    <div className="pb-10">
+      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+        Passkey
+      </div>
+      {passkey.kind === "loading" ? (
+        <SkeletonRow />
+      ) : passkey.status.enrolled ? (
+        <div className="flex items-center gap-3 py-3.5">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
+            <PasskeyIcon />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-label font-semibold text-foreground">Unlock with passkey is on</span>
+            <span className="text-caption text-muted">Set up {formatSetUpDate(passkey.status.createdAt)}</span>
+          </span>
+          <button
+            type="button"
+            disabled={passkey.busy}
+            onClick={() => void handleRemove()}
+            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60"
+          >
+            {passkey.busy ? "Removing…" : "Remove"}
+          </button>
+        </div>
+      ) : supported ? (
+        <button
+          type="button"
+          disabled={passkey.busy}
+          onClick={() => void handleSetUp()}
+          className="flex w-full items-center gap-3 py-3.5 text-left hover:bg-mist disabled:opacity-60"
+        >
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
+            <PasskeyIcon />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-label font-semibold text-foreground">Set up a passkey</span>
+            <span className="text-caption text-muted">Unlock with your fingerprint, face or security key</span>
+          </span>
+        </button>
+      ) : (
+        <p className="py-3.5 text-caption text-muted">Passkeys aren&apos;t available in this browser.</p>
+      )}
+      {passkey.kind === "ready" && passkey.error ? (
+        <p role="alert" className="pt-1 text-caption text-warning">
+          {passkey.error}
+        </p>
+      ) : null}
+      <p className="pt-2.5 text-caption leading-relaxed text-faint">
+        Your password always works too. A passkey only works in this browser profile.
+      </p>
     </div>
   );
 }

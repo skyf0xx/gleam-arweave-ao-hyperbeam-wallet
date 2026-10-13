@@ -12,7 +12,8 @@ import {
   type QrScannerProps,
   type ScannerError,
 } from "@/src/hardware/keystone";
-import { backgroundErrorText, ConnectedNotice, ConnectShell, truncateAddress } from "./connect-shared";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
+import { backgroundErrorText, ConnectedNotice, ConnectShell } from "./connect-shared";
 
 export interface ConnectViewProps {
   runtime: RuntimePort;

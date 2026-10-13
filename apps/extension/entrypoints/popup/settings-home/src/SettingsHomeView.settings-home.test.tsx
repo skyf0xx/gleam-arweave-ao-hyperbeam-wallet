@@ -64,21 +64,21 @@ describe("SettingsHomeView", () => {
     await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
   });
 
-  it("calls onOpenLockSettings when the Auto-lock row is pressed", async () => {
+  it("calls onOpenLockSettings when the Lock & unlock row is pressed", async () => {
     const onOpenLockSettings = vi.fn();
     renderSettingsHome({ onOpenLockSettings });
 
-    await waitFor(() => expect(screen.getByText("Auto-lock")).toBeTruthy());
-    fireEvent.click(screen.getByText("Auto-lock"));
+    await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
+    fireEvent.click(screen.getByText("Lock & unlock"));
 
     expect(onOpenLockSettings).toHaveBeenCalled();
   });
 
-  it("hides the Auto-lock row when there is no lock to open (vault without a password)", async () => {
+  it("hides the Lock & unlock row when there is no lock to open (vault without a password)", async () => {
     renderSettingsHome({ onOpenLockSettings: undefined });
 
     await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
-    expect(screen.queryByText("Auto-lock")).toBeNull();
+    expect(screen.queryByText("Lock & unlock")).toBeNull();
   });
 
   it("calls onOpenConnectedApps when the Connected apps row is pressed", async () => {
@@ -140,7 +140,7 @@ describe("SettingsHomeView", () => {
     const onBack = vi.fn();
     renderSettingsHome({ onBack });
 
-    await waitFor(() => expect(screen.getByText("Auto-lock")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
     expect(onBack).toHaveBeenCalled();
@@ -193,7 +193,7 @@ describe("SettingsHomeView", () => {
   it("does not render the removed Import & export or About placeholder rows", async () => {
     renderSettingsHome();
 
-    await waitFor(() => expect(screen.getByText("Auto-lock")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
     expect(screen.queryByText("Import & export")).toBeNull();
     expect(screen.queryByText("About")).toBeNull();
   });

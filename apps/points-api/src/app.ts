@@ -40,6 +40,13 @@ export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
   app.use("*", bodyLimit({ maxSize: 16 * 1024 }));
 
+  // The extension calls these without a host permission, so the browser
+  // enforces CORS on them. Any extension id is allowed so unpacked dev
+  // builds work too; every one of these requests is checked on its own
+  // merits, so the origin is never what authorises it.
+  const extensionCors = cors({ origin: (origin) => (origin.startsWith("chrome-extension://") ? origin : null) });
+  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me"]) app.use(path, extensionCors);
+
   app.get("/health", async (c) => {
     await deps.db.query("SELECT 1");
     return c.json({ ok: true });
@@ -73,7 +80,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!request) return c.json({ error: "Malformed request." }, 400);
 
     const outcome = await redeemInviteCode(deps.db, request, now(), pointsPhase);
-    return outcome.ok ? c.json({ result: outcome.result }) : c.json({ error: outcome.error }, outcome.status);
+    return outcome.ok ? c.json({ result: outcome.result, kind: outcome.kind }) : c.json({ error: outcome.error }, outcome.status);
   });
 
   app.post("/register", async (c) => {

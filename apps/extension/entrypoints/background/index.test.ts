@@ -56,6 +56,7 @@ vi.mock("wxt/utils/storage", () => ({
 
 const windowsCreate = vi.fn().mockResolvedValue({ id: 1 });
 const tabsQuery = vi.fn().mockResolvedValue([]);
+const tabsReload = vi.fn().mockResolvedValue(undefined);
 const alarmsCreate = vi.fn();
 const alarmsAddListener = vi.fn();
 const onSuspendAddListener = vi.fn();
@@ -63,8 +64,9 @@ vi.mock("wxt/browser", () => ({
   browser: {
     windows: { create: windowsCreate, remove: vi.fn(), update: vi.fn(), onRemoved: { addListener: vi.fn() } },
     runtime: { getURL: (path: string) => `chrome-extension://test${path}`, onSuspend: { addListener: onSuspendAddListener } },
-    tabs: { query: tabsQuery },
+    tabs: { query: tabsQuery, reload: tabsReload, onRemoved: { addListener: vi.fn() } },
     alarms: { create: alarmsCreate, get: vi.fn(async () => undefined), onAlarm: { addListener: alarmsAddListener } },
+    action: { setIcon: vi.fn(async () => undefined) },
   },
 }));
 
@@ -93,6 +95,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     windowsCreate.mockClear();
     tabsQuery.mockClear();
     tabsQuery.mockResolvedValue([]);
+    tabsReload.mockClear();
     await import("./index");
   });
 
@@ -114,6 +117,11 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "exportWallet",
       "getState",
       "resetAllWallets",
+      "getPasskeyStatus",
+      "checkVaultPassword",
+      "enrollPasskey",
+      "unlockWithPasskey",
+      "removePasskey",
       "getApproval",
       "resolveApproval",
       "submitDeviceSignature",
@@ -200,6 +208,24 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     await expect(resetHandler({ data: undefined })).resolves.toBeUndefined();
     await expect(getStateHandler({ data: undefined })).resolves.toMatchObject({ wallets: [] });
+  });
+
+  it("unlocks with an enrolled passkey and forgets it on reset", async () => {
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const password = "correct horse battery staple";
+    const prfOutput = "A".repeat(43);
+
+    await handler("createWallet")({ data: { name: "Wallet 1", password } });
+    await handler("enrollPasskey")({ data: { password, credentialId: "cred-1", prfSalt: "salt", prfOutput } });
+    await handler("lockWallet")({ data: undefined });
+
+    await expect(handler("unlockWithPasskey")({ data: { credentialId: "cred-1", prfOutput } })).resolves.toMatchObject({
+      unlockedWalletIds: [expect.any(String)],
+    });
+    await expect(handler("getState")({ data: undefined })).resolves.toMatchObject({ session: expect.any(Object) });
+
+    await handler("resetAllWallets")({ data: undefined });
+    await expect(handler("getPasskeyStatus")({ data: undefined })).resolves.toEqual({ enrolled: false });
   });
 
   it("rejects a KEY_METHODS name routed through providerCall", () => {
@@ -1269,6 +1295,157 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     });
   });
 
+  describe("routing a site between Gleam and another installed wallet", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+
+    beforeEach(async () => {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      tabsQuery.mockResolvedValue([{ id: 7, url: `${ORIGIN}/app` }]);
+    });
+
+    function fromContent(method: string, data: unknown, origin = ORIGIN): Promise<unknown> {
+      return (async () => rawHandlers.get(method)!({ data, sender: contentSender(origin) }))();
+    }
+
+    it("a site uses the other wallet until it holds a grant", async () => {
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: true });
+    });
+
+    it("the popup sees the other wallet the active tab reported", async () => {
+      await fromContent("reportOtherWallet", { walletName: "Wander", used: true });
+      await expect(registeredHandlers.get("getActiveSite")!({ data: undefined })).resolves.toMatchObject({
+        origin: ORIGIN,
+        otherWallet: "Wander",
+        otherWalletUsedAt: expect.any(Number),
+        grant: null,
+      });
+    });
+
+    it("Use Gleam here grants the chosen permissions, switches open tabs, and reloads the active one", async () => {
+      await registeredHandlers.get("useGleamOnSite")!({
+        data: { origin: ORIGIN, permissions: ["ACCESS_TOKENS", "NOT_A_PERMISSION"] },
+      });
+
+      expect(await getItem("local:grants")).toEqual([
+        expect.objectContaining({ origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS", "ACCESS_TOKENS"] }),
+      ]);
+      expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: true }, 7);
+      expect(tabsReload).toHaveBeenCalledWith(7);
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("doesn't reload the active tab when it has moved on to another site", async () => {
+      tabsQuery.mockResolvedValue([{ id: 8, url: "https://other.example/" }]);
+      await registeredHandlers.get("useGleamOnSite")!({ data: { origin: ORIGIN, permissions: [] } });
+      expect(tabsReload).not.toHaveBeenCalled();
+    });
+
+    it("Switch back revokes the grant, hands open tabs back, and reloads the active one", async () => {
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+      await registeredHandlers.get("stopGleamOnSite")!({ data: { origin: ORIGIN } });
+
+      expect(await getItem("local:grants")).toEqual([]);
+      expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 7);
+      expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7);
+      expect(tabsReload).toHaveBeenCalledWith(7);
+    });
+
+    it("an approved connect marks the site as using Gleam and switches its open tabs", async () => {
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+
+      const connecting = rawHandlers.get("providerCall")!({
+        data: { method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } },
+        sender: contentSender(ORIGIN),
+      });
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      const pending = (await getItem("session:pendingApprovals")) as Array<{ request: { requestId: string } }>;
+      await registeredHandlers.get("resolveApproval")!({ data: { requestId: pending[0]!.request.requestId, approved: true } });
+      await connecting;
+
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: true });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: true }, 7));
+    });
+
+    it("a dApp's own disconnect keeps the site on Gleam, so its next connect still comes to Gleam", async () => {
+      await registeredHandlers.get("useGleamOnSite")!({ data: { origin: ORIGIN, permissions: [] } });
+      sendMessage.mockClear();
+
+      await rawHandlers.get("providerCall")!({ data: { method: "disconnect", params: {} }, sender: contentSender(ORIGIN) });
+
+      expect(await getItem("local:grants")).toEqual([]);
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: true });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 7));
+      expect(sendMessage).not.toHaveBeenCalledWith("siteWalletMode", expect.anything(), expect.anything());
+    });
+
+    it("Switch back forgets the user's choice as well as the grant", async () => {
+      await registeredHandlers.get("useGleamOnSite")!({ data: { origin: ORIGIN, permissions: [] } });
+      await registeredHandlers.get("stopGleamOnSite")!({ data: { origin: ORIGIN } });
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
+    });
+
+    it("resetting the vault sends every chosen site back to the other wallet", async () => {
+      await registeredHandlers.get("useGleamOnSite")!({ data: { origin: ORIGIN, permissions: [] } });
+      await registeredHandlers.get("resetAllWallets")!({ data: undefined });
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
+    });
+
+    async function chooseGleamWithoutGrant(): Promise<void> {
+      await registeredHandlers.get("useGleamOnSite")!({ data: { origin: ORIGIN, permissions: [] } });
+      await rawHandlers.get("providerCall")!({ data: { method: "disconnect", params: {} }, sender: contentSender(ORIGIN) });
+      sendMessage.mockClear();
+    }
+
+    it("resetting the vault switches back open tabs of a chosen site that holds no grant", async () => {
+      await chooseGleamWithoutGrant();
+      await registeredHandlers.get("resetAllWallets")!({ data: undefined });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), expect.anything());
+    });
+
+    it("deleting the last wallet switches back open tabs of a chosen site that holds no grant", async () => {
+      await chooseGleamWithoutGrant();
+      await registeredHandlers.get("deleteWallet")!({ data: { walletId: "wallet-1" } });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
+    });
+
+    it("revoking from Connected apps hands open tabs back to the other wallet", async () => {
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+      await registeredHandlers.get("revokeGrant")!({ data: { origin: ORIGIN } });
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+    });
+
+    it.each(["useGleamOnSite", "stopGleamOnSite", "dismissSiteSuggestion"])("%s refuses an origin that isn't a web origin", async (method) => {
+      await expect(
+        (async () => registeredHandlers.get(method)!({ data: { origin: "chrome://settings", permissions: [] } }))(),
+      ).rejects.toThrow(/web origin/);
+    });
+
+    it.each(["getSiteWalletMode", "reportOtherWallet"])("%s is refused from an extension page", async (method) => {
+      await expect(
+        (async () => rawHandlers.get(method)!({ data: { walletName: "Wander", used: true }, sender: POPUP_SENDER }))(),
+      ).rejects.toThrow(/only accepted from a web page's content script/);
+    });
+  });
+
   describe("senders are checked against Chrome's sender, not the message body", () => {
     const ORIGIN = "https://bazar.arweave.net";
 
@@ -1306,7 +1483,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     });
 
     it("every other method is rejected from a content script, before its handler runs", async () => {
-      const guarded = [...rawHandlers.keys()].filter((method) => method !== "providerCall");
+      const contentMethods = ["providerCall", "getSiteWalletMode", "reportOtherWallet"];
+      const guarded = [...rawHandlers.keys()].filter((method) => !contentMethods.includes(method));
       expect(guarded).toEqual(
         expect.arrayContaining([
           "exportWallet",

@@ -45,7 +45,9 @@ export function explorerUrlFor(idOrAddress: string): string {
 }
 
 /**
- * Gleam Points API (apps/points-api). Also listed in
- * apps/extension/wxt.config.ts's `host_permissions`.
+ * Gleam Points API (apps/points-api). Deliberately absent from the
+ * extension's `host_permissions`: the API answers the extension's origin
+ * with CORS headers instead, so adding Points didn't raise a new
+ * permission warning that would disable Gleam on update.
  */
-export const POINTS_API_URL = "https://gleam-points.up.railway.app";
+export const POINTS_API_URL = "https://api.gleamwallet.app";

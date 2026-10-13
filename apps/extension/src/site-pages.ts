@@ -1,4 +1,4 @@
-export const SITE_URL = "https://gleam-permaweb.vercel.app/";
+export const SITE_URL = "https://gleamwallet.app/";
 
 export type SitePage = "welcome" | "feedback" | "goodbye" | "gleam" | "points";
 

@@ -13,7 +13,7 @@ const extensionPath = fileURLToPath(
 );
 
 // Pages that render without any wallet or pending request.
-const PAGES = ["popup.html", "approval.html"];
+const PAGES = ["popup.html", "approval.html", "passkey.html", "passkey.html?mode=setup"];
 
 let context: BrowserContext;
 let extensionId: string;

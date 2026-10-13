@@ -9,12 +9,18 @@ export const DEFAULT_DROP_PREFIX = "GLEAM";
 export const DROP_SUFFIX_LENGTH = 8;
 const MAX_PREFIX_LENGTH = 16 - DROP_SUFFIX_LENGTH;
 const MAX_ATTEMPTS = 5;
+export const DEFAULT_SITE_URL = "https://gleamwallet.app/";
 
 export interface DropCodeOptions {
   label: string;
   /** null is a code that never runs out. */
   seats: number | null;
   prefix: string;
+  /**
+   * When the drop closes. Not stored: it only goes into the link as
+   * `?until=`, which `invite.html` reads for its countdown.
+   */
+  until: Date | null;
 }
 
 export interface DropCode {
@@ -31,6 +37,7 @@ export function parseDropCodeArgs(argv: string[]): DropCodeOptions {
       seats: { type: "string" },
       unlimited: { type: "boolean" },
       prefix: { type: "string" },
+      until: { type: "string" },
     },
     strict: true,
   });
@@ -51,7 +58,13 @@ export function parseDropCodeArgs(argv: string[]): DropCodeOptions {
   if (!new RegExp(`^[A-Z]{1,${MAX_PREFIX_LENGTH}}$`).test(prefix)) {
     throw new Error(`--prefix must be 1 to ${MAX_PREFIX_LENGTH} letters A-Z.`);
   }
-  return { label, seats, prefix };
+
+  let until: Date | null = null;
+  if (values.until !== undefined) {
+    until = new Date(values.until);
+    if (Number.isNaN(until.getTime())) throw new Error("--until must be a date, e.g. 2026-10-20T18:00:00Z.");
+  }
+  return { label, seats, prefix, until };
 }
 
 /**
@@ -84,6 +97,18 @@ export async function createDropCode(
   });
 }
 
-export function formatDropCode({ code, seats, label }: DropCode): string {
-  return `${code}  ${seats === null ? "unlimited seats" : `${seats} seats`}  ${label}`;
+export function dropLink(code: string, until: Date | null, siteUrl: string = DEFAULT_SITE_URL): string {
+  const url = new URL("invite.html", siteUrl);
+  url.searchParams.set("c", code);
+  if (until) url.searchParams.set("until", until.toISOString());
+  return url.toString();
+}
+
+export function formatDropCode(
+  { code, seats, label }: DropCode,
+  until: Date | null = null,
+  siteUrl: string = DEFAULT_SITE_URL,
+): string {
+  const summary = `${code}  ${seats === null ? "unlimited seats" : `${seats} seats`}  ${label}`;
+  return `${summary}\n${dropLink(code, until, siteUrl)}`;
 }

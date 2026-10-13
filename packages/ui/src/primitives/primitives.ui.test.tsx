@@ -148,4 +148,22 @@ describe("ui: OptionSection and OptionRow", () => {
     fireEvent.click(row);
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it("shows a value, and a disabled coming-soon row is inert and has no chevron", () => {
+    const onClick = vi.fn();
+    render(
+      <OptionSection title="Tools">
+        <OptionRow title="Auto-lock" description="When it locks" value="Never" onClick={onClick} />
+        <OptionRow title="Upload" description="Store a file" disabled comingSoon onClick={onClick} />
+      </OptionSection>,
+    );
+
+    expect(screen.getByText("Never")).toBeTruthy();
+    expect(screen.getByText("Coming soon")).toBeTruthy();
+    const upload = screen.getByRole("button", { name: "Upload" }) as HTMLButtonElement;
+    expect(upload.disabled).toBe(true);
+    expect(upload.querySelector("svg")).toBeNull();
+    fireEvent.click(upload);
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

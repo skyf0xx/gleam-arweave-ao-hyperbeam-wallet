@@ -367,19 +367,24 @@ export class WalletLifecycleHandler {
    */
   private async checkNewWalletPassword(password: string): Promise<void> {
     const wallets = await loadWallets(this.storage);
-    const activeWalletId = await loadActiveWalletId(this.storage, wallets);
-    const encrypted = [
-      ...wallets.filter((wallet) => wallet.id === activeWalletId),
-      ...wallets.filter((wallet) => wallet.id !== activeWalletId),
-    ].flatMap((wallet) => (wallet.encryptedKeyfile ? [{ wallet, envelope: wallet.encryptedKeyfile }] : []));
-
-    if (encrypted.length === 0) {
+    if (!hasVaultPassword(wallets)) {
       const passwordCheck = validatePassword(password);
       if (!passwordCheck.valid) {
         throw new Error(passwordCheck.reason);
       }
       return;
     }
+    if (!(await this.opensVault(wallets, password))) {
+      throw new Error("That password didn't work. Use the password you unlock Gleam with.");
+    }
+  }
+
+  private async opensVault(wallets: Wallet[], password: string): Promise<boolean> {
+    const activeWalletId = await loadActiveWalletId(this.storage, wallets);
+    const encrypted = [
+      ...wallets.filter((wallet) => wallet.id === activeWalletId),
+      ...wallets.filter((wallet) => wallet.id !== activeWalletId),
+    ].flatMap((wallet) => (wallet.encryptedKeyfile ? [{ wallet, envelope: wallet.encryptedKeyfile }] : []));
 
     for (const { wallet, envelope } of encrypted) {
       try {
@@ -390,13 +395,28 @@ export class WalletLifecycleHandler {
           wallet.address,
         );
         zeroize(plaintext);
-        return;
+        return true;
       } catch {
         // Wrong password for this wallet; a vault from before the shared
         // password may have others that it opens.
       }
     }
-    throw new Error("That password didn't work. Use the password you unlock Gleam with.");
+    return false;
+  }
+
+  /** Throws unless the vault has a password and `password` is it. */
+  async checkVaultPassword(req: { password: string }): Promise<void> {
+    const wallets = await loadWallets(this.storage);
+    if (!hasVaultPassword(wallets)) {
+      throw new Error("Gleam has no password to protect. Add a wallet with a keyfile first.");
+    }
+    if (!(await this.opensVault(wallets, req.password))) {
+      throw new Error("That password didn't work. Use the password you unlock Gleam with.");
+    }
+  }
+
+  async hasVaultPassword(): Promise<boolean> {
+    return hasVaultPassword(await loadWallets(this.storage));
   }
 
   async createWallet(req: { name: string; password: string }): Promise<WalletSummary> {

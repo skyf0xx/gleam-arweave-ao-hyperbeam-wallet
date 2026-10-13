@@ -21,6 +21,8 @@ function scores(foundingNumber: number | null, seatsLeft: number | null = 3): Po
         totalAtomic: "0",
         lastDay: null,
         topPercent: null,
+        rank: null,
+        pointsToNextRankAtomic: null,
         foundingNumber,
         originalFounder: true,
         seatsLeft,

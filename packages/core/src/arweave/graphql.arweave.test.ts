@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { queryActivityTransactions, queryAoTransferActivity } from "./graphql";
+import { AO_MU_SIGNERS, queryActivityTransactions, queryAoTransferActivity } from "./graphql";
 
 const ADDRESS = "myAddr";
 
@@ -15,7 +15,7 @@ function fakeGraphQLFetch(edges: unknown[], ok = true): typeof fetch {
 function fakeSidedFetch(sent: unknown[], received: unknown[]): typeof fetch {
   return vi.fn(async (_url: string, init: RequestInit) => {
     const { query } = JSON.parse(init.body as string) as { query: string };
-    const edges = query.includes("owners:") ? sent : received;
+    const edges = query.includes("recipients:") ? received : sent;
     return { ok: true, status: 200, json: async () => ({ data: { transactions: { edges } } }) };
   }) as unknown as typeof fetch;
 }
@@ -242,10 +242,10 @@ function sentTransfer(id: string, payee: string, quantity: string) {
   });
 }
 
-function creditNotice(id: string, payer: string, quantity: string) {
+function creditNotice(id: string, payer: string, quantity: string, signer = AO_MU_SIGNERS[0]!) {
   return aoEdge({
     id,
-    ownerAddress: "muSigner",
+    ownerAddress: signer,
     recipient: ADDRESS,
     action: "Credit-Notice",
     quantity,
@@ -295,8 +295,30 @@ describe("queryAoTransferActivity", () => {
     const queries = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls.map(
       (call) => (JSON.parse(call[1].body) as { query: string }).query,
     );
-    expect(queries.find((query) => query.includes("owners:"))).toContain('values: ["Transfer"]');
+    expect(queries.find((query) => !query.includes("recipients:"))).toContain('values: ["Transfer"]');
     expect(queries.find((query) => query.includes("recipients:"))).toContain('values: ["Credit-Notice"]');
+  });
+
+  it("asks the gateway only for Credit-Notices signed by an AO MU", async () => {
+    const fetchImpl = fakeSidedFetch([], []);
+    await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    const receiveRequest = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls
+      .map((call) => JSON.parse(call[1].body) as { query: string; variables: Record<string, unknown> })
+      .find((request) => request.query.includes("recipients:"));
+    expect(receiveRequest?.query).toContain("owners: $signers");
+    expect(receiveRequest?.variables.signers).toEqual(AO_MU_SIGNERS);
+  });
+
+  it("ignores a forged Credit-Notice not signed by an AO MU and keeps a genuine one", async () => {
+    const fetchImpl = fakeSidedFetch(
+      [],
+      [creditNotice("forged", "payer", "1000000", "forger"), creditNotice("genuine", "payer", "42", AO_MU_SIGNERS[1])],
+    );
+
+    const entries = await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entries.map((entry) => entry.txId)).toEqual(["genuine"]);
   });
 
   it("drops a Credit-Notice with no From-Process, since its token is unknown", async () => {
@@ -321,7 +343,7 @@ describe("queryAoTransferActivity", () => {
         return { ok: false, status: 502, json: async () => ({}) };
       }
       const { query } = JSON.parse(init.body as string) as { query: string };
-      const edges = query.includes("owners:") ? [sentTransfer("msg4", "payee", "1")] : [];
+      const edges = query.includes("recipients:") ? [] : [sentTransfer("msg4", "payee", "1")];
       return { ok: true, status: 200, json: async () => ({ data: { transactions: { edges } } }) };
     }) as unknown as typeof fetch;
 

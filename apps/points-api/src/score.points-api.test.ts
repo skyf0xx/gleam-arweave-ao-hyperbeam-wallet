@@ -72,6 +72,8 @@ describe("POST /me", () => {
           totalAtomic: "0",
           lastDay: null,
           topPercent: null,
+          rank: null,
+          pointsToNextRankAtomic: null,
           foundingNumber: 2,
           originalFounder: false,
           seatsLeft: 3,
@@ -84,6 +86,8 @@ describe("POST /me", () => {
           totalAtomic: "0",
           lastDay: null,
           topPercent: null,
+          rank: null,
+          pointsToNextRankAtomic: null,
           foundingNumber: 3,
           originalFounder: false,
           seatsLeft: 3,
@@ -112,14 +116,20 @@ describe("POST /me", () => {
       totalAtomic: "2020",
       lastDay: { holdingAtomic: "1000", refereeBonusAtomic: "0", founderBonusAtomic: "0", referrerBonusAtomic: "10" },
       topPercent: 34,
+      rank: 1,
+      pointsToNextRankAtomic: null,
     });
+    // Bob and Carol register in the same instant, so their order falls to
+    // their randomly generated addresses.
     const byAddress = Object.fromEntries(
-      bobsView.wallets.map((w: { address: string; totalAtomic: string; topPercent: number }) => [
-        w.address,
-        [w.totalAtomic, w.topPercent],
-      ]),
+      bobsView.wallets.map(
+        (w: { address: string; totalAtomic: string; topPercent: number; rank: number | null; pointsToNextRankAtomic: string | null }) => [
+          w.address,
+          [w.totalAtomic, w.topPercent, w.rank, w.pointsToNextRankAtomic],
+        ],
+      ),
     );
-    expect(byAddress).toEqual({ [bob.address]: ["220", 67], [carol.address]: ["20", 100] });
+    expect(byAddress).toEqual({ [bob.address]: ["220", 67, 2, "1801"], [carol.address]: ["20", 100, 3, "201"] });
   });
 
   it("reports the founder flag and counts the founder bonus in the total and last day", async () => {

@@ -9,6 +9,7 @@ export { readDataItemFields } from "./arweave/data-item";
 export * from "./hardware/ledger/index";
 export * from "./vault/encryption";
 export * from "./vault/message-signing";
+export * from "./vault/passkey";
 export * from "./keys/jwk";
 export * from "./keys/address";
 export type { StoragePort } from "./ports/storage";

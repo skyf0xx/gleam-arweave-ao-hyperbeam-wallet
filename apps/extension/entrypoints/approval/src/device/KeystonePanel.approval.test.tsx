@@ -122,7 +122,7 @@ describe("KeystonePanel", () => {
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("40");
   });
 
-  it("refuses a transaction that needs a chunked upload instead of showing a QR", () => {
+  it("refuses a transaction with too much data instead of showing a QR", () => {
     const transaction: DeviceSigningPayload = {
       kind: "transaction",
       transaction: {
@@ -141,7 +141,7 @@ describe("KeystonePanel", () => {
       },
     };
     const props = renderPanel({ payloads: [transaction] });
-    expect(props.onError).toHaveBeenCalledWith(expect.stringMatching(/chunked upload/));
+    expect(props.onError).toHaveBeenCalledWith(expect.stringMatching(/too much to show as a QR/));
     expect(screen.queryByRole("img")).toBeNull();
   });
 

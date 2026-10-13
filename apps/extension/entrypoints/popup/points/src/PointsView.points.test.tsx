@@ -7,9 +7,9 @@ import { PointsView } from "./PointsView";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
-const POINTS_URL = "https://gleam-permaweb.vercel.app/points.html?v=1.2.3";
-const GLEAM_URL = "https://gleam-permaweb.vercel.app/gleam.html?v=1.2.3";
-const LINK = "https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22";
+const POINTS_URL = "https://gleamwallet.app/points.html?v=1.2.3";
+const GLEAM_URL = "https://gleamwallet.app/gleam.html?v=1.2.3";
+const LINK = "https://gleamwallet.app/invite.html?c=MYCODE22";
 
 afterEach(() => {
   cleanup();
@@ -52,6 +52,8 @@ const SCORES: PointsScores = {
       totalAtomic: (5n * BigInt(ONE_POINT)).toString(),
       lastDay: { holdingAtomic: ONE_POINT, refereeBonusAtomic: "0", founderBonusAtomic: "0", referrerBonusAtomic: "0" },
       topPercent: 12,
+      rank: 5,
+      pointsToNextRankAtomic: "1801000000000",
       foundingNumber: 7,
       originalFounder: false,
       seatsLeft: 3,
@@ -343,6 +345,33 @@ describe("PointsView", () => {
     expect(screen.queryByText(/Top \d+%/)).toBeNull();
   });
 
+  it("shows the private rank and the points needed to pass the next one", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByText("Your rank is #5. 1.80 points to pass the next one.")).toBeTruthy();
+  });
+
+  it("shows only the rank for the leader", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({
+        ...SCORES,
+        wallets: [{ ...SCORES.wallets[0]!, rank: 1, pointsToNextRankAtomic: null }],
+      }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByText("Your rank is #1.")).toBeTruthy();
+  });
+
   it("copies the invite link", async () => {
     const writeText = vi.fn(async () => {});
     Object.assign(navigator, { clipboard: { writeText } });
@@ -355,7 +384,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: "Copy invite link" }));
 
-    expect(writeText).toHaveBeenCalledWith("https://gleam-permaweb.vercel.app/invite.html?c=MYCODE22");
+    expect(writeText).toHaveBeenCalledWith("https://gleamwallet.app/invite.html?c=MYCODE22");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 

@@ -16,9 +16,11 @@ import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
 import { ContactsView } from "@/entrypoints/popup/contacts/index.tsx";
 import { PointsView } from "@/entrypoints/popup/points/index.tsx";
 import { UploadView } from "@/entrypoints/popup/upload/index.tsx";
+import { UseGleamOnSiteView } from "@/entrypoints/popup/site-wallet/index.tsx";
 import { browser } from "wxt/browser";
 import { FOUNDING_GATE } from "@/src/founding-gate";
 import { sitePageUrl } from "@/src/site-pages";
+import { openPasskeyWindow } from "@/src/passkey/open-window";
 
 /**
  * The one shared shell mounted from every surface (popup, sidepanel, and
@@ -92,7 +94,8 @@ type MainSubView =
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
   | { kind: "points" }
-  | { kind: "upload" };
+  | { kind: "upload" }
+  | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null };
 
 function resolveTopView(state: WalletState): TopView {
   if (state.wallets.length === 0) return "onboarding";
@@ -215,6 +218,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onUnlocked={() => void refresh(runtime)}
         onResetComplete={() => void refresh(runtime)}
+        passkeyMode={layout === "popup" ? "window" : "inline"}
+        openPasskeyWindow={() => openPasskeyWindow("unlock")}
       />
     );
   } else if (!wallet) {
@@ -304,6 +309,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
+        onSetUpPasskey={() => openPasskeyWindow("setup")}
       />
     );
   } else if (subView.kind === "network-peers") {
@@ -329,6 +335,16 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onDone={() => setSubView({ kind: "settings-home" })}
       />
     );
+  } else if (subView.kind === "use-gleam-on-site") {
+    content = (
+      <UseGleamOnSiteView
+        runtime={runtime}
+        origin={subView.origin}
+        favIconUrl={subView.favIconUrl}
+        onBack={() => setSubView({ kind: "home" })}
+        onDone={() => setSubView({ kind: "home" })}
+      />
+    );
   } else {
     content = (
       <PendingClaim runtime={runtime} wallet={wallet}>
@@ -342,6 +358,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
             onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
             onOpenSettings={() => setSubView({ kind: "settings-home" })}
             onOpenPoints={() => setSubView({ kind: "points" })}
+            onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
           />
         </ExistingMemberReveal>
       </PendingClaim>

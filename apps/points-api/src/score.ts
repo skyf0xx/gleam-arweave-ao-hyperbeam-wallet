@@ -11,6 +11,10 @@ export interface WalletScore {
   lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with any points; null until the wallet has some. */
   topPercent: number | null;
+  /** 1-based place among wallets with points, ties sharing a place; null until the wallet has some. Private: never listed. */
+  rank: number | null;
+  /** Atomic points that would put the wallet strictly above the next wallet up; null for the leader or an unranked wallet. */
+  pointsToNextRankAtomic: string | null;
   /** Null for wallets that registered after Phase 1. */
   foundingNumber: number | null;
   /** Backfilled before Phase 1: gets the referee bonus without a code. */
@@ -43,6 +47,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
     referee_count: string;
     total: string | null;
     rank: string | null;
+    to_next: string | null;
     founding_number: number | null;
     original_founder: boolean;
     pending_redemptions: string;
@@ -64,6 +69,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
             (SELECT count(*) FROM wallets r WHERE r.referred_by = w.address)::text AS referee_count,
             ${PENDING_MEMBER_REDEMPTIONS_SQL}::text AS pending_redemptions,
             r.total::text AS total, r.rank::text AS rank,
+            (SELECT min(a.total) - r.total + 1 FROM ranked a WHERE a.total > r.total)::text AS to_next,
             coalesce((SELECT count(*) FROM ranked), 0)::text AS ranked,
             p.holding_atomic::text AS holding, p.referee_bonus_atomic::text AS referee_bonus,
             p.founder_bonus_atomic::text AS founder_bonus,
@@ -96,6 +102,8 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
       foundingNumber: row.founding_number,
       originalFounder: row.original_founder,
       seatsLeft: memberSeatsLeft(Number(row.pending_redemptions), pointsPhase),
+      rank: row.rank === null ? null : Number(row.rank),
+      pointsToNextRankAtomic: row.to_next,
       topPercent: row.rank === null ? null : topPercent(Number(row.rank), Number(row.ranked)),
     })),
   };

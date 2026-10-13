@@ -5,10 +5,9 @@ import { cn } from "./cn";
  * The explicit-risk-acknowledgment box for the Irreversible/high-exposure
  * tier (e.g. "You haven't sent to this address before"). This is the
  * single component every screen with an Irreversible-tier confirmation
- * composes, rather than each screen inventing its own warning-box markup
- * — the rule that the warning-red accent appears only here is only
- * enforceable if there's one component gating where that color can
- * appear at all.
+ * composes, rather than each screen inventing its own warning-box markup.
+ * Warning red also marks inline errors and notices elsewhere (text field,
+ * contacts, the main-screen notice card), but never as a risk box.
  *
  * Deliberately has no `tone`/`variant` prop and always renders in the
  * warning palette — a Routine or Consequential screen has no reason to

@@ -51,6 +51,14 @@ export async function leave(db: Db, request: LeaveRequest, now: Date): Promise<L
   if (!ownsAddress || !(await verifyPointsProof(request.proof, request.owner, request.message, request.signature))) return { ok: false, status: 401, error: "Wallet signature is invalid." };
 
   await db.transaction(async (tx) => {
+    // Lock the device before the wallet, as register does, so a register
+    // can't add a wallet to the device between our delete and its cleanup.
+    const current = await tx.query<{ device_id: string }>("SELECT device_id FROM wallets WHERE address = $1", [
+      message.address,
+    ]);
+    if (current.rows[0]) {
+      await tx.query("SELECT 1 FROM devices WHERE id = $1 FOR UPDATE", [current.rows[0].device_id]);
+    }
     const deleted = await tx.query<{ device_id: string }>(
       "DELETE FROM wallets WHERE address = $1 RETURNING device_id",
       [message.address],

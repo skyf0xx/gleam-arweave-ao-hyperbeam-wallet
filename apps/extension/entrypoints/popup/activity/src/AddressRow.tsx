@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
 import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
-import { truncateAddress } from "../../main-screen/src/formatWinston";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 
 /**
  * One address row with a dicebear identicon (`generateAccountAvatarSvg`,
@@ -23,10 +23,10 @@ export function AddressRow({ address, name, onSelect }: { address: string; name:
       {name ? (
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-label font-semibold text-foreground">{name}</span>
-          <span className="truncate font-mono text-caption text-faint">{truncateAddress(address)}</span>
+          <span className="truncate font-mono text-caption text-faint">{truncateAddress(address, 6)}</span>
         </span>
       ) : (
-        <span className="min-w-0 flex-1 truncate font-mono text-label text-foreground">{truncateAddress(address)}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-label text-foreground">{truncateAddress(address, 6)}</span>
       )}
     </button>
   );

@@ -77,3 +77,61 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     expect(onBack).toHaveBeenCalled();
   });
 });
+
+describe("LockSettingsView passkey section", () => {
+  function sendFor(passkey: unknown) {
+    return vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getLockSettings") return NEVER;
+      if (type === "getPasskeyStatus") return passkey;
+      return undefined;
+    }) as unknown as RuntimePort["send"] & ReturnType<typeof vi.fn>;
+  }
+
+  it("offers passkey setup and opens the setup window", async () => {
+    const onSetUpPasskey = vi.fn(async () => undefined);
+    render(
+      <LockSettingsView
+        runtime={fakeRuntime({ send: sendFor({ enrolled: false }) })}
+        onBack={vi.fn()}
+        onLocked={vi.fn()}
+        onSetUpPasskey={onSetUpPasskey}
+        passkeysSupported
+      />,
+    );
+
+    fireEvent.click(await screen.findByText("Set up a passkey"));
+    await waitFor(() => expect(onSetUpPasskey).toHaveBeenCalledOnce());
+  });
+
+  it("says so when the browser has no passkeys", async () => {
+    render(
+      <LockSettingsView
+        runtime={fakeRuntime({ send: sendFor({ enrolled: false }) })}
+        onBack={vi.fn()}
+        onLocked={vi.fn()}
+        onSetUpPasskey={vi.fn()}
+        passkeysSupported={false}
+      />,
+    );
+
+    expect(await screen.findByText("Passkeys aren't available in this browser.")).toBeTruthy();
+  });
+
+  it("removes an enrolled passkey", async () => {
+    const send = sendFor({ enrolled: true, credentialId: "cred", prfSalt: "salt", createdAt: Date.UTC(2026, 0, 2) });
+    render(
+      <LockSettingsView
+        runtime={fakeRuntime({ send })}
+        onBack={vi.fn()}
+        onLocked={vi.fn()}
+        onSetUpPasskey={vi.fn()}
+        passkeysSupported
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "removePasskey", payload: undefined }));
+    expect(await screen.findByText("Set up a passkey")).toBeTruthy();
+  });
+});

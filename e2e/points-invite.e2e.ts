@@ -4,16 +4,17 @@ import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * The Gleam Points invite handoff, end to end: invite.html keeps the code,
- * then welcome.html (which the extension opens on install) sends it to
- * the built extension over externally_connectable. The site's files are
+ * The Gleam Points invite handoff, end to end. With the extension already
+ * installed, invite.html sends the code straight to it; otherwise it keeps
+ * the code, and welcome.html (which the extension opens on install) sends it
+ * to the built extension over externally_connectable. The site's files are
  * served under its real origin, since externally_connectable matches only
  * that origin. The unpacked extension's id differs from the store id, so
  * pages.js is served with the test id swapped in.
  */
 const extensionPath = fileURLToPath(new URL("../apps/extension/.output/chrome-mv3", import.meta.url));
 const siteDir = fileURLToPath(new URL("../apps/site/", import.meta.url));
-const SITE = "https://gleam-permaweb.vercel.app";
+const SITE = "https://gleamwallet.app";
 const STORE_EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -41,6 +42,9 @@ test.beforeAll(async () => {
   const extensionId = new URL(worker.url()).host;
 
   await context.route("https://cloud.umami.is/**", (route) => route.abort());
+  await context.route("https://api.gleamwallet.app/invite/redeem", (route) =>
+    route.fulfill({ json: { result: "ok", kind: "member" } }),
+  );
   await context.route(`${SITE}/**`, async (route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\//, "") || "index.html";
     const file = `${siteDir}${path}`;
@@ -59,18 +63,31 @@ function pendingInviteCode(): Promise<unknown> {
   return worker.evaluate(async () => (await chrome.storage.local.get("points:pendingInviteCode"))["points:pendingInviteCode"]);
 }
 
-test("an invite link's code reaches the extension via the welcome page", async () => {
+test.beforeEach(async () => {
+  await worker.evaluate(() => chrome.storage.local.clear());
+});
+
+test("an invite link hands its code to an installed extension at once", async () => {
   const page = await context.newPage();
 
   await page.goto(`${SITE}/invite.html?c=friend42`);
+
   await expect(page.locator("[data-invite-code-value]")).toHaveText("FRIEND42");
-  expect(await pendingInviteCode()).toBeUndefined();
+  await expect.poll(pendingInviteCode).toBe("FRIEND42");
+  await expect(page.locator("[data-invite-ready]")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("gleam:inviteCode"))).toBeNull();
+});
+
+test("the welcome page hands over a code saved by an earlier invite visit", async () => {
+  const page = await context.newPage();
+  await page.addInitScript(() =>
+    localStorage.setItem("gleam:inviteCode", JSON.stringify({ code: "FRIEND42", savedAt: Date.now() })),
+  );
 
   await page.goto(`${SITE}/welcome.html?v=test`);
+
   await expect.poll(pendingInviteCode).toBe("FRIEND42");
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("gleam:inviteCode")))
-    .toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("gleam:inviteCode"))).toBeNull();
 });
 
 test("a page on another origin can't message the extension", async () => {

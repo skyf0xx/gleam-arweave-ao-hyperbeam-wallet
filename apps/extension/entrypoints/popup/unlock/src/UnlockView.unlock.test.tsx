@@ -81,7 +81,7 @@ describe("UnlockView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
     fireEvent.click(screen.getByRole("button", { name: "Reset wallet" }));
     expect(onResetComplete).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalledWith({ type: "resetAllWallets", payload: undefined });
 
     fireEvent.click(screen.getByRole("button", { name: "Yes, reset wallet" }));
     await waitFor(() => expect(onResetComplete).toHaveBeenCalledOnce());

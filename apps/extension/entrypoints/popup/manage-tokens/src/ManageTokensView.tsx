@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort, TokenBalance } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { formatAtomicAsDisplay, truncateAddress } from "../../main-screen/src/formatWinston";
+import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 
 /**
@@ -156,7 +157,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                       <span className="truncate text-label font-semibold text-foreground">
                         {balance?.ticker ?? "Unavailable"}
                       </span>
-                      <span className="truncate font-mono text-caption text-muted">{truncateAddress(processId)}</span>
+                      <span className="truncate font-mono text-caption text-muted">{truncateAddress(processId, 6)}</span>
                     </span>
                     {balance ? (
                       <span className="flex-shrink-0 font-mono text-label text-muted">

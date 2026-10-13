@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -10,11 +11,6 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string> = {
   ledger: "LEDGER",
   keystone: "KEYSTONE",
 };
-
-function truncateAddress(address: string): string {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 5)}…${address.slice(-4)}`;
-}
 
 /**
  * The sheet opened from the main screen's account pill. Lists every stored
