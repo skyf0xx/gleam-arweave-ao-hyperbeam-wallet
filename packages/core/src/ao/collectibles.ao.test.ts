@@ -47,6 +47,8 @@ interface World {
   received?: string[];
   descriptors: Record<string, Record<string, string>>;
   balances: Record<string, string | number>;
+  /** Balances the gateway's HyperBEAM answers; ids missing here get a 500, as legacy assets do. */
+  gatewayBalances?: Record<string, string | number>;
 }
 
 function stubFetch(world: World) {
@@ -54,6 +56,10 @@ function stubFetch(world: World) {
   const impl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(url);
+    if (url.startsWith(GATEWAY) && url.includes("~process@1.0")) {
+      const balance = world.gatewayBalances?.[url.split("/")[3]!.split("~")[0]!];
+      return balance === undefined ? new Response("x", { status: 500 }) : Response.json(String(balance));
+    }
     if (url.startsWith(PEER)) {
       const id = url.split("/")[3]!.split("~")[0]!;
       const balance = world.balances[id];
@@ -107,6 +113,17 @@ describe("discoverCollectibles", () => {
     });
     const list = await result;
     expect(list.map((c) => c.name).sort()).toEqual(["Alpha", "Charlie"]);
+  });
+
+  it("reads balances from the gateway first and falls back to the peer", async () => {
+    const { result, calls } = run({
+      initial: [A, B],
+      descriptors: { [A]: { ...NFT, name: "Gateway" }, [B]: { ...NFT, name: "Peer" } },
+      balances: { [A]: "boom", [B]: 1 },
+      gatewayBalances: { [A]: 1 },
+    });
+    expect((await result).map((c) => c.name).sort()).toEqual(["Gateway", "Peer"]);
+    expect(calls.some((u) => u.startsWith(PEER) && u.includes(A))).toBe(false);
   });
 
   it("treats a 404 balance as not held", async () => {
