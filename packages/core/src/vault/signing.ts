@@ -21,6 +21,7 @@ import {
   verifyDataItemSignature,
 } from "../arweave/data-item";
 import { base64ToBytes } from "./base64";
+import { signMessage, verifyMessage } from "./message-signing";
 
 /**
  * `core/vault`'s share of the provider-signing-crypto surface: the actual
@@ -42,10 +43,15 @@ import { base64ToBytes } from "./base64";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
-/** What a signer signs: an unsigned format-2 transaction, or the raw bytes of an unsigned ANS-104 item. */
+/**
+ * What a signer signs: an unsigned format-2 transaction, the raw bytes of
+ * an unsigned ANS-104 item, or a `signMessage` message (SHA-256 only,
+ * the one hash a Keystone signs messages with).
+ */
 export type UnsignedPayload =
   | { kind: "transaction"; transaction: ArweaveTransactionJson }
-  | { kind: "dataItem"; raw: Bytes };
+  | { kind: "dataItem"; raw: Bytes }
+  | { kind: "message"; data: Bytes };
 
 export type SignedPayload =
   | { kind: "transaction"; id: string; transaction: ArweaveTransactionJson }
@@ -54,16 +60,22 @@ export type SignedPayload =
 /**
  * True only when `signature` is a valid RSA-PSS (SHA-256, salt 32)
  * signature by `ownerB64Url` over the payload's deep hash, which is
- * recomputed here, and the payload names that same owner.
+ * recomputed here, and the payload names that same owner. A message
+ * must pass `verifyMessage`.
  */
 export async function verifyDeviceSignature(
   unsigned: UnsignedPayload,
   signature: Uint8Array,
   ownerB64Url: string,
 ): Promise<boolean> {
-  return unsigned.kind === "transaction"
-    ? verifyTransactionSignature(unsigned.transaction, signature, ownerB64Url)
-    : verifyDataItemSignature(unsigned.raw, signature, ownerB64Url);
+  switch (unsigned.kind) {
+    case "transaction":
+      return verifyTransactionSignature(unsigned.transaction, signature, ownerB64Url);
+    case "dataItem":
+      return verifyDataItemSignature(unsigned.raw, signature, ownerB64Url);
+    case "message":
+      return verifyMessage(ownerB64Url, unsigned.data.slice().buffer, new Uint8Array(signature).buffer, "SHA-256");
+  }
 }
 
 /**
@@ -80,15 +92,21 @@ export async function applySignature(
     const { id, transaction } = await applyTransactionSignature(unsigned.transaction, signature, expectedOwner);
     return { kind: "transaction", id, transaction };
   }
+  if (unsigned.kind === "message") throw new Error("A message signature is returned as is, not applied to a payload.");
   const { id, raw } = await applyDataItemSignature(unsigned.raw, signature, expectedOwner);
   return { kind: "dataItem", id, raw };
 }
 
 /** Signs the payload's deep hash with a keyfile. Returns the raw 512-byte signature. */
 export async function signPayloadWithJwk(unsigned: UnsignedPayload, jwk: JWKInterface): Promise<Bytes> {
-  return unsigned.kind === "transaction"
-    ? signTransactionWithJwk(unsigned.transaction, jwk)
-    : signDataItemWithJwk(unsigned.raw, jwk);
+  switch (unsigned.kind) {
+    case "transaction":
+      return signTransactionWithJwk(unsigned.transaction, jwk);
+    case "dataItem":
+      return signDataItemWithJwk(unsigned.raw, jwk);
+    case "message":
+      return new Uint8Array(await signMessage(jwk, unsigned.data.slice().buffer, "SHA-256"));
+  }
 }
 
 /** Threshold (bytes) above which `dispatch()` bundles rather than posts as a base AR tx. Below it, dispatch posts directly to the gateway as a `BASE` transaction. */

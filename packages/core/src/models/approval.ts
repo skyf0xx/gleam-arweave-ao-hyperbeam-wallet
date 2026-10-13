@@ -120,7 +120,8 @@ export const WALLET_APPROVAL_ORIGIN = "gleam:wallet";
 /**
  * One thing the device signs, as it crosses the messaging boundary. A
  * transaction is the unsigned format-2 JSON (`signature` and `id` empty);
- * a data item is the unsigned ANS-104 bytes, base64url.
+ * a data item is the unsigned ANS-104 bytes, base64url; a message is the
+ * `signMessage` data, base64url.
  */
 export type DeviceSigningPayload =
   | {
@@ -140,7 +141,8 @@ export type DeviceSigningPayload =
         signature: string;
       };
     }
-  | { kind: "dataItem"; raw: string };
+  | { kind: "dataItem"; raw: string }
+  | { kind: "message"; data: string };
 
 /**
  * What a device payload actually says, decoded by the background from the
@@ -152,7 +154,9 @@ export type DeviceSigningPayload =
 export type DeviceSigningSummary =
   | { kind: "transaction"; recipient: string | null; quantity: string; fee: string; dataSize: string }
   | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
-  | { kind: "dataItem"; target: string | null; dataSize: number };
+  | { kind: "dataItem"; target: string | null; dataSize: number }
+  /** `text` is the message as UTF-8, or null when it isn't valid text. */
+  | { kind: "message"; text: string | null; size: number };
 
 /**
  * What the approval window needs to drive a hardware wallet once the user

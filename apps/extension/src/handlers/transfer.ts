@@ -260,8 +260,10 @@ export class TransferHandler {
       if (unsigned.kind === "transaction") {
         const settings = await this.loadNetworkSettings();
         ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned.transaction, signature, expectedOwner));
-      } else {
+      } else if (unsigned.kind === "dataItem") {
         ({ messageId: txId } = await finishAoTransfer(unsigned.raw, signature, expectedOwner));
+      } else {
+        throw new Error("A transfer can't finish with a message signature.");
       }
     } catch (error) {
       console.error(`Device transfer failed (token=${req.token ?? "AR"}):`, error);

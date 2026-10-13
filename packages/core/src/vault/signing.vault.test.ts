@@ -342,6 +342,7 @@ describe("vault/signing", () => {
    */
   describe("device signing pipeline", () => {
     async function deviceSign(unsigned: UnsignedPayload, key: JWKInterface) {
+      if (unsigned.kind === "message") throw new Error("Not a deep-hash payload.");
       const message =
         unsigned.kind === "transaction"
           ? await transactionSignatureData(unsigned.transaction)

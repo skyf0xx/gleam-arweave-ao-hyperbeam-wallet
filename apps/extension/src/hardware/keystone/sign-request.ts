@@ -47,6 +47,10 @@ export interface KeystoneSignRequest {
 }
 
 function payloadBytes(payload: DeviceSigningPayload): { bytes: Buffer; signType: SignType } {
+  // The Keystone signs SHA-256(data) with RSA-PSS/SHA-256, which is `signMessage`'s scheme.
+  if (payload.kind === "message") {
+    return { bytes: Buffer.from(base64UrlToBytes(payload.data)), signType: SignType.Message };
+  }
   if (payload.kind === "dataItem") {
     return { bytes: Buffer.from(base64UrlToBytes(payload.raw)), signType: SignType.DataItem };
   }

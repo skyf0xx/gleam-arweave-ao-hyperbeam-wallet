@@ -1039,7 +1039,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     it.each([
       ["ledger", "signMessage", "sign messages"],
-      ["keystone", "signature", "sign messages"],
+      ["ledger", "signature", "sign with the deprecated signature()"],
       ["ledger", "decrypt", "decrypt data"],
       ["keystone", "privateHash", "create private hashes"],
     ] as const)("%s refuses %s", async (walletMethod, method, action) => {
@@ -1048,6 +1048,16 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
       await expect(providerCall({ origin: ORIGIN, method, params })).rejects.toThrow(
         `This wallet can't ${action}. Switch to a keyfile wallet.`,
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("a Keystone's signMessage with a hash other than SHA-256 is refused", async () => {
+      await seedHardwareWallet("keystone");
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]), options: { hashAlgorithm: "SHA-384" } });
+
+      await expect(providerCall({ origin: ORIGIN, method: "signMessage", params })).rejects.toThrow(
+        "A hardware wallet signs messages with SHA-256 only, not SHA-384.",
       );
       expect(windowsCreate).not.toHaveBeenCalled();
     });

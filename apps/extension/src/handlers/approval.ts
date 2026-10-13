@@ -21,6 +21,7 @@ import {
   prepareSignTransaction,
   privateHash as vaultPrivateHash,
   readDataItemFields,
+  HARDWARE_MESSAGE_HASH,
   signDataItem,
   signMessage as vaultSignMessage,
   signTransaction,
@@ -349,6 +350,7 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "transferAoTokens",
   "transfer",
   "pointsProof",
+  "signMessage",
 ]);
 
 const TIMED_OUT = "Approval request timed out — the approval window was not resolved in time.";
@@ -357,6 +359,25 @@ const TIMED_OUT = "Approval request timed out — the approval window was not re
 const RESOLVING_RECHECK_MS = 5_000;
 
 const textDecoder = new TextDecoder();
+const strictTextDecoder = new TextDecoder("utf-8", { fatal: true });
+
+/** How much of a message the device step shows; the dApp's preview already showed it in full. */
+const MESSAGE_TEXT_LIMIT = 500;
+
+// Control characters other than tab/newline, and bidi overrides, can make
+// shown text differ from the signed bytes, so such a message shows its size.
+const UNSAFE_TEXT = /[\p{Cc}\u202A-\u202E\u2066-\u2069]/u;
+
+function messageText(data: Uint8Array): string | null {
+  let text: string;
+  try {
+    text = strictTextDecoder.decode(data);
+  } catch {
+    return null;
+  }
+  if (text.length === 0 || UNSAFE_TEXT.test(text.replace(/[\t\n]/g, ""))) return null;
+  return text.length > MESSAGE_TEXT_LIMIT ? `${text.slice(0, MESSAGE_TEXT_LIMIT)}…` : text;
+}
 
 function decodeTransactionTag(tag: { name: string; value: string }): { name: string; value: string } {
   return { name: textDecoder.decode(base64UrlToBytes(tag.name)), value: textDecoder.decode(base64UrlToBytes(tag.value)) };
@@ -367,6 +388,9 @@ function tagValue(tags: Array<{ name: string; value: string }>, name: string): s
 }
 
 function summarize(payload: UnsignedPayload): DeviceSigningSummary {
+  if (payload.kind === "message") {
+    return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
+  }
   if (payload.kind === "transaction") {
     const { target, quantity, reward, data_size } = payload.transaction;
     return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
@@ -489,6 +513,12 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
       if (summary.quantity !== input.amount) mismatch("amount");
       return;
     }
+    case "signMessage": {
+      const [payload] = payloads;
+      if (payloads.length !== 1 || payload?.kind !== "message") mismatch("message");
+      if (bytesToBase64Url(payload.data) !== bytesToBase64Url(input.payload)) mismatch("message");
+      return;
+    }
     case "pointsProof":
       checkTransaction(payloads[0], {
         target: "",
@@ -504,9 +534,14 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
 }
 
 function toWirePayload(payload: UnsignedPayload): DeviceSigningPayload {
-  return payload.kind === "transaction"
-    ? { kind: "transaction", transaction: payload.transaction }
-    : { kind: "dataItem", raw: bytesToBase64Url(payload.raw) };
+  switch (payload.kind) {
+    case "transaction":
+      return { kind: "transaction", transaction: payload.transaction };
+    case "dataItem":
+      return { kind: "dataItem", raw: bytesToBase64Url(payload.raw) };
+    case "message":
+      return { kind: "message", data: bytesToBase64Url(payload.data) };
+  }
 }
 
 function transactionOf(payload: UnsignedPayload | undefined): UnsignedPayload & { kind: "transaction" } {
@@ -1097,6 +1132,13 @@ export class ApprovalHandler {
         return [await this.deviceTransfers().prepareDeviceTransfer(this.transferRequestOf(walletId, input), owner)];
       case "pointsProof":
         return [{ kind: "transaction", transaction: await buildOwnershipTransaction(owner, textDecoder.decode(input.payload)) }];
+      case "signMessage": {
+        const hashAlgorithm = input.hashAlgorithm ?? HARDWARE_MESSAGE_HASH;
+        if (hashAlgorithm !== HARDWARE_MESSAGE_HASH) {
+          throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
+        }
+        return [{ kind: "message", data: new Uint8Array(input.payload) }];
+      }
       default:
         throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
     }
@@ -1134,6 +1176,8 @@ export class ApprovalHandler {
       }
       case "pointsProof":
         return { owner, address: wallet.address, signature: bytesToBase64Url(signature!) } satisfies PointsDeviceProof;
+      case "signMessage":
+        return new Uint8Array(signature!);
       default:
         throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
     }

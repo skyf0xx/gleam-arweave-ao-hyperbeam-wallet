@@ -14,8 +14,10 @@ export interface WalletCapabilities {
   dispatchViaBundler: boolean;
   /** Sign ANS-104 data items: AO sends, `signDataItem`, `batchSignDataItem`. */
   signDataItem: boolean;
-  /** Sign arbitrary bytes: `signMessage`, `signature`. */
+  /** `signMessage`. A device may support only SHA-256 (see `HARDWARE_MESSAGE_HASH`). */
   signMessage: boolean;
+  /** Wander's deprecated `signature`: RSA-PSS straight over the raw bytes. */
+  signature: boolean;
   decrypt: boolean;
   privateHash: boolean;
   exportKey: boolean;
@@ -36,6 +38,7 @@ const KEYFILE: WalletCapabilities = {
   dispatchViaBundler: true,
   signDataItem: true,
   signMessage: true,
+  signature: true,
   decrypt: true,
   privateHash: true,
   exportKey: true,
@@ -49,6 +52,7 @@ const NONE: WalletCapabilities = {
   dispatchViaBundler: false,
   signDataItem: false,
   signMessage: false,
+  signature: false,
   decrypt: false,
   privateHash: false,
   exportKey: false,
@@ -59,12 +63,14 @@ const NONE: WalletCapabilities = {
 
 const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
   jwk: KEYFILE,
-  // Message signing stays off until it is confirmed on a device.
+  // The Keystone hashes a message and signs the hash, which is
+  // `signMessage` with SHA-256. It can't sign raw bytes, so `signature` is off.
   keystone: {
     ...NONE,
     signTransaction: true,
     dispatchViaBundler: true,
     signDataItem: true,
+    signMessage: true,
     encrypt: true,
     points: true,
   },
@@ -82,6 +88,9 @@ const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
   ethereum: NONE,
 };
 
+/** The only `signMessage` hash a hardware wallet signs with. */
+export const HARDWARE_MESSAGE_HASH = "SHA-256";
+
 export function capabilitiesFor(method: WalletMethod): WalletCapabilities {
   return CAPABILITIES[method];
 }
@@ -95,7 +104,7 @@ const PROVIDER_REQUIREMENTS: Partial<Record<ProviderMethod, { capability: Provid
   signDataItem: { capability: "signDataItem", action: "sign data items" },
   batchSignDataItem: { capability: "signDataItem", action: "sign data items" },
   transferAoTokens: { capability: "signDataItem", action: "send AO tokens" },
-  signature: { capability: "signMessage", action: "sign messages" },
+  signature: { capability: "signature", action: "sign with the deprecated signature()" },
   signMessage: { capability: "signMessage", action: "sign messages" },
   decrypt: { capability: "decrypt", action: "decrypt data" },
   privateHash: { capability: "privateHash", action: "create private hashes" },
@@ -116,6 +125,9 @@ export function capabilityRefusal(
   // A Keystone signs data items, so it's the hardware wallet to point a Ledger user to.
   if (walletMethod === "ledger" && capability === "signDataItem") {
     return `Ledger only supports sending AR for now, so it can't ${action}. Use a Keystone instead.`;
+  }
+  if (capability === "signature" && capabilitiesFor(walletMethod).signMessage) {
+    return `This wallet can't ${action}. Use signMessage instead.`;
   }
   return unsupportedOperationMessage(action);
 }

@@ -4,9 +4,12 @@ import {
   base64UrlToBytes,
   bytesToBase64Url,
   generateJWK,
+  signature,
   signPayloadWithJwk,
+  verifyMessage,
   WALLET_APPROVAL_ORIGIN,
   type ApprovalRequest,
+  type DeviceSigningPayload,
   type DeviceSigningRequest,
   type JWKInterface,
   type StoragePort,
@@ -114,17 +117,21 @@ const GATEWAY = "https://arweave.net";
 const RECIPIENT = "r".repeat(43);
 const PROCESS_ID = bytesToBase64Url(new Uint8Array(32).fill(7));
 
+function unsignedOf(payload: DeviceSigningPayload) {
+  switch (payload.kind) {
+    case "transaction":
+      return payload;
+    case "dataItem":
+      return { kind: "dataItem" as const, raw: base64UrlToBytes(payload.raw) };
+    case "message":
+      return { kind: "message" as const, data: base64UrlToBytes(payload.data) };
+  }
+}
+
 /** Stands in for the device: signs each payload the window was handed. */
 async function deviceSign(device: DeviceSigningRequest, jwk: JWKInterface): Promise<string[]> {
   return Promise.all(
-    device.payloads.map(async (payload) =>
-      bytesToBase64Url(
-        await signPayloadWithJwk(
-          payload.kind === "transaction" ? payload : { kind: "dataItem", raw: base64UrlToBytes(payload.raw) },
-          jwk,
-        ),
-      ),
-    ),
+    device.payloads.map(async (payload) => bytesToBase64Url(await signPayloadWithJwk(unsignedOf(payload), jwk))),
   );
 }
 
@@ -338,6 +345,52 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       /doesn't match this wallet/,
     );
     expect((await handler.getApproval({ requestId })).device).toBeDefined();
+  });
+
+  it("signMessage: resolves to a signature that passes verifyMessage", async () => {
+    const message = new TextEncoder().encode("Sign in to example.com");
+    const { pending, requestId, device } = await approveOnDevice({ kind: "signMessage", payload: message });
+    expect(device.payloads).toEqual([{ kind: "message", data: bytesToBase64Url(message) }]);
+    expect(device.summaries).toEqual([{ kind: "message", text: "Sign in to example.com", size: message.byteLength }]);
+
+    await handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) });
+
+    const signature = (await pending) as Uint8Array;
+    expect(await verifyMessage(deviceKey.n, message.slice().buffer, signature.slice().buffer)).toBe(true);
+  });
+
+  it("signMessage: the device step shows only the size of a message with bidi overrides", async () => {
+    const message = new TextEncoder().encode("pay \u202Eevil");
+    const { device } = await approveOnDevice({ kind: "signMessage", payload: message });
+    expect(device.summaries).toEqual([{ kind: "message", text: null, size: message.byteLength }]);
+  });
+
+  it("signMessage: a message signed without hashing it first is refused", async () => {
+    const message = new TextEncoder().encode("hello");
+    const { requestId, device } = await approveOnDevice({ kind: "signMessage", payload: message });
+    // signature() signs RSA-PSS straight over the bytes: one hash short of signMessage.
+    const unhashed = new Uint8Array(await signature(deviceKey, message.slice().buffer));
+
+    await expect(
+      handler.submitDeviceSignature({ requestId, signatures: [bytesToBase64Url(unhashed)] }),
+    ).rejects.toThrow(/doesn't match this wallet/);
+    expect(device.payloads).toHaveLength(1);
+  });
+
+  it("signMessage: refuses a hash other than SHA-256", async () => {
+    const pending = handler.requestApproval({
+      kind: "signMessage",
+      origin: ORIGIN,
+      walletId: HW_ID,
+      payload: new TextEncoder().encode("hello"),
+      hashAlgorithm: "SHA-512",
+    });
+    const rejected = expect(pending).rejects.toThrow(/SHA-256 only, not SHA-512/);
+    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await expect(
+      handler.resolveApproval({ requestId: requestIdOf(windows.opened[0]!), approved: true }),
+    ).rejects.toThrow(/SHA-256 only/);
+    await rejected;
   });
 
   it("refuses to start when the stored public key doesn't match the wallet's address", async () => {

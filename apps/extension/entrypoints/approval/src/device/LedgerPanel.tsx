@@ -6,6 +6,7 @@ import {
   LedgerError,
   ledgerMaxPayloadBytes,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
+  LEDGER_MESSAGE_UNSUPPORTED,
   type LedgerTransport,
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -99,6 +100,7 @@ export function createLedgerPanel({
         for (const [index, payload] of payloads.entries()) {
           if (signal.aborted) throw new LedgerCancelled();
           setStep({ kind: "signing", index });
+          if (payload.kind === "message") throw new LedgerError("unsupported-payload", LEDGER_MESSAGE_UNSUPPORTED);
           const signature =
             payload.kind === "transaction"
               ? await client.signTransaction(payload.transaction, { maxBytes })

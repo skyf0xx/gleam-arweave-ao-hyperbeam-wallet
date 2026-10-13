@@ -8,6 +8,8 @@ import {
   PROVIDER_METHODS,
   bytesToBase64,
   missingPermissions,
+  HARDWARE_MESSAGE_HASH,
+  isHardwareWalletMethod,
   providerMethodRefusal,
   verifyMessage,
   type ConnectAppInfo,
@@ -557,14 +559,24 @@ async function handleProviderCall(
       });
 
     case "signMessage":
-    case "privateHash":
+    case "privateHash": {
+      const hashAlgorithm = readHashAlgorithm(params.options, method);
+      if (
+        method === "signMessage" &&
+        wallet &&
+        isHardwareWalletMethod(wallet.method) &&
+        (hashAlgorithm ?? HARDWARE_MESSAGE_HASH) !== HARDWARE_MESSAGE_HASH
+      ) {
+        throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
+      }
       return approval.requestApproval({
         kind: method,
         origin,
         walletId: activeWalletId(),
         payload: readBytes(params.data, "data"),
-        hashAlgorithm: readHashAlgorithm(params.options, method),
+        hashAlgorithm,
       });
+    }
 
     case "verifyMessage": {
       // Verification uses only public material, so it needs no approval.

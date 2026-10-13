@@ -7,12 +7,13 @@ describe("capabilitiesFor", () => {
     expect(Object.values(capabilitiesFor("jwk")).every(Boolean)).toBe(true);
   });
 
-  it("lets Keystone sign transactions and data items, but not messages or key operations", () => {
+  it("lets Keystone sign transactions, data items and messages, but not raw signatures or key operations", () => {
     expect(capabilitiesFor("keystone")).toEqual({
       signTransaction: true,
       dispatchViaBundler: true,
       signDataItem: true,
-      signMessage: false,
+      signMessage: true,
+      signature: false,
       decrypt: false,
       privateHash: false,
       exportKey: false,
@@ -28,6 +29,7 @@ describe("capabilitiesFor", () => {
       dispatchViaBundler: false,
       signDataItem: false,
       signMessage: false,
+      signature: false,
       decrypt: false,
       privateHash: false,
       exportKey: false,
@@ -51,8 +53,8 @@ describe("providerMethodRefusal", () => {
     expect(providerMethodRefusal("ledger", "signMessage")).toBe(
       "This wallet can't sign messages. Switch to a keyfile wallet.",
     );
-    expect(providerMethodRefusal("keystone", "signature")).toBe(
-      "This wallet can't sign messages. Switch to a keyfile wallet.",
+    expect(providerMethodRefusal("ledger", "signature")).toBe(
+      "This wallet can't sign with the deprecated signature(). Switch to a keyfile wallet.",
     );
     expect(providerMethodRefusal("keystone", "decrypt")).toBe(
       "This wallet can't decrypt data. Switch to a keyfile wallet.",
@@ -62,8 +64,14 @@ describe("providerMethodRefusal", () => {
     );
   });
 
+  it("points a Keystone from signature() to signMessage", () => {
+    expect(providerMethodRefusal("keystone", "signature")).toBe(
+      "This wallet can't sign with the deprecated signature(). Use signMessage instead.",
+    );
+  });
+
   it("allows what a hardware wallet can sign", () => {
-    for (const method of ["sign", "dispatch", "signDataItem", "batchSignDataItem", "transferAoTokens", "encrypt"] as const) {
+    for (const method of ["sign", "dispatch", "signDataItem", "batchSignDataItem", "transferAoTokens", "signMessage", "encrypt"] as const) {
       expect(providerMethodRefusal("keystone", method)).toBeNull();
     }
     for (const method of ["sign", "dispatch", "encrypt"] as const) {

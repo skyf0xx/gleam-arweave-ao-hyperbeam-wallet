@@ -183,10 +183,15 @@ export class LedgerArweaveClient {
   }
 
   /** Signs a payload from `core/vault/signing`'s `prepare*` step. Returns the raw 512-byte signature. */
-  signPayload(payload: UnsignedPayload, options?: LedgerSignOptions): Promise<Bytes> {
-    return payload.kind === "transaction"
-      ? this.signTransaction(payload.transaction, options)
-      : this.signDataItem(payload.raw, options);
+  async signPayload(payload: UnsignedPayload, options?: LedgerSignOptions): Promise<Bytes> {
+    switch (payload.kind) {
+      case "transaction":
+        return this.signTransaction(payload.transaction, options);
+      case "dataItem":
+        return this.signDataItem(payload.raw, options);
+      case "message":
+        throw new LedgerError("unsupported-payload", LEDGER_MESSAGE_UNSUPPORTED);
+    }
   }
 
   /** Signs an unsigned format-2 transaction owned by the device's key. Returns the raw 512-byte signature. */
@@ -309,6 +314,8 @@ function checkPermawebTags(tags: DataItemTag[]): void {
 
 export const LEDGER_PERMAWEB_REQUIRED_MESSAGE =
   "Ledger only supports sending AR for now. To send AO tokens or sign data items, use a Keystone.";
+
+export const LEDGER_MESSAGE_UNSUPPORTED = "The Ledger Arweave app can't sign messages. Use a Keystone or a keyfile wallet.";
 
 function permawebRequired(): LedgerError {
   return new LedgerError("permaweb-app-required", LEDGER_PERMAWEB_REQUIRED_MESSAGE);

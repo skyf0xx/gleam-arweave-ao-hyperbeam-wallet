@@ -159,6 +159,13 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
       </>
     );
   }
+  if (summary.kind === "message") {
+    return summary.text !== null ? (
+      <Row label="Message" value={summary.text} />
+    ) : (
+      <Row label="Message" value={`${summary.size} bytes`} />
+    );
+  }
   return (
     <>
       {summary.target !== null ? <Row label="Target" value={summary.target} mono /> : null}

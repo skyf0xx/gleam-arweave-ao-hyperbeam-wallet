@@ -71,6 +71,14 @@ describe("buildKeystoneSignRequest", () => {
     expect(Buffer.compare(request.getSignData(), raw)).toBe(0);
   });
 
+  it("sends a message's raw bytes as a Message request, for the device to hash and sign", () => {
+    const message = Buffer.from("Sign in to example.com", "utf-8");
+    const { ur } = buildKeystoneSignRequest({ kind: "message", data: message.toString("base64url") }, xfp, requestId);
+    const request = ArweaveSignRequest.fromCBOR(roundTrip(ur).cbor);
+    expect(request.getSignType()).toBe(SignType.Message);
+    expect(Buffer.compare(request.getSignData(), message)).toBe(0);
+  });
+
   it("generates a request id when none is given", () => {
     const { requestId: id } = buildKeystoneSignRequest(transaction, xfp);
     expect(id).toMatch(/^[0-9a-f-]{36}$/);

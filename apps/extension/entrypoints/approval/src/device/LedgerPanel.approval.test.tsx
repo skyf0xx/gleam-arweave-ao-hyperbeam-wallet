@@ -103,12 +103,14 @@ function dataItem(text: string): DeviceSigningPayload {
 }
 
 function hashOf(payload: DeviceSigningPayload): Promise<Uint8Array<ArrayBuffer>> {
+  if (payload.kind === "message") throw new Error("Not a deep-hash payload.");
   return payload.kind === "transaction"
     ? transactionSignatureData(payload.transaction)
     : dataItemSignatureData(base64UrlToBytes(payload.raw));
 }
 
 function unsigned(payload: DeviceSigningPayload) {
+  if (payload.kind === "message") throw new Error("Not a deep-hash payload.");
   return payload.kind === "transaction" ? payload : { kind: "dataItem" as const, raw: base64UrlToBytes(payload.raw) };
 }
 
