@@ -1,0 +1,38 @@
+# The security surface: changes here need a security-minded review.
+# Ownership is documented, not enforced: GitHub won't let a PR author
+# approve their own PR, so "require code owner review" stays off in the
+# master ruleset until there is a second maintainer.
+
+# Key material
+/packages/core/src/vault/                              @skyf0xx
+/packages/core/src/keys/                               @skyf0xx
+/apps/extension/src/handlers/key-session.ts            @skyf0xx
+/apps/extension/src/handlers/wallet-lifecycle.ts       @skyf0xx
+/apps/extension/src/handlers/passkey.ts                @skyf0xx
+/apps/extension/src/passkey/                           @skyf0xx
+/apps/extension/entrypoints/passkey/                   @skyf0xx
+/apps/extension/src/adapters/storage.ts                @skyf0xx
+
+# Signing
+/packages/core/src/ao/transfer.ts                      @skyf0xx
+
+# Trust boundary between pages and the wallet
+/apps/extension/entrypoints/background/                @skyf0xx
+/apps/extension/entrypoints/content/                   @skyf0xx
+/apps/extension/entrypoints/provider/                  @skyf0xx
+/apps/extension/src/handlers/provider-params.ts        @skyf0xx
+/packages/messaging/                                   @skyf0xx
+
+# What you see is what you sign
+/apps/extension/src/handlers/approval.ts               @skyf0xx
+/apps/extension/entrypoints/approval/                  @skyf0xx
+
+# Other ways in
+/apps/extension/src/points-invite.ts                   @skyf0xx
+/apps/extension/wxt.config.ts                          @skyf0xx
+
+# Supply chain and CI
+/.github/                                              @skyf0xx
+/pnpm-workspace.yaml                                   @skyf0xx
+/pnpm-lock.yaml                                        @skyf0xx
+/lefthook.yml                                          @skyf0xx
