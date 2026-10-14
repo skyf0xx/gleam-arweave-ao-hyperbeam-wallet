@@ -41,3 +41,20 @@ pnpm release:check   # run the gate only
 pnpm release         # all checks, then print what it would tag (dry run)
 pnpm release --yes   # tag v<version> (signed) and push that tag
 ```
+
+## Release flow
+
+1. Write `v<version>.md` here and merge it to `master` in a PR.
+2. On an up-to-date `master`, run `pnpm release --yes`. It runs the gate,
+   then pushes a signed tag `v<version>`.
+3. The tag starts `.github/workflows/release.yml`. It checks that the tag is
+   annotated and signed by a key in `.github/allowed_signers`, that the
+   commit is on `master`, that the tag matches the version, and that the
+   gate passes at that commit. Then it builds the zip with `wxt zip`,
+   attests its build provenance and publishes a GitHub Release with the zip
+   and `release-manifest.json`.
+4. Download the zip from the Release and check it against the manifest
+   (`sha256sum <zip>` and `jq -r .zipSha256 release-manifest.json`; also
+   `gh attestation verify <zip> --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet`).
+5. Upload that zip to the Chrome Web Store by hand. CI has no store
+   credentials.
