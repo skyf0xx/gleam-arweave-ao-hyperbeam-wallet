@@ -19,6 +19,7 @@
 1 apps/extension/src/passkey/
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
+1 apps/extension/src/adapters/session-access.ts
 1 apps/extension/entrypoints/popup/onboarding/src/Import.tsx
 1 apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx
 1 apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx
