@@ -22,6 +22,7 @@ import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gate
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
+  APPROVAL_GATED_METHODS,
   PROVIDER_SURFACE_METHODS,
   type ConnectEventPayload,
   type DisconnectEventPayload,
@@ -57,7 +58,7 @@ import {
   readTransaction,
   type ProviderArgs,
 } from "@/src/handlers/provider-params";
-import { contentScriptOrigin, isExtensionPageSender } from "@/src/sender";
+import { contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
 import { acceptSiteInvite } from "@/src/points-invite";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
@@ -856,6 +857,11 @@ messenger.onMessage("providerCall", (message) => {
   }
   if (!PROVIDER_SURFACE_METHODS.includes(method)) {
     throw new Error(`Unknown provider method "${method}".`);
+  }
+  // Checked on every gated call, not only at connect, so a plain-http
+  // origin still holding an older grant can't keep signing.
+  if (APPROVAL_GATED_METHODS.includes(method) && !isSecureSigningOrigin(origin)) {
+    throw new Error("Gleam only signs for secure (https) sites.");
   }
   return (async () =>
     encodeProviderResult(await handleProviderCall(origin, method, decodeProviderParams(params))))();

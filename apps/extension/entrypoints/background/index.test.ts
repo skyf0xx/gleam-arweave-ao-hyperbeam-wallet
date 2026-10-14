@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
-import { encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
+import { APPROVAL_GATED_METHODS, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
  * This file's `transferAoTokens` integration test drives the real
@@ -262,6 +262,67 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await expect(
       providerCall({ origin: "https://not-connected.example", method: "getActiveAddress", params: {} }),
     ).rejects.toThrow(/not connected/i);
+  });
+
+  describe("plain-http origins", () => {
+    const HTTP_ORIGIN = "http://dapp.example";
+
+    async function seedUnlockedWalletWithGrant(origin: string): Promise<void> {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await setItem("local:grants", [
+        { origin, walletId: "wallet-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    }
+
+    it.each(APPROVAL_GATED_METHODS)("refuses %s from a plain-http site before any window opens", (method) => {
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method, params: {} })).toThrow(
+        "Gleam only signs for secure (https) sites.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses signing from a plain-http site that already holds a grant", async () => {
+      await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method: "signature", params })).toThrow(
+        "Gleam only signs for secure (https) sites.",
+      );
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method: "connect", params: {} })).toThrow(
+        "Gleam only signs for secure (https) sites.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["http://localhost:3000", "http://127.0.0.1:5173", "http://[::1]:8080"])(
+      "still lets local development at %s connect",
+      async (origin) => {
+        await seedUnlockedWalletWithGrant(origin);
+        await expect(
+          providerCall({ origin, method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } }),
+        ).resolves.toBeDefined();
+        const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+        void providerCall({ origin, method: "signature", params }).catch(() => undefined);
+        await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      },
+    );
+
+    it("an https site with a grant still reaches the approval window", async () => {
+      await seedUnlockedWalletWithGrant("https://dapp.example");
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+      void providerCall({ origin: "https://dapp.example", method: "signature", params }).catch(() => undefined);
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    });
   });
 
   it("does not clear the key cache on runtime.onSuspend, which also fires on idle", () => {
