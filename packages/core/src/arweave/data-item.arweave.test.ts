@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { signerFromJwk } from "../vault/signer";
 import { ArweaveSigner, createData, DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
@@ -8,7 +9,7 @@ import {
   createSignedDataItem,
   dataItemSignatureData,
   readDataItemFields,
-  signDataItemWithJwk,
+  signDataItemWithSigner,
   verifyDataItemSignature,
   type DataItemFields,
 } from "./data-item";
@@ -87,7 +88,7 @@ describe("buildUnsignedDataItem", () => {
 describe("keyfile signing", () => {
   it("createSignedDataItem verifies over arbundles' parse and matches its unsigned layout outside the signature", async () => {
     const fields = CASES[0]![1];
-    const { id, raw } = await createSignedDataItem(jwk, fields);
+    const { id, raw } = await createSignedDataItem(signerFromJwk(jwk, ""), fields);
     const parsed = new DataItem(Buffer.from(raw));
     const reference = arbundlesItem(fields).getRaw();
 
@@ -97,7 +98,7 @@ describe("keyfile signing", () => {
   });
 
   it("refuses to sign an item owned by another key", async () => {
-    await expect(signDataItemWithJwk(buildUnsignedDataItem(otherJwk.n, { data: utf8("x") }), jwk)).rejects.toThrow(
+    await expect(signDataItemWithSigner(buildUnsignedDataItem(otherJwk.n, { data: utf8("x") }), signerFromJwk(jwk, ""))).rejects.toThrow(
       /different owner/,
     );
   });
@@ -106,7 +107,7 @@ describe("keyfile signing", () => {
 describe("device signatures", () => {
   /** What a hardware device does: RSA-PSS over the deep hash, never seeing a JWK in Gleam. */
   async function deviceSign(unsigned: Uint8Array, key: JWKInterface) {
-    return signRsaPss(key, await dataItemSignatureData(unsigned));
+    return signRsaPss(signerFromJwk(key, ""), await dataItemSignatureData(unsigned));
   }
 
   it("applies a signature produced from the owner's public key alone", async () => {

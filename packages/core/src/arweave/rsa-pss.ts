@@ -1,4 +1,4 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "../vault/signer";
 
 /**
  * Arweave's signature scheme: RSA-PSS over SHA-256 with a 32-byte salt,
@@ -10,16 +10,8 @@ const IMPORT_PARAMS = { name: "RSA-PSS", hash: "SHA-256" } as const;
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
-export async function signRsaPss(jwk: JWKInterface, message: Bytes): Promise<Bytes> {
-  const { kty, n, e, d, p, q, dp, dq, qi } = jwk;
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    { kty, n, e, d, p, q, dp, dq, qi, ext: true },
-    IMPORT_PARAMS,
-    false,
-    ["sign"],
-  );
-  return new Uint8Array(await crypto.subtle.sign(PSS_PARAMS, key, message));
+export async function signRsaPss(signer: Signer, message: Bytes): Promise<Bytes> {
+  return signer.signPss(message, { hash: IMPORT_PARAMS.hash, saltLength: PSS_PARAMS.saltLength });
 }
 
 /** Checks `signature` against the owner's base64url modulus. Arweave keys always use e = 65537. */

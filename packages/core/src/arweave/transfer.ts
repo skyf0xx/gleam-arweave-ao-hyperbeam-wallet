@@ -3,16 +3,16 @@ import {
   applyTransactionSignature,
   buildUnsignedTransaction,
   postTransaction,
-  signTransactionWithJwk,
+  signTransactionWithSigner,
   type ArweaveTransactionJson,
 } from "./transaction";
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "../vault/signer";
 import type { Winston } from "../models/balance";
 import type { UploadTag } from "../models/upload";
 
 /**
- * This module's public functions accept an already-decrypted
- * `JWKInterface` rather than a password or wallet id — they never
+ * This module's public functions accept an unlocked wallet's `Signer`
+ * rather than a password or wallet id — they never
  * decrypt anything themselves, and never use `core/vault`'s envelope, since key
  * material is never persisted anywhere (see `wallet-lifecycle.ts`). This
  * keeps `core/arweave` agnostic about how the caller obtained signing
@@ -94,10 +94,10 @@ export async function finishTransfer(
 /** Builds, signs with the keyfile, and posts an AR value-transfer transaction. */
 export async function submitTransfer(
   gatewayUrl: string,
-  jwk: JWKInterface,
+  signer: Signer,
   recipient: string,
   amount: Winston,
 ): Promise<SubmittedTransfer> {
-  const unsigned = await prepareTransfer(gatewayUrl, jwk.n, recipient, amount);
-  return finishTransfer(gatewayUrl, unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n);
+  const unsigned = await prepareTransfer(gatewayUrl, signer.owner, recipient, amount);
+  return finishTransfer(gatewayUrl, unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
 }

@@ -48,6 +48,42 @@ export default tseslint.config(
     },
   },
   {
+    // Only the key session and the vault/unlock path handle raw key
+    // material; everything else signs through an opaque `Signer`, so the
+    // cached key can become a non-extractable CryptoKey without touching
+    // callers. CI lints the whole repo, so a new leak fails there.
+    files: ["**/*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      "apps/extension/src/handlers/key-session.ts",
+      // Caches the key on unlock/import/create, and decrypts it for export.
+      "apps/extension/src/handlers/wallet-lifecycle.ts",
+      "packages/core/src/vault/**",
+      "packages/core/src/keys/**",
+      // Where `JWKInterface` is defined and re-exported.
+      "packages/core/src/models/wallet.ts",
+      "packages/core/src/models/index.ts",
+      // `importWallet`/`exportWallet` carry a keyfile across the wire by design.
+      "packages/messaging/src/protocol.ts",
+      // Receives the exported keyfile to hand to the user.
+      "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Identifier[name='JWKInterface']",
+          message:
+            "Raw key material stays in key-session.ts and the vault. Take a `Signer` (or the `owner` string for public-key work) instead.",
+        },
+        {
+          selector: "Identifier[name='getCachedKey']",
+          message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
+        },
+      ],
+    },
+  },
+  {
     // The static site's vanilla script runs in the browser; `globals` isn't
     // resolvable from the root, so the handful it uses are listed here.
     files: ["apps/site/**/*.js"],

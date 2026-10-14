@@ -4,6 +4,7 @@ export * from "./vault/password-policy";
 export * from "./vault/zeroize";
 export * from "./vault/base64";
 export * from "./vault/signing";
+export * from "./vault/signer";
 export type { ArweaveTransactionJson } from "./arweave/transaction";
 export { readDataItemFields } from "./arweave/data-item";
 export * from "./hardware/ledger/index";

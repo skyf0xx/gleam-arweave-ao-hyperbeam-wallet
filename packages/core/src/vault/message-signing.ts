@@ -1,4 +1,4 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "./signer";
 
 /**
  * `signMessage()`/`signature()`/`privateHash()`/`verifyMessage()` over
@@ -22,22 +22,6 @@ export type MessageHashAlgorithm = "SHA-256" | "SHA-384" | "SHA-512";
 /** Wander's fixed salt length for `signMessage`/`verifyMessage`, and `signature`'s default. */
 const WANDER_SALT_LENGTH = 32;
 
-// A stored JWK's `alg`/`key_ops`/`use` can contradict the RSA-PSS import
-// below (e.g. an `alg` of RSA-OAEP), and WebCrypto rejects the key if so.
-function stripKeyUsageHints(jwk: JsonWebKey): JsonWebKey {
-  const stripped: JsonWebKey = { ...jwk, ext: true };
-  delete stripped.alg;
-  delete stripped.key_ops;
-  delete stripped.use;
-  return stripped;
-}
-
-async function importRsaPssPrivateKey(jwk: JWKInterface, hash: MessageHashAlgorithm): Promise<CryptoKey> {
-  return crypto.subtle.importKey("jwk", stripKeyUsageHints(jwk as JsonWebKey), { name: "RSA-PSS", hash }, false, [
-    "sign",
-  ]);
-}
-
 async function importRsaPssPublicKey(publicKeyModulus: string, hash: MessageHashAlgorithm): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
@@ -50,13 +34,12 @@ async function importRsaPssPublicKey(publicKeyModulus: string, hash: MessageHash
 
 /** Signs the `hashAlgorithm` digest of `data`, as Wander's `signMessage` does. */
 export async function signMessage(
-  jwk: JWKInterface,
+  signer: Signer,
   data: ArrayBuffer,
   hashAlgorithm: MessageHashAlgorithm = "SHA-256",
 ): Promise<ArrayBuffer> {
-  const digest = await crypto.subtle.digest(hashAlgorithm, data);
-  const key = await importRsaPssPrivateKey(jwk, hashAlgorithm);
-  return crypto.subtle.sign({ name: "RSA-PSS", saltLength: WANDER_SALT_LENGTH }, key, digest);
+  const digest = new Uint8Array(await crypto.subtle.digest(hashAlgorithm, data));
+  return (await signer.signPss(digest, { hash: hashAlgorithm, saltLength: WANDER_SALT_LENGTH })).buffer;
 }
 
 export interface SignatureOptions {
@@ -65,7 +48,7 @@ export interface SignatureOptions {
 
 /** Wander's deprecated `signature()`: RSA-PSS/SHA-256 over the raw data. */
 export async function signature(
-  jwk: JWKInterface,
+  signer: Signer,
   data: ArrayBuffer,
   options: SignatureOptions = {},
 ): Promise<ArrayBuffer> {
@@ -73,30 +56,16 @@ export async function signature(
   if (!Number.isSafeInteger(saltLength) || saltLength < 0) {
     throw new Error(`saltLength must be a non-negative integer, got ${String(saltLength)}.`);
   }
-  const key = await importRsaPssPrivateKey(jwk, "SHA-256");
-  return crypto.subtle.sign({ name: "RSA-PSS", saltLength }, key, data);
+  return (await signer.signPss(new Uint8Array(data), { hash: "SHA-256", saltLength })).buffer;
 }
 
 /** Hashes `data` keyed by the wallet's private exponent — see module doc comment for the exact construction. */
 export async function privateHash(
-  jwk: JWKInterface,
+  signer: Signer,
   data: ArrayBuffer,
   hashAlgorithm: MessageHashAlgorithm = "SHA-256",
 ): Promise<ArrayBuffer> {
-  if (!jwk.d) {
-    throw new Error("privateHash requires a wallet's private key material (JWK has no 'd' field).");
-  }
-  const privateExponentText = new TextEncoder().encode(jwk.d);
-  const dataBytes = new Uint8Array(data);
-  const combined = new Uint8Array(dataBytes.byteLength + privateExponentText.byteLength);
-  combined.set(dataBytes, 0);
-  combined.set(privateExponentText, dataBytes.byteLength);
-  try {
-    return await crypto.subtle.digest(hashAlgorithm, combined);
-  } finally {
-    combined.fill(0);
-    privateExponentText.fill(0);
-  }
+  return (await signer.privateHash(new Uint8Array(data), hashAlgorithm)).buffer;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { addressFromOwner, decrypt, generateJWK, verifyMessage, type StoragePort, type WindowPort } from "@gleam/core";
+import { addressFromOwner, decrypt, generateJWK, signerFromJwk, verifyMessage, type StoragePort, type WindowPort } from "@gleam/core";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 
@@ -874,7 +874,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     const ciphertext = await approveCrypto("encrypt", new TextEncoder().encode("secret"), "hw-1");
 
     // Only the device's private key can open it.
-    const decrypted = await decrypt(deviceKey, ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" });
+    const decrypted = await decrypt(signerFromJwk(deviceKey, ""), ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" });
     expect(new TextDecoder().decode(decrypted)).toBe("secret");
   });
 

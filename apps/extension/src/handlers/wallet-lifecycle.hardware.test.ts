@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addressFromOwner, bytesToBase64Url, type StoragePort, type Wallet } from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
-import { getCachedKey, HardwareWalletSigningError } from "./key-session";
+import { getSigner, HardwareWalletSigningError } from "./key-session";
 
 /**
  * One store for every key, as the storage adapter routes `local:` and
@@ -221,7 +221,7 @@ describe("WalletLifecycleHandler: hardware wallets and the session", () => {
 
     let state = await handler.getState();
     expect(new Set(state.session?.unlockedWalletIds)).toEqual(new Set([created.id, keystone.id]));
-    expect(await getCachedKey(created.id)).not.toBeNull();
+    expect(await getSigner(created.id)).not.toBeNull();
 
     await expect(
       handler.importWallet({ jwk: validJWK(), name: "Other", password: "a different long password" }),
@@ -230,8 +230,8 @@ describe("WalletLifecycleHandler: hardware wallets and the session", () => {
 
     state = await handler.getState();
     expect(new Set(state.session?.unlockedWalletIds)).toEqual(new Set([created.id, imported.id, keystone.id]));
-    expect(await getCachedKey(created.id)).not.toBeNull();
-    expect(await getCachedKey(imported.id)).not.toBeNull();
+    expect(await getSigner(created.id)).not.toBeNull();
+    expect(await getSigner(imported.id)).not.toBeNull();
 
     await handler.lockWallet();
     expect((await handler.getState()).session).toBeNull();
@@ -247,7 +247,7 @@ describe("WalletLifecycleHandler: hardware wallets and the session", () => {
 
     const state = await handler.getState();
     expect(new Set(state.session?.unlockedWalletIds)).toEqual(new Set([imported.id, keystone.id]));
-    expect(await getCachedKey(imported.id)).not.toBeNull();
+    expect(await getSigner(imported.id)).not.toBeNull();
   });
 });
 
@@ -318,7 +318,7 @@ describe("WalletLifecycleHandler: hardware wallets have no key", () => {
 
   it("the signing-key lookup throws the hardware error, not 'locked'", async () => {
     const keystone = await addKeystone();
-    await expect(getCachedKey(keystone.id)).rejects.toBeInstanceOf(HardwareWalletSigningError);
-    await expect(getCachedKey(keystone.id)).rejects.toThrow(/signs on its device/);
+    await expect(getSigner(keystone.id)).rejects.toBeInstanceOf(HardwareWalletSigningError);
+    await expect(getSigner(keystone.id)).rejects.toThrow(/signs on its device/);
   });
 });
