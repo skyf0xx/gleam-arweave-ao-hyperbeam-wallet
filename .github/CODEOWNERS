@@ -12,6 +12,7 @@
 /apps/extension/src/passkey/                                               @skyf0xx
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
+/apps/extension/src/adapters/session-access.ts                             @skyf0xx
 /apps/extension/entrypoints/popup/onboarding/src/Import.tsx                @skyf0xx
 /apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx        @skyf0xx
 /apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx   @skyf0xx
