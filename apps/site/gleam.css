@@ -771,7 +771,12 @@ html:not(.motion) .tl-card {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--on-ink-muted);
-  transform-origin: 0 50%;
+}
+/* Only the number lands. Swinging the whole line from its left edge throws
+   the label's far end about, and pivoting on the right keeps the label still. */
+.tl-now-num {
+  display: inline-block;
+  transform-origin: 100% 70%;
 }
 .tl-now-count b {
   font-size: 2.25rem;
@@ -784,7 +789,7 @@ html:not(.motion) .tl-card {
   margin-right: 4px;
   font-variant-numeric: tabular-nums;
 }
-.tl-now-count.land {
+.tl-now-count.land .tl-now-num {
   animation: gc-land 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .tl-now-count.land b {
@@ -819,19 +824,99 @@ html:not(.motion) .tl-card {
   transform: scaleX(var(--next, 0));
   transform-origin: 0 50%;
 }
-.motion .tl-next span {
+.motion .tl-next > span {
   opacity: var(--next, 0);
   transform: translateX(calc((1 - var(--next, 0)) * 24px));
 }
-.tl-next span {
+.tl-next > span {
   position: absolute;
   left: 14px;
   right: 0;
   top: -0.68em;
+  text-wrap: balance;
   font-size: 1.125rem;
   font-weight: 650;
   line-height: 1.3;
   letter-spacing: -0.015em;
+}
+
+/* The launch beat: once the dashes reach the launch, light runs along them
+   from the present into GLEAM, the same light that carries points into
+   tokens further down. GLEAM keeps the beam's colours afterwards. */
+.tl-launch-beam {
+  position: absolute;
+  right: 100%;
+  top: -1px;
+  width: 76px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--beam-run);
+  box-shadow: 0 0 12px 1px rgba(115, 201, 232, 0.55);
+  transform-origin: left center;
+  scale: 0 1;
+  opacity: 0;
+  pointer-events: none;
+}
+.tl-launch-beam.run {
+  animation: convert-run 0.6s cubic-bezier(0.3, 0, 0.3, 1) both;
+}
+.tl-gleam i {
+  display: inline-block;
+  font-style: normal;
+  transition: color 0.5s var(--d, 0s);
+}
+.tl-next.launched .tl-gleam i {
+  color: var(--c);
+}
+.tl-gleam i.lit {
+  animation: tok-letter 0.9s ease-out both;
+  animation-delay: var(--d, 0s);
+}
+.tl-gleam i.pulse {
+  animation: tl-pulse 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes tl-pulse {
+  30% {
+    transform: translateY(-0.08em) scale(1.18);
+    text-shadow: 0 0 0.5em var(--c);
+  }
+}
+
+/* The wind-up before the launch: the dot draws in and brightens, then
+   springs out as the beam leaves it (0.35s in). */
+.tl-now.charging .tl-now-dot {
+  animation: tl-charge 0.5s cubic-bezier(0.3, 0, 0.3, 1);
+}
+@keyframes tl-charge {
+  70% {
+    scale: 0.8;
+    box-shadow:
+      0 0 0 8px rgba(255, 255, 255, 0.3),
+      0 0 60px 20px rgba(115, 201, 232, 0.9),
+      0 0 140px 50px rgba(139, 18, 255, 0.35);
+  }
+  85% {
+    scale: 1.2;
+  }
+}
+.tl-now.on.charging + .tl-next::before {
+  animation-duration: 0.2s;
+}
+
+/* A point earned, riding the dashes into GLEAM */
+.tl-spark {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow:
+    0 0 8px 2px var(--c),
+    0 0 18px 4px var(--c);
+  pointer-events: none;
+  z-index: 1;
 }
 
 @keyframes future {
@@ -854,13 +939,14 @@ html:not(.motion) .tl-card {
     font-size: 1rem;
   }
   .tl-next {
-    width: 320px;
+    width: 380px;
     margin-left: 180px;
   }
-  .tl-next::before {
+  .tl-next::before,
+  .tl-launch-beam {
     width: 180px;
   }
-  .tl-next span {
+  .tl-next > span {
     font-size: 1.375rem;
   }
 }
@@ -1340,7 +1426,7 @@ html:not(.motion) .tl-card {
   .v-gleam.glow .v-gleam-word,
   .v-twinkle,
   .gc.land .od-s,
-  .tl-now-count.land,
+  .tl-now-count.land .tl-now-num,
   .tl-now-count.land b,
   .tick .v-sig i,
   .tick .v-sig-hold::after,
@@ -1349,7 +1435,11 @@ html:not(.motion) .tl-card {
   }
   .tl-now.on .tl-now-dot::before,
   .tl-now.on .tl-now-dot::after,
-  .tl-now.on + .tl-next::before {
+  .tl-now.on + .tl-next::before,
+  .tl-launch-beam.run,
+  .tl-gleam i.lit,
+  .tl-gleam i.pulse,
+  .tl-now.charging .tl-now-dot {
     animation: none;
   }
   .v-big span,
