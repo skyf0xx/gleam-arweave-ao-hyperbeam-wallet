@@ -11,6 +11,19 @@ export interface InviteRedeemer {
 }
 
 /**
+ * Exactly `{ type: "gleam-points:invite", code }` and nothing more. A page
+ * on the site that an XSS controls can send anything, so any other key is
+ * refused rather than ignored.
+ */
+function isInviteMessage(message: unknown): message is { type: "gleam-points:invite"; code: string } {
+  if (message === null || typeof message !== "object" || Array.isArray(message)) return false;
+  const keys = Object.keys(message);
+  if (keys.length !== 2 || !keys.includes("type") || !keys.includes("code")) return false;
+  const { type, code } = message as Record<string, unknown>;
+  return type === "gleam-points:invite" && typeof code === "string" && isValidInviteCode(code);
+}
+
+/**
  * Handles a `runtime.onMessageExternal` message from the site's
  * welcome page carrying a Gleam Points invite code (POINTS.md §
  * Attribution). Only the site's own origin is trusted, and only the code's
@@ -27,10 +40,8 @@ export async function acceptSiteInvite(
   storage: StoragePort,
   redeemer: InviteRedeemer,
 ): Promise<{ ok: false } | { ok: true; redeem: InviteRedeemResult }> {
-  if (senderOrigin !== SITE_ORIGIN) return { ok: false };
-  if (message === null || typeof message !== "object") return { ok: false };
-  const { type, code } = message as Record<string, unknown>;
-  if (type !== "gleam-points:invite" || typeof code !== "string" || !isValidInviteCode(code)) return { ok: false };
+  if (senderOrigin !== SITE_ORIGIN || !isInviteMessage(message)) return { ok: false };
+  const { code } = message;
 
   const memberships = await storage.get<Record<string, unknown>>(POINTS_MEMBERSHIPS_KEY);
   if (memberships && Object.keys(memberships).length > 0) {
