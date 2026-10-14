@@ -38,7 +38,7 @@
 /apps/extension/src/handlers/approval.ts                                   @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 
-# 5 Other ways in: extension config, dependencies, CI
+# 5 Other ways in: extension config, dependencies, CI, the release gate
 /apps/extension/src/points-invite.ts                                       @skyf0xx
 /apps/extension/wxt.config.ts                                              @skyf0xx
 /.github/                                                                  @skyf0xx
@@ -46,3 +46,6 @@
 /pnpm-lock.yaml                                                            @skyf0xx
 /lefthook.yml                                                              @skyf0xx
 /.gitleaks.toml                                                            @skyf0xx
+/scripts/release-gate.mjs                                                  @skyf0xx
+/scripts/release.mjs                                                       @skyf0xx
+/security/surface.mjs                                                      @skyf0xx
