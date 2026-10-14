@@ -52,4 +52,5 @@
 5 .gitleaks.toml
 5 scripts/release-gate.mjs
 5 scripts/release.mjs
+5 scripts/verify-release.sh
 5 security/surface.mjs

@@ -1,0 +1,7 @@
+# Tests build fixtures with fake keys and unsafe inputs on purpose.
+*.test.ts
+*.test.tsx
+node_modules/
+.output/
+.wxt/
+dist/

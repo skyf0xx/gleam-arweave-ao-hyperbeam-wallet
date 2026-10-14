@@ -105,3 +105,53 @@ jobs:
       # wxt:build passing doesn't mean the bundle runs; load it in Chromium.
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:smoke
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm wxt:build
+
+      # web-ext checks against Firefox's rules. Two of its errors are
+      # Firefox-only manifest requirements that a Chrome MV3 build can't
+      # meet, so they are dropped here; any other error fails the job.
+      # Warnings are listed but don't fail it.
+      - name: Lint the build with web-ext
+        run: |
+          set -euo pipefail
+          # pnpm appends its own failure text to stdout when web-ext exits
+          # non-zero, so keep only the JSON line.
+          { pnpm --filter @gleam/extension exec web-ext lint \
+              --source-dir .output/chrome-mv3 --output json --no-config-discovery || true; } \
+            | grep '^{' > web-ext.json
+          jq -e '.errors | type == "array"' web-ext.json > /dev/null
+          jq -r '.warnings[] | "warning \(.code) \(.file // "") \(.message)"' web-ext.json
+          jq -r '.errors[]
+            | select(.code != "BACKGROUND_SERVICE_WORKER_NOFALLBACK" and .code != "ADDON_ID_REQUIRED")
+            | "::error::web-ext \(.code) \(.file // "") \(.message)"' web-ext.json | tee web-ext-errors.txt
+          [ ! -s web-ext-errors.txt ]
+
+      - name: Install osv-scanner 2.6.0
+        run: |
+          curl -sSfL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+      - run: ./osv-scanner scan --config osv-scanner.toml --lockfile pnpm-lock.yaml
+
+      # Semgrep 1.180.0. Not run as the root container user: the checkout is
+      # owned by the runner user, which git refuses to read as root.
+      - name: Semgrep
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/src" -w /src \
+            semgrep/semgrep@sha256:529ee8a277ec8adc5b534d7c74eea0a47e9de21d62852b6ba7ac6ba9566845c3 \
+            semgrep scan --metrics=off --error \
+              --config p/typescript --config p/javascript --config p/react --config p/secrets
