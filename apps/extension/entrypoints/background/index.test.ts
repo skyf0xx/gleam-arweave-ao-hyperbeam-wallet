@@ -60,8 +60,10 @@ const tabsReload = vi.fn().mockResolvedValue(undefined);
 const alarmsCreate = vi.fn();
 const alarmsAddListener = vi.fn();
 const onSuspendAddListener = vi.fn();
+const setSessionAccessLevel = vi.fn(async () => undefined);
 vi.mock("wxt/browser", () => ({
   browser: {
+    storage: { session: { setAccessLevel: setSessionAccessLevel } },
     windows: { create: windowsCreate, remove: vi.fn(), update: vi.fn(), onRemoved: { addListener: vi.fn() } },
     runtime: { getURL: (path: string) => `chrome-extension://test${path}`, onSuspend: { addListener: onSuspendAddListener } },
     tabs: { query: tabsQuery, reload: tabsReload, onRemoved: { addListener: vi.fn() } },
@@ -323,6 +325,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       void providerCall({ origin: "https://dapp.example", method: "signature", params }).catch(() => undefined);
       await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
     });
+  });
+
+  it("keeps session storage, where unlocked keys are cached, out of content scripts' reach", () => {
+    expect(setSessionAccessLevel).toHaveBeenCalledWith({ accessLevel: "TRUSTED_CONTEXTS" });
   });
 
   it("does not clear the key cache on runtime.onSuspend, which also fires on idle", () => {

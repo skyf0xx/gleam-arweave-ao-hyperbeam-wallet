@@ -146,7 +146,7 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
       await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
       const pill = screen.getByRole("button", { name: /Wallet One, address/i });
       const avatar = within(pill).getByRole("img", { name: /avatar/i });
-      expect(avatar.querySelector("svg")).toBeTruthy();
+      expect(avatar.querySelector("img")?.getAttribute("src")).toMatch(/^data:image\/svg\+xml;utf8,%3Csvg/);
 
       for (const call of fetchSpy.mock.calls) {
         const url = String(call[0]);

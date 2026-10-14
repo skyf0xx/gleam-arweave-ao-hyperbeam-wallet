@@ -32,6 +32,7 @@ import {
 } from "@gleam/messaging/src/page-protocol.ts";
 import { WxtStoragePort } from "@/src/adapters/storage";
 import { WxtWindowPort } from "@/src/adapters/windows";
+import { restrictSessionStorageToTrustedContexts } from "@/src/adapters/session-access";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
 import { PasskeyHandler } from "@/src/handlers/passkey";
 import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/reads";
@@ -91,6 +92,8 @@ const onExtensionMessage: typeof messenger.onMessage = (type, onReceived) =>
     }
     return onReceived(message);
   });
+
+void restrictSessionStorageToTrustedContexts();
 
 const storage = new WxtStoragePort();
 const windows = new WxtWindowPort(storage);
