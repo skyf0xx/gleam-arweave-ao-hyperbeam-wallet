@@ -5,6 +5,11 @@ pre-commit:
       glob: "*.{js,jsx,ts,tsx}"
       run: pnpm eslint --max-warnings=0 {staged_files}
 
+    - name: gitleaks
+      run: >
+        command -v gitleaks >/dev/null || { echo "gitleaks is missing: brew install gitleaks"; exit 1; };
+        gitleaks git --pre-commit --staged --redact --verbose --no-banner
+
     - name: tsc
       glob: "*.{ts,tsx}"
       run: >

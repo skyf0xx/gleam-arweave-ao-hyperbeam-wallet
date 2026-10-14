@@ -1,0 +1,16 @@
+[extend]
+useDefault = true
+
+# Each entry names exact files or one exact value, so a secret anywhere
+# else still fails the scan. Nothing in the listed test files is checked.
+
+[[allowlists]]
+description = "Fake keys the upload secret scanner is tested against"
+paths = [
+  '''^packages/core/src/policy/secret-scan\.policy\.test\.ts$''',
+  '''^apps/extension/src/handlers/upload\.upload\.test\.ts$''',
+]
+
+[[allowlists]]
+description = "CoinGecko demo key: ships inside the extension bundle, so it is public by design"
+regexes = ['''^CG-XG6hdjK9NPY2vfPVZQbAptqY$''']
