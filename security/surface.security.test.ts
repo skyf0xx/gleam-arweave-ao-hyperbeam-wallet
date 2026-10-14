@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parseSurface } from "./surface.mjs";
 
 const ROOT = resolve(__dirname, "..");
 
@@ -11,10 +12,7 @@ function contentLines(file: string): string[] {
     .filter((line) => line !== "" && !line.startsWith("#"));
 }
 
-const surface = contentLines("security/surface.txt").map((line) => {
-  const [tier, path, ...rest] = line.split(/\s+/);
-  return { line, tier, path: path ?? "", rest };
-});
+const surface = parseSurface(readFileSync(resolve(ROOT, "security/surface.txt"), "utf8"));
 
 const codeowners = contentLines(".github/CODEOWNERS").map((line) => line.split(/\s+/)[0]!.replace(/^\//, ""));
 

@@ -9,7 +9,7 @@
 #   2 signing: a wrong or unapproved signature
 #   3 trust boundary: a page reaches what it shouldn't
 #   4 what you see is what you sign: the approval preview lies
-#   5 other ways in: extension config, dependencies, CI
+#   5 other ways in: extension config, dependencies, CI, the release gate
 
 1 packages/core/src/vault/
 1 packages/core/src/keys/
@@ -49,3 +49,6 @@
 5 pnpm-lock.yaml
 5 lefthook.yml
 5 .gitleaks.toml
+5 scripts/release-gate.mjs
+5 scripts/release.mjs
+5 security/surface.mjs
