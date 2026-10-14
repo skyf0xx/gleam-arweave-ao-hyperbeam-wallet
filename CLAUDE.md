@@ -95,6 +95,9 @@ needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 ## Workflow
 
 Take the top item in `todo.md`. Make one Conventional Commit per item
-(`fix(ao): …`, `feat(activity): …`), then remove the item from
-`todo.md`. `todo.md` is not tracked in git. Add anything new you find to `todo.md`'s **Unsorted**
+(`fix(ao): …`, `feat(activity): …`) on its own branch, open a PR, and
+merge it once CI is green. Then remove the item from `todo.md`. `master`
+accepts only signed commits through a PR with passing CI, and admins get
+no bypass. This repo signs commits with an SSH key (`git config --local
+commit.gpgsign true`), so the key has to be loaded in `ssh-agent`. `todo.md` is not tracked in git. Add anything new you find to `todo.md`'s **Unsorted**
 section instead of fixing it on the side.
