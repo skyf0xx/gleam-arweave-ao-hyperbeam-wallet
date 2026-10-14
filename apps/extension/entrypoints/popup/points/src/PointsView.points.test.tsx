@@ -357,19 +357,21 @@ describe("PointsView", () => {
     expect(await screen.findByText("Your rank is #5. 1.80 points to pass the next one.")).toBeTruthy();
   });
 
-  it("shows only the rank for the leader", async () => {
+  it("shows #1 for the leader, even as the only ranked wallet", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
       getPointsScores: () => ({
         ...SCORES,
-        wallets: [{ ...SCORES.wallets[0]!, rank: 1, pointsToNextRankAtomic: null }],
+        wallets: [{ ...SCORES.wallets[0]!, rank: 1, topPercent: 100, pointsToNextRankAtomic: null }],
       }),
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Your rank is #1.")).toBeTruthy();
+    const standing = within(await screen.findByRole("region", { name: "Standing" }));
+    await waitFor(() => expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("#1"));
+    expect(screen.queryByText(/Your rank is/)).toBeNull();
   });
 
   it("copies the invite link", async () => {

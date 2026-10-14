@@ -42,9 +42,10 @@ export interface PointsViewProps {
 const MEMBER_SEATS = 3;
 
 /**
- * Rank shows only in the top half. Below that, and for the last-placed or
- * only ranked wallet that the server reports as "Top 100%", it reads as a
- * put-down rather than a reason to invite.
+ * Rank shows only in the top half. Below that, and for the last-placed
+ * wallet that the server reports as "Top 100%", it reads as a put-down
+ * rather than a reason to invite. The leader always shows "#1", since an
+ * only ranked wallet is also "Top 100%".
  */
 const RANK_SHOWN_MAX_PERCENT = 50;
 
@@ -264,18 +265,17 @@ function JoinedView({
             +{formatPoints(standing.dailyRateAtomic)}
           </InkStat>
           <InkStat label="Rank">
-            {topPercent !== null && topPercent <= RANK_SHOWN_MAX_PERCENT
-              ? `Top ${topPercent}%`
-              : "—"}
+            {score?.rank === 1
+              ? "#1"
+              : topPercent !== null && topPercent <= RANK_SHOWN_MAX_PERCENT
+                ? `Top ${topPercent}%`
+                : "—"}
           </InkStat>
           <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
         </dl>
-        {score?.rank != null ? (
+        {score?.rank != null && score.pointsToNextRankAtomic !== null ? (
           <p className="text-label text-on-ink-muted">
-            Your rank is #{score.rank}
-            {score.pointsToNextRankAtomic !== null
-              ? `. ${formatPoints(score.pointsToNextRankAtomic)} points to pass the next one.`
-              : "."}
+            Your rank is #{score.rank}. {formatPoints(score.pointsToNextRankAtomic)} points to pass the next one.
           </p>
         ) : null}
       </InkCard>
