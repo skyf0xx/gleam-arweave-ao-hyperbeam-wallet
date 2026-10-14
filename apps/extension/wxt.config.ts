@@ -1,9 +1,21 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
+
+// Only the sha, never a dirty-tree marker: two builds of one commit must
+// produce identical bytes for reproducible release builds.
+function buildCommit(): string {
+  try {
+    const sha = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -71,6 +83,9 @@ export default defineConfig({
     ],
   },
   vite: () => ({
+    define: {
+      'import.meta.env.VITE_GLEAM_COMMIT': JSON.stringify(buildCommit()),
+    },
     plugins: [
       tailwindcss(),
       // The Keystone UR registry hashes through bs58check → create-hash →
