@@ -25,6 +25,18 @@ describe("validateSendAmount", () => {
   it("blocks an AR amount that alone fits the balance but overflows once the fee is added", () => {
     // amount === balance, fee on top pushes it over.
     expect(validateSendAmount(AR_BALANCE, null, balances(), "50000000000")).toBe(
+      "The network fee is 0.05 AR. That plus this amount is more than your balance.",
+    );
+  });
+
+  it("explains a new-address fee when the recipient-aware fee is the cause", () => {
+    expect(validateSendAmount(AR_BALANCE, null, balances(), "260000000000", true)).toBe(
+      "This address is new to Arweave, so the network fee is 0.26 AR. That plus this amount is more than your balance.",
+    );
+  });
+
+  it("keeps the plain balance error when the amount alone exceeds the balance", () => {
+    expect(validateSendAmount((BigInt(AR_BALANCE) + 1n).toString(), null, balances(), "260000000000", true)).toBe(
       "That's more than your current balance.",
     );
   });

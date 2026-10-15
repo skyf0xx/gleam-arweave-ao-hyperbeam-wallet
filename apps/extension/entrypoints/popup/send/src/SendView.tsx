@@ -255,7 +255,15 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         // getArFee's recipient-less quote underestimates for a first-seen
         // recipient (see its doc comment) — recheck the balance now that
         // estimateTransfer has the real, recipient-specific fee.
-        const finalBalanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data, estimate.fee ?? undefined);
+        const feeIsNewAddress =
+          estimate.fee !== null && arFeeQuery.data !== undefined && BigInt(estimate.fee) > BigInt(arFeeQuery.data);
+        const finalBalanceError = validateSendAmount(
+          amountAtomic,
+          selectedToken,
+          balancesQuery.data,
+          estimate.fee ?? undefined,
+          feeIsNewAddress,
+        );
         if (finalBalanceError !== null) {
           setStep({ ...step, submitting: false, recipientError: undefined, amountError: finalBalanceError });
           return;
