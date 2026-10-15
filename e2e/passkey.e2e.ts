@@ -25,6 +25,16 @@ test.beforeAll(async () => {
   let [worker] = context.serviceWorkers();
   worker ??= await context.waitForEvent("serviceworker");
   extensionId = new URL(worker.url()).host;
+
+  // The production build opens the site's welcome page on install. If that
+  // tab lands mid-ceremony it takes focus and WebAuthn rejects the request,
+  // so wait for it and close it before any test starts.
+  await context.route("https://gleamwallet.app/**", (route) => route.fulfill({ body: "" }));
+  let welcome: Page | undefined;
+  await expect
+    .poll(() => (welcome = context.pages().find((page) => page.url().includes("/welcome.html"))), { timeout: 10_000 })
+    .toBeTruthy();
+  await welcome?.close();
 });
 
 test.afterAll(async () => {
