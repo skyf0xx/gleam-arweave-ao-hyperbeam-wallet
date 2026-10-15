@@ -5,6 +5,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
+import { extensionPagesCsp } from './src/csp';
 
 // Only the sha, never a dirty-tree marker: two builds of one commit must
 // produce identical bytes for reproducible release builds.
@@ -20,7 +21,7 @@ function buildCommit(): string {
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
-  manifest: {
+  manifest: ({ command }) => ({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
     name: 'Gleam',
@@ -86,7 +87,10 @@ export default defineConfig({
         matches: ['http://*/*', 'https://*/*'],
       },
     ],
-  },
+    content_security_policy: {
+      extension_pages: extensionPagesCsp(command),
+    },
+  }),
   vite: () => ({
     define: {
       'import.meta.env.VITE_GLEAM_COMMIT': JSON.stringify(buildCommit()),
