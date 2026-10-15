@@ -61,4 +61,9 @@ export interface FeeEstimate {
    * tier framing.
    */
   firstSeenRecipient: boolean;
+  /**
+   * A known address (contact, own wallet, past recipient) this recipient
+   * imitates by its first and last characters — address poisoning.
+   */
+  lookalikeOf?: string | null;
 }

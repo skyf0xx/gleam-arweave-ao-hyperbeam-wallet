@@ -1,5 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { ApprovalRequest, DeviceSigningRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
+import type {
+  ApprovalRequest,
+  DeviceSigningRequest,
+  RecipientAssessment,
+  RuntimePort,
+  ThemeSettings,
+  WalletState,
+} from "@gleam/core";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
@@ -44,7 +51,7 @@ type LoadState =
   | { kind: "loading" }
   | { kind: "no-wallet"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "locked"; runtime: RuntimePort; request: ApprovalRequest }
-  | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest }
+  | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest; assessment: RecipientAssessment | null }
   | { kind: "awaiting-device"; runtime: RuntimePort; request: ApprovalRequest; device: DeviceSigningRequest }
   | { kind: "error"; message: string }
   | { kind: "done"; message: string }
@@ -58,6 +65,25 @@ function needsUnlock(state: WalletState): boolean {
   const unlocked = state.session?.unlockedWalletIds ?? [];
   if (state.activeWalletId === null) return unlocked.length === 0;
   return !unlocked.includes(state.activeWalletId);
+}
+
+/** Best effort: a failed lookup shows no recipient warning, and the generic one still shows. */
+async function assessRecipientFor(
+  runtime: RuntimePort,
+  request: ApprovalRequest,
+  walletId: string | null,
+): Promise<RecipientAssessment | null> {
+  const preview = request.preview;
+  if (preview.kind === "connect" || preview.kind === "addToken" || !preview.recipient || !walletId) return null;
+  try {
+    const assessment = await runtime.send<{ walletId: string; recipient: string }, RecipientAssessment | undefined>({
+      type: "assessRecipient",
+      payload: { walletId, recipient: preview.recipient },
+    });
+    return assessment ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function hostnameOf(origin: string): string {
@@ -100,7 +126,8 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       } else if (needsUnlock(walletState)) {
         setState({ kind: "locked", runtime, request });
       } else {
-        setState({ kind: "ready", runtime, request });
+        const assessment = await assessRecipientFor(runtime, request, walletState.activeWalletId);
+        setState({ kind: "ready", runtime, request, assessment });
       }
     } catch (error) {
       setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -203,7 +230,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       />
     );
   } else {
-    const { runtime, request } = state;
+    const { runtime, request, assessment } = state;
 
     const handleReject = () => rejectRequest(runtime, request);
 
@@ -251,6 +278,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
         <SigningApprovalScreen
           origin={request.origin}
           preview={signingPreview}
+          assessment={assessment}
           onReject={() => void handleReject()}
           onSign={() => handleApprove("Signed.", "Signing failed")}
         />

@@ -10,5 +10,6 @@ export { NetworkErrorBanner, type NetworkErrorBannerProps } from "./NetworkError
 export { SkeletonRow } from "./SkeletonRow";
 export { SendReceiveActions, type SendReceiveActionsProps } from "./SendReceiveActions";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
+export { RecipientWarning, type RecipientWarningProps } from "./RecipientWarning";
 export { SkeletonTile } from "./SkeletonTile";
 export { CollectibleThumbnail, type CollectibleThumbnailProps } from "./CollectibleThumbnail";

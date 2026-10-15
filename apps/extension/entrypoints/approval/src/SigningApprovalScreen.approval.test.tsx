@@ -294,3 +294,37 @@ describe("SigningApprovalScreen: a send from the wallet itself", () => {
     expect(screen.queryByText(WALLET_SEND_PREVIEW.payloadHash)).toBeNull();
   });
 });
+
+describe("SigningApprovalScreen recipient warnings", () => {
+  const known = "xU9zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk3kLp";
+
+  function renderWith(assessment: { firstTime: boolean; lookalikeOf: string | null }) {
+    render(
+      <SigningApprovalScreen
+        origin="https://dapp.example"
+        preview={TRANSFER_PREVIEW}
+        assessment={assessment}
+        onReject={vi.fn()}
+        onSign={vi.fn()}
+      />,
+    );
+  }
+
+  it("names the address a lookalike recipient imitates", () => {
+    renderWith({ firstTime: true, lookalikeOf: known });
+    expect(screen.getByText(/looks like one you know/)).toBeTruthy();
+    expect(screen.getByText(known)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /sign and send/i }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("flags a first-time recipient", () => {
+    renderWith({ firstTime: true, lookalikeOf: null });
+    expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
+  });
+
+  it("shows no recipient warning for a known recipient", () => {
+    renderWith({ firstTime: false, lookalikeOf: null });
+    expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
+    expect(screen.queryByText(/looks like one you know/)).toBeNull();
+  });
+});
