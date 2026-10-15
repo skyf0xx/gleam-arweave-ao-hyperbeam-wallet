@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "arweave": "^2.1.0"
+    "arweave": "^2.1.0",
+    "hash-wasm": "4.12.0"
   },
   "devDependencies": {
     "@dha-team/arbundles": "^1.0.3",

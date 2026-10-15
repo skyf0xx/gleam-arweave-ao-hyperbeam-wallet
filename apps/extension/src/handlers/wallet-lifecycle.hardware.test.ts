@@ -43,6 +43,8 @@ const storage: StoragePort = {
 };
 
 const PASSWORD = "correct horse battery staple";
+/** Argon2id at its minimum, so tests don't pay the production KDF cost. */
+const TEST_KDF = { kdfParams: { memoryKiB: 64, iterations: 1, parallelism: 1 } };
 const XFP = "1a2b3c4d";
 
 function modulus(bytes = 512, fill = 7): string {
@@ -67,7 +69,7 @@ let handler: WalletLifecycleHandler;
 
 beforeEach(() => {
   store.clear();
-  handler = new WalletLifecycleHandler(storage);
+  handler = new WalletLifecycleHandler(storage, TEST_KDF);
 });
 
 function addKeystone(fill = 7, name?: string) {

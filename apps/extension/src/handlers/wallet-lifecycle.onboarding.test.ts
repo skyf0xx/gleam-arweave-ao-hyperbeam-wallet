@@ -1,8 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import type { StoragePort } from "@gleam/core";
+import * as hashWasm from "hash-wasm";
+import { bytesToBase64, VaultKdfError, type StoragePort, type VaultEnvelope, type Wallet } from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 import { getSigner, clearKeyCache } from "./key-session";
 import { sessionKeyStore } from "../adapters/session-key-store";
+
+vi.mock("hash-wasm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("hash-wasm")>();
+  return { ...actual, argon2id: vi.fn(actual.argon2id) };
+});
 
 /**
  * Real key/value store standing in for `adapters/storage.ts`'s
@@ -35,6 +41,8 @@ beforeEach(async () => {
 });
 
 const GOOD_PASSWORD = "correct horse battery staple";
+/** Argon2id at its minimum, so tests don't pay the production KDF cost. */
+const TEST_KDF = { kdfParams: { memoryKiB: 64, iterations: 1, parallelism: 1 } };
 const OTHER_PASSWORD = "another very long safe password!";
 
 /**
@@ -86,7 +94,7 @@ describe("WalletLifecycleHandler: createWallet", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage);
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
   it("rejects a password shorter than 8 characters", async () => {
@@ -153,7 +161,7 @@ describe("WalletLifecycleHandler: importWallet", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage);
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
   it("rejects a malformed keyfile with a specific reason, not a generic error", async () => {
@@ -238,7 +246,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage);
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
   it("createWallet rejects a password that doesn't open the vault, and stores nothing", async () => {
@@ -302,6 +310,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
       weak,
       wallet!.id as string,
       wallet!.address as string,
+      { params: TEST_KDF.kdfParams },
     );
     await storage.set("local:wallets", [{ ...wallet, encryptedKeyfile: envelope }]);
 
@@ -313,7 +322,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
   it("accepts a password that opens any stored wallet, not only the active one", async () => {
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     const otherStorage = createFakeStorage();
-    await new WalletLifecycleHandler(otherStorage).importWallet({
+    await new WalletLifecycleHandler(otherStorage, TEST_KDF).importWallet({
       jwk: validJWK(),
       name: "Legacy",
       password: OTHER_PASSWORD,
@@ -334,7 +343,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage);
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
   it("unlocks the last-active wallet with its own password", async () => {
@@ -478,7 +487,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     // shared one; seed that case directly since the handler always
     // creates wallets under the shared password.
     const otherStorage = createFakeStorage();
-    await new WalletLifecycleHandler(otherStorage).importWallet({
+    await new WalletLifecycleHandler(otherStorage, TEST_KDF).importWallet({
       jwk: validJWK(),
       name: "Second",
       password: OTHER_PASSWORD,
@@ -547,10 +556,311 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
   });
 });
 
+/** A version 1 envelope as every Gleam release before Argon2id wrote it. */
+async function encryptV1(text: string, password: string, walletId: string, address: string): Promise<VaultEnvelope> {
+  const encode = (value: string) => new TextEncoder().encode(value);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const material = await crypto.subtle.importKey("raw", encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 600_000, hash: "SHA-256" },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"],
+  );
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: encode(`gleam:v1:${walletId}:${address}`) },
+    key,
+    encode(text),
+  );
+  return {
+    version: 1,
+    algorithm: "AES-GCM",
+    kdf: "PBKDF2-HMAC-SHA256",
+    iterations: 600_000,
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+  };
+}
+
+describe("WalletLifecycleHandler: Argon2id envelope upgrade on unlock", () => {
+  let storage: StoragePort;
+  let handler: WalletLifecycleHandler;
+
+  async function storedWallets(): Promise<Wallet[]> {
+    return (await storage.get<Wallet[]>("local:wallets"))!;
+  }
+
+  /** Rewrites every stored keyfile as a version 1 envelope under `password`. */
+  async function downgradeToV1(password = GOOD_PASSWORD): Promise<void> {
+    const wallets = await storedWallets();
+    const legacy = await Promise.all(
+      wallets.map(async (wallet) => {
+        const jwk = await handler.exportWallet({ walletId: wallet.id, password: GOOD_PASSWORD });
+        const envelope = await encryptV1(JSON.stringify(jwk), password, wallet.id, wallet.address);
+        return { ...wallet, encryptedKeyfile: envelope };
+      }),
+    );
+    await storage.set("local:wallets", legacy);
+  }
+
+  beforeEach(() => {
+    storage = createFakeStorage();
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+  });
+
+  it("creates wallets with version 2 Argon2id envelopes", async () => {
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    const [wallet] = await storedWallets();
+    expect(wallet!.encryptedKeyfile).toMatchObject({ version: 2, kdf: "Argon2id", ...TEST_KDF.kdfParams });
+  });
+
+  it("re-encrypts a version 1 envelope as version 2 on unlock, and the result still unlocks", async () => {
+    const created = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await downgradeToV1();
+    await handler.lockWallet();
+
+    await handler.unlockWallet({ password: GOOD_PASSWORD });
+    await handler.envelopeUpgradeSettled();
+
+    const [wallet] = await storedWallets();
+    expect(wallet!.encryptedKeyfile).toMatchObject({ version: 2, kdf: "Argon2id" });
+    await handler.lockWallet();
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).resolves.toEqual({
+      unlockedWalletIds: [created.id],
+    });
+    const jwk = await handler.exportWallet({ walletId: created.id, password: GOOD_PASSWORD });
+    expect(jwk.kty).toBe("RSA");
+  });
+
+  it("gives every upgraded wallet in the vault one shared salt", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
+    await downgradeToV1();
+    await handler.lockWallet();
+
+    await handler.unlockWallet({ password: GOOD_PASSWORD });
+    await handler.envelopeUpgradeSettled();
+
+    const [first, second] = await storedWallets();
+    expect(first!.encryptedKeyfile!.version).toBe(2);
+    expect(second!.encryptedKeyfile!.salt).toBe(first!.encryptedKeyfile!.salt);
+    expect(second!.encryptedKeyfile!.iv).not.toBe(first!.encryptedKeyfile!.iv);
+  });
+
+  it("adds a wallet under the vault's existing salt", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
+
+    const [first, second] = await storedWallets();
+    expect(second!.encryptedKeyfile!.salt).toBe(first!.encryptedKeyfile!.salt);
+  });
+
+  it("leaves a wallet under a different password on version 1", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
+    const [first, second] = await storedWallets();
+    const jwk = await handler.exportWallet({ walletId: second!.id, password: GOOD_PASSWORD });
+    const otherV1 = await encryptV1(JSON.stringify(jwk), OTHER_PASSWORD, second!.id, second!.address);
+    await storage.set("local:wallets", [first, { ...second, encryptedKeyfile: otherV1 }]);
+    await handler.lockWallet();
+
+    await handler.unlockWallet({ password: GOOD_PASSWORD });
+    await handler.envelopeUpgradeSettled();
+
+    const [, after] = await storedWallets();
+    expect(after!.encryptedKeyfile).toEqual(otherV1);
+  });
+
+  it("keeps the version 1 envelope and still unlocks when writing the upgrade fails", async () => {
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await downgradeToV1();
+    const [legacy] = await storedWallets();
+    await handler.lockWallet();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const set = storage.set.bind(storage);
+    storage.set = async (key, value) => {
+      if (key === "local:wallets") throw new Error("QUOTA_BYTES quota exceeded");
+      return set(key, value);
+    };
+
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).resolves.toMatchObject({
+      unlockedWalletIds: [legacy!.id],
+    });
+    await handler.envelopeUpgradeSettled();
+
+    const [after] = await storedWallets();
+    expect(after!.encryptedKeyfile).toEqual(legacy!.encryptedKeyfile);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+    storage.set = set;
+    await handler.lockWallet();
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).resolves.toMatchObject({
+      unlockedWalletIds: [legacy!.id],
+    });
+  });
+
+  it("does not overwrite a keyfile that changed while the unlock ran", async () => {
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await downgradeToV1();
+    const [legacy] = await storedWallets();
+    await handler.lockWallet();
+    const replacement = await encryptV1("{}", GOOD_PASSWORD, legacy!.id, legacy!.address);
+    const get = storage.get.bind(storage);
+    let walletReads = 0;
+    storage.get = async <T,>(key: string) => {
+      // The upgrade re-reads the wallets just before writing; by then
+      // something else has replaced this keyfile.
+      if (key === "local:wallets" && ++walletReads === 2) {
+        await storage.set("local:wallets", [{ ...legacy, encryptedKeyfile: replacement }]);
+      }
+      return get<T>(key);
+    };
+
+    await handler.unlockWallet({ password: GOOD_PASSWORD });
+    await handler.envelopeUpgradeSettled();
+
+    const [after] = await storedWallets();
+    expect(after!.encryptedKeyfile).toEqual(replacement);
+  });
+
+  it("resolves the unlock before the upgrade is written", async () => {
+    const created = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await downgradeToV1();
+    const [legacy] = await storedWallets();
+    await handler.lockWallet();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const get = storage.get.bind(storage);
+    let walletReads = 0;
+    storage.get = async <T,>(key: string) => {
+      if (key === "local:wallets" && ++walletReads === 2) await held;
+      return get<T>(key);
+    };
+
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).resolves.toEqual({
+      unlockedWalletIds: [created.id],
+    });
+    expect(await storage.get("session:unlockedSession")).not.toBeNull();
+    const beforeRelease = (await get<Wallet[]>("local:wallets"))!;
+    expect(beforeRelease[0]!.encryptedKeyfile).toEqual(legacy!.encryptedKeyfile);
+
+    release();
+    await handler.envelopeUpgradeSettled();
+    expect((await storedWallets())[0]!.encryptedKeyfile!.version).toBe(2);
+  });
+
+  it("does not drop a write that landed while an import was encrypting", async () => {
+    await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    // A version 1 vault gives the import a fresh salt, so its encrypt runs Argon2id cold.
+    await downgradeToV1();
+    vi.mocked(hashWasm.argon2id).mockImplementationOnce(async (options) => {
+      // Another context (an envelope upgrade, a rename) writes meanwhile.
+      const [first] = await storedWallets();
+      await storage.set("local:wallets", [{ ...first!, name: "Renamed meanwhile" }]);
+      const actual = await vi.importActual<typeof import("hash-wasm")>("hash-wasm");
+      return actual.argon2id(options);
+    });
+
+    await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
+
+    const wallets = await storedWallets();
+    expect(wallets.map((wallet) => wallet.name)).toEqual(["Renamed meanwhile", "Second"]);
+  });
+
+  it("re-encrypts a version 2 envelope once the Argon2id cost is raised", async () => {
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+    const raised = { memoryKiB: 128, iterations: 2, parallelism: 1 };
+
+    const raisedHandler = new WalletLifecycleHandler(storage, { kdfParams: raised });
+    await raisedHandler.unlockWallet({ password: GOOD_PASSWORD });
+    await raisedHandler.envelopeUpgradeSettled();
+
+    const [wallet] = await storedWallets();
+    expect(wallet!.encryptedKeyfile).toMatchObject({ version: 2, ...raised });
+  });
+});
+
+describe("WalletLifecycleHandler: key derivation failures", () => {
+  let storage: StoragePort;
+  let handler: WalletLifecycleHandler;
+  const wasmFailure = () => new RangeError("WebAssembly.Memory(): could not allocate memory");
+
+  beforeEach(async () => {
+    storage = createFakeStorage();
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+  });
+
+  async function corruptFirstEnvelope(): Promise<void> {
+    const [first, ...rest] = (await storage.get<Wallet[]>("local:wallets"))!;
+    const envelope = { ...first!.encryptedKeyfile!, memoryKiB: 8 * 1024 * 1024 } as VaultEnvelope;
+    await storage.set("local:wallets", [{ ...first!, encryptedKeyfile: envelope }, ...rest]);
+  }
+
+  it("reports an Argon2id failure on unlock, not a wrong password", async () => {
+    vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
+
+    const unlock = handler.unlockWallet({ password: GOOD_PASSWORD });
+
+    await expect(unlock).rejects.toBeInstanceOf(VaultKdfError);
+    await expect(unlock).rejects.toThrow(/couldn't run its password check/);
+  });
+
+  it("reports a corrupted envelope on unlock when no wallet opens", async () => {
+    await corruptFirstEnvelope();
+
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(/corrupted/);
+  });
+
+  it("still unlocks the other wallets when one envelope is corrupted", async () => {
+    const second = await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+    await corruptFirstEnvelope();
+
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).resolves.toEqual({
+      unlockedWalletIds: [second.id],
+    });
+  });
+
+  it("still reports a wrong password as one", async () => {
+    await expect(handler.unlockWallet({ password: OTHER_PASSWORD })).rejects.toThrow(/didn't work/);
+  });
+
+  it("reports an Argon2id failure when checking the vault password", async () => {
+    vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
+
+    await expect(handler.checkVaultPassword({ password: GOOD_PASSWORD })).rejects.toBeInstanceOf(VaultKdfError);
+  });
+
+  it("reports an Argon2id failure when adding a wallet", async () => {
+    vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
+
+    await expect(
+      handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD }),
+    ).rejects.toBeInstanceOf(VaultKdfError);
+  });
+
+  it("does not leak the raw WASM error from exportWallet", async () => {
+    const [wallet] = (await storage.get<Wallet[]>("local:wallets"))!;
+    vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
+
+    const exported = handler.exportWallet({ walletId: wallet!.id, password: GOOD_PASSWORD });
+
+    await expect(exported).rejects.toThrow(/couldn't run its password check/);
+    await expect(exported).rejects.not.toThrow(/WebAssembly/);
+  });
+});
+
 describe("WalletLifecycleHandler: lockWallet", () => {
   it("immediately clears unlocked-session state", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
@@ -565,7 +875,7 @@ describe("WalletLifecycleHandler: lockWallet", () => {
 
   it("getState reports no session once locked", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.unlockWallet({ password: GOOD_PASSWORD });
     await handler.lockWallet();
@@ -577,12 +887,12 @@ describe("WalletLifecycleHandler: lockWallet", () => {
 
 describe("WalletLifecycleHandler: getLockSettings", () => {
   it("defaults to never when nothing is stored", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage());
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "never" });
   });
 
   it("reflects a value previously written by setLockSettings", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage());
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
     await handler.setLockSettings({ autoLockTimeout: "5min" });
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "5min" });
   });
@@ -590,19 +900,19 @@ describe("WalletLifecycleHandler: getLockSettings", () => {
   it("drops a malformed stored record back to the default (untrusted storage)", async () => {
     const storage = createFakeStorage();
     await storage.set("local:lockSettings", { autoLockTimeout: "not-a-real-timeout" });
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "never" });
   });
 });
 
 describe("WalletLifecycleHandler: getThemePreference", () => {
   it("defaults to light when nothing is stored", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage());
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
     expect(await handler.getThemePreference()).toEqual({ theme: "light" });
   });
 
   it("reflects a value previously written by setThemePreference", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage());
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
     await handler.setThemePreference({ theme: "dark" });
     expect(await handler.getThemePreference()).toEqual({ theme: "dark" });
   });
@@ -610,13 +920,13 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
   it("drops a malformed stored record back to the default (untrusted storage)", async () => {
     const storage = createFakeStorage();
     await storage.set("local:themeSettings", { theme: "not-a-real-theme" });
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     expect(await handler.getThemePreference()).toEqual({ theme: "light" });
   });
 
   it("defaults to light for a fresh install with no stored preference at all", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     expect(await storage.get("local:themeSettings")).toBeNull();
     expect(await handler.getThemePreference()).toEqual({ theme: "light" });
   });
@@ -624,7 +934,7 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
 
 describe("WalletLifecycleHandler: setThemePreference", () => {
   it("rejects a value that isn't exactly light or dark", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage());
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
     await expect(
       handler.setThemePreference({ theme: "system" as never }),
     ).rejects.toThrow(/invalid theme preference/i);
@@ -632,10 +942,10 @@ describe("WalletLifecycleHandler: setThemePreference", () => {
 
   it("persists across a fresh handler instance (popup close/reopen)", async () => {
     const storage = createFakeStorage();
-    const first = new WalletLifecycleHandler(storage);
+    const first = new WalletLifecycleHandler(storage, TEST_KDF);
     await first.setThemePreference({ theme: "dark" });
 
-    const second = new WalletLifecycleHandler(storage);
+    const second = new WalletLifecycleHandler(storage, TEST_KDF);
     expect(await second.getThemePreference()).toEqual({ theme: "dark" });
   });
 });
@@ -646,7 +956,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
     await storage.set("local:wallets", [
       { id: "broken", address: 12345 }, // malformed: address must be a string
     ]);
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
 
     const state = await handler.getState();
 
@@ -656,7 +966,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
   it("drops an activeWalletId that doesn't reference any stored wallet", async () => {
     const storage = createFakeStorage();
     await storage.set("local:activeWalletId", "does-not-exist");
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
 
     const state = await handler.getState();
 
@@ -665,7 +975,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
 
   it("drops an unlockedWalletIds entry that references a since-deleted wallet", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     // Simulate a stale session left over after the wallet was deleted
@@ -686,7 +996,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
   it("falls back to the default lock settings when the stored record is malformed", async () => {
     const storage = createFakeStorage();
     await storage.set("local:lockSettings", { autoLockTimeout: "bogus" });
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
 
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.lockWallet();
@@ -703,7 +1013,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage);
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
   afterEach(async () => {
@@ -824,7 +1134,7 @@ describe("WalletLifecycleHandler: deleteWallet / renameWallet / switchWallet", (
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage);
+    handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
   it("renameWallet updates the name and bumps updatedAt", async () => {
@@ -872,7 +1182,7 @@ describe("WalletLifecycleHandler: deleteWallet / renameWallet / switchWallet", (
 describe("WalletLifecycleHandler: resetAllWallets", () => {
   it("wipes every stored wallet, the active wallet pointer, and the session", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
 
@@ -886,7 +1196,7 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
 
   it("removes each wallet's activity log and watched tokens, and nothing else's", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     const wallet = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     await storage.set(`local:activityLog:${wallet.address}`, [{ id: "tx" }]);
     await storage.set(`local:watchedProcessIds:${wallet.address}`, ["process"]);
@@ -901,7 +1211,7 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
 
   it("never throws when called with nothing stored", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
 
     await expect(handler.resetAllWallets()).resolves.toBeUndefined();
   });
@@ -910,7 +1220,7 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
 describe("WalletLifecycleHandler: exportWallet", () => {
   it("rejects the wrong password with an error, never returning key material", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await expect(
@@ -922,7 +1232,7 @@ describe("WalletLifecycleHandler: exportWallet", () => {
 describe("WalletLifecycleHandler: confirmWalletBackup", () => {
   it("a new wallet starts with no confirmed backup", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     expect(wallet.backupConfirmedAt).toBeNull();
@@ -932,7 +1242,7 @@ describe("WalletLifecycleHandler: confirmWalletBackup", () => {
 
   it("records a timestamp once confirmed, surfaced through getState", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     const before = Date.now();
@@ -948,7 +1258,7 @@ describe("WalletLifecycleHandler: confirmWalletBackup", () => {
 
   it("throws for an unknown wallet id rather than silently no-op-ing", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await expect(handler.confirmWalletBackup({ walletId: "no-such-wallet" })).rejects.toThrow();
@@ -956,7 +1266,7 @@ describe("WalletLifecycleHandler: confirmWalletBackup", () => {
 
   it("does not affect other wallets' backup status", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage);
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
     const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     const second = await handler.importWallet({
       jwk: validJWK(),

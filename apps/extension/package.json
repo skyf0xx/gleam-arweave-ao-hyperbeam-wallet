@@ -37,6 +37,7 @@
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
     "fake-indexeddb": "^6.2.5",
+    "hash-wasm": "4.12.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "web-ext": "^10.7.0",

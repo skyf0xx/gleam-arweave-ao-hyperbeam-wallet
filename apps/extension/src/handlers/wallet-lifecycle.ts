@@ -2,15 +2,22 @@ import {
   addressFromOwner,
   base64UrlToBytes,
   decryptFromEnvelope,
+  DEFAULT_ARGON2ID_PARAMS,
   deriveAddress,
   encryptToEnvelope,
+  envelopeNeedsUpgrade,
+  VaultKeys,
   generateJWK,
+  newVaultSalt,
   capabilitiesFor,
   isHardwareWalletMethod,
   validateJWKShape,
   validatePassword,
+  VaultKdfError,
   zeroize,
+  type Argon2idParams,
   type AutoLockTimeout,
+  type EncryptOptions,
   type HardwareDevice,
   type HardwareWalletMethod,
   type JWKInterface,
@@ -18,6 +25,7 @@ import {
   type Session,
   type StoragePort,
   type ThemeSettings,
+  type VaultEnvelope,
   type Wallet,
   type WalletState,
   type WalletSummary,
@@ -321,6 +329,20 @@ async function saveSession(storage: StoragePort, session: Session | null): Promi
   await storage.set(SESSION_KEY, session);
 }
 
+function sameEnvelope(a: VaultEnvelope, b: VaultEnvelope): boolean {
+  return a.version === b.version && a.salt === b.salt && a.iv === b.iv && a.ciphertext === b.ciphertext;
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((byte, index) => byte === b[index]);
+}
+
+interface EnvelopeUpgrade {
+  walletId: string;
+  from: VaultEnvelope;
+  to: VaultEnvelope;
+}
+
 function jwkToBytes(jwk: JWKInterface): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(JSON.stringify(jwk)) as Uint8Array<ArrayBuffer>;
 }
@@ -366,8 +388,35 @@ async function unlockNewWallet(
   }
 }
 
+export interface WalletLifecycleOptions {
+  /** Argon2id cost for new and re-encrypted envelopes. */
+  kdfParams?: Argon2idParams;
+}
+
 export class WalletLifecycleHandler {
-  constructor(private readonly storage: StoragePort) {}
+  private readonly kdfParams: Argon2idParams;
+  private pendingUpgrade: Promise<void> = Promise.resolve();
+
+  constructor(
+    private readonly storage: StoragePort,
+    options: WalletLifecycleOptions = {},
+  ) {
+    this.kdfParams = options.kdfParams ?? DEFAULT_ARGON2ID_PARAMS;
+  }
+
+  /**
+   * Encryption settings for a new envelope in a vault where `opened` is an
+   * envelope the password already decrypted. Reusing a current envelope's
+   * salt and params lets `keys` serve the new envelope without a second
+   * Argon2id run, and keeps unlock at one derivation for the whole vault.
+   */
+  private encryptOptionsFor(opened: VaultEnvelope | null): EncryptOptions {
+    if (opened?.version === 2 && !envelopeNeedsUpgrade(opened, this.kdfParams)) {
+      const { memoryKiB, iterations, parallelism, salt } = opened;
+      return { params: { memoryKiB, iterations, parallelism }, salt };
+    }
+    return { params: this.kdfParams };
+  }
 
   /**
    * Every wallet shares the one vault password. The first wallet sets it,
@@ -377,43 +426,50 @@ export class WalletLifecycleHandler {
    * is skipped then, because a password that opens the vault is the vault
    * password even if it predates the current policy.
    */
-  private async checkNewWalletPassword(password: string): Promise<void> {
+  private async checkNewWalletPassword(keys: VaultKeys, password: string): Promise<EncryptOptions> {
     const wallets = await loadWallets(this.storage);
     if (!hasVaultPassword(wallets)) {
       const passwordCheck = validatePassword(password);
       if (!passwordCheck.valid) {
         throw new Error(passwordCheck.reason);
       }
-      return;
+      return this.encryptOptionsFor(null);
     }
-    if (!(await this.opensVault(wallets, password))) {
+    const opened = await this.opensVault(wallets, keys);
+    if (!opened) {
       throw new Error("That password didn't work. Use the password you unlock Gleam with.");
     }
+    return this.encryptOptionsFor(opened);
   }
 
-  private async opensVault(wallets: Wallet[], password: string): Promise<boolean> {
+  /**
+   * The first stored envelope `keys` decrypts, or null if the password
+   * opens none. Throws `VaultKdfError` instead of returning null when an
+   * envelope couldn't be checked at all, so that never reads as a wrong
+   * password.
+   */
+  private async opensVault(wallets: Wallet[], keys: VaultKeys): Promise<VaultEnvelope | null> {
     const activeWalletId = await loadActiveWalletId(this.storage, wallets);
     const encrypted = [
       ...wallets.filter((wallet) => wallet.id === activeWalletId),
       ...wallets.filter((wallet) => wallet.id !== activeWalletId),
     ].flatMap((wallet) => (wallet.encryptedKeyfile ? [{ wallet, envelope: wallet.encryptedKeyfile }] : []));
 
+    let kdfError: VaultKdfError | null = null;
     for (const { wallet, envelope } of encrypted) {
       try {
-        const plaintext = await decryptFromEnvelope(
-          envelope,
-          password,
-          wallet.id,
-          wallet.address,
-        );
+        const plaintext = await decryptFromEnvelope(envelope, keys, wallet.id, wallet.address);
         zeroize(plaintext);
-        return true;
-      } catch {
-        // Wrong password for this wallet; a vault from before the shared
-        // password may have others that it opens.
+        return envelope;
+      } catch (error) {
+        if (!(error instanceof VaultKdfError)) continue;
+        // Wrong password or unreadable for this wallet; a vault from before
+        // the shared password may have others that it opens.
+        kdfError ??= error;
       }
     }
-    return false;
+    if (kdfError) throw kdfError;
+    return null;
   }
 
   /** Throws unless the vault has a password and `password` is it. */
@@ -422,7 +478,7 @@ export class WalletLifecycleHandler {
     if (!hasVaultPassword(wallets)) {
       throw new Error("Gleam has no password to protect. Add a wallet with a keyfile first.");
     }
-    if (!(await this.opensVault(wallets, req.password))) {
+    if (!(await this.opensVault(wallets, new VaultKeys(req.password)))) {
       throw new Error("That password didn't work. Use the password you unlock Gleam with.");
     }
   }
@@ -433,7 +489,8 @@ export class WalletLifecycleHandler {
 
   async createWallet(req: { name: string; password: string }): Promise<WalletSummary> {
     return withSessionLock(async () => {
-      await this.checkNewWalletPassword(req.password);
+      const keys = new VaultKeys(req.password);
+      const encryptOptions = await this.checkNewWalletPassword(keys, req.password);
 
       const jwk = await generateJWK();
       const address = await deriveAddress(jwk);
@@ -443,7 +500,7 @@ export class WalletLifecycleHandler {
       // Encrypt before this key material ever reaches storage — the
       // plaintext JWK bytes are zeroized inside encryptToEnvelope's own
       // finally block, never persisted anywhere themselves.
-      const encryptedKeyfile = await encryptToEnvelope(jwkToBytes(jwk), req.password, id, address);
+      const encryptedKeyfile = await encryptToEnvelope(jwkToBytes(jwk), keys, id, address, encryptOptions);
 
       const wallet: Wallet = {
         id,
@@ -473,7 +530,8 @@ export class WalletLifecycleHandler {
     password: string;
   }): Promise<WalletSummary> {
     return withSessionLock(async () => {
-      await this.checkNewWalletPassword(req.password);
+      const keys = new VaultKeys(req.password);
+      const encryptOptions = await this.checkNewWalletPassword(keys, req.password);
 
       const shapeCheck = validateJWKShape(req.jwk);
       if (!shapeCheck.valid) {
@@ -501,9 +559,10 @@ export class WalletLifecycleHandler {
 
       const encryptedKeyfile = await encryptToEnvelope(
         jwkToBytes(shapeCheck.jwk),
-        req.password,
+        keys,
         id,
         address,
+        encryptOptions,
       );
 
       const wallet: Wallet = {
@@ -518,10 +577,12 @@ export class WalletLifecycleHandler {
         backupConfirmedAt: null,
       };
 
-      wallets.push(wallet);
-      await saveWallets(this.storage, wallets);
+      // Re-read: an envelope upgrade may have written while Argon2id ran.
+      const current = await loadWallets(this.storage);
+      current.push(wallet);
+      await saveWallets(this.storage, current);
       await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      await unlockNewWallet(this.storage, wallets, wallet.id, shapeCheck.jwk, address);
+      await unlockNewWallet(this.storage, current, wallet.id, shapeCheck.jwk, address);
 
       return toSummary(wallet);
     });
@@ -726,6 +787,11 @@ export class WalletLifecycleHandler {
    * successfully has its key imported as non-extractable session keys
    * (`key-session.ts`) so later signing calls (transfer/upload/approval)
    * don't need the password again for the rest of this unlocked session.
+   *
+   * Envelopes below the current KDF cost (every PBKDF2 one) are then
+   * re-encrypted under Argon2id, since this is the only time the password
+   * is known. That runs after the session is saved and is not awaited, so
+   * it never delays or fails the unlock.
    */
   async unlockWallet(req: { password: string }): Promise<{ unlockedWalletIds: string[] }> {
     return withSessionLock(async () => {
@@ -736,7 +802,10 @@ export class WalletLifecycleHandler {
         ...wallets.filter((wallet) => wallet.id !== activeWalletId),
       ];
 
+      const keys = new VaultKeys(req.password);
       const unlockedWalletIds: string[] = [];
+      const opened: { wallet: Wallet; envelope: VaultEnvelope }[] = [];
+      let kdfError: VaultKdfError | null = null;
       const importedWalletIds: string[] = [];
       try {
         for (const wallet of ordered) {
@@ -745,7 +814,7 @@ export class WalletLifecycleHandler {
           try {
             const plaintext = await decryptFromEnvelope(
               wallet.encryptedKeyfile,
-              req.password,
+              keys,
               wallet.id,
               wallet.address,
             );
@@ -754,9 +823,11 @@ export class WalletLifecycleHandler {
             } finally {
               zeroize(plaintext);
             }
-          } catch {
+          } catch (error) {
             // Wrong password for this wallet — silent per-wallet fallback,
-            // never surfaced as a separate prompt.
+            // never surfaced as a separate prompt. An envelope that couldn't be
+            // checked at all is reported only if nothing else unlocks.
+            if (error instanceof VaultKdfError) kdfError ??= error;
             continue;
           }
           // Outside the wrong-password catch: a storage failure here must
@@ -764,8 +835,10 @@ export class WalletLifecycleHandler {
           importedWalletIds.push(wallet.id);
           await cacheKey(wallet.id, jwk, wallet.address);
           unlockedWalletIds.push(wallet.id);
+          opened.push({ wallet, envelope: wallet.encryptedKeyfile });
         }
 
+        if (unlockedWalletIds.length === 0 && kdfError) throw kdfError;
         // A vault of only hardware wallets has no password, so there is
         // nothing to check it against.
         if (unlockedWalletIds.length === 0 && hasVaultPassword(wallets)) {
@@ -788,6 +861,7 @@ export class WalletLifecycleHandler {
         };
         await saveSession(this.storage, session);
 
+        this.pendingUpgrade = this.upgradeEnvelopes(opened, keys, req.password);
         return { unlockedWalletIds };
       } catch (error) {
         // Keys this attempt imported must not outlive it: no session will list them.
@@ -795,6 +869,74 @@ export class WalletLifecycleHandler {
         throw error;
       }
     });
+  }
+
+  /** Settles once the envelope upgrade started by the last unlock has finished or given up. */
+  envelopeUpgradeSettled(): Promise<void> {
+    return this.pendingUpgrade;
+  }
+
+  /**
+   * Re-encrypts each outdated envelope in `opened` and writes them all in
+   * one `local:wallets` set, which chrome.storage applies atomically: a
+   * failure anywhere leaves every old envelope in place. Each new envelope
+   * is decrypted and compared before the write, with a key derived afresh
+   * from the password: `keys` already holds the derived key in memory, so
+   * reading back through it would not catch a derivation that comes out
+   * differently next time and locks the wallet for good. It replaces the stored
+   * one only if that is still the envelope that was opened, so a wallet
+   * deleted or re-keyed meanwhile is left alone.
+   */
+  private async upgradeEnvelopes(
+    opened: { wallet: Wallet; envelope: VaultEnvelope }[],
+    keys: VaultKeys,
+    password: string,
+  ): Promise<void> {
+    try {
+      const outdated = opened.filter(({ envelope }) => envelopeNeedsUpgrade(envelope, this.kdfParams));
+      if (outdated.length === 0) return;
+      const current = opened.find(({ envelope }) => !envelopeNeedsUpgrade(envelope, this.kdfParams));
+      const encryptOptions = this.encryptOptionsFor(current?.envelope ?? null);
+      // Without a current envelope to share, every upgrade still shares one
+      // fresh salt, so the next unlock derives a single key.
+      const salt = encryptOptions.salt ?? newVaultSalt();
+
+      const verifyKeys = new VaultKeys(password);
+      const upgrades: EnvelopeUpgrade[] = [];
+      for (const { wallet, envelope } of outdated) {
+        const plaintext = await decryptFromEnvelope(envelope, keys, wallet.id, wallet.address);
+        try {
+          const upgraded = await encryptToEnvelope(
+            plaintext.slice(),
+            keys,
+            wallet.id,
+            wallet.address,
+            { ...encryptOptions, salt },
+          );
+          const check = await decryptFromEnvelope(upgraded, verifyKeys, wallet.id, wallet.address);
+          const matches = sameBytes(check, plaintext);
+          zeroize(check);
+          if (!matches) throw new Error("A re-encrypted keyfile didn't read back.");
+          upgrades.push({ walletId: wallet.id, from: envelope, to: upgraded });
+        } finally {
+          zeroize(plaintext);
+        }
+      }
+
+      const stored = await loadWallets(this.storage);
+      let changed = false;
+      const next = stored.map((wallet) => {
+        const upgrade = upgrades.find((candidate) => candidate.walletId === wallet.id);
+        if (!upgrade || !wallet.encryptedKeyfile || !sameEnvelope(wallet.encryptedKeyfile, upgrade.from)) {
+          return wallet;
+        }
+        changed = true;
+        return { ...wallet, encryptedKeyfile: upgrade.to };
+      });
+      if (changed) await saveWallets(this.storage, next);
+    } catch (error) {
+      console.warn("Gleam kept the existing keyfile encryption; the upgrade will retry on the next unlock.", error);
+    }
   }
 
   /**
