@@ -47,6 +47,7 @@ import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
+import { browserDownloads, watchDownloadHistory } from "@/src/adapters/downloads";
 import {
   clearKeyCache,
   enforceAutoLock,
@@ -108,7 +109,7 @@ void restrictSessionStorageToTrustedContexts();
 const storage = new WxtStoragePort();
 const windows = new WxtWindowPort(storage);
 
-const lifecycle = new WalletLifecycleHandler(storage);
+const lifecycle = new WalletLifecycleHandler(storage, { downloads: browserDownloads });
 const passkey = new PasskeyHandler(storage, lifecycle);
 const reads = new ReadsHandler(storage);
 // `approval` is declared below; hardware sends reach it only at call time.
@@ -729,8 +730,8 @@ onExtensionMessage("switchWallet", async (message) => {
     void broadcastWalletSwitch(active.address);
   }
 });
-onExtensionMessage("exportWallet", (message) => lifecycle.exportWallet(message.data));
-onExtensionMessage("confirmWalletBackup", (message) => lifecycle.confirmWalletBackup(message.data));
+onExtensionMessage("downloadKeyfile", (message) => lifecycle.downloadKeyfile(message.data));
+onExtensionMessage("cancelKeyfileDownload", (message) => lifecycle.cancelKeyfileDownload(message.data));
 onExtensionMessage("lockWallet", async () => {
   await lifecycle.lockWallet();
   // A vault of only hardware wallets has no password and stays unlocked.
@@ -960,6 +961,8 @@ export default defineBackground(() => {
   browser.tabs.onRemoved.addListener((tabId) => {
     void siteWallet.forgetTab(tabId).catch(() => undefined);
   });
+
+  watchDownloadHistory(browser.runtime.id);
 
   browser.runtime.onInstalled.addListener((details) => {
     void initializeNetworkSettingsIfMissing();

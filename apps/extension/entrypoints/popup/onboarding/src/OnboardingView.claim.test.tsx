@@ -42,8 +42,8 @@ function setup(claim: ClaimPhase | undefined, backend: Backend = {}) {
     switch (message.type) {
       case "createWallet":
         return WALLET;
-      case "exportWallet":
-        return { kty: "RSA", n: "example" };
+      case "downloadKeyfile":
+        return { ok: true, filename: "wallet-arweave-keyfile.json" };
       case "getPointsPendingInvite":
         return pending;
       case "joinPoints":

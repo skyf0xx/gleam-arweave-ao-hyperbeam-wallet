@@ -68,8 +68,22 @@ const alarmsCreate = vi.fn();
 const alarmsAddListener = vi.fn();
 const onSuspendAddListener = vi.fn();
 const setSessionAccessLevel = vi.fn(async () => undefined);
+const downloadsDownload = vi.fn<(options: { url?: string; filename?: string }) => Promise<number>>(async () => 1);
+const downloadsSearch = vi.fn(async () => [{ id: 1, state: "complete", filename: "/home/me/Downloads/main-arweave-keyfile.json" }]);
+const downloadsErase = vi.fn(async () => [1]);
+const permissionsContains = vi.fn(async () => true);
 vi.mock("wxt/browser", () => ({
   browser: {
+    downloads: {
+      download: downloadsDownload,
+      search: downloadsSearch,
+      erase: downloadsErase,
+      onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
+    },
+    permissions: {
+      contains: permissionsContains,
+      onAdded: { addListener: vi.fn(), removeListener: vi.fn() },
+    },
     storage: { session: { setAccessLevel: setSessionAccessLevel } },
     windows: { create: windowsCreate, remove: vi.fn(), update: vi.fn(), onRemoved: { addListener: vi.fn() } },
     runtime: { getURL: (path: string) => `chrome-extension://test${path}`, onSuspend: { addListener: onSuspendAddListener } },
@@ -132,7 +146,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "createWallet",
       "importWallet",
       "addHardwareWallet",
-      "exportWallet",
+      "downloadKeyfile",
       "getState",
       "resetAllWallets",
       "getPasskeyStatus",
@@ -245,6 +259,63 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     await handler("resetAllWallets")({ data: undefined });
     await expect(handler("getPasskeyStatus")({ data: undefined })).resolves.toEqual({ enrolled: false });
+  });
+
+  it("rejects downloadKeyfile routed through providerCall", () => {
+    expect(() => providerCall({ origin: "https://evil.example", method: "downloadKeyfile", params: {} })).toThrow(
+      /not reachable from a web page/i,
+    );
+  });
+
+  it("downloadKeyfile saves the keyfile from the background and answers the popup with only the outcome", async () => {
+    downloadsDownload.mockClear();
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const password = "correct horse battery staple";
+    const created = (await handler("createWallet")({ data: { name: "Main", password } })) as { id: string };
+
+    const result = await handler("downloadKeyfile")({ data: { walletId: created.id, password } });
+
+    expect(result).toEqual({ ok: true, filename: "main-arweave-keyfile.json" });
+    expect(downloadsDownload).toHaveBeenCalledOnce();
+    const { url, filename } = downloadsDownload.mock.calls[0]![0];
+    expect(filename).toBe("main-arweave-keyfile.json");
+    const jwk = JSON.parse(atob(url!.slice("data:application/json;base64,".length))) as Record<string, string>;
+    expect(jwk.kty).toBe("RSA");
+    expect(jwk.d).toEqual(expect.any(String));
+    expect(JSON.stringify(result)).not.toContain(jwk.n!.slice(0, 32));
+    expect(downloadsErase).toHaveBeenCalledWith({ id: 1 });
+    const state = (await handler("getState")({ data: undefined })) as { wallets: Array<{ id: string; backupConfirmedAt: number | null }> };
+    expect(state.wallets.find((wallet) => wallet.id === created.id)?.backupConfirmedAt).toEqual(expect.any(Number));
+  });
+
+  it("has no message that marks a backup without a download", () => {
+    expect(rawHandlers.has("confirmWalletBackup")).toBe(false);
+  });
+
+  it("downloadKeyfile with the wrong password rejects without downloading", async () => {
+    downloadsDownload.mockClear();
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const created = (await handler("createWallet")({
+      data: { name: "Main", password: "correct horse battery staple" },
+    })) as { id: string };
+
+    await expect(
+      handler("downloadKeyfile")({ data: { walletId: created.id, password: "wrong password entirely" } }),
+    ).rejects.toThrow();
+    expect(downloadsDownload).not.toHaveBeenCalled();
+  });
+
+  it("downloadKeyfile is refused from a page's content script before decrypting anything", async () => {
+    downloadsDownload.mockClear();
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const password = "correct horse battery staple";
+    const created = (await handler("createWallet")({ data: { name: "Main", password } })) as { id: string };
+    const raw = rawHandlers.get("downloadKeyfile")!;
+
+    await expect(
+      (async () => raw({ data: { walletId: created.id, password }, sender: contentSender("https://evil.example") }))(),
+    ).rejects.toThrow(/can only be called from the Gleam extension/);
+    expect(downloadsDownload).not.toHaveBeenCalled();
   });
 
   it("rejects a KEY_METHODS name routed through providerCall", () => {
@@ -1599,7 +1670,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       const guarded = [...rawHandlers.keys()].filter((method) => !contentMethods.includes(method));
       expect(guarded).toEqual(
         expect.arrayContaining([
-          "exportWallet",
+          "downloadKeyfile",
           "createWallet",
           "resolveApproval",
           "getApproval",

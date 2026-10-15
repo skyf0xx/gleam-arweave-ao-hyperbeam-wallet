@@ -15,11 +15,13 @@ export * from "./vault/message-signing";
 export * from "./vault/passkey";
 export * from "./keys/jwk";
 export * from "./keys/address";
+export * from "./keys/keyfile-filename";
 export type { StoragePort } from "./ports/storage";
 export type { RuntimeMessage, RuntimePort } from "./ports/runtime";
 export type { WindowPort } from "./ports/windows";
 export type { BadgePort } from "./ports/badge";
 export type { SessionKeyStorePort } from "./ports/session-keys";
+export type { DownloadPort, FileDownloadResult } from "./ports/downloads";
 export {
   estimateHistoricalPortfolioValue,
   type PricedHistoricalToken,

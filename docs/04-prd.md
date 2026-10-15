@@ -52,7 +52,7 @@ rule — Phase 1 mining reads only these two.
   decrypt, signature, signMessage, verifyMessage,
   signDataItem, batchSignDataItem`). A page-originated message can only
   ever reach this method set — never the key-management methods
-  (`createWallet`, `importWallet`, `exportWallet`).
+  (`createWallet`, `importWallet`, `downloadKeyfile`).
 - **NetworkSettings** — the configured Arweave gateway and list of
   AO-Core/HyperBEAM peer URLs (add/remove, per-peer enable toggle, active
   endpoint selection).
@@ -173,7 +173,7 @@ bridge requests through content script → background → approval popup.
     (`injectScript`, `keepInDom: false`) at `document_start`, top frame
     only (`all_frames: false`).
   - A page-originated message can only reach `PROVIDER_METHODS` — never
-    `KEY_METHODS` (`createWallet`, `importWallet`, `exportWallet`,
+    `KEY_METHODS` (`createWallet`, `importWallet`, `downloadKeyfile`,
     `addLedgerWallet`) or `APPROVAL_METHODS`. This boundary is enforced at
     a single dispatcher choke point.
   - `connect()` requests show the origin and requested permission scopes

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { StepDots, AddressReveal } from "@gleam/ui/src/components/onboarding/index.ts";
 
@@ -6,19 +5,19 @@ import { StepDots, AddressReveal } from "@gleam/ui/src/components/onboarding/ind
  * Create wallet — key generated / backup prompt. Backup is explicit and
  * skippable, never forced — both "Continue to wallet" and "I'll back this
  * up later" lead to the same `onContinue`, the only difference is whether
- * the user revealed/downloaded the keyfile first.
+ * the user downloaded the keyfile first.
  */
 export interface BackupProps {
   onBack: () => void;
-  keyfileContents: string;
   onDownload: () => void;
-  onCopy: () => void;
+  canDownload: boolean;
+  downloading: boolean;
+  savedAs: string | null;
+  downloadError: string | null;
   onContinue: () => void;
 }
 
-export function Backup({ onBack, keyfileContents, onDownload, onCopy, onContinue }: BackupProps) {
-  const [revealed, setRevealed] = useState(false);
-
+export function Backup({ onBack, onDownload, canDownload, downloading, savedAs, downloadError, onContinue }: BackupProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader
@@ -27,39 +26,27 @@ export function Backup({ onBack, keyfileContents, onDownload, onCopy, onContinue
         subtitle={<StepDots total={2} current={2} />}
       />
       <div className="flex flex-1 flex-col gap-5 px-6 py-6">
-        {!revealed ? (
-          <>
-            <div className="flex justify-center pb-1 pt-2">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mist text-foreground">
-                <BackupGlyph />
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <h1 className="text-h3 font-semibold tracking-tight text-foreground">
-                Your wallet is ready
-              </h1>
-              <p className="text-body leading-relaxed text-muted">
-                No seed phrase to write down. Back up your keyfile instead, whenever you
-                want.
-              </p>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <h1 className="text-h3 font-semibold tracking-tight text-foreground">Your keyfile</h1>
-            <p className="text-body leading-relaxed text-muted">
-              Store this somewhere safe. Anyone with this file and your password can access your
-              wallet.
-            </p>
+        <div className="flex justify-center pb-1 pt-2">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mist text-foreground">
+            <BackupGlyph />
           </div>
-        )}
+        </div>
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">
+            Your wallet is ready
+          </h1>
+          <p className="text-body leading-relaxed text-muted">
+            No seed phrase to write down. Back up your keyfile instead, whenever you
+            want. Anyone with the file can access your wallet, so store it somewhere safe.
+          </p>
+        </div>
 
         <AddressReveal
-          keyfileContents={keyfileContents}
-          revealed={revealed}
-          onReveal={() => setRevealed(true)}
           onDownload={onDownload}
-          onCopy={onCopy}
+          canDownload={canDownload}
+          downloading={downloading}
+          savedAs={savedAs}
+          downloadError={downloadError}
           onSkip={onContinue}
           onContinue={onContinue}
           className="mt-auto"

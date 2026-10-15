@@ -11,6 +11,7 @@ import {
   newVaultSalt,
   capabilitiesFor,
   isHardwareWalletMethod,
+  keyfileFilename,
   validateJWKShape,
   validatePassword,
   VaultKdfError,
@@ -18,6 +19,8 @@ import {
   type Argon2idParams,
   type AutoLockTimeout,
   type EncryptOptions,
+  type DownloadPort,
+  type FileDownloadResult,
   type HardwareDevice,
   type HardwareWalletMethod,
   type JWKInterface,
@@ -391,10 +394,13 @@ async function unlockNewWallet(
 export interface WalletLifecycleOptions {
   /** Argon2id cost for new and re-encrypted envelopes. */
   kdfParams?: Argon2idParams;
+  /** Where `downloadKeyfile` saves the keyfile. */
+  downloads?: DownloadPort;
 }
 
 export class WalletLifecycleHandler {
   private readonly kdfParams: Argon2idParams;
+  private readonly downloads: DownloadPort | undefined;
   private pendingUpgrade: Promise<void> = Promise.resolve();
 
   constructor(
@@ -402,6 +408,7 @@ export class WalletLifecycleHandler {
     options: WalletLifecycleOptions = {},
   ) {
     this.kdfParams = options.kdfParams ?? DEFAULT_ARGON2ID_PARAMS;
+    this.downloads = options.downloads;
   }
 
   /**
@@ -700,8 +707,8 @@ export class WalletLifecycleHandler {
 
   /**
    * Records that the user confirmed they backed up this wallet's keyfile.
-   * Called by the UI only after a download or clipboard copy of the
-   * exported keyfile actually succeeds, not merely offered.
+   * Called by `downloadKeyfile` once the keyfile is saved, never on a
+   * cancelled or failed download.
    */
   async confirmWalletBackup(req: { walletId: string }): Promise<void> {
     const wallets = await loadWallets(this.storage);
@@ -721,7 +728,18 @@ export class WalletLifecycleHandler {
     await this.storage.set(ACTIVE_WALLET_ID_KEY, req.walletId);
   }
 
-  async exportWallet(req: { walletId: string; password: string }): Promise<JWKInterface> {
+  /**
+   * At most one `downloadKeyfile` per wallet: a newer call, or
+   * `cancelKeyfileDownload`, ends an older one still waiting for the
+   * `downloads` grant, so one grant can't release two saves.
+   */
+  private readonly keyfileDownloads = new Map<string, AbortController>();
+
+  async downloadKeyfile(req: { walletId: string; password: string }): Promise<FileDownloadResult> {
+    const downloads = this.downloads;
+    if (!downloads) {
+      throw new Error("Keyfile downloads aren't available here.");
+    }
     const wallets = await loadWallets(this.storage);
     const wallet = wallets.find((w) => w.id === req.walletId);
     if (wallet && !capabilitiesFor(wallet.method).exportKey) {
@@ -730,17 +748,54 @@ export class WalletLifecycleHandler {
     if (!wallet || !wallet.encryptedKeyfile) {
       throw new Error(`No exportable key material for wallet "${req.walletId}".`);
     }
-    const plaintext = await decryptFromEnvelope(
-      wallet.encryptedKeyfile,
-      req.password,
-      wallet.id,
-      wallet.address,
-    );
+    const envelope = wallet.encryptedKeyfile;
+    // One VaultKeys so the decrypt after a permission grant reuses the
+    // derived key instead of running Argon2id again.
+    const keys = new VaultKeys(req.password);
+    const decrypt = () => decryptFromEnvelope(envelope, keys, wallet.id, wallet.address);
+
+    this.keyfileDownloads.get(wallet.id)?.abort();
+    const current = new AbortController();
+    this.keyfileDownloads.set(wallet.id, current);
+    let plaintext: Uint8Array;
     try {
-      return JSON.parse(new TextDecoder().decode(plaintext)) as JWKInterface;
+      // Decrypting first means a wrong password fails at once, while the
+      // popup may still be open, rather than after the permission prompt.
+      plaintext = await decrypt();
+      if (!(await downloads.isAllowed())) {
+        // Nothing decrypted is held while waiting for the grant.
+        zeroize(plaintext);
+        if (!(await downloads.ensureAllowed(current.signal))) {
+          return { ok: false, reason: "permission" };
+        }
+        plaintext = await decrypt();
+      }
+    } finally {
+      if (this.keyfileDownloads.get(wallet.id) === current) this.keyfileDownloads.delete(wallet.id);
+    }
+
+    // The envelope holds the keyfile's JSON bytes as created or imported,
+    // so they are saved as-is: a standard keyfile any Arweave wallet reads.
+    let result: FileDownloadResult;
+    try {
+      result = await downloads.saveFile({
+        filename: keyfileFilename(wallet.name),
+        mimeType: "application/json",
+        bytes: plaintext,
+      });
     } finally {
       zeroize(plaintext);
     }
+    // Recorded here, not by the UI: a save dialog or permission prompt can
+    // close the popup before it hears back.
+    if (result.ok) await this.confirmWalletBackup({ walletId: wallet.id });
+    return result;
+  }
+
+  /** Ends a `downloadKeyfile` still waiting for the `downloads` grant, e.g. after the user denied it. */
+  cancelKeyfileDownload(req: { walletId: string }): void {
+    this.keyfileDownloads.get(req.walletId)?.abort();
+    this.keyfileDownloads.delete(req.walletId);
   }
 
   /** Immediately clears unlocked-session state and every cached signing key, regardless of any auto-lock timeout. */

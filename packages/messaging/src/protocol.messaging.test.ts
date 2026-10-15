@@ -16,7 +16,7 @@ describe("ProtocolMap", () => {
       "deleteWallet",
       "renameWallet",
       "switchWallet",
-      "exportWallet",
+      "downloadKeyfile",
       "lockWallet",
       "unlockWallet",
       "getState",
@@ -96,10 +96,16 @@ describe("ProtocolMap", () => {
     expectTypeOf<ReturnType<ProtocolMap["getBalance"]>>().toEqualTypeOf<string>();
   });
 
-  it("exportWallet requires a password", () => {
-    expectTypeOf<Parameters<ProtocolMap["exportWallet"]>[0]>().toHaveProperty(
+  it("downloadKeyfile requires a password", () => {
+    expectTypeOf<Parameters<ProtocolMap["downloadKeyfile"]>[0]>().toHaveProperty(
       "password",
     );
+  });
+
+  it("downloadKeyfile returns only an outcome, never key material", () => {
+    expectTypeOf<ReturnType<ProtocolMap["downloadKeyfile"]>>().toEqualTypeOf<
+      { ok: true; filename: string } | { ok: false; reason: "cancelled" | "failed" | "permission" }
+    >();
   });
 
   it("resolveApproval takes a requestId and an approved boolean", () => {

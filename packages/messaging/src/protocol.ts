@@ -8,6 +8,7 @@ import type {
   Contact,
   RecipientAssessment,
   FeeEstimate,
+  FileDownloadResult,
   Grant,
   HardwareDevice,
   HardwareWalletMethod,
@@ -62,9 +63,16 @@ export interface ProtocolMap {
   deleteWallet(req: { walletId: string }): void;
   renameWallet(req: { walletId: string; name: string }): void;
   switchWallet(req: { walletId: string }): void;
-  exportWallet(req: { walletId: string; password: string }): JWKInterface;
-  /** Set only after a keyfile download or clipboard copy actually succeeds, not merely offered. */
-  confirmWalletBackup(req: { walletId: string }): void;
+  /**
+   * The background decrypts the keyfile and saves it to the user's
+   * downloads itself, so the plaintext key never crosses messaging, and
+   * records the backup on success. A wrong password rejects; a cancelled
+   * or failed download, or a missing `downloads` permission, resolves
+   * `ok: false`.
+   */
+  downloadKeyfile(req: { walletId: string; password: string }): FileDownloadResult;
+  /** Ends a `downloadKeyfile` still waiting for the `downloads` grant, so it stops holding the password. */
+  cancelKeyfileDownload(req: { walletId: string }): void;
   lockWallet(): void;
   unlockWallet(req: { password: string }): { unlockedWalletIds: string[] };
   /**
@@ -299,7 +307,7 @@ export interface ProtocolMap {
    * `providerCall` is checked against `PROVIDER_METHODS` before being
    * routed anywhere, and nothing else in this map is reachable this way
    * — `resolveApproval`/`getApproval` (`APPROVAL_METHODS`) and
-   * `createWallet`/`importWallet`/`exportWallet` (`KEY_METHODS`) are only
+   * `createWallet`/`importWallet`/`downloadKeyfile` (`KEY_METHODS`) are only
    * ever called directly, by their own trusted senders, never proxied
    * through `providerCall`.
    */

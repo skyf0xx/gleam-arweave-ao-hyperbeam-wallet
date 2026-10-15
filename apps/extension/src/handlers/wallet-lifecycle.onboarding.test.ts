@@ -1,6 +1,15 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as hashWasm from "hash-wasm";
-import { bytesToBase64, VaultKdfError, type StoragePort, type VaultEnvelope, type Wallet } from "@gleam/core";
+import {
+  bytesToBase64,
+  VaultKdfError,
+  type DownloadPort,
+  type FileDownloadResult,
+  type JWKInterface,
+  type StoragePort,
+  type VaultEnvelope,
+  type Wallet,
+} from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 import { getSigner, clearKeyCache } from "./key-session";
 import { sessionKeyStore } from "../adapters/session-key-store";
@@ -39,6 +48,52 @@ beforeEach(async () => {
   keySessionStore.clear();
   await sessionKeyStore.clear();
 });
+
+/**
+ * A `DownloadPort` that keeps a copy of each saved file. The handler
+ * zeroizes its buffer once the save resolves, so the copy is taken here.
+ */
+function fakeDownloads(result?: FileDownloadResult, allowed = true) {
+  const saved: Array<{ filename: string; mimeType: string; text: string; bytes: Uint8Array }> = [];
+  // Like `permissions.onAdded`, one grant releases every waiter.
+  const waiters = new Set<(allowed: boolean) => void>();
+  let granted = allowed;
+  const port: DownloadPort = {
+    async isAllowed() {
+      return granted;
+    },
+    ensureAllowed: vi.fn(async (signal?: AbortSignal) => {
+      if (granted) return true;
+      return new Promise<boolean>((resolve) => {
+        waiters.add(resolve);
+        signal?.addEventListener("abort", () => {
+          waiters.delete(resolve);
+          resolve(false);
+        });
+      });
+    }),
+    async saveFile({ filename, mimeType, bytes }) {
+      saved.push({ filename, mimeType, text: new TextDecoder().decode(bytes), bytes });
+      return result ?? { ok: true, filename };
+    },
+  };
+  const grant = () => {
+    granted = true;
+    for (const resolve of waiters) resolve(true);
+    waiters.clear();
+  };
+  const deny = () => {
+    for (const resolve of waiters) resolve(false);
+    waiters.clear();
+  };
+  return { port, saved, grant, deny, waiters };
+}
+
+async function downloadedJwk(storage: StoragePort, walletId: string, password: string): Promise<JWKInterface> {
+  const downloads = fakeDownloads();
+  await new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port }).downloadKeyfile({ walletId, password });
+  return JSON.parse(downloads.saved[0]!.text) as JWKInterface;
+}
 
 const GOOD_PASSWORD = "correct horse battery staple";
 /** Argon2id at its minimum, so tests don't pay the production KDF cost. */
@@ -142,7 +197,7 @@ describe("WalletLifecycleHandler: createWallet", () => {
 
   it("can decrypt the stored envelope back with the same password", async () => {
     const summary = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-    const jwk = await handler.exportWallet({ walletId: summary.id, password: GOOD_PASSWORD });
+    const jwk = await downloadedJwk(storage, summary.id, GOOD_PASSWORD);
     expect(jwk.kty).toBe("RSA");
   });
 
@@ -294,7 +349,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
       password: GOOD_PASSWORD,
     });
 
-    const jwk = await handler.exportWallet({ walletId: imported.id, password: GOOD_PASSWORD });
+    const jwk = await downloadedJwk(storage, imported.id, GOOD_PASSWORD);
     expect(jwk.n).toBe(validJWK().n);
   });
 
@@ -302,7 +357,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     const [wallet] = (await storage.get<Array<Record<string, unknown>>>("local:wallets"))!;
     // Re-encrypt the first wallet under a password the policy now rejects.
-    const jwk = await handler.exportWallet({ walletId: wallet!.id as string, password: GOOD_PASSWORD });
+    const jwk = await downloadedJwk(storage, wallet!.id as string, GOOD_PASSWORD);
     const { encryptToEnvelope } = await import("@gleam/core");
     const weak = "short1!";
     const envelope = await encryptToEnvelope(
@@ -598,7 +653,7 @@ describe("WalletLifecycleHandler: Argon2id envelope upgrade on unlock", () => {
     const wallets = await storedWallets();
     const legacy = await Promise.all(
       wallets.map(async (wallet) => {
-        const jwk = await handler.exportWallet({ walletId: wallet.id, password: GOOD_PASSWORD });
+        const jwk = await downloadedJwk(storage, wallet.id, GOOD_PASSWORD);
         const envelope = await encryptV1(JSON.stringify(jwk), password, wallet.id, wallet.address);
         return { ...wallet, encryptedKeyfile: envelope };
       }),
@@ -632,7 +687,7 @@ describe("WalletLifecycleHandler: Argon2id envelope upgrade on unlock", () => {
     await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).resolves.toEqual({
       unlockedWalletIds: [created.id],
     });
-    const jwk = await handler.exportWallet({ walletId: created.id, password: GOOD_PASSWORD });
+    const jwk = await downloadedJwk(storage, created.id, GOOD_PASSWORD);
     expect(jwk.kty).toBe("RSA");
   });
 
@@ -663,7 +718,7 @@ describe("WalletLifecycleHandler: Argon2id envelope upgrade on unlock", () => {
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
     const [first, second] = await storedWallets();
-    const jwk = await handler.exportWallet({ walletId: second!.id, password: GOOD_PASSWORD });
+    const jwk = await downloadedJwk(storage, second!.id, GOOD_PASSWORD);
     const otherV1 = await encryptV1(JSON.stringify(jwk), OTHER_PASSWORD, second!.id, second!.address);
     await storage.set("local:wallets", [first, { ...second, encryptedKeyfile: otherV1 }]);
     await handler.lockWallet();
@@ -846,11 +901,14 @@ describe("WalletLifecycleHandler: key derivation failures", () => {
     ).rejects.toBeInstanceOf(VaultKdfError);
   });
 
-  it("does not leak the raw WASM error from exportWallet", async () => {
+  it("does not leak the raw WASM error from downloadKeyfile", async () => {
     const [wallet] = (await storage.get<Wallet[]>("local:wallets"))!;
     vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
 
-    const exported = handler.exportWallet({ walletId: wallet!.id, password: GOOD_PASSWORD });
+    const exported = new WalletLifecycleHandler(storage, { downloads: fakeDownloads().port }).downloadKeyfile({
+      walletId: wallet!.id,
+      password: GOOD_PASSWORD,
+    });
 
     await expect(exported).rejects.toThrow(/couldn't run its password check/);
     await expect(exported).rejects.not.toThrow(/WebAssembly/);
@@ -1217,15 +1275,144 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
   });
 });
 
-describe("WalletLifecycleHandler: exportWallet", () => {
-  it("rejects the wrong password with an error, never returning key material", async () => {
+describe("WalletLifecycleHandler: downloadKeyfile", () => {
+  it("saves the wallet's standard keyfile JSON and returns only the outcome", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const downloads = fakeDownloads();
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.importWallet({ jwk: validJWK(), name: "Rose Quartz", password: GOOD_PASSWORD });
+
+    const result = await handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+
+    expect(result).toEqual({ ok: true, filename: "rose-quartz-arweave-keyfile.json" });
+    expect(JSON.stringify(result)).not.toContain(validJWK().n);
+    expect(downloads.saved).toHaveLength(1);
+    expect(downloads.saved[0]!.filename).toBe("rose-quartz-arweave-keyfile.json");
+    expect(downloads.saved[0]!.mimeType).toBe("application/json");
+    expect(JSON.parse(downloads.saved[0]!.text)).toEqual(validJWK());
+  });
+
+  it("zeroizes the decrypted bytes once the save settles", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads();
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    await handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+
+    expect(downloads.saved[0]!.bytes.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("records the backup itself once the file is saved", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: fakeDownloads().port });
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    await handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+
+    const state = await handler.getState();
+    expect(state.wallets[0]!.backupConfirmedAt).toEqual(expect.any(Number));
+  });
+
+  it.each([["cancelled" as const], ["failed" as const]])(
+    "passes a %s download back and leaves the wallet not backed up",
+    async (reason) => {
+      const storage = createFakeStorage();
+      const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: fakeDownloads({ ok: false, reason }).port });
+      const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+      await expect(handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD })).resolves.toEqual({
+        ok: false,
+        reason,
+      });
+      expect((await handler.getState()).wallets[0]!.backupConfirmedAt).toBeNull();
+    },
+  );
+
+  it("saves nothing when the downloads permission never arrives", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads(undefined, false);
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    const download = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+    await vi.waitFor(() => expect(downloads.waiters.size).toBe(1));
+    downloads.deny();
+
+    await expect(download).resolves.toEqual({ ok: false, reason: "permission" });
+    expect(downloads.saved).toEqual([]);
+    expect((await handler.getState()).wallets[0]!.backupConfirmedAt).toBeNull();
+  });
+
+  it("saves once the grant arrives", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads(undefined, false);
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.importWallet({ jwk: validJWK(), name: "Main", password: GOOD_PASSWORD });
+
+    const download = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+    await vi.waitFor(() => expect(downloads.waiters.size).toBe(1));
+    downloads.grant();
+
+    await expect(download).resolves.toEqual({ ok: true, filename: "main-arweave-keyfile.json" });
+    expect(JSON.parse(downloads.saved[0]!.text)).toEqual(validJWK());
+  });
+
+  it("rejects a wrong password before waiting for the grant", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads(undefined, false);
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await expect(
-      handler.exportWallet({ walletId: wallet.id, password: "wrong password entirely" }),
+      handler.downloadKeyfile({ walletId: wallet.id, password: "wrong password entirely" }),
     ).rejects.toThrow();
+    expect(downloads.port.ensureAllowed).not.toHaveBeenCalled();
+  });
+
+  it("a retry ends the older call still waiting, so one grant saves one file", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads(undefined, false);
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    const first = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+    await vi.waitFor(() => expect(downloads.waiters.size).toBe(1));
+    const second = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+
+    await expect(first).resolves.toEqual({ ok: false, reason: "permission" });
+    await vi.waitFor(() => expect(downloads.waiters.size).toBe(1));
+    downloads.grant();
+
+    await expect(second).resolves.toEqual({ ok: true, filename: "main-arweave-keyfile.json" });
+    expect(downloads.saved).toHaveLength(1);
+  });
+
+  it("cancelKeyfileDownload ends a call waiting for the grant", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads(undefined, false);
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    const download = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
+    await vi.waitFor(() => expect(downloads.waiters.size).toBe(1));
+    handler.cancelKeyfileDownload({ walletId: wallet.id });
+
+    await expect(download).resolves.toEqual({ ok: false, reason: "permission" });
+    downloads.grant();
+    expect(downloads.saved).toEqual([]);
+  });
+
+  it("rejects the wrong password and saves nothing", async () => {
+    const storage = createFakeStorage();
+    const downloads = fakeDownloads();
+    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+
+    await expect(
+      handler.downloadKeyfile({ walletId: wallet.id, password: "wrong password entirely" }),
+    ).rejects.toThrow();
+    expect(downloads.saved).toEqual([]);
   });
 });
 

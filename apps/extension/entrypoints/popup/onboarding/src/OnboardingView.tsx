@@ -1,5 +1,11 @@
 import { useState } from "react";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
+import {
+  downloadKeyfile,
+  keyfileDownloadError,
+  requestDownloadsPermission,
+  type RequestDownloadsPermission,
+} from "@/src/keyfile/download";
 import { Welcome } from "./Welcome";
 import { CreatePassword } from "./CreatePassword";
 import { Backup } from "./Backup";
@@ -25,7 +31,9 @@ type Step =
   | { kind: "welcome" }
   | { kind: "existing" }
   | { kind: "create-password" }
-  | { kind: "backup"; keyfileContents: string; walletName: string; wallet: WalletSummary }
+  // The password is kept only until the first download attempt resolves,
+  // so the background can decrypt the keyfile when the user saves it.
+  | { kind: "backup"; password: string | null; wallet: WalletSummary }
   | { kind: "import" }
   | { kind: "import-password"; jwk: unknown }
   | { kind: "claim"; wallet: WalletSummary }
@@ -52,6 +60,8 @@ export interface OnboardingViewProps {
   onConnectKeystone?: () => void;
   /** Opens the Ledger connect page. Defaults to a new browser tab. */
   onConnectLedger?: () => void;
+  /** Asks for the optional `downloads` permission from the Download click. */
+  requestDownloadPermission?: RequestDownloadsPermission;
 }
 
 const DEFAULT_WALLET_NAMES = [
@@ -99,11 +109,16 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone = () => void openKeystoneConnect(), onConnectLedger = () => void openLedgerConnect() }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone = () => void openKeystoneConnect(), onConnectLedger = () => void openLedgerConnect(), requestDownloadPermission = requestDownloadsPermission }: OnboardingViewProps) {
   const addingWallet = mode === "add-wallet";
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string>();
+  const [backup, setBackup] = useState<{ downloading: boolean; savedAs: string | null; error: string | null }>({
+    downloading: false,
+    savedAs: null,
+    error: null,
+  });
 
   const finish = (wallet: WalletSummary) => {
     if (claim) setStep({ kind: "claim", wallet });
@@ -132,24 +147,36 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         payload: { name: randomDefaultWalletName(), password },
       });
       await markClaimPending(summary);
-      // `exportWallet` re-decrypts the just-created envelope rather than
-      // this view module ever holding the plaintext JWK itself — the
-      // password already left this component's state by this point.
-      const jwk = await runtime.send<{ walletId: string; password: string }, unknown>({
-        type: "exportWallet",
-        payload: { walletId: summary.id, password },
-      });
-      setStep({
-        kind: "backup",
-        keyfileContents: JSON.stringify(jwk),
-        walletName: summary.name,
-        wallet: summary,
-      });
+      setStep({ kind: "backup", password, wallet: summary });
     } catch (error) {
       setServerError(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDownloadKeyfile = async (wallet: WalletSummary, password: string) => {
+    setBackup((current) => ({ ...current, downloading: true, error: null }));
+    let result: Awaited<ReturnType<typeof downloadKeyfile>> | null = null;
+    let error: string | null = null;
+    try {
+      result = await downloadKeyfile(runtime, { walletId: wallet.id, password }, requestDownloadPermission);
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught);
+    }
+    if (result?.ok) {
+      setStep((current) => (current.kind === "backup" ? { ...current, password: null } : current));
+      setBackup({ downloading: false, savedAs: result.filename, error: null });
+      return;
+    }
+    // A closed save dialog or a declined permission is worth retrying here,
+    // so the password is kept until a save succeeds or onboarding moves on.
+    const reason = result ? keyfileDownloadError(result) : error;
+    setBackup({
+      downloading: false,
+      savedAs: null,
+      error: `${reason ?? "The keyfile couldn't be saved."} Try again, or back it up later from this wallet's settings.`,
+    });
   };
 
   const handleImportPassword = async (jwk: unknown, password: string) => {
@@ -227,9 +254,13 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
           // start would only offer to create another one. Back finishes
           // like Continue does, so the claim step still shows.
           onBack={() => finish(step.wallet)}
-          keyfileContents={step.keyfileContents}
-          onDownload={() => downloadKeyfile(step.keyfileContents, step.walletName)}
-          onCopy={() => void navigator.clipboard?.writeText(step.keyfileContents)}
+          onDownload={() => {
+            if (step.password !== null) void handleDownloadKeyfile(step.wallet, step.password);
+          }}
+          canDownload={step.password !== null}
+          downloading={backup.downloading}
+          savedAs={backup.savedAs}
+          downloadError={backup.error}
           onContinue={() => finish(step.wallet)}
         />
       );
@@ -291,14 +322,4 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         />
       );
   }
-}
-
-function downloadKeyfile(contents: string, walletName: string): void {
-  const blob = new Blob([contents], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${walletName.replace(/\s+/g, "-").toLowerCase()}-arweave-keyfile.json`;
-  link.click();
-  URL.revokeObjectURL(url);
 }

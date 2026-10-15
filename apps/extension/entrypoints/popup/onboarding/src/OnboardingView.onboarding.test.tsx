@@ -23,15 +23,18 @@ function openKeyfileImport() {
 }
 
 describe("OnboardingView: create flow", () => {
-  it("walks welcome -> password -> backup and calls createWallet then exportWallet", async () => {
+  it("walks welcome -> password -> backup, and the download goes through the background", async () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
-      .mockResolvedValueOnce({ kty: "RSA", n: "example" }); // exportWallet
+      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // downloadKeyfile
     const runtime = fakeRuntime({ send });
     const onComplete = vi.fn();
 
-    render(<OnboardingView runtime={runtime} onComplete={onComplete} />);
+    const requestDownloadPermission = vi.fn(async () => true);
+    render(
+      <OnboardingView runtime={runtime} onComplete={onComplete} requestDownloadPermission={requestDownloadPermission} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
 
@@ -52,10 +55,17 @@ describe("OnboardingView: create flow", () => {
       type: "createWallet",
       payload: { name: expect.any(String), password: GOOD_PASSWORD },
     });
+    expect(send).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    await waitFor(() => expect(screen.getByText("Saved as wallet-1-arweave-keyfile.json")).toBeTruthy());
+    expect(requestDownloadPermission).toHaveBeenCalledOnce();
     expect(send).toHaveBeenNthCalledWith(2, {
-      type: "exportWallet",
+      type: "downloadKeyfile",
       payload: { walletId: "wallet-1", password: GOOD_PASSWORD },
     });
+    // The background records the backup itself.
+    expect(send).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
     expect(onComplete).toHaveBeenCalledOnce();
@@ -65,7 +75,7 @@ describe("OnboardingView: create flow", () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
-      .mockResolvedValueOnce({ kty: "RSA", n: "example" }); // exportWallet
+      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // downloadKeyfile
     const runtime = fakeRuntime({ send });
     const onComplete = vi.fn();
 
@@ -88,6 +98,83 @@ describe("OnboardingView: create flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onComplete).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
+  });
+
+  async function reachBackup(send: RuntimePort["send"], requestDownloadPermission = vi.fn(async () => true)) {
+    render(
+      <OnboardingView
+        runtime={fakeRuntime({ send })}
+        onComplete={vi.fn()}
+        requestDownloadPermission={requestDownloadPermission}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
+    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByText("Your wallet is ready")).toBeTruthy());
+  }
+
+  function downloadButton() {
+    return screen.getByRole("button", { name: "Download keyfile" }) as HTMLButtonElement;
+  }
+
+  it.each([
+    ["cancelled", "The download was cancelled."],
+    ["failed", "The keyfile couldn't be saved."],
+  ])("after a %s download, offers a retry and points to wallet settings", async (reason, message) => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
+      .mockResolvedValueOnce({ ok: false, reason }) // downloadKeyfile
+      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // retry
+    await reachBackup(send);
+
+    fireEvent.click(downloadButton());
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain(message));
+    expect(screen.getByRole("alert").textContent).toContain("from this wallet's settings");
+    expect(screen.getByText("I'll back this up later")).toBeTruthy();
+    await waitFor(() => expect(downloadButton().disabled).toBe(false));
+    fireEvent.click(downloadButton());
+    await waitFor(() => expect(screen.getByText("Saved as wallet-1-arweave-keyfile.json")).toBeTruthy());
+    expect(send).toHaveBeenLastCalledWith({
+      type: "downloadKeyfile",
+      payload: { walletId: "wallet-1", password: expect.any(String) },
+    });
+    expect(downloadButton().disabled).toBe(true);
+  });
+
+  it("explains a denied downloads permission and saves nothing", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
+      .mockReturnValueOnce(new Promise(() => {})) // downloadKeyfile, still waiting for the grant
+      .mockResolvedValueOnce(undefined); // cancelKeyfileDownload
+    await reachBackup(send, vi.fn(async () => false));
+
+    fireEvent.click(downloadButton());
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("needs permission to manage downloads"));
+    expect(downloadButton().disabled).toBe(false);
+    expect(send).toHaveBeenLastCalledWith({ type: "cancelKeyfileDownload", payload: { walletId: "wallet-1" } });
+  });
+
+  it("drops the password after a successful download too", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
+      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // downloadKeyfile
+    await reachBackup(send);
+
+    fireEvent.click(downloadButton());
+
+    await waitFor(() => expect(screen.getByText("Saved as wallet-1-arweave-keyfile.json")).toBeTruthy());
+    expect(downloadButton().disabled).toBe(true);
   });
 
   it("surfaces a server-side rejection (e.g. common password) as an inline error", async () => {
@@ -177,7 +264,7 @@ describe("OnboardingView: add-wallet mode", () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({ id: "wallet-2", name: "Opal" }) // createWallet
-      .mockResolvedValueOnce({ kty: "RSA", n: "example" }); // exportWallet
+      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // downloadKeyfile
     const onComplete = vi.fn();
     render(
       <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" onComplete={onComplete} />,
@@ -197,10 +284,7 @@ describe("OnboardingView: add-wallet mode", () => {
       type: "createWallet",
       payload: { name: expect.any(String), password: GOOD_PASSWORD },
     });
-    expect(send).toHaveBeenNthCalledWith(2, {
-      type: "exportWallet",
-      payload: { walletId: "wallet-2", password: GOOD_PASSWORD },
-    });
+    expect(send).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
     expect(onComplete).toHaveBeenCalledOnce();

@@ -83,36 +83,35 @@ describe("ui/onboarding: PasswordStrengthMeter", () => {
 });
 
 describe("ui/onboarding: AddressReveal", () => {
-  it("hides keyfile contents until reveal is clicked", () => {
-    const onReveal = vi.fn();
-    render(
-      <AddressReveal
-        keyfileContents='{"kty":"RSA"}'
-        revealed={false}
-        onReveal={onReveal}
-        onDownload={vi.fn()}
-        onCopy={vi.fn()}
-        onSkip={vi.fn()}
-        onContinue={vi.fn()}
-      />,
-    );
-    expect(screen.queryByText('{"kty":"RSA"}')).toBeNull();
-    fireEvent.click(screen.getByText("Reveal"));
-    expect(onReveal).toHaveBeenCalledOnce();
+  it("offers a download and a skip before the keyfile is saved", () => {
+    const onDownload = vi.fn();
+    const onSkip = vi.fn();
+    render(<AddressReveal onDownload={onDownload} onSkip={onSkip} onContinue={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    expect(onDownload).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByText("I'll back this up later"));
+    expect(onSkip).toHaveBeenCalledOnce();
   });
 
-  it("shows keyfile contents once revealed", () => {
+  it("names the saved file and drops the skip link once saved", () => {
+    render(
+      <AddressReveal savedAs="jade-arweave-keyfile.json" onDownload={vi.fn()} onSkip={vi.fn()} onContinue={vi.fn()} />,
+    );
+    expect(screen.getByText("Saved as jade-arweave-keyfile.json")).toBeTruthy();
+    expect(screen.queryByText("I'll back this up later")).toBeNull();
+  });
+
+  it("disables the download while saving and shows a failure", () => {
     render(
       <AddressReveal
-        keyfileContents='{"kty":"RSA"}'
-        revealed={true}
-        onReveal={vi.fn()}
+        downloading
+        downloadError="The download failed."
         onDownload={vi.fn()}
-        onCopy={vi.fn()}
         onSkip={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
-    expect(screen.getByText('{"kty":"RSA"}')).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Download keyfile" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("alert").textContent).toBe("The download failed.");
   });
 });

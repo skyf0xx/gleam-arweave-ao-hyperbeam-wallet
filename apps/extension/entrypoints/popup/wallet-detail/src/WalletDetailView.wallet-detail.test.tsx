@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { WalletDetailView } from "./WalletDetailView";
@@ -26,17 +26,15 @@ const WALLET: WalletSummary = {
   backupConfirmedAt: null,
 };
 
-const JWK = { kty: "RSA", n: "n".repeat(10), e: "AQAB" };
+const PASSWORD = "correct horse battery staple";
+
+function startBackup() {
+  fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: PASSWORD } });
+  fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+}
 
 describe("WalletDetailView", () => {
-  beforeEach(() => {
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn(() => "blob:mock"),
-      revokeObjectURL: vi.fn(),
-    });
-    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
-  });
 
   it("shows the wallet's name with no method label for a JWK wallet", () => {
     const send = vi.fn();
@@ -122,101 +120,82 @@ describe("WalletDetailView", () => {
     expect(onRenamed).not.toHaveBeenCalled();
   });
 
-  it("walks the back-up flow: password -> reveal -> download records confirmWalletBackup", async () => {
-    const send = vi
-      .fn()
-      .mockResolvedValueOnce(JWK) // exportWallet
-      .mockResolvedValueOnce(undefined); // confirmWalletBackup
+  function renderForBackup(send: RuntimePort["send"], requestDownloadPermission = vi.fn(async () => true)) {
     render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+      <WalletDetailView
+        runtime={fakeRuntime({ send })}
+        wallet={WALLET}
+        onBack={vi.fn()}
+        onRenamed={vi.fn()}
+        onRemoved={vi.fn()}
+        requestDownloadPermission={requestDownloadPermission}
+      />,
     );
+    return requestDownloadPermission;
+  }
+
+  it("warns that the saved keyfile isn't password-protected", async () => {
+    renderForBackup(vi.fn());
+
+    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("isn't password-protected"));
+  });
+
+  it("has the background save the keyfile and shows it backed up, with no separate confirm call", async () => {
+    const send = vi.fn().mockResolvedValueOnce({ ok: true, filename: "wallet-one-arweave-keyfile.json" });
+    const requestDownloadPermission = renderForBackup(send);
 
     fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     await waitFor(() => expect(screen.getByText("Enter your password")).toBeTruthy());
-
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery staple" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({
-        type: "exportWallet",
-        payload: { walletId: "wallet-1", password: "correct horse battery staple" },
-      }),
-    );
-    await waitFor(() => expect(screen.getByText("Your keyfile")).toBeTruthy());
-
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: PASSWORD } });
     fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
 
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({
-        type: "confirmWalletBackup",
-        payload: { walletId: "wallet-1" },
-      }),
-    );
+    await waitFor(() => expect(screen.getByText("Saved as wallet-one-arweave-keyfile.json")).toBeTruthy());
+    expect(requestDownloadPermission).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledExactlyOnceWith({
+      type: "downloadKeyfile",
+      payload: { walletId: "wallet-1", password: PASSWORD },
+    });
   });
 
-  it("walks the back-up flow: password -> reveal -> copy records confirmWalletBackup", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
+  it("explains a denied downloads permission", async () => {
     const send = vi
       .fn()
-      .mockResolvedValueOnce(JWK) // exportWallet
-      .mockResolvedValueOnce(undefined); // confirmWalletBackup
-    render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
-    );
+      .mockReturnValueOnce(new Promise(() => {})) // downloadKeyfile, still waiting for the grant
+      .mockResolvedValueOnce(undefined); // cancelKeyfileDownload
+    renderForBackup(send, vi.fn(async () => false));
 
-    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery staple" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(screen.getByText("Your keyfile")).toBeTruthy());
+    startBackup();
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy to clipboard" }));
-
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(JSON.stringify(JWK)));
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({
-        type: "confirmWalletBackup",
-        payload: { walletId: "wallet-1" },
-      }),
-    );
-    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
-  });
-
-  it("does not record the backup as confirmed when the clipboard write rejects, and shows an error", async () => {
-    const writeText = vi.fn().mockRejectedValue(new Error("Clipboard write failed"));
-    Object.assign(navigator, { clipboard: { writeText } });
-    const send = vi.fn().mockResolvedValueOnce(JWK); // exportWallet only — confirmWalletBackup must not be reached
-    render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery staple" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(screen.getByText("Your keyfile")).toBeTruthy());
-
-    fireEvent.click(screen.getByRole("button", { name: "Copy to clipboard" }));
-
-    await waitFor(() => expect(screen.getByText("Clipboard write failed")).toBeTruthy());
-    expect(send).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "confirmWalletBackup" }),
-    );
-    expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
-
+    await waitFor(() => expect(screen.getByText(/needs permission to manage downloads/)).toBeTruthy());
+    expect(send).toHaveBeenLastCalledWith({ type: "cancelKeyfileDownload", payload: { walletId: "wallet-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => expect(screen.getByText("Not backed up yet")).toBeTruthy());
   });
 
-  it("shows the server error and lets the user retry the password", async () => {
-    const send = vi.fn().mockRejectedValueOnce(new Error("That password didn't work."));
-    render(
-      <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
-    );
+  it("shows a cancelled download as not backed up", async () => {
+    renderForBackup(vi.fn().mockResolvedValueOnce({ ok: false, reason: "cancelled" }));
 
-    fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "wrong" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    startBackup();
+
+    await waitFor(() => expect(screen.getByText("The download was cancelled.")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.getByText("Not backed up yet")).toBeTruthy());
+  });
+
+  it("shows a failed download", async () => {
+    renderForBackup(vi.fn().mockResolvedValueOnce({ ok: false, reason: "failed" }));
+
+    startBackup();
+
+    await waitFor(() => expect(screen.getByText("The keyfile couldn't be saved.")).toBeTruthy());
+  });
+
+  it("shows the server error and lets the user retry the password", async () => {
+    renderForBackup(vi.fn().mockRejectedValueOnce(new Error("That password didn't work.")));
+
+    startBackup();
 
     await waitFor(() => expect(screen.getByText("That password didn't work.")).toBeTruthy());
   });

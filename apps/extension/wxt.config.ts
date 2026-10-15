@@ -37,6 +37,11 @@ export default defineConfig({
     // 'offscreen' backs the keyring document (entrypoints/keyring), which
     // holds unlocked wallets' non-extractable keys in memory only.
     permissions: ['storage', 'sidePanel', 'tabs', 'alarms', 'offscreen'],
+    // 'downloads' lets the background save a keyfile backup itself, so the
+    // plaintext key never reaches the popup. It is optional because a new
+    // required permission disables the extension on update until the user
+    // re-approves it; the Download button requests it instead.
+    optional_permissions: ['downloads'],
     // MV3 requires an explicit host permission for every origin the
     // background service worker fetches, unless that origin answers with
     // CORS headers (the Gleam Points API does; see POINTS_API_URL). The

@@ -207,8 +207,8 @@ function statefulRuntime(initial: WalletState, request: ApprovalRequest) {
       case "createWallet":
         walletState = UNLOCKED_STATE;
         return WALLET_SUMMARY;
-      case "exportWallet":
-        return { kty: "RSA", n: "n" };
+      case "downloadKeyfile":
+        return { ok: true, filename: "wallet-arweave-keyfile.json" };
       case "resolveApproval":
         return undefined;
       default:

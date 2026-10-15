@@ -53,7 +53,8 @@ export const APPROVAL_METHODS = ["getApproval", "resolveApproval", "submitDevice
 export const KEY_METHODS = [
   "createWallet",
   "importWallet",
-  "exportWallet",
+  "downloadKeyfile",
+  "cancelKeyfileDownload",
   "addHardwareWallet",
   "resetAllWallets",
   "enrollPasskey",

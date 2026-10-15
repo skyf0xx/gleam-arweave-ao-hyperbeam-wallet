@@ -1,96 +1,68 @@
-import * as React from "react";
 import { cn } from "../../primitives/cn";
 import { Button } from "../../primitives/button";
 
 /**
- * The "your wallet is ready" keyfile card — backup is explicit and
- * skippable; the raw key is never shown by default, requiring an
- * explicit reveal tap. This component only renders what it's given and
- * emits the three actions; downloading/copying/deciding what "content"
- * is belongs to the caller.
+ * The "your wallet is ready" keyfile card. Backup is explicit and
+ * skippable. The card never holds the key itself: the caller saves the
+ * file and reports back `downloading`, `savedAs` or `downloadError`.
  */
 export interface AddressRevealProps {
-  keyfileContents: string;
-  revealed: boolean;
-  onReveal: () => void;
   onDownload: () => void;
-  onCopy: () => void;
+  /** False once this screen can no longer start a download. */
+  canDownload?: boolean;
+  downloading?: boolean;
+  /** The saved file's name, once the download has finished. */
+  savedAs?: string | null;
+  downloadError?: string | null;
   onSkip: () => void;
   onContinue: () => void;
   className?: string;
 }
 
 export function AddressReveal({
-  keyfileContents,
-  revealed,
-  onReveal,
   onDownload,
-  onCopy,
+  canDownload = true,
+  downloading = false,
+  savedAs = null,
+  downloadError = null,
   onSkip,
   onContinue,
   className,
 }: AddressRevealProps) {
   return (
     <div className={cn("flex flex-col gap-5", className)}>
-      {!revealed ? (
-        <div className="overflow-hidden rounded-lg border border-line">
-          <div className="flex items-center gap-2.5 border-b border-line p-3">
-            <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
-              <FileIcon />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <div className="text-label font-semibold text-foreground">Wallet keyfile</div>
-              <div className="text-caption text-muted">
-                JSON &middot; encrypted with your password
-              </div>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2.5 rounded-lg border border-line p-3">
+          <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+            <FileIcon />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="text-label font-semibold text-foreground">Wallet keyfile</div>
+            <div className="truncate text-caption text-muted">
+              {savedAs ? `Saved as ${savedAs}` : downloading ? "Saving…" : <>JSON &middot; standard Arweave keyfile</>}
             </div>
-            <button
-              type="button"
-              aria-label="Download keyfile"
-              onClick={onDownload}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
-            >
-              <DownloadIcon />
-            </button>
           </div>
-          <div className="flex items-center justify-between gap-2.5 p-3">
-            <span className="text-label font-medium text-foreground">Show keyfile contents</span>
-            <button
-              type="button"
-              onClick={onReveal}
-              className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
-            >
-              Reveal
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div
-            className="max-h-24 overflow-hidden rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-muted"
-            style={{ wordBreak: "break-all" }}
+          <button
+            type="button"
+            aria-label="Download keyfile"
+            onClick={onDownload}
+            disabled={downloading || !canDownload}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground disabled:opacity-50"
           >
-            {keyfileContents}
-          </div>
-          <div className="flex items-center justify-between gap-2.5">
-            <span className="text-label font-medium text-muted">
-              Full contents copied on download
-            </span>
-            <button
-              type="button"
-              onClick={onCopy}
-              className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
-            >
-              Copy
-            </button>
-          </div>
-        </>
-      )}
+            <DownloadIcon />
+          </button>
+        </div>
+        {downloadError ? (
+          <p role="alert" className="text-caption leading-relaxed text-warning">
+            {downloadError}
+          </p>
+        ) : null}
+      </div>
 
       <Button type="button" onClick={onContinue}>
         Continue to wallet
       </Button>
-      {!revealed ? (
+      {!savedAs ? (
         <div className="flex justify-center">
           <button
             type="button"

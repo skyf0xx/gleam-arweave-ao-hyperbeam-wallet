@@ -297,11 +297,14 @@ describe("WalletLifecycleHandler: stored hardware records", () => {
 });
 
 describe("WalletLifecycleHandler: hardware wallets have no key", () => {
-  it("exportWallet refuses a hardware wallet", async () => {
+  it("downloadKeyfile refuses a hardware wallet", async () => {
     const keystone = await addKeystone();
-    await expect(handler.exportWallet({ walletId: keystone.id, password: PASSWORD })).rejects.toThrow(
+    const saveFile = vi.fn();
+    const withDownloads = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: { isAllowed: async () => true, ensureAllowed: async () => true, saveFile } });
+    await expect(withDownloads.downloadKeyfile({ walletId: keystone.id, password: PASSWORD })).rejects.toThrow(
       /stays on its device/,
     );
+    expect(saveFile).not.toHaveBeenCalled();
   });
 
   it("importing a keyfile for a hardware wallet's address is refused", async () => {
