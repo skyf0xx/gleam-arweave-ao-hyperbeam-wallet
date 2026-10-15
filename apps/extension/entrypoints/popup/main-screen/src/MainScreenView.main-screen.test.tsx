@@ -520,6 +520,26 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
     scrollTo.mockRestore();
   });
 
+  it("resets to the Tokens tab once scrolled back to the top", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const onTabChange = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send: successfulSend() }), initialTab: "activity", onTabChange });
+
+    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    // Mounting on a restored tab doesn't reset it; only a collapse-then-expand does.
+    expect(screen.getByRole("tab", { name: "Activity" }).getAttribute("aria-selected")).toBe("true");
+
+    setScrollY(200);
+    await screen.findByRole("button", { name: "Back" });
+    setScrollY(0);
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Tokens" }).getAttribute("aria-selected")).toBe("true"),
+    );
+    expect(onTabChange).toHaveBeenLastCalledWith("tokens");
+    scrollTo.mockRestore();
+  });
+
   it("fades the header back in and makes it interactive again once scrolled back near the top", async () => {
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
