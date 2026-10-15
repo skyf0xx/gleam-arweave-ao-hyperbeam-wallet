@@ -386,6 +386,25 @@ export function MainScreenView({
   }, [headerCollapsed]);
 
   /**
+   * Back at the top, the home screen shows Tokens again. Only an expand
+   * after a collapse counts, so a remount on a tab the caller restored
+   * (returning from a detail screen) keeps that tab.
+   */
+  const wasCollapsedRef = useRef(false);
+  useEffect(() => {
+    if (headerCollapsed) {
+      wasCollapsedRef.current = true;
+      return;
+    }
+    if (!wasCollapsedRef.current) return;
+    wasCollapsedRef.current = false;
+    setActiveTab("tokens");
+    onTabChange?.("tokens");
+    // onTabChange is deliberately left out: only the collapse flip should reset the tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [headerCollapsed]);
+
+  /**
    * Picking a tab scrolls the window until the section reaches its docked
    * position, so the header fades, the section docks, and the whole list
    * has the popup to itself. Once docked, the section scrolls on its own,
