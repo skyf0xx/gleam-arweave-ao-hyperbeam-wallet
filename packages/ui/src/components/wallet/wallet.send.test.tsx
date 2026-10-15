@@ -55,6 +55,14 @@ describe("TokenRow", () => {
     expect(screen.getByText("128.4204")).toBeTruthy();
   });
 
+  it("shows the full amount on hover and to screen readers when the amount is shortened", () => {
+    render(<TokenRow glyph={{ label: "GP" }} name="Gleam Points" amount="1.2K points" amountFull="1,234 points" />);
+    const short = screen.getByText("1.2K points");
+    expect(short.getAttribute("aria-hidden")).toBe("true");
+    expect(short.parentElement?.getAttribute("title")).toBe("1,234 points");
+    expect(screen.getByText("1,234 points").className).toContain("sr-only");
+  });
+
   it("keeps the existing usdValue visible (dimmed, not hidden) while loading", () => {
     render(
       <TokenRow

@@ -33,13 +33,18 @@ export interface TokenRowProps {
   icon?: ReactNode;
   name: string;
   amount: string;
+  /**
+   * The unabbreviated amount when `amount` is shortened ("1.2K"). Shown on
+   * hover and read by screen readers in place of the short form.
+   */
+  amountFull?: string;
   usdValue?: string;
   loading?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
-export function TokenRow({ glyph, icon, name, amount, usdValue, loading = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, icon, name, amount, amountFull, usdValue, loading = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -54,7 +59,16 @@ export function TokenRow({ glyph, icon, name, amount, usdValue, loading = false,
       {icon ?? <TokenGlyph {...glyph} />}
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
-        <div className="text-caption tabular-nums text-muted">{amount}</div>
+        <div className="text-caption tabular-nums text-muted" title={amountFull}>
+          {amountFull ? (
+            <>
+              <span aria-hidden="true">{amount}</span>
+              <span className="sr-only">{amountFull}</span>
+            </>
+          ) : (
+            amount
+          )}
+        </div>
       </div>
       {usdValue ? (
         <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", loading && "opacity-50 transition-opacity")}>
