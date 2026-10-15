@@ -7,8 +7,8 @@ import type { UploadTag } from "./upload";
  * `messaging` and the layers that actually execute these operations can
  * share one definition.
  *
- * Every operation resolves its signing key via the existing
- * unlocked-session cache (`getCachedKey(walletId)` in
+ * Every operation resolves its signer from the unlocked session
+ * (`getSigner(walletId)` in
  * `apps/extension/src/handlers/key-session.ts`) — none of these request
  * shapes carries a password field.
  *

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { signerFromJwk } from "../vault/signer";
 import Arweave from "arweave";
 import { estimateFee, finishTransfer, prepareTransfer, submitTransfer } from "./transfer";
 
@@ -45,7 +46,7 @@ describe("submitTransfer", () => {
       { status: 200, body: { ok: true } }, // post
     ]);
 
-    const result = await submitTransfer("https://arweave.net", jwk, RECIPIENT, "1000000000000");
+    const result = await submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), RECIPIENT, "1000000000000");
     expect(typeof result.txId).toBe("string");
     expect(result.txId.length).toBeGreaterThan(0);
   });
@@ -58,7 +59,7 @@ describe("submitTransfer", () => {
     ]);
 
     await expect(
-      submitTransfer("https://arweave.net", jwk, RECIPIENT, "1000000000000"),
+      submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), RECIPIENT, "1000000000000"),
     ).rejects.toThrow(/Failed to submit transfer/);
   });
 
@@ -66,7 +67,7 @@ describe("submitTransfer", () => {
     mockFetchSequence([{ status: 200, body: "" }]);
 
     await expect(
-      submitTransfer("https://arweave.net", jwk, "recipientAddr", "1000000000000"),
+      submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), "recipientAddr", "1000000000000"),
     ).rejects.toThrow(/must be an Arweave address/);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -103,7 +104,7 @@ describe("prepareTransfer / finishTransfer", () => {
     vi.restoreAllMocks();
 
     const calls = recordFetch();
-    const { txId } = await submitTransfer("https://arweave.net", jwk, TARGET, "1000");
+    const { txId } = await submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), TARGET, "1000");
 
     expect(expected.map((call) => call.method)).toEqual(["GET", "GET", "POST"]);
     expect(expected[2]!.body).toMatchObject({ owner: jwk.n, target: TARGET, quantity: "1000", reward: "1234567" });

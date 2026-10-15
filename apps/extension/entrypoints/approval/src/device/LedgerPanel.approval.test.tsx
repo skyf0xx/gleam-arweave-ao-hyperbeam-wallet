@@ -6,6 +6,7 @@ import {
   bytesToBase64Url,
   generateJWK,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
+  signerFromJwk,
   verifyDeviceSignature,
   type DeviceSigningPayload,
   type JWKInterface,
@@ -77,7 +78,7 @@ class FakeLedger implements LedgerTransport {
         if (this.signRefusal !== null) return sw(this.signRefusal);
         const hash = this.hashes.shift();
         if (!hash) return sw(0x6984);
-        this.signature = await signRsaPss(this.key, hash);
+        this.signature = await signRsaPss(signerFromJwk(this.key, ""), hash);
         return ok(hash);
       }
       case 0x10:

@@ -1,9 +1,11 @@
 import {
   isHardwareWalletMethod,
+  signerFromJwk,
   type AutoLockTimeout,
   type HardwareDevice,
   type JWKInterface,
   type Session,
+  type Signer,
   type WalletMethod,
 } from "@gleam/core";
 import { storagePort } from "../adapters/storage";
@@ -158,9 +160,9 @@ export function isValidSession(value: unknown): value is Session {
  * cached key and the session record before anything can sign with them.
  * A key with no session listing its wallet is treated as locked. Throws
  * `HardwareWalletSigningError` for a hardware wallet, which never has a
- * key here.
+ * key here. Not exported: the key leaves this module only as a `Signer`.
  */
-export async function getCachedKey(walletId: string): Promise<CachedKey | null> {
+async function getCachedKey(walletId: string): Promise<CachedKey | null> {
   if (await isHardwareWallet(walletId)) throw new HardwareWalletSigningError();
   const session = await storagePort.get<unknown>(SESSION_KEY);
   if (!isValidSession(session)) return null;
@@ -171,6 +173,15 @@ export async function getCachedKey(walletId: string): Promise<CachedKey | null> 
   }
   if (!session.unlockedWalletIds.includes(walletId)) return null;
   return storagePort.get<CachedKey>(`${KEY_PREFIX}${walletId}`);
+}
+
+/**
+ * A signer for an unlocked wallet, or `null` if it is locked. Same
+ * auto-lock and hardware-wallet rules as every key read here.
+ */
+export async function getSigner(walletId: string): Promise<Signer | null> {
+  const cached = await getCachedKey(walletId);
+  return cached ? signerFromJwk(cached.jwk, cached.address) : null;
 }
 
 export async function hasCachedKey(walletId: string): Promise<boolean> {

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
-import { getCachedKey, clearKeyCache } from "./key-session";
+import { getSigner, clearKeyCache } from "./key-session";
 
 /**
  * Real key/value store standing in for `adapters/storage.ts`'s
@@ -45,7 +45,7 @@ const OTHER_PASSWORD = "another very long safe password!";
 function createFakeStorage(): StoragePort {
   const localStore = new Map<string, unknown>();
   // `session:` keys share key-session's store, as they share
-  // chrome.storage.session in the extension: getCachedKey reads the
+  // chrome.storage.session in the extension: getSigner reads the
   // session record this handler writes.
   const areaFor = (key: string) => (key.startsWith("session:") ? keySessionStore : localStore);
   return {
@@ -608,25 +608,25 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
   it("unlockWallet caches the wallet's decrypted signing key so later calls don't need the password again", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.lockWallet();
-    expect(await getCachedKey(wallet.id)).toBeNull();
+    expect(await getSigner(wallet.id)).toBeNull();
 
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
-    expect(await getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getSigner(wallet.id)).not.toBeNull();
   });
 
   it("lockWallet clears every cached signing key immediately", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-    expect(await getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getSigner(wallet.id)).not.toBeNull();
 
     await handler.lockWallet();
 
-    expect(await getCachedKey(wallet.id)).toBeNull();
+    expect(await getSigner(wallet.id)).toBeNull();
   });
 
   it("an elapsed auto-lock timeout clears the session and the cached key on the next getState", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-    expect(await getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getSigner(wallet.id)).not.toBeNull();
 
     // Simulate a session whose "immediate" timeout (1-minute grace) has
     // already elapsed — the same shape unlockWallet would have written,
@@ -641,7 +641,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     const state = await handler.getState();
 
     expect(state.session).toBeNull();
-    expect(await getCachedKey(wallet.id)).toBeNull();
+    expect(await getSigner(wallet.id)).toBeNull();
   });
 
   it("a session within its auto-lock timeout stays unlocked and keeps its cached key", async () => {
@@ -657,7 +657,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     const state = await handler.getState();
 
     expect(state.session).not.toBeNull();
-    expect(await getCachedKey(wallet.id)).not.toBeNull();
+    expect(await getSigner(wallet.id)).not.toBeNull();
   });
 
   it("getState reports locked and drops the session when every cached key is gone", async () => {
@@ -682,7 +682,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     expect(state.session?.unlockedWalletIds).toEqual([second.id]);
     const stored = await storage.get<{ unlockedWalletIds: string[] }>("session:unlockedSession");
     expect(stored?.unlockedWalletIds).toEqual([second.id]);
-    expect(await getCachedKey(second.id)).not.toBeNull();
+    expect(await getSigner(second.id)).not.toBeNull();
   });
 
   it("createWallet leaves every created wallet unlocked and signable", async () => {
@@ -692,8 +692,8 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     const state = await handler.getState();
 
     expect(state.session?.unlockedWalletIds).toEqual([first.id, second.id]);
-    expect(await getCachedKey(first.id)).not.toBeNull();
-    expect(await getCachedKey(second.id)).not.toBeNull();
+    expect(await getSigner(first.id)).not.toBeNull();
+    expect(await getSigner(second.id)).not.toBeNull();
   });
 
   it("getState refreshes lastActivityAt, extending the session on activity", async () => {

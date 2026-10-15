@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { signerFromJwk } from "../../vault/signer";
 import { clientForGateway } from "../../arweave/client";
 import { buildUnsignedDataItem, dataItemSignatureData } from "../../arweave/data-item";
 import { sha256, signRsaPss } from "../../arweave/rsa-pss";
@@ -133,7 +134,7 @@ class SimulatedLedger implements LedgerTransport {
     } catch (error) {
       return sw(0x6984, [...utf8((error as Error).message)]);
     }
-    this.signature = await signRsaPss(jwk, deepHash);
+    this.signature = await signRsaPss(signerFromJwk(jwk, ""), deepHash);
     if (this.tamperHash) deepHash[0] = deepHash[0]! ^ 1;
     return sw(0x9000, [...deepHash]);
   }

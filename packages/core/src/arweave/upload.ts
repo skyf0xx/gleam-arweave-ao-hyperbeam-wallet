@@ -1,10 +1,10 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "../vault/signer";
 import { createSignedDataItem } from "./data-item";
 import type { UploadTag } from "../models/upload";
 
 /**
- * This module never decrypts anything itself — it accepts an
- * already-decrypted `JWKInterface` and never imports `core/vault`,
+ * This module never decrypts anything itself — it accepts an unlocked
+ * wallet's `Signer` and never touches `core/vault`'s envelope,
  * matching `core/arweave/transfer.ts`'s signing-capability boundary.
  */
 
@@ -16,7 +16,7 @@ export interface SubmittedUpload {
 
 /**
  * Builds an ANS-104 `DataItem` from the draft's payload/tags/license tag,
- * signs it with the caller-supplied JWK, and posts the signed binary to
+ * signs it with the caller-supplied signer, and posts the signed binary to
  * an ANS-104 bundler endpoint.
  *
  * Uses the DataItem's own locally computed `id` as the returned `txId`
@@ -26,7 +26,7 @@ export interface SubmittedUpload {
  */
 export async function submitUploadToBundler(
   bundlerUrl: string,
-  jwk: JWKInterface,
+  signer: Signer,
   data: Uint8Array,
   contentType: string,
   tags: UploadTag[],
@@ -38,7 +38,7 @@ export async function submitUploadToBundler(
     ...(licenseTag ? [licenseTag] : []),
   ];
 
-  const { id, raw } = await createSignedDataItem(jwk, { data, tags: allTags });
+  const { id, raw } = await createSignedDataItem(signer, { data, tags: allTags });
   await postDataItemToBundler(bundlerUrl, raw);
 
   return { txId: id };

@@ -6,7 +6,7 @@ import {
 } from "@gleam/core/src/arweave/transfer.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
-import { signTransactionWithJwk, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
+import { signTransactionWithSigner, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
 import { assertCoversNetworkFee, prepareCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import {
   finishTransfer as finishAoTransfer,
@@ -22,24 +22,24 @@ import {
   type ActivityEntry,
   type CollectibleSendDraft,
   type FeeEstimate,
-  type JWKInterface,
   type NetworkSettings,
+  type Signer,
   type StoragePort,
   type TransferDraft,
   type UnsignedPayload,
   type Wallet,
   type Winston,
 } from "@gleam/core";
-import { getCachedKey, getWalletMethod } from "./key-session";
+import { getSigner, getWalletMethod } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
  * `submitTransfer`. Same constructor-injected-`StoragePort` shape as the
  * other handlers in this directory.
  *
- * Signing key source: an AR transfer needs the decrypted JWK, which this
- * handler reads from `key-session.ts`'s in-memory cache — populated by
- * `WalletLifecycleHandler.unlockWallet` — rather than requiring a password
+ * Signing key source: a transfer signs through `key-session.ts`'s
+ * `getSigner`, backed by the key cached by
+ * `WalletLifecycleHandler.unlockWallet`, rather than requiring a password
  * on every request. `submitTransfer`
  * throws a specific "wallet is locked" error if no key is cached for
  * `req.walletId` — the caller (`SendView`) has no password field to fall
@@ -134,13 +134,13 @@ export class TransferHandler {
     await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, [entry, ...existing]);
   }
 
-  /** Reads a wallet's signing key from the unlocked-session cache. Throws if the wallet isn't currently unlocked. */
-  private async signingKeyFor(walletId: string): Promise<{ jwk: JWKInterface; address: string }> {
-    const cached = await getCachedKey(walletId);
-    if (!cached) {
+  /** The unlocked wallet's signer. Throws if the wallet isn't currently unlocked. */
+  private async signerFor(walletId: string): Promise<Signer> {
+    const signer = await getSigner(walletId);
+    if (!signer) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
-    return cached;
+    return signer;
   }
 
   /**
@@ -272,17 +272,23 @@ export class TransferHandler {
     }
 
     const settings = await this.loadNetworkSettings();
-    const { jwk, address } = await this.signingKeyFor(req.walletId);
+    const signer = await this.signerFor(req.walletId);
+    const { address } = signer;
 
     let txId: string;
     try {
       if (req.collectible) {
-        const unsigned = await this.prepareCollectibleSend(req, jwk.n);
-        ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n));
+        const unsigned = await this.prepareCollectibleSend(req, signer.owner);
+        ({ txId } = await finishArweaveTransfer(
+          settings.gatewayUrl,
+          unsigned,
+          await signTransactionWithSigner(unsigned, signer),
+          signer.owner,
+        ));
       } else if (req.token === null) {
-        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount));
+        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, signer, req.recipient, req.amount));
       } else {
-        const { messageId } = await submitAoTransfer(jwk, req.token, req.recipient, req.amount);
+        const { messageId } = await submitAoTransfer(signer, req.token, req.recipient, req.amount);
         txId = messageId;
       }
     } catch (error) {

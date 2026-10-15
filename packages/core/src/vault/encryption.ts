@@ -1,4 +1,4 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "./signer";
 import type { EncryptAlgorithm } from "../models/signing";
 
 /**
@@ -51,44 +51,33 @@ export function normalizeEncryptAlgorithm(value: unknown): EncryptAlgorithm {
   throw new Error(`Unsupported encryption algorithm "${String(raw.name)}". Use { name: "RSA-OAEP" }.`);
 }
 
-async function importRsaPublicKey(jwk: JWKInterface): Promise<CryptoKey> {
+/** `owner` is the base64url RSA modulus; Arweave keys always use e = 65537. */
+async function importRsaPublicKey(owner: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
-    { kty: jwk.kty, e: jwk.e, n: jwk.n, alg: "RSA-OAEP-256", ext: true },
+    { kty: "RSA", e: "AQAB", n: owner, alg: "RSA-OAEP-256", ext: true },
     { name: "RSA-OAEP", hash: "SHA-256" },
     false,
     ["encrypt"],
   );
 }
 
-async function importRsaPrivateKey(jwk: JWKInterface): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "jwk",
-    { ...jwk, alg: "RSA-OAEP-256", ext: true },
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["decrypt"],
-  );
-}
-
 export async function encrypt(
-  jwk: JWKInterface,
+  owner: string,
   plaintext: Uint8Array<ArrayBuffer>,
   algorithm: EncryptAlgorithm,
 ): Promise<Uint8Array> {
   const params = normalizeEncryptAlgorithm(algorithm);
-  const key = await importRsaPublicKey(jwk);
+  const key = await importRsaPublicKey(owner);
   const ciphertext = await crypto.subtle.encrypt(params, key, plaintext);
   return new Uint8Array(ciphertext);
 }
 
 export async function decrypt(
-  jwk: JWKInterface,
+  signer: Signer,
   ciphertext: Uint8Array<ArrayBuffer>,
   algorithm: EncryptAlgorithm,
 ): Promise<Uint8Array> {
   const params = normalizeEncryptAlgorithm(algorithm);
-  const key = await importRsaPrivateKey(jwk);
-  const plaintext = await crypto.subtle.decrypt(params, key, ciphertext);
-  return new Uint8Array(plaintext);
+  return signer.decryptOaep(ciphertext, params.label);
 }

@@ -55,7 +55,7 @@ function setup(initial: Record<string, unknown> = {}, reply: () => Response | Pr
     storage,
     deviceKey: async () => device,
     apiUrl: "https://points.test",
-    signingKey: async () => null,
+    signer: async () => null,
     walletMethod: async () => null,
     badge: { setDot: async () => {} },
     fetchImpl,

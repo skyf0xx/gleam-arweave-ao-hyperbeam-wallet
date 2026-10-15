@@ -43,7 +43,6 @@ import {
   type Grant,
   type HardwareDevice,
   type HardwareWalletMethod,
-  type JWKInterface,
   type PermissionType,
   type SignTransactionInput,
   type SigningApprovalPreview,
@@ -59,7 +58,7 @@ import {
 } from "@gleam/messaging/src/page-protocol.ts";
 import { buildOwnershipTransaction, POINTS_PROOF_TAG } from "@gleam/core/src/points/index.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
-import { getCachedKey, getStoredWallet, getWalletMethod } from "./key-session";
+import { getSigner, getStoredWallet, getWalletMethod } from "./key-session";
 import type { SubmitTransferRequest } from "./transfer";
 
 /**
@@ -1365,15 +1364,14 @@ export class ApprovalHandler {
       if (!input.encryptAlgorithm) {
         throw new Error("encrypt requires an algorithm.");
       }
-      const publicJwk = await this.storedPublicJwk(walletId);
-      return encrypt(publicJwk, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
+      const owner = await this.storedOwner(walletId);
+      return encrypt(owner, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
     }
 
-    const cached = await getCachedKey(walletId);
-    if (!cached) {
+    const signer = await getSigner(walletId);
+    if (!signer) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
-    const { jwk } = cached;
 
     if (input.kind === "transferAoTokens" || input.kind === "transfer") {
       return this.performTransfer(walletId, input);
@@ -1383,13 +1381,13 @@ export class ApprovalHandler {
 
     switch (input.kind) {
       case "sign": {
-        return signTransaction(this.requireGatewayUrl(input), jwk, transaction);
+        return signTransaction(this.requireGatewayUrl(input), signer, transaction);
       }
 
       case "dispatch": {
         // A cached key means a keyfile wallet even if its record can't be read.
         const { dispatchViaBundler: viaBundler } = capabilitiesFor((await getWalletMethod(walletId)) ?? "jwk");
-        return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, jwk, transaction, { viaBundler });
+        return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, signer, transaction, { viaBundler });
       }
 
       case "signDataItem": {
@@ -1397,11 +1395,11 @@ export class ApprovalHandler {
         if (!dataItem) throw new Error("signDataItem requires a data item.");
         // Wander resolves to the raw signed item as an ArrayBuffer, which
         // aoconnect's createDataItemSigner parses directly.
-        return toArrayBuffer(await signDataItem(jwk, dataItem));
+        return toArrayBuffer(await signDataItem(signer, dataItem));
       }
 
       case "batchSignDataItem": {
-        const signed = await batchSignDataItem(jwk, input.dataItems ?? []);
+        const signed = await batchSignDataItem(signer, input.dataItems ?? []);
         return signed.map(toArrayBuffer);
       }
 
@@ -1409,19 +1407,19 @@ export class ApprovalHandler {
         if (!input.encryptAlgorithm) {
           throw new Error("decrypt requires an algorithm.");
         }
-        return decrypt(jwk, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
+        return decrypt(signer, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
       }
 
       case "signature": {
-        return new Uint8Array(await vaultSignature(jwk, toArrayBuffer(input.payload), { saltLength: input.saltLength }));
+        return new Uint8Array(await vaultSignature(signer, toArrayBuffer(input.payload), { saltLength: input.saltLength }));
       }
 
       case "signMessage": {
-        return new Uint8Array(await vaultSignMessage(jwk, toArrayBuffer(input.payload), input.hashAlgorithm));
+        return new Uint8Array(await vaultSignMessage(signer, toArrayBuffer(input.payload), input.hashAlgorithm));
       }
 
       case "privateHash": {
-        return new Uint8Array(await vaultPrivateHash(jwk, toArrayBuffer(input.payload), input.hashAlgorithm));
+        return new Uint8Array(await vaultPrivateHash(signer, toArrayBuffer(input.payload), input.hashAlgorithm));
       }
 
       // A keyfile proves ownership with signMessage in PointsHandler and never reaches here.
@@ -1463,11 +1461,11 @@ export class ApprovalHandler {
   }
 
   /**
-   * The wallet's stored public key as an RSA public JWK; Arweave keys
-   * always use e = 65537. The key must hash to the wallet's address, so a
-   * tampered or corrupted record can't redirect what a dApp encrypts.
+   * The wallet's stored public key (`owner`). It must hash to the
+   * wallet's address, so a tampered or corrupted record can't redirect
+   * what a dApp encrypts.
    */
-  private async storedPublicJwk(walletId: string): Promise<JWKInterface> {
+  private async storedOwner(walletId: string): Promise<string> {
     const wallet = await getStoredWallet(walletId);
     if (!wallet || wallet.publicKey.length === 0) {
       throw new Error(`No public key stored for wallet "${walletId}".`);
@@ -1475,7 +1473,7 @@ export class ApprovalHandler {
     if ((await addressFromOwner(wallet.publicKey)) !== wallet.address) {
       throw new Error("This wallet's stored public key doesn't match its address. Encryption was refused.");
     }
-    return { kty: "RSA", n: wallet.publicKey, e: "AQAB" };
+    return wallet.publicKey;
   }
 
   /**

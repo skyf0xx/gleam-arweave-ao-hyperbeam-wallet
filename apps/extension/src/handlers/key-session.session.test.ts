@@ -30,7 +30,8 @@ vi.mock("../adapters/storage", () => ({
 const {
   cacheKey,
   clearKeyCache,
-  getCachedKey,
+  getSigner,
+  HardwareWalletSigningError,
   hasCachedKey,
   isKeyStored,
   isSessionExpired,
@@ -55,22 +56,22 @@ beforeEach(() => {
 });
 
 describe("key-session", () => {
-  it("reads a cached key fresh from storage on every call (no re-caching in process)", async () => {
+  it("builds the signer from a key read fresh from storage on every call (no re-caching in process)", async () => {
     await cacheKey("wallet-a", jwkA, "address-a");
 
-    const first = await getCachedKey("wallet-a");
-    expect(first).toEqual({ jwk: jwkA, address: "address-a" });
+    const first = await getSigner("wallet-a");
+    expect(first).toMatchObject({ owner: "wallet-a-n", address: "address-a" });
 
     // Simulate another process reading the same underlying store directly:
     // mutating storage between reads must be visible on the next read, which
-    // is only possible if getCachedKey never caches in-process itself.
+    // is only possible if the key read never caches in-process itself.
     store.set("session:key:wallet-a", { jwk: jwkB, address: "address-b" });
-    const second = await getCachedKey("wallet-a");
-    expect(second).toEqual({ jwk: jwkB, address: "address-b" });
+    const second = await getSigner("wallet-a");
+    expect(second).toMatchObject({ owner: "wallet-b-n", address: "address-b" });
   });
 
   it("returns null for a wallet that was never cached", async () => {
-    expect(await getCachedKey("missing-wallet")).toBeNull();
+    expect(await getSigner("missing-wallet")).toBeNull();
     expect(await hasCachedKey("missing-wallet")).toBe(false);
   });
 
@@ -86,8 +87,8 @@ describe("key-session", () => {
 
     await removeCachedKey("wallet-a");
 
-    expect(await getCachedKey("wallet-a")).toBeNull();
-    expect(await getCachedKey("wallet-b")).toEqual({ jwk: jwkB, address: "address-b" });
+    expect(await getSigner("wallet-a")).toBeNull();
+    expect(await getSigner("wallet-b")).toMatchObject({ owner: "wallet-b-n", address: "address-b" });
   });
 
   it("clearKeyCache wipes every cached key", async () => {
@@ -96,8 +97,8 @@ describe("key-session", () => {
 
     await clearKeyCache();
 
-    expect(await getCachedKey("wallet-a")).toBeNull();
-    expect(await getCachedKey("wallet-b")).toBeNull();
+    expect(await getSigner("wallet-a")).toBeNull();
+    expect(await getSigner("wallet-b")).toBeNull();
   });
 
   it("clearKeyCache leaves unrelated session storage entries untouched", async () => {
@@ -125,7 +126,7 @@ describe("key-session", () => {
     expect(zeroizedValue.address).toBe("0".repeat("address-a".length));
 
     // and the entry is actually gone afterward, not just overwritten
-    expect(await getCachedKey("wallet-a")).toBeNull();
+    expect(await getSigner("wallet-a")).toBeNull();
     setSpy.mockRestore();
   });
 
@@ -142,9 +143,15 @@ describe("key-session", () => {
       .map(([key]) => key);
     expect(zeroizedKeys.sort()).toEqual(["session:key:wallet-a", "session:key:wallet-b"]);
 
-    expect(await getCachedKey("wallet-a")).toBeNull();
-    expect(await getCachedKey("wallet-b")).toBeNull();
+    expect(await getSigner("wallet-a")).toBeNull();
+    expect(await getSigner("wallet-b")).toBeNull();
     setSpy.mockRestore();
+  });
+
+  it("getSigner throws HardwareWalletSigningError for a hardware wallet instead of reporting it locked", async () => {
+    store.set("local:wallets", [{ id: "wallet-a", address: "address-a", method: "keystone", publicKey: "wallet-a-n" }]);
+
+    await expect(getSigner("wallet-a")).rejects.toBeInstanceOf(HardwareWalletSigningError);
   });
 
   it("isKeyStored reports a stored key even when no session lists the wallet", async () => {
@@ -154,7 +161,7 @@ describe("key-session", () => {
     await cacheKey("wallet-a", jwkA, "address-a");
 
     expect(await isKeyStored("wallet-a")).toBe(true);
-    expect(await getCachedKey("wallet-a")).toBeNull();
+    expect(await getSigner("wallet-a")).toBeNull();
   });
 
   describe("auto-lock on key read", () => {
@@ -173,7 +180,7 @@ describe("key-session", () => {
 
       vi.advanceTimersByTime(5 * 60 * 1000);
 
-      expect(await getCachedKey("wallet-a")).toEqual({ jwk: jwkA, address: "address-a" });
+      expect(await getSigner("wallet-a")).toMatchObject({ owner: "wallet-a-n", address: "address-a" });
     });
 
     it("once the timeout has passed, returns null and wipes every key and the session", async () => {
@@ -183,7 +190,7 @@ describe("key-session", () => {
 
       vi.advanceTimersByTime(5 * 60 * 1000 + 1);
 
-      expect(await getCachedKey("wallet-a")).toBeNull();
+      expect(await getSigner("wallet-a")).toBeNull();
       expect(store.has("session:key:wallet-a")).toBe(false);
       expect(store.has("session:key:wallet-b")).toBe(false);
       expect(store.has("session:unlockedSession")).toBe(false);
@@ -195,7 +202,7 @@ describe("key-session", () => {
 
       vi.advanceTimersByTime(365 * 24 * 60 * 60 * 1000);
 
-      expect(await getCachedKey("wallet-a")).not.toBeNull();
+      expect(await getSigner("wallet-a")).not.toBeNull();
     });
 
     it("'immediate' keeps the key for a 1-minute grace after the last activity", async () => {
@@ -204,7 +211,7 @@ describe("key-session", () => {
 
       vi.advanceTimersByTime(60 * 1000);
 
-      expect(await getCachedKey("wallet-a")).toEqual({ jwk: jwkA, address: "address-a" });
+      expect(await getSigner("wallet-a")).toMatchObject({ owner: "wallet-a-n", address: "address-a" });
     });
 
     it("'immediate' expires once the 1-minute grace has passed", async () => {
@@ -213,7 +220,7 @@ describe("key-session", () => {
 
       vi.advanceTimersByTime(60 * 1000 + 1);
 
-      expect(await getCachedKey("wallet-a")).toBeNull();
+      expect(await getSigner("wallet-a")).toBeNull();
       expect(store.has("session:key:wallet-a")).toBe(false);
       expect(store.has("session:unlockedSession")).toBe(false);
     });
@@ -222,14 +229,14 @@ describe("key-session", () => {
       await cacheKey("wallet-a", jwkA, "address-a");
       store.delete("session:unlockedSession");
 
-      expect(await getCachedKey("wallet-a")).toBeNull();
+      expect(await getSigner("wallet-a")).toBeNull();
     });
 
     it("returns null for a wallet the session doesn't list", async () => {
       setSession("never", Date.now(), ["wallet-b"]);
       await cacheKey("wallet-a", jwkA, "address-a");
 
-      expect(await getCachedKey("wallet-a")).toBeNull();
+      expect(await getSigner("wallet-a")).toBeNull();
     });
   });
 

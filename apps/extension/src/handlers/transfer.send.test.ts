@@ -262,7 +262,7 @@ describe("TransferHandler: submitTransfer", () => {
     });
 
     expect(result.txId).toBe("ao-msg-id-1");
-    expect(aoSubmitMock).toHaveBeenCalledWith(expect.objectContaining({ kty: "RSA" }), AO_PROCESS_ID, "recipientAoAddr", "42");
+    expect(aoSubmitMock).toHaveBeenCalledWith(expect.objectContaining({ address: wallet.address, owner: wallet.publicKey }), AO_PROCESS_ID, "recipientAoAddr", "42");
 
     const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
     expect(log).toHaveLength(1);

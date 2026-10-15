@@ -158,7 +158,7 @@ describe("POST /register", () => {
   it("rejects a signature from another wallet", async () => {
     const body = await registerBody(alice, await createTestDevice(), { issuedAt: NOW_SECONDS });
 
-    const { status } = await post(setup(await createTestDb()), { ...body, owner: bob.jwk.n });
+    const { status } = await post(setup(await createTestDb()), { ...body, owner: bob.signer.owner });
 
     expect(status).toBe(401);
   });
