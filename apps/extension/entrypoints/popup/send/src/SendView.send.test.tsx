@@ -362,7 +362,7 @@ describe("SendView AR Max and balance check account for the network fee", () => 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.getByRole("alert").textContent).toContain("more than your current balance");
+    expect(screen.getByRole("alert").textContent).toContain("This address is new to Arweave, so the network fee is 0.2 AR");
     expect(screen.queryByText("Review send")).toBeNull();
   });
 
