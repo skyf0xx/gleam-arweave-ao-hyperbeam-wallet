@@ -32,6 +32,24 @@ export default tseslint.config(
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      // Wallet pages hold unlocked keys, so markup is never parsed into
+      // their DOM: render images through <img> and text through React.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message: "Don't inject HTML. Render SVG through an <img> data URI and text through React.",
+        },
+        {
+          selector:
+            "AssignmentExpression[left.property.name=/^(inner|outer)HTML$/]:not([right.type='Literal'][right.value=''])",
+          message: "Don't assign HTML. Build nodes with textContent or createElement instead.",
+        },
+        {
+          selector: "CallExpression[callee.property.name=/^(insertAdjacentHTML|createContextualFragment)$/]",
+          message: "Don't parse HTML into the page. Build nodes with textContent or createElement instead.",
+        },
+      ],
       "import/no-restricted-paths": [
         "error",
         {

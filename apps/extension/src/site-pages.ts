@@ -1,5 +1,15 @@
 export const SITE_URL = "https://gleamwallet.app/";
 
+export const REPO_URL = "https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet";
+
+export function releaseUrl(version: string): string {
+  return `${REPO_URL}/releases/tag/v${version}`;
+}
+
+export function commitUrl(sha: string): string {
+  return `${REPO_URL}/commit/${sha}`;
+}
+
 export type SitePage = "welcome" | "feedback" | "goodbye" | "gleam" | "points";
 
 /**

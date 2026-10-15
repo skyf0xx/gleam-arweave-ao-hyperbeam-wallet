@@ -9,7 +9,7 @@
 #   2 signing: a wrong or unapproved signature
 #   3 trust boundary: a page reaches what it shouldn't
 #   4 what you see is what you sign: the approval preview lies
-#   5 other ways in: extension config, dependencies, CI
+#   5 other ways in: extension config, dependencies, CI, the release gate
 
 1 packages/core/src/vault/
 1 packages/core/src/keys/
@@ -19,6 +19,7 @@
 1 apps/extension/src/passkey/
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
+1 apps/extension/src/adapters/session-access.ts
 1 apps/extension/entrypoints/popup/onboarding/src/Import.tsx
 1 apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx
 1 apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx
@@ -49,3 +50,7 @@
 5 pnpm-lock.yaml
 5 lefthook.yml
 5 .gitleaks.toml
+5 scripts/release-gate.mjs
+5 scripts/release.mjs
+5 scripts/verify-release.sh
+5 security/surface.mjs

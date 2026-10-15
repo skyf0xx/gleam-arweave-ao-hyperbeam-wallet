@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { browser } from "wxt/browser";
 import type { AutoLockTimeout, LockSettings, NetworkSettings, RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
+import { REPO_URL } from "@/src/site-pages";
+import { AboutBuild } from "./AboutBuild";
 
 const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
   never: "Never",
@@ -175,6 +178,7 @@ export function SettingsHomeView({
               <FeedbackCard onClick={onOpenFeedback} />
               <SourceLink />
             </div>
+            <AboutBuild version={browser.runtime.getManifest().version} commit={import.meta.env.VITE_GLEAM_COMMIT} />
           </OptionSection>
         </div>
       </div>
@@ -242,13 +246,11 @@ function FeedbackCard({ onClick }: { onClick: () => void }) {
   );
 }
 
-const SOURCE_URL = "https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet";
-
 /** A wallet asks for trust, so the source sits one click away. */
 function SourceLink() {
   return (
     <a
-      href={SOURCE_URL}
+      href={REPO_URL}
       target="_blank"
       rel="noreferrer"
       className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-mist"
