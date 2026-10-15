@@ -33,6 +33,7 @@
 /apps/extension/entrypoints/content/                                       @skyf0xx
 /apps/extension/entrypoints/provider/                                      @skyf0xx
 /apps/extension/src/handlers/provider-params.ts                            @skyf0xx
+/apps/extension/src/sender.ts                                              @skyf0xx
 /packages/messaging/                                                       @skyf0xx
 
 # 4 What you see is what you sign
