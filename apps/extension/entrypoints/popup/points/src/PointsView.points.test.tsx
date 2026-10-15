@@ -123,6 +123,22 @@ describe("PointsTokenRow", () => {
     expect(await screen.findByText("5.00 points")).toBeTruthy();
     expect(screen.queryByText(/\$/)).toBeNull();
   });
+
+  it("shortens a large total and keeps the full number on hover", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: Date.parse(SETTLED_AT) });
+    const wallet = { ...SCORES.wallets[0]!, totalAtomic: (194_180n * BigInt(ONE_POINT)).toString() };
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({ ...SCORES, wallets: [wallet] }),
+    });
+
+    renderWithQuery(<PointsTokenRow runtime={runtime} wallet={WALLET} onOpen={vi.fn()} />);
+
+    const short = await screen.findByText("194.1K points");
+    expect(short.parentElement?.getAttribute("title")).toBe("194,180 points");
+    expect(screen.getByText("194,180 points").className).toContain("sr-only");
+  });
 });
 
 describe("PointsView", () => {
