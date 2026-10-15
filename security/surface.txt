@@ -38,6 +38,7 @@
 3 apps/extension/entrypoints/content/
 3 apps/extension/entrypoints/provider/
 3 apps/extension/src/handlers/provider-params.ts
+3 apps/extension/src/sender.ts
 3 packages/messaging/
 
 4 apps/extension/src/handlers/approval.ts
