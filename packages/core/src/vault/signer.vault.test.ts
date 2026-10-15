@@ -3,8 +3,13 @@ import Arweave from "arweave";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import { verifyRsaPss } from "../arweave/rsa-pss";
+import { applyTransactionSignature, buildUnsignedTransaction, signTransactionWithSigner } from "../arweave/transaction";
+import { buildUnsignedDataItem, createSignedDataItem, verifyDataItemSignature } from "../arweave/data-item";
+import { clientForGateway } from "../arweave/client";
 import { encrypt } from "./encryption";
-import { signerFromJwk, type Signer } from "./signer";
+import { signMessage, verifyMessage } from "./message-signing";
+import { Keyring } from "./keyring";
+import { importSessionKeys, signerFromJwk, signerFromKeyStore, type SessionKeyHandles, type Signer } from "./signer";
 
 const bytes = (text: string) => new TextEncoder().encode(text) as Uint8Array<ArrayBuffer>;
 
@@ -15,14 +20,30 @@ async function verifyPss(owner: string, hash: string, saltLength: number, data: 
   return crypto.subtle.verify({ name: "RSA-PSS", saltLength }, key, new Uint8Array(signature), new Uint8Array(data));
 }
 
-describe("vault/signer", () => {
-  let jwk: JWKInterface;
+let jwk: JWKInterface;
+
+beforeAll(async () => {
+  jwk = await generateJWK();
+}, 60_000);
+
+const SIGNERS: Array<[string, () => Promise<Signer>]> = [
+  ["signerFromJwk", async () => signerFromJwk(jwk, "address-a")],
+  [
+    "signerFromKeyStore over a Keyring",
+    async () => {
+      const keyring = new Keyring();
+      await keyring.importKey("wallet-a", jwk);
+      return signerFromKeyStore(keyring, "wallet-a", { address: "address-a", owner: jwk.n });
+    },
+  ],
+];
+
+describe.each(SIGNERS)("vault/signer: %s", (_, makeSigner) => {
   let signer: Signer;
 
   beforeAll(async () => {
-    jwk = await generateJWK();
-    signer = signerFromJwk(jwk, "address-a");
-  }, 60_000);
+    signer = await makeSigner();
+  });
 
   it("exposes the owner modulus and the address it was given", () => {
     expect(signer.owner).toBe(jwk.n);
@@ -56,13 +77,31 @@ describe("vault/signer", () => {
       await expect(verifyPss(jwk.n, "SHA-256", 32, data, signature)).resolves.toBe(false);
     });
 
-    it("signs with a stored JWK whose alg/key_ops name another algorithm", async () => {
-      const hinted = signerFromJwk({ ...jwk, alg: "RSA-OAEP-256", key_ops: ["decrypt"] } as JWKInterface, "address-a");
-      const data = bytes("hinted");
+    it("signs a transaction arweave-js verifies", async () => {
+      const unsigned = await buildUnsignedTransaction("https://arweave.net", jwk.n, {
+        target: "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI",
+        quantity: "1000",
+        reward: "5000",
+        last_tx: "b".repeat(64),
+      });
+      const { transaction } = await applyTransactionSignature(unsigned, await signTransactionWithSigner(unsigned, signer), jwk.n);
+      const arweave = clientForGateway("https://arweave.net");
 
-      await expect(verifyRsaPss(jwk.n, data, await hinted.signPss(data, { hash: "SHA-256", saltLength: 32 }))).resolves.toBe(
-        true,
-      );
+      await expect(arweave.transactions.verify(arweave.transactions.fromRaw(transaction))).resolves.toBe(true);
+    });
+
+    it("signs an ANS-104 data item that verifies", async () => {
+      const fields = { data: bytes("ao message"), target: "", anchor: "", tags: [{ name: "Action", value: "Transfer" }] };
+      const { raw } = await createSignedDataItem(signer, fields);
+
+      await expect(verifyDataItemSignature(buildUnsignedDataItem(jwk.n, fields), raw.subarray(2, 514), jwk.n)).resolves.toBe(true);
+    });
+
+    it("signs a message verifyMessage accepts", async () => {
+      const data = bytes("hello").buffer;
+      const signature = await signMessage(signer, data, "SHA-384");
+
+      await expect(verifyMessage(jwk.n, data, signature, "SHA-384")).resolves.toBe(true);
     });
   });
 
@@ -84,19 +123,34 @@ describe("vault/signer", () => {
       await expect(signer.decryptOaep(ciphertext)).rejects.toThrow();
     });
   });
+});
 
-  describe("privateHash", () => {
-    it("digests the data followed by the UTF-8 text of d", async () => {
-      const data = bytes("payload");
-      const expected = await crypto.subtle.digest("SHA-384", new Uint8Array([...data, ...new TextEncoder().encode(jwk.d)]));
+describe("vault/signer: signerFromJwk", () => {
+  it("signs with a stored JWK whose alg/key_ops name another algorithm", async () => {
+    const hinted = signerFromJwk({ ...jwk, alg: "RSA-OAEP-256", key_ops: ["decrypt"] } as JWKInterface, "address-a");
+    const data = bytes("hinted");
 
-      expect(Array.from(await signer.privateHash(data, "SHA-384"))).toEqual(Array.from(new Uint8Array(expected)));
-    });
+    await expect(verifyRsaPss(jwk.n, data, await hinted.signPss(data, { hash: "SHA-256", saltLength: 32 }))).resolves.toBe(true);
+  });
+});
 
-    it("refuses a key with no private exponent", async () => {
-      const publicOnly = signerFromJwk({ kty: "RSA", e: "AQAB", n: jwk.n } as JWKInterface, "address-a");
+describe("vault/signer: importSessionKeys", () => {
+  let keys: SessionKeyHandles;
 
-      await expect(publicOnly.privateHash(bytes("x"), "SHA-256")).rejects.toThrow(/no 'd' field/);
-    });
+  beforeAll(async () => {
+    keys = await importSessionKeys({ ...jwk, alg: "RSA-OAEP-256", key_ops: ["decrypt"] } as JWKInterface);
+  });
+
+  it("imports one non-extractable key per PSS hash and one for OAEP, none of which export", async () => {
+    const all = [keys.pss["SHA-256"], keys.pss["SHA-384"], keys.pss["SHA-512"], keys.oaep];
+
+    expect(keys.pss["SHA-384"].algorithm).toMatchObject({ name: "RSA-PSS", hash: { name: "SHA-384" } });
+    expect(keys.oaep.algorithm).toMatchObject({ name: "RSA-OAEP", hash: { name: "SHA-256" } });
+    for (const key of all) {
+      expect(key.extractable).toBe(false);
+      expect(key.type).toBe("private");
+      await expect(crypto.subtle.exportKey("jwk", key)).rejects.toThrow();
+      await expect(crypto.subtle.exportKey("pkcs8", key)).rejects.toThrow();
+    }
   });
 });

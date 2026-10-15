@@ -7,8 +7,6 @@ import type {
   DispatchResult,
   EncryptAlgorithm,
   EncryptRequest,
-  PrivateHashRequest,
-  PrivateHashResult,
   RsaOaepParams,
   SignatureRequest,
   SignDataItemRequest,
@@ -84,24 +82,16 @@ describe("signing/crypto model shapes", () => {
     expect(request.walletId).toBe("wallet-1");
   });
 
-  it("signMessage/privateHash accept ArrayBuffer directly, not a base64 string", () => {
+  it("signMessage accepts ArrayBuffer directly, not a base64 string", () => {
     const signMessageRequest: SignMessageRequest = {
       walletId: "wallet-1",
       data: new ArrayBuffer(8),
     };
     const signMessageResult: SignMessageResult = { signature: new ArrayBuffer(64) };
-    const privateHashRequest: PrivateHashRequest = {
-      walletId: "wallet-1",
-      data: new ArrayBuffer(8),
-    };
-    const privateHashResult: PrivateHashResult = { hash: new ArrayBuffer(32) };
 
     expectTypeOf<SignMessageRequest["data"]>().toEqualTypeOf<ArrayBuffer>();
-    expectTypeOf<PrivateHashRequest["data"]>().toEqualTypeOf<ArrayBuffer>();
     expect(signMessageRequest.data).toBeInstanceOf(ArrayBuffer);
     expect(signMessageResult.signature).toBeInstanceOf(ArrayBuffer);
-    expect(privateHashRequest.data).toBeInstanceOf(ArrayBuffer);
-    expect(privateHashResult.hash).toBeInstanceOf(ArrayBuffer);
   });
 
   it("verifyMessage takes a publicKey rather than a walletId, since verification needs no signing session", () => {

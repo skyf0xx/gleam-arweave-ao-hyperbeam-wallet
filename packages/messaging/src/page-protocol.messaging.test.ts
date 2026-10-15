@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APPROVAL_GATED_METHODS,
   EVENT,
   PROVIDER_EVENT,
   PROVIDER_SURFACE_METHODS,
@@ -15,7 +16,7 @@ import {
   type ProviderEventName,
   type WalletSwitchEventPayload,
 } from "./page-protocol";
-import { KEY_METHODS, PROVIDER_METHODS } from "@gleam/core";
+import { KEY_METHODS, PROVIDER_METHODS, REFUSED_PROVIDER_METHODS } from "@gleam/core";
 
 describe("page ↔ content envelope constants", () => {
   it("REQUEST, RESPONSE, and EVENT are distinct string tags", () => {
@@ -31,10 +32,16 @@ describe("page ↔ content envelope constants", () => {
 });
 
 describe("PROVIDER_SURFACE_METHODS", () => {
-  it("matches PROVIDER_METHODS from core's privilege tiers exactly", () => {
+  it("is core's PROVIDER_METHODS plus the refused methods, exactly", () => {
     expect([...PROVIDER_SURFACE_METHODS].sort()).toEqual(
-      [...PROVIDER_METHODS].sort(),
+      [...PROVIDER_METHODS, ...Object.keys(REFUSED_PROVIDER_METHODS)].sort(),
     );
+  });
+
+  it("never marks a refused method as approval-gated", () => {
+    for (const method of Object.keys(REFUSED_PROVIDER_METHODS)) {
+      expect(APPROVAL_GATED_METHODS as readonly string[]).not.toContain(method);
+    }
   });
 
   it("never includes a KEY_METHODS name — a page must never reach key management", () => {

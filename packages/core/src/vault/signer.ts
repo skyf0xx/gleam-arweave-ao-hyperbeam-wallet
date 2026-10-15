@@ -1,6 +1,7 @@
 import type { JWKInterface } from "../models/wallet";
 import type { EncryptAlgorithm } from "../models/signing";
 import type { MessageHashAlgorithm } from "./message-signing";
+import type { SessionKeyStorePort } from "../ports/session-keys";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -13,8 +14,8 @@ export interface RsaPssSignParams {
 /**
  * The private-key operations a wallet's RSA key performs, without exposing
  * the key. Everything outside `key-session.ts` and the unlock path signs
- * through one of these, so the key can move to a non-extractable
- * `CryptoKey` without touching any caller.
+ * through one of these, so callers never see where the key behind it is
+ * held.
  */
 export interface Signer {
   /** The wallet's address, as recorded when the key was unlocked. */
@@ -25,16 +26,38 @@ export interface Signer {
   signPss(data: Bytes, params: RsaPssSignParams): Promise<Bytes>;
   /** RSA-OAEP/SHA-256 decryption, with the optional OAEP label. */
   decryptOaep(ciphertext: Bytes, label?: ArrayBuffer): Promise<Bytes>;
-  /** `digest(data || UTF-8(d))`, Wander's `privateHash` (see `message-signing.ts`). */
-  privateHash(data: Bytes, hash: MessageHashAlgorithm): Promise<Bytes>;
 }
 
 // The Arweave RSA fields only: a stored JWK's `alg`/`key_ops`/`use` can
-// contradict the RSA-PSS import (e.g. an `alg` of RSA-OAEP), and WebCrypto
-// rejects the key if so.
-function rsaPssPrivateJwk(jwk: JWKInterface): JsonWebKey {
+// contradict the import (e.g. an `alg` of RSA-OAEP on a PSS import), and
+// WebCrypto rejects the key if so.
+function rsaPrivateJwk(jwk: JWKInterface): JsonWebKey {
   const { kty, n, e, d, p, q, dp, dq, qi } = jwk;
   return { kty, n, e, d, p, q, dp, dq, qi, ext: true };
+}
+
+function importPssKey(jwk: JWKInterface, hash: MessageHashAlgorithm): Promise<CryptoKey> {
+  return crypto.subtle.importKey("jwk", rsaPrivateJwk(jwk), { name: "RSA-PSS", hash }, false, ["sign"]);
+}
+
+function importOaepKey(jwk: JWKInterface): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    { ...rsaPrivateJwk(jwk), alg: "RSA-OAEP-256" },
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["decrypt"],
+  );
+}
+
+async function signPssWith(key: CryptoKey, data: Bytes, saltLength: number): Promise<Bytes> {
+  return new Uint8Array(await crypto.subtle.sign({ name: "RSA-PSS", saltLength }, key, data));
+}
+
+async function decryptOaepWith(key: CryptoKey, ciphertext: Bytes, label?: ArrayBuffer): Promise<Bytes> {
+  // Chrome rejects `label: undefined`, so an absent label must be a missing key.
+  const params: EncryptAlgorithm = label ? { name: "RSA-OAEP", label } : { name: "RSA-OAEP" };
+  return new Uint8Array(await crypto.subtle.decrypt(params, key, ciphertext));
 }
 
 /** A `Signer` over a decrypted keyfile JWK. The key is imported per call and never cached as a `CryptoKey`. */
@@ -42,41 +65,60 @@ export function signerFromJwk(jwk: JWKInterface, address: string): Signer {
   return {
     address,
     owner: jwk.n,
-
     async signPss(data, { hash, saltLength }) {
-      const key = await crypto.subtle.importKey("jwk", rsaPssPrivateJwk(jwk), { name: "RSA-PSS", hash }, false, [
-        "sign",
-      ]);
-      return new Uint8Array(await crypto.subtle.sign({ name: "RSA-PSS", saltLength }, key, data));
+      return signPssWith(await importPssKey(jwk, hash), data, saltLength);
     },
-
     async decryptOaep(ciphertext, label) {
-      const key = await crypto.subtle.importKey(
-        "jwk",
-        { ...jwk, alg: "RSA-OAEP-256", ext: true },
-        { name: "RSA-OAEP", hash: "SHA-256" },
-        false,
-        ["decrypt"],
-      );
-      // Chrome rejects `label: undefined`, so an absent label must be a missing key.
-      const params: EncryptAlgorithm = label ? { name: "RSA-OAEP", label } : { name: "RSA-OAEP" };
-      return new Uint8Array(await crypto.subtle.decrypt(params, key, ciphertext));
-    },
-
-    async privateHash(data, hash) {
-      if (!jwk.d) {
-        throw new Error("privateHash requires a wallet's private key material (JWK has no 'd' field).");
-      }
-      const privateExponentText = new TextEncoder().encode(jwk.d);
-      const combined = new Uint8Array(data.byteLength + privateExponentText.byteLength);
-      combined.set(data, 0);
-      combined.set(privateExponentText, data.byteLength);
-      try {
-        return new Uint8Array(await crypto.subtle.digest(hash, combined));
-      } finally {
-        combined.fill(0);
-        privateExponentText.fill(0);
-      }
+      return decryptOaepWith(await importOaepKey(jwk), ciphertext, label);
     },
   };
+}
+
+/**
+ * Non-extractable handles to one wallet's private key. WebCrypto binds an
+ * RSA-PSS key to a single hash, so there is one signing key per hash a
+ * caller may ask for.
+ */
+export interface SessionKeyHandles {
+  pss: Record<MessageHashAlgorithm, CryptoKey>;
+  oaep: CryptoKey;
+}
+
+/** Imports a decrypted keyfile as `CryptoKey`s that can sign and decrypt but can't be exported. */
+export async function importSessionKeys(jwk: JWKInterface): Promise<SessionKeyHandles> {
+  const [pss256, pss384, pss512, oaep] = await Promise.all([
+    importPssKey(jwk, "SHA-256"),
+    importPssKey(jwk, "SHA-384"),
+    importPssKey(jwk, "SHA-512"),
+    importOaepKey(jwk),
+  ]);
+  return { pss: { "SHA-256": pss256, "SHA-384": pss384, "SHA-512": pss512 }, oaep };
+}
+
+export interface SessionSignerInfo {
+  address: string;
+  owner: string;
+}
+
+/** A `Signer` whose private-key operations run in a `SessionKeyStorePort`, which never hands the key back. */
+export function signerFromKeyStore(store: SessionKeyStorePort, walletId: string, info: SessionSignerInfo): Signer {
+  return {
+    address: info.address,
+    owner: info.owner,
+    signPss(data, params) {
+      return store.sign(walletId, params, data);
+    },
+    decryptOaep(ciphertext, label) {
+      return store.decrypt(walletId, ciphertext, label ? new Uint8Array(label) : undefined);
+    },
+  };
+}
+
+/** Private-key operations over one wallet's imported handles. */
+export function signPssWithHandles(keys: SessionKeyHandles, data: Bytes, { hash, saltLength }: RsaPssSignParams): Promise<Bytes> {
+  return signPssWith(keys.pss[hash], data, saltLength);
+}
+
+export function decryptOaepWithHandles(keys: SessionKeyHandles, ciphertext: Bytes, label?: ArrayBuffer): Promise<Bytes> {
+  return decryptOaepWith(keys.oaep, ciphertext, label);
 }

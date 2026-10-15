@@ -47,7 +47,6 @@ describe("method privilege tiers", () => {
         "decrypt",
         "signature",
         "signMessage",
-        "privateHash",
         "verifyMessage",
         "signDataItem",
         "batchSignDataItem",

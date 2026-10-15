@@ -49,7 +49,7 @@ rule — Phase 1 mining reads only these two.
   ArConnect-compatible method surface (`connect, disconnect,
   getPermissions, getActiveAddress, getAllAddresses, getActivePublicKey,
   getWalletNames, getArweaveConfig, getBalances, sign, dispatch, encrypt,
-  decrypt, signature, signMessage, privateHash, verifyMessage,
+  decrypt, signature, signMessage, verifyMessage,
   signDataItem, batchSignDataItem`). A page-originated message can only
   ever reach this method set — never the key-management methods
   (`createWallet`, `importWallet`, `exportWallet`).
@@ -101,9 +101,10 @@ configurable auto-lock.
   - The unlock screen shows no per-wallet identity (avatar/name/address).
   - "Forgot password" leads to an explicit, plainly-worded destructive
     reset (wipes all locally stored vaults) — never a silent delete.
-- Rule: unlocked-session metadata lives in memory-only storage
-  (`chrome.storage.session`), never written to disk; a non-extractable
-  `CryptoKey` cannot itself be persisted there.
+- Rule: unlocked keys live in memory only, as non-extractable
+  `CryptoKey`s in the keyring offscreen document; unlocked-session
+  metadata lives in memory-only storage (`chrome.storage.session`).
+  Nothing key-related is written to disk.
 
 ### Feature: AR balance & main screen
 Show the AR balance for the active address and a portfolio view.

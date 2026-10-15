@@ -1,5 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
+import {
+  generateJWK,
+  METHOD_PERMISSIONS,
+  PERMISSION_TYPES,
+  PROVIDER_METHODS,
+  type JWKInterface,
+  type PermissionType,
+} from "@gleam/core";
 import { APPROVAL_GATED_METHODS, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
@@ -84,6 +91,15 @@ vi.mock("wxt/utils/define-background", () => ({
  * dispatcher code running, not a reimplementation of its logic.
  */
 const originalFetch = globalThis.fetch;
+
+let sessionJwk: Promise<JWKInterface> | null = null;
+
+/** Leaves what unlocking a wallet leaves: its session entry and its non-extractable keys. */
+async function seedSessionKey(walletId: string, address: string): Promise<void> {
+  sessionJwk ??= generateJWK();
+  const { cacheKey } = await import("@/src/handlers/key-session");
+  await cacheKey(walletId, await sessionJwk, address);
+}
 
 describe("background.ts: providerCall privilege-tier choke point", () => {
   beforeEach(async () => {
@@ -266,6 +282,15 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     ).rejects.toThrow(/not connected/i);
   });
 
+  it("refuses privateHash for any site, before any grant check, without opening a window", () => {
+    for (const origin of ["https://not-connected.example", "http://dapp.example"]) {
+      expect(() => providerCall({ origin, method: "privateHash", params: {} })).toThrow(
+        "privateHash is not supported. Use encrypt/decrypt instead.",
+      );
+    }
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
   describe("plain-http origins", () => {
     const HTTP_ORIGIN = "http://dapp.example";
 
@@ -280,7 +305,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await seedSessionKey("wallet-1", "addr-1");
       await setItem("local:grants", [
         { origin, walletId: "wallet-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
       ]);
@@ -472,7 +497,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       autoLockTimeout: "never",
       unlockedWalletIds: ["wallet-1"],
     });
-    await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+    await seedSessionKey("wallet-1", "addr-1");
     await setItem("local:networkSettings", {
       gatewayUrl: "https://ar-io.dev",
       peers: [],
@@ -506,7 +531,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       unlockedWalletIds: ["wallet-1"],
     });
     // getState reports a wallet with no cached key as locked.
-    await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+    await seedSessionKey("wallet-1", "addr-1");
 
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
@@ -568,8 +593,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     // The unlocked-session key cache (`key-session.ts`) — populated in a
     // real run by `unlockWallet`, seeded directly here since this test
     // drives the dispatcher module fresh per `beforeEach`'s `resetModules`.
-    const { cacheKey } = await import("@/src/handlers/key-session");
-    cacheKey("wallet-1", { kty: "RSA", n: "n", e: "e" } as never, "addr-1");
+    await seedSessionKey("wallet-1", "addr-1");
 
     // `previewWatchedToken`'s balance read for the amount's denomination —
     // a bare atomic-quantity string, the shape a live HyperBEAM node
@@ -907,7 +931,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: [walletId],
       });
-      await setItem(`session:key:${walletId}`, { jwk: { kty: "RSA", n: "n", e: "e" }, address });
+      await seedSessionKey(walletId, address);
     }
 
     it("connect() pushes a CONNECT event only to the tab that just connected", async () => {
@@ -1045,8 +1069,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1", "wallet-2"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
-      await setItem("session:key:wallet-2", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-2" });
+      await seedSessionKey("wallet-1", "addr-1");
+      await seedSessionKey("wallet-2", "addr-2");
     }
 
     async function grant(): Promise<void> {
@@ -1120,7 +1144,6 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       ["ledger", "signMessage", "sign messages"],
       ["ledger", "signature", "sign with the deprecated signature()"],
       ["ledger", "decrypt", "decrypt data"],
-      ["keystone", "privateHash", "create private hashes"],
     ] as const)("%s refuses %s", async (walletMethod, method, action) => {
       await seedHardwareWallet(walletMethod);
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
@@ -1164,7 +1187,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await seedSessionKey("wallet-1", "addr-1");
       await setItem("local:grants", [
         { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS", "SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
       ]);
@@ -1247,7 +1270,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         unlockedWalletIds: walletIds,
       });
       for (const id of walletIds) {
-        await setItem(`session:key:${id}`, { jwk: { kty: "RSA", n: "n", e: "e" }, address: `addr-${id}` });
+        await seedSessionKey(id, `addr-${id}`);
       }
       await setItem("local:grants", [
         grantFor("https://a.example", walletIds[0]!),
@@ -1455,7 +1478,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await seedSessionKey("wallet-1", "addr-1");
 
       const connecting = rawHandlers.get("providerCall")!({
         data: { method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } },

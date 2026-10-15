@@ -6,6 +6,7 @@ export * from "./vault/zeroize";
 export * from "./vault/base64";
 export * from "./vault/signing";
 export * from "./vault/signer";
+export * from "./vault/keyring";
 export type { ArweaveTransactionJson } from "./arweave/transaction";
 export { readDataItemFields } from "./arweave/data-item";
 export * from "./hardware/ledger/index";
@@ -18,6 +19,7 @@ export type { StoragePort } from "./ports/storage";
 export type { RuntimeMessage, RuntimePort } from "./ports/runtime";
 export type { WindowPort } from "./ports/windows";
 export type { BadgePort } from "./ports/badge";
+export type { SessionKeyStorePort } from "./ports/session-keys";
 export {
   estimateHistoricalPortfolioValue,
   type PricedHistoricalToken,

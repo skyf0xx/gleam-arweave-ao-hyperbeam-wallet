@@ -1,5 +1,16 @@
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+
+/**
+ * The background reaches unlocked keys through the keyring offscreen
+ * document, which needs `chrome.offscreen`. Tests get the same in-memory
+ * `Keyring` that document runs. `offscreen-keyring.*.test.ts` covers the
+ * transport itself.
+ */
+vi.mock("./apps/extension/src/adapters/session-key-store.ts", async () => {
+  const { Keyring } = await import("./packages/core/src/vault/keyring.ts");
+  return { sessionKeyStore: new Keyring(), listenForKeyringConnections: () => {} };
+});
 
 /**
  * Without this, no component test in the workspace ever unmounts, so a

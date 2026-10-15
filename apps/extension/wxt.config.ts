@@ -24,13 +24,18 @@ export default defineConfig({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
     name: 'Gleam',
+    // runtime.getContexts, which the keyring adapter uses to find its
+    // offscreen document, arrived in Chrome 116.
+    minimum_chrome_version: '116',
     // 'tabs' lets the background worker resolve tab.url/origin for
     // provider-event delivery (background/index.ts's findTabsForOrigin)
     // without needing a granted host_permission per origin — MV3's
     // tab-info privacy gate accepts either. 'alarms' backs the
     // background interval check that promotes pending activity entries
-    // to confirmed once the gateway indexes them.
-    permissions: ['storage', 'sidePanel', 'tabs', 'alarms'],
+    // to confirmed once the gateway indexes them, and the auto-lock tick.
+    // 'offscreen' backs the keyring document (entrypoints/keyring), which
+    // holds unlocked wallets' non-extractable keys in memory only.
+    permissions: ['storage', 'sidePanel', 'tabs', 'alarms', 'offscreen'],
     // MV3 requires an explicit host permission for every origin the
     // background service worker fetches, unless that origin answers with
     // CORS headers (the Gleam Points API does; see POINTS_API_URL). The

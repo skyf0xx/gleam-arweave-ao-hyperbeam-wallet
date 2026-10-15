@@ -26,7 +26,6 @@ export const PROVIDER_METHODS = [
   "decrypt",
   "signature",
   "signMessage",
-  "privateHash",
   "verifyMessage",
   "signDataItem",
   "batchSignDataItem",
@@ -36,6 +35,16 @@ export const PROVIDER_METHODS = [
   "addToken",
   "isTokenAdded",
 ] as const;
+
+/**
+ * Methods `window.arweaveWallet` still defines, so a dApp gets a clear
+ * error instead of `undefined`, but that the background refuses before
+ * any grant check or approval window. `privateHash` digests the private
+ * exponent's text, which non-extractable session keys can't provide.
+ */
+export const REFUSED_PROVIDER_METHODS = {
+  privateHash: "privateHash is not supported. Use encrypt/decrypt instead.",
+} as const;
 
 /** Reachable only from the approval window. */
 export const APPROVAL_METHODS = ["getApproval", "resolveApproval", "submitDeviceSignature", "deviceActivity"] as const;
@@ -51,5 +60,6 @@ export const KEY_METHODS = [
 ] as const;
 
 export type ProviderMethod = (typeof PROVIDER_METHODS)[number];
+export type RefusedProviderMethod = keyof typeof REFUSED_PROVIDER_METHODS;
 export type ApprovalMethod = (typeof APPROVAL_METHODS)[number];
 export type KeyMethod = (typeof KEY_METHODS)[number];

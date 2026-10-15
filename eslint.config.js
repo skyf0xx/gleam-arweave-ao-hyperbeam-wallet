@@ -83,6 +83,10 @@ export default tseslint.config(
       "packages/core/src/models/index.ts",
       // `importWallet`/`exportWallet` carry a keyfile across the wire by design.
       "packages/messaging/src/protocol.ts",
+      // Unlock hands the key to the keyring offscreen document, once.
+      "packages/core/src/ports/session-keys.ts",
+      "packages/messaging/src/keyring-protocol.ts",
+      "apps/extension/src/adapters/offscreen-keyring.ts",
       // Receives the exported keyfile to hand to the user.
       "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
     ],

@@ -1,7 +1,7 @@
 import type { Signer } from "./signer";
 
 /**
- * `signMessage()`/`signature()`/`privateHash()`/`verifyMessage()` over
+ * `signMessage()`/`signature()`/`verifyMessage()` over
  * WebCrypto, built the way Wander (and permawebOS) build them so a
  * signature from either wallet verifies with the other's `verifyMessage`
  * and with arweave-js's `crypto.verify`:
@@ -11,10 +11,6 @@ import type { Signer } from "./signer";
  * - `verifyMessage` recomputes the digest and checks it the same way.
  * - `signature` is the deprecated raw form: RSA-PSS/SHA-256 straight over
  *   the data, salt length from `saltLength` (default 32).
- *
- * `privateHash` is `digest(data || UTF-8(d))`: Wander appends the JWK's
- * base64url `d` string as text, not the exponent's decoded bytes
- * (`src/api/modules/private_hash/private_hash.background.ts`).
  */
 
 export type MessageHashAlgorithm = "SHA-256" | "SHA-384" | "SHA-512";
@@ -57,15 +53,6 @@ export async function signature(
     throw new Error(`saltLength must be a non-negative integer, got ${String(saltLength)}.`);
   }
   return (await signer.signPss(new Uint8Array(data), { hash: "SHA-256", saltLength })).buffer;
-}
-
-/** Hashes `data` keyed by the wallet's private exponent — see module doc comment for the exact construction. */
-export async function privateHash(
-  signer: Signer,
-  data: ArrayBuffer,
-  hashAlgorithm: MessageHashAlgorithm = "SHA-256",
-): Promise<ArrayBuffer> {
-  return (await signer.privateHash(new Uint8Array(data), hashAlgorithm)).buffer;
 }
 
 /**

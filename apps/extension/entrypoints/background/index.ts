@@ -6,6 +6,7 @@ import {
   POINTS_API_URL,
   PERMISSION_TYPES,
   PROVIDER_METHODS,
+  REFUSED_PROVIDER_METHODS,
   bytesToBase64,
   missingPermissions,
   HARDWARE_MESSAGE_HASH,
@@ -15,6 +16,7 @@ import {
   type ConnectAppInfo,
   type NetworkSettings,
   type PermissionType,
+  type ProviderMethod,
   type WalletSummary,
   vaultHasPassword,
 } from "@gleam/core";
@@ -27,10 +29,10 @@ import {
   type ConnectEventPayload,
   type DisconnectEventPayload,
   type ProviderEventName,
-  type ProviderSurfaceMethod,
   type WalletSwitchEventPayload,
 } from "@gleam/messaging/src/page-protocol.ts";
 import { WxtStoragePort } from "@/src/adapters/storage";
+import { listenForKeyringConnections } from "@/src/adapters/session-key-store";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { restrictSessionStorageToTrustedContexts } from "@/src/adapters/session-access";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
@@ -45,7 +47,15 @@ import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
-import { getSigner, getStoredWallet, getWalletMethod } from "@/src/handlers/key-session";
+import {
+  clearKeyCache,
+  enforceAutoLock,
+  getSigner,
+  getStoredWallet,
+  getWalletMethod,
+  reconcileKeyring,
+  withSessionLock,
+} from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -145,9 +155,22 @@ const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) =>
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
 // the worker idles out (~30s), not only on browser shutdown, so clearing
-// there locked every wallet behind the user's back.
-// The cache lives in chrome.storage.session, which is memory-only and
-// dropped when the browser closes; lockWallet and auto-lock clear it.
+// there locked every wallet behind the user's back. The keys live in the
+// keyring offscreen document and the session entries in
+// chrome.storage.session, both memory-only and both outliving the worker.
+
+const AUTO_LOCK_ALARM_NAME = "auto-lock";
+// Auto-lock is otherwise only checked when something reads the session;
+// this tick drops the keys once the timeout passes even if nothing does.
+// Created only when missing: re-creating it on every worker start would
+// restart its period each time.
+void browser.alarms.get(AUTO_LOCK_ALARM_NAME).then((existing) => {
+  if (!existing) browser.alarms.create(AUTO_LOCK_ALARM_NAME, { periodInMinutes: 1 });
+});
+browser.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== AUTO_LOCK_ALARM_NAME) return;
+  enforceAutoLock().catch((error: unknown) => console.error("Auto-lock failed.", error));
+});
 
 /**
  * Finds every open tab whose URL origin matches `origin` exactly, since
@@ -341,7 +364,7 @@ async function resolveTokenDenominationAndTicker(
 }
 
 /**
- * Maps a `PROVIDER_SURFACE_METHODS` name + already-origin-checked params
+ * Maps a `PROVIDER_METHODS` name + already-origin-checked params
  * into the actual read/approval-flow work, distinct from `providerCall`'s
  * own job (the privilege-tier gate). No `WalletState` read here ever
  * exposes an address for an origin without an active `Grant` — every
@@ -350,7 +373,7 @@ async function resolveTokenDenominationAndTicker(
  */
 async function handleProviderCall(
   origin: string,
-  method: ProviderSurfaceMethod,
+  method: ProviderMethod,
   params: ProviderArgs,
 ): Promise<unknown> {
   if (method === "connect") {
@@ -562,11 +585,9 @@ async function handleProviderCall(
         saltLength: readSaltLength(params.options, method),
       });
 
-    case "signMessage":
-    case "privateHash": {
+    case "signMessage": {
       const hashAlgorithm = readHashAlgorithm(params.options, method);
       if (
-        method === "signMessage" &&
         wallet &&
         isHardwareWalletMethod(wallet.method) &&
         (hashAlgorithm ?? HARDWARE_MESSAGE_HASH) !== HARDWARE_MESSAGE_HASH
@@ -637,7 +658,7 @@ async function handleProviderCall(
     }
 
     default:
-      // Not a `never`-exhaustive check: `ProviderSurfaceMethod` can grow
+      // Not a `never`-exhaustive check: `ProviderMethod` can grow
       // ahead of this switch being updated to handle a new method, so an
       // unhandled method is a named runtime failure here rather than a
       // compile error.
@@ -856,7 +877,11 @@ messenger.onMessage("providerCall", (message) => {
     throw new Error("providerCall is only accepted from a web page's content script.");
   }
   const { method, params } = message.data;
-  if (!PROVIDER_METHODS.includes(method as (typeof PROVIDER_METHODS)[number])) {
+  // Before any grant check, so every site gets the same answer and no window opens.
+  if (Object.hasOwn(REFUSED_PROVIDER_METHODS, method)) {
+    throw new Error(REFUSED_PROVIDER_METHODS[method as keyof typeof REFUSED_PROVIDER_METHODS]);
+  }
+  if (!PROVIDER_METHODS.includes(method as ProviderMethod)) {
     throw new Error(`Provider method "${method}" is not reachable from a web page.`);
   }
   if (!PROVIDER_SURFACE_METHODS.includes(method)) {
@@ -868,7 +893,7 @@ messenger.onMessage("providerCall", (message) => {
     throw new Error("Gleam only signs for secure (https) sites.");
   }
   return (async () =>
-    encodeProviderResult(await handleProviderCall(origin, method, decodeProviderParams(params))))();
+    encodeProviderResult(await handleProviderCall(origin, method as ProviderMethod, decodeProviderParams(params))))();
 });
 
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
@@ -897,6 +922,11 @@ async function initializeNetworkSettingsIfMissing(): Promise<void> {
 }
 
 export default defineBackground(() => {
+  listenForKeyringConnections();
+  // Runs synchronously after the module's listeners are registered, so it
+  // takes the session lock before any event this wake-up delivers.
+  reconcileKeyring().catch((error: unknown) => console.error("Couldn't reconcile the keyring.", error));
+
   // Installs that had a vault before the gate existed (and every wake-up
   // after) are marked unlocked, so a reset never locks them out.
   void lifecycle
@@ -919,6 +949,12 @@ export default defineBackground(() => {
   browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
     void acceptSiteInvite(message, sender.origin, storage, points).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
+  });
+
+  browser.runtime.onStartup.addListener(() => {
+    withSessionLock(clearKeyCache).catch((error: unknown) =>
+      console.error("Couldn't clear session keys at startup.", error),
+    );
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {

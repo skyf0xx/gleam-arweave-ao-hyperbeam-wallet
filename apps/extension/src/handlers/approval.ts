@@ -19,7 +19,6 @@ import {
   prepareDataItems,
   prepareDispatch,
   prepareSignTransaction,
-  privateHash as vaultPrivateHash,
   readDataItemFields,
   HARDWARE_MESSAGE_HASH,
   signDataItem,
@@ -212,7 +211,7 @@ export interface SigningRequestInput {
   dataItems?: DataItemInput[];
   /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
   encryptAlgorithm?: EncryptAlgorithm;
-  /** `signMessage`/`signature`/`privateHash`'s hash digest selection. */
+  /** `signMessage`'s hash digest selection. */
   hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512";
   /** `signature`'s RSA-PSS salt length. */
   saltLength?: number;
@@ -1416,10 +1415,6 @@ export class ApprovalHandler {
 
       case "signMessage": {
         return new Uint8Array(await vaultSignMessage(signer, toArrayBuffer(input.payload), input.hashAlgorithm));
-      }
-
-      case "privateHash": {
-        return new Uint8Array(await vaultPrivateHash(signer, toArrayBuffer(input.payload), input.hashAlgorithm));
       }
 
       // A keyfile proves ownership with signMessage in PointsHandler and never reaches here.

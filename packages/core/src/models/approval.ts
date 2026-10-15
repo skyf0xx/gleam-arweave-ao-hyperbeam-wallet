@@ -13,7 +13,6 @@ export type ApprovalKind =
   | "transferAoTokens"
   | "signature"
   | "signMessage"
-  | "privateHash"
   | "addToken"
   | "transfer"
   | "pointsProof";
@@ -69,7 +68,6 @@ export interface SigningApprovalPreview {
     | "transferAoTokens"
     | "signature"
     | "signMessage"
-    | "privateHash"
     | "transfer"
     | "pointsProof";
   recipient: string | null;

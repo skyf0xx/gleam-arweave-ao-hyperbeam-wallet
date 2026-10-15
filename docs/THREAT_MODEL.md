@@ -57,12 +57,44 @@ stored in `chrome.storage.local`. The derived key is a non-extractable
 WebCrypto key, and the password bytes are zeroed after use. See
 `packages/core/src/vault/envelope.ts`.
 
-**While unlocked.** Unlocking decrypts the keyfile and keeps it in
-`chrome.storage.session`. That storage lives in memory only, is cleared
-when the browser closes, and is not readable by content scripts or web
-pages. Locking overwrites each cached key before removing it. Auto-lock is
-checked on every key read, so it holds even when Chrome restarts the
-service worker. See `apps/extension/src/handlers/key-session.ts`.
+**While unlocked.** Unlocking decrypts the keyfile and hands it, once,
+to the keyring: an offscreen document the background opens for this
+alone. The keyring imports it as non-extractable WebCrypto keys: one
+RSA-PSS signing key per hash (SHA-256, SHA-384, SHA-512) and one RSA-OAEP
+decryption key. They can sign and decrypt, but their bytes can't be
+exported, and they exist only in the keyring's memory. Nothing
+key-related is written to disk: not IndexedDB, which would store the key
+material in the browser profile, and not `chrome.storage`. No code keeps
+a reference to the decrypted JWK after the import, but the parsed copies
+in the background and in the keyring stay in memory until garbage
+collection, since JavaScript can't overwrite strings. Because no
+private key material is readable while unlocked, Wander's `privateHash`,
+which digests the private exponent's text, is refused.
+
+The keyring opens one port to the background and reopens it whenever the
+service worker restarts. The background accepts that port only from the
+keyring document, judged by Chrome's sender (extension id, page URL, no
+tab, offscreen document id), and disconnects any other page that
+connects under the keyring's name. What the background posts on the port
+reaches only the keyring, so the JWK goes nowhere else. What the keyring
+posts back, signatures and decrypted plaintexts, reaches every extension
+page listening for connections, and such a page could also send the
+keyring requests. No Gleam page listens; a compromised one is the
+"compromised extension code" case below: it can get signatures and
+decryptions while the wallet is unlocked, never the key.
+
+`chrome.storage.session` holds only the address, the public key and
+which wallets are unlocked. That storage lives in memory only, is cleared when the browser closes, and is not readable by content
+scripts or web pages. A wallet counts as unlocked only while the session
+lists it and the keyring holds its key; if the keyring document is gone,
+the wallet reads as locked. Lock, auto-lock, wallet removal, reset and
+browser startup clear the keyring and close its document. Locking
+overwrites each session entry before removing it. Auto-lock is checked on
+every key read and by a one-minute alarm, so the keys go when the timeout
+passes even if nothing reads them. Lock and unlock run one at a time, so
+a lock can't race an unlock and leave keys behind. See
+`apps/extension/src/handlers/key-session.ts` and
+`apps/extension/entrypoints/keyring/`.
 
 **Passkey unlock.** A passkey's WebAuthn PRF output wraps the vault
 password. Unlocking with a passkey recovers the password and then unlocks
@@ -95,10 +127,10 @@ device. Gleam stores only the public key and address.
 | Malicious website | Read addresses, sign or send without consent, reach key methods | Connect approval; per-request approval window; fixed method list; origin from Chrome's sender | A user approving a request they don't understand. The preview is the defense. |
 | Phishing site or fake popup drawn in a page | Trick the user into typing the password or approving | Real requests always open a separate browser window; Gleam never asks for the password inside a page | Users who don't know the rule. |
 | Network attacker | Inject requests into a page, tamper with data | Extension code ships in the package, never fetched; HTTPS for all extension traffic; plain-`http://` sites can't connect or request a signature, except `localhost`, `127.0.0.1` and `[::1]` | Loopback `http://` stays allowed for local development; its traffic never crosses the network. |
-| Compromised npm dependency | Read the unlocked key and send it out | Locked dependency versions; new releases held back 3 days; provenance downgrades refused; dependency PRs reviewed by CI | Code running inside the extension can read the unlocked key and has no network restriction. The largest open risk. |
+| Compromised npm dependency | Read the unlocked key and send it out | Locked dependency versions; new releases held back 3 days; provenance downgrades refused; dependency PRs reviewed by CI | Code running inside the extension can ask for signatures and decryptions while the wallet is unlocked, and has no network restriction. It can't copy the key: unlocked keys are non-extractable. The largest open risk. |
 | Hijacked Chrome Web Store account | Push a malicious update to every user | The developer account's own login protection | No signed-upload requirement yet, so the account alone can publish. Planned: verified CRX uploads, which need an offline signing key. |
 | Hijacked GitHub account or token | Change the source or CI | 2FA; protected `master`: signed commits, PR with passing CI, no force-push, no admin bypass | An account takeover can change the rules. |
-| Malware on the user's computer | Copy the vault, log keystrokes | Encrypted vault; unlocked key in memory only | Malware that can read browser memory or keystrokes wins; no browser wallet can stop it. A stolen vault can be attacked offline: see password strength below. |
+| Malware on the user's computer | Copy the vault, log keystrokes | Encrypted vault; unlocked keys in memory only, cleared on lock | Malware that can read browser memory or keystrokes wins; no browser wallet can stop it. A stolen vault can be attacked offline: see password strength below. |
 | Someone at an unlocked browser | Send funds, export the key | Export needs the password; sends need confirmation | Auto-lock is off by default. |
 | Compromised gleamwallet.app | Message the extension, show announcements | The site can only hand over a points invite code; announcement links are limited to the Gleam site and x.com | Misleading announcement text. |
 | Lying gateway, AO unit or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input | Wrong balances or history on screen; a dishonest gateway can drop a transaction. |
@@ -126,11 +158,6 @@ gateway sees the addresses it is asked about.
 
 These are true of the current release. Each has a fix planned unless it says otherwise.
 
-- **The unlocked key is readable by extension code.** It sits in session
-  storage as a JWK. Malicious code running inside the extension, such as
-  a compromised dependency, could read it while the wallet is unlocked.
-  Planned: hold it only as a non-extractable WebCrypto key, which can sign
-  but can't be read.
 - **No network allowlist.** The extension's content security policy
   doesn't restrict which hosts its code can contact, so stolen data
   could be sent anywhere. Planned: a `connect-src` allowlist.

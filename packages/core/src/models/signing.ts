@@ -164,7 +164,7 @@ export interface SignatureResult {
 }
 
 /**
- * `signMessage`/`privateHash` both accept an `ArrayBuffer` directly per
+ * `signMessage` accepts an `ArrayBuffer` directly per
  * Wander's convention (not a base64 string like `signature()`'s older
  * shape) — tagged as `TaggedArrayBuffer` at the wire-envelope layer since
  * raw `ArrayBuffer` doesn't survive `@webext-core/messaging`'s envelope
@@ -178,16 +178,6 @@ export interface SignMessageRequest {
 
 export interface SignMessageResult {
   signature: ArrayBuffer;
-}
-
-export interface PrivateHashRequest {
-  walletId: string;
-  data: ArrayBuffer;
-  options?: { hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512" };
-}
-
-export interface PrivateHashResult {
-  hash: ArrayBuffer;
 }
 
 export interface VerifyMessageRequest {

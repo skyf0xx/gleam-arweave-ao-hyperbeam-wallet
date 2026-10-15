@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 import { getSigner, clearKeyCache } from "./key-session";
+import { sessionKeyStore } from "../adapters/session-key-store";
 
 /**
  * Real key/value store standing in for `adapters/storage.ts`'s
@@ -28,8 +29,9 @@ vi.mock("../adapters/storage", () => ({
   },
 }));
 
-beforeEach(() => {
+beforeEach(async () => {
   keySessionStore.clear();
+  await sessionKeyStore.clear();
 });
 
 const GOOD_PASSWORD = "correct horse battery staple";
@@ -342,6 +344,109 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     const result = await handler.unlockWallet({ password: GOOD_PASSWORD });
 
     expect(result.unlockedWalletIds).toEqual([wallet.id]);
+  });
+
+  it("hands the unlocked key to the keyring and drops it on lock", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+    await handler.unlockWallet({ password: GOOD_PASSWORD });
+
+    expect(await sessionKeyStore.has([wallet.id])).toEqual([wallet.id]);
+
+    await handler.lockWallet();
+
+    expect(await sessionKeyStore.has([wallet.id])).toEqual([]);
+    expect(await getSigner(wallet.id)).toBeNull();
+  });
+
+  it("a lock sent while an unlock is running waits for it, then leaves no key or session", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+
+    const unlocking = handler.unlockWallet({ password: GOOD_PASSWORD });
+    const locking = handler.lockWallet();
+    await Promise.all([unlocking, locking]);
+
+    expect(await sessionKeyStore.has([wallet.id])).toEqual([]);
+    expect((await handler.getState()).session).toBeNull();
+  });
+
+  it("a failed unlock drops the keys it had already imported", async () => {
+    const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+    const importKey = sessionKeyStore.importKey.bind(sessionKeyStore);
+    vi.spyOn(sessionKeyStore, "importKey")
+      .mockImplementationOnce(importKey)
+      .mockRejectedValueOnce(new Error("keyring gone"));
+
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(/couldn't keep the wallet unlocked/);
+
+    expect(await sessionKeyStore.has([first.id])).toEqual([]);
+    expect((await handler.getState()).session).toBeNull();
+    vi.restoreAllMocks();
+  });
+
+  describe("when the keyring fails", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("unlockWallet reports the keyring failure, not a wrong password", async () => {
+      await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+      await handler.lockWallet();
+      vi.spyOn(sessionKeyStore, "importKey").mockRejectedValue(new Error("keyring gone"));
+
+      await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(
+        /couldn't keep the wallet unlocked/,
+      );
+    });
+
+    it("createWallet reports the keyring failure", async () => {
+      vi.spyOn(sessionKeyStore, "importKey").mockRejectedValue(new Error("keyring gone"));
+
+      await expect(handler.createWallet({ name: "Main", password: GOOD_PASSWORD })).rejects.toThrow(
+        /couldn't keep the wallet unlocked/,
+      );
+    });
+
+    it("lockWallet surfaces a failed key wipe but still locks every wallet", async () => {
+      const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+      vi.spyOn(sessionKeyStore, "clear").mockRejectedValueOnce(new Error("disk error"));
+
+      await expect(handler.lockWallet()).rejects.toThrow("disk error");
+
+      expect((await handler.getState()).session).toBeNull();
+      expect(await getSigner(wallet.id)).toBeNull();
+    });
+
+    it("resetAllWallets surfaces a failed key wipe but still wipes the vault", async () => {
+      await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+      vi.spyOn(sessionKeyStore, "clear").mockRejectedValueOnce(new Error("disk error"));
+
+      await expect(handler.resetAllWallets()).rejects.toThrow("disk error");
+
+      const state = await handler.getState();
+      expect(state.wallets).toEqual([]);
+      expect(state.session).toBeNull();
+    });
+
+    it("deleteWallet surfaces a failed key removal but still removes the wallet", async () => {
+      const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+      vi.spyOn(sessionKeyStore, "remove").mockRejectedValueOnce(new Error("disk error"));
+
+      await expect(handler.deleteWallet({ walletId: wallet.id })).rejects.toThrow("disk error");
+
+      expect((await handler.getState()).wallets).toEqual([]);
+    });
+
+    it("getState reports the wallet locked instead of failing when the keyring can't be reached", async () => {
+      await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+      vi.spyOn(sessionKeyStore, "has").mockRejectedValue(new Error("keyring gone"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect((await handler.getState()).session).toBeNull();
+    });
   });
 
   it("rejects an unlock attempt when the password matches no stored wallet", async () => {

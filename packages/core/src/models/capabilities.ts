@@ -4,7 +4,7 @@ import type { WalletMethod } from "./wallet";
 /**
  * What a wallet of a given kind can do. Hardware wallets sign on the
  * device, so anything that needs the private key in Gleam (decrypt,
- * privateHash, export) is out, and some signing formats depend on what
+ * export) is out, and some signing formats depend on what
  * the device firmware supports.
  */
 export interface WalletCapabilities {
@@ -19,7 +19,6 @@ export interface WalletCapabilities {
   /** Wander's deprecated `signature`: RSA-PSS straight over the raw bytes. */
   signature: boolean;
   decrypt: boolean;
-  privateHash: boolean;
   exportKey: boolean;
   /** Encrypt to the wallet's own public key. */
   encrypt: boolean;
@@ -40,7 +39,6 @@ const KEYFILE: WalletCapabilities = {
   signMessage: true,
   signature: true,
   decrypt: true,
-  privateHash: true,
   exportKey: true,
   encrypt: true,
   upload: true,
@@ -54,7 +52,6 @@ const NONE: WalletCapabilities = {
   signMessage: false,
   signature: false,
   decrypt: false,
-  privateHash: false,
   exportKey: false,
   encrypt: false,
   upload: false,
@@ -107,7 +104,6 @@ const PROVIDER_REQUIREMENTS: Partial<Record<ProviderMethod, { capability: Provid
   signature: { capability: "signature", action: "sign with the deprecated signature()" },
   signMessage: { capability: "signMessage", action: "sign messages" },
   decrypt: { capability: "decrypt", action: "decrypt data" },
-  privateHash: { capability: "privateHash", action: "create private hashes" },
   encrypt: { capability: "encrypt", action: "encrypt data" },
 };
 

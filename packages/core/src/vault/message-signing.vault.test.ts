@@ -2,7 +2,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { signerFromJwk } from "./signer";
 import Arweave from "arweave";
 import { generateJWK } from "../keys/jwk";
-import { signMessage, signature, privateHash, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
+import { signMessage, signature, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
 import { base64UrlToBytes } from "./base64";
 import type { JWKInterface } from "../models/wallet";
 
@@ -164,77 +164,4 @@ describe("vault/message-signing", () => {
     });
   });
 
-  describe("privateHash", () => {
-    // Known answers from `printf '%s%s' "$message" "$d" | shasum -a <bits>`,
-    // which is Wander's `digest(data || UTF-8(d))`.
-    const PRIVATE_HASH_VECTOR = {
-      d: "dGVzdC1vbmx5LXByaXZhdGUtZXhwb25lbnQtbm90LWEtcmVhbC1rZXk",
-      message: "gleam wander parity",
-      "SHA-256": "1d8a212955b38e006a54efc0c26d2de59f0f90c459c81bc54bc071ed4d9ee16c",
-      "SHA-384":
-        "d67519c5b09bef37a7b387eb40403fb7bf8798d0a2bb840366cc9eaab3aa561ea49c1e754cd017584115d08194ed486d",
-      "SHA-512":
-        "058f4b854906a69504f44fc4d9bfcd2cb8c7c599c8dbe846900901674967008496a73ac73025f317c7b97a7cfebf77cc3cfe43257fc8f75e2b7b287dc5fdbb6f",
-      /** The same input hashed over the decoded exponent bytes, which Wander does not do. */
-      decodedBytesSha256: "ba8158b24c4578f7ba8846cc7159fa5da0bd398a9ef4fe5a8b46e04a0b381bc8",
-    };
-    const vectorKey = { kty: "RSA", e: "AQAB", n: "unused", d: PRIVATE_HASH_VECTOR.d } as JWKInterface;
-    const toHex = (buffer: ArrayBuffer) =>
-      Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
-
-    it.each(["SHA-256", "SHA-384", "SHA-512"] as const)("matches the Wander known answer for %s", async (hash) => {
-      const result = await privateHash(signerFromJwk(vectorKey, ""), bytes(PRIVATE_HASH_VECTOR.message), hash);
-      expect(toHex(result)).toBe(PRIVATE_HASH_VECTOR[hash]);
-    });
-
-    it("hashes d as base64url text, not as the decoded exponent", async () => {
-      const result = toHex(await privateHash(signerFromJwk(vectorKey, ""), bytes(PRIVATE_HASH_VECTOR.message)));
-      expect(result).not.toBe(PRIVATE_HASH_VECTOR.decodedBytesSha256);
-    });
-
-    it("matches Wander's construction for a generated wallet", async () => {
-      const data = bytes("any input");
-      const wander = await crypto.subtle.digest(
-        "SHA-512",
-        new Uint8Array([...new Uint8Array(data), ...new TextEncoder().encode(jwk.d)]),
-      );
-      expect(toHex(await privateHash(signerFromJwk(jwk, ""), data, "SHA-512"))).toBe(toHex(wander));
-    });
-
-    it("rejects a key without d", async () => {
-      const publicOnly = { kty: "RSA", e: "AQAB", n: "unused" } as JWKInterface;
-      await expect(privateHash(signerFromJwk(publicOnly, ""), bytes("x"))).rejects.toThrow(/no 'd' field/);
-    });
-
-    it("is deterministic for the same wallet and input", async () => {
-      const data = new TextEncoder().encode("hash me").buffer;
-
-      const hash1 = await privateHash(signerFromJwk(jwk, ""), data);
-      const hash2 = await privateHash(signerFromJwk(jwk, ""), data);
-
-      expect(new Uint8Array(hash1)).toEqual(new Uint8Array(hash2));
-    });
-
-    it("differs for different input data", async () => {
-      const hashA = await privateHash(signerFromJwk(jwk, ""), new TextEncoder().encode("a").buffer);
-      const hashB = await privateHash(signerFromJwk(jwk, ""), new TextEncoder().encode("b").buffer);
-
-      expect(new Uint8Array(hashA)).not.toEqual(new Uint8Array(hashB));
-    });
-
-    it("differs between two different wallets for the same input", async () => {
-      const otherJwk = await generateJWK();
-      const data = new TextEncoder().encode("same input").buffer;
-
-      const hashA = await privateHash(signerFromJwk(jwk, ""), data);
-      const hashB = await privateHash(signerFromJwk(otherJwk, ""), data);
-
-      expect(new Uint8Array(hashA)).not.toEqual(new Uint8Array(hashB));
-    });
-
-    it("produces a 32-byte digest for the default SHA-256", async () => {
-      const hash = await privateHash(signerFromJwk(jwk, ""), new TextEncoder().encode("x").buffer);
-      expect(hash.byteLength).toBe(32);
-    });
-  });
 });

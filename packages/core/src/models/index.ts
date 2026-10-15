@@ -78,11 +78,13 @@ export type {
 } from "./portfolio-history";
 export {
   PROVIDER_METHODS,
+  REFUSED_PROVIDER_METHODS,
   APPROVAL_METHODS,
   KEY_METHODS,
 } from "./method-privileges";
 export type {
   ProviderMethod,
+  RefusedProviderMethod,
   ApprovalMethod,
   KeyMethod,
 } from "./method-privileges";
@@ -109,8 +111,6 @@ export type {
   SignatureResult,
   SignMessageRequest,
   SignMessageResult,
-  PrivateHashRequest,
-  PrivateHashResult,
   VerifyMessageRequest,
   VerifyMessageResult,
 } from "./signing";
