@@ -45,7 +45,7 @@ import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
-import { getCachedKey, getStoredWallet, getWalletMethod } from "@/src/handlers/key-session";
+import { getSigner, getStoredWallet, getWalletMethod } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -128,7 +128,7 @@ const points = new PointsHandler({
   storage,
   deviceKey: loadOrCreateDeviceKey,
   apiUrl: POINTS_API_URL,
-  signingKey: getCachedKey,
+  signer: getSigner,
   walletMethod: getWalletMethod,
   deviceProof: async ({ walletId, message }) => {
     const wallet = await getStoredWallet(walletId);

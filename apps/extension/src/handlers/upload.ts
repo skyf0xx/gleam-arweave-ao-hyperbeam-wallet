@@ -10,15 +10,15 @@ import {
   type UploadDraft,
   type UploadReview,
 } from "@gleam/core";
-import { getCachedKey, getWalletMethod } from "./key-session";
+import { getSigner, getWalletMethod } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `reviewUpload`/
  * `submitUpload`. Same constructor-injected-`StoragePort` shape as every
  * other handler in this directory.
  *
- * Signing key source: submitting an upload needs the decrypted JWK to
- * sign the ANS-104 DataItem, read from `key-session.ts`'s in-memory cache
+ * Signing key source: submitting an upload signs the ANS-104 DataItem
+ * with the unlocked wallet's signer from `key-session.ts`'s `getSigner`
  * — same resolution as `handlers/transfer.ts`'s `submitTransfer`, so this
  * request itself carries no password. `reviewUpload` needs no signing key at all (it only
  * scans/validates), so it keeps `ProtocolMap`'s exact `UploadDraft` shape
@@ -105,26 +105,26 @@ export class UploadHandler {
       );
     }
 
-    const cached = await getCachedKey(req.walletId);
-    if (!cached) {
+    const signer = await getSigner(req.walletId);
+    if (!signer) {
       throw new Error(`Wallet "${req.walletId}" is locked. Unlock it to continue.`);
     }
     const dataBytes = base64ToBytes(req.data);
 
     const { txId } = await submitUploadToBundler(
       this.bundlerUrl,
-      cached.jwk,
+      signer,
       dataBytes,
       req.contentType,
       req.tags,
       req.licenseTag,
     );
 
-    await this.appendActivityLog(cached.address, {
+    await this.appendActivityLog(signer.address, {
       txId,
       type: "upload",
       status: "pending",
-      address: cached.address,
+      address: signer.address,
       amount: null,
       tags: req.tags,
       timestamp: Date.now(),

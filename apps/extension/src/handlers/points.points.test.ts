@@ -5,13 +5,15 @@ import {
   bytesToBase64Url,
   deriveAddress,
   generateJWK,
+  signerFromJwk,
   verifyMessage,
   type BadgePort,
   type JWKInterface,
+  type Signer,
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
-import { signTransactionWithJwk } from "@gleam/core/src/arweave/transaction.ts";
+import { signTransactionWithSigner } from "@gleam/core/src/arweave/transaction.ts";
 import {
   buildOwnershipTransaction,
   deviceKeyThumbprint,
@@ -77,11 +79,12 @@ function createFakeBadge(): BadgePort & { dot: boolean | null; setDot: ReturnTyp
 const NOW = Date.UTC(2026, 9, 8, 12);
 const HOUR = 3_600_000;
 
-let wallet: { jwk: JWKInterface; address: string };
+let wallet: { jwk: JWKInterface; address: string; signer: Signer };
 
 beforeAll(async () => {
   const jwk = await generateJWK();
-  wallet = { jwk, address: await deriveAddress(jwk) };
+  const address = await deriveAddress(jwk);
+  wallet = { jwk, address, signer: signerFromJwk(jwk, address) };
 }, 60_000);
 
 async function setup(
@@ -108,7 +111,7 @@ async function setup(
     storage,
     deviceKey: async () => device,
     apiUrl: "https://points.example",
-    signingKey: async (walletId) => (walletId === "w1" && !options.locked ? wallet : null),
+    signer: async (walletId) => (walletId === "w1" && !options.locked ? wallet.signer : null),
     walletMethod: async () => options.walletMethod ?? "jwk",
     deviceProof: options.deviceProof,
     badge,
@@ -264,7 +267,7 @@ describe("PointsHandler.join", () => {
     // Stands in for the approval window: the "device" signs with the test wallet's key.
     const deviceProof = vi.fn(async ({ message }: { walletId: string; message: (address: string) => string }) => {
       const text = message(wallet.address);
-      const signature = await signTransactionWithJwk(await buildOwnershipTransaction(wallet.jwk.n, text), wallet.jwk);
+      const signature = await signTransactionWithSigner(await buildOwnershipTransaction(wallet.jwk.n, text), wallet.signer);
       return { owner: wallet.jwk.n, address: wallet.address, message: text, signature: bytesToBase64Url(signature) };
     });
     const { handler, fetchImpl } = await setup(null, 200, {
@@ -285,7 +288,7 @@ describe("PointsHandler.join", () => {
   it("leaves a hardware wallet with a device-signed leave message for its own address", async () => {
     const deviceProof = vi.fn(async ({ message }: { walletId: string; message: (address: string) => string }) => {
       const text = message(wallet.address);
-      const signature = await signTransactionWithJwk(await buildOwnershipTransaction(wallet.jwk.n, text), wallet.jwk);
+      const signature = await signTransactionWithSigner(await buildOwnershipTransaction(wallet.jwk.n, text), wallet.signer);
       return { owner: wallet.jwk.n, address: wallet.address, message: text, signature: bytesToBase64Url(signature) };
     });
     const { handler, fetchImpl } = await setup({ registered: true, lastHeartbeatAt: NOW }, 200, {
@@ -415,7 +418,7 @@ describe("PointsHandler.redeemInvite", () => {
       storage,
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
-      signingKey: async () => null,
+      signer: async () => null,
       walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl: (async () => new Response(JSON.stringify(response))) as unknown as typeof fetch,
@@ -452,7 +455,7 @@ describe("PointsHandler.markUnlockedForVault", () => {
       storage,
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
-      signingKey: async () => null,
+      signer: async () => null,
       walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl,
@@ -491,7 +494,7 @@ describe("PointsHandler.pendingInvite", () => {
       storage: createFakeStorage(initial),
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
-      signingKey: async () => null,
+      signer: async () => null,
       walletMethod: async () => null,
       badge: createFakeBadge(),
       fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -522,7 +525,7 @@ describe("PointsHandler founding reveal seen", () => {
       storage,
       deviceKey: createDeviceKey,
       apiUrl: "https://points.test",
-      signingKey: async () => null,
+      signer: async () => null,
       walletMethod: async () => null,
       badge: createFakeBadge(),
       now: () => NOW,

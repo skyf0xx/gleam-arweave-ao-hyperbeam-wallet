@@ -1,4 +1,4 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "../vault/signer";
 import type { UploadTag } from "../models/upload";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { clientForGateway } from "./client";
@@ -161,11 +161,11 @@ export async function applyTransactionSignature(
 }
 
 /** Signs an unsigned transaction's deep hash with a keyfile. Returns the raw 512-byte signature. */
-export async function signTransactionWithJwk(unsigned: ArweaveTransactionJson, jwk: JWKInterface): Promise<Bytes> {
-  if (!sameOwner(unsigned.owner, jwk.n)) {
+export async function signTransactionWithSigner(unsigned: ArweaveTransactionJson, signer: Signer): Promise<Bytes> {
+  if (!sameOwner(unsigned.owner, signer.owner)) {
     throw new Error("This transaction names a different owner than the signing key.");
   }
-  return signRsaPss(jwk, await transactionSignatureData(unsigned));
+  return signRsaPss(signer, await transactionSignatureData(unsigned));
 }
 
 /**

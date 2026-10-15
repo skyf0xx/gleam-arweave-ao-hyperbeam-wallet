@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { signerFromJwk } from "../vault/signer";
 import Arweave from "arweave";
 import { finishTransfer } from "../arweave/transfer";
-import { signTransactionWithJwk } from "../arweave/transaction";
+import { signTransactionWithSigner } from "../arweave/transaction";
 import { base64UrlToBytes } from "../vault/base64";
 import {
   assertCoversNetworkFee,
@@ -52,7 +53,7 @@ describe("prepareCollectibleTransfer", () => {
     const fetchSpy = stubGateway();
     const unsigned = await prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, RECIPIENT);
 
-    const { txId } = await finishTransfer(GATEWAY, unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n);
+    const { txId } = await finishTransfer(GATEWAY, unsigned, await signTransactionWithSigner(unsigned, signerFromJwk(jwk, "")), jwk.n);
 
     const post = fetchSpy.mock.calls.find(([input, init]) => String(input).endsWith("/tx") && init?.method === "POST");
     const posted = JSON.parse(String(post?.[1]?.body)) as Record<string, unknown>;

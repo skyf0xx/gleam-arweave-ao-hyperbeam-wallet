@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
+import { signerFromJwk } from "./signer";
 import Arweave from "arweave";
 import { generateJWK } from "../keys/jwk";
 import { signMessage, signature, privateHash, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
@@ -61,13 +62,13 @@ describe("vault/message-signing", () => {
     it("produces a signature verifiable against the wallet's public key", async () => {
       const data = bytes("arbitrary message");
 
-      const sig = await signMessage(jwk, data);
+      const sig = await signMessage(signerFromJwk(jwk, ""), data);
 
       await expect(verifyMessage(jwk.n, data, sig)).resolves.toBe(true);
     });
 
     it("rejects a signature verified against different data", async () => {
-      const sig = await signMessage(jwk, bytes("original"));
+      const sig = await signMessage(signerFromJwk(jwk, ""), bytes("original"));
 
       await expect(verifyMessage(jwk.n, bytes("tampered"), sig)).resolves.toBe(false);
     });
@@ -76,7 +77,7 @@ describe("vault/message-signing", () => {
       const otherJwk = await generateJWK();
       const data = bytes("message");
 
-      const sig = await signMessage(jwk, data);
+      const sig = await signMessage(signerFromJwk(jwk, ""), data);
 
       await expect(verifyMessage(otherJwk.n, data, sig)).resolves.toBe(false);
     });
@@ -84,7 +85,7 @@ describe("vault/message-signing", () => {
     it("binds the signature to the hash algorithm", async () => {
       const data = bytes("sha-512 message");
 
-      const sig = await signMessage(jwk, data, "SHA-512");
+      const sig = await signMessage(signerFromJwk(jwk, ""), data, "SHA-512");
 
       await expect(verifyMessage(jwk.n, data, sig, "SHA-512")).resolves.toBe(true);
       await expect(verifyMessage(jwk.n, data, sig, "SHA-256")).resolves.toBe(false);
@@ -102,7 +103,7 @@ describe("vault/message-signing", () => {
     it.each<Hash>(["SHA-256", "SHA-384", "SHA-512"])("interoperates with permawebOS's construction (%s)", async (hash) => {
       const data = bytes("cross-wallet message");
 
-      const ours = await signMessage(jwk, data, hash);
+      const ours = await signMessage(signerFromJwk(jwk, ""), data, hash);
       const theirs = await permawebOS.signMessage(jwk, data, hash);
 
       await expect(permawebOS.verifyMessage(jwk.n, data, ours, hash)).resolves.toBe(true);
@@ -113,7 +114,7 @@ describe("vault/message-signing", () => {
       const data = new TextEncoder().encode("server-side check");
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", data));
 
-      const sig = new Uint8Array(await signMessage(jwk, data.buffer));
+      const sig = new Uint8Array(await signMessage(signerFromJwk(jwk, ""), data.buffer));
       await expect(Arweave.crypto.verify(jwk.n, digest, sig)).resolves.toBe(true);
 
       // Salt 32 is the web driver's default; Node's driver defaults to the maximum.
@@ -124,7 +125,7 @@ describe("vault/message-signing", () => {
     it("does not verify a signature over the raw data", async () => {
       const data = bytes("raw, not hashed");
 
-      const raw = await signature(jwk, data);
+      const raw = await signature(signerFromJwk(jwk, ""), data);
 
       await expect(verifyMessage(jwk.n, data, raw)).resolves.toBe(false);
     });
@@ -134,7 +135,7 @@ describe("vault/message-signing", () => {
     it("signs the raw data with salt length 32 by default, as permawebOS does", async () => {
       const data = bytes("legacy signature payload");
 
-      const sig = await signature(jwk, data);
+      const sig = await signature(signerFromJwk(jwk, ""), data);
 
       await expect(permawebOS.verifySignature(jwk.n, data, sig, 32)).resolves.toBe(true);
       await expect(permawebOS.verifySignature(jwk.n, data, sig, 0)).resolves.toBe(false);
@@ -143,23 +144,23 @@ describe("vault/message-signing", () => {
     it("honours saltLength", async () => {
       const data = bytes("salted");
 
-      const sig = await signature(jwk, data, { saltLength: 0 });
+      const sig = await signature(signerFromJwk(jwk, ""), data, { saltLength: 0 });
 
       await expect(permawebOS.verifySignature(jwk.n, data, sig, 0)).resolves.toBe(true);
       await expect(permawebOS.verifySignature(jwk.n, data, sig, 32)).resolves.toBe(false);
     });
 
     it("rejects a negative or fractional saltLength", async () => {
-      await expect(signature(jwk, bytes("x"), { saltLength: -1 })).rejects.toThrow(/saltLength/);
-      await expect(signature(jwk, bytes("x"), { saltLength: 1.5 })).rejects.toThrow(/saltLength/);
+      await expect(signature(signerFromJwk(jwk, ""), bytes("x"), { saltLength: -1 })).rejects.toThrow(/saltLength/);
+      await expect(signature(signerFromJwk(jwk, ""), bytes("x"), { saltLength: 1.5 })).rejects.toThrow(/saltLength/);
     });
 
     it("signs with a stored JWK whose alg/key_ops name another algorithm", async () => {
       const data = bytes("hinted key");
       const hinted = { ...jwk, alg: "RSA-OAEP-256", key_ops: ["decrypt"] } as JWKInterface;
 
-      await expect(permawebOS.verifySignature(jwk.n, data, await signature(hinted, data))).resolves.toBe(true);
-      await expect(verifyMessage(jwk.n, data, await signMessage(hinted, data))).resolves.toBe(true);
+      await expect(permawebOS.verifySignature(jwk.n, data, await signature(signerFromJwk(hinted, ""), data))).resolves.toBe(true);
+      await expect(verifyMessage(jwk.n, data, await signMessage(signerFromJwk(hinted, ""), data))).resolves.toBe(true);
     });
   });
 
@@ -182,12 +183,12 @@ describe("vault/message-signing", () => {
       Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
     it.each(["SHA-256", "SHA-384", "SHA-512"] as const)("matches the Wander known answer for %s", async (hash) => {
-      const result = await privateHash(vectorKey, bytes(PRIVATE_HASH_VECTOR.message), hash);
+      const result = await privateHash(signerFromJwk(vectorKey, ""), bytes(PRIVATE_HASH_VECTOR.message), hash);
       expect(toHex(result)).toBe(PRIVATE_HASH_VECTOR[hash]);
     });
 
     it("hashes d as base64url text, not as the decoded exponent", async () => {
-      const result = toHex(await privateHash(vectorKey, bytes(PRIVATE_HASH_VECTOR.message)));
+      const result = toHex(await privateHash(signerFromJwk(vectorKey, ""), bytes(PRIVATE_HASH_VECTOR.message)));
       expect(result).not.toBe(PRIVATE_HASH_VECTOR.decodedBytesSha256);
     });
 
@@ -197,26 +198,26 @@ describe("vault/message-signing", () => {
         "SHA-512",
         new Uint8Array([...new Uint8Array(data), ...new TextEncoder().encode(jwk.d)]),
       );
-      expect(toHex(await privateHash(jwk, data, "SHA-512"))).toBe(toHex(wander));
+      expect(toHex(await privateHash(signerFromJwk(jwk, ""), data, "SHA-512"))).toBe(toHex(wander));
     });
 
     it("rejects a key without d", async () => {
       const publicOnly = { kty: "RSA", e: "AQAB", n: "unused" } as JWKInterface;
-      await expect(privateHash(publicOnly, bytes("x"))).rejects.toThrow(/no 'd' field/);
+      await expect(privateHash(signerFromJwk(publicOnly, ""), bytes("x"))).rejects.toThrow(/no 'd' field/);
     });
 
     it("is deterministic for the same wallet and input", async () => {
       const data = new TextEncoder().encode("hash me").buffer;
 
-      const hash1 = await privateHash(jwk, data);
-      const hash2 = await privateHash(jwk, data);
+      const hash1 = await privateHash(signerFromJwk(jwk, ""), data);
+      const hash2 = await privateHash(signerFromJwk(jwk, ""), data);
 
       expect(new Uint8Array(hash1)).toEqual(new Uint8Array(hash2));
     });
 
     it("differs for different input data", async () => {
-      const hashA = await privateHash(jwk, new TextEncoder().encode("a").buffer);
-      const hashB = await privateHash(jwk, new TextEncoder().encode("b").buffer);
+      const hashA = await privateHash(signerFromJwk(jwk, ""), new TextEncoder().encode("a").buffer);
+      const hashB = await privateHash(signerFromJwk(jwk, ""), new TextEncoder().encode("b").buffer);
 
       expect(new Uint8Array(hashA)).not.toEqual(new Uint8Array(hashB));
     });
@@ -225,14 +226,14 @@ describe("vault/message-signing", () => {
       const otherJwk = await generateJWK();
       const data = new TextEncoder().encode("same input").buffer;
 
-      const hashA = await privateHash(jwk, data);
-      const hashB = await privateHash(otherJwk, data);
+      const hashA = await privateHash(signerFromJwk(jwk, ""), data);
+      const hashB = await privateHash(signerFromJwk(otherJwk, ""), data);
 
       expect(new Uint8Array(hashA)).not.toEqual(new Uint8Array(hashB));
     });
 
     it("produces a 32-byte digest for the default SHA-256", async () => {
-      const hash = await privateHash(jwk, new TextEncoder().encode("x").buffer);
+      const hash = await privateHash(signerFromJwk(jwk, ""), new TextEncoder().encode("x").buffer);
       expect(hash.byteLength).toBe(32);
     });
   });
