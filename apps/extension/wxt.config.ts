@@ -85,11 +85,14 @@ export default defineConfig({
     },
     // Required for content.ts's injectScript("/provider.js", ...) to
     // resolve at runtime — WXT does not add this automatically (see its
-    // own inject-script.mjs doc comment).
+    // own inject-script.mjs doc comment). use_dynamic_url makes Chrome
+    // serve it from a per-session id, so a page can't probe
+    // chrome-extension://<id>/provider.js to detect Gleam.
     web_accessible_resources: [
       {
         resources: ['provider.js'],
         matches: ['http://*/*', 'https://*/*'],
+        use_dynamic_url: true,
       },
     ],
     content_security_policy: {
