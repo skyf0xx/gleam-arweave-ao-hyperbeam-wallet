@@ -1,4 +1,5 @@
 export * from "./models/index";
+export * from "./recipients/index";
 export * from "./vault/envelope";
 export * from "./vault/password-policy";
 export * from "./vault/zeroize";

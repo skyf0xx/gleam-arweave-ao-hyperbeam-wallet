@@ -12,9 +12,8 @@ import {
   type WalletSummary,
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
+import { CollectibleThumbnail, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
@@ -191,7 +190,8 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
   if (step.kind === "review") {
     const known = contactFor(step.recipient) ?? ownWalletFor(step.recipient);
-    const irreversible = step.estimate.firstSeenRecipient && !known;
+    const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
+    const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
     const signsOnDevice = isHardwareWalletMethod(wallet.method);
 
     const handleSign = async () => {
@@ -218,10 +218,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           </div>
 
           {irreversible ? (
-            <RiskNotice>
-              <strong className="font-bold">You haven&apos;t sent to this address before.</strong> Double-check
-              it&apos;s correct. This can&apos;t be undone once signed.
-            </RiskNotice>
+            <RecipientWarning firstTime lookalikeOf={lookalikeOf} />
           ) : (
             <p className="text-label leading-relaxed text-muted">
               You&apos;re sending {collectible.name} to this address. This can&apos;t be undone.
