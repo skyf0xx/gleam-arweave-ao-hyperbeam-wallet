@@ -50,4 +50,5 @@
 /.gitleaks.toml                                                            @skyf0xx
 /scripts/release-gate.mjs                                                  @skyf0xx
 /scripts/release.mjs                                                       @skyf0xx
+/scripts/verify-release.sh                                                 @skyf0xx
 /security/surface.mjs                                                      @skyf0xx

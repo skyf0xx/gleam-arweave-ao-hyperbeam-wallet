@@ -198,6 +198,9 @@ class GleamProvider {
         method,
         params: encodeTaggedBinary(params),
       };
+      // The page posts to its own window and the content script's listener
+      // checks event.source, so no other window or origin receives this.
+      // nosemgrep: javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration
       window.postMessage(request, "*");
     });
   }
