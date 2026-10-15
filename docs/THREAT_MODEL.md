@@ -124,7 +124,7 @@ gateway sees the addresses it is asked about.
 
 ## Known limitations
 
-These are true of the current release. Each has a fix planned.
+These are true of the current release. Each has a fix planned unless it says otherwise.
 
 - **The unlocked key is readable by extension code.** It sits in session
   storage as a JWK. Malicious code running inside the extension, such as
@@ -142,11 +142,21 @@ These are true of the current release. Each has a fix planned.
 - **Key export passes the plaintext keyfile to the popup.** It's needed to
   save the file, and it requires the password.
 - **Hardware wallets can't sign yet.** They can hold funds and receive.
-- **Dependency advisories without a fix:** `elliptic`
-  (GHSA-848j-6mx2-7j84) and `node-forge` (GHSA-86w9-cpqp-85rv, development
-  tools only). Gleam signs with RSA through WebCrypto, not with elliptic's
-  ECDSA. Confirming it is unreachable from the built extension is
-  pending.
+- **Dependency advisories without a fix, not in the shipped extension.** No fix planned until upstream releases one.
+  Neither package has a patched release.
+  - `elliptic` ≤ 6.6.1 (GHSA-848j-6mx2-7j84): faulty ECDSA nonces can
+    leak the signing key. It enters the lockfile through
+    `@dha-team/arbundles` (`@ethersproject/signing-key`, `secp256k1`),
+    which only `packages/core` tests import to cross-check our ANS-104
+    encoding, and through `vite-plugin-node-polyfills`' `crypto-browserify`,
+    which the build doesn't include (only `stream` and `events` are
+    polyfilled). A production build contains no elliptic code: its
+    curve constants, error strings and `HmacDRBG` are absent from
+    `.output/chrome-mv3`. Every Gleam signature is RSA-PSS through
+    WebCrypto (`core/vault/signer.ts`, `core/arweave/rsa-pss.ts`).
+  - `node-forge` ≤ 1.4.0 (GHSA-86w9-cpqp-85rv): forged RSA PKCS#1 v1.5
+    signatures. It comes only through `wxt` → `web-ext` → `adbkit`, a
+    development tool, and isn't in the build.
 - **No independent audit has been completed.**
 
 ## Out of scope
