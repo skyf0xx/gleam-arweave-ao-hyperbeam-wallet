@@ -156,8 +156,8 @@ export function decodeTaggedBinary(value: unknown): unknown {
 }
 
 /**
- * A page → content script request envelope. `id` is generated with
- * `crypto.randomUUID()` per request and matched on the response.
+ * A page → content script request envelope. `id` is a fresh random hex
+ * string per request, matched on the response.
  */
 export interface PageRequestEnvelope {
   type: typeof REQUEST;
