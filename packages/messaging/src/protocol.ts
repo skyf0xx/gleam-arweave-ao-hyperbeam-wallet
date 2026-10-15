@@ -6,6 +6,7 @@ import type {
   CollectibleSendDraft,
   ApprovalRequest,
   Contact,
+  RecipientAssessment,
   FeeEstimate,
   Grant,
   HardwareDevice,
@@ -151,6 +152,8 @@ export interface ProtocolMap {
   // not a password on the request: once unlocked, no further call needs
   // one until the session is locked or its auto-lock timeout elapses.
   estimateTransfer(req: TransferDraft): FeeEstimate;
+  /** First-time and lookalike checks for a recipient, for the approval window. */
+  assessRecipient(req: { walletId: string; recipient: string }): RecipientAssessment;
   submitTransfer(req: TransferDraft): { txId: string };
   /** Quotes the AR network fee for sending one collectible; fails when the wallet's AR can't cover it. */
   estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;

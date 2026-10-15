@@ -771,6 +771,7 @@ function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walle
 
 // actions
 onExtensionMessage("estimateTransfer", (message) => transfer.estimateTransfer(requireWalletId(message.data)));
+onExtensionMessage("assessRecipient", (message) => transfer.assessRecipient(message.data));
 onExtensionMessage("submitTransfer", (message) => transfer.submitTransfer(requireWalletId(message.data)));
 onExtensionMessage("estimateCollectibleSend", (message) => transfer.estimateCollectibleSend(requireWalletId(message.data)));
 onExtensionMessage("sendCollectible", (message) => transfer.sendCollectible(requireWalletId(message.data)));

@@ -378,3 +378,47 @@ describe("TransferHandler: submitTransfer", () => {
     expect(entry?.amount).toBe("1000000000000");
   });
 });
+
+describe("TransferHandler: lookalike recipients", () => {
+  const SENT_TO = "AbcdXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXwxyz";
+  const POISON = "AbcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYwxyz";
+  let storage: StoragePort;
+  let wallet: Wallet;
+
+  beforeEach(async () => {
+    storage = createFakeStorage();
+    const created = await createTestWallet();
+    wallet = created.wallet;
+    await storage.set("local:wallets", [wallet]);
+    await cacheKey(WALLET_ID, created.jwk, wallet.address);
+  });
+
+  it("names a past recipient that the new address imitates", async () => {
+    await storage.set(`local:activityLog:${wallet.address}`, [
+      { txId: "t", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 1 },
+    ]);
+    mockFetchSequence([{ status: 200, body: "999" }]);
+    const estimate = await new TransferHandler(storage).estimateTransfer({
+      walletId: WALLET_ID,
+      recipient: POISON,
+      token: null,
+      amount: "1000",
+      fee: null,
+    });
+    expect(estimate.lookalikeOf).toBe(SENT_TO);
+  });
+
+  it("names a saved contact that the new address imitates, for the approval window", async () => {
+    await storage.set("local:contacts", [{ address: SENT_TO, name: "Sam", createdAt: 0 }]);
+    mockFetchSequence([]);
+    const assessment = await new TransferHandler(storage).assessRecipient({ walletId: WALLET_ID, recipient: POISON });
+    expect(assessment).toEqual({ firstTime: true, lookalikeOf: SENT_TO });
+  });
+
+  it("treats a saved contact as known", async () => {
+    await storage.set("local:contacts", [{ address: SENT_TO, name: "Sam", createdAt: 0 }]);
+    mockFetchSequence([]);
+    const assessment = await new TransferHandler(storage).assessRecipient({ walletId: WALLET_ID, recipient: SENT_TO });
+    expect(assessment).toEqual({ firstTime: false, lookalikeOf: null });
+  });
+});

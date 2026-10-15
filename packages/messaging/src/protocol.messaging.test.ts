@@ -26,6 +26,7 @@ describe("ProtocolMap", () => {
       "getActivity",
       "getConnectedApps",
       "estimateTransfer",
+      "assessRecipient",
       "submitTransfer",
       "estimateCollectibleSend",
       "sendCollectible",
@@ -44,7 +45,7 @@ describe("ProtocolMap", () => {
       "saveContact",
       "deleteContact",
     ];
-    expect(methodNames.length).toBe(32);
+    expect(methodNames.length).toBe(33);
     expect(new Set(methodNames).size).toBe(methodNames.length);
   });
 

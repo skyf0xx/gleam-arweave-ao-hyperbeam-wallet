@@ -14,6 +14,7 @@ import {
   submitTransfer as submitAoTransfer,
 } from "@gleam/core/src/ao/transfer.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
+import { assessRecipient } from "@gleam/core/src/recipients/index.ts";
 import {
   capabilityRefusal,
   collectibleSendRefusal,
@@ -22,6 +23,7 @@ import {
   type ActivityEntry,
   type CollectibleSendDraft,
   type FeeEstimate,
+  type RecipientAssessment,
   type NetworkSettings,
   type Signer,
   type StoragePort,
@@ -69,6 +71,7 @@ export interface DeviceTransferApprovals {
 
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const WALLETS_KEY = "local:wallets";
+const CONTACTS_KEY = "local:contacts";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const FIRST_SEEN_LOOKUP_LIMIT = 100;
 
@@ -170,22 +173,64 @@ export class TransferHandler {
   async estimateTransfer(req: EstimateTransferRequest): Promise<FeeEstimate> {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
-    const firstSeenRecipient = await this.isFirstSeenRecipient(settings, wallet.address, req.recipient);
+    const { firstSeenRecipient, lookalikeOf } = await this.checkRecipient(settings, wallet.address, req.recipient);
 
     if (req.token !== null) {
-      return { fee: null, firstSeenRecipient };
+      return { fee: null, firstSeenRecipient, lookalikeOf };
     }
 
     const { fee } = await estimateFee(settings.gatewayUrl, req.recipient);
-    return { fee, firstSeenRecipient };
+    return { fee, firstSeenRecipient, lookalikeOf };
   }
 
-  private async isFirstSeenRecipient(settings: NetworkSettings, address: string, recipient: string): Promise<boolean> {
-    const [localLog, gatewayEntries] = await Promise.all([
+  private async loadRecipientHistory(settings: NetworkSettings, address: string): Promise<[ActivityEntry[], ActivityEntry[]]> {
+    return Promise.all([
       this.loadActivityLog(address),
       queryActivityTransactions(address, settings.gatewayUrl, FIRST_SEEN_LOOKUP_LIMIT).catch(() => []),
     ]);
-    return isFirstSeenRecipient(recipient, localLog, gatewayEntries);
+  }
+
+  /** Contacts and the user's own wallets: addresses trusted without any history. */
+  private async loadKnownAddresses(): Promise<string[]> {
+    const [contacts, wallets] = await Promise.all([
+      this.storage.get<unknown>(CONTACTS_KEY),
+      this.storage.get<unknown>(WALLETS_KEY),
+    ]);
+    const addresses: string[] = [];
+    if (Array.isArray(contacts)) {
+      for (const contact of contacts) {
+        if (contact && typeof contact.address === "string") addresses.push(contact.address);
+      }
+    }
+    if (Array.isArray(wallets)) addresses.push(...wallets.filter(isValidWallet).map((wallet) => wallet.address));
+    return addresses;
+  }
+
+  /** One history read for both the legacy first-seen flag and the lookalike check. */
+  private async checkRecipient(
+    settings: NetworkSettings,
+    address: string,
+    recipient: string,
+  ): Promise<{ firstSeenRecipient: boolean; lookalikeOf: string | null }> {
+    const [[localLog, gatewayEntries], known] = await Promise.all([
+      this.loadRecipientHistory(settings, address),
+      this.loadKnownAddresses(),
+    ]);
+    return {
+      firstSeenRecipient: isFirstSeenRecipient(recipient, localLog, gatewayEntries),
+      lookalikeOf: assessRecipient(recipient, [...localLog, ...gatewayEntries], known).lookalikeOf,
+    };
+  }
+
+  /** What the approval window shows for a recipient; reads the same history as the send screen. */
+  async assessRecipient(req: { walletId: string; recipient: string }): Promise<RecipientAssessment> {
+    const settings = await this.loadNetworkSettings();
+    const wallet = await this.loadWallet(req.walletId);
+    const [[localLog, gatewayEntries], known] = await Promise.all([
+      this.loadRecipientHistory(settings, wallet.address),
+      this.loadKnownAddresses(),
+    ]);
+    return assessRecipient(req.recipient, [...localLog, ...gatewayEntries], known);
   }
 
   /**
@@ -197,13 +242,13 @@ export class TransferHandler {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
     refuseCollectibleSend(wallet.address, req.recipient, req.collectible.id);
-    const [{ fee }, balance, firstSeenRecipient] = await Promise.all([
+    const [{ fee }, balance, recipientCheck] = await Promise.all([
       estimateFee(settings.gatewayUrl, req.collectible.id),
       getArBalance(wallet.address, settings.gatewayUrl),
-      this.isFirstSeenRecipient(settings, wallet.address, req.recipient),
+      this.checkRecipient(settings, wallet.address, req.recipient),
     ]);
     assertCoversNetworkFee(balance, fee);
-    return { fee, firstSeenRecipient };
+    return { fee, ...recipientCheck };
   }
 
   /** Sends one collectible through `submitTransfer`, so a hardware wallet signs it in the approval window too. */
