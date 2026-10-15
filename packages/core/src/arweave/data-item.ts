@@ -1,4 +1,4 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "../vault/signer";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
 
@@ -337,11 +337,11 @@ export async function applyDataItemSignature(
 }
 
 /** Signs an unsigned item's deep hash with a keyfile. Returns the raw 512-byte signature. */
-export async function signDataItemWithJwk(unsigned: Uint8Array, jwk: JWKInterface): Promise<Bytes> {
-  if (!sameOwner(dataItemOwner(unsigned), jwk.n)) {
+export async function signDataItemWithSigner(unsigned: Uint8Array, signer: Signer): Promise<Bytes> {
+  if (!sameOwner(dataItemOwner(unsigned), signer.owner)) {
     throw new Error("This data item names a different owner than the signing key.");
   }
-  const signature = await signRsaPss(jwk, await dataItemSignatureData(unsigned));
+  const signature = await signRsaPss(signer, await dataItemSignatureData(unsigned));
   if (signature.byteLength !== SIGNATURE_LENGTH) {
     throw new Error(`Expected a ${SIGNATURE_LENGTH}-byte RSA-PSS signature, got ${signature.byteLength} bytes.`);
   }
@@ -349,7 +349,7 @@ export async function signDataItemWithJwk(unsigned: Uint8Array, jwk: JWKInterfac
 }
 
 /** Build → sign with the keyfile → apply. */
-export async function createSignedDataItem(jwk: JWKInterface, fields: DataItemFields): Promise<SignedDataItem> {
-  const unsigned = buildUnsignedDataItem(jwk.n, fields);
-  return applyDataItemSignature(unsigned, await signDataItemWithJwk(unsigned, jwk), jwk.n);
+export async function createSignedDataItem(signer: Signer, fields: DataItemFields): Promise<SignedDataItem> {
+  const unsigned = buildUnsignedDataItem(signer.owner, fields);
+  return applyDataItemSignature(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
 }

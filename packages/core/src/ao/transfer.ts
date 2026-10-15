@@ -1,5 +1,5 @@
-import type { JWKInterface } from "../models/wallet";
-import { applyDataItemSignature, buildUnsignedDataItem, signDataItemWithJwk } from "../arweave/data-item";
+import type { Signer } from "../vault/signer";
+import { applyDataItemSignature, buildUnsignedDataItem, signDataItemWithSigner } from "../arweave/data-item";
 
 export { createSignedDataItem } from "../arweave/data-item";
 
@@ -59,13 +59,13 @@ const encoder = new TextEncoder();
  * treat status as "message accepted by the MU", not "transfer confirmed".
  */
 export async function submitTransfer(
-  jwk: JWKInterface,
+  signer: Signer,
   processId: string,
   recipient: string,
   amount: string,
 ): Promise<SubmittedAoTransfer> {
-  const unsigned = prepareTransfer(jwk.n, processId, recipient, amount);
-  return finishTransfer(unsigned, await signDataItemWithJwk(unsigned, jwk), jwk.n);
+  const unsigned = prepareTransfer(signer.owner, processId, recipient, amount);
+  return finishTransfer(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
 }
 
 /** The unsigned `Transfer` data item `ownerB64Url` will sign. */

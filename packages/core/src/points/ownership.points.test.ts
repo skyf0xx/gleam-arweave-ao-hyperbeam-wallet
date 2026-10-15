@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { signTransactionWithJwk } from "../arweave/transaction";
+import { signerFromJwk } from "../vault/signer";
+import { signTransactionWithSigner } from "../arweave/transaction";
 import { encodeTransactionForLedger } from "../hardware/ledger/serialize";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
@@ -34,7 +35,7 @@ describe("buildOwnershipTransaction", () => {
 
 describe("verifyPointsProof", () => {
   it("accepts the owner's signature over the ownership transaction, for that message only", async () => {
-    const signature = bytesToBase64Url(await signTransactionWithJwk(await buildOwnershipTransaction(jwk.n, MESSAGE), jwk));
+    const signature = bytesToBase64Url(await signTransactionWithSigner(await buildOwnershipTransaction(jwk.n, MESSAGE), signerFromJwk(jwk, "")));
 
     expect(await verifyPointsProof("transaction", jwk.n, MESSAGE, signature)).toBe(true);
     expect(await verifyPointsProof("transaction", jwk.n, `${MESSAGE}1`, signature)).toBe(false);
@@ -44,7 +45,7 @@ describe("verifyPointsProof", () => {
 
   it("accepts a signMessage signature as a message proof", async () => {
     const signature = bytesToBase64Url(
-      new Uint8Array(await signMessage(jwk, new TextEncoder().encode(MESSAGE).buffer as ArrayBuffer)),
+      new Uint8Array(await signMessage(signerFromJwk(jwk, ""), new TextEncoder().encode(MESSAGE).buffer as ArrayBuffer)),
     );
 
     expect(await verifyPointsProof("message", jwk.n, MESSAGE, signature)).toBe(true);

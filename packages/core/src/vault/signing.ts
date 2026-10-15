@@ -1,4 +1,4 @@
-import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "./signer";
 import type {
   SignTransactionInput,
   SignedTransaction,
@@ -10,14 +10,14 @@ import {
   applyTransactionSignature,
   buildUnsignedTransaction,
   postTransaction,
-  signTransactionWithJwk,
+  signTransactionWithSigner,
   verifyTransactionSignature,
   type ArweaveTransactionJson,
 } from "../arweave/transaction";
 import {
   applyDataItemSignature,
   buildUnsignedDataItem,
-  signDataItemWithJwk,
+  signDataItemWithSigner,
   verifyDataItemSignature,
 } from "../arweave/data-item";
 import { base64ToBytes } from "./base64";
@@ -26,15 +26,14 @@ import { signMessage, verifyMessage } from "./message-signing";
 /**
  * `core/vault`'s share of the provider-signing-crypto surface: the actual
  * cryptographic operations behind `sign`/`dispatch`/`signDataItem`/
- * `batchSignDataItem`. Every function here accepts an already-decrypted
- * `JWKInterface` or only the owner's public key, and never touches
- * `core/vault`'s envelope or storage; resolving the key from the
- * unlocked-session cache (`getCachedKey(walletId)`) is the dispatch
- * layer's job.
+ * `batchSignDataItem`. Every function here accepts an unlocked wallet's
+ * `Signer` or only the owner's public key, and never touches
+ * `core/vault`'s envelope or storage; resolving the signer from the
+ * unlocked session (`getSigner(walletId)`) is the dispatch layer's job.
  *
  * Each operation comes in three parts so keyfile and hardware wallets
  * share one pipeline: `prepare*` builds the unsigned payload from the
- * owner alone, the key signs its deep hash (`signPayloadWithJwk` here, or
+ * owner alone, the key signs its deep hash (`signPayloadWithSigner` here, or
  * a device), and `finish*` applies the signature, checks it, and
  * submits. The keyfile entry points (`signTransaction`,
  * `dispatchTransaction`, `signDataItem`, `batchSignDataItem`) are those
@@ -98,14 +97,14 @@ export async function applySignature(
 }
 
 /** Signs the payload's deep hash with a keyfile. Returns the raw 512-byte signature. */
-export async function signPayloadWithJwk(unsigned: UnsignedPayload, jwk: JWKInterface): Promise<Bytes> {
+export async function signPayloadWithSigner(unsigned: UnsignedPayload, signer: Signer): Promise<Bytes> {
   switch (unsigned.kind) {
     case "transaction":
-      return signTransactionWithJwk(unsigned.transaction, jwk);
+      return signTransactionWithSigner(unsigned.transaction, signer);
     case "dataItem":
-      return signDataItemWithJwk(unsigned.raw, jwk);
+      return signDataItemWithSigner(unsigned.raw, signer);
     case "message":
-      return new Uint8Array(await signMessage(jwk, unsigned.data.slice().buffer, "SHA-256"));
+      return new Uint8Array(await signMessage(signer, unsigned.data.slice().buffer, "SHA-256"));
   }
 }
 
@@ -169,11 +168,11 @@ export async function finishSignTransaction(
 /** Signs the dApp's transaction with a keyfile without posting it. */
 export async function signTransaction(
   gatewayUrl: string,
-  jwk: JWKInterface,
+  signer: Signer,
   input: SignTransactionInput,
 ): Promise<SignedTransaction> {
-  const unsigned = await prepareSignTransaction(gatewayUrl, jwk.n, input);
-  return finishSignTransaction(unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n);
+  const unsigned = await prepareSignTransaction(gatewayUrl, signer.owner, input);
+  return finishSignTransaction(unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
 }
 
 export interface DispatchOptions {
@@ -248,12 +247,12 @@ export async function finishDispatch(
 export async function dispatchTransaction(
   gatewayUrl: string,
   bundlerUrl: string,
-  jwk: JWKInterface,
+  signer: Signer,
   input: SignTransactionInput,
   options: DispatchOptions,
 ): Promise<DispatchResult> {
-  const unsigned = await prepareDispatch(gatewayUrl, jwk.n, input, options);
-  return finishDispatch(gatewayUrl, bundlerUrl, unsigned, await signPayloadWithJwk(unsigned, jwk), jwk.n);
+  const unsigned = await prepareDispatch(gatewayUrl, signer.owner, input, options);
+  return finishDispatch(gatewayUrl, bundlerUrl, unsigned, await signPayloadWithSigner(unsigned, signer), signer.owner);
 }
 
 /** The unsigned item for a dApp's `signDataItem`. `input.data` is standard base64 and tags are plain text. */
@@ -272,9 +271,9 @@ export async function finishDataItem(unsigned: Uint8Array, signature: Uint8Array
 }
 
 /** Signs one ANS-104 data item with a keyfile and returns its raw bytes. */
-export async function signDataItem(jwk: JWKInterface, input: DataItemInput): Promise<Bytes> {
-  const unsigned = prepareDataItem(jwk.n, input);
-  return finishDataItem(unsigned, await signDataItemWithJwk(unsigned, jwk), jwk.n);
+export async function signDataItem(signer: Signer, input: DataItemInput): Promise<Bytes> {
+  const unsigned = prepareDataItem(signer.owner, input);
+  return finishDataItem(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
 }
 
 export function prepareDataItems(ownerB64Url: string, inputs: DataItemInput[]): Bytes[] {
@@ -298,11 +297,11 @@ export async function finishDataItems(
 }
 
 /** Signs each item in order with the same keyfile. */
-export async function batchSignDataItem(jwk: JWKInterface, inputs: DataItemInput[]): Promise<Bytes[]> {
-  const unsigned = prepareDataItems(jwk.n, inputs);
+export async function batchSignDataItem(signer: Signer, inputs: DataItemInput[]): Promise<Bytes[]> {
+  const unsigned = prepareDataItems(signer.owner, inputs);
   const signatures: Bytes[] = [];
   for (const item of unsigned) {
-    signatures.push(await signDataItemWithJwk(item, jwk));
+    signatures.push(await signDataItemWithSigner(item, signer));
   }
-  return finishDataItems(unsigned, signatures, jwk.n);
+  return finishDataItems(unsigned, signatures, signer.owner);
 }

@@ -5,7 +5,8 @@ import {
   bytesToBase64Url,
   generateJWK,
   signature,
-  signPayloadWithJwk,
+  signPayloadWithSigner,
+  signerFromJwk,
   verifyMessage,
   WALLET_APPROVAL_ORIGIN,
   type ApprovalRequest,
@@ -131,7 +132,7 @@ function unsignedOf(payload: DeviceSigningPayload) {
 /** Stands in for the device: signs each payload the window was handed. */
 async function deviceSign(device: DeviceSigningRequest, jwk: JWKInterface): Promise<string[]> {
   return Promise.all(
-    device.payloads.map(async (payload) => bytesToBase64Url(await signPayloadWithJwk(unsignedOf(payload), jwk))),
+    device.payloads.map(async (payload) => bytesToBase64Url(await signPayloadWithSigner(unsignedOf(payload), signerFromJwk(jwk, "")))),
   );
 }
 
@@ -340,7 +341,7 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     const payload = device.payloads[0]!;
     if (payload.kind !== "dataItem") throw new Error("expected a data item");
     const message = await dataItemSignatureData(base64UrlToBytes(payload.raw));
-    const signature = bytesToBase64Url(await signRsaPss(otherKey, message));
+    const signature = bytesToBase64Url(await signRsaPss(signerFromJwk(otherKey, ""), message));
     await expect(handler.submitDeviceSignature({ requestId, signatures: [signature] })).rejects.toThrow(
       /doesn't match this wallet/,
     );
@@ -369,7 +370,7 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     const message = new TextEncoder().encode("hello");
     const { requestId, device } = await approveOnDevice({ kind: "signMessage", payload: message });
     // signature() signs RSA-PSS straight over the bytes: one hash short of signMessage.
-    const unhashed = new Uint8Array(await signature(deviceKey, message.slice().buffer));
+    const unhashed = new Uint8Array(await signature(signerFromJwk(deviceKey, ""), message.slice().buffer));
 
     await expect(
       handler.submitDeviceSignature({ requestId, signatures: [bytesToBase64Url(unhashed)] }),
