@@ -1,0 +1,4 @@
+{
+  "extends": "../../apps/points-api/tsconfig.json",
+  "include": ["."]
+}

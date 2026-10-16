@@ -14,14 +14,20 @@ professional audit.
    `gleamwallet.app/scan.html`. It has one line to copy into your coding
    agent.
 2. **The agent scans.** It checks out the latest release tag and runs
-   `pnpm scan start`, which fetches a challenge. Then it follows
-   `security/scan/SKILL.md` from that checkout.
+   `pnpm scan start`. That fetches a challenge, saves it to
+   `.gleam-scan/challenge.json`, writes a starter
+   `.gleam-scan/attestation.json` and prints the 3 functions to answer.
+   Then the agent follows `security/scan/SKILL.md` from that checkout.
 3. **The agent reports what it finds.** Low or informational issues go
    in a PR. Medium and above go in a private GitHub advisory.
-4. **The agent checks its own work.** `pnpm scan finish` sends the
-   attestation to `POST /attestations/check`, which runs every server
-   check that doesn't need your signature, and prints a link. If a check
-   fails, the agent fixes it before you see anything.
+4. **The agent checks its own work.** `pnpm scan finish` reads
+   `.gleam-scan/attestation.json`, fills `release` and `commit` from git,
+   runs the core checks locally, then sends the attestation to
+   `POST /attestations/check`, which runs every server check that doesn't
+   need your signature. On success it prints the `attest.html#<payload>`
+   link. Each failure prints one line, `✗ <field>: <what to change>`, and
+   the agent fixes it before you see anything. `--json` prints the same
+   result as one JSON object.
 5. **You sign.** Open the link. Gleam shows a window with the release,
    the model, the result and the report. Approve, and the extension
    submits the attestation. The agent never touches a key.
@@ -59,7 +65,10 @@ gets the points.
 through `externally_connectable`, the same channel the invite code
 uses. The extension opens its own approval window, then signs
 `gleam-points:attest:v1:<release>:<sha256 of the attestation>` the same
-way it signs points registration. Hardware wallets use the transaction
+way it signs points registration. The link carries the attestation in
+its fragment as `<payload>`: base64url, without padding, of the UTF-8
+canonical JSON, so the page decodes it with plain JS (base64url, UTF-8,
+`JSON.parse`) and the fragment never reaches a server. Hardware wallets use the transaction
 proof. A dApp's `signMessage` is never involved, so the site needs no
 wallet connection. That sha256 is the **attestation id**. Every PR and
 advisory a scan files includes it, which links each finding to a
@@ -194,7 +203,8 @@ it.
 
 ## The skill: `security/scan/SKILL.md`
 
-1. Check out the latest release tag and run `pnpm scan start`.
+1. Check out the latest release tag and run `pnpm scan start`. It saves
+   `.gleam-scan/challenge.json` and a starter `.gleam-scan/attestation.json`.
 2. Read `docs/THREAT_MODEL.md` first. Its attackers, out-of-scope list
    and By design entries are given. Where the docs and the code
    disagree, the code is right; fix the docs in a PR.
@@ -204,9 +214,10 @@ it.
 5. Look anywhere else that seems worth it.
 6. Report: low or informational issues in a PR, medium and above in a
    private advisory. Never as a public issue.
-7. Answer the challenge from the code you read and write the
-   attestation. Run `pnpm scan finish` until it passes, then give the
-   user the link it prints.
+7. Answer the challenge from the code you read by filling in
+   `.gleam-scan/attestation.json`. Run `pnpm scan finish` until it
+   passes, then give the user the link it prints and the sentence that
+   goes with it. Put the attestation id in every PR and advisory.
 
 **Report like a working security engineer:**
 
