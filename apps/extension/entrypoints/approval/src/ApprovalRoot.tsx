@@ -8,7 +8,8 @@ import type {
   ThemeSettings,
   WalletState,
 } from "@gleam/core";
-import { SecurityPhraseBadge } from "@gleam/ui/src/components/security-phrase/index.ts";
+import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
+import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
@@ -99,13 +100,12 @@ function hostnameOf(origin: string): string {
 export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = DEFAULT_DEVICE_PANELS }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
-  const [securityPhrase, setSecurityPhrase] = useState<SecurityPhrase | null>(null);
+  const [securityPhrase, setSecurityPhrase] = useState<{ phrase: SecurityPhrase; icon: string } | null>(null);
 
   const loadSecurityPhrase = async (runtime: RuntimePort) => {
     try {
-      setSecurityPhrase(
-        (await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined })) ?? null,
-      );
+      const phrase = await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined });
+      setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
     } catch {
       setSecurityPhrase(null);
     }
@@ -307,7 +307,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
     <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
       {showSecurityPhrase ? (
         <div className="flex justify-center px-6 pt-3">
-          <SecurityPhraseBadge phrase={securityPhrase} />
+          <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
         </div>
       ) : null}
       {content}

@@ -74,9 +74,9 @@ export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, explo
 export type { ThemePreference, ThemeSettings } from "./theme";
 export type { SecurityPhrase } from "./security-phrase";
 export {
-  SECURITY_PHRASE_EMOJI,
   SECURITY_PHRASE_WORD_MAX_LENGTH,
   readSecurityPhrase,
+  securityPhraseSeed,
   suggestSecurityPhrase,
 } from "./security-phrase";
 export type { PasskeyEnrollment, PasskeyStatus } from "./passkey";

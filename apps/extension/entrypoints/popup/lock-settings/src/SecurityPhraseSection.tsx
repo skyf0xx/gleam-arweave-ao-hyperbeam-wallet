@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { readSecurityPhrase, suggestSecurityPhrase, type RuntimePort, type SecurityPhrase } from "@gleam/core";
-import { SecurityPhraseBadge, SecurityPhrasePicker } from "@gleam/ui/src/components/security-phrase/index.ts";
+import { SecurityPhraseMark, SecurityPhrasePicker } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
 
 type SectionState =
   | { kind: "loading" }
@@ -12,6 +13,9 @@ type SectionState =
 /** Lock & unlock's anti-phishing phrase: shown, set up, or changed in place. */
 export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
   const [state, setState] = useState<SectionState>({ kind: "loading" });
+  const shownWord =
+    state.kind === "editing" ? readSecurityPhrase(state.draft)?.word : state.kind === "showing" ? state.phrase?.word : undefined;
+  const icon = useMemo(() => (shownWord ? securityPhraseIconSvg(shownWord) : undefined), [shownWord]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +66,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
         >
           <SecurityPhrasePicker
             value={state.draft}
+            iconSvg={icon}
             onChange={(draft) => setState({ ...state, draft, error: undefined })}
             disabled={state.saving}
             errorMessage={state.error ?? (readSecurityPhrase(state.draft) ? undefined : "Use up to 24 letters or numbers.")}
@@ -81,9 +86,9 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
             </Button>
           </div>
         </form>
-      ) : state.phrase ? (
+      ) : state.phrase && icon ? (
         <div className="flex items-center gap-3 py-3.5">
-          <SecurityPhraseBadge phrase={state.phrase} />
+          <SecurityPhraseMark phrase={state.phrase} iconSvg={icon} />
           <span className="flex-1" />
           <button
             type="button"
@@ -100,7 +105,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           className="flex w-full flex-col gap-0.5 py-3.5 text-left hover:bg-mist"
         >
           <span className="text-label font-semibold text-foreground">Set up a security phrase</span>
-          <span className="text-caption text-muted">An emoji and a word only Gleam can show you</span>
+          <span className="text-caption text-muted">A word and its icon, which only Gleam can show you</span>
         </button>
       )}
       <p className="pt-2.5 text-caption leading-relaxed text-faint">

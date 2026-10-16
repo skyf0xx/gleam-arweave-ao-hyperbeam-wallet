@@ -27,12 +27,12 @@ describe("UnlockView", () => {
 
   it("shows the security phrase before the password is typed", async () => {
     const send = vi.fn(async (message: { type: string }) =>
-      message.type === "getSecurityPhrase" ? { emoji: "🦉", word: "willow" } : undefined,
+      message.type === "getSecurityPhrase" ? { word: "willow" } : undefined,
     ) as unknown as RuntimePort["send"];
     render(<UnlockView runtime={fakeRuntime({ send })} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
-    expect(screen.getByText("🦉")).toBeTruthy();
+    expect(document.querySelector('img[src^="data:image/svg+xml"]')).toBeTruthy();
   });
 
   it("shows no phrase when none is set", async () => {

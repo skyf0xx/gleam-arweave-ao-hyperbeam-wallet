@@ -73,12 +73,11 @@ describe("OnboardingView: create flow", () => {
     await waitFor(() => expect(screen.getByText("Pick your security phrase")).toBeTruthy());
     expect(onComplete).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("radio", { name: "🦉" }));
     fireEvent.change(screen.getByLabelText("Word"), { target: { value: "willow" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
-    expect(send).toHaveBeenNthCalledWith(4, { type: "setSecurityPhrase", payload: { emoji: "🦉", word: "willow" } });
+    expect(send).toHaveBeenNthCalledWith(4, { type: "setSecurityPhrase", payload: { word: "willow" } });
   });
 
   it("finishes onboarding instead of returning to Welcome when backup's back button is used", async () => {
@@ -86,7 +85,7 @@ describe("OnboardingView: create flow", () => {
       .fn()
       .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
       // A phrase kept from before a reset skips the phrase step.
-      .mockResolvedValueOnce({ emoji: "🦊", word: "harbor" }); // getSecurityPhrase
+      .mockResolvedValueOnce({ word: "harbor" }); // getSecurityPhrase
     const runtime = fakeRuntime({ send });
     const onComplete = vi.fn();
 

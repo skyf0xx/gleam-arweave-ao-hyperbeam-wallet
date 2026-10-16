@@ -17,7 +17,7 @@ export class SecurityPhraseHandler {
 
   async set(req: SecurityPhrase): Promise<void> {
     const phrase = readSecurityPhrase(req);
-    if (!phrase) throw new Error("Pick one of the emoji and a word of up to 24 letters or numbers.");
+    if (!phrase) throw new Error("Pick a word of up to 24 letters or numbers.");
     await this.storage.set(SECURITY_PHRASE_KEY, phrase);
   }
 }

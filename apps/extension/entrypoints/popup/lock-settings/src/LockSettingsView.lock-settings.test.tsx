@@ -107,24 +107,23 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
 
 describe("LockSettingsView security phrase section", () => {
   it("shows the current phrase", async () => {
-    const send = sendFor({ phrase: { emoji: "🦉", word: "willow" } });
+    const send = sendFor({ phrase: { word: "willow" } });
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
   });
 
   it("changes the phrase in place", async () => {
-    const send = sendFor({ phrase: { emoji: "🦉", word: "willow" } });
+    const send = sendFor({ phrase: { word: "willow" } });
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Change" })).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Change" }));
-    fireEvent.click(screen.getByRole("radio", { name: "🌊" }));
     fireEvent.change(screen.getByLabelText("Word"), { target: { value: "harbor" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(screen.getByLabelText("Your security phrase: harbor")).toBeTruthy());
-    expect(send).toHaveBeenCalledWith({ type: "setSecurityPhrase", payload: { emoji: "🌊", word: "harbor" } });
+    expect(send).toHaveBeenCalledWith({ type: "setSecurityPhrase", payload: { word: "harbor" } });
   });
 
   it("offers to set one up when none is set, and won't save a blank word", async () => {

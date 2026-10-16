@@ -303,7 +303,7 @@ describe("ApprovalRoot: no wallet yet", () => {
 });
 
 describe("ApprovalRoot security phrase", () => {
-  const PHRASE = { emoji: "🦉", word: "willow" };
+  const PHRASE = { word: "willow" };
 
   function runtimeWith(state: WalletState) {
     const send = vi.fn(async (message: { type: string }) => {

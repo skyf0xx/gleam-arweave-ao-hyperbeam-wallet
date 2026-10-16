@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { SecurityPhrase } from "@gleam/core";
 import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
-import { SecurityPhraseBadge } from "@gleam/ui/src/components/security-phrase/index.ts";
+import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
 
 /**
  * A pure brand moment, global unlock: no per-wallet identity (avatar/name/
@@ -41,6 +42,8 @@ export function UnlockScreen({
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
+  const phraseWord = securityPhrase?.word;
+  const phraseIcon = useMemo(() => (phraseWord ? securityPhraseIconSvg(phraseWord) : undefined), [phraseWord]);
 
   // Clear the typed password once a fresh unlock failure arrives, without
   // an effect (react-hooks/set-state-in-effect): adjust state during
@@ -58,7 +61,9 @@ export function UnlockScreen({
       <div className="mt-16 mb-2">
         <BeamMark tagline={tagline} />
       </div>
-      {securityPhrase ? <SecurityPhraseBadge phrase={securityPhrase} className="mt-4" /> : null}
+      {securityPhrase && phraseIcon ? (
+        <SecurityPhraseMark phrase={securityPhrase} iconSvg={phraseIcon} layout="stacked" className="mt-6" />
+      ) : null}
 
       {passkey && !usePassword ? (
         <PasskeyUnlock

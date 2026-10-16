@@ -20,20 +20,20 @@ describe("SecurityPhraseHandler", () => {
 
   it("stores the trimmed phrase and reads it back", async () => {
     const handler = new SecurityPhraseHandler(memoryStorage());
-    await handler.set({ emoji: "🦉", word: " willow " });
-    expect(await handler.get()).toEqual({ emoji: "🦉", word: "willow" });
+    await handler.set({ word: " willow " });
+    expect(await handler.get()).toEqual({ word: "willow" });
   });
 
   it("rejects an invalid phrase without overwriting the current one", async () => {
     const handler = new SecurityPhraseHandler(memoryStorage());
-    await handler.set({ emoji: "🦉", word: "willow" });
-    await expect(handler.set({ emoji: "💀", word: "willow" })).rejects.toThrow(/Pick one of the emoji/);
-    expect(await handler.get()).toEqual({ emoji: "🦉", word: "willow" });
+    await handler.set({ word: "willow" });
+    await expect(handler.set({ word: "-willow" })).rejects.toThrow(/Pick a word/);
+    expect(await handler.get()).toEqual({ word: "willow" });
   });
 
   it("reads a tampered stored value as no phrase", async () => {
     const storage = memoryStorage();
-    storage.data.set("local:securityPhrase", { emoji: "🦉", word: "<img src=x>" });
+    storage.data.set("local:securityPhrase", { word: "<img src=x>" });
     expect(await new SecurityPhraseHandler(storage).get()).toBeNull();
   });
 });
