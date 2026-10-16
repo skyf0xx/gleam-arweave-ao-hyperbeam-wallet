@@ -12,7 +12,9 @@ professional audit.
 
 1. **Hand the page to your agent.** Settings → Community scans opens
    `gleamwallet.app/scan.html`. It has one line to copy into your coding
-   agent.
+   agent:
+
+   > Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.
 2. **The agent scans.** It checks out the latest release tag and runs
    `pnpm scan start`. That fetches a challenge, saves it to
    `.gleam-scan/challenge.json`, writes a starter
@@ -203,6 +205,9 @@ it.
 
 ## The skill: `security/scan/SKILL.md`
 
+[`security/scan/SKILL.md`](security/scan/SKILL.md) is written for any
+coding agent to follow literally, with the exact commands. In summary:
+
 1. Check out the latest release tag and run `pnpm scan start`. It saves
    `.gleam-scan/challenge.json` and a starter `.gleam-scan/attestation.json`.
 2. Read `docs/THREAT_MODEL.md` first. Its attackers, out-of-scope list
@@ -212,12 +217,14 @@ it.
 4. Review the files in `security/surface.txt` that changed since the
    last release, then the rest of the surface.
 5. Look anywhere else that seems worth it.
-6. Report: low or informational issues in a PR, medium and above in a
-   private advisory. Never as a public issue.
+6. Draft the reports: low or informational issues as a PR, medium and
+   above as a private advisory. Never as a public issue. File nothing
+   yet, since each one has to quote the attestation id.
 7. Answer the challenge from the code you read by filling in
    `.gleam-scan/attestation.json`. Run `pnpm scan finish` until it
-   passes, then give the user the link it prints and the sentence that
-   goes with it. Put the attestation id in every PR and advisory.
+   passes, then file each draft with the attestation id it prints, and
+   leave the attestation unchanged after that. Give the user the link
+   and the sentence that goes with it.
 
 **Report like a working security engineer:**
 

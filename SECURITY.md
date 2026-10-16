@@ -23,6 +23,10 @@ Include, where relevant:
 - Impact — what an attacker could do (e.g. key exfiltration, signing without
   approval, draining funds).
 
+If the report comes from a [community scan](SCANS.md), include its
+attestation id as a line of its own, `Attestation id: <64 hex characters>`,
+so the finding is credited to the wallet that signed the scan.
+
 ## Scope
 
 In scope: the extension itself (`apps/extension`), the core signing/vault
