@@ -68,6 +68,7 @@ jobs:
       - run: pnpm tsc -p packages/ui --noEmit
       - run: pnpm tsc -p apps/extension --noEmit
       - run: pnpm tsc -p apps/points-api --noEmit
+      - run: pnpm tsc -p scripts/scan --noEmit
 
   test:
     runs-on: ubuntu-latest

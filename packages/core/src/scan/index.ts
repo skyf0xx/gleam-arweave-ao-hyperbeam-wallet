@@ -18,3 +18,4 @@ export { pickChallenge } from "./challenge";
 export type { ChallengeFunction } from "./challenge";
 export { isScannablePath, listSurfaceFunctions, parseSurfaceText, surfaceFiles } from "./surface";
 export type { SurfaceEntry, SurfaceFunction, SurfaceTier } from "./surface";
+export { decodeAttestationPayload, encodeAttestationPayload } from "./payload";
