@@ -104,8 +104,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
         </button>
       )}
       <p className="pt-2.5 text-caption leading-relaxed text-faint">
-        Gleam shows it when you unlock and on every request you approve. A window that asks for your password
-        without it isn&apos;t Gleam.
+        This phrase is shown before important actions to confirm authenticity
       </p>
     </div>
   );
