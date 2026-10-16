@@ -5,6 +5,7 @@ import {
   type PermissionType,
   type ProviderMethod,
 } from "@gleam/core";
+import { hasPointsProofTag, isPointsMessage } from "@gleam/core/src/points/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   readBytes,
@@ -15,6 +16,7 @@ import {
   readProcessId,
   readSaltLength,
   readTransaction,
+  type ProviderTransaction,
 } from "@/src/handlers/provider-params";
 
 /**
@@ -71,6 +73,30 @@ function reader<T>(read: (value: unknown) => T) {
       return z.NEVER;
     }
   });
+}
+
+/**
+ * Gleam Points payloads are signed only by `PointsHandler`. A site holding
+ * one could register or remove the wallet in Gleam Points, so a dApp
+ * `signMessage` of one is refused before any window opens.
+ */
+function refusePointsMessage(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  if (isPointsMessage(data)) {
+    throw new Error("Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.");
+  }
+  return data;
+}
+
+/**
+ * A hardware wallet's Points proof is a transaction with a `Gleam-Points`
+ * tag. Other fields of the proof keep a dApp transaction from matching it
+ * too; refusing the tag means a site can't get close to one at all.
+ */
+function refusePointsProofTag(transaction: ProviderTransaction): ProviderTransaction {
+  if (hasPointsProofTag(transaction.tags)) {
+    throw new Error("Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.");
+  }
+  return transaction;
 }
 
 /** Caps `appInfo.name` so an unbounded dApp-supplied string can't break the approval screen's layout. */
@@ -138,12 +164,12 @@ export const PAGE_METHODS = {
   sign: page({
     approval: true,
     grant: true,
-    params: z.object({ transaction: reader((value) => readTransaction(value, "sign")) }),
+    params: z.object({ transaction: reader((value) => refusePointsProofTag(readTransaction(value, "sign"))) }),
   }),
   dispatch: page({
     approval: true,
     grant: true,
-    params: z.object({ transaction: reader((value) => readTransaction(value, "dispatch")) }),
+    params: z.object({ transaction: reader((value) => refusePointsProofTag(readTransaction(value, "dispatch"))) }),
   }),
   encrypt: page({
     approval: true,
@@ -173,7 +199,7 @@ export const PAGE_METHODS = {
     approval: true,
     grant: true,
     params: z.object({
-      data: reader((value) => readBytes(value, "data")),
+      data: reader((value) => refusePointsMessage(readBytes(value, "data"))),
       options: reader((value) => readHashAlgorithm(value, "signMessage")),
     }),
   }),

@@ -122,3 +122,67 @@ describe("dispatch/methods: content-script params", () => {
     );
   });
 });
+
+describe("dispatch/methods: Gleam Points refusals", () => {
+  const encode = (text: string) => new TextEncoder().encode(text);
+  const b64url = (text: string) => Buffer.from(text).toString("base64url");
+  const POINTS_MESSAGE = "gleam-points:leave:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:1700000000";
+
+  it.each([undefined, "SHA-256", "SHA-384", "SHA-512"])(
+    "refuses a signMessage whose data starts with the points prefix (hashAlgorithm %s)",
+    (hashAlgorithm) => {
+      const options = hashAlgorithm === undefined ? undefined : { hashAlgorithm };
+      expect(() => parseParams(PAGE_METHODS.signMessage.params, { data: encode(POINTS_MESSAGE), options })).toThrow(
+        "Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.",
+      );
+    },
+  );
+
+  it("refuses the prefix at byte 0 of a view into a larger buffer, and in a bare ArrayBuffer", () => {
+    const points = encode(POINTS_MESSAGE);
+    const parent = new Uint8Array(points.byteLength + 5);
+    parent.set([1, 2, 3, 4, 5]);
+    parent.set(points, 5);
+    const view = parent.subarray(5);
+    expect(view.byteOffset).toBe(5);
+
+    for (const data of [view, points.slice().buffer]) {
+      expect(() => parseParams(PAGE_METHODS.signMessage.params, { data })).toThrow(
+        "Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.",
+      );
+    }
+  });
+
+  it("refuses a sign tag name with a UTF-8 BOM before Gleam-Points", () => {
+    const transaction = { tags: [{ name: b64url("\uFEFFGleam-Points"), value: b64url(POINTS_MESSAGE) }] };
+    expect(() => parseParams(PAGE_METHODS.sign.params, { transaction })).toThrow(
+      "Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.",
+    );
+  });
+
+  it("accepts a signMessage that only contains the prefix after byte 0", () => {
+    const data = encode(`Sign in to example.com. ${POINTS_MESSAGE}`);
+    expect(Array.from(parseParams(PAGE_METHODS.signMessage.params, { data }).data)).toEqual(Array.from(data));
+  });
+
+  it.each(["sign", "dispatch"] as const)("refuses a %s transaction carrying a Gleam-Points tag", (method) => {
+    for (const name of ["Gleam-Points", "gleam-points"]) {
+      const transaction = {
+        tags: [
+          { name: b64url("App-Name"), value: b64url("x") },
+          { name: b64url(name), value: b64url(POINTS_MESSAGE) },
+        ],
+      };
+      expect(() => parseParams(PAGE_METHODS[method].params, { transaction })).toThrow(
+        "Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.",
+      );
+    }
+  });
+
+  it.each(["sign", "dispatch"] as const)("accepts a %s transaction whose other tags hold a points message", (method) => {
+    const transaction = { tags: [{ name: b64url("Note"), value: b64url(POINTS_MESSAGE) }] };
+    expect(parseParams(PAGE_METHODS[method].params, { transaction }).transaction.tags).toEqual([
+      { name: "Note", value: POINTS_MESSAGE },
+    ]);
+  });
+});

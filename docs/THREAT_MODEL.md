@@ -114,6 +114,12 @@ device. Gleam stores only the public key and address.
   request id and approve or reject. The background signs its own stored
   copy of the request, so the preview and the signed bytes come from the
   same object.
+- **Gleam Points payloads are refused from sites.** A `signMessage`
+  whose data starts with `gleam-points:`, and a `sign` or `dispatch`
+  with a `Gleam-Points` tag, are refused before any window opens
+  (`apps/extension/src/dispatch/methods.ts`). The tag refusal adds to
+  how a hardware proof is built (`core/points/ownership.ts`), which
+  already keeps a site's transaction from matching one.
 - **There is no auto-approval.** No setting lets a site sign without the
   window.
 - **Requests expire.** An unanswered request is rejected after 5 minutes

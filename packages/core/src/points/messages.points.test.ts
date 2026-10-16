@@ -7,6 +7,7 @@ import {
   parseRedeemMessage,
   buildRegisterMessage,
   isFreshIssuedAt,
+  isPointsMessage,
   isValidInviteCode,
   normalizeInviteCode,
   parseDeviceMessage,
@@ -126,5 +127,34 @@ describe("invite codes", () => {
     expect(normalizeInviteCode("  gleam42 ")).toBe("GLEAM42");
     expect(isValidInviteCode("GLEAM42")).toBe(true);
     expect(isValidInviteCode("GL")).toBe(false);
+  });
+});
+
+describe("isPointsMessage", () => {
+  const encode = (text: string) => new TextEncoder().encode(text);
+
+  it("flags every payload Gleam Points builds", () => {
+    for (const text of [
+      buildRegisterMessage({ deviceKeyThumbprint: THUMBPRINT, inviteCode: null, issuedAt: 1 }),
+      buildLeaveMessage(THUMBPRINT, 1),
+      buildRedeemMessage("GLEAM42", 1),
+      buildDeviceMessage("heartbeat", 1),
+      "gleam-points:attest:v1:1.2.3:abc",
+    ]) {
+      expect(isPointsMessage(encode(text))).toBe(true);
+    }
+  });
+
+  it("flags the bare prefix, even when the rest isn't UTF-8", () => {
+    expect(isPointsMessage(encode("gleam-points:"))).toBe(true);
+    expect(isPointsMessage(new Uint8Array([...encode("gleam-points:"), 0xff, 0xfe]))).toBe(true);
+  });
+
+  it("only matches the prefix at byte 0", () => {
+    expect(isPointsMessage(encode(" gleam-points:leave:v1"))).toBe(false);
+    expect(isPointsMessage(encode("hello gleam-points:leave:v1"))).toBe(false);
+    expect(isPointsMessage(encode("gleam-points"))).toBe(false);
+    expect(isPointsMessage(encode("Gleam-Points:leave:v1"))).toBe(false);
+    expect(isPointsMessage(new Uint8Array())).toBe(false);
   });
 });
