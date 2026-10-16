@@ -13,11 +13,9 @@ import { clientForGateway } from "@gleam/core/src/arweave/client.ts";
 import {
   encrypt,
   generateJWK,
-  Keyring,
-  KeyringLockedError,
-  signerFromKeyStore,
   type JWKInterface,
 } from "@gleam/core";
+import { Keyring, KeyringLockedError, signerFromKeyStore } from "@gleam/core/signer";
 import { KEYRING_PORT_NAME, type KeyringEnvelope, type KeyringResponse } from "@gleam/messaging/src/keyring-protocol.ts";
 import { keepKeyringConnected, type KeyringDocumentPort } from "../keyring/server";
 import {

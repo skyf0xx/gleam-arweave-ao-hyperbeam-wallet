@@ -3,12 +3,12 @@ import {
   addressFromOwner,
   decrypt,
   generateJWK,
-  signerFromJwk,
   verifyMessage,
   type JWKInterface,
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
+import { signerFromJwk } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 

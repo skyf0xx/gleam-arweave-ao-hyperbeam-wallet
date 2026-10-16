@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { signerFromJwk } from "./signer";
+import { signerFromJwk } from "../signer/keys";
 import Arweave from "arweave";
 import { generateJWK } from "../keys/jwk";
 import { signMessage, signature, verifyMessage, type MessageHashAlgorithm } from "./message-signing";

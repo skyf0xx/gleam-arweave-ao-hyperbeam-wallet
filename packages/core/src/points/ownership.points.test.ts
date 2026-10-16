@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { signerFromJwk } from "../vault/signer";
+import { signerFromJwk } from "../signer/keys";
 import { signTransactionWithSigner } from "../arweave/transaction";
 import { encodeTransactionForLedger } from "../hardware/ledger/serialize";
 import { generateJWK } from "../keys/jwk";

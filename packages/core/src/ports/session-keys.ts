@@ -9,7 +9,7 @@ type Bytes = Uint8Array<ArrayBuffer>;
  * unlock, and from then on get only signatures and plaintexts back: the
  * port has no way to read a key out.
  *
- * `Keyring` (`vault/keyring.ts`) is the in-memory implementation. The
+ * `Keyring` (`signer/keyring.ts`) is the in-memory implementation. The
  * extension runs it inside an offscreen document and reaches it through
  * `apps/extension/src/adapters/offscreen-keyring.ts`.
  */

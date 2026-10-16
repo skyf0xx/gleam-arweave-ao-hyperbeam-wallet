@@ -13,7 +13,8 @@ import { signTransactionWithSigner } from "@gleam/core/src/arweave/transaction.t
 import { deriveAddress, generateJWK } from "@gleam/core/src/keys/jwk.ts";
 import { bytesToBase64Url } from "@gleam/core/src/vault/base64.ts";
 import { signMessage } from "@gleam/core/src/vault/message-signing.ts";
-import { signerFromJwk, type Signer } from "@gleam/core/src/vault/signer.ts";
+import { signerFromJwk } from "@gleam/core/signer";
+import type { Signer } from "@gleam/core/src/vault/signer.ts";
 
 export interface TestWallet {
   signer: Signer;

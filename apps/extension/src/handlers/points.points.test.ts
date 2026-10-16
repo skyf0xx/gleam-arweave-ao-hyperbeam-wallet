@@ -5,7 +5,6 @@ import {
   bytesToBase64Url,
   deriveAddress,
   generateJWK,
-  signerFromJwk,
   verifyMessage,
   type BadgePort,
   type JWKInterface,
@@ -13,6 +12,7 @@ import {
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
+import { signerFromJwk } from "@gleam/core/signer";
 import { signTransactionWithSigner } from "@gleam/core/src/arweave/transaction.ts";
 import {
   buildOwnershipTransaction,

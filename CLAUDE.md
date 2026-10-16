@@ -19,8 +19,10 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 
 ## Layout
 
-- `packages/core`: pure domain logic. `vault/` and `keys/` (encryption,
-  JWK), `arweave/` (AR balance, transfer, GraphQL, upload), `ao/` (AO
+- `packages/core`: pure domain logic. `signer/` (vault envelope, key
+  import and signing, keyring; reached only through `@gleam/core/signer`
+  and allowed no npm imports but `hash-wasm`), `vault/` and `keys/`
+  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, upload), `ao/` (AO
   balance, transfer, result), `activity/`, `pricing/`, `policy/`, and
   `models/`. `ports/` holds the interfaces for storage, runtime and
   windows.

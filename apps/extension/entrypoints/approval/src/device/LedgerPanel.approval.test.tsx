@@ -6,12 +6,12 @@ import {
   bytesToBase64Url,
   generateJWK,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
-  signerFromJwk,
   verifyDeviceSignature,
   type DeviceSigningPayload,
   type JWKInterface,
   type LedgerTransport,
 } from "@gleam/core";
+import { signerFromJwk } from "@gleam/core/signer";
 import { buildUnsignedDataItem, dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { buildUnsignedTransaction, transactionSignatureData } from "@gleam/core/src/arweave/transaction.ts";

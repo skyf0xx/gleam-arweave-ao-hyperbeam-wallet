@@ -1,6 +1,6 @@
 import { argon2id } from "hash-wasm";
 import type { Argon2idParams, VaultEnvelope, VaultEnvelopeV2 } from "../models/wallet";
-import { base64ToBytes, bytesToBase64 } from "./base64";
+import { base64ToBytes, bytesToBase64 } from "../vault/base64";
 import { zeroize } from "./zeroize";
 
 const PBKDF2_ITERATIONS = 600_000;

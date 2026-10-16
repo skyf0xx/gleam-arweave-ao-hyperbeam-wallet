@@ -1,11 +1,11 @@
 import {
   base64ToBytes,
   bytesToBase64,
-  KeyringLockedError,
   type JWKInterface,
   type RsaPssSignParams,
   type SessionKeyStorePort,
 } from "@gleam/core";
+import { KeyringLockedError } from "@gleam/core/signer";
 import {
   KEYRING_PORT_NAME,
   type KeyringEnvelope,

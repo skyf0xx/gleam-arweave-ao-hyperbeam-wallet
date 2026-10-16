@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import Arweave from "arweave";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
-import { encrypt } from "./encryption";
+import { encrypt } from "../vault/encryption";
 import { Keyring, KeyringLockedError } from "./keyring";
 
 const bytes = (text: string) => new TextEncoder().encode(text) as Uint8Array<ArrayBuffer>;
@@ -14,7 +14,7 @@ beforeAll(async () => {
   [jwkA, jwkB] = await Promise.all([generateJWK(), generateJWK()]);
 }, 60_000);
 
-describe("vault/keyring", () => {
+describe("signer/keyring", () => {
   let keyring: Keyring;
 
   beforeEach(async () => {

@@ -2,7 +2,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as hashWasm from "hash-wasm";
 import {
   bytesToBase64,
-  VaultKdfError,
   type DownloadPort,
   type FileDownloadResult,
   type JWKInterface,
@@ -10,6 +9,7 @@ import {
   type VaultEnvelope,
   type Wallet,
 } from "@gleam/core";
+import { VaultKdfError } from "@gleam/core/signer";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 import { getSigner, clearKeyCache } from "./key-session";
 import { sessionKeyStore } from "../adapters/session-key-store";
@@ -358,7 +358,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
     const [wallet] = (await storage.get<Array<Record<string, unknown>>>("local:wallets"))!;
     // Re-encrypt the first wallet under a password the policy now rejects.
     const jwk = await downloadedJwk(storage, wallet!.id as string, GOOD_PASSWORD);
-    const { encryptToEnvelope } = await import("@gleam/core");
+    const { encryptToEnvelope } = await import("@gleam/core/signer");
     const weak = "short1!";
     const envelope = await encryptToEnvelope(
       new TextEncoder().encode(JSON.stringify(jwk)) as Uint8Array<ArrayBuffer>,

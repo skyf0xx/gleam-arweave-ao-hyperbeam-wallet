@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { signerFromJwk } from "../vault/signer";
+import { signerFromJwk } from "../signer/keys";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import { clientForGateway } from "./client";

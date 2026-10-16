@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { signerFromJwk } from "./signer";
+import { signerFromJwk } from "../signer/keys";
 import Arweave from "arweave";
 import { DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";

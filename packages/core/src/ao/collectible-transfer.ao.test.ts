@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { signerFromJwk } from "../vault/signer";
+import { signerFromJwk } from "../signer/keys";
 import Arweave from "arweave";
 import { finishTransfer } from "../arweave/transfer";
 import { signTransactionWithSigner } from "../arweave/transaction";

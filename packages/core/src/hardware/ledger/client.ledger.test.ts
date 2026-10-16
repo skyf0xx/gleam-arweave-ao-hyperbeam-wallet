@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { signerFromJwk } from "../../vault/signer";
+import { signerFromJwk } from "../../signer/keys";
 import { clientForGateway } from "../../arweave/client";
 import { buildUnsignedDataItem, dataItemSignatureData } from "../../arweave/data-item";
 import { sha256, signRsaPss } from "../../arweave/rsa-pss";

@@ -6,7 +6,6 @@ import {
   generateJWK,
   signature,
   signPayloadWithSigner,
-  signerFromJwk,
   verifyMessage,
   WALLET_APPROVAL_ORIGIN,
   type ApprovalRequest,
@@ -16,6 +15,7 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
+import { signerFromJwk } from "@gleam/core/signer";
 import { dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { verifyPointsProof } from "@gleam/core/src/points/index.ts";

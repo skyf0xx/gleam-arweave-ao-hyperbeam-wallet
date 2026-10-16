@@ -1,12 +1,7 @@
 import type { JWKInterface } from "../models/wallet";
 import type { SessionKeyStorePort } from "../ports/session-keys";
-import {
-  decryptOaepWithHandles,
-  importSessionKeys,
-  signPssWithHandles,
-  type RsaPssSignParams,
-  type SessionKeyHandles,
-} from "./signer";
+import type { RsaPssSignParams } from "../vault/signer";
+import { decryptOaepWithHandles, importSessionKeys, signPssWithHandles, type SessionKeyHandles } from "./keys";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 

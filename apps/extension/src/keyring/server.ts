@@ -1,11 +1,10 @@
 import {
   base64ToBytes,
   bytesToBase64,
-  KeyringLockedError,
-  zeroize,
   type MessageHashAlgorithm,
   type SessionKeyStorePort,
 } from "@gleam/core";
+import { KeyringLockedError, zeroize } from "@gleam/core/signer";
 import {
   KEYRING_PORT_NAME,
   type KeyringReply,

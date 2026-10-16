@@ -6,10 +6,11 @@ import { verifyRsaPss } from "../arweave/rsa-pss";
 import { applyTransactionSignature, buildUnsignedTransaction, signTransactionWithSigner } from "../arweave/transaction";
 import { buildUnsignedDataItem, createSignedDataItem, verifyDataItemSignature } from "../arweave/data-item";
 import { clientForGateway } from "../arweave/client";
-import { encrypt } from "./encryption";
-import { signMessage, verifyMessage } from "./message-signing";
+import { encrypt } from "../vault/encryption";
+import { signMessage, verifyMessage } from "../vault/message-signing";
 import { Keyring } from "./keyring";
-import { importSessionKeys, signerFromJwk, signerFromKeyStore, type SessionKeyHandles, type Signer } from "./signer";
+import type { Signer } from "../vault/signer";
+import { importSessionKeys, signerFromJwk, signerFromKeyStore, type SessionKeyHandles } from "./keys";
 
 const bytes = (text: string) => new TextEncoder().encode(text) as Uint8Array<ArrayBuffer>;
 
@@ -38,7 +39,7 @@ const SIGNERS: Array<[string, () => Promise<Signer>]> = [
   ],
 ];
 
-describe.each(SIGNERS)("vault/signer: %s", (_, makeSigner) => {
+describe.each(SIGNERS)("signer/keys: %s", (_, makeSigner) => {
   let signer: Signer;
 
   beforeAll(async () => {
@@ -125,7 +126,7 @@ describe.each(SIGNERS)("vault/signer: %s", (_, makeSigner) => {
   });
 });
 
-describe("vault/signer: signerFromJwk", () => {
+describe("signer/keys: signerFromJwk", () => {
   it("signs with a stored JWK whose alg/key_ops name another algorithm", async () => {
     const hinted = signerFromJwk({ ...jwk, alg: "RSA-OAEP-256", key_ops: ["decrypt"] } as JWKInterface, "address-a");
     const data = bytes("hinted");
@@ -134,7 +135,7 @@ describe("vault/signer: signerFromJwk", () => {
   });
 });
 
-describe("vault/signer: importSessionKeys", () => {
+describe("signer/keys: importSessionKeys", () => {
   let keys: SessionKeyHandles;
 
   beforeAll(async () => {

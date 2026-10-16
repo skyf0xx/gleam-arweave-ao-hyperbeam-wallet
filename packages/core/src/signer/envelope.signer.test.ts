@@ -8,7 +8,7 @@ import {
   encryptToEnvelope,
   envelopeNeedsUpgrade,
 } from "./envelope";
-import { base64ToBytes, bytesToBase64 } from "./base64";
+import { base64ToBytes, bytesToBase64 } from "../vault/base64";
 import type { Argon2idParams, VaultEnvelope, VaultEnvelopeV1 } from "../models/wallet";
 
 vi.mock("hash-wasm", async (importOriginal) => {

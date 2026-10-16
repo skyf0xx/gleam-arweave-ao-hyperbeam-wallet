@@ -1,5 +1,5 @@
 import { base64ToBytes, bytesToBase64 } from "./base64";
-import { zeroize } from "./zeroize";
+import { zeroize } from "../signer/zeroize";
 
 const IV_LENGTH_BYTES = 12;
 const HKDF_INFO = new TextEncoder().encode("gleam:passkey:v1");

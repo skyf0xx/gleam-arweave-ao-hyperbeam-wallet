@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import { Keyring } from "@gleam/core";
+import { Keyring } from "@gleam/core/signer";
 import { keepKeyringConnected } from "@/src/keyring/server";
 
 /**

@@ -55,7 +55,7 @@ record by additional authenticated data (`gleam:v1:<walletId>:<address>`),
 so an envelope moved onto another wallet's record fails to decrypt. It is
 stored in `chrome.storage.local`. The derived key is a non-extractable
 WebCrypto key, and the password bytes are zeroed after use. See
-`packages/core/src/vault/envelope.ts`.
+`packages/core/src/signer/envelope.ts`.
 
 **While unlocked.** Unlocking decrypts the keyfile and hands it, once,
 to the keyring: an offscreen document the background opens for this
@@ -180,7 +180,7 @@ These are true of the current release. Each has a fix planned unless it says oth
     polyfilled). A production build contains no elliptic code: its
     curve constants, error strings and `HmacDRBG` are absent from
     `.output/chrome-mv3`. Every Gleam signature is RSA-PSS through
-    WebCrypto (`core/vault/signer.ts`, `core/arweave/rsa-pss.ts`).
+    WebCrypto (`core/signer/keys.ts`, `core/arweave/rsa-pss.ts`).
   - `node-forge` ≤ 1.4.0 (GHSA-86w9-cpqp-85rv): forged RSA PKCS#1 v1.5
     signatures. It comes only through `wxt` → `web-ext` → `adbkit`, a
     development tool, and isn't in the build.

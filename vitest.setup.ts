@@ -8,7 +8,7 @@ import { cleanup } from "@testing-library/react";
  * transport itself.
  */
 vi.mock("./apps/extension/src/adapters/session-key-store.ts", async () => {
-  const { Keyring } = await import("./packages/core/src/vault/keyring.ts");
+  const { Keyring } = await import("./packages/core/src/signer/keyring.ts");
   return { sessionKeyStore: new Keyring(), listenForKeyringConnections: () => {} };
 });
 

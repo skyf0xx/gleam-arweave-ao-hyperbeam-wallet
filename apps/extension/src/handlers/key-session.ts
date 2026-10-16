@@ -1,6 +1,5 @@
 import {
   isHardwareWalletMethod,
-  signerFromKeyStore,
   vaultHasPassword,
   type AutoLockTimeout,
   type HardwareDevice,
@@ -9,6 +8,7 @@ import {
   type Signer,
   type WalletMethod,
 } from "@gleam/core";
+import { signerFromKeyStore } from "@gleam/core/signer";
 import { sessionKeyStore } from "../adapters/session-key-store";
 import { storagePort } from "../adapters/storage";
 
@@ -132,7 +132,7 @@ function isSessionKeyEntry(value: unknown): value is SessionKeyEntry {
 }
 
 /**
- * `zeroize()` (core/vault/zeroize.ts) operates on byte buffers, but these
+ * `zeroize()` (core/signer/zeroize.ts) operates on byte buffers, but these
  * entries hold base64url strings and `StoragePort` has no in-place
  * overwrite. So "zeroize before removal" means: overwrite the record with
  * a same-shape all-zero copy via `set`, then `remove` it, rather than

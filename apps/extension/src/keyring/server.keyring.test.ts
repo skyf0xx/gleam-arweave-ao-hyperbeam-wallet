@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { verifyRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
-import { bytesToBase64, base64ToBytes, encrypt, generateJWK, Keyring, type JWKInterface } from "@gleam/core";
+import { bytesToBase64, base64ToBytes, encrypt, generateJWK, type JWKInterface } from "@gleam/core";
+import { Keyring } from "@gleam/core/signer";
 import { KEYRING_PORT_NAME, type KeyringResponse } from "@gleam/messaging/src/keyring-protocol.ts";
 import {
   keepKeyringConnected,
