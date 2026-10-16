@@ -22,7 +22,7 @@ describe("site CSP", () => {
   for (const page of readdirSync(SITE).filter((file) => file.endsWith(".html"))) {
     it(`allows every inline script in ${page}`, () => {
       const html = readFileSync(join(SITE, page), "utf8");
-      for (const [, body] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+      for (const [, body] of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
         const hash = `'sha256-${createHash("sha256").update(body!).digest("base64")}'`;
         expect(scriptSrc, `add ${hash} to script-src in apps/site/vercel.json`).toContain(hash);
       }
@@ -31,7 +31,7 @@ describe("site CSP", () => {
 
   it("never allows inline event handlers", () => {
     for (const page of readdirSync(SITE).filter((file) => file.endsWith(".html"))) {
-      expect(readFileSync(join(SITE, page), "utf8")).not.toMatch(/\son[a-z]+="/);
+      expect(readFileSync(join(SITE, page), "utf8")).not.toMatch(/\son[a-z]+="/i);
     }
   });
 });
