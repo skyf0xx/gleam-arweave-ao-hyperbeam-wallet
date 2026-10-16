@@ -18,22 +18,8 @@ Code written for
 
 ### Keep a user's data private across devices
 
-Want a user's data encrypted so only their wallet can open it, on any
-device? Use `encrypt` and `decrypt`.
-
-1. Make a random key in your app.
-2. Ask Gleam to encrypt that key. Save the result wherever you keep the
-   user's data.
-3. Encrypt the user's data with your key.
-4. On another device, the user connects the same wallet. Ask Gleam to
-   decrypt the saved key. Now you can open their data.
-
-Each step that touches the wallet shows the user an approval window.
-
-Gleam doesn't support `privateHash`. It needs the wallet's private key to
-stay readable while the wallet is unlocked. Gleam holds the unlocked key in
-memory only, never on disk, in a form not even its own code can copy. `privateHash` also isn't tied to your
-site, so another site could ask for the same value.
+Use `encrypt` and `decrypt` to lock your app's data key to the user's
+wallet, so they can open their data on any device.
 
 <details>
 <summary>Example</summary>
@@ -41,16 +27,16 @@ site, so another site could ask for the same value.
 ```js
 await window.arweaveWallet.connect(["ENCRYPT", "DECRYPT"]);
 
-// First time: make a key and save it encrypted to the user's wallet.
-const key = crypto.getRandomValues(new Uint8Array(32));
-const lockedKey = await window.arweaveWallet.encrypt(key, { name: "RSA-OAEP" });
-// Save lockedKey with the user's data, then encrypt the data with key (AES-GCM).
-
-// Any device later: unlock the saved key.
-const sameKey = await window.arweaveWallet.decrypt(lockedKey, { name: "RSA-OAEP" });
+const key = crypto.getRandomValues(new Uint8Array(32)); // your app's data key
+const locked = await window.arweaveWallet.encrypt(key, { name: "RSA-OAEP" });
+// Later, on any device:
+const sameKey = await window.arweaveWallet.decrypt(locked, { name: "RSA-OAEP" });
 ```
 
 </details>
+
+Gleam doesn't support `privateHash`, which needs the private key to stay
+readable while the wallet is unlocked.
 
 ### Add a Connect with Gleam button
 
