@@ -86,7 +86,9 @@ fake.
 
 **Challenge.** `pnpm scan start` calls `GET /scan/challenge`. The
 server picks 3 functions at random from the security-surface files and
-returns them with a challenge id. The challenge expires after 24 hours
+returns them with a challenge id. It picks only functions that make a
+check: their own body has an `if`, `throw` or `switch`, not counting
+nested functions, strings or comments. The challenge expires after 24 hours
 and can be used once. For each function, the agent names the line of a
 security check that function makes, and says in one sentence what the
 check prevents.

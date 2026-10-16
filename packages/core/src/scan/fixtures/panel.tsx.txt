@@ -1,0 +1,30 @@
+import { useState } from "react";
+
+interface Props {
+  origin: string;
+  onApprove: () => void;
+}
+
+export function ApprovalPanel({ origin, onApprove }: Props) {
+  const [ack, setAck] = useState(false);
+  if (!origin.startsWith("https://")) return null;
+  return (
+    <div className="panel" data-x="{not a brace">
+      <p>Don't approve a site you didn't open. It can't {"}"} undo.</p>
+      {/* a JSX comment { */}
+      <button disabled={!ack} onClick={() => { onApprove(); }}>
+        Approve {origin}
+      </button>
+      <input type="checkbox" onChange={(event) => setAck(event.target.checked)} />
+    </div>
+  );
+}
+
+export const Banner = ({ text }: { text: string }) => {
+  const isLong = text.length > 80;
+  return <p title={`${text} }`}>{isLong ? <b>{text}</b> : text}</p>;
+};
+
+function compare(a: number, b: number) {
+  return a < b ? a : b;
+}

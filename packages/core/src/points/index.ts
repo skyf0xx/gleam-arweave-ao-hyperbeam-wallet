@@ -12,6 +12,8 @@ export {
   parseRedeemMessage,
   buildDeviceMessage,
   parseDeviceMessage,
+  buildAttestMessage,
+  parseAttestMessage,
   isFreshIssuedAt,
 } from "./messages";
 export type { RegisterMessage, DeviceMessageKind } from "./messages";
