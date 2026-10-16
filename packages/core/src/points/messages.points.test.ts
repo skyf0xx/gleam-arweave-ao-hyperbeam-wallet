@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAttestMessage,
+  parseAttestMessage,
   buildDeviceMessage,
   buildLeaveMessage,
   parseLeaveMessage,
@@ -105,6 +107,39 @@ describe("device messages", () => {
   it("refuses a fractional or negative timestamp", () => {
     expect(() => buildDeviceMessage("me", 1.5)).toThrow();
     expect(() => buildDeviceMessage("me", -1)).toThrow();
+  });
+});
+
+describe("attest message", () => {
+  const ID = "3f".repeat(32);
+
+  it("round-trips", () => {
+    const text = buildAttestMessage("1.4.0", ID);
+
+    expect(text).toBe(`gleam-points:attest:v1:1.4.0:${ID}`);
+    expect(parseAttestMessage(text)).toEqual({ release: "1.4.0", attestationId: ID });
+  });
+
+  it("refuses to build with a malformed release or id", () => {
+    expect(() => buildAttestMessage("1.4", ID)).toThrow();
+    expect(() => buildAttestMessage("1.4.0:x", ID)).toThrow();
+    expect(() => buildAttestMessage("1.4.0", ID.toUpperCase())).toThrow();
+    expect(() => buildAttestMessage("1.4.0", ID.slice(1))).toThrow();
+  });
+
+  it.each([
+    ["another kind", `gleam-points:leave:v1:1.4.0:${ID}`],
+    ["another version", `gleam-points:attest:v2:1.4.0:${ID}`],
+    ["a pre-release", `gleam-points:attest:v1:1.4.0-rc.1:${ID}`],
+    ["an uppercase id", `gleam-points:attest:v1:1.4.0:${ID.toUpperCase()}`],
+    ["an extra field", `gleam-points:attest:v1:1.4.0:${ID}:1`],
+    ["a missing id", "gleam-points:attest:v1:1.4.0"],
+  ])("rejects %s", (_label, text) => {
+    expect(parseAttestMessage(text)).toBeNull();
+  });
+
+  it("is refused as a dApp signMessage payload", () => {
+    expect(isPointsMessage(new TextEncoder().encode(buildAttestMessage("1.4.0", ID)))).toBe(true);
   });
 });
 
