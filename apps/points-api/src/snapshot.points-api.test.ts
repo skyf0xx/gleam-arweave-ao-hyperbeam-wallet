@@ -136,4 +136,46 @@ describe("runSnapshot", () => {
 
     expect(await runSnapshot(db, NOW, { readBalances: reader({}) })).toMatchObject({ walletCount: 0 });
   });
+
+  describe("bounty pool", () => {
+    const poolRows = (db: Db) =>
+      db.query<{ day: string; delta: string; reason: string }>(
+        "SELECT day::text AS day, delta_atomic::text AS delta, reason FROM bounty_pool ORDER BY day",
+      );
+
+    it("grows by 2% of the day's holding points, once per day", async () => {
+      const db = await createTestDb();
+      await seed(db, [
+        { address: "alice", heartbeat: HOURS_AGO },
+        { address: "bob", heartbeat: HOURS_AGO },
+      ]);
+      const readBalances = reader({ alice: { arAtomic: "1000", aoAtomic: "0" }, bob: { arAtomic: "1500", aoAtomic: "0" } });
+
+      await runSnapshot(db, NOW, { readBalances });
+      expect(await runSnapshot(db, NOW, { readBalances })).toBeNull();
+      await runSnapshot(db, new Date(NOW.getTime() + 86_400_000), { readBalances });
+
+      expect((await poolRows(db)).rows).toEqual([
+        { day: "2026-10-08", delta: "50", reason: "daily" },
+        { day: "2026-10-09", delta: "50", reason: "daily" },
+      ]);
+    });
+
+    it("rounds down and adds no row when the delta is 0", async () => {
+      const db = await createTestDb();
+      await seed(db, [{ address: "alice", heartbeat: HOURS_AGO }]);
+      await runSnapshot(db, NOW, { readBalances: reader({ alice: { arAtomic: "10", aoAtomic: "0" } }) });
+      expect((await poolRows(db)).rows).toEqual([]);
+      await runSnapshot(db, new Date(NOW.getTime() + 86_400_000), { readBalances: reader({ alice: { arAtomic: "99", aoAtomic: "0" } }) });
+      expect((await poolRows(db)).rows).toEqual([{ day: "2026-10-09", delta: "1", reason: "daily" }]);
+    });
+
+    it("refuses a second daily row for the same day", async () => {
+      const db = await createTestDb();
+      await db.query("INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ('2026-10-08', 5, 'daily', now())");
+      await expect(
+        db.query("INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ('2026-10-08', 5, 'daily', now())"),
+      ).rejects.toThrow();
+    });
+  });
 });

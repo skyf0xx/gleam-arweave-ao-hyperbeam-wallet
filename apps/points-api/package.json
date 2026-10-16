@@ -6,7 +6,9 @@
   "scripts": {
     "start": "tsx src/server.ts",
     "drop-code": "tsx scripts/drop-code.ts",
-    "funnel": "tsx scripts/funnel.ts"
+    "funnel": "tsx scripts/funnel.ts",
+    "scan-award": "tsx scripts/scan-award.ts",
+    "scan-void": "tsx scripts/scan-void.ts"
   },
   "dependencies": {
     "@gleam/core": "workspace:*",
