@@ -3,6 +3,8 @@ import type { BalanceReader } from "./balances";
 import type { Db } from "./db";
 
 export const LIVENESS_WINDOW_MS = 3 * 86_400_000;
+/** Percent of a day's holding points that joins the bounty pool (SCANS.md § Points). */
+export const POOL_GROWTH_PERCENT = 2;
 
 export interface SnapshotOptions {
   readBalances: BalanceReader;
@@ -91,6 +93,15 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
         credited.map(([, p]) => p.founderBonusAtomic),
         credited.map(([, p]) => p.referrerBonusAtomic),
       ],
+    );
+    // Summed from the stored rows so it matches what members were credited,
+    // wallets that left mid-run excluded.
+    await tx.query(
+      `INSERT INTO bounty_pool (day, delta_atomic, reason, created_at)
+       SELECT $1::date, div(t.total * $2, 100), 'daily', $3
+         FROM (SELECT coalesce(sum(holding_atomic), 0) AS total FROM points WHERE day = $1::date) t
+        WHERE div(t.total * $2, 100) > 0`,
+      [day, POOL_GROWTH_PERCENT, now],
     );
   });
 

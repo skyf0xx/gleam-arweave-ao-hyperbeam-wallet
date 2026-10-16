@@ -167,11 +167,13 @@ To pay a finding, run the award script locally, as with `drop-code`:
 
 ```bash
 DATABASE_URL=… pnpm --filter @gleam/points-api scan-award --attestation <id> --severity high --ref <url>
+DATABASE_URL=… pnpm --filter @gleam/points-api scan-void --attestation <id>
 ```
 
-It shows the amount and asks for confirmation. It won't pay the same
-`--ref` twice. `scan-void --attestation <id>` removes an attestation
-that shows no real work. The server has no admin endpoint.
+`scan-award` shows the pool balance, the share and the amount, and asks
+for confirmation. It won't pay the same `--ref` twice. `scan-void`
+removes the points of an attestation that shows no real work and keeps
+any finding points. The server has no admin endpoint.
 
 ## By design
 
