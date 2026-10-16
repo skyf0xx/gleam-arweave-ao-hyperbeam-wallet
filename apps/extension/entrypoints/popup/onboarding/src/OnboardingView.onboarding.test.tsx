@@ -38,7 +38,7 @@ describe("OnboardingView: create flow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
 
-    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
       target: { value: GOOD_PASSWORD },
     });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
@@ -82,7 +82,7 @@ describe("OnboardingView: create flow", () => {
     render(<OnboardingView runtime={runtime} onComplete={onComplete} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
-    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
       target: { value: GOOD_PASSWORD },
     });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
@@ -109,7 +109,7 @@ describe("OnboardingView: create flow", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
-    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
       target: { value: GOOD_PASSWORD },
     });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
@@ -184,7 +184,7 @@ describe("OnboardingView: create flow", () => {
     render(<OnboardingView runtime={runtime} onComplete={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Create a wallet" }));
 
-    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
       target: { value: GOOD_PASSWORD },
     });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {

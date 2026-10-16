@@ -151,9 +151,16 @@ export function LockSettingsView({
               })
             )}
           </div>
-          <p className="pt-2.5 text-caption leading-relaxed text-faint">
-            Gleam stays unlocked until you lock it or this timeout is reached.
-          </p>
+          {state.settings?.autoLockTimeout === "never" ? (
+            <p role="note" className="pt-2.5 text-caption leading-relaxed text-warning">
+              Gleam stays unlocked until you lock it, even when your computer locks. Anyone who uses this
+              browser meanwhile can approve requests from your wallet.
+            </p>
+          ) : (
+            <p className="pt-2.5 text-caption leading-relaxed text-faint">
+              Gleam locks after this long without use, and whenever your computer locks.
+            </p>
+          )}
         </div>
 
       </div>

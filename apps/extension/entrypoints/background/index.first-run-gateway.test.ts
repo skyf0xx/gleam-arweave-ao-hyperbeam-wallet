@@ -47,6 +47,7 @@ vi.mock("wxt/browser", () => ({
     },
     tabs: { query: vi.fn().mockResolvedValue([]), onRemoved: { addListener: vi.fn() } },
     alarms: { create: vi.fn(), get: vi.fn(async () => undefined), onAlarm: { addListener: vi.fn() } },
+    idle: { onStateChanged: { addListener: vi.fn() } },
   },
 }));
 
@@ -60,9 +61,9 @@ vi.mock("wxt/utils/define-background", () => ({
 const originalFetch = globalThis.fetch;
 
 async function runOnInstalled(): Promise<void> {
-  const listener = onInstalledAddListener.mock.calls[0]?.[0] as (() => void) | undefined;
+  const listener = onInstalledAddListener.mock.calls[0]?.[0] as ((details: { reason: string }) => void) | undefined;
   if (!listener) throw new Error("onInstalled listener was never registered.");
-  listener();
+  listener({ reason: "install" });
   // The listener fires an unawaited async function; poll until it has
   // written (or definitively won't write) rather than guessing a fixed
   // number of microtask turns for its several sequential `await`s

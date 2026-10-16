@@ -50,6 +50,17 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     );
   });
 
+  it("warns while Never is selected, and drops the warning once a timeout is picked", async () => {
+    const send = vi.fn().mockResolvedValueOnce(NEVER).mockResolvedValueOnce(undefined);
+    render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("note").textContent).toMatch(/stays unlocked until you lock it/));
+    fireEvent.click(screen.getByText("1 hour"));
+
+    await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
+    expect(screen.getByText(/whenever your computer locks/)).toBeTruthy();
+  });
+
   it("does not re-save when the already-selected timeout is tapped again", async () => {
     const send = vi.fn().mockResolvedValue(NEVER);
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);

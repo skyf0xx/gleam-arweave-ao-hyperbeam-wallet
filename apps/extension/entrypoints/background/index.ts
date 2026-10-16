@@ -657,6 +657,23 @@ async function setLockedIcon(locked: boolean) {
   })
 }
 
+async function lockVault(): Promise<void> {
+  await lifecycle.lockWallet();
+  // A vault of only hardware wallets has no password and stays unlocked.
+  if (vaultHasPassword((await lifecycle.getState()).wallets)) void setLockedIcon(true);
+}
+
+/**
+ * Locks when the computer's screen locks, unless auto-lock is "never".
+ * Only `"locked"` counts: the auto-lock timeout already runs from the last
+ * use of the wallet, which is stricter than the OS's idle state.
+ */
+async function lockOnScreenLock(state: string): Promise<void> {
+  if (state !== "locked") return;
+  if ((await lifecycle.getLockSettings()).autoLockTimeout === "never") return;
+  await lockVault();
+}
+
 // A new wallet becomes the active one. Connected dApps follow the active
 // wallet, so they hear about it; with no earlier wallet there is nothing
 // connected to tell.
@@ -737,11 +754,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   },
   downloadKeyfile: (data) => lifecycle.downloadKeyfile(data),
   cancelKeyfileDownload: (data) => lifecycle.cancelKeyfileDownload(data),
-  lockWallet: async () => {
-    await lifecycle.lockWallet();
-    // A vault of only hardware wallets has no password and stays unlocked.
-    if (vaultHasPassword((await lifecycle.getState()).wallets)) void setLockedIcon(true);
-  },
+  lockWallet: () => lockVault(),
   unlockWallet: async (data) => {
     const result = await lifecycle.unlockWallet(data);
     void setLockedIcon(false);
@@ -951,8 +964,15 @@ export default defineBackground(() => {
 
   watchDownloadHistory(browser.runtime.id);
 
+  browser.idle.onStateChanged.addListener((state) => {
+    lockOnScreenLock(state).catch((error: unknown) => console.error("Couldn't lock on screen lock.", error));
+  });
+
   browser.runtime.onInstalled.addListener((details) => {
     void initializeNetworkSettingsIfMissing();
+    if (details.reason === "update") {
+      lifecycle.keepLockTimeoutOnUpdate().catch((error: unknown) => console.error("Couldn't keep the lock timeout.", error));
+    }
     // Dev builds reload constantly; opening the site from them would
     // inflate the install and uninstall counts.
     if (import.meta.env.PROD) {

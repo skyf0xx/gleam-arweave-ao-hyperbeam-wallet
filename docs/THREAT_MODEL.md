@@ -91,7 +91,9 @@ the wallet reads as locked. Lock, auto-lock, wallet removal, reset and
 browser startup clear the keyring and close its document. Locking
 overwrites each session entry before removing it. Auto-lock is checked on
 every key read and by a one-minute alarm, so the keys go when the timeout
-passes even if nothing reads them. Lock and unlock run one at a time, so
+passes even if nothing reads them. The default timeout is 1 hour, and the
+vault also locks when the computer's screen locks unless auto-lock is set
+to "never". Lock and unlock run one at a time, so
 a lock can't race an unlock and leave keys behind. See
 `apps/extension/src/handlers/key-session.ts` and
 `apps/extension/entrypoints/keyring/`.
@@ -161,11 +163,10 @@ These are true of the current release. Each has a fix planned unless it says oth
 - **No network allowlist.** The extension's content security policy
   doesn't restrict which hosts its code can contact, so stolen data
   could be sent anywhere. Planned: a `connect-src` allowlist.
-- **Auto-lock is off by default.** Planned: on by default, and lock when
-  the computer locks.
-- **Password strength.** The minimum is 8 characters, with a blocklist of
-  common passwords. Against a stolen vault, PBKDF2 slows guessing but
-  doesn't stop a GPU attack on a weak password. Planned: Argon2id.
+- **Password strength.** The minimum is 12 characters, with a blocklist
+  of common passwords, and Argon2id makes each guess against a stolen
+  vault slow. A reused or predictable password can still be guessed. No
+  fix planned beyond the policy.
 - **Key export passes the plaintext keyfile to the popup.** It's needed to
   save the file, and it requires the password.
 - **Hardware wallets can't sign yet.** They can hold funds and receive.

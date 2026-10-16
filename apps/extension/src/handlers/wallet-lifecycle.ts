@@ -95,7 +95,7 @@ const THEME_SETTINGS_KEY = "local:themeSettings";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 
-const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
+const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "1hr" };
 const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
 
 const VALID_THEME_PREFERENCES: readonly ThemeSettings["theme"][] = ["light", "dark"];
@@ -1030,6 +1030,19 @@ export class WalletLifecycleHandler {
    */
   async getLockSettings(): Promise<LockSettings> {
     return loadLockSettings(this.storage);
+  }
+
+  /**
+   * Run on an extension update. Vaults from before the 1-hour default ran
+   * with "never" without anyone choosing it, so they keep it rather than
+   * starting to lock after the update. Only new installs get the default.
+   */
+  async keepLockTimeoutOnUpdate(): Promise<void> {
+    return withSessionLock(async () => {
+      if ((await this.storage.get<unknown>(LOCK_SETTINGS_KEY)) !== null) return;
+      if ((await loadWallets(this.storage)).length === 0) return;
+      await this.storage.set(LOCK_SETTINGS_KEY, { autoLockTimeout: "never" } satisfies LockSettings);
+    });
   }
 
   /**

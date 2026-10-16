@@ -36,7 +36,7 @@ export default defineConfig({
     // to confirmed once the gateway indexes them, and the auto-lock tick.
     // 'offscreen' backs the keyring document (entrypoints/keyring), which
     // holds unlocked wallets' non-extractable keys in memory only.
-    permissions: ['storage', 'sidePanel', 'tabs', 'alarms', 'offscreen'],
+    permissions: ['storage', 'sidePanel', 'tabs', 'alarms', 'offscreen', 'idle'],
     // 'downloads' lets the background save a keyfile backup itself, so the
     // plaintext key never reaches the popup. It is optional because a new
     // required permission disables the extension on update until the user

@@ -152,15 +152,15 @@ describe("WalletLifecycleHandler: createWallet", () => {
     handler = new WalletLifecycleHandler(storage, TEST_KDF);
   });
 
-  it("rejects a password shorter than 8 characters", async () => {
+  it("rejects a password shorter than 12 characters", async () => {
     await expect(handler.createWallet({ name: "Main", password: "short1!" })).rejects.toThrow(
-      /at least 8 characters/i,
+      /at least 12 characters/i,
     );
   });
 
   it("rejects a common/breached password", async () => {
     await expect(
-      handler.createWallet({ name: "Main", password: "iloveyou123" }),
+      handler.createWallet({ name: "Main", password: "loginpassword" }),
     ).rejects.toThrow(/too common/i);
   });
 
@@ -236,7 +236,7 @@ describe("WalletLifecycleHandler: importWallet", () => {
   it("rejects a weak password even with a valid keyfile", async () => {
     await expect(
       handler.importWallet({ jwk: validJWK(), name: "Imported", password: "short" }),
-    ).rejects.toThrow(/at least 8 characters/i);
+    ).rejects.toThrow(/at least 12 characters/i);
   });
 
   it("imports a structurally valid JWK and stores it encrypted-only", async () => {
@@ -601,13 +601,13 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     expect(session).not.toHaveProperty("key");
   });
 
-  it("defaults the session's autoLockTimeout to never", async () => {
+  it("defaults the session's autoLockTimeout to 1 hour", async () => {
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.lockWallet();
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
     const session = await storage.get<{ autoLockTimeout: string }>("session:unlockedSession");
-    expect(session?.autoLockTimeout).toBe("never");
+    expect(session?.autoLockTimeout).toBe("1hr");
   });
 });
 
@@ -944,9 +944,9 @@ describe("WalletLifecycleHandler: lockWallet", () => {
 });
 
 describe("WalletLifecycleHandler: getLockSettings", () => {
-  it("defaults to never when nothing is stored", async () => {
+  it("defaults to 1 hour when nothing is stored", async () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
-    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "never" });
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "1hr" });
   });
 
   it("reflects a value previously written by setLockSettings", async () => {
@@ -959,7 +959,39 @@ describe("WalletLifecycleHandler: getLockSettings", () => {
     const storage = createFakeStorage();
     await storage.set("local:lockSettings", { autoLockTimeout: "not-a-real-timeout" });
     const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "1hr" });
+  });
+});
+
+describe("WalletLifecycleHandler: keepLockTimeoutOnUpdate", () => {
+  it("keeps never for a vault that predates the 1-hour default", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await storage.remove("local:lockSettings");
+
+    await handler.keepLockTimeoutOnUpdate();
+
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "never" });
+  });
+
+  it("leaves a timeout the user chose", async () => {
+    const storage = createFakeStorage();
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    await handler.setLockSettings({ autoLockTimeout: "5min" });
+
+    await handler.keepLockTimeoutOnUpdate();
+
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "5min" });
+  });
+
+  it("leaves an install with no wallet on the default", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+
+    await handler.keepLockTimeoutOnUpdate();
+
+    expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "1hr" });
   });
 });
 
@@ -1061,7 +1093,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
     const session = await storage.get<{ autoLockTimeout: string }>("session:unlockedSession");
-    expect(session?.autoLockTimeout).toBe("never");
+    expect(session?.autoLockTimeout).toBe("1hr");
   });
 });
 

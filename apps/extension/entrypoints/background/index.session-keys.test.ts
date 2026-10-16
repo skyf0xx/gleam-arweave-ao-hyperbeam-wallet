@@ -26,6 +26,7 @@ const onStartupAddListener = vi.fn();
 const onAlarmAddListener = vi.fn();
 const alarmsCreate = vi.fn();
 const alarmsGet = vi.fn<(name: string) => Promise<unknown>>(async () => undefined);
+const onIdleStateChangedAddListener = vi.fn();
 vi.mock("wxt/browser", () => ({
   browser: {
     windows: { create: vi.fn(), remove: vi.fn(), update: vi.fn(), onRemoved: { addListener: vi.fn() } },
@@ -38,6 +39,7 @@ vi.mock("wxt/browser", () => ({
     },
     tabs: { query: vi.fn().mockResolvedValue([]), onRemoved: { addListener: vi.fn() } },
     alarms: { create: alarmsCreate, get: alarmsGet, onAlarm: { addListener: onAlarmAddListener } },
+    idle: { onStateChanged: { addListener: onIdleStateChangedAddListener } },
   },
 }));
 
@@ -60,6 +62,7 @@ beforeEach(() => {
   onStartupAddListener.mockClear();
   onAlarmAddListener.mockClear();
   alarmsCreate.mockClear();
+  onIdleStateChangedAddListener.mockClear();
   alarmsGet.mockReset();
   alarmsGet.mockResolvedValue(undefined);
 });
@@ -123,6 +126,48 @@ describe("background.ts: session keys", () => {
 
     await vi.waitFor(async () => expect(await sessionKeyStore.has(["wallet-a"])).toEqual([]));
     expect(store.has("session:unlockedSession")).toBe(false);
+  });
+
+  describe("when the computer's screen locks", () => {
+    function idleListener(): (state: string) => void {
+      const listener = onIdleStateChangedAddListener.mock.calls[0]?.[0] as ((state: string) => void) | undefined;
+      if (!listener) throw new Error("idle.onStateChanged listener was never registered.");
+      return listener;
+    }
+
+    it("locks the wallet", async () => {
+      const sessionKeyStore = await loadBackground();
+      unlockedSession(Date.now(), "1hr");
+      await sessionKeyStore.importKey("wallet-a", jwk);
+
+      idleListener()("locked");
+
+      await vi.waitFor(async () => expect(await sessionKeyStore.has(["wallet-a"])).toEqual([]));
+      expect(store.has("session:unlockedSession")).toBe(false);
+    });
+
+    it("stays unlocked when auto-lock is never", async () => {
+      const sessionKeyStore = await loadBackground();
+      store.set("local:lockSettings", { autoLockTimeout: "never" });
+      unlockedSession(Date.now(), "never");
+      await sessionKeyStore.importKey("wallet-a", jwk);
+
+      idleListener()("locked");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(await sessionKeyStore.has(["wallet-a"])).toEqual(["wallet-a"]);
+    });
+
+    it("ignores the OS idle state, which the auto-lock timeout already covers", async () => {
+      const sessionKeyStore = await loadBackground();
+      unlockedSession(Date.now(), "1hr");
+      await sessionKeyStore.importKey("wallet-a", jwk);
+
+      idleListener()("idle");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(await sessionKeyStore.has(["wallet-a"])).toEqual(["wallet-a"]);
+    });
   });
 
   it("keeps an existing auto-lock alarm instead of restarting its period", async () => {
