@@ -3,8 +3,9 @@
 Gleam is a browser-extension wallet holding user private keys. Please report
 vulnerabilities privately rather than through a public GitHub issue.
 
-How Gleam protects keys, what it defends against and its known
-limitations are in [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md). The files
+How Gleam protects keys, what it defends against, its by-design
+trade-offs and its known limitations are in
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md). The files
 in scope for a security review are listed in
 [security/surface.txt](security/surface.txt).
 

@@ -162,25 +162,20 @@ that shows no real work. The server has no admin endpoint.
 
 ## By design
 
-Gleam follows **informed security**. It defaults to the stronger
-guarantee, and the user may turn it off once they've been told the
-risk. A weaker option is not a finding in itself. It becomes one if
-the user isn't told, can't see the current setting, or the setting
-can change without them.
+Gleam follows **informed security** for the choices it leaves to the
+user. It defaults to the stronger guarantee, and the user may turn it
+off once they've been told the risk. Such a setting is not a finding in
+itself. It becomes one if the user isn't told, can't see the current
+setting, or the setting can change without them. Other by-design
+entries are fixed trade-offs, each with its own reason. Only what an
+entry names is by design.
 
-`docs/THREAT_MODEL.md` has a **By design** section listing these
-choices. Each entry gives the decision, why it was made, and what
-would still count as a finding:
-
-> **Auto-lock can be set to "never".** Some users keep the wallet open
-> all day. The default is 1 hour, and choosing "never" shows a warning.
-> *Still a finding if:* "never" can be set without the warning, or
-> anything other than the user can change the setting.
-
-First entries: auto-lock "never", the password policy, key export
-showing the keyfile after the password, `http://` on loopback, the
-refused `privateHash`, and dev-only dependency advisories. When a
-maintainer rejects a report as by design, they add an entry for it.
+The entries are in
+[`docs/THREAT_MODEL.md` § By design](docs/THREAT_MODEL.md#by-design).
+Each gives the decision, why it was made, and a *Still a finding if*
+clause naming what a reporter could demonstrate that would still count.
+When a maintainer rejects a report as by design, they add an entry for
+it.
 
 ## The skill: `security/scan/SKILL.md`
 
