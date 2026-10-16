@@ -70,7 +70,7 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByRole("note").textContent).toMatch(/stays unlocked until you lock it/));
+    await waitFor(() => expect(screen.getByRole("note").textContent).toMatch(/stays unlocked always, even when your computer locks/));
     fireEvent.click(screen.getByText("1 hour"));
 
     await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
