@@ -6,7 +6,10 @@ export interface WalletScore {
   inviteCode: string;
   referred: boolean;
   refereeCount: number;
+  /** Holding, referral and scan points together. */
   totalAtomic: string;
+  /** Points from scans and accepted findings, already in `totalAtomic`. */
+  scanPointsAtomic: string;
   /** The latest snapshot's credit, which the extension projects forward from. */
   lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with any points; null until the wallet has some. */
@@ -46,6 +49,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
     referred: boolean;
     referee_count: string;
     total: string | null;
+    scan_points: string;
     rank: string | null;
     to_next: string | null;
     founding_number: number | null;
@@ -58,8 +62,11 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
     referrer_bonus: string | null;
   }>(
     `WITH totals AS (
-       SELECT address, sum(holding_atomic + referee_bonus_atomic + founder_bonus_atomic + referrer_bonus_atomic) AS total
-         FROM points GROUP BY address
+       SELECT address, sum(amount) AS total FROM (
+         SELECT address, holding_atomic + referee_bonus_atomic + founder_bonus_atomic + referrer_bonus_atomic AS amount FROM points
+         UNION ALL
+         SELECT address, amount_atomic FROM scan_points
+       ) credits GROUP BY address
      ),
      ranked AS (
        SELECT address, total, rank() OVER (ORDER BY total DESC) AS rank, count(*) OVER () AS ranked
@@ -68,7 +75,9 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
      SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred, w.founding_number, w.original_founder,
             (SELECT count(*) FROM wallets r WHERE r.referred_by = w.address)::text AS referee_count,
             ${PENDING_MEMBER_REDEMPTIONS_SQL}::text AS pending_redemptions,
-            r.total::text AS total, r.rank::text AS rank,
+            r.total::text AS total,
+            (SELECT coalesce(sum(s.amount_atomic), 0) FROM scan_points s WHERE s.address = w.address)::text AS scan_points,
+            r.rank::text AS rank,
             (SELECT min(a.total) - r.total + 1 FROM ranked a WHERE a.total > r.total)::text AS to_next,
             coalesce((SELECT count(*) FROM ranked), 0)::text AS ranked,
             p.holding_atomic::text AS holding, p.referee_bonus_atomic::text AS referee_bonus,
@@ -90,6 +99,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
       referred: row.referred,
       refereeCount: Number(row.referee_count),
       totalAtomic: row.total ?? "0",
+      scanPointsAtomic: row.scan_points,
       lastDay:
         row.holding === null
           ? null

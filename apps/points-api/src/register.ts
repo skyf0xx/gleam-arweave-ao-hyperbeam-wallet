@@ -33,16 +33,18 @@ export type RegisterOutcome =
 
 const INVITE_REQUIRED = { ok: false, status: 403, error: "Invite required.", code: "invite_required" } as const;
 
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
-const MAX_OWNER_LENGTH = 700;
+export const BASE64URL = /^[A-Za-z0-9_-]+$/;
+export const MAX_OWNER_LENGTH = 700;
+export const MAX_MESSAGE_LENGTH = 200;
+export const MAX_SIGNATURE_LENGTH = 1000;
 const MAX_INVITE_CODE_ATTEMPTS = 5;
 
 export function parseRegisterRequest(body: unknown): RegisterRequest | null {
   if (body === null || typeof body !== "object") return null;
   const { owner, message, signature, proof = "message", devicePublicKey } = body as Record<string, unknown>;
   if (typeof owner !== "string" || owner.length > MAX_OWNER_LENGTH || !BASE64URL.test(owner)) return null;
-  if (typeof message !== "string" || message.length > 200) return null;
-  if (typeof signature !== "string" || signature.length > 1000 || !BASE64URL.test(signature)) return null;
+  if (typeof message !== "string" || message.length > MAX_MESSAGE_LENGTH) return null;
+  if (typeof signature !== "string" || signature.length > MAX_SIGNATURE_LENGTH || !BASE64URL.test(signature)) return null;
   if (proof !== "message" && proof !== "transaction") return null;
   if (!isDevicePublicJwk(devicePublicKey)) return null;
   return { owner, message, signature, proof, devicePublicKey };

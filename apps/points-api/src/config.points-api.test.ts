@@ -11,7 +11,14 @@ describe("readConfig", () => {
       arweaveGatewayUrl: "https://arweave.net",
       hyperbeamUrl: "https://state.forward.computer",
       pointsPhase: 1,
+      githubRepo: "skyf0xx/gleam-arweave-ao-hyperbeam-wallet",
     });
+  });
+
+  it("reads the GitHub repo and token", () => {
+    const config = readConfig({ DATABASE_URL: "postgres://x", GITHUB_REPO: "a/b", GITHUB_TOKEN: "t" });
+    expect(config.githubRepo).toBe("a/b");
+    expect(config.githubToken).toBe("t");
   });
 
   it("reads POINTS_PHASE and treats empty as Phase 1", () => {

@@ -1,4 +1,6 @@
+import { attestationId, parseAttestation } from "@gleam/core/src/scan/index.ts";
 import {
+  buildAttestMessage,
   buildDeviceMessage,
   buildLeaveMessage,
   buildRedeemMessage,
@@ -65,6 +67,24 @@ export async function registerBody(
     signature: await signProof(wallet, message, options.proof ?? "message"),
     ...(options.proof === "transaction" ? { proof: "transaction" } : {}),
     devicePublicKey: device.publicKey,
+  };
+}
+
+export async function attestBody(
+  wallet: TestWallet,
+  attestation: unknown,
+  options: { proof?: PointsProofKind; message?: string } = {},
+) {
+  const parsed = parseAttestation(attestation);
+  if (!parsed.ok) throw new Error(`Test attestation is invalid: ${JSON.stringify(parsed.issues)}`);
+  const proof = options.proof ?? "message";
+  const message = options.message ?? buildAttestMessage(parsed.attestation.release, await attestationId(parsed.attestation));
+  return {
+    attestation,
+    owner: wallet.signer.owner,
+    message,
+    signature: await signProof(wallet, message, proof),
+    ...(proof === "transaction" ? { proof: "transaction" } : {}),
   };
 }
 
