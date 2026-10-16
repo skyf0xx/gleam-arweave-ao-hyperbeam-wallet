@@ -62,6 +62,12 @@ if [ -z "$chrome_bin" ]; then
 fi
 [ -n "$chrome_bin" ] || { echo "no Chrome/Chromium binary found; set CHROME_BIN" >&2; exit 2; }
 
+repo_root="$(cd "$here/.." && pwd)"
+[ "$(git -C "$repo_root" cat-file -t "refs/tags/$tag" 2> /dev/null)" = "tag" ] \
+  || { echo "$tag is not an annotated tag" >&2; exit 1; }
+git -C "$repo_root" -c gpg.ssh.allowedSignersFile=.github/allowed_signers tag -v "$tag" \
+  || { echo "$tag is not signed by a key in .github/allowed_signers; refusing to pack" >&2; exit 1; }
+
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
