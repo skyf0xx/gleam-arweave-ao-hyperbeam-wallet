@@ -56,11 +56,12 @@ function stubFetch(world: World) {
   const impl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(url);
-    if (url.startsWith(GATEWAY) && url.includes("~process@1.0")) {
+    const origin = new URL(url).origin;
+    if (origin === new URL(GATEWAY).origin && url.includes("~process@1.0")) {
       const balance = world.gatewayBalances?.[url.split("/")[3]!.split("~")[0]!];
       return balance === undefined ? new Response("x", { status: 500 }) : Response.json(String(balance));
     }
-    if (url.startsWith(PEER)) {
+    if (origin === new URL(PEER).origin) {
       const id = url.split("/")[3]!.split("~")[0]!;
       const balance = world.balances[id];
       if (balance === undefined) return new Response("no", { status: 404 });
@@ -123,7 +124,7 @@ describe("discoverCollectibles", () => {
       gatewayBalances: { [A]: 1 },
     });
     expect((await result).map((c) => c.name).sort()).toEqual(["Gateway", "Peer"]);
-    expect(calls.some((u) => u.startsWith(PEER) && u.includes(A))).toBe(false);
+    expect(calls.some((u) => new URL(u).origin === new URL(PEER).origin && u.includes(A))).toBe(false);
   });
 
   it("treats a 404 balance as not held", async () => {
@@ -193,6 +194,6 @@ describe("discoverCollectibles", () => {
       maxCandidates: 1,
     });
     expect(list).toHaveLength(1);
-    expect(calls.filter((u) => u.startsWith(PEER))).toHaveLength(1);
+    expect(calls.filter((u) => new URL(u).origin === new URL(PEER).origin)).toHaveLength(1);
   });
 });
