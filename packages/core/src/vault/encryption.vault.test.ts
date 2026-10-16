@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeAll, afterEach, vi } from "vitest";
+import { signerFromJwk } from "../signer/keys";
 import { generateJWK } from "../keys/jwk";
 import { encrypt, decrypt, normalizeEncryptAlgorithm } from "./encryption";
 import type { JWKInterface } from "../models/wallet";
@@ -15,11 +16,11 @@ describe("vault/encryption", () => {
     it("round-trips plaintext through encrypt/decrypt", async () => {
       const plaintext = new TextEncoder().encode("secret message") as Uint8Array<ArrayBuffer>;
 
-      const ciphertext = await encrypt(jwk, plaintext, { name: "RSA-OAEP" });
+      const ciphertext = await encrypt(jwk.n, plaintext, { name: "RSA-OAEP" });
       expect(ciphertext).not.toEqual(plaintext);
 
       const decrypted = await decrypt(
-        jwk,
+        signerFromJwk(jwk, ""),
         ciphertext as Uint8Array<ArrayBuffer>,
         { name: "RSA-OAEP" },
       );
@@ -29,10 +30,10 @@ describe("vault/encryption", () => {
     it("fails to decrypt with a mismatched key", async () => {
       const otherJwk = await generateJWK();
       const plaintext = new TextEncoder().encode("secret") as Uint8Array<ArrayBuffer>;
-      const ciphertext = await encrypt(jwk, plaintext, { name: "RSA-OAEP" });
+      const ciphertext = await encrypt(jwk.n, plaintext, { name: "RSA-OAEP" });
 
       await expect(
-        decrypt(otherJwk, ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" }),
+        decrypt(signerFromJwk(otherJwk, ""), ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" }),
       ).rejects.toThrow();
     });
   });
@@ -48,10 +49,10 @@ describe("vault/encryption", () => {
       const encryptSpy = vi.spyOn(crypto.subtle, "encrypt");
       const input = new Uint8Array([1, 2, 3]);
 
-      await expect(encrypt(jwk, input, params as never)).rejects.toThrow(
+      await expect(encrypt(jwk.n, input, params as never)).rejects.toThrow(
         new RegExp(`${params.name} is not supported.*RSA-OAEP`),
       );
-      await expect(decrypt(jwk, input, params as never)).rejects.toThrow(/is not supported/);
+      await expect(decrypt(signerFromJwk(jwk, ""), input, params as never)).rejects.toThrow(/is not supported/);
       expect(encryptSpy).not.toHaveBeenCalled();
       encryptSpy.mockRestore();
     });
@@ -75,8 +76,8 @@ describe("vault/encryption", () => {
       const plaintext = new TextEncoder().encode("to wander") as Uint8Array<ArrayBuffer>;
       const label = new TextEncoder().encode("ctx").buffer;
 
-      const plain = (await encrypt(jwk, plaintext, { name: "RSA-OAEP" })) as Uint8Array<ArrayBuffer>;
-      const labelled = (await encrypt(jwk, plaintext, { name: "RSA-OAEP", label })) as Uint8Array<ArrayBuffer>;
+      const plain = (await encrypt(jwk.n, plaintext, { name: "RSA-OAEP" })) as Uint8Array<ArrayBuffer>;
+      const labelled = (await encrypt(jwk.n, plaintext, { name: "RSA-OAEP", label })) as Uint8Array<ArrayBuffer>;
 
       expect(plain.byteLength).toBe(512);
       expect(new TextDecoder().decode(await wanderDecrypt(jwk, plain, { name: "RSA-OAEP" }))).toBe("to wander");
@@ -98,8 +99,8 @@ describe("vault/encryption", () => {
       const decryptSpy = vi.spyOn(crypto.subtle, "decrypt");
       const plaintext = new TextEncoder().encode("x") as Uint8Array<ArrayBuffer>;
 
-      const ciphertext = await encrypt(jwk, plaintext, { name: "RSA-OAEP", label: undefined });
-      await decrypt(jwk, ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP", label: null } as never);
+      const ciphertext = await encrypt(jwk.n, plaintext, { name: "RSA-OAEP", label: undefined });
+      await decrypt(signerFromJwk(jwk, ""), ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP", label: null } as never);
 
       expect(encryptSpy.mock.calls[0]![0]).toStrictEqual({ name: "RSA-OAEP" });
       expect(decryptSpy.mock.calls[0]![0]).toStrictEqual({ name: "RSA-OAEP" });
@@ -108,11 +109,11 @@ describe("vault/encryption", () => {
     it("keeps a real label and requires it to match on decrypt", async () => {
       const plaintext = new TextEncoder().encode("x") as Uint8Array<ArrayBuffer>;
       const label = new TextEncoder().encode("ctx").buffer;
-      const ciphertext = (await encrypt(jwk, plaintext, { name: "RSA-OAEP", label })) as Uint8Array<ArrayBuffer>;
+      const ciphertext = (await encrypt(jwk.n, plaintext, { name: "RSA-OAEP", label })) as Uint8Array<ArrayBuffer>;
 
-      const decrypted = await decrypt(jwk, ciphertext, { name: "RSA-OAEP", label });
+      const decrypted = await decrypt(signerFromJwk(jwk, ""), ciphertext, { name: "RSA-OAEP", label });
       expect(Array.from(decrypted)).toEqual(Array.from(plaintext));
-      await expect(decrypt(jwk, ciphertext, { name: "RSA-OAEP" })).rejects.toThrow();
+      await expect(decrypt(signerFromJwk(jwk, ""), ciphertext, { name: "RSA-OAEP" })).rejects.toThrow();
     });
   });
 

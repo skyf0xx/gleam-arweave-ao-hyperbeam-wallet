@@ -13,7 +13,7 @@ import { version as PACKAGE_VERSION } from "../../package.json";
 /**
  * Unit-tests the injected provider script's pure bridge logic directly
  * against jsdom's real `window` (no extension context needed for any of
- * this — `crypto.randomUUID`/`crypto.subtle` and `window.
+ * this — `crypto.getRandomValues`/`crypto.subtle` and `window.
  * postMessage`/`addEventListener` are all ambient browser APIs).
  *
  * `postResponse` dispatches a synthetic `MessageEvent` with `source`
@@ -55,14 +55,35 @@ describe("provider.ts: GleamProvider bridge", () => {
     return call[0] as { id: string; method: string; params: unknown };
   }
 
-  it("posts a REQUEST envelope with a fresh crypto.randomUUID id per call (point 2)", async () => {
+  it("posts a REQUEST envelope with a fresh random id per call (point 2)", async () => {
     const callPromise = provider.getActiveAddress();
     const envelope = lastRequestEnvelope();
-    expect(envelope.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(envelope.id).toMatch(/^[0-9a-f]{32}$/);
     expect(envelope.method).toBe("getActiveAddress");
+
+    void provider.getActiveAddress();
+    const ids = (postMessageSpy.mock.calls as [{ type?: string; id?: string }][])
+      .filter(([message]) => message.type === REQUEST)
+      .map(([message]) => message.id);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).not.toBe(ids[0]);
 
     postResponse({ type: RESPONSE, id: envelope.id, result: "some-address" });
     await expect(callPromise).resolves.toBe("some-address");
+  });
+
+  it("still sends a request on a plain-http page, where crypto.randomUUID is missing", async () => {
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto), subtle: crypto.subtle });
+    try {
+      const callPromise = provider.connect(["ACCESS_ADDRESS"]);
+      const envelope = lastRequestEnvelope();
+      expect(envelope.method).toBe("connect");
+
+      postResponse({ type: RESPONSE, id: envelope.id, error: { message: "Gleam only signs for secure (https) sites." } });
+      await expect(callPromise).rejects.toThrow("Gleam only signs for secure (https) sites.");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("transferAoTokens posts a REQUEST envelope carrying token/recipient/amount, resolving with the relayed result", async () => {

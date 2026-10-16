@@ -3,6 +3,9 @@ export type {
   WalletMethod,
   WalletSummary,
   VaultEnvelope,
+  VaultEnvelopeV1,
+  VaultEnvelopeV2,
+  Argon2idParams,
   JWKInterface,
   HardwareWalletMethod,
   HardwareDevice,
@@ -69,6 +72,13 @@ export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
 export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
+export type { SecurityPhrase } from "./security-phrase";
+export {
+  SECURITY_PHRASE_WORD_MAX_LENGTH,
+  readSecurityPhrase,
+  securityPhraseSeed,
+  suggestSecurityPhrase,
+} from "./security-phrase";
 export type { PasskeyEnrollment, PasskeyStatus } from "./passkey";
 export type {
   PortfolioHistoryRange,
@@ -78,11 +88,13 @@ export type {
 } from "./portfolio-history";
 export {
   PROVIDER_METHODS,
+  REFUSED_PROVIDER_METHODS,
   APPROVAL_METHODS,
   KEY_METHODS,
 } from "./method-privileges";
 export type {
   ProviderMethod,
+  RefusedProviderMethod,
   ApprovalMethod,
   KeyMethod,
 } from "./method-privileges";
@@ -109,8 +121,6 @@ export type {
   SignatureResult,
   SignMessageRequest,
   SignMessageResult,
-  PrivateHashRequest,
-  PrivateHashResult,
   VerifyMessageRequest,
   VerifyMessageResult,
 } from "./signing";

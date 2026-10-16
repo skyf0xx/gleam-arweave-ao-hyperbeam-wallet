@@ -146,7 +146,7 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
       await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
       const pill = screen.getByRole("button", { name: /Wallet One, address/i });
       const avatar = within(pill).getByRole("img", { name: /avatar/i });
-      expect(avatar.querySelector("svg")).toBeTruthy();
+      expect(avatar.querySelector("img")?.getAttribute("src")).toMatch(/^data:image\/svg\+xml;utf8,%3Csvg/);
 
       for (const call of fetchSpy.mock.calls) {
         const url = String(call[0]);
@@ -517,6 +517,26 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
 
     setScrollY(0);
     await waitFor(() => expect(screen.getByRole("button", { name: /Wallet One, address/i })).toBeTruthy());
+    scrollTo.mockRestore();
+  });
+
+  it("resets to the Tokens tab once scrolled back to the top", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const onTabChange = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send: successfulSend() }), initialTab: "activity", onTabChange });
+
+    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    // Mounting on a restored tab doesn't reset it; only a collapse-then-expand does.
+    expect(screen.getByRole("tab", { name: "Activity" }).getAttribute("aria-selected")).toBe("true");
+
+    setScrollY(200);
+    await screen.findByRole("button", { name: "Back" });
+    setScrollY(0);
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Tokens" }).getAttribute("aria-selected")).toBe("true"),
+    );
+    expect(onTabChange).toHaveBeenLastCalledWith("tokens");
     scrollTo.mockRestore();
   });
 

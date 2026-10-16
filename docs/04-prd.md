@@ -49,10 +49,10 @@ rule — Phase 1 mining reads only these two.
   ArConnect-compatible method surface (`connect, disconnect,
   getPermissions, getActiveAddress, getAllAddresses, getActivePublicKey,
   getWalletNames, getArweaveConfig, getBalances, sign, dispatch, encrypt,
-  decrypt, signature, signMessage, privateHash, verifyMessage,
+  decrypt, signature, signMessage, verifyMessage,
   signDataItem, batchSignDataItem`). A page-originated message can only
   ever reach this method set — never the key-management methods
-  (`createWallet`, `importWallet`, `exportWallet`).
+  (`createWallet`, `importWallet`, `downloadKeyfile`).
 - **NetworkSettings** — the configured Arweave gateway and list of
   AO-Core/HyperBEAM peer URLs (add/remove, per-peer enable toggle, active
   endpoint selection).
@@ -95,15 +95,17 @@ configurable auto-lock.
 - FR — Consequences (testable):
   - A single Vault password unlocks every stored Wallet at once: the
     first Wallet created sets it, and every later Wallet must reuse it.
-  - Default auto-lock timeout is "never"; manual "Lock now" always
+  - Default auto-lock timeout is 1 hour, and the vault also locks when the
+    computer's screen locks unless the timeout is "never"; manual "Lock now" always
     available and immediately clears unlocked-session state regardless of
     timeout config.
   - The unlock screen shows no per-wallet identity (avatar/name/address).
   - "Forgot password" leads to an explicit, plainly-worded destructive
     reset (wipes all locally stored vaults) — never a silent delete.
-- Rule: unlocked-session metadata lives in memory-only storage
-  (`chrome.storage.session`), never written to disk; a non-extractable
-  `CryptoKey` cannot itself be persisted there.
+- Rule: unlocked keys live in memory only, as non-extractable
+  `CryptoKey`s in the keyring offscreen document; unlocked-session
+  metadata lives in memory-only storage (`chrome.storage.session`).
+  Nothing key-related is written to disk.
 
 ### Feature: AR balance & main screen
 Show the AR balance for the active address and a portfolio view.
@@ -172,7 +174,7 @@ bridge requests through content script → background → approval popup.
     (`injectScript`, `keepInDom: false`) at `document_start`, top frame
     only (`all_frames: false`).
   - A page-originated message can only reach `PROVIDER_METHODS` — never
-    `KEY_METHODS` (`createWallet`, `importWallet`, `exportWallet`,
+    `KEY_METHODS` (`createWallet`, `importWallet`, `downloadKeyfile`,
     `addLedgerWallet`) or `APPROVAL_METHODS`. This boundary is enforced at
     a single dispatcher choke point.
   - `connect()` requests show the origin and requested permission scopes

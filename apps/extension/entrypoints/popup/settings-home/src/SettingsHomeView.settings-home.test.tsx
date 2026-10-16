@@ -3,6 +3,8 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import type { LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
 import { SettingsHomeView } from "./SettingsHomeView";
 
+vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
+
 afterEach(() => {
   cleanup();
   document.documentElement.removeAttribute("data-theme");

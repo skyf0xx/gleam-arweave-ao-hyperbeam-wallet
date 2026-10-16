@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { signerFromJwk } from "../signer/keys";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import { clientForGateway } from "./client";
@@ -6,7 +7,7 @@ import { signRsaPss } from "./rsa-pss";
 import {
   applyTransactionSignature,
   buildUnsignedTransaction,
-  signTransactionWithJwk,
+  signTransactionWithSigner,
   transactionSignatureData,
   verifyTransactionSignature,
   type ArweaveTransactionJson,
@@ -102,20 +103,20 @@ describe("buildUnsignedTransaction", () => {
 describe("keyfile signing", () => {
   it("signs a transaction arweave-js verifies", async () => {
     const unsigned = await buildUnsignedTransaction(GATEWAY, jwk.n, { ...CASES[1]![1] }, TAGS);
-    const { transaction } = await applyTransactionSignature(unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n);
+    const { transaction } = await applyTransactionSignature(unsigned, await signTransactionWithSigner(unsigned, signerFromJwk(jwk, "")), jwk.n);
 
     await expect(arweave.transactions.verify(arweave.transactions.fromRaw(transaction))).resolves.toBe(true);
   });
 
   it("refuses to sign a transaction owned by another key", async () => {
     const unsigned = await buildUnsignedTransaction(GATEWAY, otherJwk.n, { ...CASES[0]![1] });
-    await expect(signTransactionWithJwk(unsigned, jwk)).rejects.toThrow(/different owner/);
+    await expect(signTransactionWithSigner(unsigned, signerFromJwk(jwk, ""))).rejects.toThrow(/different owner/);
   });
 });
 
 describe("device signatures", () => {
   async function deviceSign(unsigned: ArweaveTransactionJson, key: JWKInterface) {
-    return signRsaPss(key, await transactionSignatureData(unsigned));
+    return signRsaPss(signerFromJwk(key, ""), await transactionSignatureData(unsigned));
   }
 
   it("rejects a signature over any other field values", async () => {

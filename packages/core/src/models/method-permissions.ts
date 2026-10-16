@@ -27,7 +27,6 @@ export const METHOD_PERMISSIONS: Readonly<Record<ProviderMethod, readonly Permis
   decrypt: ["DECRYPT"],
   signature: ["SIGNATURE"],
   signMessage: ["SIGNATURE"],
-  privateHash: ["SIGNATURE"],
   verifyMessage: ["SIGNATURE"],
   signDataItem: ["SIGN_TRANSACTION"],
   batchSignDataItem: ["SIGN_TRANSACTION"],

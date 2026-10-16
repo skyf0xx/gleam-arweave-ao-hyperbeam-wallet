@@ -19,8 +19,10 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 
 ## Layout
 
-- `packages/core`: pure domain logic. `vault/` and `keys/` (encryption,
-  JWK), `arweave/` (AR balance, transfer, GraphQL, upload), `ao/` (AO
+- `packages/core`: pure domain logic. `signer/` (vault envelope, key
+  import and signing, keyring; reached only through `@gleam/core/signer`
+  and allowed no npm imports but `hash-wasm`), `vault/` and `keys/`
+  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, upload), `ao/` (AO
   balance, transfer, result), `activity/`, `pricing/`, `policy/`, and
   `models/`. `ports/` holds the interfaces for storage, runtime and
   windows.
@@ -42,8 +44,10 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   network access in (`fetchImpl`, URLs) and storage through `StoragePort`.
   The background entrypoint connects adapters to handlers.
 - **UI never imports background code.** Every cross-context call goes
-  through `packages/messaging`. The background dispatcher enforces which
-  methods a page may call and which need approval.
+  through `packages/messaging`. `src/dispatch/methods.ts` is the one table
+  of each method's caller tier, whether it can open an approval, and the
+  zod schema its page-supplied params are parsed with; the background
+  dispatcher enforces it before any handler runs.
 - **Signing keys** are decrypted on unlock and held in
   `chrome.storage.session` through `handlers/key-session.ts`, keyed by
   wallet id. Handlers get the key from there. Never re-derive it from a
@@ -101,3 +105,14 @@ accepts only signed commits through a PR with passing CI, and admins get
 no bypass. This repo signs commits with an SSH key (`git config --local
 commit.gpgsign true`), so the key has to be loaded in `ssh-agent`. `todo.md` is not tracked in git. Add anything new you find to `todo.md`'s **Unsorted**
 section instead of fixing it on the side.
+
+## Releasing
+
+When Will asks to cut or ship a release, run `pnpm release:all <major|minor|patch> --key <path-to-cws-private-key>`
+(or set `GLEAM_CWS_KEY`). It walks version bump → PR → tag → CI build →
+pack/sign, pausing at each step a human has to clear (merging the PR,
+confirming the GitHub Release exists). It refuses to tag without an audit
+at `security/audits/v<version>.md` with no open critical/high findings —
+point that out if the pause before tagging hits it. The Chrome Web Store
+upload at the end stays manual; no store credentials or signing key ever
+reach CI.

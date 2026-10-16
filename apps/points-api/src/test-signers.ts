@@ -9,20 +9,22 @@ import {
   type DevicePublicJwk,
   type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
-import { signTransactionWithJwk } from "@gleam/core/src/arweave/transaction.ts";
+import { signTransactionWithSigner } from "@gleam/core/src/arweave/transaction.ts";
 import { deriveAddress, generateJWK } from "@gleam/core/src/keys/jwk.ts";
 import { bytesToBase64Url } from "@gleam/core/src/vault/base64.ts";
 import { signMessage } from "@gleam/core/src/vault/message-signing.ts";
-import type { JWKInterface } from "@gleam/core/src/models/wallet.ts";
+import { signerFromJwk } from "@gleam/core/signer";
+import type { Signer } from "@gleam/core/src/vault/signer.ts";
 
 export interface TestWallet {
-  jwk: JWKInterface;
+  signer: Signer;
   address: string;
 }
 
 export async function createTestWallet(): Promise<TestWallet> {
   const jwk = await generateJWK();
-  return { jwk, address: await deriveAddress(jwk) };
+  const address = await deriveAddress(jwk);
+  return { signer: signerFromJwk(jwk, address), address };
 }
 
 export interface TestDevice {
@@ -42,8 +44,8 @@ export async function createTestDevice(): Promise<TestDevice> {
 async function signProof(wallet: TestWallet, message: string, proof: PointsProofKind): Promise<string> {
   const signature =
     proof === "transaction"
-      ? await signTransactionWithJwk(await buildOwnershipTransaction(wallet.jwk.n, message), wallet.jwk)
-      : new Uint8Array(await signMessage(wallet.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer));
+      ? await signTransactionWithSigner(await buildOwnershipTransaction(wallet.signer.owner, message), wallet.signer)
+      : new Uint8Array(await signMessage(wallet.signer, new TextEncoder().encode(message).buffer as ArrayBuffer));
   return bytesToBase64Url(signature);
 }
 
@@ -58,7 +60,7 @@ export async function registerBody(
     issuedAt: options.issuedAt,
   });
   return {
-    owner: wallet.jwk.n,
+    owner: wallet.signer.owner,
     message,
     signature: await signProof(wallet, message, options.proof ?? "message"),
     ...(options.proof === "transaction" ? { proof: "transaction" } : {}),
@@ -79,7 +81,7 @@ export async function leaveBody(
 ) {
   const message = buildLeaveMessage(address, issuedAt);
   return {
-    owner: wallet.jwk.n,
+    owner: wallet.signer.owner,
     message,
     signature: await signProof(wallet, message, proof),
     ...(proof === "transaction" ? { proof: "transaction" } : {}),

@@ -1,0 +1,57 @@
+# The security surface: the files where a bug can leak a key, sign
+# something the user didn't approve, or let a page past the wallet's
+# boundary. The release gate re-audits when any of them change, and
+# .github/CODEOWNERS lists exactly these paths.
+#
+# Format: <tier> <path>. A path ending in / covers the whole directory.
+# Tiers, by worst outcome of a bug:
+#   1 key material: the key leaks or is lost
+#   2 signing: a wrong or unapproved signature
+#   3 trust boundary: a page reaches what it shouldn't
+#   4 what you see is what you sign: the approval preview lies
+#   5 other ways in: extension config, dependencies, CI, the release gate
+
+1 packages/core/src/vault/
+1 packages/core/src/keys/
+1 apps/extension/src/handlers/key-session.ts
+1 apps/extension/src/handlers/wallet-lifecycle.ts
+1 apps/extension/src/handlers/passkey.ts
+1 apps/extension/src/passkey/
+1 apps/extension/entrypoints/passkey/
+1 apps/extension/src/adapters/storage.ts
+1 apps/extension/src/adapters/session-access.ts
+1 apps/extension/entrypoints/popup/onboarding/src/Import.tsx
+1 apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx
+1 apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx
+
+2 packages/core/src/ao/transfer.ts
+2 packages/core/src/arweave/data-item.ts
+2 packages/core/src/arweave/rsa-pss.ts
+2 packages/core/src/arweave/transaction.ts
+2 packages/core/src/arweave/transfer.ts
+2 packages/core/src/arweave/upload.ts
+2 apps/extension/src/handlers/transfer.ts
+2 apps/extension/src/handlers/upload.ts
+2 apps/extension/src/handlers/points.ts
+
+3 apps/extension/entrypoints/background/
+3 apps/extension/entrypoints/content/
+3 apps/extension/entrypoints/provider/
+3 apps/extension/src/handlers/provider-params.ts
+3 apps/extension/src/sender.ts
+3 packages/messaging/
+
+4 apps/extension/src/handlers/approval.ts
+4 apps/extension/entrypoints/approval/
+
+5 apps/extension/src/points-invite.ts
+5 apps/extension/wxt.config.ts
+5 .github/
+5 pnpm-workspace.yaml
+5 pnpm-lock.yaml
+5 lefthook.yml
+5 .gitleaks.toml
+5 scripts/release-gate.mjs
+5 scripts/release.mjs
+5 scripts/verify-release.sh
+5 security/surface.mjs

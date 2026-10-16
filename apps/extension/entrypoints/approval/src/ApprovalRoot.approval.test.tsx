@@ -207,8 +207,8 @@ function statefulRuntime(initial: WalletState, request: ApprovalRequest) {
       case "createWallet":
         walletState = UNLOCKED_STATE;
         return WALLET_SUMMARY;
-      case "exportWallet":
-        return { kty: "RSA", n: "n" };
+      case "downloadKeyfile":
+        return { ok: true, filename: "wallet-arweave-keyfile.json" };
       case "resolveApproval":
         return undefined;
       default:
@@ -275,7 +275,7 @@ describe("ApprovalRoot: no wallet yet", () => {
     render(<ApprovalRoot requestId="req-1" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Create a wallet" }));
-    fireEvent.change(screen.getByPlaceholderText("At least 8 characters"), {
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
       target: { value: "correct horse battery staple" },
     });
     fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
@@ -299,5 +299,33 @@ describe("ApprovalRoot: no wallet yet", () => {
 
     expect(await screen.findByText(/no pending approval request/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
+  });
+});
+
+describe("ApprovalRoot security phrase", () => {
+  const PHRASE = { word: "willow" };
+
+  function runtimeWith(state: WalletState) {
+    const send = vi.fn(async (message: { type: string }) => {
+      if (message.type === "getState") return state;
+      if (message.type === "getApproval") return CONNECT_REQUEST;
+      if (message.type === "getThemePreference") return { theme: "light" } satisfies ThemeSettings;
+      if (message.type === "getSecurityPhrase") return PHRASE;
+      return undefined;
+    });
+    return fakeRuntime({ send: send as never });
+  }
+
+  it("shows the phrase above a request", async () => {
+    render(<ApprovalRoot requestId="req-1" runtime={runtimeWith(UNLOCKED_STATE)} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+  });
+
+  it("shows it once while locked, on the unlock screen", async () => {
+    render(<ApprovalRoot requestId="req-1" runtime={runtimeWith({ ...UNLOCKED_STATE, session: null })} />);
+
+    await waitFor(() => expect(screen.getByPlaceholderText("Enter your password")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByLabelText("Your security phrase: willow")).toHaveLength(1));
   });
 });

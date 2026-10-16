@@ -1,7 +1,24 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { addressFromOwner, decrypt, generateJWK, verifyMessage, type StoragePort, type WindowPort } from "@gleam/core";
+import {
+  addressFromOwner,
+  decrypt,
+  generateJWK,
+  verifyMessage,
+  type JWKInterface,
+  type StoragePort,
+  type WindowPort,
+} from "@gleam/core";
+import { signerFromJwk } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
+
+let jwkPromise: Promise<JWKInterface> | null = null;
+
+/** One generated key for the tests that need an unlocked wallet but never check what it signs. */
+function sharedJwk(): Promise<JWKInterface> {
+  jwkPromise ??= generateJWK();
+  return jwkPromise;
+}
 
 /**
  * Real key/value store standing in for `adapters/storage.ts`'s
@@ -413,7 +430,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
     const transfers = {
       submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
     };
-    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
     windows = createFakeWindows();
     handler = new ApprovalHandler(storage, windows, transfers);
 
@@ -444,7 +461,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
     const transfers = {
       submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
     };
-    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
     windows = createFakeWindows();
     handler = new ApprovalHandler(storage, windows, transfers);
 
@@ -739,7 +756,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
   });
 
   it("signing with a cached key but no gatewayUrl fails with a named gateway error (not a locked-wallet error)", async () => {
-    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
     const pending = handler.requestApproval({
       kind: "sign",
@@ -874,7 +891,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     const ciphertext = await approveCrypto("encrypt", new TextEncoder().encode("secret"), "hw-1");
 
     // Only the device's private key can open it.
-    const decrypted = await decrypt(deviceKey, ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" });
+    const decrypted = await decrypt(signerFromJwk(deviceKey, ""), ciphertext as Uint8Array<ArrayBuffer>, { name: "RSA-OAEP" });
     expect(new TextDecoder().decode(decrypted)).toBe("secret");
   });
 
@@ -1056,7 +1073,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "ao-message-id-123" });
     const handler = new ApprovalHandler(storage, windows, { submitTransfer });
     await seedWallet(storage);
-    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -1098,7 +1115,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "should-not-be-called" });
     const handler = new ApprovalHandler(storage, windows, { submitTransfer });
     await seedWallet(storage);
-    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -1151,7 +1168,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     windows = createFakeWindows();
     const handler = new ApprovalHandler(storage, windows);
     await seedWallet(storage);
-    await cacheKey(WALLET_ID, { kty: "RSA", n: "n", e: "e" } as never, "abc-address");
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",

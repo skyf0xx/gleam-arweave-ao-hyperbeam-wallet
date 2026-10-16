@@ -222,10 +222,12 @@ describe("provider message methods, end to end", () => {
     expect(windowsCreate).not.toHaveBeenCalled();
   });
 
-  it("privateHash returns a Uint8Array digest of the requested size", async () => {
-    const { result } = await approved<Uint8Array>(wallet.privateHash(new Uint8Array([1, 2, 3]), { hashAlgorithm: "SHA-512" }));
-    expect(ArrayBuffer.isView(result)).toBe(true);
-    expect(result.byteLength).toBe(64);
+  it("privateHash is still defined but refused, without opening a window", async () => {
+    expect(typeof wallet.privateHash).toBe("function");
+    await expect(wallet.privateHash(new Uint8Array([1, 2, 3]), { hashAlgorithm: "SHA-512" })).rejects.toThrow(
+      "privateHash is not supported. Use encrypt/decrypt instead.",
+    );
+    expect(windowsCreate).not.toHaveBeenCalled();
   });
 
   it("encrypt takes a string and RSA-OAEP params, and decrypt returns the plaintext bytes", async () => {

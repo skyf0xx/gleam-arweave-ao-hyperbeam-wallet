@@ -362,7 +362,7 @@ describe("SendView AR Max and balance check account for the network fee", () => 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.getByRole("alert").textContent).toContain("more than your current balance");
+    expect(screen.getByRole("alert").textContent).toContain("This address is new to Arweave, so the network fee is 0.2 AR");
     expect(screen.queryByText("Review send")).toBeNull();
   });
 
@@ -682,5 +682,33 @@ describe("SendView with a hardware wallet", () => {
     const keystone: WalletSummary = { ...WALLET, method: "keystone", device: { kind: "keystone", xfp: "1" } };
     renderSendView({ runtime: fakeRuntime({ send }), wallet: keystone, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
     expect(screen.queryByText(/Ledger only supports sending AR/)).toBeNull();
+  });
+});
+
+describe("SendView recipient lookalike warning", () => {
+  const LOOKALIKE_OF = "AAAAAA2222222222222222222222222222222222222";
+
+  async function reviewWith(estimate: { lookalikeOf?: string | null; firstSeenRecipient: boolean }) {
+    const send = routedSend({
+      estimateTransfer: () => ({ fee: "100000000", ...estimate }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+  }
+
+  it("names the address a lookalike recipient imitates, and still lets the user send", async () => {
+    await reviewWith({ firstSeenRecipient: false, lookalikeOf: LOOKALIKE_OF });
+    expect(screen.getByText(/looks like one you know/)).toBeTruthy();
+    expect(screen.getByText(LOOKALIKE_OF)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /sign and send/i }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("shows the first-time notice when there is no lookalike", async () => {
+    await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
+    expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
+    expect(screen.queryByText(/looks like one you know/)).toBeNull();
   });
 });

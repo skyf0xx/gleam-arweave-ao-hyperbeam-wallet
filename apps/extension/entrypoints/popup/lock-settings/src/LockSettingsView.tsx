@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AutoLockTimeout, LockSettings, PasskeyStatus, RuntimePort } from "@gleam/core";
+import type {
+  AutoLockTimeout,
+  LockSettings,
+  PasskeyStatus,
+  RuntimePort,
+} from "@gleam/core";
 import { PasskeyIcon } from "@/entrypoints/popup/unlock/src/UnlockScreen";
 import { forgetPasskey, passkeysAvailable } from "@/src/passkey/webauthn";
-import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import {
+  NetworkErrorBanner,
+  SkeletonRow,
+} from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { SecurityPhraseSection } from "./SecurityPhraseSection";
 
 const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
   { value: "never", label: "Never" },
@@ -42,14 +51,23 @@ export function LockSettingsView({
   onSetUpPasskey,
   passkeysSupported = passkeysAvailable(),
 }: LockSettingsViewProps) {
-  const [state, setState] = useState<LoadState>({ settings: null, loading: true, error: null });
+  const [state, setState] = useState<LoadState>({
+    settings: null,
+    loading: true,
+    error: null,
+  });
   const [locking, setLocking] = useState(false);
-  const [savingTimeout, setSavingTimeout] = useState<AutoLockTimeout | null>(null);
+  const [savingTimeout, setSavingTimeout] = useState<AutoLockTimeout | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const settings = await runtime.send<void, LockSettings>({ type: "getLockSettings", payload: undefined });
+      const settings = await runtime.send<void, LockSettings>({
+        type: "getLockSettings",
+        payload: undefined,
+      });
       setState({ settings, loading: false, error: null });
     } catch (error) {
       setState((prev) => ({
@@ -67,10 +85,16 @@ export function LockSettingsView({
   const handleLockNow = async () => {
     setLocking(true);
     try {
-      await runtime.send<void, void>({ type: "lockWallet", payload: undefined });
+      await runtime.send<void, void>({
+        type: "lockWallet",
+        payload: undefined,
+      });
       onLocked();
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : String(error) }));
+      setState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : String(error),
+      }));
       setLocking(false);
     }
   };
@@ -79,10 +103,16 @@ export function LockSettingsView({
     if (state.settings?.autoLockTimeout === autoLockTimeout) return;
     setSavingTimeout(autoLockTimeout);
     try {
-      await runtime.send<LockSettings, void>({ type: "setLockSettings", payload: { autoLockTimeout } });
+      await runtime.send<LockSettings, void>({
+        type: "setLockSettings",
+        payload: { autoLockTimeout },
+      });
       setState((prev) => ({ ...prev, settings: { autoLockTimeout } }));
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : String(error) }));
+      setState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : String(error),
+      }));
     } finally {
       setSavingTimeout(null);
     }
@@ -116,8 +146,14 @@ export function LockSettingsView({
         </div>
 
         {onSetUpPasskey ? (
-          <PasskeySection runtime={runtime} supported={passkeysSupported} onSetUp={onSetUpPasskey} />
+          <PasskeySection
+            runtime={runtime}
+            supported={passkeysSupported}
+            onSetUp={onSetUpPasskey}
+          />
         ) : null}
+
+        <SecurityPhraseSection runtime={runtime} />
 
         <div>
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
@@ -131,7 +167,8 @@ export function LockSettingsView({
               </>
             ) : (
               TIMEOUT_OPTIONS.map((option) => {
-                const selected = state.settings?.autoLockTimeout === option.value;
+                const selected =
+                  state.settings?.autoLockTimeout === option.value;
                 return (
                   <button
                     key={option.value}
@@ -140,9 +177,14 @@ export function LockSettingsView({
                     onClick={() => void handleSelectTimeout(option.value)}
                     className="flex w-full items-center gap-2.5 py-3.5 text-left hover:bg-mist disabled:opacity-60"
                   >
-                    <span className="flex-1 text-label font-semibold text-foreground">{option.label}</span>
+                    <span className="flex-1 text-label font-semibold text-foreground">
+                      {option.label}
+                    </span>
                     {selected ? (
-                      <span aria-hidden="true" className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground">
+                      <span
+                        aria-hidden="true"
+                        className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground"
+                      >
                         <CheckIcon />
                       </span>
                     ) : null}
@@ -151,11 +193,20 @@ export function LockSettingsView({
               })
             )}
           </div>
-          <p className="pt-2.5 text-caption leading-relaxed text-faint">
-            Gleam stays unlocked until you lock it or this timeout is reached.
-          </p>
+          {state.settings?.autoLockTimeout === "never" ? (
+            <p
+              role="note"
+              className="pt-2.5 text-caption leading-relaxed text-warning"
+            >
+              Gleam stays unlocked always, even when your computer locks.
+            </p>
+          ) : (
+            <p className="pt-2.5 text-caption leading-relaxed text-faint">
+              Gleam locks after this long without use, and whenever your
+              computer locks.
+            </p>
+          )}
         </div>
-
       </div>
     </div>
   );
@@ -166,7 +217,11 @@ type PasskeyState =
   | { kind: "ready"; status: PasskeyStatus; busy: boolean; error?: string };
 
 function formatSetUpDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /**
@@ -187,8 +242,15 @@ function PasskeySection({
 
   const loadStatus = useCallback(async () => {
     try {
-      const status = await runtime.send<void, PasskeyStatus>({ type: "getPasskeyStatus", payload: undefined });
-      setPasskey({ kind: "ready", status: status?.enrolled === true ? status : { enrolled: false }, busy: false });
+      const status = await runtime.send<void, PasskeyStatus>({
+        type: "getPasskeyStatus",
+        payload: undefined,
+      });
+      setPasskey({
+        kind: "ready",
+        status: status?.enrolled === true ? status : { enrolled: false },
+        busy: false,
+      });
     } catch (error) {
       setPasskey({
         kind: "ready",
@@ -212,7 +274,11 @@ function PasskeySection({
     try {
       await onSetUp();
     } catch (error) {
-      setPasskey({ ...passkey, busy: false, error: error instanceof Error ? error.message : String(error) });
+      setPasskey({
+        ...passkey,
+        busy: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return;
     }
     setPasskey({ ...passkey, busy: false });
@@ -223,11 +289,18 @@ function PasskeySection({
     const { credentialId } = passkey.status;
     setPasskey({ ...passkey, busy: true, error: undefined });
     try {
-      await runtime.send<void, void>({ type: "removePasskey", payload: undefined });
+      await runtime.send<void, void>({
+        type: "removePasskey",
+        payload: undefined,
+      });
       forgetPasskey(credentialId);
       setPasskey({ kind: "ready", status: { enrolled: false }, busy: false });
     } catch (error) {
-      setPasskey({ ...passkey, busy: false, error: error instanceof Error ? error.message : String(error) });
+      setPasskey({
+        ...passkey,
+        busy: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -244,8 +317,12 @@ function PasskeySection({
             <PasskeyIcon />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">Unlock with passkey is on</span>
-            <span className="text-caption text-muted">Set up {formatSetUpDate(passkey.status.createdAt)}</span>
+            <span className="text-label font-semibold text-foreground">
+              Unlock with passkey is on
+            </span>
+            <span className="text-caption text-muted">
+              Set up {formatSetUpDate(passkey.status.createdAt)}
+            </span>
           </span>
           <button
             type="button"
@@ -267,38 +344,72 @@ function PasskeySection({
             <PasskeyIcon />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">Set up a passkey</span>
-            <span className="text-caption text-muted">Unlock with your fingerprint, face or security key</span>
+            <span className="text-label font-semibold text-foreground">
+              Set up a passkey
+            </span>
+            <span className="text-caption text-muted">
+              Unlock with your fingerprint, face or security key
+            </span>
           </span>
         </button>
       ) : (
-        <p className="py-3.5 text-caption text-muted">Passkeys aren&apos;t available in this browser.</p>
+        <p className="py-3.5 text-caption text-muted">
+          Passkeys aren&apos;t available in this browser.
+        </p>
       )}
       {passkey.kind === "ready" && passkey.error ? (
         <p role="alert" className="pt-1 text-caption text-warning">
           {passkey.error}
         </p>
       ) : null}
-      <p className="pt-2.5 text-caption leading-relaxed text-faint">
-        Your password always works too. A passkey only works in this browser profile.
-      </p>
     </div>
   );
 }
 
 function LockIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="5"
+        y="11"
+        width="14"
+        height="10"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 11V7a4 4 0 0 1 8 0v4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
 function CheckIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M20 6 9 17l-5-5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

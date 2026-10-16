@@ -20,7 +20,9 @@ export const OTHER_WALLET = "GLEAM_OTHER_WALLET";
 
 /**
  * The ArConnect-compatible method surface injected as
- * `window.arweaveWallet`. A page-originated message can only ever reach
+ * `window.arweaveWallet`: core's `PROVIDER_METHODS` plus
+ * `REFUSED_PROVIDER_METHODS`, which stay defined so a dApp gets a clear
+ * error. A page-originated message can only ever reach
  * this set — never `KEY_METHODS`/`APPROVAL_METHODS` — enforced at the
  * dispatcher choke point built in a later layer.
  * See https://github.com/wanderwallet/wander-docs/tree/main/api for details
@@ -79,7 +81,6 @@ export const APPROVAL_GATED_METHODS: readonly ProviderSurfaceMethod[] = [
   "decrypt",
   "signature",
   "signMessage",
-  "privateHash",
   "signDataItem",
   "batchSignDataItem",
   "transferAoTokens",
@@ -156,8 +157,8 @@ export function decodeTaggedBinary(value: unknown): unknown {
 }
 
 /**
- * A page → content script request envelope. `id` is generated with
- * `crypto.randomUUID()` per request and matched on the response.
+ * A page → content script request envelope. `id` is a fresh random hex
+ * string per request, matched on the response.
  */
 export interface PageRequestEnvelope {
   type: typeof REQUEST;

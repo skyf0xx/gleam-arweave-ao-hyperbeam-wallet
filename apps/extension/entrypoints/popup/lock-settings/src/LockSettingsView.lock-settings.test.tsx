@@ -17,9 +17,25 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 const NEVER: LockSettings = { autoLockTimeout: "never" };
 
+/** Answers by message type, so the sections' independent loads can run in any order. */
+function sendFor({ lock = NEVER as LockSettings | Error, phrase = null as unknown } = {}) {
+  let lockFailures = lock instanceof Error ? 1 : 0;
+  return vi.fn(async ({ type }: { type: string }) => {
+    if (type === "getLockSettings") {
+      if (lockFailures > 0) {
+        lockFailures -= 1;
+        throw lock;
+      }
+      return lock instanceof Error ? NEVER : lock;
+    }
+    if (type === "getSecurityPhrase") return phrase;
+    return undefined;
+  }) as unknown as RuntimePort["send"] & ReturnType<typeof vi.fn>;
+}
+
 describe("LockSettingsView (1.6 lock-settings)", () => {
   it("loads current settings via getLockSettings and marks the active option", async () => {
-    const send = vi.fn().mockResolvedValue({ autoLockTimeout: "5min" } satisfies LockSettings);
+    const send = sendFor({ lock: { autoLockTimeout: "5min" } });
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("5 minutes")).toBeTruthy());
@@ -27,7 +43,7 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
   });
 
   it("Lock now calls lockWallet then onLocked", async () => {
-    const send = vi.fn().mockResolvedValueOnce(NEVER).mockResolvedValueOnce(undefined);
+    const send = sendFor();
     const onLocked = vi.fn();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={onLocked} />);
 
@@ -39,7 +55,7 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
   });
 
   it("selecting a timeout calls setLockSettings with that value", async () => {
-    const send = vi.fn().mockResolvedValueOnce(NEVER).mockResolvedValueOnce(undefined);
+    const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("1 hour")).toBeTruthy());
@@ -50,18 +66,29 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     );
   });
 
+  it("warns while Never is selected, and drops the warning once a timeout is picked", async () => {
+    const send = sendFor();
+    render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("note").textContent).toMatch(/stays unlocked always, even when your computer locks/));
+    fireEvent.click(screen.getByText("1 hour"));
+
+    await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
+    expect(screen.getByText(/whenever your computer locks/)).toBeTruthy();
+  });
+
   it("does not re-save when the already-selected timeout is tapped again", async () => {
-    const send = vi.fn().mockResolvedValue(NEVER);
+    const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
     fireEvent.click(screen.getByText("Never"));
 
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setLockSettings" }));
   });
 
   it("shows the network error banner on a failed load", async () => {
-    const send = vi.fn().mockRejectedValueOnce(new Error("unreachable")).mockResolvedValueOnce(NEVER);
+    const send = sendFor({ lock: new Error("unreachable") });
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText(/couldn't reach the network/i)).toBeTruthy());
@@ -69,12 +96,45 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
 
   it("calls onBack when the header back button is pressed", async () => {
     const onBack = vi.fn();
-    const send = vi.fn().mockResolvedValue(NEVER);
+    const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={onBack} onLocked={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalled();
+  });
+});
+
+describe("LockSettingsView security phrase section", () => {
+  it("shows the current phrase", async () => {
+    const send = sendFor({ phrase: { word: "willow" } });
+    render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+  });
+
+  it("changes the phrase in place", async () => {
+    const send = sendFor({ phrase: { word: "willow" } });
+    render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Change" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    fireEvent.change(screen.getByLabelText("Word"), { target: { value: "harbor" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Your security phrase: harbor")).toBeTruthy());
+    expect(send).toHaveBeenCalledWith({ type: "setSecurityPhrase", payload: { word: "harbor" } });
+  });
+
+  it("offers to set one up when none is set, and won't save a blank word", async () => {
+    const send = sendFor();
+    render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Set up a security phrase")).toBeTruthy());
+    fireEvent.click(screen.getByText("Set up a security phrase"));
+    fireEvent.change(screen.getByLabelText("Word"), { target: { value: "  " } });
+
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

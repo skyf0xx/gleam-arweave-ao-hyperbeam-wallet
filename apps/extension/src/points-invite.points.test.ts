@@ -55,7 +55,7 @@ function setup(initial: Record<string, unknown> = {}, reply: () => Response | Pr
     storage,
     deviceKey: async () => device,
     apiUrl: "https://points.test",
-    signingKey: async () => null,
+    signer: async () => null,
     walletMethod: async () => null,
     badge: { setDot: async () => {} },
     fetchImpl,
@@ -167,5 +167,81 @@ describe("acceptSiteInvite", () => {
     expect(await acceptSiteInvite(message, SITE_ORIGIN, storage, points)).toEqual({ ok: false });
     expect(storage.store.size).toBe(0);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  describe("refuses hostile messages without writing anything", () => {
+    it.each([
+      ["no origin", undefined],
+      ["another site", "https://evil.example"],
+      ["the site over plain http", "http://gleamwallet.app"],
+      ["a subdomain", "https://www.gleamwallet.app"],
+      ["a lookalike suffix", "https://gleamwallet.app.evil.example"],
+      ["a lookalike host", "https://gIeamwallet.app"],
+      ["a punycode lookalike", "https://xn--gleamwallt-r7a.app"],
+      ["another port", "https://gleamwallet.app:8443"],
+      ["a URL, not an origin", "https://gleamwallet.app/"],
+      ["an opaque origin", "null"],
+      ["an empty origin", ""],
+    ])("from %s", async (_label, origin) => {
+      const { storage, fetchImpl, points } = setup();
+
+      expect(await acceptSiteInvite(INVITE, origin, storage, points)).toEqual({ ok: false });
+      expect(storage.store.size).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["undefined", undefined],
+      ["a bare string", "FRIEND42"],
+      ["a number", 42],
+      ["an array", ["gleam-points:invite", "FRIEND42"]],
+      ["an array holding the invite", [INVITE]],
+      ["an extra field", { ...INVITE, walletId: "w1" }],
+      ["an extra method field", { ...INVITE, method: "downloadKeyfile" }],
+      ["only a code", { code: "FRIEND42" }],
+      ["only the type", { type: "gleam-points:invite" }],
+      ["fields inherited, not its own", Object.create(INVITE) as unknown],
+      ["a request for a wallet method", { type: "downloadKeyfile", code: "FRIEND42" }],
+      ["a provider call", { type: "providerCall", method: "sign", params: {} }],
+      ["a key read", { type: "getState" }],
+      ["a code too short", { ...INVITE, code: "ABC12" }],
+      ["a code too long", { ...INVITE, code: "A".repeat(17) }],
+      ["an oversized code", { ...INVITE, code: "A".repeat(1_000_000) }],
+      ["an empty code", { ...INVITE, code: "" }],
+      ["a code with spaces", { ...INVITE, code: " FRIEND42 " }],
+      ["a code with a trailing newline", { ...INVITE, code: "FRIEND42\n" }],
+      ["a code with full-width digits", { ...INVITE, code: "FRIEND４２" }],
+      ["a code with an accented letter", { ...INVITE, code: "FRIÉND42" }],
+      ["a code with a zero-width space", { ...INVITE, code: "FRIEND​42" }],
+      ["a code with markup", { ...INVITE, code: "<img src=x>" }],
+      ["an object code", { ...INVITE, code: { toString: () => "FRIEND42" } }],
+      ["an array code", { ...INVITE, code: ["FRIEND42"] }],
+      ["a null code", { ...INVITE, code: null }],
+      ["a boolean type", { type: true, code: "FRIEND42" }],
+      [
+        "an own __proto__ key",
+        JSON.parse('{"type":"gleam-points:invite","code":"FRIEND42","__proto__":{"polluted":true}}') as unknown,
+      ],
+      [
+        "an own constructor key",
+        JSON.parse('{"type":"gleam-points:invite","code":"FRIEND42","constructor":{"prototype":{"polluted":true}}}') as unknown,
+      ],
+      ["a __proto__ code", { ...INVITE, code: "__proto__" }],
+    ])("carrying %s", async (_label, message) => {
+      const { storage, fetchImpl, points } = setup();
+
+      expect(await acceptSiteInvite(message, SITE_ORIGIN, storage, points)).toEqual({ ok: false });
+      expect(storage.store.size).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it("replies with the redeem outcome only, never wallet data", async () => {
+      const { storage, points } = setup({ [POINTS_MEMBERSHIPS_KEY]: { w1: { address: "addr-1" } } });
+
+      const reply = await acceptSiteInvite(INVITE, SITE_ORIGIN, storage, points);
+      expect(reply).toEqual({ ok: true, redeem: "ok" });
+      expect(Object.keys(reply)).toEqual(["ok", "redeem"]);
+    });
   });
 });

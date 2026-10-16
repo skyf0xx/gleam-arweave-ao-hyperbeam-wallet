@@ -116,7 +116,7 @@ describe("TransferHandler: estimateCollectibleSend", () => {
       recipient: RECIPIENT,
       collectible: COLLECTIBLE,
     });
-    expect(estimate).toEqual({ fee: REWARD, firstSeenRecipient: true });
+    expect(estimate).toEqual({ fee: REWARD, firstSeenRecipient: true, lookalikeOf: null });
   });
 
   it("fails with the fee in AR when the wallet's AR can't cover it", async () => {

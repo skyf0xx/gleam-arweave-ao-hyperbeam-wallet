@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { SecurityPhrase } from "@gleam/core";
 import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
+import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
 
 /**
  * A pure brand moment, global unlock: no per-wallet identity (avatar/name/
@@ -16,6 +19,8 @@ export interface UnlockScreenProps {
   tagline?: string;
   /** Present when a passkey is set up. It becomes the primary way in, with the password one tap away. */
   passkey?: PasskeyUnlockProps;
+  /** The user's anti-phishing phrase, when one is set. */
+  securityPhrase?: SecurityPhrase | null;
 }
 
 export interface PasskeyUnlockProps {
@@ -32,10 +37,13 @@ export function UnlockScreen({
   onForgotPassword,
   tagline = "Simple. Fast. Easy.",
   passkey,
+  securityPhrase,
 }: UnlockScreenProps) {
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
+  const phraseWord = securityPhrase?.word;
+  const phraseIcon = useMemo(() => (phraseWord ? securityPhraseIconSvg(phraseWord) : undefined), [phraseWord]);
 
   // Clear the typed password once a fresh unlock failure arrives, without
   // an effect (react-hooks/set-state-in-effect): adjust state during
@@ -53,6 +61,9 @@ export function UnlockScreen({
       <div className="mt-16 mb-2">
         <BeamMark tagline={tagline} />
       </div>
+      {securityPhrase && phraseIcon ? (
+        <SecurityPhraseMark phrase={securityPhrase} iconSvg={phraseIcon} layout="stacked" className="mt-6" />
+      ) : null}
 
       {passkey && !usePassword ? (
         <PasskeyUnlock

@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { signerFromJwk } from "../signer/keys";
 import Arweave from "arweave";
 import { DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";
@@ -62,7 +63,7 @@ describe("vault/signing", () => {
     it("signs the dApp's own fields without asking the gateway for defaults", async () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-      const result = await signTransaction("https://arweave.net", jwk, {
+      const result = await signTransaction("https://arweave.net", signerFromJwk(jwk, ""), {
         data: bytesToBase64(new TextEncoder().encode("hello")),
         target,
         quantity: "1000",
@@ -94,7 +95,7 @@ describe("vault/signing", () => {
         return new Response(url.includes("tx_anchor") ? lastTx : "777", { status: 200 });
       });
 
-      const result = await signTransaction("https://arweave.net", jwk, {
+      const result = await signTransaction("https://arweave.net", signerFromJwk(jwk, ""), {
         data: bytesToBase64(new TextEncoder().encode("hello")),
       });
 
@@ -115,7 +116,7 @@ describe("vault/signing", () => {
       dappTx.addTag("Content-Type", "text/plain");
       dappTx.addTag("App-Name", "Gleam ✓");
 
-      const signed = await signTransaction("https://arweave.net", jwk, {
+      const signed = await signTransaction("https://arweave.net", signerFromJwk(jwk, ""), {
         data: bytesToBase64(dappTx.data),
         target: dappTx.target,
         quantity: dappTx.quantity,
@@ -167,7 +168,7 @@ describe("vault/signing", () => {
     it("posts small payloads as a BASE transaction", async () => {
       const fetchSpy = mockGatewayFetch(200);
 
-      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
         data: bytesToBase64(new TextEncoder().encode("small payload")),
       }, VIA_BUNDLER);
 
@@ -181,7 +182,7 @@ describe("vault/signing", () => {
       const largeData = new Uint8Array(150 * 1024).fill(1);
       const target = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
 
-      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
         data: bytesToBase64(largeData),
         target,
         tags: [{ name: "Content-Type", value: "application/octet-stream" }],
@@ -207,7 +208,7 @@ describe("vault/signing", () => {
       const fetchSpy = mockGatewayFetch(200);
       const target = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";
 
-      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
         data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
         target,
         quantity: "1000",
@@ -227,7 +228,7 @@ describe("vault/signing", () => {
     it.each(["0", "", "000"])("still bundles a large payload whose quantity is %j", async (quantity) => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-      const result = await dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
         data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
         quantity,
       }, VIA_BUNDLER);
@@ -242,7 +243,7 @@ describe("vault/signing", () => {
       const result = await dispatchTransaction(
         "https://arweave.net",
         BUNDLER,
-        jwk,
+        signerFromJwk(jwk, ""),
         { data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)) },
         { viaBundler: false },
       );
@@ -257,7 +258,7 @@ describe("vault/signing", () => {
       );
 
       await expect(
-        dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+        dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
           data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
         }, VIA_BUNDLER),
       ).rejects.toThrow(/bundler https:\/\/up\.arweave\.net.*HTTP 402/);
@@ -267,7 +268,7 @@ describe("vault/signing", () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
 
       await expect(
-        dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+        dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
           data: bytesToBase64(new Uint8Array(150 * 1024).fill(1)),
         }, VIA_BUNDLER),
       ).rejects.toThrow(/Failed to fetch/);
@@ -277,7 +278,7 @@ describe("vault/signing", () => {
       mockGatewayFetch(500, "Internal Server Error");
 
       await expect(
-        dispatchTransaction("https://arweave.net", BUNDLER, jwk, {
+        dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
           data: bytesToBase64(new TextEncoder().encode("x")),
         }, VIA_BUNDLER),
       ).rejects.toThrow(/Failed to dispatch transaction/);
@@ -289,7 +290,7 @@ describe("vault/signing", () => {
     const anchor = "a".repeat(32);
 
     it("returns raw item bytes that arbundles parses and whose signature verifies", async () => {
-      const raw = await signDataItem(jwk, {
+      const raw = await signDataItem(signerFromJwk(jwk, ""), {
         data: bytesToBase64(new TextEncoder().encode("data item payload")),
         tags: [{ name: "Content-Type", value: "text/plain" }],
         target,
@@ -307,7 +308,7 @@ describe("vault/signing", () => {
     });
 
     it("fails verification once the data is tampered with", async () => {
-      const raw = await signDataItem(jwk, { data: bytesToBase64(new TextEncoder().encode("hello")) });
+      const raw = await signDataItem(signerFromJwk(jwk, ""), { data: bytesToBase64(new TextEncoder().encode("hello")) });
       raw[raw.byteLength - 1]! ^= 1;
       expect(await verifies(new DataItem(Buffer.from(raw)))).toBe(false);
     });
@@ -317,7 +318,7 @@ describe("vault/signing", () => {
     it("signs each item in order, each one verifying on its own", async () => {
       const payloads = ["item 1", "item 2", "item 3"];
       const results = await batchSignDataItem(
-        jwk,
+        signerFromJwk(jwk, ""),
         payloads.map((text) => ({ data: bytesToBase64(new TextEncoder().encode(text)) })),
       );
 
@@ -330,7 +331,7 @@ describe("vault/signing", () => {
     });
 
     it("returns an empty array for an empty input list", async () => {
-      const results = await batchSignDataItem(jwk, []);
+      const results = await batchSignDataItem(signerFromJwk(jwk, ""), []);
       expect(results).toEqual([]);
     });
   });
@@ -347,7 +348,7 @@ describe("vault/signing", () => {
         unsigned.kind === "transaction"
           ? await transactionSignatureData(unsigned.transaction)
           : await dataItemSignatureData(unsigned.raw);
-      return signRsaPss(key, message);
+      return signRsaPss(signerFromJwk(key, ""), message);
     }
 
     it("sign: finishes a transaction arweave-js verifies", async () => {

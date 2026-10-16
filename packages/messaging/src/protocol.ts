@@ -6,7 +6,9 @@ import type {
   CollectibleSendDraft,
   ApprovalRequest,
   Contact,
+  RecipientAssessment,
   FeeEstimate,
+  FileDownloadResult,
   Grant,
   HardwareDevice,
   HardwareWalletMethod,
@@ -22,6 +24,7 @@ import type {
   PortfolioHistory,
   PortfolioHistoryRange,
   PortfolioScope,
+  SecurityPhrase,
   ThemeSettings,
   TokenBalance,
   TokenPrice,
@@ -61,9 +64,16 @@ export interface ProtocolMap {
   deleteWallet(req: { walletId: string }): void;
   renameWallet(req: { walletId: string; name: string }): void;
   switchWallet(req: { walletId: string }): void;
-  exportWallet(req: { walletId: string; password: string }): JWKInterface;
-  /** Set only after a keyfile download or clipboard copy actually succeeds, not merely offered. */
-  confirmWalletBackup(req: { walletId: string }): void;
+  /**
+   * The background decrypts the keyfile and saves it to the user's
+   * downloads itself, so the plaintext key never crosses messaging, and
+   * records the backup on success. A wrong password rejects; a cancelled
+   * or failed download, or a missing `downloads` permission, resolves
+   * `ok: false`.
+   */
+  downloadKeyfile(req: { walletId: string; password: string }): FileDownloadResult;
+  /** Ends a `downloadKeyfile` still waiting for the `downloads` grant, so it stops holding the password. */
+  cancelKeyfileDownload(req: { walletId: string }): void;
   lockWallet(): void;
   unlockWallet(req: { password: string }): { unlockedWalletIds: string[] };
   /**
@@ -141,6 +151,8 @@ export interface ProtocolMap {
    * by trusted extension UI, never proxied through `providerCall`.
    */
   getThemePreference(): ThemeSettings;
+  /** Read while locked: the unlock screen shows it before the password is typed. */
+  getSecurityPhrase(): SecurityPhrase | null;
   /** One list for the whole vault, most-recently-saved first. */
   listContacts(): Contact[];
 
@@ -151,6 +163,8 @@ export interface ProtocolMap {
   // not a password on the request: once unlocked, no further call needs
   // one until the session is locked or its auto-lock timeout elapses.
   estimateTransfer(req: TransferDraft): FeeEstimate;
+  /** First-time and lookalike checks for a recipient, for the approval window. */
+  assessRecipient(req: { walletId: string; recipient: string }): RecipientAssessment;
   submitTransfer(req: TransferDraft): { txId: string };
   /** Quotes the AR network fee for sending one collectible; fails when the wallet's AR can't cover it. */
   estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;
@@ -192,6 +206,8 @@ export interface ProtocolMap {
   setNetworkSettings(req: NetworkSettings): void;
   setLockSettings(req: LockSettings): void;
   setThemePreference(req: ThemeSettings): void;
+  /** Rejects a phrase `readSecurityPhrase` doesn't accept. */
+  setSecurityPhrase(req: SecurityPhrase): void;
   revokeGrant(req: { origin: string }): void;
   /**
    * Upserts by `address` (case-sensitive exact match): saving over an
@@ -296,7 +312,7 @@ export interface ProtocolMap {
    * `providerCall` is checked against `PROVIDER_METHODS` before being
    * routed anywhere, and nothing else in this map is reachable this way
    * — `resolveApproval`/`getApproval` (`APPROVAL_METHODS`) and
-   * `createWallet`/`importWallet`/`exportWallet` (`KEY_METHODS`) are only
+   * `createWallet`/`importWallet`/`downloadKeyfile` (`KEY_METHODS`) are only
    * ever called directly, by their own trusted senders, never proxied
    * through `providerCall`.
    */

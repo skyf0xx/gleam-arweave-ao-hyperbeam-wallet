@@ -1,4 +1,5 @@
 import type { TokenBalance } from "@gleam/core";
+import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import type { WalletBalances } from "./useBalances";
 
 /**
@@ -28,12 +29,20 @@ import type { WalletBalances } from "./useBalances";
  * for the same "unknown isn't insufficient" reason. Ignored for AO token
  * sends, which have no sender-side fee (see `FeeEstimate.fee`'s doc
  * comment).
+ *
+ * When the amount fits the balance but amount + fee doesn't, the message
+ * names the fee and its size instead of the generic balance error, so the
+ * user isn't told they're short on an amount they can see they have.
+ * `feeIsNewAddress` (the recipient-aware fee exceeds the recipient-less
+ * quote, i.e. the gateway added its new-wallet fee) says why the fee is
+ * that large.
  */
 export function validateSendAmount(
   amountAtomic: string,
   token: TokenBalance | null,
   balances: WalletBalances | undefined,
   arFeeAtomic?: string,
+  feeIsNewAddress = false,
 ): string | null {
   if (!balances) return null;
 
@@ -43,10 +52,14 @@ export function validateSendAmount(
   if (available === undefined) return null;
 
   try {
-    const required =
-      token === null && arFeeAtomic !== undefined ? BigInt(amountAtomic) + BigInt(arFeeAtomic) : BigInt(amountAtomic);
-    if (required > BigInt(available)) {
+    if (BigInt(amountAtomic) > BigInt(available)) {
       return "That's more than your current balance.";
+    }
+    if (token === null && arFeeAtomic !== undefined && BigInt(amountAtomic) + BigInt(arFeeAtomic) > BigInt(available)) {
+      const fee = `${formatWinstonAsAr(arFeeAtomic)} AR`;
+      return feeIsNewAddress
+        ? `This address is new to Arweave, so the network fee is ${fee}. That plus this amount is more than your balance.`
+        : `The network fee is ${fee}. That plus this amount is more than your balance.`;
     }
   } catch {
     return null;

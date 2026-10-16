@@ -35,7 +35,8 @@ import { version as WALLET_VERSION } from "../../package.json";
  *
  * 1. `if (event.source !== window) return;` in the page-side listener —
  *    otherwise a same-document iframe could forge a response.
- * 2. `crypto.randomUUID()` per request, matched on the response's `id`.
+ * 2. A fresh random id per request (`requestId`), matched on the
+ *    response's `id`.
  * 3. A `settled` flag per pending call, so a duplicate or late response
  *    (e.g. the content script relays twice) can't resolve/reject twice.
  * 4. A timeout that rejects — a hung/killed service worker must not hang
@@ -111,6 +112,15 @@ function keepCallerTags(transaction: unknown, signed: unknown): unknown {
   return unchanged ? { ...(signed as object), tags: callerTags } : signed;
 }
 
+/**
+ * 128 random bits as hex. Not `crypto.randomUUID()`: that exists only in
+ * secure contexts, so on a plain-http page it would throw before the
+ * request reached the background's "secure (https) sites" refusal.
+ */
+function requestId(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 interface PendingCall {
   settled: boolean;
   resolve: (value: unknown) => void;
@@ -168,7 +178,7 @@ class GleamProvider {
       return Promise.reject(new Error(`"${method}" was aborted before it was sent.`));
     }
 
-    const id = crypto.randomUUID();
+    const id = requestId();
     const timeoutMs = timeoutFor(method);
 
     return new Promise((resolve, reject) => {
@@ -198,6 +208,9 @@ class GleamProvider {
         method,
         params: encodeTaggedBinary(params),
       };
+      // The page posts to its own window and the content script's listener
+      // checks event.source, so no other window or origin receives this.
+      // nosemgrep: javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration
       window.postMessage(request, "*");
     });
   }

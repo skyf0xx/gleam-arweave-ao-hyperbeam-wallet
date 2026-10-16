@@ -7,8 +7,8 @@ import type { UploadTag } from "./upload";
  * `messaging` and the layers that actually execute these operations can
  * share one definition.
  *
- * Every operation resolves its signing key via the existing
- * unlocked-session cache (`getCachedKey(walletId)` in
+ * Every operation resolves its signer from the unlocked session
+ * (`getSigner(walletId)` in
  * `apps/extension/src/handlers/key-session.ts`) — none of these request
  * shapes carries a password field.
  *
@@ -164,7 +164,7 @@ export interface SignatureResult {
 }
 
 /**
- * `signMessage`/`privateHash` both accept an `ArrayBuffer` directly per
+ * `signMessage` accepts an `ArrayBuffer` directly per
  * Wander's convention (not a base64 string like `signature()`'s older
  * shape) — tagged as `TaggedArrayBuffer` at the wire-envelope layer since
  * raw `ArrayBuffer` doesn't survive `@webext-core/messaging`'s envelope
@@ -178,16 +178,6 @@ export interface SignMessageRequest {
 
 export interface SignMessageResult {
   signature: ArrayBuffer;
-}
-
-export interface PrivateHashRequest {
-  walletId: string;
-  data: ArrayBuffer;
-  options?: { hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512" };
-}
-
-export interface PrivateHashResult {
-  hash: ArrayBuffer;
 }
 
 export interface VerifyMessageRequest {

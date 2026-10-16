@@ -2,9 +2,8 @@ import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { EmptyState, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { EmptyState, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { AddressRow } from "../../activity/src/AddressRow";
@@ -255,7 +254,15 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         // getArFee's recipient-less quote underestimates for a first-seen
         // recipient (see its doc comment) — recheck the balance now that
         // estimateTransfer has the real, recipient-specific fee.
-        const finalBalanceError = validateSendAmount(amountAtomic, selectedToken, balancesQuery.data, estimate.fee ?? undefined);
+        const feeIsNewAddress =
+          estimate.fee !== null && arFeeQuery.data !== undefined && BigInt(estimate.fee) > BigInt(arFeeQuery.data);
+        const finalBalanceError = validateSendAmount(
+          amountAtomic,
+          selectedToken,
+          balancesQuery.data,
+          estimate.fee ?? undefined,
+          feeIsNewAddress,
+        );
         if (finalBalanceError !== null) {
           setStep({ ...step, submitting: false, recipientError: undefined, amountError: finalBalanceError });
           return;
@@ -732,7 +739,8 @@ function ReviewStep({
   // check has no record of it yet (e.g. a contact saved from elsewhere, or
   // a wallet you've never actually sent to before).
   const known = contact ?? ownWallet;
-  const irreversible = step.estimate.firstSeenRecipient && !known;
+  const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
+  const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
   const knownName = contact?.name ?? ownWallet?.name;
 
   return (
@@ -746,10 +754,7 @@ function ReviewStep({
         </div>
 
         {irreversible ? (
-          <RiskNotice>
-            <strong className="font-bold">You haven&apos;t sent to this address before.</strong> Double-check
-            it&apos;s correct. This can&apos;t be undone once signed.
-          </RiskNotice>
+          <RecipientWarning firstTime lookalikeOf={lookalikeOf} />
         ) : (
           <p className="text-label leading-relaxed text-muted">
             You&apos;re sending {formatAmount(step.amountAtomic, token)} {ticker} to this address. This can&apos;t

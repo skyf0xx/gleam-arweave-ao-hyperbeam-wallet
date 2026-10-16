@@ -11,6 +11,7 @@ import {
   type JWKInterface,
   type LedgerTransport,
 } from "@gleam/core";
+import { signerFromJwk } from "@gleam/core/signer";
 import { buildUnsignedDataItem, dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { buildUnsignedTransaction, transactionSignatureData } from "@gleam/core/src/arweave/transaction.ts";
@@ -77,7 +78,7 @@ class FakeLedger implements LedgerTransport {
         if (this.signRefusal !== null) return sw(this.signRefusal);
         const hash = this.hashes.shift();
         if (!hash) return sw(0x6984);
-        this.signature = await signRsaPss(this.key, hash);
+        this.signature = await signRsaPss(signerFromJwk(this.key, ""), hash);
         return ok(hash);
       }
       case 0x10:

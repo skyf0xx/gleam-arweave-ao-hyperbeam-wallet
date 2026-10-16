@@ -1,6 +1,13 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { METHOD_PERMISSIONS, PERMISSION_TYPES, PROVIDER_METHODS, type PermissionType } from "@gleam/core";
-import { encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
+import {
+  generateJWK,
+  METHOD_PERMISSIONS,
+  PERMISSION_TYPES,
+  PROVIDER_METHODS,
+  type JWKInterface,
+  type PermissionType,
+} from "@gleam/core";
+import { APPROVAL_GATED_METHODS, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
  * This file's `transferAoTokens` integration test drives the real
@@ -60,8 +67,24 @@ const tabsReload = vi.fn().mockResolvedValue(undefined);
 const alarmsCreate = vi.fn();
 const alarmsAddListener = vi.fn();
 const onSuspendAddListener = vi.fn();
+const setSessionAccessLevel = vi.fn(async () => undefined);
+const downloadsDownload = vi.fn<(options: { url?: string; filename?: string }) => Promise<number>>(async () => 1);
+const downloadsSearch = vi.fn(async () => [{ id: 1, state: "complete", filename: "/home/me/Downloads/main-arweave-keyfile.json" }]);
+const downloadsErase = vi.fn(async () => [1]);
+const permissionsContains = vi.fn(async () => true);
 vi.mock("wxt/browser", () => ({
   browser: {
+    downloads: {
+      download: downloadsDownload,
+      search: downloadsSearch,
+      erase: downloadsErase,
+      onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
+    },
+    permissions: {
+      contains: permissionsContains,
+      onAdded: { addListener: vi.fn(), removeListener: vi.fn() },
+    },
+    storage: { session: { setAccessLevel: setSessionAccessLevel } },
     windows: { create: windowsCreate, remove: vi.fn(), update: vi.fn(), onRemoved: { addListener: vi.fn() } },
     runtime: { getURL: (path: string) => `chrome-extension://test${path}`, onSuspend: { addListener: onSuspendAddListener } },
     tabs: { query: tabsQuery, reload: tabsReload, onRemoved: { addListener: vi.fn() } },
@@ -82,6 +105,15 @@ vi.mock("wxt/utils/define-background", () => ({
  * dispatcher code running, not a reimplementation of its logic.
  */
 const originalFetch = globalThis.fetch;
+
+let sessionJwk: Promise<JWKInterface> | null = null;
+
+/** Leaves what unlocking a wallet leaves: its session entry and its non-extractable keys. */
+async function seedSessionKey(walletId: string, address: string): Promise<void> {
+  sessionJwk ??= generateJWK();
+  const { cacheKey } = await import("@/src/handlers/key-session");
+  await cacheKey(walletId, await sessionJwk, address);
+}
 
 describe("background.ts: providerCall privilege-tier choke point", () => {
   beforeEach(async () => {
@@ -114,7 +146,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "createWallet",
       "importWallet",
       "addHardwareWallet",
-      "exportWallet",
+      "downloadKeyfile",
       "getState",
       "resetAllWallets",
       "getPasskeyStatus",
@@ -229,6 +261,63 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await expect(handler("getPasskeyStatus")({ data: undefined })).resolves.toEqual({ enrolled: false });
   });
 
+  it("rejects downloadKeyfile routed through providerCall", () => {
+    expect(() => providerCall({ origin: "https://evil.example", method: "downloadKeyfile", params: {} })).toThrow(
+      /not reachable from a web page/i,
+    );
+  });
+
+  it("downloadKeyfile saves the keyfile from the background and answers the popup with only the outcome", async () => {
+    downloadsDownload.mockClear();
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const password = "correct horse battery staple";
+    const created = (await handler("createWallet")({ data: { name: "Main", password } })) as { id: string };
+
+    const result = await handler("downloadKeyfile")({ data: { walletId: created.id, password } });
+
+    expect(result).toEqual({ ok: true, filename: "main-arweave-keyfile.json" });
+    expect(downloadsDownload).toHaveBeenCalledOnce();
+    const { url, filename } = downloadsDownload.mock.calls[0]![0];
+    expect(filename).toBe("main-arweave-keyfile.json");
+    const jwk = JSON.parse(atob(url!.slice("data:application/json;base64,".length))) as Record<string, string>;
+    expect(jwk.kty).toBe("RSA");
+    expect(jwk.d).toEqual(expect.any(String));
+    expect(JSON.stringify(result)).not.toContain(jwk.n!.slice(0, 32));
+    expect(downloadsErase).toHaveBeenCalledWith({ id: 1 });
+    const state = (await handler("getState")({ data: undefined })) as { wallets: Array<{ id: string; backupConfirmedAt: number | null }> };
+    expect(state.wallets.find((wallet) => wallet.id === created.id)?.backupConfirmedAt).toEqual(expect.any(Number));
+  });
+
+  it("has no message that marks a backup without a download", () => {
+    expect(rawHandlers.has("confirmWalletBackup")).toBe(false);
+  });
+
+  it("downloadKeyfile with the wrong password rejects without downloading", async () => {
+    downloadsDownload.mockClear();
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const created = (await handler("createWallet")({
+      data: { name: "Main", password: "correct horse battery staple" },
+    })) as { id: string };
+
+    await expect(
+      handler("downloadKeyfile")({ data: { walletId: created.id, password: "wrong password entirely" } }),
+    ).rejects.toThrow();
+    expect(downloadsDownload).not.toHaveBeenCalled();
+  });
+
+  it("downloadKeyfile is refused from a page's content script before decrypting anything", async () => {
+    downloadsDownload.mockClear();
+    const handler = (name: string) => registeredHandlers.get(name)!;
+    const password = "correct horse battery staple";
+    const created = (await handler("createWallet")({ data: { name: "Main", password } })) as { id: string };
+    const raw = rawHandlers.get("downloadKeyfile")!;
+
+    await expect(
+      (async () => raw({ data: { walletId: created.id, password }, sender: contentSender("https://evil.example") }))(),
+    ).rejects.toThrow(/can only be called from the Gleam extension/);
+    expect(downloadsDownload).not.toHaveBeenCalled();
+  });
+
   it("rejects a KEY_METHODS name routed through providerCall", () => {
     expect(() => providerCall({ origin: "https://evil.example", method: "createWallet", params: {} })).toThrow(
       /not reachable from a web page/i,
@@ -262,6 +351,80 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await expect(
       providerCall({ origin: "https://not-connected.example", method: "getActiveAddress", params: {} }),
     ).rejects.toThrow(/not connected/i);
+  });
+
+  it("refuses privateHash for any site, before any grant check, without opening a window", () => {
+    for (const origin of ["https://not-connected.example", "http://dapp.example"]) {
+      expect(() => providerCall({ origin, method: "privateHash", params: {} })).toThrow(
+        "privateHash is not supported. Use encrypt/decrypt instead.",
+      );
+    }
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
+  describe("plain-http origins", () => {
+    const HTTP_ORIGIN = "http://dapp.example";
+
+    async function seedUnlockedWalletWithGrant(origin: string): Promise<void> {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("session:unlockedSession", {
+        unlockedAt: 0,
+        lastActivityAt: 0,
+        autoLockTimeout: "never",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      await seedSessionKey("wallet-1", "addr-1");
+      await setItem("local:grants", [
+        { origin, walletId: "wallet-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    }
+
+    it.each(APPROVAL_GATED_METHODS)("refuses %s from a plain-http site before any window opens", (method) => {
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method, params: {} })).toThrow(
+        "Gleam only signs for secure (https) sites.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses signing from a plain-http site that already holds a grant", async () => {
+      await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method: "signature", params })).toThrow(
+        "Gleam only signs for secure (https) sites.",
+      );
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method: "connect", params: {} })).toThrow(
+        "Gleam only signs for secure (https) sites.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["http://localhost:3000", "http://127.0.0.1:5173", "http://[::1]:8080"])(
+      "still lets local development at %s connect",
+      async (origin) => {
+        await seedUnlockedWalletWithGrant(origin);
+        await expect(
+          providerCall({ origin, method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } }),
+        ).resolves.toBeDefined();
+        const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+        void providerCall({ origin, method: "signature", params }).catch(() => undefined);
+        await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+      },
+    );
+
+    it("an https site with a grant still reaches the approval window", async () => {
+      await seedUnlockedWalletWithGrant("https://dapp.example");
+      const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
+      void providerCall({ origin: "https://dapp.example", method: "signature", params }).catch(() => undefined);
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    });
+  });
+
+  it("keeps session storage, where unlocked keys are cached, out of content scripts' reach", () => {
+    expect(setSessionAccessLevel).toHaveBeenCalledWith({ accessLevel: "TRUSTED_CONTEXTS" });
   });
 
   it("does not clear the key cache on runtime.onSuspend, which also fires on idle", () => {
@@ -405,7 +568,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       autoLockTimeout: "never",
       unlockedWalletIds: ["wallet-1"],
     });
-    await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+    await seedSessionKey("wallet-1", "addr-1");
     await setItem("local:networkSettings", {
       gatewayUrl: "https://ar-io.dev",
       peers: [],
@@ -439,7 +602,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       unlockedWalletIds: ["wallet-1"],
     });
     // getState reports a wallet with no cached key as locked.
-    await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+    await seedSessionKey("wallet-1", "addr-1");
 
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
@@ -501,8 +664,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     // The unlocked-session key cache (`key-session.ts`) — populated in a
     // real run by `unlockWallet`, seeded directly here since this test
     // drives the dispatcher module fresh per `beforeEach`'s `resetModules`.
-    const { cacheKey } = await import("@/src/handlers/key-session");
-    cacheKey("wallet-1", { kty: "RSA", n: "n", e: "e" } as never, "addr-1");
+    await seedSessionKey("wallet-1", "addr-1");
 
     // `previewWatchedToken`'s balance read for the amount's denomination —
     // a bare atomic-quantity string, the shape a live HyperBEAM node
@@ -840,7 +1002,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: [walletId],
       });
-      await setItem(`session:key:${walletId}`, { jwk: { kty: "RSA", n: "n", e: "e" }, address });
+      await seedSessionKey(walletId, address);
     }
 
     it("connect() pushes a CONNECT event only to the tab that just connected", async () => {
@@ -978,8 +1140,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1", "wallet-2"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
-      await setItem("session:key:wallet-2", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-2" });
+      await seedSessionKey("wallet-1", "addr-1");
+      await seedSessionKey("wallet-2", "addr-2");
     }
 
     async function grant(): Promise<void> {
@@ -1053,7 +1215,6 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       ["ledger", "signMessage", "sign messages"],
       ["ledger", "signature", "sign with the deprecated signature()"],
       ["ledger", "decrypt", "decrypt data"],
-      ["keystone", "privateHash", "create private hashes"],
     ] as const)("%s refuses %s", async (walletMethod, method, action) => {
       await seedHardwareWallet(walletMethod);
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
@@ -1097,7 +1258,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await seedSessionKey("wallet-1", "addr-1");
       await setItem("local:grants", [
         { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS", "SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
       ]);
@@ -1180,7 +1341,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         unlockedWalletIds: walletIds,
       });
       for (const id of walletIds) {
-        await setItem(`session:key:${id}`, { jwk: { kty: "RSA", n: "n", e: "e" }, address: `addr-${id}` });
+        await seedSessionKey(id, `addr-${id}`);
       }
       await setItem("local:grants", [
         grantFor("https://a.example", walletIds[0]!),
@@ -1388,7 +1549,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         autoLockTimeout: "never",
         unlockedWalletIds: ["wallet-1"],
       });
-      await setItem("session:key:wallet-1", { jwk: { kty: "RSA", n: "n", e: "e" }, address: "addr-1" });
+      await seedSessionKey("wallet-1", "addr-1");
 
       const connecting = rawHandlers.get("providerCall")!({
         data: { method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } },
@@ -1509,7 +1670,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       const guarded = [...rawHandlers.keys()].filter((method) => !contentMethods.includes(method));
       expect(guarded).toEqual(
         expect.arrayContaining([
-          "exportWallet",
+          "downloadKeyfile",
           "createWallet",
           "resolveApproval",
           "getApproval",

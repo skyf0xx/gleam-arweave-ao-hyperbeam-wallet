@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeAll, afterEach } from "vitest";
+import { signerFromJwk } from "../signer/keys";
 import { DataItem } from "@dha-team/arbundles/web";
 import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
@@ -64,7 +65,7 @@ function postedItem(fetchMock: ReturnType<typeof stubMu>): DataItem {
 
 describe("createSignedDataItem", () => {
   it("produces an ANS-104 item whose signature verifies over arbundles' own parse, with the id derived from its signature", async () => {
-    const { id, raw } = await createSignedDataItem(jwk, {
+    const { id, raw } = await createSignedDataItem(signerFromJwk(jwk, ""), {
       data: new TextEncoder().encode("hello"),
       target: PROCESS_ID,
       tags: [{ name: "Action", value: "Transfer" }],
@@ -80,14 +81,14 @@ describe("createSignedDataItem", () => {
   });
 
   it("fails verification once a signed field is tampered with", async () => {
-    const { raw } = await createSignedDataItem(jwk, { data: new TextEncoder().encode("hello"), target: PROCESS_ID, tags: [] });
+    const { raw } = await createSignedDataItem(signerFromJwk(jwk, ""), { data: new TextEncoder().encode("hello"), target: PROCESS_ID, tags: [] });
     raw[raw.byteLength - 1]! ^= 1;
     expect(await verifies(new DataItem(Buffer.from(raw)))).toBe(false);
   });
 
   it("rejects a target that isn't a 32-byte Arweave id", async () => {
     await expect(
-      createSignedDataItem(jwk, { data: new Uint8Array([1]), target: "not-an-id", tags: [] }),
+      createSignedDataItem(signerFromJwk(jwk, ""), { data: new Uint8Array([1]), target: "not-an-id", tags: [] }),
     ).rejects.toThrow(/32-byte Arweave id/);
   });
 });
@@ -95,7 +96,7 @@ describe("createSignedDataItem", () => {
 describe("AO submitTransfer", () => {
   it("posts the signed item as octet-stream to the legacynet MU", async () => {
     const fetchMock = stubMu();
-    await submitTransfer(jwk, PROCESS_ID, RECIPIENT, "1000000000000");
+    await submitTransfer(signerFromJwk(jwk, ""), PROCESS_ID, RECIPIENT, "1000000000000");
 
     expect(fetchMock).toHaveBeenCalledWith(
       AO_LEGACY_MU_URL,
@@ -109,7 +110,7 @@ describe("AO submitTransfer", () => {
 
   it("sends an ao.TN.1 Transfer message targeting the process, with capitalized tags", async () => {
     const fetchMock = stubMu();
-    await submitTransfer(jwk, PROCESS_ID, RECIPIENT, "42");
+    await submitTransfer(signerFromJwk(jwk, ""), PROCESS_ID, RECIPIENT, "42");
 
     const item = postedItem(fetchMock);
     expect(item.target).toBe(PROCESS_ID);
@@ -126,14 +127,14 @@ describe("AO submitTransfer", () => {
 
   it("returns the posted data item's id as the messageId", async () => {
     const fetchMock = stubMu();
-    const result = await submitTransfer(jwk, PROCESS_ID, RECIPIENT, "42");
+    const result = await submitTransfer(signerFromJwk(jwk, ""), PROCESS_ID, RECIPIENT, "42");
     expect(result).toEqual({ messageId: postedItem(fetchMock).id });
   });
 
   it("preserves large atomic-integer amounts exactly as strings, never floats", async () => {
     const fetchMock = stubMu();
     const huge = "90071992547409930000";
-    await submitTransfer(jwk, PROCESS_ID, RECIPIENT, huge);
+    await submitTransfer(signerFromJwk(jwk, ""), PROCESS_ID, RECIPIENT, huge);
 
     const quantityTag = postedItem(fetchMock).tags.find((tag) => tag.name === "Quantity");
     expect(quantityTag?.value).toBe(huge);
@@ -141,12 +142,12 @@ describe("AO submitTransfer", () => {
 
   it("throws with the MU's status and body when it rejects the message", async () => {
     stubMu(new Response("bad item", { status: 400 }));
-    await expect(submitTransfer(jwk, PROCESS_ID, RECIPIENT, "1")).rejects.toThrow(/failed \(400\): bad item/);
+    await expect(submitTransfer(signerFromJwk(jwk, ""), PROCESS_ID, RECIPIENT, "1")).rejects.toThrow(/failed \(400\): bad item/);
   });
 
   it("propagates a network failure reaching the MU", async () => {
     globalThis.fetch = vi.fn<typeof fetch>().mockRejectedValue(new Error("network error"));
-    await expect(submitTransfer(jwk, PROCESS_ID, RECIPIENT, "1")).rejects.toThrow(/network error/);
+    await expect(submitTransfer(signerFromJwk(jwk, ""), PROCESS_ID, RECIPIENT, "1")).rejects.toThrow(/network error/);
   });
 });
 
@@ -160,7 +161,7 @@ describe("AO prepareTransfer / finishTransfer", () => {
   it("posts an item signed from the owner's public key alone, and refuses a signature for another item", async () => {
     const fetchMock = stubMu();
     const unsigned = prepareTransfer(jwk.n, PROCESS_ID, RECIPIENT, "42");
-    const signature = await signRsaPss(jwk, await dataItemSignatureData(unsigned));
+    const signature = await signRsaPss(signerFromJwk(jwk, ""), await dataItemSignatureData(unsigned));
 
     const { messageId } = await finishTransfer(unsigned, signature, jwk.n);
 
@@ -178,7 +179,7 @@ describe("AO prepareTransfer / finishTransfer", () => {
     const fetchMock = stubMu();
     const other = await generateJWK();
     const foreign = prepareTransfer(other.n, PROCESS_ID, RECIPIENT, "42");
-    const signature = await signRsaPss(other, await dataItemSignatureData(foreign));
+    const signature = await signRsaPss(signerFromJwk(other, ""), await dataItemSignatureData(foreign));
 
     await expect(finishTransfer(foreign, signature, jwk.n)).rejects.toThrow(/doesn't match/);
     expect(fetchMock).not.toHaveBeenCalled();

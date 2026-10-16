@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
+import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
+import { CollectibleThumbnail, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
@@ -21,6 +21,8 @@ import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-scree
 export interface SigningApprovalScreenProps {
   origin: string;
   preview: SigningApprovalPreview;
+  /** Recipient checks for a transfer; omitted or null shows none. */
+  assessment?: RecipientAssessment | null;
   onReject: () => void;
   /** Rejects (surfacing its message inline) if signing fails — e.g. the wallet's unlocked session has since expired. */
   onSign: () => Promise<void>;
@@ -36,7 +38,6 @@ const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
   transferAoTokens: "Send",
   signature: "Sign data",
   signMessage: "Sign message",
-  privateHash: "Generate hash",
   transfer: "Send",
   pointsProof: "Prove ownership",
 };
@@ -139,7 +140,7 @@ async function copyToClipboard(value: string): Promise<void> {
   }
 }
 
-export function SigningApprovalScreen({ origin, preview, onReject, onSign }: SigningApprovalScreenProps) {
+export function SigningApprovalScreen({ origin, preview, assessment, onReject, onSign }: SigningApprovalScreenProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const isTransfer = preview.recipient !== null;
@@ -195,6 +196,8 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
               before signing.
             </RiskNotice>
 
+            <RecipientWarning firstTime={assessment?.firstTime ?? false} lookalikeOf={assessment?.lookalikeOf} />
+
             <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
@@ -220,6 +223,8 @@ export function SigningApprovalScreen({ origin, preview, onReject, onSign }: Sig
                 before signing.
               </RiskNotice>
             ) : null}
+
+            <RecipientWarning firstTime={assessment?.firstTime ?? false} lookalikeOf={assessment?.lookalikeOf} />
 
             <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
 

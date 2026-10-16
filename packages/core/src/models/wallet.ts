@@ -78,15 +78,41 @@ export interface WalletSummary {
 }
 
 /**
- * The encryption envelope wrapping a Wallet's key material: PBKDF2-HMAC-SHA256
- * (600,000 iterations) deriving a non-extractable AES-256-GCM key, random
- * salt/IV, record-bound AAD (`gleam:v1:<walletId>:<address>`).
+ * The encryption envelope wrapping a Wallet's key material: a password KDF
+ * deriving a non-extractable AES-256-GCM key, random salt/IV, record-bound
+ * AAD (`gleam:v<version>:<walletId>:<address>`).
+ *
+ * New envelopes are version 2 (Argon2id). Version 1 (PBKDF2) is only read,
+ * and is re-encrypted as version 2 on the next unlock.
  */
-export interface VaultEnvelope {
+export type VaultEnvelope = VaultEnvelopeV1 | VaultEnvelopeV2;
+
+export interface VaultEnvelopeV1 {
   version: 1;
   algorithm: "AES-GCM";
   kdf: "PBKDF2-HMAC-SHA256";
   iterations: 600_000;
+  /** Base64-encoded random salt used in key derivation. */
+  salt: string;
+  /** Base64-encoded random initialization vector. */
+  iv: string;
+  /** Base64-encoded ciphertext of the JWK keyfile. */
+  ciphertext: string;
+}
+
+/** The Argon2id cost, stored per envelope so it can be raised later. */
+export interface Argon2idParams {
+  /** Memory cost in KiB. */
+  memoryKiB: number;
+  /** Time cost (passes over memory). */
+  iterations: number;
+  parallelism: number;
+}
+
+export interface VaultEnvelopeV2 extends Argon2idParams {
+  version: 2;
+  algorithm: "AES-GCM";
+  kdf: "Argon2id";
   /** Base64-encoded random salt used in key derivation. */
   salt: string;
   /** Base64-encoded random initialization vector. */

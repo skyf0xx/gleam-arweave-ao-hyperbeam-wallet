@@ -1,0 +1,54 @@
+# The security surface, kept identical to security/surface.txt (a test
+# checks it). Ownership is documented, not enforced: GitHub won't let a
+# PR author approve their own PR, so "require code owner review" stays
+# off in the master ruleset until there is a second maintainer.
+
+# 1 Key material
+/packages/core/src/vault/                                                  @skyf0xx
+/packages/core/src/keys/                                                   @skyf0xx
+/apps/extension/src/handlers/key-session.ts                                @skyf0xx
+/apps/extension/src/handlers/wallet-lifecycle.ts                           @skyf0xx
+/apps/extension/src/handlers/passkey.ts                                    @skyf0xx
+/apps/extension/src/passkey/                                               @skyf0xx
+/apps/extension/entrypoints/passkey/                                       @skyf0xx
+/apps/extension/src/adapters/storage.ts                                    @skyf0xx
+/apps/extension/src/adapters/session-access.ts                             @skyf0xx
+/apps/extension/entrypoints/popup/onboarding/src/Import.tsx                @skyf0xx
+/apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx        @skyf0xx
+/apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx   @skyf0xx
+
+# 2 Signing
+/packages/core/src/ao/transfer.ts                                          @skyf0xx
+/packages/core/src/arweave/data-item.ts                                    @skyf0xx
+/packages/core/src/arweave/rsa-pss.ts                                      @skyf0xx
+/packages/core/src/arweave/transaction.ts                                  @skyf0xx
+/packages/core/src/arweave/transfer.ts                                     @skyf0xx
+/packages/core/src/arweave/upload.ts                                       @skyf0xx
+/apps/extension/src/handlers/transfer.ts                                   @skyf0xx
+/apps/extension/src/handlers/upload.ts                                     @skyf0xx
+/apps/extension/src/handlers/points.ts                                     @skyf0xx
+
+# 3 Trust boundary between pages and the wallet
+/apps/extension/entrypoints/background/                                    @skyf0xx
+/apps/extension/entrypoints/content/                                       @skyf0xx
+/apps/extension/entrypoints/provider/                                      @skyf0xx
+/apps/extension/src/handlers/provider-params.ts                            @skyf0xx
+/apps/extension/src/sender.ts                                              @skyf0xx
+/packages/messaging/                                                       @skyf0xx
+
+# 4 What you see is what you sign
+/apps/extension/src/handlers/approval.ts                                   @skyf0xx
+/apps/extension/entrypoints/approval/                                      @skyf0xx
+
+# 5 Other ways in: extension config, dependencies, CI, the release gate
+/apps/extension/src/points-invite.ts                                       @skyf0xx
+/apps/extension/wxt.config.ts                                              @skyf0xx
+/.github/                                                                  @skyf0xx
+/pnpm-workspace.yaml                                                       @skyf0xx
+/pnpm-lock.yaml                                                            @skyf0xx
+/lefthook.yml                                                              @skyf0xx
+/.gitleaks.toml                                                            @skyf0xx
+/scripts/release-gate.mjs                                                  @skyf0xx
+/scripts/release.mjs                                                       @skyf0xx
+/scripts/verify-release.sh                                                 @skyf0xx
+/security/surface.mjs                                                      @skyf0xx

@@ -9,11 +9,11 @@ import {
   signMessage,
   type InviteRedeemResult,
   type InviteUnlock,
-  type JWKInterface,
   type PointsMembership,
   type PointsScores,
   type PointsSeatsRecord,
   type PointsSharePrompt,
+  type Signer,
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
@@ -79,8 +79,8 @@ export interface PointsHandlerDeps {
   storage: StoragePort;
   deviceKey: () => Promise<DeviceKey>;
   apiUrl: string;
-  /** The unlocked wallet's key from the session cache, or null if it's locked. */
-  signingKey: (walletId: string) => Promise<{ jwk: JWKInterface; address: string } | null>;
+  /** The unlocked wallet's signer, or null if it's locked. */
+  signer: (walletId: string) => Promise<Signer | null>;
   /** The stored wallet's method, or null when it is unknown. */
   walletMethod: (walletId: string) => Promise<WalletMethod | null>;
   /**
@@ -204,13 +204,13 @@ export class PointsHandler {
       if (!this.deps.deviceProof) throw new Error(unsupportedOperationMessage(`${action} Gleam Points`));
       return { ...(await this.deps.deviceProof({ walletId, message: buildMessage })), proof: "transaction" };
     }
-    const key = await this.deps.signingKey(walletId);
-    if (!key) throw new Error(`Unlock this wallet to ${action} Gleam Points.`);
-    const message = buildMessage(key.address);
-    const signature = await signMessage(key.jwk, new TextEncoder().encode(message).buffer as ArrayBuffer);
+    const signer = await this.deps.signer(walletId);
+    if (!signer) throw new Error(`Unlock this wallet to ${action} Gleam Points.`);
+    const message = buildMessage(signer.address);
+    const signature = await signMessage(signer, new TextEncoder().encode(message).buffer as ArrayBuffer);
     return {
-      owner: key.jwk.n,
-      address: key.address,
+      owner: signer.owner,
+      address: signer.address,
       message,
       signature: bytesToBase64Url(new Uint8Array(signature)),
       proof: "message",

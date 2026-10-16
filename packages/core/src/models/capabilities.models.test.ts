@@ -15,7 +15,6 @@ describe("capabilitiesFor", () => {
       signMessage: true,
       signature: false,
       decrypt: false,
-      privateHash: false,
       exportKey: false,
       encrypt: true,
       upload: false,
@@ -31,7 +30,6 @@ describe("capabilitiesFor", () => {
       signMessage: false,
       signature: false,
       decrypt: false,
-      privateHash: false,
       exportKey: false,
       encrypt: true,
       upload: false,
@@ -58,9 +56,6 @@ describe("providerMethodRefusal", () => {
     );
     expect(providerMethodRefusal("keystone", "decrypt")).toBe(
       "This wallet can't decrypt data. Switch to a keyfile wallet.",
-    );
-    expect(providerMethodRefusal("ledger", "privateHash")).toBe(
-      "This wallet can't create private hashes. Switch to a keyfile wallet.",
     );
   });
 

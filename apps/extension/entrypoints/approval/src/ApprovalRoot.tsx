@@ -1,5 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { ApprovalRequest, DeviceSigningRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
+import type {
+  ApprovalRequest,
+  DeviceSigningRequest,
+  RecipientAssessment,
+  RuntimePort,
+  SecurityPhrase,
+  ThemeSettings,
+  WalletState,
+} from "@gleam/core";
+import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
+import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
@@ -44,7 +54,7 @@ type LoadState =
   | { kind: "loading" }
   | { kind: "no-wallet"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "locked"; runtime: RuntimePort; request: ApprovalRequest }
-  | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest }
+  | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest; assessment: RecipientAssessment | null }
   | { kind: "awaiting-device"; runtime: RuntimePort; request: ApprovalRequest; device: DeviceSigningRequest }
   | { kind: "error"; message: string }
   | { kind: "done"; message: string }
@@ -60,6 +70,25 @@ function needsUnlock(state: WalletState): boolean {
   return !unlocked.includes(state.activeWalletId);
 }
 
+/** Best effort: a failed lookup shows no recipient warning, and the generic one still shows. */
+async function assessRecipientFor(
+  runtime: RuntimePort,
+  request: ApprovalRequest,
+  walletId: string | null,
+): Promise<RecipientAssessment | null> {
+  const preview = request.preview;
+  if (preview.kind === "connect" || preview.kind === "addToken" || !preview.recipient || !walletId) return null;
+  try {
+    const assessment = await runtime.send<{ walletId: string; recipient: string }, RecipientAssessment | undefined>({
+      type: "assessRecipient",
+      payload: { walletId, recipient: preview.recipient },
+    });
+    return assessment ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function hostnameOf(origin: string): string {
   try {
     return new URL(origin).hostname;
@@ -71,6 +100,16 @@ function hostnameOf(origin: string): string {
 export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = DEFAULT_DEVICE_PANELS }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
+  const [securityPhrase, setSecurityPhrase] = useState<{ phrase: SecurityPhrase; icon: string } | null>(null);
+
+  const loadSecurityPhrase = async (runtime: RuntimePort) => {
+    try {
+      const phrase = await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined });
+      setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
+    } catch {
+      setSecurityPhrase(null);
+    }
+  };
 
   const applyTheme = async (runtime: RuntimePort) => {
     try {
@@ -100,7 +139,8 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       } else if (needsUnlock(walletState)) {
         setState({ kind: "locked", runtime, request });
       } else {
-        setState({ kind: "ready", runtime, request });
+        const assessment = await assessRecipientFor(runtime, request, walletState.activeWalletId);
+        setState({ kind: "ready", runtime, request, assessment });
       }
     } catch (error) {
       setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -118,7 +158,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       try {
         const runtime = runtimeProp ?? (await import("@/src/adapters/runtime")).runtimePort;
         if (cancelled) return;
-        await Promise.all([load(runtime, requestId), applyTheme(runtime)]);
+        await Promise.all([load(runtime, requestId), applyTheme(runtime), loadSecurityPhrase(runtime)]);
       } catch (error) {
         if (cancelled) return;
         setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -203,7 +243,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       />
     );
   } else {
-    const { runtime, request } = state;
+    const { runtime, request, assessment } = state;
 
     const handleReject = () => rejectRequest(runtime, request);
 
@@ -251,6 +291,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
         <SigningApprovalScreen
           origin={request.origin}
           preview={signingPreview}
+          assessment={assessment}
           onReject={() => void handleReject()}
           onSign={() => handleApprove("Signed.", "Signing failed")}
         />
@@ -258,8 +299,17 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
     }
   }
 
+  // The unlock screen shows the phrase itself; the request screens get it
+  // above their own header.
+  const showSecurityPhrase = securityPhrase !== null && (state.kind === "ready" || state.kind === "awaiting-device");
+
   return (
     <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
+      {showSecurityPhrase ? (
+        <div className="flex justify-center px-6 pt-3">
+          <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
+        </div>
+      ) : null}
       {content}
     </div>
   );

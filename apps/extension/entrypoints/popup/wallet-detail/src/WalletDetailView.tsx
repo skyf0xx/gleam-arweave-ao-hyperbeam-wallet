@@ -1,6 +1,12 @@
 import { useMemo, useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import { isHardwareWalletMethod, type JWKInterface, type RuntimePort, type WalletSummary } from "@gleam/core";
+import { isHardwareWalletMethod, type RuntimePort, type WalletSummary } from "@gleam/core";
+import {
+  downloadKeyfile,
+  keyfileDownloadError,
+  requestDownloadsPermission,
+  type RequestDownloadsPermission,
+} from "@/src/keyfile/download";
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
@@ -24,22 +30,11 @@ function formatBackupDate(timestamp: number): string {
   return `Backed up ${days} days ago`;
 }
 
-function downloadKeyfile(contents: string, walletName: string): void {
-  const blob = new Blob([contents], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${walletName.replace(/\s+/g, "-").toLowerCase()}-arweave-keyfile.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 /**
- * `backupConfirmedAt` is set only after a download or copy actually
- * succeeds — a clipboard write can silently reject (unsupported context,
- * permission denied), and marking the backup confirmed anyway would leave
- * removal flows trusting a backup that was never made. An old stored
- * record with no value for the field counts as not backed up.
+ * `backupConfirmedAt` is set only after the background reports the
+ * keyfile download finished. A cancelled or failed download leaves it
+ * unset, so removal flows never trust a backup that was never made. An
+ * old stored record with no value for the field counts as not backed up.
  */
 export interface WalletDetailViewProps {
   runtime: RuntimePort;
@@ -48,15 +43,23 @@ export interface WalletDetailViewProps {
   onRenamed: (name: string) => void;
   /** Called after `deleteWallet` succeeds — the caller re-derives its view from `getState` (removing the last wallet returns to onboarding on its own). */
   onRemoved: () => void;
+  /** Asks for the optional `downloads` permission from the Download click. */
+  requestDownloadPermission?: RequestDownloadsPermission;
 }
 
 type Step =
   | { kind: "detail" }
   | { kind: "export-password"; submitting: boolean; serverError?: string }
-  | { kind: "export-reveal"; keyfileContents: string }
   | { kind: "remove-confirm"; removing: boolean; serverError?: string };
 
-export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved }: WalletDetailViewProps) {
+export function WalletDetailView({
+  runtime,
+  wallet,
+  onBack,
+  onRenamed,
+  onRemoved,
+  requestDownloadPermission = requestDownloadsPermission,
+}: WalletDetailViewProps) {
   const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
 
   const [name, setName] = useState(wallet.name);
@@ -64,6 +67,7 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
   const [nameError, setNameError] = useState<string | null>(null);
   const [backupConfirmedAt, setBackupConfirmedAt] = useState(wallet.backupConfirmedAt);
   const [step, setStep] = useState<Step>({ kind: "detail" });
+  const [savedAs, setSavedAs] = useState<string | null>(null);
 
   const trimmedName = name.trim();
   const nameChanged = trimmedName.length > 0 && trimmedName !== wallet.name;
@@ -88,11 +92,15 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
   const handleExportPassword = async (password: string) => {
     setStep({ kind: "export-password", submitting: true });
     try {
-      const jwk = await runtime.send<{ walletId: string; password: string }, JWKInterface>({
-        type: "exportWallet",
-        payload: { walletId: wallet.id, password },
-      });
-      setStep({ kind: "export-reveal", keyfileContents: JSON.stringify(jwk) });
+      const result = await downloadKeyfile(runtime, { walletId: wallet.id, password }, requestDownloadPermission);
+      if (!result.ok) {
+        setStep({ kind: "export-password", submitting: false, serverError: keyfileDownloadError(result) ?? undefined });
+        return;
+      }
+      // The background has already recorded the backup.
+      setSavedAs(result.filename);
+      setBackupConfirmedAt((current) => current ?? Date.now());
+      setStep({ kind: "detail" });
     } catch (error) {
       setStep({
         kind: "export-password",
@@ -100,15 +108,6 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
         serverError: error instanceof Error ? error.message : String(error),
       });
     }
-  };
-
-  const confirmBackup = async () => {
-    if (backupConfirmedAt !== null) return;
-    await runtime.send<{ walletId: string }, void>({
-      type: "confirmWalletBackup",
-      payload: { walletId: wallet.id },
-    });
-    setBackupConfirmedAt(Date.now());
   };
 
   const handleRemove = async () => {
@@ -152,27 +151,6 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
         onSubmit={(password) => void handleExportPassword(password)}
         submitting={step.submitting}
         serverError={step.serverError}
-      />
-    );
-  }
-
-  if (step.kind === "export-reveal") {
-    const keyfileContents = step.keyfileContents;
-    return (
-      <ExportRevealStep
-        keyfileContents={keyfileContents}
-        onBack={() => setStep({ kind: "detail" })}
-        onDownload={() => {
-          downloadKeyfile(keyfileContents, wallet.name);
-          void confirmBackup();
-        }}
-        onCopy={async () => {
-          if (!navigator.clipboard) {
-            throw new Error("Clipboard isn't available. Download the keyfile instead.");
-          }
-          await navigator.clipboard.writeText(keyfileContents);
-          await confirmBackup();
-        }}
       />
     );
   }
@@ -221,9 +199,13 @@ export function WalletDetailView({ runtime, wallet, onBack, onRenamed, onRemoved
               <span className="text-label font-semibold text-foreground">Back up keyfile</span>
               <span
                 id="keyfile-backup-status"
-                className={`text-caption ${backupConfirmedAt !== null ? "text-muted" : "font-semibold text-warning"}`}
+                className={`truncate text-caption ${backupConfirmedAt !== null || savedAs ? "text-muted" : "font-semibold text-warning"}`}
               >
-                {backupConfirmedAt !== null ? formatBackupDate(backupConfirmedAt) : "Not backed up yet"}
+                {savedAs
+                  ? `Saved as ${savedAs}`
+                  : backupConfirmedAt !== null
+                    ? formatBackupDate(backupConfirmedAt)
+                    : "Not backed up yet"}
               </span>
             </span>
             <ChevronIcon />
@@ -341,9 +323,14 @@ function ExportPasswordStep({
         <div className="flex flex-col gap-1.5">
           <h1 className="text-h3 font-semibold tracking-tight text-foreground">Enter your password</h1>
           <p className="text-body leading-relaxed text-muted">
-            Confirms it's you before revealing this wallet's keyfile.
+            Confirms it's you, then saves this wallet's keyfile to your downloads.
           </p>
         </div>
+
+        <RiskNotice>
+          The keyfile isn&apos;t password-protected. Anyone who gets it controls this wallet.
+          Keep it offline, and never share or upload it.
+        </RiskNotice>
 
         <PasswordField
           label="Password"
@@ -359,69 +346,9 @@ function ExportPasswordStep({
         />
 
         <Button type="submit" disabled={submitting || password.length === 0} className="mt-8">
-          {submitting ? "Verifying…" : "Continue"}
+          {submitting ? "Saving…" : "Download keyfile"}
         </Button>
       </form>
-    </div>
-  );
-}
-
-function ExportRevealStep({
-  keyfileContents,
-  onBack,
-  onDownload,
-  onCopy,
-}: {
-  keyfileContents: string;
-  onBack: () => void;
-  onDownload: () => void;
-  onCopy: () => Promise<void>;
-}) {
-  const [copied, setCopied] = useState(false);
-  const [copying, setCopying] = useState(false);
-  const [copyError, setCopyError] = useState<string | null>(null);
-
-  const handleCopy = async () => {
-    setCopying(true);
-    setCopyError(null);
-    try {
-      await onCopy();
-      setCopied(true);
-    } catch (error) {
-      setCopyError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setCopying(false);
-    }
-  };
-
-  return (
-    <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Your keyfile" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-5 px-6 py-6">
-        <p className="text-body leading-relaxed text-muted">
-          Store this somewhere safe. Anyone with this file and your password can access your
-          wallet.
-        </p>
-
-        <div
-          className="max-h-24 overflow-hidden rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-muted"
-          style={{ wordBreak: "break-all" }}
-        >
-          {keyfileContents}
-        </div>
-
-        <Button type="button" onClick={onDownload}>
-          Download keyfile
-        </Button>
-        <Button type="button" variant="secondary" disabled={copying} onClick={() => void handleCopy()}>
-          {copied ? "Copied" : copying ? "Copying…" : "Copy to clipboard"}
-        </Button>
-        {copyError ? (
-          <p role="alert" className="text-caption leading-relaxed text-warning">
-            {copyError}
-          </p>
-        ) : null}
-      </div>
     </div>
   );
 }

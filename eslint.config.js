@@ -13,6 +13,14 @@ import reactHooks from "eslint-plugin-react-hooks";
  * imports background-adapter code directly — every cross-context call
  * crosses `packages/messaging`.
  */
+// Any path into `packages/core/src/signer`: the `@gleam/core/signer`
+// subpath, a deep or cross-package relative path, or a sibling folder's
+// `../signer`. `vault/signer.ts` (the `Signer` interface) is `./signer`
+// from inside `vault/` and stays importable.
+const SIGNER_IMPORT = "^@gleam/core/signer(/|$)|(^|/)core/src/signer(/|$)|^(\\.\\./)+signer(/|$)|^\\./signer/";
+const SIGNER_IMPORT_MESSAGE =
+  "Only key-session.ts, wallet-lifecycle.ts and the keyring import core/signer. Sign through a `Signer` from `getSigner(walletId)`.";
+
 export default tseslint.config(
   {
     ignores: [
@@ -32,6 +40,24 @@ export default tseslint.config(
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      // Wallet pages hold unlocked keys, so markup is never parsed into
+      // their DOM: render images through <img> and text through React.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message: "Don't inject HTML. Render SVG through an <img> data URI and text through React.",
+        },
+        {
+          selector:
+            "AssignmentExpression[left.property.name=/^(inner|outer)HTML$/]:not([right.type='Literal'][right.value=''])",
+          message: "Don't assign HTML. Build nodes with textContent or createElement instead.",
+        },
+        {
+          selector: "CallExpression[callee.property.name=/^(insertAdjacentHTML|createContextualFragment)$/]",
+          message: "Don't parse HTML into the page. Build nodes with textContent or createElement instead.",
+        },
+      ],
       "import/no-restricted-paths": [
         "error",
         {
@@ -43,6 +69,122 @@ export default tseslint.config(
                 "packages/core must not import an adapter directly — adapters are wired at the extension's entrypoints, per core-design.md's ports/adapters split.",
             },
           ],
+        },
+      ],
+    },
+  },
+  {
+    // Only the key session and the vault/unlock path handle raw key
+    // material; everything else signs through an opaque `Signer`, so the
+    // cached key can become a non-extractable CryptoKey without touching
+    // callers. CI lints the whole repo, so a new leak fails there.
+    files: ["**/*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      "apps/extension/src/handlers/key-session.ts",
+      // Caches the key on unlock/import/create, and decrypts it for export.
+      "apps/extension/src/handlers/wallet-lifecycle.ts",
+      "packages/core/src/signer/**",
+      // Generates, validates and addresses keyfiles.
+      "packages/core/src/keys/jwk.ts",
+      // Where `JWKInterface` is defined and re-exported.
+      "packages/core/src/models/wallet.ts",
+      "packages/core/src/models/index.ts",
+      // `importWallet`/`exportWallet` carry a keyfile across the wire by design.
+      "packages/messaging/src/protocol.ts",
+      // Unlock hands the key to the keyring offscreen document, once.
+      "packages/core/src/ports/session-keys.ts",
+      "packages/messaging/src/keyring-protocol.ts",
+      "apps/extension/src/adapters/offscreen-keyring.ts",
+      // Receives the exported keyfile to hand to the user.
+      "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Identifier[name='JWKInterface']",
+          message:
+            "Raw key material stays in key-session.ts and core/signer. Take a `Signer` (or the `owner` string for public-key work) instead.",
+        },
+        {
+          selector: "Identifier[name='getCachedKey']",
+          message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
+        },
+      ],
+    },
+  },
+  {
+    // `core/signer` holds the vault envelope and the unlocked key. Only the
+    // key session, the unlock path and the keyring reach it, so a compromised
+    // UI dependency or handler has no import path to the key.
+    files: ["**/*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      "packages/core/src/signer/**",
+      "apps/extension/src/handlers/key-session.ts",
+      "apps/extension/src/handlers/wallet-lifecycle.ts",
+      "apps/extension/src/keyring/server.ts",
+      "apps/extension/src/adapters/offscreen-keyring.ts",
+      "apps/extension/entrypoints/keyring/main.ts",
+      // Points API test fixtures sign with throwaway keys.
+      "apps/points-api/src/test-signers.ts",
+    ],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE }] }],
+    },
+  },
+  {
+    // `@gleam/core` is imported everywhere, so it can't re-export the signer.
+    files: ["packages/core/src/index.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ regex: `${SIGNER_IMPORT}|^\\./signer$`, message: SIGNER_IMPORT_MESSAGE }] },
+      ],
+    },
+  },
+  {
+    // Wipes the passkey's PRF output, and may take nothing else from the signer.
+    files: ["packages/core/src/vault/passkey.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT.replace("^(\\.\\./)+signer(/|$)", "^(\\.\\./)+signer(?!/zeroize$)"), message: SIGNER_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Key code can't pull in a dependency: one compromised package here
+    // would sit next to the decrypted key. Argon2id (`hash-wasm`) is the
+    // one exception, and relative imports may only reach types and the
+    // byte helpers.
+    files: ["packages/core/src/signer/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex:
+                "^(?!hash-wasm$|\\./[^/]+$|\\.\\./models/[^/]+$|\\.\\./ports/[^/]+$|\\.\\./vault/(base64|signer|message-signing)$)",
+              message:
+                "core/signer imports only hash-wasm, its own files, models, ports and vault/{base64,signer,message-signing}.",
+            },
+          ],
+        },
+      ],
+      // The import rule reads only static `import`/`export … from`.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.name='require'], ImportExpression",
+          message: "core/signer uses static imports only, so the import fence above can check them.",
         },
       ],
     },

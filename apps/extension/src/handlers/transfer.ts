@@ -6,7 +6,7 @@ import {
 } from "@gleam/core/src/arweave/transfer.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
-import { signTransactionWithJwk, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
+import { signTransactionWithSigner, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
 import { assertCoversNetworkFee, prepareCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import {
   finishTransfer as finishAoTransfer,
@@ -14,6 +14,7 @@ import {
   submitTransfer as submitAoTransfer,
 } from "@gleam/core/src/ao/transfer.ts";
 import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
+import { assessRecipient } from "@gleam/core/src/recipients/index.ts";
 import {
   capabilityRefusal,
   collectibleSendRefusal,
@@ -22,24 +23,25 @@ import {
   type ActivityEntry,
   type CollectibleSendDraft,
   type FeeEstimate,
-  type JWKInterface,
+  type RecipientAssessment,
   type NetworkSettings,
+  type Signer,
   type StoragePort,
   type TransferDraft,
   type UnsignedPayload,
   type Wallet,
   type Winston,
 } from "@gleam/core";
-import { getCachedKey, getWalletMethod } from "./key-session";
+import { getSigner, getWalletMethod } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
  * `submitTransfer`. Same constructor-injected-`StoragePort` shape as the
  * other handlers in this directory.
  *
- * Signing key source: an AR transfer needs the decrypted JWK, which this
- * handler reads from `key-session.ts`'s in-memory cache — populated by
- * `WalletLifecycleHandler.unlockWallet` — rather than requiring a password
+ * Signing key source: a transfer signs through `key-session.ts`'s
+ * `getSigner`, backed by the key cached by
+ * `WalletLifecycleHandler.unlockWallet`, rather than requiring a password
  * on every request. `submitTransfer`
  * throws a specific "wallet is locked" error if no key is cached for
  * `req.walletId` — the caller (`SendView`) has no password field to fall
@@ -69,6 +71,7 @@ export interface DeviceTransferApprovals {
 
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const WALLETS_KEY = "local:wallets";
+const CONTACTS_KEY = "local:contacts";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const FIRST_SEEN_LOOKUP_LIMIT = 100;
 
@@ -134,13 +137,13 @@ export class TransferHandler {
     await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, [entry, ...existing]);
   }
 
-  /** Reads a wallet's signing key from the unlocked-session cache. Throws if the wallet isn't currently unlocked. */
-  private async signingKeyFor(walletId: string): Promise<{ jwk: JWKInterface; address: string }> {
-    const cached = await getCachedKey(walletId);
-    if (!cached) {
+  /** The unlocked wallet's signer. Throws if the wallet isn't currently unlocked. */
+  private async signerFor(walletId: string): Promise<Signer> {
+    const signer = await getSigner(walletId);
+    if (!signer) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
-    return cached;
+    return signer;
   }
 
   /**
@@ -170,22 +173,64 @@ export class TransferHandler {
   async estimateTransfer(req: EstimateTransferRequest): Promise<FeeEstimate> {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
-    const firstSeenRecipient = await this.isFirstSeenRecipient(settings, wallet.address, req.recipient);
+    const { firstSeenRecipient, lookalikeOf } = await this.checkRecipient(settings, wallet.address, req.recipient);
 
     if (req.token !== null) {
-      return { fee: null, firstSeenRecipient };
+      return { fee: null, firstSeenRecipient, lookalikeOf };
     }
 
     const { fee } = await estimateFee(settings.gatewayUrl, req.recipient);
-    return { fee, firstSeenRecipient };
+    return { fee, firstSeenRecipient, lookalikeOf };
   }
 
-  private async isFirstSeenRecipient(settings: NetworkSettings, address: string, recipient: string): Promise<boolean> {
-    const [localLog, gatewayEntries] = await Promise.all([
+  private async loadRecipientHistory(settings: NetworkSettings, address: string): Promise<[ActivityEntry[], ActivityEntry[]]> {
+    return Promise.all([
       this.loadActivityLog(address),
       queryActivityTransactions(address, settings.gatewayUrl, FIRST_SEEN_LOOKUP_LIMIT).catch(() => []),
     ]);
-    return isFirstSeenRecipient(recipient, localLog, gatewayEntries);
+  }
+
+  /** Contacts and the user's own wallets: addresses trusted without any history. */
+  private async loadKnownAddresses(): Promise<string[]> {
+    const [contacts, wallets] = await Promise.all([
+      this.storage.get<unknown>(CONTACTS_KEY),
+      this.storage.get<unknown>(WALLETS_KEY),
+    ]);
+    const addresses: string[] = [];
+    if (Array.isArray(contacts)) {
+      for (const contact of contacts) {
+        if (contact && typeof contact.address === "string") addresses.push(contact.address);
+      }
+    }
+    if (Array.isArray(wallets)) addresses.push(...wallets.filter(isValidWallet).map((wallet) => wallet.address));
+    return addresses;
+  }
+
+  /** One history read for both the legacy first-seen flag and the lookalike check. */
+  private async checkRecipient(
+    settings: NetworkSettings,
+    address: string,
+    recipient: string,
+  ): Promise<{ firstSeenRecipient: boolean; lookalikeOf: string | null }> {
+    const [[localLog, gatewayEntries], known] = await Promise.all([
+      this.loadRecipientHistory(settings, address),
+      this.loadKnownAddresses(),
+    ]);
+    return {
+      firstSeenRecipient: isFirstSeenRecipient(recipient, localLog, gatewayEntries),
+      lookalikeOf: assessRecipient(recipient, [...localLog, ...gatewayEntries], known).lookalikeOf,
+    };
+  }
+
+  /** What the approval window shows for a recipient; reads the same history as the send screen. */
+  async assessRecipient(req: { walletId: string; recipient: string }): Promise<RecipientAssessment> {
+    const settings = await this.loadNetworkSettings();
+    const wallet = await this.loadWallet(req.walletId);
+    const [[localLog, gatewayEntries], known] = await Promise.all([
+      this.loadRecipientHistory(settings, wallet.address),
+      this.loadKnownAddresses(),
+    ]);
+    return assessRecipient(req.recipient, [...localLog, ...gatewayEntries], known);
   }
 
   /**
@@ -197,13 +242,13 @@ export class TransferHandler {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
     refuseCollectibleSend(wallet.address, req.recipient, req.collectible.id);
-    const [{ fee }, balance, firstSeenRecipient] = await Promise.all([
+    const [{ fee }, balance, recipientCheck] = await Promise.all([
       estimateFee(settings.gatewayUrl, req.collectible.id),
       getArBalance(wallet.address, settings.gatewayUrl),
-      this.isFirstSeenRecipient(settings, wallet.address, req.recipient),
+      this.checkRecipient(settings, wallet.address, req.recipient),
     ]);
     assertCoversNetworkFee(balance, fee);
-    return { fee, firstSeenRecipient };
+    return { fee, ...recipientCheck };
   }
 
   /** Sends one collectible through `submitTransfer`, so a hardware wallet signs it in the approval window too. */
@@ -272,17 +317,23 @@ export class TransferHandler {
     }
 
     const settings = await this.loadNetworkSettings();
-    const { jwk, address } = await this.signingKeyFor(req.walletId);
+    const signer = await this.signerFor(req.walletId);
+    const { address } = signer;
 
     let txId: string;
     try {
       if (req.collectible) {
-        const unsigned = await this.prepareCollectibleSend(req, jwk.n);
-        ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned, await signTransactionWithJwk(unsigned, jwk), jwk.n));
+        const unsigned = await this.prepareCollectibleSend(req, signer.owner);
+        ({ txId } = await finishArweaveTransfer(
+          settings.gatewayUrl,
+          unsigned,
+          await signTransactionWithSigner(unsigned, signer),
+          signer.owner,
+        ));
       } else if (req.token === null) {
-        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, jwk, req.recipient, req.amount));
+        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, signer, req.recipient, req.amount));
       } else {
-        const { messageId } = await submitAoTransfer(jwk, req.token, req.recipient, req.amount);
+        const { messageId } = await submitAoTransfer(signer, req.token, req.recipient, req.amount);
         txId = messageId;
       }
     } catch (error) {
