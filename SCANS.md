@@ -18,9 +18,10 @@ professional audit.
    `security/scan/SKILL.md` from that checkout.
 3. **The agent reports what it finds.** Low or informational issues go
    in a PR. Medium and above go in a private GitHub advisory.
-4. **The agent checks its own work.** `pnpm scan finish` runs the same
-   checks the server runs and prints a link. If a check fails, the
-   agent fixes it before you see anything.
+4. **The agent checks its own work.** `pnpm scan finish` sends the
+   attestation to `POST /attestations/check`, which runs every server
+   check that doesn't need your signature, and prints a link. If a check
+   fails, the agent fixes it before you see anything.
 5. **You sign.** Open the link. Gleam shows a window with the release,
    the model, the result and the report. Approve, and the extension
    submits the attestation. The agent never touches a key.
@@ -76,7 +77,14 @@ Gleam.
 3. The challenge is unexpired and unused, and every answer passes the
    automatic check (see Proof of scan).
 4. The wallet hasn't already attested this release.
-5. The release has fewer than 20 paid scans so far.
+5. The release has fewer than 20 paid scans so far. If it has 20, the
+   attestation is still recorded, with no points.
+
+`POST /attestations/check` runs checks 2 and 3 and the attestation's
+shape, without a signature, and fails with the same issues as the
+submission. It uses up nothing, so `pnpm scan finish` can run it as
+often as it needs. The server checks the release and the code at the
+tag's commit, read from GitHub.
 
 ## Proof of scan
 
@@ -108,7 +116,8 @@ sign.
 
 **Human check.** Every `report` and every answer is public on
 `scan.html`, so an empty or generic report stands out. A maintainer
-voids it with `scan-void`, which removes its points.
+voids it with `scan-void`, which removes its points and frees its paid
+place.
 
 **Limited payoff.** A scan earns a small, fixed amount, and only 20
 scans are paid per release. Finding real problems pays far more, and
@@ -122,8 +131,10 @@ rise as the community grows.
 **Scans.** A scan earns **0.1% of the previous day's total holding
 points**, credited as soon as it's accepted. The first 20 scans of each
 release are paid. After that, scans are still recorded and shown but
-earn nothing. `scan.html` shows how many paid places are left. `pass`
-and `scanned` earn the same, and so does every model.
+earn nothing. A scan that earns no points, such as one made before the
+first daily snapshot, doesn't use up a paid place. `scan.html` shows how
+many paid places are left. `pass` and `scanned` earn the same, and so
+does every model.
 
 **Findings.** Each day the bounty pool grows by 2% of that day's
 holding points. An accepted finding takes a share of the pool's current

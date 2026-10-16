@@ -1,13 +1,25 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import {
+  AttestationListCache,
+  checkAttestation,
+  listAttestations,
+  parseListQuery,
+  parseCheckRequest,
+  parseSubmitRequest,
+  submitAttestation,
+} from "./attestations";
 import type { Db } from "./db";
+import { createGithubClient, type GithubClient } from "./github";
 import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./heartbeat";
 import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./invite";
 import { randomInviteCode } from "./invite-code";
 import { parseLeaveRequest, leave } from "./leave";
 import { RateLimiter } from "./rate-limit";
 import { parseRegisterRequest, register } from "./register";
+import { issueChallenge } from "./scan-challenge";
+import type { ScanFailure } from "./scan-errors";
 import { scoresForDevice } from "./score";
 
 export interface AppDeps {
@@ -16,15 +28,21 @@ export interface AppDeps {
   newInviteCode?: () => string;
   /** Defaults to 1, like `POINTS_PHASE`. */
   pointsPhase?: 1 | 2;
+  /** Reads releases and their files from GitHub; defaults to the public repo. */
+  github?: GithubClient;
 }
 
 const HOUR_MS = 3_600_000;
 const STATS_TTL_MS = 60_000;
+const ATTESTATION_PATHS = ["/attestations", "/attestations/check"];
+// An attestation carries a report of up to 20,000 characters.
+const ATTESTATION_BODY_LIMIT = 160 * 1024;
 
 export function createApp(deps: AppDeps): Hono {
   const now = deps.now ?? (() => new Date());
   const pointsPhase = deps.pointsPhase ?? 1;
   const newInviteCode = deps.newInviteCode ?? randomInviteCode;
+  const github = deps.github ?? createGithubClient({ now: () => now().getTime() });
   const registerByIp = new RateLimiter(20, HOUR_MS);
   const leaveByIp = new RateLimiter(20, HOUR_MS);
   const heartbeatByIp = new RateLimiter(120, HOUR_MS);
@@ -35,10 +53,20 @@ export function createApp(deps: AppDeps): Hono {
   // Shared by check and redeem, so codes can't be enumerated through either.
   // 30 an hour covers a person retrying typos and reopening the invite page.
   const inviteByIp = new RateLimiter(30, HOUR_MS);
+  // The scan limits are per IP. Agents rerun `pnpm scan finish` several
+  // times, so the dry run gets more room than the real submission.
+  const attestationListings = new AttestationListCache(() => now().getTime());
+  const challengeByIp = new RateLimiter(30, HOUR_MS);
+  const checkByIp = new RateLimiter(120, HOUR_MS);
+  const attestByIp = new RateLimiter(20, HOUR_MS);
+  const attestationsListByIp = new RateLimiter(600, HOUR_MS);
   let statsCache: { foundingMembers: number; expiresAt: number } | null = null;
 
   const app = new Hono();
-  app.use("*", bodyLimit({ maxSize: 16 * 1024 }));
+  app.use("*", async (c, next) => {
+    const limit = ATTESTATION_PATHS.includes(c.req.path) ? ATTESTATION_BODY_LIMIT : 16 * 1024;
+    return bodyLimit({ maxSize: limit })(c, next);
+  });
 
   // The extension calls these without a host permission, so the browser
   // enforces CORS on them. Any extension id is allowed so unpacked dev
@@ -46,6 +74,10 @@ export function createApp(deps: AppDeps): Hono {
   // merits, so the origin is never what authorises it.
   const extensionCors = cors({ origin: (origin) => (origin.startsWith("chrome-extension://") ? origin : null) });
   for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me"]) app.use(path, extensionCors);
+
+  // Scan endpoints are open to any origin: the CLI sends no origin, scan.html
+  // reads the list, and the signature (not the origin) authorises a submission.
+  for (const path of [...ATTESTATION_PATHS, "/scan/challenge"]) app.use(path, cors({ origin: "*" }));
 
   app.get("/health", async (c) => {
     await deps.db.query("SELECT 1");
@@ -126,7 +158,64 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(await scoresForDevice(deps.db, auth.deviceId, pointsPhase));
   });
 
+  app.get("/scan/challenge", async (c) => {
+    if (!challengeByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, challengeByIp, now().getTime());
+    const outcome = await issueChallenge(deps.db, github, now());
+    return outcome.ok ? c.json(outcome.challenge) : scanFailure(c, outcome);
+  });
+
+  app.post("/attestations/check", async (c) => {
+    if (!checkByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, checkByIp, now().getTime());
+    const request = parseCheckRequest(await readJson(c));
+    if (!request) return scanMalformed(c);
+    const outcome = await checkAttestation(deps.db, github, request, now());
+    return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
+  });
+
+  app.post("/attestations", async (c) => {
+    if (!attestByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, attestByIp, now().getTime());
+    const request = parseSubmitRequest(await readJson(c));
+    if (!request) return scanMalformed(c);
+    const outcome = await submitAttestation(deps.db, github, request, now(), attestationListings);
+    return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
+  });
+
+  app.get("/attestations", async (c) => {
+    if (!attestationsListByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, attestationsListByIp, now().getTime());
+    const query = parseListQuery(c.req.query());
+    if ("ok" in query) return scanFailure(c, query);
+    const outcome = await listAttestations(deps.db, github, attestationListings, query);
+    if (!outcome.ok) return scanFailure(c, outcome);
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json(outcome.listing);
+  });
+
   return app;
+}
+
+function scanFailure(c: Context, failure: ScanFailure) {
+  if (failure.retryAfterSeconds) c.header("Retry-After", String(failure.retryAfterSeconds));
+  return c.json(
+    { error: failure.error, code: failure.code, ...(failure.issues.length > 0 ? { issues: failure.issues } : {}) },
+    failure.status,
+  );
+}
+
+function scanMalformed(c: Context) {
+  return c.json(
+    {
+      error: "Send a JSON body with the attestation (and, to submit, message, signature and owner); use the link `pnpm scan finish` printed.",
+      code: "malformed_request",
+    },
+    400,
+  );
+}
+
+function scanRateLimited(c: Context, limiter: RateLimiter, nowMs: number) {
+  const seconds = limiter.retryAfterSeconds(clientIp(c), nowMs);
+  c.header("Retry-After", String(seconds));
+  const wait = seconds < 90 ? `${seconds} seconds` : `${Math.ceil(seconds / 60)} minutes`;
+  return c.json({ error: `Too many scan requests from this address; try again in about ${wait}.`, code: "rate_limited" }, 429);
 }
 
 async function readJson(c: Context): Promise<unknown> {
