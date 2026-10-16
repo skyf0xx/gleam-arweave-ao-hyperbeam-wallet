@@ -1,7 +1,5 @@
 # Gleam
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/badge)](https://scorecard.dev/viewer/?uri=github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)
-
 <img src="docs/branding/images/dashboard-tilted-crisp.png" alt="Gleam wallet dashboard" width="360" />
 
 A Chrome browser-extension wallet for Arweave and AO.
