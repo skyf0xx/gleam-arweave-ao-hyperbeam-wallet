@@ -25,6 +25,24 @@ describe("UnlockView", () => {
     expect(screen.queryByText(/wallet 1|0x|address/i)).toBeNull();
   });
 
+  it("shows the security phrase before the password is typed", async () => {
+    const send = vi.fn(async (message: { type: string }) =>
+      message.type === "getSecurityPhrase" ? { emoji: "🦉", word: "willow" } : undefined,
+    ) as unknown as RuntimePort["send"];
+    render(<UnlockView runtime={fakeRuntime({ send })} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+    expect(screen.getByText("🦉")).toBeTruthy();
+  });
+
+  it("shows no phrase when none is set", async () => {
+    const send = vi.fn().mockResolvedValue(null);
+    render(<UnlockView runtime={fakeRuntime({ send })} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "getSecurityPhrase", payload: undefined }));
+    expect(screen.queryByLabelText(/Your security phrase/)).toBeNull();
+  });
+
   it("calls unlockWallet with the entered password and onUnlocked on success", async () => {
     const send = vi.fn().mockResolvedValue({ unlockedWalletIds: ["wallet-1"] });
     const runtime = fakeRuntime({ send });

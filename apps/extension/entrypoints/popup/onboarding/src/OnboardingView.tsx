@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RuntimePort, WalletSummary } from "@gleam/core";
+import type { RuntimePort, SecurityPhrase, WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
   keyfileDownloadError,
@@ -17,6 +17,7 @@ import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
 import { VaultPassword } from "./VaultPassword";
 import { ClaimStep, type ClaimPhase } from "./ClaimStep";
 import { FoundingRevealScreen } from "./FoundingReveal";
+import { SecurityPhraseStep } from "./SecurityPhraseStep";
 
 /**
  * Onboarding view module (`entrypoints/popup/onboarding/`) — a folder, not
@@ -36,6 +37,7 @@ type Step =
   | { kind: "backup"; password: string | null; wallet: WalletSummary }
   | { kind: "import" }
   | { kind: "import-password"; jwk: unknown }
+  | { kind: "security-phrase"; wallet: WalletSummary }
   | { kind: "claim"; wallet: WalletSummary }
   | { kind: "reveal"; wallet: WalletSummary; inviteCode: string };
 
@@ -120,9 +122,20 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     error: null,
   });
 
-  const finish = (wallet: WalletSummary) => {
+  const proceed = (wallet: WalletSummary) => {
     if (claim) setStep({ kind: "claim", wallet });
     else onComplete();
+  };
+
+  // A first wallet also picks the security phrase, unless one survives
+  // from before a reset. If the phrase can't be read, onboarding still
+  // finishes; it can be set later in Lock & unlock.
+  const finish = (wallet: WalletSummary) => {
+    if (addingWallet) return proceed(wallet);
+    runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined }).then(
+      (phrase) => (phrase ? proceed(wallet) : setStep({ kind: "security-phrase", wallet })),
+      () => proceed(wallet),
+    );
   };
 
   // Recorded as soon as the wallet exists, so closing the popup anywhere
@@ -296,6 +309,9 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
           serverError={serverError}
         />
       );
+
+    case "security-phrase":
+      return <SecurityPhraseStep runtime={runtime} onDone={() => proceed(step.wallet)} />;
 
     case "claim":
       return (

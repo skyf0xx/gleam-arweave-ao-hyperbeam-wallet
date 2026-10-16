@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PasskeyStatus, RuntimePort } from "@gleam/core";
+import type { PasskeyStatus, RuntimePort, SecurityPhrase } from "@gleam/core";
 import { UnlockScreen, type PasskeyUnlockProps } from "./UnlockScreen";
 import { ForgotPassword } from "./ForgotPassword";
 import { PasskeyError } from "@/src/passkey/webauthn";
@@ -49,6 +49,7 @@ export function UnlockView({
   const [passkey, setPasskey] = useState<Enrolled | null>(null);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyNotice, setPasskeyNotice] = useState<PasskeyUnlockProps["notice"]>();
+  const [securityPhrase, setSecurityPhrase] = useState<SecurityPhrase | null>(null);
 
   const handlePasskeyUnlock = async (status: Enrolled) => {
     setPasskeyBusy(true);
@@ -72,6 +73,9 @@ export function UnlockView({
 
   useEffect(() => {
     let cancelled = false;
+    void readSecurityPhrase(runtime).then((phrase) => {
+      if (!cancelled) setSecurityPhrase(phrase);
+    });
     void (async () => {
       const status = await readPasskeyStatus(runtime);
       if (cancelled || !status?.enrolled) return;
@@ -138,6 +142,7 @@ export function UnlockView({
       errorMessage={errorMessage}
       onForgotPassword={() => setStep({ kind: "forgot-password" })}
       tagline={tagline}
+      securityPhrase={securityPhrase}
       passkey={
         passkey
           ? { onUnlock: () => void handlePasskeyUnlock(passkey), busy: passkeyBusy, notice: passkeyNotice }
@@ -145,6 +150,15 @@ export function UnlockView({
       }
     />
   );
+}
+
+/** Null when none is set or it can't be read. */
+async function readSecurityPhrase(runtime: RuntimePort): Promise<SecurityPhrase | null> {
+  try {
+    return (await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined })) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Null when the status can't be read: no passkey button, and the password still works. */

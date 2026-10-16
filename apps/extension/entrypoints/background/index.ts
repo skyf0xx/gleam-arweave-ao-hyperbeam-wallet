@@ -46,6 +46,7 @@ import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
 import { AnnouncementsHandler } from "@/src/handlers/announcements";
 import { SiteWalletHandler } from "@/src/handlers/site-wallet";
+import { SecurityPhraseHandler } from "@/src/handlers/security-phrase";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
@@ -141,6 +142,7 @@ const points = new PointsHandler({
 registerPointsHeartbeatAlarm(points);
 
 const announcements = new AnnouncementsHandler({ storage });
+const securityPhrase = new SecurityPhraseHandler(storage);
 const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) => approval.findActiveGrant(origin) });
 
 // No runtime.onSuspend handler clears the key cache. onSuspend fires when
@@ -816,6 +818,8 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   setLockSettings: (data) => lifecycle.setLockSettings(data),
   getThemePreference: () => lifecycle.getThemePreference(),
   setThemePreference: (data) => lifecycle.setThemePreference(data),
+  getSecurityPhrase: () => securityPhrase.get(),
+  setSecurityPhrase: (data) => securityPhrase.set(data),
   revokeGrant: async (data) => {
     await approval.revokeGrant(data);
     void announceAccessEnded(data.origin);

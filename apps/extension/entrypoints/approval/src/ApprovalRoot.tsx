@@ -4,9 +4,11 @@ import type {
   DeviceSigningRequest,
   RecipientAssessment,
   RuntimePort,
+  SecurityPhrase,
   ThemeSettings,
   WalletState,
 } from "@gleam/core";
+import { SecurityPhraseBadge } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
@@ -97,6 +99,17 @@ function hostnameOf(origin: string): string {
 export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = DEFAULT_DEVICE_PANELS }: ApprovalRootProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
+  const [securityPhrase, setSecurityPhrase] = useState<SecurityPhrase | null>(null);
+
+  const loadSecurityPhrase = async (runtime: RuntimePort) => {
+    try {
+      setSecurityPhrase(
+        (await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined })) ?? null,
+      );
+    } catch {
+      setSecurityPhrase(null);
+    }
+  };
 
   const applyTheme = async (runtime: RuntimePort) => {
     try {
@@ -145,7 +158,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       try {
         const runtime = runtimeProp ?? (await import("@/src/adapters/runtime")).runtimePort;
         if (cancelled) return;
-        await Promise.all([load(runtime, requestId), applyTheme(runtime)]);
+        await Promise.all([load(runtime, requestId), applyTheme(runtime), loadSecurityPhrase(runtime)]);
       } catch (error) {
         if (cancelled) return;
         setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -286,8 +299,17 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
     }
   }
 
+  // The unlock screen shows the phrase itself; the request screens get it
+  // above their own header.
+  const showSecurityPhrase = securityPhrase !== null && (state.kind === "ready" || state.kind === "awaiting-device");
+
   return (
     <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
+      {showSecurityPhrase ? (
+        <div className="flex justify-center px-6 pt-3">
+          <SecurityPhraseBadge phrase={securityPhrase} />
+        </div>
+      ) : null}
       {content}
     </div>
   );

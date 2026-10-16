@@ -301,3 +301,31 @@ describe("ApprovalRoot: no wallet yet", () => {
     expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
   });
 });
+
+describe("ApprovalRoot security phrase", () => {
+  const PHRASE = { emoji: "🦉", word: "willow" };
+
+  function runtimeWith(state: WalletState) {
+    const send = vi.fn(async (message: { type: string }) => {
+      if (message.type === "getState") return state;
+      if (message.type === "getApproval") return CONNECT_REQUEST;
+      if (message.type === "getThemePreference") return { theme: "light" } satisfies ThemeSettings;
+      if (message.type === "getSecurityPhrase") return PHRASE;
+      return undefined;
+    });
+    return fakeRuntime({ send: send as never });
+  }
+
+  it("shows the phrase above a request", async () => {
+    render(<ApprovalRoot requestId="req-1" runtime={runtimeWith(UNLOCKED_STATE)} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+  });
+
+  it("shows it once while locked, on the unlock screen", async () => {
+    render(<ApprovalRoot requestId="req-1" runtime={runtimeWith({ ...UNLOCKED_STATE, session: null })} />);
+
+    await waitFor(() => expect(screen.getByPlaceholderText("Enter your password")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByLabelText("Your security phrase: willow")).toHaveLength(1));
+  });
+});

@@ -24,6 +24,7 @@ import type {
   PortfolioHistory,
   PortfolioHistoryRange,
   PortfolioScope,
+  SecurityPhrase,
   ThemeSettings,
   TokenBalance,
   TokenPrice,
@@ -150,6 +151,8 @@ export interface ProtocolMap {
    * by trusted extension UI, never proxied through `providerCall`.
    */
   getThemePreference(): ThemeSettings;
+  /** Read while locked: the unlock screen shows it before the password is typed. */
+  getSecurityPhrase(): SecurityPhrase | null;
   /** One list for the whole vault, most-recently-saved first. */
   listContacts(): Contact[];
 
@@ -203,6 +206,8 @@ export interface ProtocolMap {
   setNetworkSettings(req: NetworkSettings): void;
   setLockSettings(req: LockSettings): void;
   setThemePreference(req: ThemeSettings): void;
+  /** Rejects a phrase `readSecurityPhrase` doesn't accept. */
+  setSecurityPhrase(req: SecurityPhrase): void;
   revokeGrant(req: { origin: string }): void;
   /**
    * Upserts by `address` (case-sensitive exact match): saving over an

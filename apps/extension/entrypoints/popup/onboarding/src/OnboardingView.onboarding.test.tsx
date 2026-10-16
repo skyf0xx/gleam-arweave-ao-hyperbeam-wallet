@@ -23,11 +23,13 @@ function openKeyfileImport() {
 }
 
 describe("OnboardingView: create flow", () => {
-  it("walks welcome -> password -> backup, and the download goes through the background", async () => {
+  it("walks welcome -> password -> backup -> security phrase, and the download goes through the background", async () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
-      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // downloadKeyfile
+      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }) // downloadKeyfile
+      .mockResolvedValueOnce(null) // getSecurityPhrase
+      .mockResolvedValueOnce(undefined); // setSecurityPhrase
     const runtime = fakeRuntime({ send });
     const onComplete = vi.fn();
 
@@ -68,14 +70,23 @@ describe("OnboardingView: create flow", () => {
     expect(send).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
-    expect(onComplete).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.getByText("Pick your security phrase")).toBeTruthy());
+    expect(onComplete).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("radio", { name: "🦉" }));
+    fireEvent.change(screen.getByLabelText("Word"), { target: { value: "willow" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenNthCalledWith(4, { type: "setSecurityPhrase", payload: { emoji: "🦉", word: "willow" } });
   });
 
   it("finishes onboarding instead of returning to Welcome when backup's back button is used", async () => {
     const send = vi
       .fn()
       .mockResolvedValueOnce({ id: "wallet-1", name: "Wallet 1" }) // createWallet
-      .mockResolvedValueOnce({ ok: true, filename: "wallet-1-arweave-keyfile.json" }); // downloadKeyfile
+      // A phrase kept from before a reset skips the phrase step.
+      .mockResolvedValueOnce({ emoji: "🦊", word: "harbor" }); // getSecurityPhrase
     const runtime = fakeRuntime({ send });
     const onComplete = vi.fn();
 
@@ -96,8 +107,9 @@ describe("OnboardingView: create flow", () => {
     // not land on Welcome's "Create a wallet" — that would re-run
     // createWallet with a new password, which the vault rejects.
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(onComplete).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
     expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
+    expect(screen.queryByText("Pick your security phrase")).toBeNull();
   });
 
   async function reachBackup(send: RuntimePort["send"], requestDownloadPermission = vi.fn(async () => true)) {

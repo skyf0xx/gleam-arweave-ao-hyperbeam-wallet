@@ -1,5 +1,7 @@
 import { useState } from "react";
+import type { SecurityPhrase } from "@gleam/core";
 import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
+import { SecurityPhraseBadge } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
@@ -16,6 +18,8 @@ export interface UnlockScreenProps {
   tagline?: string;
   /** Present when a passkey is set up. It becomes the primary way in, with the password one tap away. */
   passkey?: PasskeyUnlockProps;
+  /** The user's anti-phishing phrase, when one is set. */
+  securityPhrase?: SecurityPhrase | null;
 }
 
 export interface PasskeyUnlockProps {
@@ -32,6 +36,7 @@ export function UnlockScreen({
   onForgotPassword,
   tagline = "Simple. Fast. Easy.",
   passkey,
+  securityPhrase,
 }: UnlockScreenProps) {
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -53,6 +58,7 @@ export function UnlockScreen({
       <div className="mt-16 mb-2">
         <BeamMark tagline={tagline} />
       </div>
+      {securityPhrase ? <SecurityPhraseBadge phrase={securityPhrase} className="mt-4" /> : null}
 
       {passkey && !usePassword ? (
         <PasskeyUnlock

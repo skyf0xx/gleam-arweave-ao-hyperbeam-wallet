@@ -4,6 +4,7 @@ import { PasskeyIcon } from "@/entrypoints/popup/unlock/src/UnlockScreen";
 import { forgetPasskey, passkeysAvailable } from "@/src/passkey/webauthn";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { SecurityPhraseSection } from "./SecurityPhraseSection";
 
 const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
   { value: "never", label: "Never" },
@@ -118,6 +119,8 @@ export function LockSettingsView({
         {onSetUpPasskey ? (
           <PasskeySection runtime={runtime} supported={passkeysSupported} onSetUp={onSetUpPasskey} />
         ) : null}
+
+        <SecurityPhraseSection runtime={runtime} />
 
         <div>
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
