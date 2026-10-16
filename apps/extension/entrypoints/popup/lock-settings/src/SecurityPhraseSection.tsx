@@ -104,12 +104,12 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           onClick={() => setState({ kind: "editing", phrase: null, draft: suggestSecurityPhrase(), saving: false })}
           className="flex w-full flex-col gap-0.5 py-3.5 text-left hover:bg-mist"
         >
-          <span className="text-label font-semibold text-foreground">Set up a security phrase</span>
-          <span className="text-caption text-muted">A word and its icon, which only Gleam can show you</span>
+          <span className="text-label font-semibold text-foreground">Set up an anti-phishing phrase</span>
+          <span className="text-caption text-muted">A word and icon which only Gleam can show you</span>
         </button>
       )}
       <p className="pt-2.5 text-caption leading-relaxed text-faint">
-        This phrase is shown before important actions to confirm authenticity
+        GLEAM shows this phrase before important actions to verify authenticity.
       </p>
     </div>
   );
