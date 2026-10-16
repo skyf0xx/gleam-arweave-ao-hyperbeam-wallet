@@ -45,8 +45,8 @@ Consequential/Irreversible screens — never a generic "Are you sure?".
 
 ## Flow: Unlock
 
-Reached whenever the wallet is currently locked: manual "Lock" action, an
-opted-in auto-lock timeout elapsing, or first popup open after
+Reached whenever the wallet is currently locked: manual "Lock" action, the
+auto-lock timeout elapsing, or first popup open after
 install/browser restart. Single password field, single "Unlock" button,
 no per-wallet identity shown. Wrong-password error is direct with a
 next step, never an apology. A quiet "Forgot password?" link is always

@@ -91,9 +91,9 @@ the wallet reads as locked. Lock, auto-lock, wallet removal, reset and
 browser startup clear the keyring and close its document. Locking
 overwrites each session entry before removing it. Auto-lock is checked on
 every key read and by a one-minute alarm, so the keys go when the timeout
-passes even if nothing reads them. The default timeout is 1 hour, and the
-vault also locks when the computer's screen locks unless auto-lock is set
-to "never". Lock and unlock run one at a time, so
+passes even if nothing reads them. The default timeout is 1 hour. The vault
+also locks when the computer's screen locks unless auto-lock is set to
+"never", and choosing "never" shows a warning. Lock and unlock run one at a time, so
 a lock can't race an unlock and leave keys behind. See
 `apps/extension/src/handlers/key-session.ts` and
 `apps/extension/entrypoints/keyring/`.
@@ -133,7 +133,7 @@ device. Gleam stores only the public key and address.
 | Hijacked Chrome Web Store account | Push a malicious update to every user | The developer account's own login protection | No signed-upload requirement yet, so the account alone can publish. Planned: verified CRX uploads, which need an offline signing key. |
 | Hijacked GitHub account or token | Change the source or CI | 2FA; protected `master`: signed commits, PR with passing CI, no force-push, no admin bypass | An account takeover can change the rules. |
 | Malware on the user's computer | Copy the vault, log keystrokes | Encrypted vault; unlocked keys in memory only, cleared on lock | Malware that can read browser memory or keystrokes wins; no browser wallet can stop it. A stolen vault can be attacked offline: see password strength below. |
-| Someone at an unlocked browser | Send funds, export the key | Export needs the password; sends need confirmation | Auto-lock is off by default. |
+| Someone at an unlocked browser | Send funds, export the key | Export needs the password; sends need confirmation | Auto-lock is 1 hour by default; the user can choose "never", with a warning. |
 | Compromised gleamwallet.app | Message the extension, show announcements | The site can only hand over a points invite code; announcement links are limited to the Gleam site and x.com | Misleading announcement text. |
 | Lying gateway, AO unit or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input | Wrong balances or history on screen; a dishonest gateway can drop a transaction. |
 
@@ -169,7 +169,11 @@ These are true of the current release. Each has a fix planned unless it says oth
   fix planned beyond the policy.
 - **Key export passes the plaintext keyfile to the popup.** It's needed to
   save the file, and it requires the password.
-- **Hardware wallets can't sign yet.** They can hold funds and receive.
+- **Hardware wallets sign only part of the API.** Keystone signs
+  transactions, data items and messages, but not `signature()`, `decrypt`
+  or key export. Ledger signs AR transactions only: the Ledger Arweave app
+  has no data-item command, so AO sends and `signDataItem` are off
+  (`core/models/capabilities.ts`).
 - **Dependency advisories without a fix, not in the shipped extension.** No fix planned until upstream releases one.
   Neither package has a patched release.
   - `elliptic` ≤ 6.6.1 (GHSA-848j-6mx2-7j84): faulty ECDSA nonces can
@@ -199,5 +203,6 @@ These are true of the current release. Each has a fix planned unless it says oth
 [`security/surface.txt`](../security/surface.txt) lists every file where a
 bug could leak a key, produce an unapproved signature, or let a page past
 the wallet's boundary, ranked by impact. It is the scope for audits and
-security review. A release gate that blocks a release while any of those
-files has changed since the last review is planned.
+security review. The release gate (`scripts/release-gate.mjs`) refuses to
+tag a release while any of those files has changed since the last audit
+(`security/audits/README.md`).

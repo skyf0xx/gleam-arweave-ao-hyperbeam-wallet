@@ -95,8 +95,7 @@ configurable auto-lock.
 - FR — Consequences (testable):
   - A single Vault password unlocks every stored Wallet at once: the
     first Wallet created sets it, and every later Wallet must reuse it.
-  - Default auto-lock timeout is 1 hour for new installs (vaults from
-    before that default keep "never"), and the vault also locks when the
+  - Default auto-lock timeout is 1 hour, and the vault also locks when the
     computer's screen locks unless the timeout is "never"; manual "Lock now" always
     available and immediately clears unlocked-session state regardless of
     timeout config.

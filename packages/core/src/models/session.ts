@@ -1,10 +1,9 @@
 import type { WalletSummary } from "./wallet";
 
 /**
- * Auto-lock timeout options. Default is `never`: "unlocked" must survive
- * service-worker restarts to be honest about that default, which is why
- * session metadata is modeled separately from any in-memory-only
- * implementation detail.
+ * Auto-lock timeout options. Default is `1hr`. "unlocked" must survive
+ * service-worker restarts to honor `never`, which is why session metadata is modeled
+ * separately from any in-memory-only implementation detail.
  */
 export type AutoLockTimeout = "never" | "immediate" | "5min" | "1hr" | "4hr";
 
