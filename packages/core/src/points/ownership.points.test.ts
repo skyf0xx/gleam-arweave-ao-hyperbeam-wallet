@@ -6,7 +6,7 @@ import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { signMessage } from "../vault/message-signing";
-import { buildOwnershipTransaction, verifyPointsProof } from "./ownership";
+import { buildOwnershipTransaction, hasPointsProofTag, verifyPointsProof } from "./ownership";
 
 const MESSAGE = "gleam-points:leave:v1:someAddress:1700000000";
 
@@ -55,5 +55,25 @@ describe("verifyPointsProof", () => {
   it("rejects garbage without throwing", async () => {
     expect(await verifyPointsProof("transaction", "not-a-key", MESSAGE, "AAAA")).toBe(false);
     expect(await verifyPointsProof("message", jwk.n, MESSAGE, "%%%")).toBe(false);
+  });
+});
+
+describe("hasPointsProofTag", () => {
+  it("finds the ownership transaction's own tag once decoded", async () => {
+    const tx = await buildOwnershipTransaction(jwk.n, MESSAGE);
+    const decoded = tx.tags.map((tag) => ({ name: new TextDecoder().decode(base64UrlToBytes(tag.name)) }));
+
+    expect(hasPointsProofTag(decoded)).toBe(true);
+  });
+
+  it("ignores case and position among other tags", () => {
+    expect(hasPointsProofTag([{ name: "App-Name" }, { name: "gleam-points" }])).toBe(true);
+    expect(hasPointsProofTag([{ name: "GLEAM-POINTS" }])).toBe(true);
+    expect(hasPointsProofTag([{ name: "\uFEFFGleam-Points" }, { name: " Gleam-Points\n" }])).toBe(true);
+  });
+
+  it("passes tags with other names", () => {
+    expect(hasPointsProofTag([])).toBe(false);
+    expect(hasPointsProofTag([{ name: "Gleam-Points-Extra" }, { name: "Gleam" }, { name: "Content-Type" }])).toBe(false);
   });
 });

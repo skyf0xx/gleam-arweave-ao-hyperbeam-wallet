@@ -1244,6 +1244,47 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     });
   });
 
+  describe("requests that could yield a Gleam Points proof are refused before any window opens", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+    const POINTS_MESSAGE = "gleam-points:register:v1:NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs:-:1700000000";
+    const b64url = (text: string) => Buffer.from(text).toString("base64url");
+
+    beforeEach(async () => {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    });
+
+    it.each(["SHA-256", "SHA-384", "SHA-512"])("signMessage of a points payload with %s", async (hashAlgorithm) => {
+      const params = encodeTaggedBinary({ data: new TextEncoder().encode(POINTS_MESSAGE), options: { hashAlgorithm } });
+
+      await expect(providerCall({ origin: ORIGIN, method: "signMessage", params })).rejects.toThrow(
+        "Gleam Points messages can only be signed from Gleam itself.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["sign", "dispatch"])("%s of a transaction with a Gleam-Points tag", async (method) => {
+      const params = { transaction: { tags: [{ name: b64url("Gleam-Points"), value: b64url(POINTS_MESSAGE) }] } };
+
+      await expect(providerCall({ origin: ORIGIN, method, params })).rejects.toThrow(
+        "a Gleam-Points tag can only be signed from Gleam itself.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("a message that only mentions the prefix later still reaches the approval window", async () => {
+      const params = encodeTaggedBinary({ data: new TextEncoder().encode(`Hello ${POINTS_MESSAGE}`) });
+      void providerCall({ origin: ORIGIN, method: "signMessage", params }).catch(() => undefined);
+
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    });
+  });
+
   describe("connect() from an origin that already has a grant", () => {
     const ORIGIN = "https://bazar.arweave.net";
 

@@ -13,6 +13,17 @@ export type PointsProofKind = "message" | "transaction";
 
 export const POINTS_PROOF_TAG = "Gleam-Points";
 
+/**
+ * True when any tag is named `POINTS_PROOF_TAG`, given decoded tag names.
+ * A proof only verifies with the exact name, but the match ignores case,
+ * surrounding whitespace and byte-order marks, so a near-miss spelling is
+ * refused too rather than signed.
+ */
+export function hasPointsProofTag(tags: ReadonlyArray<{ name: string }>): boolean {
+  const proofTag = POINTS_PROOF_TAG.toLowerCase();
+  return tags.some((tag) => tag.name.trim().toLowerCase() === proofTag);
+}
+
 const encoder = new TextEncoder();
 
 /**
