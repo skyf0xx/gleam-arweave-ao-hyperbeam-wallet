@@ -44,8 +44,10 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   network access in (`fetchImpl`, URLs) and storage through `StoragePort`.
   The background entrypoint connects adapters to handlers.
 - **UI never imports background code.** Every cross-context call goes
-  through `packages/messaging`. The background dispatcher enforces which
-  methods a page may call and which need approval.
+  through `packages/messaging`. `src/dispatch/methods.ts` is the one table
+  of each method's caller tier, whether it can open an approval, and the
+  zod schema its page-supplied params are parsed with; the background
+  dispatcher enforces it before any handler runs.
 - **Signing keys** are decrypted on unlock and held in
   `chrome.storage.session` through `handlers/key-session.ts`, keyed by
   wallet id. Handlers get the key from there. Never re-derive it from a

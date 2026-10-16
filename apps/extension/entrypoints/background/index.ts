@@ -1,11 +1,15 @@
-import { defineExtensionMessaging } from "@webext-core/messaging";
+import {
+  defineExtensionMessaging,
+  type GetDataType,
+  type GetReturnType,
+  type MaybePromise,
+} from "@webext-core/messaging";
+import type { z } from "zod";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
 import {
   DEFAULT_BUNDLER_URL,
   POINTS_API_URL,
-  PERMISSION_TYPES,
-  PROVIDER_METHODS,
   REFUSED_PROVIDER_METHODS,
   bytesToBase64,
   missingPermissions,
@@ -13,10 +17,10 @@ import {
   isHardwareWalletMethod,
   providerMethodRefusal,
   verifyMessage,
-  type ConnectAppInfo,
+  type Grant,
   type NetworkSettings,
-  type PermissionType,
   type ProviderMethod,
+  type WalletState,
   type WalletSummary,
   vaultHasPassword,
 } from "@gleam/core";
@@ -24,8 +28,6 @@ import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gate
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import {
   PROVIDER_EVENT,
-  APPROVAL_GATED_METHODS,
-  PROVIDER_SURFACE_METHODS,
   type ConnectEventPayload,
   type DisconnectEventPayload,
   type ProviderEventName,
@@ -60,16 +62,19 @@ import {
 import {
   decodeProviderParams,
   encodeProviderResult,
-  readBytes,
-  readDataItem,
-  readDataItems,
-  readEncryptAlgorithm,
-  readHashAlgorithm,
-  readProcessId,
-  readSaltLength,
-  readTransaction,
-  type ProviderArgs,
+  type ProviderDataItem,
+  type ProviderTransaction,
 } from "@/src/handlers/provider-params";
+import {
+  BACKGROUND_MESSAGES,
+  PAGE_METHODS,
+  parseParams,
+  type BackgroundMessage,
+  type ContentScriptMethodSpec,
+  type ExtensionMethodSpec,
+  type PageMethodSpec,
+  type PageParams,
+} from "@/src/dispatch/methods";
 import { contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
 import { acceptSiteInvite } from "@/src/points-invite";
@@ -79,30 +84,14 @@ import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
  * The background service worker: builds the adapters and handlers and
  * registers every `ProtocolMap` method.
  *
- * Every message is checked against Chrome's `sender`, never against
- * anything the message body claims. `providerCall` is the only method a
- * content script may send, and its origin is the sending frame's origin.
- * Every other method (key export, wallet creation, approval resolution,
- * settings) is accepted only from this extension's own pages. Within
- * `providerCall`, the method must also be in `PROVIDER_METHODS`, which is
- * disjoint from the approval and key tiers.
+ * Who may call what is `src/dispatch/methods.ts`: every method's tier,
+ * whether it can open an approval window, and the schema its params are
+ * parsed with. This file holds the handlers behind that table. Every
+ * message is checked against Chrome's `sender`, never against anything
+ * the message body claims.
  */
 const messenger = defineExtensionMessaging<ProtocolMap>();
 const extensionBaseUrl = browser.runtime.getURL("");
-
-/**
- * `onMessage` for methods only this extension's pages may call. A content
- * script shares the extension's messaging channel, so without this check a
- * compromised page's content script could export keys or approve its own
- * requests.
- */
-const onExtensionMessage: typeof messenger.onMessage = (type, onReceived) =>
-  messenger.onMessage(type, (message) => {
-    if (!isExtensionPageSender(message.sender, extensionBaseUrl)) {
-      throw new Error(`"${String(type)}" can only be called from the Gleam extension.`);
-    }
-    return onReceived(message);
-  });
 
 void restrictSessionStorageToTrustedContexts();
 
@@ -303,26 +292,6 @@ async function broadcastWalletSwitch(address: string): Promise<void> {
 }
 
 /**
- * The dApp's own claim of who it is, passed to `connect(permissions,
- * appInfo)` per ArConnect's `AppInfo` shape. Untrusted input — only the
- * two display fields are kept, and only when they're strings, so a
- * malformed or hostile payload degrades to `null` (the approval screen's
- * origin-derived fallback) instead of throwing or storing garbage.
- */
-/** Caps `appInfo.name` so an unbounded dApp-supplied string can't break the approval screen's layout. */
-const APP_INFO_NAME_MAX_LENGTH = 64;
-
-function readAppInfo(value: unknown): ConnectAppInfo | null {
-  if (typeof value !== "object" || value === null) return null;
-  const candidate = value as { name?: unknown; logo?: unknown };
-  const trimmedName = typeof candidate.name === "string" ? candidate.name.trim() : "";
-  const name = trimmedName.length > 0 ? trimmedName.slice(0, APP_INFO_NAME_MAX_LENGTH) : null;
-  const logo = typeof candidate.logo === "string" ? candidate.logo : null;
-  if (name === null && logo === null) return null;
-  return { name, logo };
-}
-
-/**
  * ArConnect's `getArweaveConfig()` shape, derived from the wallet's own
  * `NetworkSettings.gatewayUrl` rather than a dApp-supplied `connect(...,
  * gateway)` hint — a dApp doesn't get to redirect a connected wallet's
@@ -364,29 +333,36 @@ async function resolveTokenDenominationAndTicker(
   return Promise.race([lookup, timeout]);
 }
 
-/**
- * Maps a `PROVIDER_METHODS` name + already-origin-checked params
- * into the actual read/approval-flow work, distinct from `providerCall`'s
- * own job (the privilege-tier gate). No `WalletState` read here ever
- * exposes an address for an origin without an active `Grant` — every
- * branch below either reads through `approval.findActiveGrant` first or
- * is itself the `connect` call that creates one.
- */
-async function handleProviderCall(
-  origin: string,
-  method: ProviderMethod,
-  params: ProviderArgs,
-): Promise<unknown> {
-  if (method === "connect") {
-    const requested = Array.isArray((params as { permissions?: unknown } | undefined)?.permissions)
-      ? ((params as { permissions: unknown[] }).permissions.filter(
-          (value): value is PermissionType =>
-            typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value),
-        ) as PermissionType[])
-      : [];
+/** What a provider handler gets once the dispatcher has checked the origin's grant. */
+interface GrantedCall {
+  origin: string;
+  grant: Grant;
+  state: WalletState;
+  /**
+   * The wallet the user has switched to. A grant belongs to the origin, not
+   * to one wallet: every read and signing request follows the active
+   * wallet, the address the `walletSwitch` event already announced.
+   * `grant.walletId` only records which wallet approved the connection.
+   */
+  wallet: WalletState["wallets"][number] | null;
+  activeWalletId(): string;
+}
 
-    const wanted: PermissionType[] = requested.length > 0 ? requested : ["ACCESS_ADDRESS"];
-    const appInfo = readAppInfo((params as { appInfo?: unknown } | undefined)?.appInfo);
+type ProviderHandlers = {
+  [M in ProviderMethod]: (
+    params: PageParams<M>,
+    call: (typeof PAGE_METHODS)[M]["grant"] extends true ? GrantedCall : { origin: string },
+  ) => Promise<unknown>;
+};
+
+/**
+ * The work behind each `PAGE_METHODS` entry. Params arrive parsed, and
+ * for every method but `connect`/`disconnect` the origin's active grant
+ * and permissions have been checked, so no handler here exposes an
+ * address to an origin without a grant.
+ */
+const PROVIDER_HANDLERS: ProviderHandlers = {
+  async connect({ permissions: wanted, appInfo }, { origin }) {
     const state = await lifecycle.getState();
 
     // Many dApps call connect() on every page load. An origin whose grant
@@ -430,241 +406,242 @@ async function handleProviderCall(
     void pushSiteWalletMode(origin, true);
 
     return result;
-  }
+  },
 
-  if (method === "disconnect") {
+  async disconnect(_params, { origin }) {
     await approval.revokeGrant({ origin });
     void emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
     return undefined;
+  },
+
+  async getPermissions(_params, { grant }) {
+    return grant.permissions;
+  },
+  async getActiveAddress(_params, { wallet }) {
+    return wallet?.address ?? null;
+  },
+  async getAllAddresses(_params, { state }) {
+    return state.wallets.map((candidate) => candidate.address);
+  },
+  async getActivePublicKey(_params, { wallet }) {
+    return wallet?.publicKey ?? null;
+  },
+  async getWalletNames(_params, { state }) {
+    return Object.fromEntries(state.wallets.map((candidate) => [candidate.address, candidate.name]));
+  },
+  async getArweaveConfig() {
+    const { gatewayUrl } = await reads.getNetworkSettings();
+    return arweaveConfigFromGatewayUrl(gatewayUrl);
+  },
+  async getBalances(_params, { wallet }) {
+    if (!wallet) throw new Error("No active wallet to read balances for.");
+    return { ar: await reads.getBalance({ address: wallet.address }) };
+  },
+
+  sign: ({ transaction }, call) => requestTransactionApproval("sign", transaction, call),
+  dispatch: ({ transaction }, call) => requestTransactionApproval("dispatch", transaction, call),
+
+  signDataItem: ({ dataItem }, call) => requestDataItemApproval("signDataItem", [dataItem], call),
+  batchSignDataItem: ({ dataItems }, call) => requestDataItemApproval("batchSignDataItem", dataItems, call),
+
+  async encrypt({ data, options }, { origin, activeWalletId }) {
+    return approval.requestApproval({ kind: "encrypt", origin, walletId: activeWalletId(), payload: data, encryptAlgorithm: options });
+  },
+  async decrypt({ data, options }, { origin, activeWalletId }) {
+    return approval.requestApproval({ kind: "decrypt", origin, walletId: activeWalletId(), payload: data, encryptAlgorithm: options });
+  },
+
+  async transferAoTokens({ token, recipient, amount }, { origin, wallet, activeWalletId }) {
+    if (!wallet) throw new Error("No active wallet to sign with.");
+
+    // Best-effort: the same denomination/ticker read the token list uses
+    // for balances, so the approval amount can render scaled with its
+    // ticker instead of as a raw atomic integer. A failed, unresolvable,
+    // or hanging lookup (unconfigured peer, unreachable HyperBEAM node)
+    // must never block or delay showing the approval — raced against
+    // `TOKEN_METADATA_LOOKUP_TIMEOUT_MS` so a hung peer can't stall the
+    // window open. `formatAmount`/`formatAmountUnit` fall back to the raw
+    // amount and a "smallest units" label when either comes back `null`.
+    const { tokenDenomination, tokenTicker } = await resolveTokenDenominationAndTicker(wallet.address, token);
+
+    return approval.requestApproval({
+      kind: "transferAoTokens",
+      origin,
+      walletId: activeWalletId(),
+      recipient,
+      amount,
+      fee: null,
+      token,
+      tokenDenomination,
+      tokenTicker,
+      payload: new Uint8Array(),
+      tags: [],
+    });
+  },
+
+  async signature({ data, options }, { origin, activeWalletId }) {
+    return approval.requestApproval({ kind: "signature", origin, walletId: activeWalletId(), payload: data, saltLength: options });
+  },
+
+  async signMessage({ data, options: hashAlgorithm }, { origin, wallet, activeWalletId }) {
+    if (
+      wallet &&
+      isHardwareWalletMethod(wallet.method) &&
+      (hashAlgorithm ?? HARDWARE_MESSAGE_HASH) !== HARDWARE_MESSAGE_HASH
+    ) {
+      throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
+    }
+    return approval.requestApproval({ kind: "signMessage", origin, walletId: activeWalletId(), payload: data, hashAlgorithm });
+  },
+
+  async verifyMessage({ data, signature, publicKey: givenKey, options: hashAlgorithm }, { wallet }) {
+    // Verification uses only public material, so it needs no approval.
+    const publicKey = givenKey ?? wallet?.publicKey;
+    if (typeof publicKey !== "string" || publicKey.length === 0) {
+      throw new Error("verifyMessage needs a publicKey when no wallet is active.");
+    }
+    return verifyMessage(publicKey, data.buffer, signature.buffer, hashAlgorithm);
+  },
+
+  async tokenBalance({ id }, { wallet }) {
+    if (!wallet) throw new Error("No active wallet to read a token balance for.");
+    return reads.tokenBalance({ address: wallet.address, id });
+  },
+
+  async userTokens({ options }, { wallet }) {
+    if (!wallet) throw new Error("No active wallet to read tokens for.");
+    return reads.userTokens({ address: wallet.address, options });
+  },
+
+  async isTokenAdded({ id: processId }, { wallet }) {
+    if (!wallet) throw new Error("No active wallet to check tokens for.");
+    return reads.isTokenAdded({ address: wallet.address, processId });
+  },
+
+  async addToken({ id: processId }, { origin, wallet }) {
+    if (!wallet) throw new Error("No active wallet to add a token to.");
+    // Already listed: nothing to ask the user.
+    if (await reads.isTokenAdded({ address: wallet.address, processId })) return undefined;
+    // Resolving first proves the id answers as a token, and gives the
+    // prompt a ticker and name to show instead of only the id.
+    const token = await reads.previewWatchedToken({ address: wallet.address, processId });
+    return approval.requestApproval({
+      kind: "addToken",
+      origin,
+      walletId: wallet.id,
+      address: wallet.address,
+      processId,
+      // `getTokenBalance` echoes the process id when it finds no ticker.
+      ticker: token.ticker === processId ? null : token.ticker,
+      name: token.name,
+    });
+  },
+};
+
+async function requestTransactionApproval(
+  kind: "sign" | "dispatch",
+  transaction: ProviderTransaction,
+  { origin, activeWalletId }: GrantedCall,
+): Promise<unknown> {
+  const { gatewayUrl } = await reads.getNetworkSettings();
+  // The dApp's reward is the fee actually charged. Without one, the
+  // preview shows a fresh quote, and the transaction fetches its own
+  // reward when it is built after approval, so the two can differ. A
+  // hardware wallet's device step shows the reward actually signed.
+  const fee =
+    transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
+  return approval.requestApproval({
+    kind,
+    origin,
+    walletId: activeWalletId(),
+    recipient: transaction.target ?? null,
+    amount: transaction.target ? (transaction.quantity ?? "0") : null,
+    fee,
+    payload: transaction.data,
+    tags: transaction.tags,
+    gatewayUrl,
+    target: transaction.target,
+    quantity: transaction.quantity,
+    reward: transaction.reward,
+    last_tx: transaction.last_tx,
+  });
+}
+
+async function requestDataItemApproval(
+  kind: "signDataItem" | "batchSignDataItem",
+  items: ProviderDataItem[],
+  { origin, activeWalletId }: GrantedCall,
+): Promise<unknown> {
+  const [first] = items;
+  return approval.requestApproval({
+    kind,
+    origin,
+    walletId: activeWalletId(),
+    payload: first!.data,
+    tags: first!.tags,
+    dataItems: items.map((item) => ({
+      data: bytesToBase64(item.data),
+      tags: item.tags,
+      target: item.target,
+      anchor: item.anchor,
+    })),
+  });
+}
+
+/**
+ * Routes one `window.arweaveWallet` call by its `PAGE_METHODS` entry. The
+ * refusals that don't depend on the origin's grant throw synchronously,
+ * so every site gets the same answer and no window opens.
+ */
+function dispatchProviderCall(origin: string, method: string, rawParams: unknown): Promise<unknown> {
+  if (Object.hasOwn(REFUSED_PROVIDER_METHODS, method)) {
+    throw new Error(REFUSED_PROVIDER_METHODS[method as keyof typeof REFUSED_PROVIDER_METHODS]);
   }
+  if (!Object.hasOwn(PAGE_METHODS, method)) {
+    throw new Error(`Provider method "${method}" is not reachable from a web page.`);
+  }
+  const providerMethod = method as ProviderMethod;
+  // Checked on every call that can open a window, not only at connect, so
+  // a plain-http origin still holding an older grant can't keep signing.
+  if (PAGE_METHODS[providerMethod].approval && !isSecureSigningOrigin(origin)) {
+    throw new Error("Gleam only signs for secure (https) sites.");
+  }
+  return runProviderMethod(origin, providerMethod, rawParams);
+}
+
+async function runProviderMethod(origin: string, method: ProviderMethod, rawParams: unknown): Promise<unknown> {
+  const spec: PageMethodSpec = PAGE_METHODS[method];
+  const handle = PROVIDER_HANDLERS[method] as (params: unknown, call: GrantedCall | { origin: string }) => Promise<unknown>;
+  const decoded = decodeProviderParams(rawParams);
+  if (!spec.grant) return handle(parseParams(spec.params, decoded), { origin });
 
   const grant = await approval.findActiveGrant(origin);
   if (!grant) {
     throw new Error(`"${origin}" is not connected. Call connect() first.`);
   }
-
   const missing = missingPermissions(method, grant.permissions);
   if (missing.length > 0) {
     throw new Error(`Missing permission(s) for "${method}": ${missing.join(", ")}`);
   }
 
-  // A grant belongs to the origin, not to one wallet: every read and
-  // signing request follows the wallet the user has switched to, which is
-  // the address the `walletSwitch` event already announced.
-  // `grant.walletId` only records which wallet approved the connection.
   const state = await lifecycle.getState();
   const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId) ?? null;
-  const activeWalletId = (): string => {
-    if (!wallet) throw new Error("No active wallet to sign with.");
-    return wallet.id;
-  };
-
   // Refuse what the active wallet can't do before any approval window
   // opens, rather than after the user has approved it.
   const refusal = wallet ? providerMethodRefusal(wallet.method, method) : null;
   if (refusal) throw new Error(refusal);
 
-  switch (method) {
-    case "getPermissions":
-      return grant.permissions;
-    case "getActiveAddress":
-      return wallet?.address ?? null;
-    case "getAllAddresses":
-      return state.wallets.map((candidate) => candidate.address);
-    case "getActivePublicKey":
-      return wallet?.publicKey ?? null;
-    case "getWalletNames":
-      return Object.fromEntries(state.wallets.map((candidate) => [candidate.address, candidate.name]));
-    case "getArweaveConfig": {
-      const { gatewayUrl } = await reads.getNetworkSettings();
-      return arweaveConfigFromGatewayUrl(gatewayUrl);
-    }
-    case "getBalances":
-      if (!wallet) throw new Error("No active wallet to read balances for.");
-      return { ar: await reads.getBalance({ address: wallet.address }) };
-
-    case "sign":
-    case "dispatch": {
-      const transaction = readTransaction(params.transaction, method);
-      const { gatewayUrl } = await reads.getNetworkSettings();
-      // The dApp's reward is the fee actually charged. Without one, the
-      // preview shows a fresh quote, and the transaction fetches its own
-      // reward when it is built after approval, so the two can differ. A
-      // hardware wallet's device step shows the reward actually signed.
-      const fee =
-        transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
-      return approval.requestApproval({
-        kind: method,
-        origin,
-        walletId: activeWalletId(),
-        recipient: transaction.target ?? null,
-        amount: transaction.target ? (transaction.quantity ?? "0") : null,
-        fee,
-        payload: transaction.data,
-        tags: transaction.tags,
-        gatewayUrl,
-        target: transaction.target,
-        quantity: transaction.quantity,
-        reward: transaction.reward,
-        last_tx: transaction.last_tx,
-      });
-    }
-
-    case "signDataItem":
-    case "batchSignDataItem": {
-      const items =
-        method === "signDataItem"
-          ? [readDataItem(params.dataItem, method)]
-          : readDataItems(params.dataItems);
-      const [first] = items;
-      return approval.requestApproval({
-        kind: method,
-        origin,
-        walletId: activeWalletId(),
-        payload: first!.data,
-        tags: first!.tags,
-        dataItems: items.map((item) => ({
-          data: bytesToBase64(item.data),
-          tags: item.tags,
-          target: item.target,
-          anchor: item.anchor,
-        })),
-      });
-    }
-
-    case "encrypt":
-    case "decrypt":
-      return approval.requestApproval({
-        kind: method,
-        origin,
-        walletId: activeWalletId(),
-        payload: readBytes(params.data, "data", method === "encrypt" ? "utf8" : "reject"),
-        encryptAlgorithm: readEncryptAlgorithm(params.options, method),
-      });
-
-    case "transferAoTokens": {
-      const transferParams = params as { token?: string; recipient?: string; amount?: string };
-      if (!transferParams.token || !transferParams.recipient || !transferParams.amount) {
-        throw new Error("transferAoTokens requires token, recipient, and amount.");
-      }
+  const params = parseParams(spec.params, decoded);
+  return handle(params, {
+    origin,
+    grant,
+    state,
+    wallet,
+    activeWalletId: () => {
       if (!wallet) throw new Error("No active wallet to sign with.");
-
-      // Best-effort: the same denomination/ticker read the token list uses
-      // for balances, so the approval amount can render scaled with its
-      // ticker instead of as a raw atomic integer. A failed, unresolvable,
-      // or hanging lookup (unconfigured peer, unreachable HyperBEAM node)
-      // must never block or delay showing the approval — raced against
-      // `TOKEN_METADATA_LOOKUP_TIMEOUT_MS` so a hung peer can't stall the
-      // window open. `formatAmount`/`formatAmountUnit` fall back to the raw
-      // amount and a "smallest units" label when either comes back `null`.
-      const { tokenDenomination, tokenTicker } = await resolveTokenDenominationAndTicker(
-        wallet.address,
-        transferParams.token,
-      );
-
-      return approval.requestApproval({
-        kind: "transferAoTokens",
-        origin,
-        walletId: activeWalletId(),
-        recipient: transferParams.recipient,
-        amount: transferParams.amount,
-        fee: null,
-        token: transferParams.token,
-        tokenDenomination,
-        tokenTicker,
-        payload: new Uint8Array(),
-        tags: [],
-      });
-    }
-
-    case "signature":
-      return approval.requestApproval({
-        kind: method,
-        origin,
-        walletId: activeWalletId(),
-        payload: readBytes(params.data, "data"),
-        saltLength: readSaltLength(params.options, method),
-      });
-
-    case "signMessage": {
-      const hashAlgorithm = readHashAlgorithm(params.options, method);
-      if (
-        wallet &&
-        isHardwareWalletMethod(wallet.method) &&
-        (hashAlgorithm ?? HARDWARE_MESSAGE_HASH) !== HARDWARE_MESSAGE_HASH
-      ) {
-        throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
-      }
-      return approval.requestApproval({
-        kind: method,
-        origin,
-        walletId: activeWalletId(),
-        payload: readBytes(params.data, "data"),
-        hashAlgorithm,
-      });
-    }
-
-    case "verifyMessage": {
-      // Verification uses only public material, so it needs no approval.
-      // Wander defaults `publicKey` to the active wallet's key.
-      const data = readBytes(params.data, "data");
-      const signature = readBytes(params.signature, "signature", "base64url");
-      const publicKey = params.publicKey ?? wallet?.publicKey;
-      if (typeof publicKey !== "string" || publicKey.length === 0) {
-        throw new Error("verifyMessage needs a publicKey when no wallet is active.");
-      }
-      return verifyMessage(
-        publicKey,
-        data.buffer,
-        signature.buffer,
-        readHashAlgorithm(params.options, "verifyMessage"),
-      );
-    }
-
-    case "tokenBalance": {
-      if (!wallet) throw new Error("No active wallet to read a token balance for.");
-      // The id becomes a path segment of the HyperBEAM URL.
-      return reads.tokenBalance({ address: wallet.address, id: readProcessId(params.id, method) });
-    }
-
-    case "userTokens": {
-      if (!wallet) throw new Error("No active wallet to read tokens for.");
-      const options = params.options as { fetchBalance?: unknown } | null | undefined;
-      return reads.userTokens({ address: wallet.address, options: { fetchBalance: options?.fetchBalance === true } });
-    }
-
-    case "isTokenAdded": {
-      if (!wallet) throw new Error("No active wallet to check tokens for.");
-      return reads.isTokenAdded({ address: wallet.address, processId: readProcessId(params.id, method) });
-    }
-
-    case "addToken": {
-      if (!wallet) throw new Error("No active wallet to add a token to.");
-      const processId = readProcessId(params.id, method);
-      // Already listed: nothing to ask the user.
-      if (await reads.isTokenAdded({ address: wallet.address, processId })) return undefined;
-      // Resolving first proves the id answers as a token, and gives the
-      // prompt a ticker and name to show instead of only the id.
-      const token = await reads.previewWatchedToken({ address: wallet.address, processId });
-      return approval.requestApproval({
-        kind: "addToken",
-        origin,
-        walletId: wallet.id,
-        address: wallet.address,
-        processId,
-        // `getTokenBalance` echoes the process id when it finds no ticker.
-        ticker: token.ticker === processId ? null : token.ticker,
-        name: token.name,
-      });
-    }
-
-    default:
-      // Not a `never`-exhaustive check: `ProviderMethod` can grow
-      // ahead of this switch being updated to handle a new method, so an
-      // unhandled method is a named runtime failure here rather than a
-      // compile error.
-      throw new Error(`Provider method "${String(method)}" is not implemented yet.`);
-  }
+      return wallet.id;
+    },
+  });
 }
 
 async function setLockedIcon(locked: boolean) {
@@ -680,7 +657,6 @@ async function setLockedIcon(locked: boolean) {
   })
 }
 
-// wallet lifecycle
 // A new wallet becomes the active one. Connected dApps follow the active
 // wallet, so they hear about it; with no earlier wallet there is nothing
 // connected to tell.
@@ -691,90 +667,6 @@ async function addWallet(add: () => Promise<WalletSummary>): Promise<WalletSumma
   if (before.activeWalletId !== null) void broadcastWalletSwitch(summary.address);
   return summary;
 }
-onExtensionMessage("createWallet", (message) => addWallet(() => lifecycle.createWallet(message.data)));
-onExtensionMessage("importWallet", (message) => addWallet(() => lifecycle.importWallet(message.data)));
-onExtensionMessage("addHardwareWallet", (message) =>
-  addWallet(() => lifecycle.addHardwareWallet(message.data)),
-);
-onExtensionMessage("deleteWallet", async (message) => {
-  const { walletId } = message.data;
-  const before = await lifecycle.getState();
-  const isLastWallet = before.wallets.every((candidate) => candidate.id === walletId);
-
-  // Grants follow the active wallet, so they only go when no wallet is left
-  // to follow, as on reset.
-  let revoked: string[] = [];
-  if (isLastWallet) {
-    revoked = await approval.revokeAllAccess("The wallet was removed.");
-  } else {
-    await approval.rejectWalletApprovals(walletId);
-  }
-  await lifecycle.deleteWallet(message.data);
-  if (isLastWallet) await announceGleamSitesForgotten(revoked);
-
-  const after = await lifecycle.getState();
-  if (after.activeWalletId !== before.activeWalletId) {
-    const active = after.wallets.find((candidate) => candidate.id === after.activeWalletId);
-    if (active) void broadcastWalletSwitch(active.address);
-  }
-});
-onExtensionMessage("renameWallet", (message) => lifecycle.renameWallet(message.data));
-onExtensionMessage("switchWallet", async (message) => {
-  await lifecycle.switchWallet(message.data);
-  // `switchWallet`'s locked signature returns `void`, so the resulting
-  // active address is derived here from `getState()` after the call
-  // resolves.
-  const state = await lifecycle.getState();
-  const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
-  if (active) {
-    void broadcastWalletSwitch(active.address);
-  }
-});
-onExtensionMessage("downloadKeyfile", (message) => lifecycle.downloadKeyfile(message.data));
-onExtensionMessage("cancelKeyfileDownload", (message) => lifecycle.cancelKeyfileDownload(message.data));
-onExtensionMessage("lockWallet", async () => {
-  await lifecycle.lockWallet();
-  // A vault of only hardware wallets has no password and stays unlocked.
-  if (vaultHasPassword((await lifecycle.getState()).wallets)) void setLockedIcon(true);
-});
-onExtensionMessage("unlockWallet", async (message) => {
-  const result = await lifecycle.unlockWallet(message.data);
-  void setLockedIcon(false);
-  return result;
-});
-onExtensionMessage("getPasskeyStatus", () => passkey.getPasskeyStatus());
-onExtensionMessage("checkVaultPassword", (message) => lifecycle.checkVaultPassword(message.data));
-onExtensionMessage("enrollPasskey", (message) => passkey.enrollPasskey(message.data));
-onExtensionMessage("unlockWithPasskey", async (message) => {
-  const result = await passkey.unlockWithPasskey(message.data);
-  void setLockedIcon(false);
-  return result;
-});
-onExtensionMessage("removePasskey", () => passkey.removePasskey());
-onExtensionMessage("resetAllWallets", async () => {
-  // Grants go first, here and when deleteWallet removes the last wallet: a
-  // removal that fails part-way must not leave a dApp connected to nothing.
-  const revoked = await approval.revokeAllAccess();
-  await passkey.removePasskey();
-  await lifecycle.resetAllWallets();
-  await announceGleamSitesForgotten(revoked);
-});
-
-// reads
-onExtensionMessage("getState", () => lifecycle.getState());
-onExtensionMessage("getBalance", (message) => reads.getBalance(message.data));
-onExtensionMessage("getArFee", () => transfer.getArFee());
-onExtensionMessage("getTokenBalances", (message) => reads.getTokenBalances(message.data));
-onExtensionMessage("getCollectibles", (message) => reads.getCollectibles(message.data));
-onExtensionMessage("getWatchedTokens", (message) => reads.getWatchedTokens(message.data));
-onExtensionMessage("previewWatchedToken", (message) => reads.previewWatchedToken(message.data));
-onExtensionMessage("addWatchedToken", (message) => reads.addWatchedToken(message.data));
-onExtensionMessage("removeWatchedToken", (message) => reads.removeWatchedToken(message.data));
-onExtensionMessage("getActivity", (message) => reads.getActivity(message.data));
-onExtensionMessage("getPortfolioHistory", (message) => reads.getPortfolioHistory(message.data));
-onExtensionMessage("getTokenPrices", () => reads.getTokenPrices());
-onExtensionMessage("getConnectedApps", () => approval.getConnectedApps());
-onExtensionMessage("listContacts", () => contacts.listContacts());
 
 /**
  * `TransferDraft`/`UploadDraft` type `walletId` as optional. Every real
@@ -791,111 +683,206 @@ function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walle
   return draft as T & { walletId: string };
 }
 
-// actions
-onExtensionMessage("estimateTransfer", (message) => transfer.estimateTransfer(requireWalletId(message.data)));
-onExtensionMessage("assessRecipient", (message) => transfer.assessRecipient(message.data));
-onExtensionMessage("submitTransfer", (message) => transfer.submitTransfer(requireWalletId(message.data)));
-onExtensionMessage("estimateCollectibleSend", (message) => transfer.estimateCollectibleSend(requireWalletId(message.data)));
-onExtensionMessage("sendCollectible", (message) => transfer.sendCollectible(requireWalletId(message.data)));
-onExtensionMessage("reviewUpload", (message) => upload.reviewUpload(message.data));
-onExtensionMessage("submitUpload", (message) => upload.submitUpload(requireWalletId(message.data)));
+/** A content script's call, from the tab Chrome says sent it. */
+interface ContentScriptCaller {
+  origin: string;
+  tabId: number | undefined;
+}
 
-// approvals
-onExtensionMessage("getApproval", (message) => approval.getApproval(message.data));
-onExtensionMessage("resolveApproval", (message) => approval.resolveApproval(message.data));
-onExtensionMessage("submitDeviceSignature", (message) => approval.submitDeviceSignature(message.data));
-onExtensionMessage("deviceActivity", (message) => approval.deviceActivity(message.data));
+type MessageHandlers = {
+  [K in BackgroundMessage]: (typeof BACKGROUND_MESSAGES)[K] extends ContentScriptMethodSpec<infer S>
+    ? (data: z.output<S>, caller: ContentScriptCaller) => MaybePromise<GetReturnType<ProtocolMap[K]>>
+    : (data: GetDataType<ProtocolMap[K]>) => MaybePromise<GetReturnType<ProtocolMap[K]>>;
+};
 
-// settings
-onExtensionMessage("getNetworkSettings", () => reads.getNetworkSettings());
-onExtensionMessage("setNetworkSettings", (message) => storage.set("local:networkSettings", message.data));
-onExtensionMessage("getLockSettings", () => lifecycle.getLockSettings());
-onExtensionMessage("setLockSettings", (message) => lifecycle.setLockSettings(message.data));
-onExtensionMessage("getThemePreference", () => lifecycle.getThemePreference());
-onExtensionMessage("setThemePreference", (message) => lifecycle.setThemePreference(message.data));
-onExtensionMessage("revokeGrant", async (message) => {
-  await approval.revokeGrant(message.data);
-  void announceAccessEnded(message.data.origin);
-});
-onExtensionMessage("getActiveSite", async () => siteWallet.activeSite(await activeTab()));
-onExtensionMessage("useGleamOnSite", async (message) => {
-  const origin = requireWebOrigin(message.data.origin);
-  await approval.grantSite({ origin, permissions: message.data.permissions });
-  await siteWallet.setUseGleam(origin, true);
-  await pushSiteWalletMode(origin, true);
-  await reloadActiveTabFor(origin);
-});
-onExtensionMessage("stopGleamOnSite", async (message) => {
-  const origin = requireWebOrigin(message.data.origin);
-  await approval.revokeGrant({ origin });
-  await announceAccessEnded(origin);
-  await reloadActiveTabFor(origin);
-});
-onExtensionMessage("dismissSiteSuggestion", (message) => siteWallet.dismiss(requireWebOrigin(message.data.origin)));
-onExtensionMessage("saveContact", (message) => contacts.saveContact(message.data));
-onExtensionMessage("deleteContact", (message) => contacts.deleteContact(message.data));
+/** The work behind each `BACKGROUND_MESSAGES` entry, run once its sender has been checked. */
+const MESSAGE_HANDLERS: MessageHandlers = {
+  // wallet lifecycle
+  createWallet: (data) => addWallet(() => lifecycle.createWallet(data)),
+  importWallet: (data) => addWallet(() => lifecycle.importWallet(data)),
+  addHardwareWallet: (data) => addWallet(() => lifecycle.addHardwareWallet(data)),
+  deleteWallet: async (data) => {
+    const { walletId } = data;
+    const before = await lifecycle.getState();
+    const isLastWallet = before.wallets.every((candidate) => candidate.id === walletId);
 
-// Gleam Points
-onExtensionMessage("joinPoints", (message) => points.join(message.data));
-onExtensionMessage("leavePoints", (message) => points.leave(message.data));
-onExtensionMessage("getPointsMemberships", () => points.getMemberships());
-onExtensionMessage("getPointsScores", () => points.scores());
-onExtensionMessage("getPointsInviteUnlock", () => points.getInviteUnlock());
-onExtensionMessage("redeemPointsInvite", (message) => points.redeemInvite(message.data.code));
-onExtensionMessage("getPointsPendingInvite", () => points.pendingInvite());
-onExtensionMessage("getPointsRevealSeen", () => points.getRevealSeen());
-onExtensionMessage("markPointsRevealSeen", (message) => points.markRevealSeen(message.data));
-onExtensionMessage("getPointsClaimPending", () => points.getClaimPending());
-onExtensionMessage("setPointsClaimPending", (message) => points.setClaimPending(message.data));
-onExtensionMessage("getPointsShareSeen", () => points.getShareSeen());
-onExtensionMessage("markPointsShareSeen", (message) => points.markShareSeen(message.data));
-onExtensionMessage("getPointsSeatsSeen", () => points.getSeatsSeen());
-onExtensionMessage("markPointsSeatsSeen", (message) => points.markSeatsSeen(message.data));
-onExtensionMessage("getAnnouncements", () => announcements.fetchAnnouncements());
-onExtensionMessage("getDismissedAnnouncements", () => announcements.getDismissed());
-onExtensionMessage("dismissAnnouncement", (message) => announcements.dismiss(message.data));
+    // Grants follow the active wallet, so they only go when no wallet is left
+    // to follow, as on reset.
+    let revoked: string[] = [];
+    if (isLastWallet) {
+      revoked = await approval.revokeAllAccess("The wallet was removed.");
+    } else {
+      await approval.rejectWalletApprovals(walletId);
+    }
+    await lifecycle.deleteWallet(data);
+    if (isLastWallet) await announceGleamSitesForgotten(revoked);
 
-// What a content script may ask about its own tab, besides providerCall.
-// Like providerCall, the origin comes from Chrome's sender.
-messenger.onMessage("getSiteWalletMode", (message) => {
-  const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
-  if (!origin) throw new Error("getSiteWalletMode is only accepted from a web page's content script.");
-  return siteWallet.mode(origin);
-});
-messenger.onMessage("reportOtherWallet", (message) => {
-  const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
-  const tabId = message.sender.tab?.id;
-  if (!origin || typeof tabId !== "number") {
-    throw new Error("reportOtherWallet is only accepted from a web page's content script.");
-  }
-  return siteWallet.report(tabId, origin, message.data);
-});
+    const after = await lifecycle.getState();
+    if (after.activeWalletId !== before.activeWalletId) {
+      const active = after.wallets.find((candidate) => candidate.id === after.activeWalletId);
+      if (active) void broadcastWalletSwitch(active.address);
+    }
+  },
+  renameWallet: (data) => lifecycle.renameWallet(data),
+  switchWallet: async (data) => {
+    await lifecycle.switchWallet(data);
+    // `switchWallet`'s locked signature returns `void`, so the resulting
+    // active address is derived here from `getState()` after the call
+    // resolves.
+    const state = await lifecycle.getState();
+    const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
+    if (active) {
+      void broadcastWalletSwitch(active.address);
+    }
+  },
+  downloadKeyfile: (data) => lifecycle.downloadKeyfile(data),
+  cancelKeyfileDownload: (data) => lifecycle.cancelKeyfileDownload(data),
+  lockWallet: async () => {
+    await lifecycle.lockWallet();
+    // A vault of only hardware wallets has no password and stays unlocked.
+    if (vaultHasPassword((await lifecycle.getState()).wallets)) void setLockedIcon(true);
+  },
+  unlockWallet: async (data) => {
+    const result = await lifecycle.unlockWallet(data);
+    void setLockedIcon(false);
+    return result;
+  },
+  getPasskeyStatus: () => passkey.getPasskeyStatus(),
+  checkVaultPassword: (data) => lifecycle.checkVaultPassword(data),
+  enrollPasskey: (data) => passkey.enrollPasskey(data),
+  unlockWithPasskey: async (data) => {
+    const result = await passkey.unlockWithPasskey(data);
+    void setLockedIcon(false);
+    return result;
+  },
+  removePasskey: () => passkey.removePasskey(),
+  resetAllWallets: async () => {
+    // Grants go first, here and when deleteWallet removes the last wallet: a
+    // removal that fails part-way must not leave a dApp connected to nothing.
+    const revoked = await approval.revokeAllAccess();
+    await passkey.removePasskey();
+    await lifecycle.resetAllWallets();
+    await announceGleamSitesForgotten(revoked);
+  },
 
-// The only method a web page can reach, through the content script.
-messenger.onMessage("providerCall", (message) => {
-  const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
-  if (!origin) {
-    throw new Error("providerCall is only accepted from a web page's content script.");
-  }
-  const { method, params } = message.data;
-  // Before any grant check, so every site gets the same answer and no window opens.
-  if (Object.hasOwn(REFUSED_PROVIDER_METHODS, method)) {
-    throw new Error(REFUSED_PROVIDER_METHODS[method as keyof typeof REFUSED_PROVIDER_METHODS]);
-  }
-  if (!PROVIDER_METHODS.includes(method as ProviderMethod)) {
-    throw new Error(`Provider method "${method}" is not reachable from a web page.`);
-  }
-  if (!PROVIDER_SURFACE_METHODS.includes(method)) {
-    throw new Error(`Unknown provider method "${method}".`);
-  }
-  // Checked on every gated call, not only at connect, so a plain-http
-  // origin still holding an older grant can't keep signing.
-  if (APPROVAL_GATED_METHODS.includes(method) && !isSecureSigningOrigin(origin)) {
-    throw new Error("Gleam only signs for secure (https) sites.");
-  }
-  return (async () =>
-    encodeProviderResult(await handleProviderCall(origin, method as ProviderMethod, decodeProviderParams(params))))();
-});
+  // reads
+  getState: () => lifecycle.getState(),
+  getBalance: (data) => reads.getBalance(data),
+  getArFee: () => transfer.getArFee(),
+  getTokenBalances: (data) => reads.getTokenBalances(data),
+  getCollectibles: (data) => reads.getCollectibles(data),
+  getWatchedTokens: (data) => reads.getWatchedTokens(data),
+  previewWatchedToken: (data) => reads.previewWatchedToken(data),
+  addWatchedToken: (data) => reads.addWatchedToken(data),
+  removeWatchedToken: (data) => reads.removeWatchedToken(data),
+  getActivity: (data) => reads.getActivity(data),
+  getPortfolioHistory: (data) => reads.getPortfolioHistory(data),
+  getTokenPrices: () => reads.getTokenPrices(),
+  getConnectedApps: () => approval.getConnectedApps(),
+  listContacts: () => contacts.listContacts(),
+
+  // actions
+  estimateTransfer: (data) => transfer.estimateTransfer(requireWalletId(data)),
+  assessRecipient: (data) => transfer.assessRecipient(data),
+  submitTransfer: (data) => transfer.submitTransfer(requireWalletId(data)),
+  estimateCollectibleSend: (data) => transfer.estimateCollectibleSend(requireWalletId(data)),
+  sendCollectible: (data) => transfer.sendCollectible(requireWalletId(data)),
+  reviewUpload: (data) => upload.reviewUpload(data),
+  submitUpload: (data) => upload.submitUpload(requireWalletId(data)),
+
+  // approvals
+  getApproval: (data) => approval.getApproval(data),
+  resolveApproval: (data) => approval.resolveApproval(data),
+  submitDeviceSignature: (data) => approval.submitDeviceSignature(data),
+  deviceActivity: (data) => approval.deviceActivity(data),
+
+  // settings
+  getNetworkSettings: () => reads.getNetworkSettings(),
+  setNetworkSettings: (data) => storage.set("local:networkSettings", data),
+  getLockSettings: () => lifecycle.getLockSettings(),
+  setLockSettings: (data) => lifecycle.setLockSettings(data),
+  getThemePreference: () => lifecycle.getThemePreference(),
+  setThemePreference: (data) => lifecycle.setThemePreference(data),
+  revokeGrant: async (data) => {
+    await approval.revokeGrant(data);
+    void announceAccessEnded(data.origin);
+  },
+  getActiveSite: async () => siteWallet.activeSite(await activeTab()),
+  useGleamOnSite: async (data) => {
+    const origin = requireWebOrigin(data.origin);
+    await approval.grantSite({ origin, permissions: data.permissions });
+    await siteWallet.setUseGleam(origin, true);
+    await pushSiteWalletMode(origin, true);
+    await reloadActiveTabFor(origin);
+  },
+  stopGleamOnSite: async (data) => {
+    const origin = requireWebOrigin(data.origin);
+    await approval.revokeGrant({ origin });
+    await announceAccessEnded(origin);
+    await reloadActiveTabFor(origin);
+  },
+  dismissSiteSuggestion: (data) => siteWallet.dismiss(requireWebOrigin(data.origin)),
+  saveContact: (data) => contacts.saveContact(data),
+  deleteContact: (data) => contacts.deleteContact(data),
+
+  // Gleam Points
+  joinPoints: (data) => points.join(data),
+  leavePoints: (data) => points.leave(data),
+  getPointsMemberships: () => points.getMemberships(),
+  getPointsScores: () => points.scores(),
+  getPointsInviteUnlock: () => points.getInviteUnlock(),
+  redeemPointsInvite: (data) => points.redeemInvite(data.code),
+  getPointsPendingInvite: () => points.pendingInvite(),
+  getPointsRevealSeen: () => points.getRevealSeen(),
+  markPointsRevealSeen: (data) => points.markRevealSeen(data),
+  getPointsClaimPending: () => points.getClaimPending(),
+  setPointsClaimPending: (data) => points.setClaimPending(data),
+  getPointsShareSeen: () => points.getShareSeen(),
+  markPointsShareSeen: (data) => points.markShareSeen(data),
+  getPointsSeatsSeen: () => points.getSeatsSeen(),
+  markPointsSeatsSeen: (data) => points.markSeatsSeen(data),
+  getAnnouncements: () => announcements.fetchAnnouncements(),
+  getDismissedAnnouncements: () => announcements.getDismissed(),
+  dismissAnnouncement: (data) => announcements.dismiss(data),
+
+  // content script
+  getSiteWalletMode: (_data, { origin }) => siteWallet.mode(origin),
+  reportOtherWallet: (data, { origin, tabId }) => {
+    if (typeof tabId !== "number") {
+      throw new Error("reportOtherWallet is only accepted from a web page's content script.");
+    }
+    return siteWallet.report(tabId, origin, data);
+  },
+  // The only path a web page has into the wallet. Not `async`: the
+  // grant-independent refusals throw before anything is awaited.
+  providerCall: ({ method, params }, { origin }) =>
+    dispatchProviderCall(origin, method, params).then(encodeProviderResult),
+};
+
+/**
+ * Registers every `BACKGROUND_MESSAGES` method. A content script shares
+ * the extension's messaging channel, so each call is checked against
+ * Chrome's `sender` before its params are parsed or its handler runs:
+ * without that, a compromised page's content script could export keys or
+ * approve its own requests.
+ */
+function registerMessage(type: BackgroundMessage): void {
+  const spec: ExtensionMethodSpec | ContentScriptMethodSpec = BACKGROUND_MESSAGES[type];
+  const handle = MESSAGE_HANDLERS[type] as (data: unknown, caller?: ContentScriptCaller) => unknown;
+  messenger.onMessage(type, (message) => {
+    if (spec.tier === "extension") {
+      if (!isExtensionPageSender(message.sender, extensionBaseUrl)) {
+        throw new Error(`"${type}" can only be called from the Gleam extension.`);
+      }
+      return handle(message.data) as never;
+    }
+    const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
+    if (!origin) throw new Error(`${type} is only accepted from a web page's content script.`);
+    return handle(parseParams(spec.params, message.data), { origin, tabId: message.sender.tab?.id }) as never;
+  });
+}
+
+for (const type of Object.keys(BACKGROUND_MESSAGES) as BackgroundMessage[]) registerMessage(type);
 
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 
