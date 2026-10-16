@@ -12,7 +12,9 @@
     "vitest": "vitest",
     "tsc": "tsc",
     "release": "node scripts/release.mjs",
-    "release:check": "node scripts/release-gate.mjs"
+    "release:check": "node scripts/release-gate.mjs",
+    "release:pack": "scripts/pack-release.sh",
+    "release:all": "node scripts/release-all.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",

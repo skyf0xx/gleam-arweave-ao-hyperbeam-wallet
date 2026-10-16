@@ -105,3 +105,14 @@ accepts only signed commits through a PR with passing CI, and admins get
 no bypass. This repo signs commits with an SSH key (`git config --local
 commit.gpgsign true`), so the key has to be loaded in `ssh-agent`. `todo.md` is not tracked in git. Add anything new you find to `todo.md`'s **Unsorted**
 section instead of fixing it on the side.
+
+## Releasing
+
+When Will asks to cut or ship a release, run `pnpm release:all <major|minor|patch> --key <path-to-cws-private-key>`
+(or set `GLEAM_CWS_KEY`). It walks version bump → PR → tag → CI build →
+pack/sign, pausing at each step a human has to clear (merging the PR,
+confirming the GitHub Release exists). It refuses to tag without an audit
+at `security/audits/v<version>.md` with no open critical/high findings —
+point that out if the pause before tagging hits it. The Chrome Web Store
+upload at the end stays manual; no store credentials or signing key ever
+reach CI.
