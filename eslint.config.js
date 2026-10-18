@@ -14,12 +14,44 @@ import reactHooks from "eslint-plugin-react-hooks";
  * crosses `packages/messaging`.
  */
 // Any path into `packages/core/src/signer`: the `@gleam/core/signer`
-// subpath, a deep or cross-package relative path, or a sibling folder's
-// `../signer`. `vault/signer.ts` (the `Signer` interface) is `./signer`
-// from inside `vault/` and stays importable.
-const SIGNER_IMPORT = "^@gleam/core/signer(/|$)|(^|/)core/src/signer(/|$)|^(\\.\\./)+signer(/|$)|^\\./signer/";
+// subpath, any path through `src/signer`, or `../signer` anywhere in a
+// relative path (so `../ao/../signer` counts too). `vault/signer.ts` (the
+// `Signer` interface) is `./signer` from inside `vault/` and stays
+// importable. `dirTail` follows the folder name, so an override can let
+// one file through.
+const signerImport = (dirTail = "(/|$)") =>
+  `^@gleam/core/signer(/|$)|(^|/)(\\.\\.|src)/signer${dirTail}|^\\./signer/`;
+const SIGNER_IMPORT = signerImport();
 const SIGNER_IMPORT_MESSAGE =
   "Only key-session.ts, wallet-lifecycle.ts and the keyring import core/signer. Sign through a `Signer` from `getSigner(walletId)`.";
+
+// `no-restricted-imports` reads only static `import`/`export … from`, so
+// this catches `import("…")` with a literal path against the same regex.
+const noDynamicImport = {
+  meta: { type: "problem", schema: [{ type: "object", properties: { regex: { type: "string" }, message: { type: "string" } } }] },
+  create(context) {
+    const { regex, message } = context.options[0] ?? {};
+    if (!regex) return {};
+    const re = new RegExp(regex);
+    return {
+      ImportExpression(node) {
+        const src = node.source;
+        const path =
+          src.type === "Literal" && typeof src.value === "string"
+            ? src.value
+            : src.type === "TemplateLiteral" && src.expressions.length === 0
+              ? src.quasis[0].value.cooked
+              : null;
+        if (path !== null && re.test(path)) context.report({ node, message: `'${path}' import is restricted. ${message}` });
+      },
+    };
+  },
+};
+const gleam = { rules: { "no-dynamic-import": noDynamicImport } };
+const signerFence = (regex) => ({
+  "no-restricted-imports": ["error", { patterns: [{ regex, message: SIGNER_IMPORT_MESSAGE }] }],
+  "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
+});
 
 export default tseslint.config(
   {
@@ -36,6 +68,7 @@ export default tseslint.config(
     plugins: {
       import: importPlugin,
       "react-hooks": reactHooks,
+      gleam,
     },
     rules: {
       "react-hooks/rules-of-hooks": "error",
@@ -129,34 +162,23 @@ export default tseslint.config(
       "apps/extension/entrypoints/keyring/main.ts",
       // Points API test fixtures sign with throwaway keys.
       "apps/points-api/src/test-signers.ts",
+      // Gives tests the in-memory `Keyring` in place of the offscreen one.
+      "vitest.setup.ts",
     ],
-    rules: {
-      "no-restricted-imports": ["error", { patterns: [{ regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE }] }],
-    },
+    rules: signerFence(SIGNER_IMPORT),
   },
   {
-    // `@gleam/core` is imported everywhere, so it can't re-export the signer.
-    files: ["packages/core/src/index.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        { patterns: [{ regex: `${SIGNER_IMPORT}|^\\./signer$`, message: SIGNER_IMPORT_MESSAGE }] },
-      ],
-    },
+    // From the top of `core/src`, `./signer` is the signer folder itself.
+    // `@gleam/core` (`index.ts`) is imported everywhere, so it can't
+    // re-export the signer either.
+    files: ["packages/core/src/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: signerFence(`${SIGNER_IMPORT}|^\\./signer$`),
   },
   {
     // Wipes the passkey's PRF output, and may take nothing else from the signer.
     files: ["packages/core/src/vault/passkey.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            { regex: SIGNER_IMPORT.replace("^(\\.\\./)+signer(/|$)", "^(\\.\\./)+signer(?!/zeroize$)"), message: SIGNER_IMPORT_MESSAGE },
-          ],
-        },
-      ],
-    },
+    rules: signerFence(signerImport("(?!/zeroize$)")),
   },
   {
     // Key code can't pull in a dependency: one compromised package here
