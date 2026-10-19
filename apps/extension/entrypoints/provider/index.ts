@@ -200,13 +200,15 @@ class GleamProvider {
       const pendingCall: PendingCall = { settled: false, resolve, reject, timeoutId };
       this.pending.set(id, pendingCall);
 
-      const onAbort = () => {
+      const settleEarly = (error: unknown) => {
         if (pendingCall.settled) return;
         pendingCall.settled = true;
         clearTimeout(timeoutId);
         this.pending.delete(id);
-        reject(new Error(`"${method}" was aborted.`));
+        signal?.removeEventListener("abort", onAbort);
+        reject(error);
       };
+      const onAbort = () => settleEarly(new Error(`"${method}" was aborted.`));
       signal?.addEventListener("abort", onAbort, { once: true });
 
       const request: PageRequestEnvelope = {
@@ -217,7 +219,13 @@ class GleamProvider {
       };
       // Targeted at this document's own origin, so the request is dropped
       // if the window has navigated elsewhere by the time it is delivered.
-      window.postMessage(request, location.origin);
+      // An opaque origin ("null", e.g. file:// or a sandboxed page) is not a
+      // valid target and throws.
+      try {
+        window.postMessage(request, location.origin);
+      } catch (error) {
+        settleEarly(error);
+      }
     });
   }
 

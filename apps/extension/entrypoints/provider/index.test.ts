@@ -78,6 +78,21 @@ describe("provider.ts: GleamProvider bridge", () => {
     expect(call?.[1]).toBe(location.origin);
   });
 
+  it("rejects and forgets a request the page can't post, as on an opaque origin", async () => {
+    vi.useFakeTimers();
+    const syntaxError = new DOMException("Invalid target origin 'null'", "SyntaxError");
+    postMessageSpy.mockImplementationOnce(() => {
+      throw syntaxError;
+    });
+    const controller = new AbortController();
+    const removeListener = vi.spyOn(controller.signal, "removeEventListener");
+
+    await expect(provider.sign({}, { signal: controller.signal })).rejects.toBe(syntaxError);
+    expect((provider as unknown as { pending: Map<string, unknown> }).pending.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(removeListener).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+
   it("still sends a request on a plain-http page, where crypto.randomUUID is missing", async () => {
     vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto), subtle: crypto.subtle });
     try {
