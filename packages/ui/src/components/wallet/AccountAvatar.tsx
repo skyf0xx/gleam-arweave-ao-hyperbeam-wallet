@@ -22,18 +22,26 @@ const FACETED = "polygon(50% 0%, 79% 10%, 95% 35%, 95% 65%, 79% 90%, 50% 100%, 2
 
 export function AccountAvatar({ svgMarkup, label, size = 28, className }: AccountAvatarProps) {
   return (
+    // clip-path would cut a CSS border off, so the border is the outer gem
+    // showing around a second gem 1px smaller, with a thin gap inside it.
     <span
       role="img"
       aria-label={label}
-      className={cn("inline-flex shrink-0 overflow-hidden bg-mist", className)}
+      className={cn("inline-flex shrink-0 bg-line p-px", className)}
       style={{ width: size, height: size, clipPath: FACETED }}
     >
-      <img
-        src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`}
-        alt=""
-        draggable={false}
-        className="block h-full w-full"
-      />
+      <span
+        className="block h-full w-full overflow-hidden bg-background"
+        style={{ clipPath: FACETED, padding: Math.max(1, Math.round(size * 0.05)) }}
+      >
+        <img
+          src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`}
+          alt=""
+          draggable={false}
+          className="block h-full w-full"
+          style={{ clipPath: FACETED }}
+        />
+      </span>
     </span>
   );
 }
