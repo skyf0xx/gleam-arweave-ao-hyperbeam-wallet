@@ -4,7 +4,6 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "@/src/address-identity";
-import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
 /**
@@ -14,7 +13,7 @@ import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-scree
  * possible. Full addresses only, never truncated: addresses render in
  * `MemorableAddress`'s chunked form with their avatar. Never uses the beam as anything
  * but the small identity mark, and never uses humor here — maximum
- * clarity, zero cleverness. The irreversible-tier `RiskNotice`/
+ * clarity, zero cleverness. The irreversible-tier `RecipientWarning`/
  * `destructive` Button pairing is the same one `RiskNotice`'s own doc
  * comment names as this screen's reason for existing as a single shared
  * component.
@@ -202,11 +201,6 @@ export function SigningApprovalScreen({
               </span>
             </div>
 
-            <RiskNotice>
-              <strong className="font-bold">This can&apos;t be undone.</strong> Double-check the recipient
-              before signing.
-            </RiskNotice>
-
             <RecipientWarning
               firstTime={assessment?.firstTime ?? false}
               lookalikeOf={lookalikeOf}
@@ -232,13 +226,6 @@ export function SigningApprovalScreen({
                 </span>
               ) : null}
             </div>
-
-            {irreversible ? (
-              <RiskNotice>
-                <strong className="font-bold">This can&apos;t be undone.</strong> Double-check the recipient
-                before signing.
-              </RiskNotice>
-            ) : null}
 
             <RecipientWarning
               firstTime={assessment?.firstTime ?? false}

@@ -237,7 +237,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
           {irreversible ? (
             <RecipientWarning
-              firstTime
+              firstTime={step.estimate.firstSeenRecipient && !known}
               lookalikeOf={shownLookalikeOf}
               lookalikeAvatarSvg={lookalikeAvatarSvg}
               emphasisPick={emphasisPick}

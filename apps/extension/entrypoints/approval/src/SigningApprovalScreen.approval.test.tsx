@@ -323,6 +323,15 @@ describe("SigningApprovalScreen recipient warnings", () => {
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
   });
 
+  it("folds every reason into one notice that says \"can't be undone\" once", () => {
+    renderWith({ firstTime: true, lookalikeOf: known });
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    const text = screen.getByRole("alert").textContent ?? "";
+    expect(text.match(/can't be undone/gi)).toHaveLength(1);
+    expect(text).toMatch(/haven't sent to this address before/);
+    expect(text).toMatch(/looks like one you know/);
+  });
+
   it("shows no recipient warning for a known recipient", () => {
     renderWith({ firstTime: false, lookalikeOf: null });
     expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();

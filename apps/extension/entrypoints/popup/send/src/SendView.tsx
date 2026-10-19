@@ -829,7 +829,7 @@ function ReviewStep({
 
         {irreversible ? (
           <RecipientWarning
-            firstTime
+            firstTime={step.estimate.firstSeenRecipient && !known}
             lookalikeOf={lookalikeOf}
             lookalikeAvatarSvg={lookalikeAvatarSvg}
             emphasisPick={emphasisPick}
