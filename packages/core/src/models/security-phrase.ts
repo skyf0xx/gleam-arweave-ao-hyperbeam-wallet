@@ -13,10 +13,11 @@ export const SECURITY_PHRASE_WORD_MAX_LENGTH = 24;
 const WORD_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} '-]*$/u;
 
 const SUGGESTED_WORDS = [
-  "amber", "anchor", "aurora", "basalt", "breeze", "cedar", "comet", "coral",
-  "delta", "ember", "fjord", "garnet", "harbor", "indigo", "juniper", "kestrel",
-  "lagoon", "maple", "meadow", "nectar", "orbit", "pebble", "quartz", "river",
-  "saffron", "summit", "tundra", "velvet", "willow", "zephyr",
+  "prism", "rainbow", "glint", "diamond", "quartz", "beam", "bright", "cipher",
+  "citrine", "clarity", "crystal", "dazzle", "facet", "lucent", "nova", "gleam",
+  "glimmer", "glow", "halo", "iris", "jewel", "lumen", "lustre", "mirror",
+  "opal", "pearl", "radiant", "ray", "refract", "shard", "shimmer", "sparkle",
+  "spectrum", "sunbeam", "topaz", "twinkle", "zircon", "aurora",
 ] as const;
 
 /** The phrase in `value` with its word trimmed, or `null` if it isn't a valid one. */
