@@ -13,7 +13,7 @@ export function commitUrl(sha: string): string {
   return `${REPO_URL}/commit/${sha}`;
 }
 
-export type SitePage = "welcome" | "feedback" | "goodbye" | "gleam" | "points";
+export type SitePage = "welcome" | "feedback" | "goodbye" | "gleam" | "points" | "scan";
 
 /**
  * A page on the Gleam website. The extension version is the only thing

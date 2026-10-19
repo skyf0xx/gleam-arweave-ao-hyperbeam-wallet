@@ -283,6 +283,11 @@ export interface ProtocolMap {
    * the host allowlist are dropped, and any failure yields an empty list.
    */
   getAnnouncements(): Announcement[];
+  /**
+   * How many community scans attest the running release, from the points
+   * API; null when it can't be read.
+   */
+  getScanCount(): number | null;
   /** Ids of the announcements the user has dismissed. */
   getDismissedAnnouncements(): string[];
   dismissAnnouncement(req: { id: string }): void;

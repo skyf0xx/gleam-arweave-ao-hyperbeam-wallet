@@ -71,8 +71,8 @@ describe("ProtocolMap", () => {
   });
 
   it("declares announcement methods", () => {
-    const methodNames: Array<keyof ProtocolMap> = ["getAnnouncements", "getDismissedAnnouncements", "dismissAnnouncement"];
-    expect(new Set(methodNames).size).toBe(3);
+    const methodNames: Array<keyof ProtocolMap> = ["getAnnouncements", "getScanCount", "getDismissedAnnouncements", "dismissAnnouncement"];
+    expect(new Set(methodNames).size).toBe(4);
     expectTypeOf<Parameters<ProtocolMap["dismissAnnouncement"]>[0]>().toEqualTypeOf<{ id: string }>();
     expectTypeOf<ReturnType<ProtocolMap["getDismissedAnnouncements"]>>().toEqualTypeOf<string[]>();
   });

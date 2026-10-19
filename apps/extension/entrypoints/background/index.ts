@@ -45,6 +45,7 @@ import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
 import { AnnouncementsHandler } from "@/src/handlers/announcements";
+import { ScansHandler } from "@/src/handlers/scans";
 import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { SecurityPhraseHandler } from "@/src/handlers/security-phrase";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
@@ -150,6 +151,7 @@ const points = new PointsHandler({
 registerPointsHeartbeatAlarm(points);
 
 const announcements = new AnnouncementsHandler({ storage });
+const scans = new ScansHandler({ apiUrl: POINTS_API_URL, version: () => browser.runtime.getManifest().version });
 const securityPhrase = new SecurityPhraseHandler(storage);
 const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) => approval.findActiveGrant(origin) });
 
@@ -867,6 +869,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   getPointsSeatsSeen: () => points.getSeatsSeen(),
   markPointsSeatsSeen: (data) => points.markSeatsSeen(data),
   getAnnouncements: () => announcements.fetchAnnouncements(),
+  getScanCount: () => scans.count(),
   getDismissedAnnouncements: () => announcements.getDismissed(),
   dismissAnnouncement: (data) => announcements.dismiss(data),
 

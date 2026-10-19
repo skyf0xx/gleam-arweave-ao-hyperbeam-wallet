@@ -150,6 +150,14 @@ function invalidAttestation(issues: ScanIssue[]): ScanFailure {
   return { ok: false, status: 400, code: "invalid_attestation", error: issues[0]!.message, issues };
 }
 
+async function attestationTotal(db: Queryable, release: string): Promise<number> {
+  const { rows } = await db.query<{ total: string }>(
+    "SELECT count(*)::text AS total FROM attestations WHERE release = $1 AND voided_at IS NULL",
+    [release],
+  );
+  return Number(rows[0]!.total);
+}
+
 async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
   const { rows } = await db.query<{ taken: string }>(
     "SELECT count(*)::text AS taken FROM attestations WHERE release = $1 AND paid AND voided_at IS NULL",
@@ -337,6 +345,7 @@ const MAX_CACHED_LISTINGS = 200;
 /** What a release's listing says about the release as a whole, whatever page is asked for. */
 interface ReleaseSummary {
   commit: string;
+  total: number;
   paidPlacesLeft: number;
   /** Null until a first page (no cursor) has computed it. */
   coverage: AttestationListing["coverage"] | null;
@@ -417,6 +426,8 @@ export function parseListQuery(query: { release?: string; cursor?: string; limit
 export interface AttestationListing {
   release: string;
   commit: string;
+  /** Non-voided attestations of the release, whatever page this is. */
+  total: number;
   /** Over every attestation of the release, whatever page this is. */
   paidPlacesLeft: number;
   /**
@@ -499,6 +510,7 @@ export async function listAttestations(
     if (!summary || (summary.coverage === null && query.cursor === null)) {
       summary = {
         commit,
+        total: await attestationTotal(db, release),
         paidPlacesLeft: await paidPlacesLeft(db, release),
         coverage: query.cursor === null ? await coverageOf(db, github, { release, commit, isLatest, storedTotal }) : null,
       };
@@ -529,6 +541,7 @@ export async function listAttestations(
     const listing: AttestationListing = {
       release,
       commit,
+      total: summary.total,
       paidPlacesLeft: summary.paidPlacesLeft,
       coverage: summary.coverage,
       attestations: page.map((row) => ({

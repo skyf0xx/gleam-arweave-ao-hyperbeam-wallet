@@ -349,6 +349,7 @@ export const BACKGROUND_MESSAGES = {
   getPointsSeatsSeen: EXTENSION,
   markPointsSeatsSeen: EXTENSION,
   getAnnouncements: EXTENSION,
+  getScanCount: EXTENSION,
   getDismissedAnnouncements: EXTENSION,
   dismissAnnouncement: EXTENSION,
 

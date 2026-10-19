@@ -738,7 +738,7 @@ describe("GET /attestations", () => {
     expect(status).toBe(200);
     expect(headers.get("cache-control")).toBe("public, max-age=60");
     expect(headers.get("access-control-allow-origin")).toBe("*");
-    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, paidPlacesLeft: 18 });
+    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, total: 2, paidPlacesLeft: 18 });
     expect(json.attestations.map((x: { id: string }) => x.id).sort()).toEqual([a, b].sort());
     const first = json.attestations.find((x: { id: string }) => x.id === a)!;
     expect(first).toMatchObject({
@@ -773,6 +773,7 @@ describe("GET /attestations", () => {
     const { json } = await s.get("/attestations");
 
     expect(json.attestations).toHaveLength(1);
+    expect(json.total).toBe(1);
     expect(json.paidPlacesLeft).toBe(19);
     expect(json.coverage.examined).toBe(3);
   });
@@ -780,7 +781,7 @@ describe("GET /attestations", () => {
   it("starts empty with every function unexamined", async () => {
     const s = await setup();
     const { json } = await s.get("/attestations");
-    expect(json).toMatchObject({ attestations: [], paidPlacesLeft: 20, coverage: { examined: 0, total: 6 } });
+    expect(json).toMatchObject({ attestations: [], total: 0, paidPlacesLeft: 20, coverage: { examined: 0, total: 6 } });
     expect(json.coverage.unexamined).toHaveLength(6);
   });
 
@@ -847,6 +848,8 @@ describe("GET /attestations", () => {
 
       expect(a.json.paidPlacesLeft).toBe(17);
       expect(b.json.paidPlacesLeft).toBe(17);
+      expect(a.json.total).toBe(3);
+      expect(b.json.total).toBe(3);
       expect(b.json.coverage).toEqual(a.json.coverage);
     });
 
