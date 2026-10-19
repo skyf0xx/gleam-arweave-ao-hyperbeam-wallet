@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
@@ -117,6 +118,9 @@ export default defineConfig({
       // and keystone/sign-request.ts use.
       nodePolyfills({ include: ['stream', 'events'] }),
     ],
+    resolve: {
+      alias: [{ find: /^function-bind$/, replacement: fileURLToPath(new URL('./src/shims/function-bind.cjs', import.meta.url)) }],
+    },
     build: {
       // Extension pages are same-origin and load in milliseconds; Vite's
       // <link modulepreload> injection for shared chunks (App.js,
