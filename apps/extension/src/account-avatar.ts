@@ -5,12 +5,13 @@ import { securityPhraseSeed } from "@gleam/core";
 const shapesStyle = new Style(shapes);
 
 /**
- * The beam's colours without Beam Red: a red mark beside an address reads
- * as an alert. The ground is left transparent so `AccountAvatar` sets it
- * on the theme's own background, keeping white as the canvas and the beam
- * as the accent.
+ * Beam Sky and Beam Yellow, each with its complement (coral, lavender),
+ * plus a mint and a rose for range. All six sit at about the same
+ * lightness and strength, so no one colour dominates a tile the way Beam
+ * Purple did, and none is a warning red. The ground is left transparent
+ * so `AccountAvatar` sets it on the theme's own background.
  */
-const SHAPE_COLORS = ["#8b12ff", "#73c9e8", "#ffe45c", "#28f02d"];
+const SHAPE_COLORS = ["#73c9e8", "#ff9c8b", "#ffe45c", "#bdafff", "#7cd591", "#f59cd8"];
 const TRANSPARENT = ["#00000000"];
 
 /**
