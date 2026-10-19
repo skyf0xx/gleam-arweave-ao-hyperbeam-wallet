@@ -16,6 +16,7 @@ import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
 import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
+import { useLookalikeOf } from "./useLookalikeOf";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -199,6 +200,13 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
   const knownNameFor = (address: string): string | undefined => (contactFor(address) ?? ownWalletFor(address))?.name;
   const { emphasisPick } = useAddressIdentity();
+  const lookalikeOf = useLookalikeOf(
+    runtime,
+    wallet,
+    step.kind === "compose" ? step.recipient : "",
+    contactsQuery.data ?? [],
+    otherWalletsQuery.data ?? [],
+  );
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
@@ -296,6 +304,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         step={step}
         knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
         emphasisPick={emphasisPick}
+        lookalikeOf={lookalikeOf}
         onBack={onBack}
         onChange={(patch) =>
           setStep({
@@ -439,6 +448,7 @@ function ComposeStep({
   step,
   knownName,
   emphasisPick,
+  lookalikeOf,
   onBack,
   onChange,
   onBlurRecipient,
@@ -459,6 +469,7 @@ function ComposeStep({
   step: Extract<Step, { kind: "compose" }>;
   knownName: string | undefined;
   emphasisPick: number | null;
+  lookalikeOf: string | null;
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
   onBlurRecipient: () => void;
@@ -512,6 +523,7 @@ function ComposeStep({
           recipientError={step.recipientError}
           knownName={knownName}
           emphasisPick={emphasisPick}
+          lookalikeOf={lookalikeOf}
           onChangeRecipient={(recipient) => onChange({ recipient })}
           onBlurRecipient={onBlurRecipient}
           onOpenSavedAddresses={onOpenSavedAddresses}
@@ -598,6 +610,7 @@ export function RecipientField({
   recipientError,
   knownName,
   emphasisPick,
+  lookalikeOf,
   onChangeRecipient,
   onBlurRecipient,
   onOpenSavedAddresses,
@@ -614,6 +627,8 @@ export function RecipientField({
   /** The saved contact's or own wallet's name for `recipient`, if it is one. */
   knownName: string | undefined;
   emphasisPick: number | null;
+  /** A trusted address this one imitates, warned about while still composing. */
+  lookalikeOf: string | null;
   onChangeRecipient: (recipient: string) => void;
   onBlurRecipient: () => void;
   onOpenSavedAddresses: () => void;
@@ -673,7 +688,16 @@ export function RecipientField({
           {recipientError}
         </div>
       ) : null}
-      {!recipientError && recipientSchema.safeParse(recipient).success && !hideSaveOption ? (
+      {lookalikeOf ? (
+        <RecipientWarning
+          firstTime={false}
+          lookalikeOf={lookalikeOf}
+          lookalikeAvatarSvg={identity.avatarSvg(lookalikeOf)}
+          emphasisPick={emphasisPick}
+        />
+      ) : null}
+      {/* Saving a lookalike would make the fake a trusted contact. */}
+      {!recipientError && !lookalikeOf && recipientSchema.safeParse(recipient).success && !hideSaveOption ? (
         <SaveAddressInline
           expanded={showSaveAddress}
           name={saveAddressName}

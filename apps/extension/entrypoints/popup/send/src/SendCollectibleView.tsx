@@ -20,6 +20,7 @@ import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSendCollectible } from "../../activity/src/useSendCollectible";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
+import { useLookalikeOf } from "./useLookalikeOf";
 import { RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
 
 /**
@@ -85,6 +86,13 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
   const identity = useAddressIdentity();
   const { emphasisPick } = identity;
+  const composeLookalikeOf = useLookalikeOf(
+    runtime,
+    wallet,
+    step.kind === "compose" ? step.recipient : "",
+    contactsQuery.data ?? [],
+    otherWalletsQuery.data ?? [],
+  );
   const reviewRecipient = step.kind === "review" ? step.recipient : null;
   const lookalikeOf = step.kind === "review" ? (step.estimate.lookalikeOf ?? null) : null;
   const avatarSvg = reviewRecipient ? identity.avatarSvg(reviewRecipient) : "";
@@ -135,6 +143,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             recipientError={step.recipientError}
             knownName={parsed.success ? (contactFor(parsed.data) ?? ownWalletFor(parsed.data))?.name : undefined}
             emphasisPick={emphasisPick}
+            lookalikeOf={composeLookalikeOf}
             onChangeRecipient={(recipient) =>
               setStep({ ...step, recipient, recipientError: undefined, error: undefined, showSaveAddress: false, saveAddressName: "" })
             }

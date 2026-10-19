@@ -732,3 +732,35 @@ describe("SendView recipient lookalike warning", () => {
     expect(screen.queryByText(/looks like one you know/)).toBeNull();
   });
 });
+
+describe("SendView lookalike warning while composing", () => {
+  const SENT_TO = "AAAAAA1111111111111111111111111111111111111";
+  // Same first and last four characters as SENT_TO, different middle.
+  const LOOKALIKE = `AAAA${"9".repeat(35)}1111`;
+
+  it("warns as soon as a pasted address imitates one already sent to, and hides Save", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([{ txId: "tx-1", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 100 }]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: LOOKALIKE } });
+
+    expect(await screen.findByText(/looks like one you know/)).toBeTruthy();
+    expect(screen.getByText(addressText(SENT_TO))).toBeTruthy();
+    expect(screen.queryByText("Save this address")).toBeNull();
+  });
+
+  it("stays quiet for an address that resembles nothing trusted", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([{ txId: "tx-1", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 100 }]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: `BBBB${"2".repeat(39)}` } });
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getActivity" })));
+    expect(screen.queryByText(/looks like one you know/)).toBeNull();
+  });
+});
