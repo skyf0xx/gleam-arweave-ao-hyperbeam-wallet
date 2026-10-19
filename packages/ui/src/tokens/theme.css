@@ -93,9 +93,6 @@
    */
   --color-negative: #dc2626;
 
-  /* Underlines the address chunks to check (`MemorableAddress`). Not a risk colour: it marks where to look. */
-  --color-emphasis: #f59e0b;
-
   /* ---- Typography ---- */
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;

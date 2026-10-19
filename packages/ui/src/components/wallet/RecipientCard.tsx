@@ -20,29 +20,27 @@ export interface RecipientCardProps {
 
 /** Who you're sending to: the address's avatar, its name if known, and the chunked address. */
 export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "default", onEdit, className }: RecipientCardProps) {
-  const showNameLine = name !== undefined || onEdit !== undefined;
   return (
-    <div className={cn("flex items-start gap-3 rounded-md border border-line bg-background px-3.5 py-3", className)}>
-      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={32} />
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-0.5", !showNameLine && "self-center")}>
-        {showNameLine ? (
-          <div className="flex min-h-4.5 items-center justify-between gap-2">
-            <span className={cn("truncate text-label font-semibold", name ? "text-foreground" : "text-muted")}>
-              {name ?? (name === null ? "New address" : "")}
-            </span>
-            {onEdit ? (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="flex-shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-muted hover:bg-mist hover:text-foreground"
-              >
-                Change
-              </button>
-            ) : null}
-          </div>
+    <div className={cn("flex items-center gap-3.5 rounded-md border border-line bg-background py-3 pl-3.5 pr-3", className)}>
+      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={40} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        {name !== undefined ? (
+          <span className={cn("truncate text-label font-semibold", name ? "text-foreground" : "text-muted")}>
+            {name ?? "New address"}
+          </span>
         ) : null}
-        <MemorableAddress address={address} emphasisPick={emphasisPick} tone={tone} />
+        {/* Pulls the padded chunks back so the address lines up with the name. */}
+        <MemorableAddress address={address} emphasisPick={emphasisPick} tone={tone} className="-ml-[0.35ch]" />
       </div>
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="shrink-0 self-start rounded-md px-1.5 py-0.5 text-caption font-medium text-muted hover:bg-mist hover:text-foreground"
+        >
+          Change
+        </button>
+      ) : null}
     </div>
   );
 }

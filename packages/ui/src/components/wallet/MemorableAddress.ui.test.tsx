@@ -15,7 +15,7 @@ describe("MemorableAddress", () => {
 
   it("emphasises the first, last and two middle chunks", () => {
     const { container } = render(<MemorableAddress address={ADDRESS} emphasisPick={null} />);
-    const emphasized = Array.from(container.querySelectorAll(".underline")).map((chunk) => chunk.textContent);
+    const emphasized = Array.from(container.querySelectorAll("[data-emphasized]")).map((chunk) => chunk.textContent);
     expect(emphasized).toEqual(["weY8", "hGV3", "n8gz", "uFk"]);
   });
 
