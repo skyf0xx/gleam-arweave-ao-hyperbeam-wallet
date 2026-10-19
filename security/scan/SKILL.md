@@ -30,6 +30,9 @@ unless a step says otherwise. Background on the program is in `SCANS.md`.
   not in the attestation `report`, a PR, an issue, a commit message or a
   comment. Those details go only in a private advisory.
 - Never open a public GitHub issue for a security problem.
+- If you find a secret in the repository (a key, token or password),
+  report it in a private advisory with only its file and line. Never copy
+  the value anywhere, including the advisory.
 - Keep the scan checkout's `HEAD` on the release tag. `pnpm scan finish`
   fails if `HEAD` moves. Write any fix in a separate worktree (Step 6).
 - When a `pnpm scan` command prints a line starting with `✗`, do what that
@@ -130,7 +133,7 @@ Done when you can name the attackers and the By design entries.
 
 ```bash
 pnpm vitest run
-osv-scanner scan source -L pnpm-lock.yaml       # or, if unavailable: pnpm audit
+osv-scanner scan --config osv-scanner.toml --lockfile pnpm-lock.yaml   # or, if unavailable: pnpm audit
 ```
 
 The tests take a few minutes. Done when both have finished and you have
@@ -138,6 +141,16 @@ noted the results. A test failure
 is not a finding by itself; note it in the report. A vulnerable dependency
 is a finding only if Gleam uses the affected code in a way an attacker from
 the threat model can reach; otherwise note it in the report.
+`osv-scanner.toml` lists the advisories Gleam already knows about, each
+with the reason it can't be reached. One of those is a finding only if you
+show the reason is wrong.
+
+CI already runs semgrep with the `p/typescript`, `p/javascript`, `p/react`
+and `p/secrets` rulesets, so running those again finds nothing new. If you
+have semgrep, write your own rules for patterns specific to Gleam instead,
+for example a page-supplied value reaching a signing call without going
+through its zod schema. This is optional. Say in the report whether you
+ran any.
 
 ## Step 4: Review the security surface, changed files first
 
@@ -171,14 +184,74 @@ git ls-files -- $(awk '!/^#/ && NF == 2 { print $2 }' security/surface.txt)
 Read the 3 challenge functions closely on the way, since you answer for
 them in Step 7.
 
+What to look for in each area:
+
+- **Key material** (`core/signer/`, `core/vault/`, `handlers/key-session.ts`,
+  `src/keyring/`, `entrypoints/keyring/`, `adapters/offscreen-keyring.ts`):
+  where the decrypted key lives while unlocked, and whether it ever
+  reaches `chrome.storage.local`, a message to a page or a log. Whether
+  byte buffers are zeroed after use and on every error path (`zeroize.ts`);
+  a JS string can't be zeroed, so a key held as a string is worth noting.
+  Which contexts the offscreen keyring accepts a port from, and what it
+  checks before it answers.
+- **Locking** (`handlers/key-session.ts`, `enforceAutoLock`): whether the
+  auto-lock alarm really removes the keys, and what happens when the
+  service worker or the offscreen document restarts mid-session: does
+  the wallet come back unlocked when it should be locked?
+- **Provider bridge** (`entrypoints/provider/`, `entrypoints/content/`,
+  `packages/messaging/src/page-protocol.ts`): the `event.source` check,
+  per-request ids, the `settled` flag, timeouts, and decoding of binary
+  values. Whether every page-supplied value has a size limit before it is
+  parsed, stored or shown.
+- **Dispatch** (`src/dispatch/methods.ts`, `src/sender.ts`,
+  `handlers/provider-params.ts`): each method's caller tier, whether it can
+  open an approval, and whether its zod schema accepts anything the handler
+  doesn't expect. Whether any method that signs or reveals something can
+  run without an approval.
+- **Permissions** (`wxt.config.ts`): `optional_host_permissions` is
+  `https://*/*`, so check that every runtime host request asks for exactly
+  the host the user typed, shows it, and validates it
+  (`popup/network-peers/`). Check what each `web_accessible_resources`
+  entry lets a page load or learn.
+- **CSP** (`src/csp.ts`): what `wasm-unsafe-eval` allows, whether any
+  directive is missing, and whether the looser dev policy can reach a
+  production build.
+- **Crypto** (`core/signer/envelope.ts`, `core/arweave/rsa-pss.ts`): the
+  Argon2id parameters and their bounds, whether a stored envelope can force
+  weaker parameters, and whether there is any fallback to a weaker KDF.
+  Correct AES-GCM nonce handling and RSA-PSS salt length.
+
 Done when you have read every changed surface file and as much of the rest
 as you can, and you know which files you didn't reach.
 
 ## Step 5: Look anywhere else that seems worth it
 
-Follow data and calls out of the surface wherever they lead: callers,
-message handlers, the build config, anything you suspect. Done when you
-have followed the leads you found.
+The surface list and Step 4's checklist are where to start, not the
+limit. Follow data and calls out of the surface wherever they lead:
+callers, message handlers, the build config, anything you suspect. A
+finding outside the surface counts the same as one inside it.
+
+To find leads quickly, search the whole repository (not only the surface)
+for these, and check each hit that handles key material or page input:
+
+```bash
+git grep -nE 'crypto\.subtle|exportKey|importKey|storage\.local|storage\.session|postMessage|innerHTML|insertAdjacentHTML|data:|downloads\.' -- '*.ts' '*.tsx' '*.js' '*.mjs' ':!*.test.ts' ':!*.test.tsx'
+```
+
+It prints about 200 lines, so skip the ones you have already read.
+
+To show that a suspected bug is real, write a throwaway unit test, for
+example one that feeds a malformed or oversized binary value to the
+decoder in `page-protocol.ts`, and run it with `pnpm vitest run
+<path-fragment>`. A failing test turns "suspected" into "demonstrated".
+Delete the test afterwards, or put it in your fix PR. Never test against
+a real wallet.
+
+If a file you reviewed here can leak a key, sign something unapproved or
+let a page past the wallet's boundary, it belongs on the surface. Note it
+for the surface PR in Step 6.
+
+Done when you have followed the leads you found.
 
 ## Step 6: Draft your reports (don't file them yet)
 
@@ -216,7 +289,25 @@ from the attacker's access to the harm, whether you demonstrated it or
 suspect it, and the impact. Keep the draft local, for example in
 `.gleam-scan/advisory-1.md` (`.gleam-scan/` is ignored by git).
 
-Done when every finding has a draft. If you have none, that's a clean scan.
+**Skill or surface PR.** This skill improves through the scans that use
+it. If something would have made your scan better, draft a PR for it, in
+its own worktree off `master` like a fix PR. For example:
+
+- a file that belongs in `security/surface.txt`. Add it at its tier, and
+  add the same path to `.github/CODEOWNERS` (a test keeps the two
+  identical);
+- an area, check, search or tool that Step 4 or Step 5 should name;
+- a command in this skill that failed or misled you, or a `✗` message
+  that didn't say what to do.
+
+Title it `docs(scan): <what it improves>`, and fill the template's **Why**
+with what happened in your scan. Keep it general: a skill PR never
+describes a vulnerability, not even a low one. It doesn't change
+`result`. A maintainer reviews it like any other PR, and nothing merges
+automatically.
+
+Done when every finding and skill suggestion has a draft. If you have no
+findings, that's a clean scan.
 
 ## Step 7: Answer the challenge, finish, then file
 
@@ -262,8 +353,9 @@ Fill it in field by field:
     using the `lines <start>-<end>` that `pnpm scan start` printed.
   - `check`: one sentence, 10 to 300 characters, on one line, on what that
     check prevents. Write it from what you read, about this code.
-- `result`: `"pass"` if you drafted nothing in Step 6, `"scanned"` if you
-  drafted at least one PR or advisory. It never says what you found, and
+- `result`: `"pass"` if you drafted no fix PR or advisory in Step 6,
+  `"scanned"` if you drafted at least one. A skill or surface PR doesn't
+  count either way. It never says what you found, and
   both earn the same.
 - `report`: markdown, at most 20,000 characters, `\n` line endings. It
   describes **coverage only**: what you checked, what you didn't, the tools

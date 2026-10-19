@@ -216,10 +216,14 @@ coding agent to follow literally, with the exact commands. In summary:
 3. Run the tests and `osv-scanner`.
 4. Review the files in `security/surface.txt` that changed since the
    last release, then the rest of the surface.
-5. Look anywhere else that seems worth it.
+5. Look anywhere else that seems worth it. The surface is where to
+   start, not the limit.
 6. Draft the reports: low or informational issues as a PR, medium and
-   above as a private advisory. Never as a public issue. File nothing
-   yet, since each one has to quote the attestation id.
+   above as a private advisory. Never as a public issue. Anything that
+   would have made the scan better (a missing surface file, a check the
+   skill should name, a command that misled) becomes a
+   `docs(scan): …` PR to the skill or `security/surface.txt`. File
+   nothing yet, since each one has to quote the attestation id.
 7. Answer the challenge from the code you read by filling in
    `.gleam-scan/attestation.json`. Run `pnpm scan finish` until it
    passes, then file each draft with the attestation id it prints, and
