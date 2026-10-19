@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   APPROVAL_MAX_MS,
+  EVENT,
   OTHER_WALLET,
   REQUEST,
   RESPONSE,
@@ -35,14 +36,17 @@ function postResponse(data: unknown): void {
 
 describe("provider.ts: GleamProvider bridge", () => {
   let provider: GleamProvider;
+  let providerListener: AbortController;
   let postMessageSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    provider = new GleamProvider();
+    providerListener = new AbortController();
+    provider = new GleamProvider(providerListener.signal);
     postMessageSpy = vi.spyOn(window, "postMessage");
   });
 
   afterEach(() => {
+    providerListener.abort();
     postMessageSpy.mockRestore();
     vi.useRealTimers();
   });
@@ -493,6 +497,25 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
   function gleamRequests() {
     return postMessageSpy.mock.calls.filter(([message]: [unknown]) => (message as { type?: string })?.type === REQUEST);
   }
+
+  it("teardown stops the provider relaying page events", () => {
+    const relayed = vi.fn();
+    window.addEventListener("walletSwitch", relayed);
+    listeners.push(["walletSwitch", relayed]);
+    const postEvent = () =>
+      window.dispatchEvent(
+        new MessageEvent("message", { data: { type: EVENT, event: "walletSwitch", data: {} }, source: window }),
+      );
+
+    teardown = install();
+    postEvent();
+    expect(relayed).toHaveBeenCalledTimes(1);
+
+    teardown();
+    teardown = undefined;
+    postEvent();
+    expect(relayed).toHaveBeenCalledTimes(1);
+  });
 
   it("installs window.arweaveWallet with walletName 'Gleam' when none exists", () => {
     teardown = install();

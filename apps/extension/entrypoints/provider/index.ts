@@ -140,7 +140,8 @@ class GleamProvider {
   readonly walletVersion = WALLET_VERSION;
   private readonly pending = new Map<string, PendingCall>();
 
-  constructor() {
+  /** `signal` removes the message listener when it aborts; `install`'s teardown uses it. */
+  constructor(signal?: AbortSignal) {
     window.addEventListener("message", (event: MessageEvent) => {
       // (1) Origin/source check — only ever trust messages this exact
       // window posted to itself (the content script relays into `window`
@@ -156,7 +157,7 @@ class GleamProvider {
       } else if (envelope.type === EVENT) {
         this.handleEvent(envelope as PageEventEnvelope);
       }
-    });
+    }, { signal });
   }
 
   private handleResponse(envelope: PageResponseEnvelope): void {
@@ -496,7 +497,8 @@ function permawebConnectShim(callGleam: (method: PermawebMethod, args: unknown[]
 
 /** Returns a teardown that stops listening and reclaiming the slot, for tests. */
 function install(): () => void {
-  const gleamProvider = new GleamProvider();
+  const providerListener = new AbortController();
+  const gleamProvider = new GleamProvider(providerListener.signal);
   const gleam = gleamProvider as unknown as WalletLike;
   const walletWindow = window as unknown as WalletWindow;
   try {
@@ -763,6 +765,7 @@ function install(): () => void {
   // so a dApp's handler doesn't take Gleam for the only wallet.
   if (other()) announce();
   return () => {
+    providerListener.abort();
     clearTimeout(modeTimeout);
     clearTimeout(settleTimeout);
     window.removeEventListener("message", onMessage);
