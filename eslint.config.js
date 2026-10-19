@@ -53,6 +53,45 @@ const signerFence = (regex) => ({
   "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
 });
 
+// Flat config replaces a rule's options wholesale when a later block sets
+// the same rule, so every block that sets `no-restricted-syntax` spreads
+// in the full list it needs rather than adding to an earlier block's.
+//
+// Wallet pages hold unlocked keys, so markup is never parsed into their
+// DOM: render images through <img> and text through React.
+const NO_HTML_INJECTION = [
+  {
+    selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+    message: "Don't inject HTML. Render SVG through an <img> data URI and text through React.",
+  },
+  {
+    selector:
+      "AssignmentExpression[left.property.name=/^(inner|outer)HTML$/]:not([right.type='Literal'][right.value=''])",
+    message: "Don't assign HTML. Build nodes with textContent or createElement instead.",
+  },
+  {
+    selector: "CallExpression[callee.property.name=/^(insertAdjacentHTML|createContextualFragment)$/]",
+    message: "Don't parse HTML into the page. Build nodes with textContent or createElement instead.",
+  },
+];
+const NO_RAW_KEY = [
+  {
+    selector: "Identifier[name='JWKInterface']",
+    message:
+      "Raw key material stays in key-session.ts and core/signer. Take a `Signer` (or the `owner` string for public-key work) instead.",
+  },
+  {
+    selector: "Identifier[name='getCachedKey']",
+    message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
+  },
+];
+const NO_DYNAMIC_SIGNER_IMPORT = [
+  {
+    selector: "CallExpression[callee.name='require'], ImportExpression",
+    message: "core/signer uses static imports only, so the import fence above can check them.",
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -74,24 +113,7 @@ export default tseslint.config(
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      // Wallet pages hold unlocked keys, so markup is never parsed into
-      // their DOM: render images through <img> and text through React.
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
-          message: "Don't inject HTML. Render SVG through an <img> data URI and text through React.",
-        },
-        {
-          selector:
-            "AssignmentExpression[left.property.name=/^(inner|outer)HTML$/]:not([right.type='Literal'][right.value=''])",
-          message: "Don't assign HTML. Build nodes with textContent or createElement instead.",
-        },
-        {
-          selector: "CallExpression[callee.property.name=/^(insertAdjacentHTML|createContextualFragment)$/]",
-          message: "Don't parse HTML into the page. Build nodes with textContent or createElement instead.",
-        },
-      ],
+      "no-restricted-syntax": ["error", ...NO_HTML_INJECTION],
       "import/no-restricted-paths": [
         "error",
         {
@@ -134,18 +156,7 @@ export default tseslint.config(
       "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
     ],
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "Identifier[name='JWKInterface']",
-          message:
-            "Raw key material stays in key-session.ts and core/signer. Take a `Signer` (or the `owner` string for public-key work) instead.",
-        },
-        {
-          selector: "Identifier[name='getCachedKey']",
-          message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
-        },
-      ],
+      "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_RAW_KEY],
     },
   },
   {
@@ -203,13 +214,7 @@ export default tseslint.config(
         },
       ],
       // The import rule reads only static `import`/`export … from`.
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "CallExpression[callee.name='require'], ImportExpression",
-          message: "core/signer uses static imports only, so the import fence above can check them.",
-        },
-      ],
+      "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_DYNAMIC_SIGNER_IMPORT],
     },
   },
   {
