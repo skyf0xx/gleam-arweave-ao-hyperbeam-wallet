@@ -181,6 +181,17 @@ describe("acceptSiteInvite", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("refuses a local copy of the site in a production build", async () => {
+    vi.stubEnv("DEV", false);
+    try {
+      const { storage, fetchImpl, points } = setup();
+      expect(await acceptSiteInvite(INVITE, "http://localhost:8000", storage, points)).toEqual({ ok: false });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   describe("refuses hostile messages without writing anything", () => {
     it.each([
       ["no origin", undefined],

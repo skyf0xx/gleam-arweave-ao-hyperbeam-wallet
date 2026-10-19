@@ -6,6 +6,7 @@ import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/netw
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
 import { extensionPagesCsp } from './src/csp';
+import { DEV_SITE_HOSTS, SITE_ORIGIN } from './src/site-pages';
 
 // Only the sha, never a dirty-tree marker: two builds of one commit must
 // produce identical bytes for reproducible release builds.
@@ -21,7 +22,7 @@ function buildCommit(): string {
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
-  manifest: ({ command }) => ({
+  manifest: ({ command, mode }) => ({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
     name: 'Gleam',
@@ -78,9 +79,14 @@ export default defineConfig({
     optional_host_permissions: ['https://*/*'],
     // Lets the site's pages hand over a Gleam Points invite code
     // (src/points-invite.ts) or a scan attestation to sign
-    // (src/points-attest.ts). Only this origin can message the extension.
+    // (src/points-attest.ts). Only this origin can message the extension;
+    // a development build also lets a local copy of the site in
+    // (src/site-pages.ts's isSiteOrigin), on any port.
     externally_connectable: {
-      matches: ['https://gleamwallet.app/*'],
+      matches: [
+        `${SITE_ORIGIN}/*`,
+        ...(mode === 'development' ? DEV_SITE_HOSTS.map((host) => `http://${host}/*`) : []),
+      ],
     },
     // Required for content.ts's injectScript("/provider.js", ...) to
     // resolve at runtime — WXT does not add this automatically (see its
