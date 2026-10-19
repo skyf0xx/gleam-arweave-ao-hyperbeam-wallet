@@ -1201,7 +1201,24 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     expect(await getSigner(second.id)).not.toBeNull();
   });
 
-  it("getState refreshes lastActivityAt, extending the session on activity", async () => {
+  it("getState with recordActivity refreshes lastActivityAt, extending the session", async () => {
+    const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+    const staleTimestamp = Date.now() - 1000;
+    await storage.set("session:unlockedSession", {
+      unlockedAt: staleTimestamp,
+      lastActivityAt: staleTimestamp,
+      autoLockTimeout: "5min",
+      unlockedWalletIds: [wallet.id],
+    });
+
+    const state = await handler.getState({ recordActivity: true });
+
+    const session = await storage.get<{ lastActivityAt: number }>("session:unlockedSession");
+    expect(session!.lastActivityAt).toBeGreaterThan(staleTimestamp);
+    expect(state.session!.lastActivityAt).toBe(session!.lastActivityAt);
+  });
+
+  it("a plain getState read leaves lastActivityAt alone", async () => {
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     const staleTimestamp = Date.now() - 1000;
     await storage.set("session:unlockedSession", {
@@ -1214,7 +1231,24 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
     await handler.getState();
 
     const session = await storage.get<{ lastActivityAt: number }>("session:unlockedSession");
-    expect(session!.lastActivityAt).toBeGreaterThan(staleTimestamp);
+    expect(session!.lastActivityAt).toBe(staleTimestamp);
+  });
+
+  it("repeated plain reads don't keep a session open past its timeout", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
+      await handler.setLockSettings({ autoLockTimeout: "5min" });
+      await handler.getState({ recordActivity: true });
+      for (let minute = 0; minute < 12; minute += 4) {
+        vi.advanceTimersByTime(4 * 60_000);
+        await handler.getState();
+      }
+      expect((await handler.getState()).session).toBeNull();
+      expect(await getSigner(wallet.id)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

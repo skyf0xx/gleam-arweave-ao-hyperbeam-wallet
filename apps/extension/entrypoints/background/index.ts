@@ -795,7 +795,8 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   },
 
   // reads
-  getState: () => lifecycle.getState(),
+  // Extension-tier only, so this is the user looking at a Gleam page.
+  getState: () => lifecycle.getState({ recordActivity: true }),
   getBalance: (data) => reads.getBalance(data),
   getArFee: () => transfer.getArFee(),
   getTokenBalances: (data) => reads.getTokenBalances(data),

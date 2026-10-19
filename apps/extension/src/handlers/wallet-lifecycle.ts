@@ -997,20 +997,22 @@ export class WalletLifecycleHandler {
   }
 
   /**
-   * `getState` is called on every popup/sidepanel mount (`App.tsx`), which
-   * makes it the natural place to refresh `lastActivityAt` — "opened the
-   * extension and looked at it" counts as activity for auto-lock purposes,
-   * the same way Rabby's timeout resets on interaction rather than only on
-   * unlock. Refreshed only for a session `loadSession` didn't just expire.
+   * Reads the wallets and session. Only `recordActivity` refreshes
+   * `lastActivityAt`, and only the extension pages' own `getState` message
+   * passes it (popup, side panel and approval window mounts): a connected
+   * site's reads and background housekeeping also call this, and counting
+   * those would let a polling page keep the vault unlocked past auto-lock.
+   * Refreshed only for a session `loadSession` didn't just expire.
    */
-  async getState(): Promise<WalletState> {
+  async getState({ recordActivity = false }: { recordActivity?: boolean } = {}): Promise<WalletState> {
     return withSessionLock(async () => {
       const wallets = await loadWallets(this.storage);
       const activeWalletId = await loadActiveWalletId(this.storage, wallets);
-      const session = await loadSession(this.storage, wallets);
+      let session = await loadSession(this.storage, wallets);
 
-      if (session !== null) {
-        await saveSession(this.storage, { ...session, lastActivityAt: Date.now() });
+      if (session !== null && recordActivity) {
+        session = { ...session, lastActivityAt: Date.now() };
+        await saveSession(this.storage, session);
       }
 
       return {

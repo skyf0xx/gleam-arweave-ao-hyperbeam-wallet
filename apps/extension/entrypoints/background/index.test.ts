@@ -446,6 +446,30 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       },
     );
 
+    it("a connected site's reads don't extend the session, but a Gleam page's getState does", async () => {
+      await seedUnlockedWalletWithGrant("https://dapp.example");
+      // A password vault, so auto-lock applies to the session.
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: { v: 2 } },
+      ]);
+      const stale = Date.now() - 60_000;
+      await setItem("session:unlockedSession", {
+        unlockedAt: stale,
+        lastActivityAt: stale,
+        autoLockTimeout: "5min",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      const lastActivity = () => (store.get("session:unlockedSession") as { lastActivityAt: number }).lastActivityAt;
+
+      for (const method of ["getActiveAddress", "getAllAddresses", "getPermissions"]) {
+        await providerCall({ origin: "https://dapp.example", method, params: {} });
+      }
+      expect(lastActivity()).toBe(stale);
+
+      await registeredHandlers.get("getState")!({ data: undefined });
+      expect(lastActivity()).toBeGreaterThan(stale);
+    });
+
     it("an https site with a grant still reaches the approval window", async () => {
       await seedUnlockedWalletWithGrant("https://dapp.example");
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });

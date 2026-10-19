@@ -97,8 +97,10 @@ wallet reads as locked. Lock, auto-lock, wallet removal, reset and
 browser startup clear the keyring and close its document. Locking
 overwrites each session entry before removing it. Auto-lock is checked
 on every key read and by a one-minute alarm, so the keys go when the
-timeout passes even if nothing reads them. New installs default to 1
-hour. The vault also locks when the computer's screen locks, unless
+timeout passes even if nothing reads them. The timeout counts from the
+last time a Gleam page (popup, side panel or approval window) loaded the
+wallet state; a connected site's calls don't extend it. New installs
+default to 1 hour. The vault also locks when the computer's screen locks, unless
 auto-lock is set to "never" (see [By design](#by-design)). Lock and
 unlock run one at a time, so a lock can't race an unlock and leave keys
 behind. See
