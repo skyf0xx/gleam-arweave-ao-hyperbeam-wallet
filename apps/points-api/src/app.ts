@@ -16,6 +16,7 @@ import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from ".
 import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./invite";
 import { randomInviteCode } from "./invite-code";
 import { parseLeaveRequest, leave } from "./leave";
+import { createPriceService, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices";
 import { RateLimiter } from "./rate-limit";
 import { parseRegisterRequest, register } from "./register";
 import { issueChallenge } from "./scan-challenge";
@@ -30,6 +31,8 @@ export interface AppDeps {
   pointsPhase?: 1 | 2;
   /** Reads releases and their files from GitHub; defaults to the public repo. */
   github?: GithubClient;
+  /** Looks up CoinGecko/CoinPaprika prices; defaults to the live providers. */
+  prices?: PriceService;
 }
 
 const HOUR_MS = 3_600_000;
@@ -43,6 +46,7 @@ export function createApp(deps: AppDeps): Hono {
   const pointsPhase = deps.pointsPhase ?? 1;
   const newInviteCode = deps.newInviteCode ?? randomInviteCode;
   const github = deps.github ?? createGithubClient({ now: () => now().getTime() });
+  const prices = deps.prices ?? createPriceService({ now: () => now().getTime() });
   const registerByIp = new RateLimiter(20, HOUR_MS);
   const leaveByIp = new RateLimiter(20, HOUR_MS);
   const heartbeatByIp = new RateLimiter(120, HOUR_MS);
@@ -50,6 +54,7 @@ export function createApp(deps: AppDeps): Hono {
   const scoreByIp = new RateLimiter(600, HOUR_MS);
   const scoreByDevice = new RateLimiter(60, HOUR_MS);
   const statsByIp = new RateLimiter(600, HOUR_MS);
+  const pricesByIp = new RateLimiter(1200, HOUR_MS);
   // Shared by check and redeem, so codes can't be enumerated through either.
   // 30 an hour covers a person retrying typos and reopening the invite page.
   const inviteByIp = new RateLimiter(30, HOUR_MS);
@@ -73,7 +78,7 @@ export function createApp(deps: AppDeps): Hono {
   // builds work too; every one of these requests is checked on its own
   // merits, so the origin is never what authorises it.
   const extensionCors = cors({ origin: (origin) => (origin.startsWith("chrome-extension://") ? origin : null) });
-  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me"]) app.use(path, extensionCors);
+  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me", "/prices", "/prices/history"]) app.use(path, extensionCors);
 
   // Scan endpoints are open to any origin: the CLI sends no origin, scan.html
   // reads the list, and the signature (not the origin) authorises a submission.
@@ -94,6 +99,22 @@ export function createApp(deps: AppDeps): Hono {
     }
     c.header("Cache-Control", "public, max-age=60");
     return c.json({ foundingMembers: statsCache.foundingMembers });
+  });
+
+  // Proxies CoinGecko/CoinPaprika for users whose network blocks them. Only
+  // registry ids are accepted, so this can't be used to relay arbitrary lookups.
+  app.get("/prices", async (c) => {
+    if (!pricesByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const ids = parseSpotQuery(c.req.query());
+    if (!ids) return c.json({ error: "Unknown or missing price ids." }, 400);
+    return c.json({ prices: await prices.spot(ids) });
+  });
+
+  app.get("/prices/history", async (c) => {
+    if (!pricesByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const query = parseHistoryQuery(c.req.query());
+    if (!query) return c.json({ error: "Unknown price id or range." }, 400);
+    return c.json({ series: await prices.history(query.id, query.range) });
   });
 
   // Read by invite.html, a static page on another origin.

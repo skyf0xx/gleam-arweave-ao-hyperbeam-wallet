@@ -161,9 +161,9 @@ The extension talks to:
 - **AO:** `mu.ao-testnet.xyz` (sending messages), `cu.ao-testnet.xyz`
   (reading results), `state.forward.computer` and HyperBEAM peers (token
   balances).
-- **Prices:** `api.coingecko.com`, `api.coinpaprika.com`.
-- **Gleam:** `api.gleamwallet.app` (Gleam Points: the wallet address, a
-  signed proof of ownership, and a device id) and `gleamwallet.app`
+- **Gleam:** `api.gleamwallet.app` (prices: the token id only, relayed to
+  CoinGecko and CoinPaprika; Gleam Points: the wallet address, a signed
+  proof of ownership, and a device id) and `gleamwallet.app`
   (announcements, the welcome and uninstall pages).
 
 The content security policy limits `fetch` and other connections to

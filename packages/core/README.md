@@ -203,10 +203,12 @@ a ground lookalike can't know which middle chunks the user checks.
 
 ### pricing/
 
-USD price lookups for AR, AO, and registered tokens. Lookups fall from
-CoinGecko to CoinPaprika on failure, and report `null` rather than a
-fabricated `0` when both fail. `historical.ts` and `portfolio.ts` extend
-this to price series and portfolio-value estimation over time.
+USD price lookups for AR, AO, and registered tokens. The extension never
+calls a price provider: `spot.ts` and `historical.ts` read the Gleam
+server's `/prices` and `/prices/history` proxy, which falls from CoinGecko
+to CoinPaprika and caches. A lookup reports `null` (or an empty series)
+rather than a fabricated `0` when the server or both providers fail.
+`portfolio.ts` turns price series into portfolio-value estimates over time.
 
 ### policy/
 

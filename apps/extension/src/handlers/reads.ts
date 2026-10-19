@@ -9,12 +9,12 @@ import {
   DEFAULT_TOKEN_REGISTRY,
   buildPriceAtFromSeries,
   estimateHistoricalPortfolioValue,
-  getHistoricalUsdPricesWithFallback,
-  getUsdPriceWithFallback,
+  getHistoricalUsdPrices,
+  getUsdPrice,
   isRegisteredProcessId,
   resolveUnregisteredTokenMetadata,
 } from "@gleam/core/src/pricing/index.ts";
-import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
+import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL } from "@gleam/core";
 import type {
   ActivityEntry,
   ActivityPage,
@@ -230,7 +230,11 @@ function isCollectiblesCache(value: unknown): value is CollectiblesCache {
 export class ReadsHandler {
   private readonly collectiblesInFlight = new Map<string, Promise<Collectible[]>>();
 
-  constructor(private readonly storage: StoragePort) {}
+  /** `pricesApiUrl` is the Gleam server, which proxies CoinGecko/CoinPaprika for users who can't reach them. */
+  constructor(
+    private readonly storage: StoragePort,
+    private readonly pricesApiUrl: string = POINTS_API_URL,
+  ) {}
 
   async loadNetworkSettings(): Promise<NetworkSettings> {
     const raw = await this.storage.get<unknown>(NETWORK_SETTINGS_KEY);
@@ -673,8 +677,7 @@ export class ReadsHandler {
    * Drives the main screen's total-portfolio-value chart
    * (`ProtocolMap.getPortfolioHistory`). Sources each registered token's
    * (see `core/pricing`'s `DEFAULT_TOKEN_REGISTRY`) historical USD price
-   * series via `getHistoricalUsdPricesWithFallback` (CoinGecko, falling
-   * back to CoinPaprika) and reduces them through
+   * series via `getHistoricalUsdPrices` (the Gleam server's price proxy) and reduces them through
    * `estimateHistoricalPortfolioValue` at each AR series timestamp against
    * the *current* balance of that token, either the active wallet's or,
    * with `scope: "all"`, the sum across every stored wallet — this project models
@@ -717,7 +720,7 @@ export class ReadsHandler {
     const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
 
     const arPriceSeries = AR_TOKEN.priceSource
-      ? await getHistoricalUsdPricesWithFallback(AR_TOKEN.priceSource, req.range)
+      ? await getHistoricalUsdPrices(AR_TOKEN.priceSource, req.range, this.pricesApiUrl)
       : [];
 
     if (arPriceSeries.length === 0) {
@@ -745,7 +748,7 @@ export class ReadsHandler {
 
       if (readQuantities.length > 0) {
         const aoQuantity = readQuantities.reduce((sum, quantity) => sum + quantity, 0);
-        const aoPriceSeries = await getHistoricalUsdPricesWithFallback(AO_TOKEN.priceSource, req.range);
+        const aoPriceSeries = await getHistoricalUsdPrices(AO_TOKEN.priceSource, req.range, this.pricesApiUrl);
         if (aoPriceSeries.length > 0) {
           tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries) });
         } else if (aoQuantity > 0) {
@@ -782,7 +785,7 @@ export class ReadsHandler {
     return Promise.all(
       priced.map(async (token) => ({
         processId: token.processId,
-        usd: await getUsdPriceWithFallback(token.priceSource as NonNullable<typeof token.priceSource>),
+        usd: await getUsdPrice(token.priceSource as NonNullable<typeof token.priceSource>, this.pricesApiUrl),
       })),
     );
   }

@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  getHistoricalUsdPrices,
-  getHistoricalUsdPricesFromCoinPaprika,
-  getHistoricalUsdPricesWithFallback,
-  buildPriceAtFromSeries,
-} from "./historical";
+import { getHistoricalUsdPrices, buildPriceAtFromSeries } from "./historical";
 import { estimateHistoricalPortfolioValue } from "./portfolio";
 
 function fakeFetch(body: unknown, ok = true, status = 200): typeof fetch {
@@ -15,95 +10,43 @@ function fakeFetch(body: unknown, ok = true, status = 200): typeof fetch {
   })) as unknown as typeof fetch;
 }
 
-describe("getHistoricalUsdPrices (CoinGecko)", () => {
-  it("returns a time-ordered series from the market_chart response", async () => {
+const API = "https://api.example.test";
+const AR = { coinGeckoId: "arweave" };
+
+describe("getHistoricalUsdPrices", () => {
+  it("returns a time-ordered series from the server's proxy", async () => {
     const fetchImpl = fakeFetch({
-      prices: [
-        [2000, 12.5],
-        [1000, 10],
+      series: [
+        { timestamp: 2000, usd: 12.5 },
+        { timestamp: 1000, usd: 10 },
       ],
     });
-    const series = await getHistoricalUsdPrices("arweave", "7D", fetchImpl);
+    const series = await getHistoricalUsdPrices(AR, "7D", API, fetchImpl);
     expect(series).toEqual([
       { timestamp: 1000, usd: 10 },
       { timestamp: 2000, usd: 12.5 },
     ]);
+    expect(fetchImpl).toHaveBeenCalledWith(`${API}/prices/history?id=arweave&range=7D`);
   });
 
-  it("returns an empty series when prices are absent from the body", async () => {
-    const fetchImpl = fakeFetch({});
-    const series = await getHistoricalUsdPrices("arweave", "24H", fetchImpl);
-    expect(series).toEqual([]);
+  it("drops malformed points", async () => {
+    const fetchImpl = fakeFetch({ series: [{ timestamp: 1, usd: 2 }, { timestamp: "x", usd: 3 }, null] });
+    expect(await getHistoricalUsdPrices(AR, "1M", API, fetchImpl)).toEqual([{ timestamp: 1, usd: 2 }]);
   });
 
-  it("throws on a non-2xx response", async () => {
-    const fetchImpl = fakeFetch(null, false, 429);
-    await expect(getHistoricalUsdPrices("arweave", "1M", fetchImpl)).rejects.toThrow(/HTTP 429/);
-  });
-});
-
-describe("getHistoricalUsdPricesFromCoinPaprika", () => {
-  it("returns a time-ordered series from the historical ticker response", async () => {
-    const fetchImpl = fakeFetch([
-      { timestamp: "2024-01-02T00:00:00Z", price: 11 },
-      { timestamp: "2024-01-01T00:00:00Z", price: 9 },
-    ]);
-    const series = await getHistoricalUsdPricesFromCoinPaprika("ar-arweave", "1M", fetchImpl);
-    expect(series).toEqual([
-      { timestamp: new Date("2024-01-01T00:00:00Z").getTime(), usd: 9 },
-      { timestamp: new Date("2024-01-02T00:00:00Z").getTime(), usd: 11 },
-    ]);
+  it("returns an empty series when the series is absent from the body", async () => {
+    expect(await getHistoricalUsdPrices(AR, "24H", API, fakeFetch({}))).toEqual([]);
   });
 
-  it("throws on a non-2xx response", async () => {
-    const fetchImpl = fakeFetch(null, false, 500);
-    await expect(
-      getHistoricalUsdPricesFromCoinPaprika("ar-arweave", "ALL", fetchImpl),
-    ).rejects.toThrow(/HTTP 500/);
-  });
-});
-
-describe("getHistoricalUsdPricesWithFallback", () => {
-  it("returns the CoinGecko series when it succeeds", async () => {
-    const fetchImpl = fakeFetch({ prices: [[1000, 5]] });
-    const series = await getHistoricalUsdPricesWithFallback(
-      { coinGeckoId: "arweave", coinPaprikaId: "ar-arweave" },
-      "24H",
-      fetchImpl,
-    );
-    expect(series).toEqual([{ timestamp: 1000, usd: 5 }]);
+  it("returns an empty series (never throws) on a non-2xx response", async () => {
+    expect(await getHistoricalUsdPrices(AR, "1Y", API, fakeFetch(null, false, 500))).toEqual([]);
   });
 
-  it("falls back to CoinPaprika when CoinGecko fails", async () => {
-    let call = 0;
+  it("returns an empty series when the request itself fails", async () => {
     const fetchImpl = vi.fn(async () => {
-      call += 1;
-      if (call === 1) {
-        return { ok: false, status: 500, json: async () => null } as Response;
-      }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => [{ timestamp: "2024-01-01T00:00:00Z", price: 3.5 }],
-      } as Response;
+      throw new TypeError("Failed to fetch");
     }) as unknown as typeof fetch;
-
-    const series = await getHistoricalUsdPricesWithFallback(
-      { coinGeckoId: "arweave", coinPaprikaId: "ar-arweave" },
-      "7D",
-      fetchImpl,
-    );
-    expect(series).toEqual([{ timestamp: new Date("2024-01-01T00:00:00Z").getTime(), usd: 3.5 }]);
-  });
-
-  it("returns an empty series (never throws) when both sources fail", async () => {
-    const fetchImpl = fakeFetch(null, false, 500);
-    const series = await getHistoricalUsdPricesWithFallback(
-      { coinGeckoId: "arweave", coinPaprikaId: "ar-arweave" },
-      "1Y",
-      fetchImpl,
-    );
-    expect(series).toEqual([]);
+    expect(await getHistoricalUsdPrices(AR, "ALL", API, fetchImpl)).toEqual([]);
   });
 });
 

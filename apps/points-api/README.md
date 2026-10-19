@@ -27,6 +27,7 @@ CLI.
 - [`score.ts`](#scorets) — the per-device points read
 - [`scan-challenge.ts`](#scan-challengets--attestationsts) / [`attestations.ts`](#scan-challengets--attestationsts) — the scan protocol
 - [`github.ts`](#githubts) — the GitHub release/file reader
+- [`prices.ts`](#pricests) — the CoinGecko/CoinPaprika price proxy
 - [`bounty.ts`](#bountyts--funnelts) / [`funnel.ts`](#bountyts--funnelts) — operator CLI scripts
 
 ### server.ts
@@ -48,6 +49,8 @@ Routes split into two groups by caller:
   `chrome-extension://` origins (any extension id, so unpacked dev
   builds work). Every request is still checked on its own signature,
   never trusted by origin.
+- **Extension-only** also covers the price proxy, `GET /prices?ids=` and
+  `GET /prices/history?id=&range=`.
 - **Open CORS** — `/stats`, `/invite/check`, `/scan/challenge`,
   `/attestations*`. These are read by static pages (`invite.html`,
   `scan.html`) on other origins, or by the `pnpm scan` CLI with no
@@ -61,6 +64,15 @@ Every handler is a thin shim: parse and validate the body with a
 `parse*` function from the matching module (it returns `null` on
 anything malformed), call that module's function, then map its outcome
 to an HTTP response. No business logic lives in `app.ts` itself.
+
+### prices.ts
+
+The price proxy for users whose network blocks CoinGecko or CoinPaprika.
+Only ids in core's `DEFAULT_TOKEN_REGISTRY` are accepted. Each lookup
+tries CoinGecko, then CoinPaprika, and answers `null` / an empty series
+if both fail. Results are cached in memory (spot 60 s, history 5 min,
+failures 15 s) and concurrent misses share one upstream call, so many
+users don't multiply provider requests.
 
 ### db.ts
 

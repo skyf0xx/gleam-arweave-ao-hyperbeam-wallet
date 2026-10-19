@@ -1,5 +1,3 @@
-import type { CoinGeckoId } from "./coingecko";
-import type { CoinPaprikaId } from "./coinpaprika";
 import { queryTokenMetadata } from "../arweave/token-metadata";
 import type { TokenMetadata } from "../models/token-metadata";
 
@@ -16,6 +14,12 @@ import type { TokenMetadata } from "../models/token-metadata";
  * provider id for an arbitrary AO process at runtime, so an unmapped
  * token's price is "unavailable", never guessed.
  */
+/** CoinGecko's own id strings, not our token tickers. */
+export type CoinGeckoId = "arweave" | "ao-computer" | (string & {});
+
+/** CoinPaprika's own id strings (e.g. "ar-arweave"), not our tickers. */
+export type CoinPaprikaId = "ar-arweave" | (string & {});
+
 export interface TokenPriceSource {
   coinGeckoId: CoinGeckoId;
   coinPaprikaId: CoinPaprikaId;

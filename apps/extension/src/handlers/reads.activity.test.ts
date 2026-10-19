@@ -832,7 +832,7 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     });
   });
 
-  it("prices the active wallet's current AR balance across the fetched CoinGecko series", async () => {
+  it("prices the active wallet's current AR balance across the fetched price series", async () => {
     const storage = createFakeStorage();
     await storage.set("local:wallets", [
       { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
@@ -843,14 +843,14 @@ describe("ReadsHandler: getPortfolioHistory", () => {
       if (url.includes("wallet/addr1/balance")) {
         return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
       }
-      if (url.includes("market_chart")) {
+      if (url.includes("/prices/history")) {
         return {
           ok: true,
           status: 200,
           json: async () => ({
-            prices: [
-              [1000, 10],
-              [2000, 20],
+            series: [
+              { timestamp: 1000, usd: 10 },
+              { timestamp: 2000, usd: 20 },
             ],
           }),
         };
@@ -884,8 +884,8 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
       if (url.includes("wallet/addr2/balance")) return { ok: true, status: 200, text: async () => "3000000000000" }; // 3 AR
-      if (url.includes("market_chart")) {
-        return { ok: true, status: 200, json: async () => ({ prices: [[1000, 10], [2000, 20]] }) };
+      if (url.includes("/prices/history")) {
+        return { ok: true, status: 200, json: async () => ({ series: [{ timestamp: 1000, usd: 10 }, { timestamp: 2000, usd: 20 }] }) };
       }
       throw new Error(`Unexpected fetch url: ${url}`);
     }) as unknown as typeof fetch;

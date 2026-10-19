@@ -44,12 +44,12 @@ export default defineConfig({
     optional_permissions: ['downloads'],
     // MV3 requires an explicit host permission for every origin the
     // background service worker fetches, unless that origin answers with
-    // CORS headers (the Gleam Points API does; see POINTS_API_URL). The
+    // CORS headers (the Gleam API does, price proxy included; see POINTS_API_URL). The
     // hosts fetched
     // unconditionally (Arweave gateway, the up.arweave.net bundler used
     // for uploads — a distinct host from arweave.net under MV3's exact
     // match-pattern rules, not covered by 'https://arweave.net/*' —
-    // CoinGecko, CoinPaprika, and the default
+    // and the default
     // HyperBEAM peers AO balance reads use out of the box, from
     // packages/core's
     // DEFAULT_HYPERBEAM_PEER_URLS) are known at build time and granted
@@ -70,8 +70,6 @@ export default defineConfig({
       ...new Set([
         'https://arweave.net/*',
         'https://up.arweave.net/*',
-        'https://api.coingecko.com/*',
-        'https://api.coinpaprika.com/*',
         ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
         ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
         ...GRAPHQL_FALLBACK_GATEWAYS.map((url) => `${url}/*`),
