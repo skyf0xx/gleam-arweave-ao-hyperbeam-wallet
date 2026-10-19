@@ -274,6 +274,22 @@ describe("ApprovalHandler: scan attestations", () => {
     await expect(closed.pending).rejects.toMatchObject({ name: "ApprovalDeclinedError", timedOut: false });
   });
 
+  it("waits 20 minutes for an answer, not the usual 5, then times out", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      const { pending, requestId } = await open(KEYFILE_ID);
+      const timedOut = expect(pending).rejects.toMatchObject({ name: "ApprovalDeclinedError", timedOut: true });
+
+      await vi.advanceTimersByTimeAsync(19 * 60_000);
+      await expect(handler.getApproval({ requestId })).resolves.toMatchObject({ kind: "scanAttestation" });
+
+      await vi.advanceTimersByTimeAsync(61_000);
+      await timedOut;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("signs with the wallet it was opened for after the user switches wallets", async () => {
     await cacheKey(KEYFILE_ID, keyfileJwk, await addressFromOwner(keyfileJwk.n));
     const { requestId } = await open(KEYFILE_ID);

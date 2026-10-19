@@ -53,6 +53,7 @@ import {
 import {
   APPROVAL_MAX_MS,
   APPROVAL_TIMEOUT_MS,
+  SCAN_ATTESTATION_TIMEOUT_MS,
   decodeTaggedBinary,
   encodeTaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
@@ -139,6 +140,11 @@ import type { SubmitTransferRequest } from "./transfer";
  * every read and pruned on the next write, unless it is being resolved.
  */
 const GRANTS_KEY = "local:grants";
+
+/** How long a request waits for its first answer. */
+function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
+  return kind === "scanAttestation" ? SCAN_ATTESTATION_TIMEOUT_MS : APPROVAL_TIMEOUT_MS;
+}
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 const APPROVAL_WINDOW_PATH = "/approval.html";
 
@@ -806,7 +812,7 @@ export class ApprovalHandler {
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
   private pastDeadline(entry: PendingApprovalRecord): boolean {
     if (entry.outcome) return false;
-    const deadline = entry.device?.deadline ?? entry.request.createdAt + APPROVAL_TIMEOUT_MS;
+    const deadline = entry.device?.deadline ?? entry.request.createdAt + reviewTimeoutMs(entry.request.kind);
     return Date.now() > deadline;
   }
 
@@ -900,7 +906,7 @@ export class ApprovalHandler {
       `${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`,
     );
 
-    return this.awaitResolution(requestId);
+    return this.awaitResolution(requestId, input.kind);
   }
 
   /**
@@ -910,7 +916,7 @@ export class ApprovalHandler {
    * one-tick write `resolveApproval` makes just before removing the
    * record), or rejects on timeout.
    */
-  private async awaitResolution(requestId: string): Promise<unknown> {
+  private async awaitResolution(requestId: string, kind: ApprovalRequest["kind"]): Promise<unknown> {
     return new Promise((resolve, reject) => {
       let timeout: ReturnType<typeof setTimeout>;
       const expireAt = (at: number) => {
@@ -934,7 +940,7 @@ export class ApprovalHandler {
         void this.windows.closeApprovalWindow(requestId);
         reject(new ApprovalDeclinedError(TIMED_OUT, true));
       };
-      expireAt(Date.now() + APPROVAL_TIMEOUT_MS);
+      expireAt(Date.now() + reviewTimeoutMs(kind));
 
       const unwatch = this.storage.watch<PendingApprovalRecord[]>(PENDING_APPROVALS_KEY, (value) => {
         const entry = (value ?? []).find((candidate) => candidate.request.requestId === requestId);
@@ -1109,8 +1115,9 @@ export class ApprovalHandler {
   }
 
   /** The earliest of another idle window from now and the request's hard cap. */
-  private deviceDeadline(createdAt: number): number {
-    return Math.min(Date.now() + APPROVAL_TIMEOUT_MS, createdAt + APPROVAL_MAX_MS);
+  private deviceDeadline(request: ApprovalRequest): number {
+    const cap = Math.max(APPROVAL_MAX_MS, reviewTimeoutMs(request.kind));
+    return Math.min(Date.now() + APPROVAL_TIMEOUT_MS, request.createdAt + cap);
   }
 
   private async startDeviceSigning(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
@@ -1121,7 +1128,7 @@ export class ApprovalHandler {
     assertPreparedMatches(input, payloads);
     const device: PendingDeviceSigning = {
       payloads: encodeTaggedBinary(payloads),
-      deadline: this.deviceDeadline(entry.request.createdAt),
+      deadline: this.deviceDeadline(entry.request),
     };
     const requestId = entry.request.requestId;
     let stillPending = false;
@@ -1142,7 +1149,7 @@ export class ApprovalHandler {
     if (!entry.device) {
       throw new Error(`Approval request "${req.requestId}" isn't waiting for a device.`);
     }
-    const deadline = this.deviceDeadline(entry.request.createdAt);
+    const deadline = this.deviceDeadline(entry.request);
     await this.updatePending((current) =>
       current.map((candidate) =>
         candidate.request.requestId === req.requestId && candidate.device
