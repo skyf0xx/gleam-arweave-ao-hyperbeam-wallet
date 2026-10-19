@@ -8,6 +8,7 @@ import {
   RESPONSE,
   SITE_MODE,
   SITE_MODE_REQUEST,
+  PROVIDER_EVENT,
   PROVIDER_SURFACE_METHODS,
   decodeTaggedBinary,
   encodeTaggedBinary,
@@ -71,6 +72,12 @@ import { version as WALLET_VERSION } from "../../package.json";
  *    so a dApp can offer its own "Connect with Gleam" button (README.md
  *    § For dApp developers). It is announced at once with
  *    `gleamWalletLoaded`.
+ * 9. Answers a dApp's PermawebOS button when PermawebOS isn't installed:
+ *    an empty `window.permawebConnect` slot gets a shim that calls Gleam
+ *    (`permawebConnectShim`). PermawebOS's injected script redefines the
+ *    slot unconditionally and announces `permawebConnectLoaded`, so the
+ *    shim is configurable and steps aside, like the router yielding to
+ *    Wander.
  */
 const REQUEST_TIMEOUT_MS = 60_000;
 /** Leaves time to sign or post once the user approves at the last moment. */
@@ -395,6 +402,85 @@ function claimSlot(router: unknown, onAssign: (value: unknown) => void): boolean
   }
 }
 
+/**
+ * What PermawebOS's dApp SDK checks before it treats `window.permawebConnect`
+ * as a wallet (`walletVersion`, `events.on`/`off` and every one of these
+ * as a function). Its connect button then calls only `connect`,
+ * `disconnect` and the reads behind `getSnapshot`.
+ */
+const PERMAWEB_CONNECT_METHODS = [
+  "connect",
+  "disconnect",
+  "getPermissions",
+  "getActiveAddress",
+  "getActivePublicKey",
+  "getAllAddresses",
+  "getWalletNames",
+  "getArweaveConfig",
+  "signMessage",
+  "verifyMessage",
+  "signature",
+  "privateHash",
+  "encrypt",
+  "decrypt",
+  "signDataItem",
+  "batchSignDataItem",
+  "sign",
+  "dispatch",
+] as const satisfies readonly (ProviderSurfaceMethod & keyof GleamProvider)[];
+
+type PermawebListener = (payload: unknown) => void;
+
+/**
+ * The events the SDK's `subscribe` listens for on `permawebConnect.events`,
+ * each fed from the window event Gleam already posts. Gleam has no
+ * permissions-change event, so `permissions` never fires; the SDK reads
+ * permissions again through `getPermissions`.
+ */
+const PERMAWEB_EVENT_SOURCES: Record<string, ReadonlyArray<[string, (detail: unknown) => unknown]>> = {
+  connect: [[PROVIDER_EVENT.CONNECT, () => null]],
+  disconnect: [[PROVIDER_EVENT.DISCONNECT, () => null]],
+  activeAddress: [
+    [PROVIDER_EVENT.CONNECT, (detail) => (detail as { activeAddress?: unknown } | null)?.activeAddress],
+    [PROVIDER_EVENT.WALLET_SWITCH, (detail) => (detail as { address?: unknown } | null)?.address],
+  ],
+};
+
+/** A `window.permawebConnect` in PermawebOS's shape whose every call goes to Gleam. */
+function permawebConnectShim(gleam: GleamProvider): WalletLike {
+  const bridges = new Map<PermawebListener, Array<[string, EventListener]>>();
+  const events = {
+    on(name: unknown, listener: unknown): void {
+      if (typeof name !== "string" || typeof listener !== "function") return;
+      const sources = PERMAWEB_EVENT_SOURCES[name] ?? [];
+      const added = sources.map(([windowEvent, read]): [string, EventListener] => {
+        const bridge: EventListener = (event) => {
+          const payload = read((event as CustomEvent).detail);
+          if (name !== "activeAddress" || typeof payload === "string") (listener as PermawebListener)(payload);
+        };
+        window.addEventListener(windowEvent, bridge);
+        return [windowEvent, bridge];
+      });
+      bridges.set(listener as PermawebListener, [...(bridges.get(listener as PermawebListener) ?? []), ...added]);
+    },
+    off(name: unknown, listener: unknown): void {
+      if (typeof name !== "string" || typeof listener !== "function") return;
+      const sourceEvents = (PERMAWEB_EVENT_SOURCES[name] ?? []).map(([windowEvent]) => windowEvent);
+      const kept = (bridges.get(listener as PermawebListener) ?? []).filter(([windowEvent, bridge]) => {
+        if (!sourceEvents.includes(windowEvent)) return true;
+        window.removeEventListener(windowEvent, bridge);
+        return false;
+      });
+      bridges.set(listener as PermawebListener, kept);
+    },
+  };
+  const shim: WalletLike = { walletName: WALLET_NAME, walletVersion: WALLET_VERSION, events };
+  for (const method of PERMAWEB_CONNECT_METHODS) {
+    shim[method] = (...args: unknown[]) => (gleam[method] as (...rest: unknown[]) => unknown).apply(gleam, args);
+  }
+  return Object.freeze(shim);
+}
+
 /** Returns a teardown that stops listening and reclaiming the slot, for tests. */
 function install(): () => void {
   const gleamProvider = new GleamProvider();
@@ -407,6 +493,18 @@ function install(): () => void {
   } catch {
     // Something made `window.gleam` non-configurable first; leave it alone.
   }
+  let permawebShim: WalletLike | null = null;
+  if (!("permawebConnect" in window)) {
+    const shim = permawebConnectShim(gleamProvider);
+    try {
+      // Configurable, so PermawebOS's own `defineProperty` replaces it.
+      Object.defineProperty(window, "permawebConnect", { value: shim, configurable: true, enumerable: true, writable: false });
+      permawebShim = shim;
+    } catch {
+      // Taken between the check and the define; leave it to its owner.
+    }
+  }
+  const shimHoldsPermaweb = (): boolean => permawebShim !== null && walletWindow.permawebConnect === permawebShim;
   let captured: WalletLike | null = null;
   // Null until the content script says whether this site holds a grant.
   let useGleam: boolean | null = null;
@@ -431,7 +529,7 @@ function install(): () => void {
   const other = (): WalletLike | null => {
     if (captured) return captured;
     const permaweb = walletWindow.permawebConnect;
-    return isWalletLike(permaweb) && !isRouter(permaweb) ? permaweb : null;
+    return isWalletLike(permaweb) && !isRouter(permaweb) && permaweb !== permawebShim ? permaweb : null;
   };
 
   /** Whether a call made now reaches the wallet the site will keep using. */
@@ -609,6 +707,8 @@ function install(): () => void {
   // PermawebOS skips a taken slot and announces `arweaveWalletLoaded` only
   // while it holds the slot itself, so Gleam announces it instead.
   const onPermawebLoaded = (): void => {
+    // Gleam's own announcement of the shim, not PermawebOS arriving.
+    if (shimHoldsPermaweb()) return;
     noteOther();
     if (settled) announce();
   };
@@ -617,6 +717,9 @@ function install(): () => void {
     noteOther();
     wake();
     announce();
+    // Like `arweaveWalletLoaded`, held until PermawebOS has had its chance
+    // to take the slot, so a dApp hears about the shim only in its absence.
+    if (shimHoldsPermaweb()) window.dispatchEvent(new CustomEvent("permawebConnectLoaded"));
   };
   const scheduleSettle = (): void => {
     settleTimeout = setTimeout(settle, OTHER_WALLET_SETTLE_MS);

@@ -792,11 +792,140 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
     expect(other.connect).toHaveBeenCalled();
   });
 
+  // As PermawebOS's injected.js installs it: defined unconditionally,
+  // configurable and read-only.
   function permawebOS() {
     const permaweb = { walletName: "ArConnect", connect: vi.fn().mockResolvedValue("permaweb-connected") };
-    (window as unknown as { permawebConnect: unknown }).permawebConnect = permaweb;
+    Object.defineProperty(window, "permawebConnect", { value: permaweb, configurable: true, writable: false });
     return permaweb;
   }
+
+  function permawebSlot(): Wallet & { events: { on: (...args: unknown[]) => void; off: (...args: unknown[]) => void } } {
+    return (window as unknown as { permawebConnect: never }).permawebConnect;
+  }
+
+  // The check PermawebOS's dApp SDK (`assets/index-*.js`, `Q`) runs before
+  // its connect button uses `window.permawebConnect`.
+  function passesPermawebDetection(value: unknown): boolean {
+    const wallet = value as Record<string, unknown> & { events?: Record<string, unknown> };
+    return (
+      typeof wallet === "object" &&
+      typeof wallet.walletVersion === "string" &&
+      typeof wallet.events?.on === "function" &&
+      typeof wallet.events?.off === "function" &&
+      [
+        "connect", "disconnect", "getPermissions", "getActiveAddress", "getActivePublicKey", "getAllAddresses",
+        "getWalletNames", "getArweaveConfig", "signMessage", "verifyMessage", "signature", "privateHash",
+        "encrypt", "decrypt", "signDataItem", "batchSignDataItem", "sign", "dispatch",
+      ].every((name) => typeof wallet[name] === "function")
+    );
+  }
+
+  describe("window.permawebConnect when PermawebOS isn't installed", () => {
+    it("fills the empty slot with a Gleam shim PermawebOS's SDK accepts", () => {
+      teardown = install();
+      const shim = permawebSlot();
+      expect(passesPermawebDetection(shim)).toBe(true);
+      expect(shim.walletName).toBe("Gleam");
+      expect(shim.walletVersion).toBe(PACKAGE_VERSION);
+    });
+
+    it("sends the connect button's calls to Gleam with their arguments", () => {
+      teardown = install();
+      void permawebSlot().connect!(["ACCESS_ADDRESS", "SIGNATURE"], { name: "Bazar" });
+      void (permawebSlot().getActivePublicKey as () => Promise<unknown>)();
+      const sent = gleamRequests().map(([message]: [unknown]) => message as { method: string; params: unknown });
+      expect(sent.map((message: { method: string }) => message.method)).toEqual(["connect", "getActivePublicKey"]);
+      expect(sent[0]!.params).toMatchObject({ permissions: ["ACCESS_ADDRESS", "SIGNATURE"], appInfo: { name: "Bazar" } });
+    });
+
+    it("isn't taken for another wallet, so a Gleam-only page never asks for the site mode", async () => {
+      vi.useFakeTimers();
+      teardown = install();
+      void current()!.connect!();
+      await vi.advanceTimersByTimeAsync(150);
+      expect(modeRequests()).toHaveLength(0);
+      expect(otherWalletReports()).toHaveLength(0);
+      expect(gleamRequests()).toHaveLength(1);
+    });
+
+    it("leaves a slot PermawebOS already filled", () => {
+      const permaweb = permawebOS();
+      teardown = install();
+      expect(permawebSlot()).toBe(permaweb);
+    });
+
+    it("announces the shim with permawebConnectLoaded once other wallets have had the chance to install", async () => {
+      vi.useFakeTimers();
+      const onLoaded = listen("permawebConnectLoaded");
+      teardown = install();
+      expect(onLoaded).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(150);
+      expect(onLoaded).toHaveBeenCalledTimes(1);
+      expect(listen("arweaveWalletLoaded")).not.toHaveBeenCalled();
+    });
+
+    it("doesn't announce the shim when PermawebOS took the slot before the settle", async () => {
+      vi.useFakeTimers();
+      const onLoaded = listen("permawebConnectLoaded");
+      teardown = install();
+      permawebOS();
+      await vi.advanceTimersByTimeAsync(150);
+      expect(onLoaded).not.toHaveBeenCalled();
+    });
+
+    it("hands the slot to PermawebOS when it loads, and the router then forwards to it", async () => {
+      teardown = install();
+      const permaweb = permawebOS();
+      window.dispatchEvent(new CustomEvent("permawebConnectLoaded"));
+      expect(permawebSlot()).toBe(permaweb);
+      sendSiteMode(false);
+      await expect(current()!.connect!()).resolves.toBe("permaweb-connected");
+      expect(gleamRequests()).toHaveLength(0);
+    });
+
+    // What `GleamProvider.handleEvent` dispatches for a pushed event.
+    function pushEvent(event: string, data: unknown): void {
+      window.dispatchEvent(new CustomEvent(event, { detail: data }));
+    }
+
+    it("feeds the SDK's connect, disconnect and activeAddress listeners from Gleam's events, until removed", () => {
+      teardown = install();
+      const { events } = permawebSlot();
+      const onConnect = vi.fn();
+      const onDisconnect = vi.fn();
+      const onAddress = vi.fn();
+      const onPermissions = vi.fn();
+      events.on("connect", onConnect);
+      events.on("disconnect", onDisconnect);
+      events.on("activeAddress", onAddress);
+      events.on("permissions", onPermissions);
+
+      pushEvent("connect", { activeAddress: "addr-1" });
+      pushEvent("walletSwitch", { address: "addr-2" });
+      pushEvent("disconnect", {});
+      expect(onConnect).toHaveBeenCalledTimes(1);
+      expect(onAddress.mock.calls).toEqual([["addr-1"], ["addr-2"]]);
+      expect(onDisconnect).toHaveBeenCalledTimes(1);
+      expect(onPermissions).not.toHaveBeenCalled();
+
+      events.off("connect", onConnect);
+      events.off("activeAddress", onAddress);
+      pushEvent("connect", { activeAddress: "addr-3" });
+      pushEvent("walletSwitch", { address: "addr-4" });
+      expect(onConnect).toHaveBeenCalledTimes(1);
+      expect(onAddress).toHaveBeenCalledTimes(2);
+    });
+
+    it("can't be swapped out by assignment", () => {
+      teardown = install();
+      const shim = permawebSlot();
+      expect(() => {
+        (window as unknown as { permawebConnect: unknown }).permawebConnect = { walletName: "Imposter" };
+      }).toThrow();
+      expect(permawebSlot()).toBe(shim);
+    });
+  });
 
   it("finds PermawebOS at window.permawebConnect when it skipped the taken slot, and announces it", async () => {
     vi.useFakeTimers();
