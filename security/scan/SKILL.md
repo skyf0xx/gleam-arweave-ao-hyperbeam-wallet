@@ -22,6 +22,15 @@ wallet that signs gets the points.
 Follow the steps in order. Every command runs from the root of the checkout
 unless a step says otherwise. Background on the program is in `SCANS.md`.
 
+This skill has two companion files in the same directory. Each step says
+when to read them:
+
+- `security/scan/CHECKS.md`: what to look for, area by area (Steps 4
+  and 5).
+- `security/scan/VERIFY.md`: how to try to disprove a finding and rate
+  what survives (Step 6). It stands on its own, so a fresh subagent can
+  follow it.
+
 ## Rules that always apply
 
 - Never use a seed phrase, a real key, a real wallet, or real funds. Test
@@ -34,7 +43,7 @@ unless a step says otherwise. Background on the program is in `SCANS.md`.
   report it in a private advisory with only its file and line. Never copy
   the value anywhere, including the advisory.
 - Keep the scan checkout's `HEAD` on the release tag. `pnpm scan finish`
-  fails if `HEAD` moves. Write any fix in a separate worktree (Step 6).
+  fails if `HEAD` moves. Write any fix in a separate worktree (Step 7).
 - When a `pnpm scan` command prints a line starting with `✗`, do what that
   line says, then run the command again.
 
@@ -91,7 +100,7 @@ osv-scanner wasn't run.
 
 Install `gitleaks` (`brew install gitleaks`, or a binary from
 https://github.com/gitleaks/gitleaks/releases) if you may commit a fix in
-Step 6. The pre-commit hook refuses every commit without it.
+Step 7. The pre-commit hook refuses every commit without it.
 
 Note the start time. The report says how long you spent:
 
@@ -114,7 +123,7 @@ writes two files:
 
 - `.gleam-scan/challenge.json`: the challenge. Don't edit it.
 - `.gleam-scan/attestation.json`: a starter attestation you fill in at
-  Step 7.
+  Step 8.
 
 The challenge expires after 24 hours. Only the user's signature in Gleam
 uses it up; `pnpm scan finish` doesn't. Run `start` only once. Running it
@@ -140,7 +149,7 @@ you build on them:
 
 Where the docs and the code disagree, the code is right. A docs mismatch
 is a low finding, unless the mismatch is itself a medium or higher issue.
-Fix a low one in a PR (Step 6).
+Fix a low one in a PR (Step 7).
 
 Done when you can name the attackers and the By design entries.
 
@@ -202,56 +211,31 @@ tier order. List it all with:
 git ls-files -- $(awk '!/^#/ && NF == 2 { print $2 }' security/surface.txt)
 ```
 Read the 3 challenge functions closely on the way, since you answer for
-them in Step 7.
+them in Step 8.
 
-What to look for in each area:
+For what to look for, read `security/scan/CHECKS.md`. Section 1 has the
+questions for each area of the surface. Section 2 has the classes of bug
+that cut across areas; keep them in mind in every file.
 
-- **Key material** (`core/signer/`, `core/vault/`, `handlers/key-session.ts`,
-  `src/keyring/`, `entrypoints/keyring/`, `adapters/offscreen-keyring.ts`):
-  where the decrypted key lives while unlocked, and whether it ever
-  reaches `chrome.storage.local`, a message to a page or a log. Whether
-  byte buffers are zeroed after use and on every error path (`zeroize.ts`);
-  a JS string can't be zeroed, so a key held as a string is worth noting.
-  Which contexts the offscreen keyring accepts a port from, and what it
-  checks before it answers.
-- **Locking** (`handlers/key-session.ts`, `enforceAutoLock`): whether the
-  auto-lock alarm really removes the keys, and what happens when the
-  service worker or the offscreen document restarts mid-session: does
-  the wallet come back unlocked when it should be locked?
-- **Provider bridge** (`entrypoints/provider/`, `entrypoints/content/`,
-  `packages/messaging/src/page-protocol.ts`): the `event.source` check,
-  per-request ids, the `settled` flag, timeouts, and decoding of binary
-  values. Whether every page-supplied value has a size limit before it is
-  parsed, stored or shown.
-- **Dispatch** (`src/dispatch/methods.ts`, `src/sender.ts`,
-  `handlers/provider-params.ts`): each method's caller tier, whether it can
-  open an approval, and whether its zod schema accepts anything the handler
-  doesn't expect. Whether any method that signs or reveals something can
-  run without an approval.
-- **Permissions** (`wxt.config.ts`): `optional_host_permissions` is
-  `https://*/*`, so check that every runtime host request asks for exactly
-  the host the user typed, shows it, and validates it
-  (`popup/network-peers/`). Check what each `web_accessible_resources`
-  entry lets a page load or learn.
-- **CSP** (`src/csp.ts`): what `wasm-unsafe-eval` allows, whether any
-  directive is missing, and whether the looser dev policy can reach a
-  production build.
-- **Crypto** (`core/signer/envelope.ts`, `core/arweave/rsa-pss.ts`): the
-  Argon2id parameters and their bounds, whether a stored envelope can force
-  weaker parameters, and whether there is any fallback to a weaker KDF.
-  Correct AES-GCM nonce handling and RSA-PSS salt length.
+Each time you hit something you can't settle, note it as a lead in
+`.gleam-scan/leads.md` (`.gleam-scan/` is ignored by git) with its file
+and line, and keep going. Step 6 turns the leads into candidates.
 
 Done when you have read every changed surface file (as above) and as much
 of the rest as you can, and you know which files you didn't reach.
 
 ## Step 5: Look anywhere else that seems worth it
 
-The surface list and Step 4's checklist are where to start, not the
-limit. Follow data and calls out of the surface wherever they lead:
-callers, message handlers, the build config, anything you suspect. A
-finding outside the surface counts the same as one inside it.
+The surface list and `CHECKS.md` are where to start, not the limit.
+Follow data and calls out of the surface wherever they lead: callers,
+message handlers, the build config, anything you suspect. A finding
+outside the surface counts the same as one inside it.
 
-To find leads quickly, search the whole repository (not only the surface)
+Work through `CHECKS.md` Sections 3 to 5: the wildcard questions, the
+literal list of obvious things (with its own search), and the cases the
+tests don't cover.
+
+To find more leads, search the whole repository (not only the surface)
 for these, and check each hit that handles key material or page input:
 
 ```bash
@@ -270,13 +254,52 @@ test against a real wallet.
 
 If a file you reviewed here can leak a key, sign something unapproved or
 let a page past the wallet's boundary, it belongs on the surface. Note it
-for the surface PR in Step 6.
+for the surface PR in Step 7.
 
 Done when you have followed the leads you found.
 
-## Step 6: Draft your reports (don't file them yet)
+## Step 6: Try to disprove each finding
 
-Decide the severity of each finding with the calibration rules below. Then:
+Go through `.gleam-scan/leads.md`. Drop each lead you have since settled
+as safe. Write each one left as a candidate note,
+`.gleam-scan/candidates/1.md`, `2.md` and so on. A note gives the six
+fields of the bar in `security/scan/VERIFY.md` (attacker, entry,
+control, boundary, harm, evidence), the `file:line` steps of the trace,
+and the throwaway test if you wrote one.
+
+Then put every candidate through `VERIFY.md`:
+
+- **If your agent can start a subagent**, start a fresh one for each
+  candidate. Give it only the checkout path and this instruction:
+  "Follow security/scan/VERIFY.md for the candidate in
+  .gleam-scan/candidates/<n>.md, and return the verdict block it
+  describes." Don't pass it your own reasoning. A verifier that starts
+  from your conclusion finds what you found. You can run several at
+  once.
+- **Otherwise**, verify each candidate yourself, one at a time. Follow
+  `VERIFY.md` from its first step, and re-read every cited line as if
+  someone else had written the note.
+
+Act on each verdict:
+
+| Verdict | Do |
+| --- | --- |
+| `holds` | Draft it in Step 7 at the severity the verdict gives. |
+| `holds, weaker` | Apply the **Corrections** to the note, then draft it at the lower severity. |
+| `needs a browser check` | Draft it at the severity the verdict gives, and say in the draft that it is unconfirmed and which fact a maintainer has to check. |
+| `refuted` | Drop it. If the reason shows the threat model or `CHECKS.md` misled you, note that for a skill PR in Step 7. |
+
+If you disagree with a subagent's verdict, don't overrule it. Start one
+more fresh verifier and give the candidate to it. If the two still
+disagree, take the lower severity, or `refuted` if one of them refuted
+it.
+
+Done when every candidate has a verdict.
+
+## Step 7: Draft your reports (don't file them yet)
+
+Draft each candidate that survived Step 6, at the severity its verdict
+gives:
 
 - **Low or informational, or a hardening change:** draft a PR.
 - **Medium, high or critical:** draft a private advisory. If you're unsure
@@ -284,7 +307,7 @@ Decide the severity of each finding with the calibration rules below. Then:
 
 Draft everything first, and file nothing yet. Every PR and advisory,
 skill and surface PRs included, quotes the attestation id, which only
-exists after Step 7. Write `{{ATTESTATION_ID}}` in its place. The id goes
+exists after Step 8. Write `{{ATTESTATION_ID}}` in its place. The id goes
 in PR and advisory bodies, never in a commit message.
 
 **PR draft.** Write the fix in a separate worktree, so the scan checkout
@@ -317,9 +340,10 @@ it fails, fix what it names and commit again.
 
 **Advisory draft.** Write a title, the severity, and a description with:
 the attacker (from the threat model), the affected files or flow, the steps
-from the attacker's access to the harm, whether you demonstrated it or
-suspect it, and the impact. Keep the draft local, for example in
-`.gleam-scan/advisory-1.md` (`.gleam-scan/` is ignored by git).
+from the attacker's access to the harm, the impact, and the evidence from
+the verdict: demonstrated, traced, or the exact fact a browser check has
+to settle. Keep the draft local, for example in
+`.gleam-scan/advisory-1.md`.
 
 **Skill or surface PR.** This skill improves through the scans that use
 it. If something would have made your scan better, draft a PR for it, in
@@ -328,7 +352,9 @@ its own worktree like a fix PR. For example:
 - a file that belongs in `security/surface.txt`. Add it at its tier, and
   add the same path to `.github/CODEOWNERS` (a test keeps the two
   identical);
-- an area, check, search or tool that Step 4 or Step 5 should name;
+- an area, check, search or tool that `CHECKS.md` should name;
+- a reason to refute, or a severity example, that `VERIFY.md` should
+  give;
 - a command in this skill that failed or misled you, or a `✗` message
   that didn't say what to do.
 
@@ -340,12 +366,12 @@ until the advisory is fixed. It doesn't change
 `result`. A maintainer reviews it like any other PR, and nothing merges
 automatically.
 
-Done when every finding and skill suggestion has a draft. If you have no
-findings, that's a clean scan.
+Done when every surviving finding and skill suggestion has a draft. If
+nothing survived Step 6, that's a clean scan.
 
-## Step 7: Answer the challenge, finish, then file
+## Step 8: Answer the challenge, finish, then file
 
-### 7a. Fill in `.gleam-scan/attestation.json`
+### 8a. Fill in `.gleam-scan/attestation.json`
 
 `pnpm scan start` wrote this starter:
 
@@ -389,18 +415,19 @@ Fill it in field by field:
     using the `lines <start>-<end>` that `pnpm scan start` printed.
   - `check`: one sentence, 10 to 300 characters, on one line, on what that
     check prevents. Write it from what you read, about this code.
-- `result`: `"pass"` if you drafted no fix PR or advisory in Step 6,
+- `result`: `"pass"` if you drafted no fix PR or advisory in Step 7,
   `"scanned"` if you drafted at least one. A skill or surface PR doesn't
   count either way. It never says what you found, and
   both earn the same.
 - `report`: markdown, at most 20,000 characters, `\n` line endings. It
   describes **coverage only**: what you checked, what you didn't, the tools
-  you ran and their outcome in general terms, and how long you spent
+  you ran and their outcome in general terms, how many candidates Step 6
+  verified and whether subagents verified them, and how long you spent
   (`cat .gleam-scan/started; date -u`, then subtract). Never
   vulnerability details, not even for a low finding. "Filed 1 PR and 1
   advisory" is fine. What they are about is not.
 
-### 7b. Run `pnpm scan finish` until it passes
+### 8b. Run `pnpm scan finish` until it passes
 
 ```bash
 pnpm scan finish          # or: pnpm scan finish --json
@@ -426,7 +453,7 @@ Tell the user: Open this link in Chrome with Gleam installed and click Sign with
 at any time, for example after you edit the report. It doesn't use up the
 challenge, and only the id from the last run counts.
 
-### 7c. Get the signature, then file the drafts
+### 8c. Get the signature, then file the drafts
 
 The attestation id is the SHA-256 of the attestation's content, so it
 changes if any field changes. In this order:
@@ -436,7 +463,7 @@ changes if any field changes. In this order:
    `pnpm scan start`.
 2. Wait until the user confirms that Gleam accepted the signature. Don't
    edit `.gleam-scan/attestation.json` after that.
-3. In every draft from Step 6, replace `{{ATTESTATION_ID}}` with the id
+3. In every draft from Step 7, replace `{{ATTESTATION_ID}}` with the id
    from the last `pnpm scan finish`. Then file it.
 
 If the challenge expires first, follow its Troubleshooting row and give
@@ -480,14 +507,16 @@ user, with the id in it.
 
 ## Report like a working security engineer
 
-- Name a realistic attacker from the threat model, and show the concrete
-  steps from the attacker's access to the harm. An attack that needs a
-  compromised OS, malware, or the user's password is out of scope.
-- Rate severity by what is likely, not the worst case you can imagine.
+- Every finding meets the bar in `VERIFY.md`: a realistic attacker from
+  the threat model, and concrete steps from the attacker's access to the
+  harm. An attack that needs a compromised OS, malware, or the user's
+  password is out of scope.
+- Rate severity with the anchors in `VERIFY.md`: by what you showed, not
+  the worst case you can imagine.
 - Missing defence in depth is not a finding unless it enables a real
   attack.
-- Say once whether a finding was demonstrated or is suspected, then write
-  plainly.
+- Say once whether a finding was demonstrated, traced or needs a browser
+  check, then write plainly.
 - A clean `pass` earns the same as `scanned`. Padding a report with weak
   findings earns nothing.
 

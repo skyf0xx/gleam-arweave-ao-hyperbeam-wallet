@@ -208,7 +208,13 @@ it.
 ## The skill: `security/scan/SKILL.md`
 
 [`security/scan/SKILL.md`](security/scan/SKILL.md) is written for any
-coding agent to follow literally, with the exact commands. In summary:
+coding agent to follow literally, with the exact commands. Two companion
+files sit beside it:
+[`CHECKS.md`](security/scan/CHECKS.md), the questions to ask in each area
+and the classes of bug that cut across them, and
+[`VERIFY.md`](security/scan/VERIFY.md), which a fresh subagent (or the
+scanning agent itself) follows to try to disprove one finding and rate
+what survives. In summary:
 
 1. Check out the latest release tag and run `pnpm scan start`. It saves
    `.gleam-scan/challenge.json` and a starter `.gleam-scan/attestation.json`.
@@ -217,16 +223,19 @@ coding agent to follow literally, with the exact commands. In summary:
    disagree, the code is right; fix the docs in a PR.
 3. Run the tests and `osv-scanner`.
 4. Review the files in `security/surface.txt` that changed since the
-   last release, then the rest of the surface.
+   last release, then the rest of the surface, with `CHECKS.md`.
 5. Look anywhere else that seems worth it. The surface is where to
    start, not the limit.
-6. Draft the reports: low or informational issues as a PR, medium and
+6. Try to disprove each finding with `VERIFY.md`, in a fresh subagent
+   where the agent can start one. Only findings that survive get
+   drafted, at the severity the verdict gives.
+7. Draft the reports: low or informational issues as a PR, medium and
    above as a private advisory. Never as a public issue. Anything that
    would have made the scan better (a missing surface file, a check the
    skill should name, a command that misled) becomes a
    `docs(scan): …` PR to the skill or `security/surface.txt`. File
    nothing yet, since each one has to quote the attestation id.
-7. Answer the challenge from the code you read by filling in
+8. Answer the challenge from the code you read by filling in
    `.gleam-scan/attestation.json`. Run `pnpm scan finish` until it
    passes, and give the user the link and the sentence that goes with
    it. Once they have signed, file each draft with the attestation id.
@@ -237,11 +246,12 @@ coding agent to follow literally, with the exact commands. In summary:
   concrete steps from the attacker's access to the harm. An attack that
   needs a compromised OS, malware, or the user's password is out of
   scope.
-- Rate severity by what is likely, not the worst case you can imagine.
+- Rate severity with the anchors in `VERIFY.md`: by what was shown, not
+  the worst case you can imagine.
 - Missing defence in depth is not a finding unless it enables a real
   attack.
-- Say once whether a finding was demonstrated or is suspected, then
-  write plainly.
+- Say once whether a finding was demonstrated, traced or needs a
+  browser check, then write plainly.
 - A clean `pass` earns the same as `scanned`. Padding a report with
   weak findings earns nothing.
 
