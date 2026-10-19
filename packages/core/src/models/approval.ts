@@ -185,6 +185,12 @@ export type DeviceSigningPayload =
 export type DeviceSigningSummary =
   | { kind: "transaction"; recipient: string | null; quantity: string; fee: string; dataSize: string }
   | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
+  /**
+   * A zero-AR L1 transaction whose tags move `quantity` of an
+   * `arweave-scheduler@1.0` token (`ao/l1-transfer.ts`). `fee` is the AR
+   * reward the transaction actually carries.
+   */
+  | { kind: "l1TokenTransfer"; process: string; recipient: string; quantity: string; fee: string }
   /** A zero-AR L1 transaction whose tags move one collectible (`ao/collectible-transfer.ts`). */
   | { kind: "collectibleTransfer"; asset: string; recipient: string; fee: string }
   | { kind: "dataItem"; target: string | null; dataSize: number }

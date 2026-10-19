@@ -123,8 +123,8 @@ maps to. Handlers depend only on ports (`StoragePort`, `WindowPort`,
 etc.), never on `chrome.*` directly.
 
 - **`wallet-lifecycle.ts`** — create, import, lock/unlock, rename, delete, and switch wallets.
-- **`reads.ts`** — balances, token balances, activity, prices, network settings.
-- **`transfer.ts`** — AR/AO transfer estimate and submission.
+- **`reads.ts`** — balances, token balances (AO, watched, and discovered from the wallet's history, minus hidden ones), token metadata and routing, activity, prices, network settings.
+- **`transfer.ts`** — AR/AO transfer estimate and submission. A token on `arweave-scheduler@1.0` is sent as an L1 transaction, a legacy token through the MU.
 - **`upload.ts`** — ANS-104 upload review and submission.
 - **`approval.ts`** — the connect/sign/encrypt/decrypt/add-token/scan-attestation approval lifecycle, including opening and tracking approval windows.
 - **`key-session.ts`** — reads the unlocked signer from `chrome.storage.session` and enforces auto-lock.

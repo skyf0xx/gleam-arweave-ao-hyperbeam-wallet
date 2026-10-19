@@ -797,12 +797,12 @@ function ReviewStep({
   onSign: () => void;
 }) {
   const ticker = tickerFor(token);
-  // AO transfers have no sender-side fee quote — `estimate.fee` is `null`
-  // for that path (see `core/ao/transfer.ts`'s `AO_TRANSFER_HAS_NO_FEE` doc
-  // comment). The total then equals the send amount itself, and the Fee row
-  // says so explicitly rather than showing a fabricated "0 <TICKER>".
+  // A legacy AO transfer has no sender-side fee (`estimate.fee` is `null`),
+  // so the Fee row says so rather than showing a fabricated "0 <TICKER>".
+  // An L1 token transfer's fee is AR, a different unit from the amount,
+  // so only an AR send folds the fee into its total.
   const total =
-    step.estimate.fee === null
+    step.estimate.fee === null || token !== null
       ? step.amountAtomic
       : (BigInt(step.amountAtomic) + BigInt(step.estimate.fee)).toString();
   // A saved contact or one of your own wallets counts as a known recipient

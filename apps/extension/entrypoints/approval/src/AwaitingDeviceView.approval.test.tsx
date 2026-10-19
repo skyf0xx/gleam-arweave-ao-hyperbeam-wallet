@@ -90,6 +90,20 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getByText("2.5 ARDRIVE")).toBeTruthy();
   });
 
+  it("shows an L1 token transfer's AR fee, and calls a target the preview didn't resolve an unknown token", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        payloads: [{ kind: "dataItem", raw: "AQID" }],
+        summaries: [{ kind: "l1TokenTransfer", process: "z".repeat(43), recipient: "q".repeat(43), quantity: "311", fee: "654321" }],
+      },
+      token: { processId: "p".repeat(43), denomination: 6, ticker: "ARDRIVE" },
+    });
+    expect(screen.getByText("Unknown token")).toBeTruthy();
+    expect(screen.getByText("311 smallest units")).toBeTruthy();
+    expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
+  });
+
   it("shows Gleam, not a hostname, for a send from the wallet itself", () => {
     renderView({ origin: WALLET_APPROVAL_ORIGIN, device: { ...DEVICE, method: "keystone", device: { kind: "keystone", xfp: "1" } } });
     expect(screen.getByText("Gleam")).toBeTruthy();

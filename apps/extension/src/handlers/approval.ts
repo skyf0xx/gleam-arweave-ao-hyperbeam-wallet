@@ -70,6 +70,7 @@ import {
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
+import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import { getSigner, getStoredWallet, getWalletMethod } from "./key-session";
 import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
@@ -446,6 +447,16 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     if (collectible) {
       return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
     }
+    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
+    if (tokenTransfer) {
+      return {
+        kind: "l1TokenTransfer",
+        process: tokenTransfer.processId,
+        recipient: tokenTransfer.recipient,
+        quantity: tokenTransfer.quantity,
+        fee: reward,
+      };
+    }
     return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
@@ -564,6 +575,16 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
           target: input.recipient ?? "",
           quantity: input.amount ?? "",
           tags: [],
+          data: new Uint8Array(),
+        });
+        return;
+      }
+      if (payload?.kind === "transaction") {
+        // An arweave-scheduler token takes its transfer as an L1 transaction.
+        checkTransaction(payload, {
+          target: input.token,
+          quantity: "0",
+          tags: l1TransferTags(input.recipient ?? "", input.amount ?? ""),
           data: new Uint8Array(),
         });
         return;

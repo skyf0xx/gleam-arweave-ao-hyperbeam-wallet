@@ -112,7 +112,7 @@ const transfer: TransferHandler = new TransferHandler(storage, {
     const metadata = req.token === null ? {} : await resolveTokenDenominationAndTicker(await walletAddress(req.walletId), req.token);
     return approval.requestWalletTransfer({ ...req, ...metadata });
   },
-}, reads);
+}, reads, reads);
 const upload = new UploadHandler(storage);
 const contacts = new ContactsHandler(storage);
 const approval: ApprovalHandler = new ApprovalHandler(

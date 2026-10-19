@@ -145,7 +145,9 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
       </>
     );
   }
-  if (summary.kind === "aoTransfer") {
+  if (summary.kind === "aoTransfer" || summary.kind === "l1TokenTransfer") {
+    // Scaled only for the token the preview resolved; any other target is
+    // shown as unknown rather than trusted to be a token at all.
     const scale = token?.processId === summary.process ? token : undefined;
     const quantity =
       scale?.denomination != null
@@ -153,9 +155,11 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
         : `${summary.quantity} smallest units`;
     return (
       <>
-        <Row label="Token" value={summary.process} mono />
+        <Row label="Token" value={scale?.ticker ?? "Unknown token"} />
+        <Row label="Token process" value={summary.process} mono />
         <Row label="Recipient" value={summary.recipient} mono />
         <Row label="Amount" value={quantity} />
+        {summary.kind === "l1TokenTransfer" ? <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} /> : null}
       </>
     );
   }
