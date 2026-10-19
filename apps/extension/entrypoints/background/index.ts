@@ -601,6 +601,8 @@ async function requestDataItemApproval(
   });
 }
 
+const INSECURE_ORIGIN_ERROR = "Gleam only works with secure (https) sites.";
+
 /**
  * Routes one `window.arweaveWallet` call by its `PAGE_METHODS` entry. The
  * refusals that don't depend on the origin's grant throw synchronously,
@@ -614,10 +616,11 @@ function dispatchProviderCall(origin: string, method: string, rawParams: unknown
     throw new Error(`Provider method "${method}" is not reachable from a web page.`);
   }
   const providerMethod = method as ProviderMethod;
-  // Checked on every call that can open a window, not only at connect, so
-  // a plain-http origin still holding an older grant can't keep signing.
-  if (PAGE_METHODS[providerMethod].approval && !isSecureSigningOrigin(origin)) {
-    throw new Error("Gleam only signs for secure (https) sites.");
+  // Checked on every call, not only at connect, so a plain-http origin
+  // still holding an older grant can neither sign nor read addresses.
+  // `disconnect` only drops the grant, so such a site may still clear it.
+  if (providerMethod !== "disconnect" && !isSecureSigningOrigin(origin)) {
+    throw new Error(INSECURE_ORIGIN_ERROR);
   }
   return runProviderMethod(origin, providerMethod, rawParams);
 }

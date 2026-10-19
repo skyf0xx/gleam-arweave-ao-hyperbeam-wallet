@@ -384,9 +384,40 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     it.each(APPROVAL_GATED_METHODS)("refuses %s from a plain-http site before any window opens", (method) => {
       expect(() => providerCall({ origin: HTTP_ORIGIN, method, params: {} })).toThrow(
-        "Gleam only signs for secure (https) sites.",
+        "Gleam only works with secure (https) sites.",
       );
       expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["getActiveAddress", "getAllAddresses", "getActivePublicKey", "getWalletNames", "getPermissions", "getBalances", "getArweaveConfig"])(
+      "refuses the read %s from a plain-http site that already holds a grant",
+      async (method) => {
+        await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
+        expect(() => providerCall({ origin: HTTP_ORIGIN, method, params: {} })).toThrow(
+          "Gleam only works with secure (https) sites.",
+        );
+      },
+    );
+
+    it("refuses a read from a LAN or *.localhost plain-http origin", async () => {
+      for (const origin of ["http://192.168.1.10", "http://foo.localhost:3000"]) {
+        await seedUnlockedWalletWithGrant(origin);
+        expect(() => providerCall({ origin, method: "getActiveAddress", params: {} })).toThrow(
+          "Gleam only works with secure (https) sites.",
+        );
+      }
+    });
+
+    it("lets a plain-http site drop its own grant", async () => {
+      await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
+      await expect(providerCall({ origin: HTTP_ORIGIN, method: "disconnect", params: {} })).resolves.toBeUndefined();
+    });
+
+    it("still answers reads for a granted loopback http site", async () => {
+      await seedUnlockedWalletWithGrant("http://localhost:3000");
+      await expect(
+        providerCall({ origin: "http://localhost:3000", method: "getActiveAddress", params: {} }),
+      ).resolves.toBe("addr-1");
     });
 
     it("refuses signing from a plain-http site that already holds a grant", async () => {
@@ -394,10 +425,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
 
       expect(() => providerCall({ origin: HTTP_ORIGIN, method: "signature", params })).toThrow(
-        "Gleam only signs for secure (https) sites.",
+        "Gleam only works with secure (https) sites.",
       );
       expect(() => providerCall({ origin: HTTP_ORIGIN, method: "connect", params: {} })).toThrow(
-        "Gleam only signs for secure (https) sites.",
+        "Gleam only works with secure (https) sites.",
       );
       expect(windowsCreate).not.toHaveBeenCalled();
     });

@@ -141,7 +141,7 @@ device. Gleam stores only the public key and address.
 | --- | --- | --- | --- |
 | Malicious website | Read addresses, sign or send without consent, reach key methods | Connect approval; per-request approval window; fixed method list; origin from Chrome's sender | A user approving a request they don't understand. The preview is the defense. |
 | Phishing site or fake popup drawn in a page | Trick the user into typing the password or approving | Real requests always open a separate browser window; Gleam never asks for the password inside a page | Users who don't know the rule. |
-| Network attacker | Inject requests into a page, tamper with data | Extension code ships in the package, never fetched; HTTPS for all extension traffic; plain-`http://` sites can't connect or request a signature, except `localhost`, `127.0.0.1` and `[::1]` | Loopback `http://` stays allowed for local development; its traffic never crosses the network. |
+| Network attacker | Inject requests into a page, tamper with data | Extension code ships in the package, never fetched; HTTPS for all extension traffic; plain-`http://` sites can't connect, read or request a signature, except `localhost`, `127.0.0.1` and `[::1]` | Loopback `http://` stays allowed for local development; its traffic never crosses the network. |
 | Compromised npm dependency | Read the unlocked key and send it out | Locked dependency versions; new releases held back 3 days; provenance downgrades refused; dependency PRs reviewed by CI | Code running inside the extension can ask for signatures and decryptions while the wallet is unlocked, and can reach any https host or load an image from any URL. It can't copy the key: unlocked keys are non-extractable. The largest open risk. |
 | Hijacked Chrome Web Store account | Push a malicious update to every user | The developer account's own login protection | No signed-upload requirement yet, so the account alone can publish. Planned: verified CRX uploads, which need an offline signing key. |
 | Hijacked GitHub account or token | Change the source or CI | 2FA; protected `master`: signed commits, PR with passing CI, no force-push, no admin bypass | An account takeover can change the rules. |
@@ -235,14 +235,15 @@ count as a finding.
   completes or is cancelled.
 - **Plain `http://` is allowed on loopback.** Developers run dApps on
   `http://localhost`, and loopback traffic never crosses the network.
-  Every method that can open an approval window, `connect` included, is
+  Every page method but `disconnect`, reads and `connect` included, is
   refused for a plain-http origin unless its hostname is exactly
   `localhost`, `127.0.0.1` or `[::1]` (`isSecureSigningOrigin` in
   `apps/extension/src/sender.ts`, checked on every call in
-  `apps/extension/entrypoints/background/index.ts`).
+  `apps/extension/entrypoints/background/index.ts`), so a grant made
+  before a site lost https reads nothing.
   *Still a finding if:* a plain-http origin with any other hostname,
-  such as `foo.localhost`, a LAN address or a public host, can connect
-  or open an approval window.
+  such as `foo.localhost`, a LAN address or a public host, can connect,
+  read an address or balance, or open an approval window.
 - **`privateHash` is refused.** Wander's `privateHash` digests the
   private key itself. Gleam's unlocked keys are non-extractable, so it
   can't compute one, and handing sites a value derived from the key is
