@@ -4,7 +4,7 @@ import { SecurityPhraseMark, SecurityPhrasePicker } from "@gleam/ui/src/componen
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
-import { forgetAddressEmphasis } from "@/src/use-address-emphasis";
+import { useAddressIdentity } from "@/src/address-identity";
 
 type SectionState =
   | { kind: "loading" }
@@ -13,6 +13,7 @@ type SectionState =
 
 /** Lock & unlock's anti-phishing phrase: shown, set up, or changed in place. */
 export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
+  const { refresh: refreshAddressIdentity } = useAddressIdentity();
   const [state, setState] = useState<SectionState>({ kind: "loading" });
   const shownWord =
     state.kind === "editing" ? readSecurityPhrase(state.draft)?.word : state.kind === "showing" ? state.phrase?.word : undefined;
@@ -38,7 +39,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
     setState({ kind: "editing", phrase, draft, saving: true });
     try {
       await runtime.send<SecurityPhrase, void>({ type: "setSecurityPhrase", payload: draft });
-      forgetAddressEmphasis();
+      refreshAddressIdentity();
       setState({ kind: "showing", phrase: readSecurityPhrase(draft) });
     } catch (error) {
       setState({

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   capabilityRefusal,
   collectibleSendRefusal,
@@ -14,8 +14,7 @@ import {
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { CollectibleThumbnail, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
-import { useAddressEmphasis } from "@/src/use-address-emphasis";
+import { useAddressIdentity } from "@/src/address-identity";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
@@ -84,11 +83,12 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
     contactsQuery.data?.find((candidate) => candidate.address === address);
   const ownWalletFor = (address: string): WalletSummary | undefined =>
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
-  const emphasisPick = useAddressEmphasis(runtime);
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
   const reviewRecipient = step.kind === "review" ? step.recipient : null;
   const lookalikeOf = step.kind === "review" ? (step.estimate.lookalikeOf ?? null) : null;
-  const avatarSvg = useMemo(() => (reviewRecipient ? generateAccountAvatarSvg(reviewRecipient) : ""), [reviewRecipient]);
-  const lookalikeAvatarSvg = useMemo(() => (lookalikeOf ? generateAccountAvatarSvg(lookalikeOf) : undefined), [lookalikeOf]);
+  const avatarSvg = reviewRecipient ? identity.avatarSvg(reviewRecipient) : "";
+  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
 
   if (step.kind === "compose") {
     const unsupported = capabilityRefusal(wallet.method, "signTransaction", "send collectibles");

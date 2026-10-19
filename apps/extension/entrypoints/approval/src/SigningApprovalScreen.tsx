@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
+import { useAddressIdentity } from "@/src/address-identity";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
@@ -24,8 +24,6 @@ export interface SigningApprovalScreenProps {
   preview: SigningApprovalPreview;
   /** Recipient checks for a transfer; omitted or null shows none. */
   assessment?: RecipientAssessment | null;
-  /** The user's address emphasis pick (`addressEmphasisPick`). */
-  emphasisPick?: number | null;
   onReject: () => void;
   /** Rejects (surfacing its message inline) if signing fails — e.g. the wallet's unlocked session has since expired. */
   onSign: () => Promise<void>;
@@ -147,12 +145,13 @@ export function SigningApprovalScreen({
   origin,
   preview,
   assessment,
-  emphasisPick = null,
   onReject,
   onSign,
 }: SigningApprovalScreenProps) {
   const lookalikeOf = assessment?.lookalikeOf ?? null;
-  const lookalikeAvatarSvg = useMemo(() => (lookalikeOf ? generateAccountAvatarSvg(lookalikeOf) : undefined), [lookalikeOf]);
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const isTransfer = preview.recipient !== null;
@@ -215,7 +214,7 @@ export function SigningApprovalScreen({
               emphasisPick={emphasisPick}
             />
 
-            <RecipientBlock address={preview.recipient ?? ""} emphasisPick={emphasisPick} />
+            <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
               <ReviewRow label="Network fee" value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
@@ -248,7 +247,7 @@ export function SigningApprovalScreen({
               emphasisPick={emphasisPick}
             />
 
-            <RecipientBlock address={preview.recipient ?? ""} emphasisPick={emphasisPick} />
+            <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
               <ReviewRow label="Fee" value={formatFee(preview.fee)} />
@@ -267,7 +266,7 @@ export function SigningApprovalScreen({
               {preview.items.length} item{preview.items.length === 1 ? "" : "s"} to sign
             </span>
             {preview.items.map((item, index) => (
-              <DataItemPreview key={index} index={index} item={item} emphasisPick={emphasisPick} />
+              <DataItemPreview key={index} index={index} item={item} />
             ))}
           </div>
         ) : (
@@ -330,13 +329,13 @@ export function SigningApprovalScreen({
 function DataItemPreview({
   index,
   item,
-  emphasisPick,
 }: {
   index: number;
   item: NonNullable<SigningApprovalPreview["items"]>[number];
-  emphasisPick: number | null;
 }) {
-  const targetAvatarSvg = useMemo(() => (item.target ? generateAccountAvatarSvg(item.target) : undefined), [item.target]);
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const targetAvatarSvg = item.target ? identity.avatarSvg(item.target) : undefined;
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
       <span className="text-caption font-semibold text-foreground">Item {index + 1}</span>
@@ -378,8 +377,10 @@ function DataItemPreview({
   );
 }
 
-function RecipientBlock({ address, emphasisPick }: { address: string; emphasisPick: number | null }) {
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(address), [address]);
+function RecipientBlock({ address }: { address: string }) {
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const avatarSvg = identity.avatarSvg(address);
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">

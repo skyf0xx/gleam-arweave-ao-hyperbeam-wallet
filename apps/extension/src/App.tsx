@@ -1,8 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
+import {
+  AddressIdentityProvider,
+  loadAddressIdentityKey,
+  makeAddressIdentity,
+  NO_ADDRESS_IDENTITY_KEY,
+  type AddressIdentityKey,
+} from "./address-identity";
 import { CollectibleDetailView } from "@/entrypoints/popup/collectibles/index.tsx";
 import { MainScreenView, type MainScreenTab } from "@/entrypoints/popup/main-screen/index.tsx";
 import { SendCollectibleView, SendView } from "@/entrypoints/popup/send/index.tsx";
@@ -121,6 +128,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [resolvedRuntime, setResolvedRuntime] = useState<RuntimePort | null>(runtimeProp ?? null);
   const [initError, setInitError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
+  const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
 
   const refresh = async (runtime: RuntimePort) => {
     const state = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
@@ -186,7 +194,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         const runtime = runtimeProp ?? (await import("./adapters/runtime")).runtimePort;
         if (!isEnvironmentLive()) return;
         setResolvedRuntime(runtime);
-        await Promise.all([refresh(runtime), applyTheme(runtime)]);
+        // Avatars are seeded from the security phrase, so it loads before
+        // the first paint rather than redrawing them a moment later.
+        await Promise.all([refresh(runtime), applyTheme(runtime), loadAddressIdentityKey(runtime).then(setIdentityKey)]);
       } catch (error) {
         if (!isEnvironmentLive()) return;
         // A resolution/read failure this early (no extension messaging
@@ -207,6 +217,10 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   }, []);
 
   const runtime = resolvedRuntime;
+  const addressIdentity = useMemo(
+    () => makeAddressIdentity(identityKey, () => void (runtime && loadAddressIdentityKey(runtime).then(setIdentityKey))),
+    [identityKey, runtime],
+  );
 
   let content: ReactNode;
 
@@ -264,7 +278,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else if (subView.kind === "points") {
     content = <PointsView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "receive") {
-    content = <ReceiveView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
+    content = <ReceiveView wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "wallet-switcher") {
     content = (
       <WalletSwitcherView
@@ -394,13 +408,15 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div
-        data-layout={layout}
-        data-theme={theme === "dark" ? "dark" : undefined}
-        className="min-h-full bg-background text-foreground"
-      >
-        {content}
-      </div>
+      <AddressIdentityProvider value={addressIdentity}>
+        <div
+          data-layout={layout}
+          data-theme={theme === "dark" ? "dark" : undefined}
+          className="min-h-full bg-background text-foreground"
+        >
+          {content}
+        </div>
+      </AddressIdentityProvider>
     </QueryClientProvider>
   );
 }

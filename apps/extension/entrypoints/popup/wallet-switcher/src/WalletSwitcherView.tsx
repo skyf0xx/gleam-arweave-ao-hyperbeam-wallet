@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
+import { useAddressIdentity } from "@/src/address-identity";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -24,7 +24,7 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
  *
  * Each wallet's row uses the same dicebear identicon as the main screen's
  * account pill (`AccountAvatar` + `src/account-avatar.ts`'s
- * `generateAccountAvatarSvg`, keyed on `wallet.address`, computed locally
+ * `avatarSvg`, keyed on `wallet.address`, computed locally
  * with no network call) so the same wallet shows the same identity mark on
  * both screens.
  */
@@ -145,7 +145,8 @@ interface WalletSwitcherRowProps {
 }
 
 function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: WalletSwitcherRowProps) {
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(wallet.address);
   const methodLabel = WALLET_METHOD_LABEL[wallet.method];
 
   return (

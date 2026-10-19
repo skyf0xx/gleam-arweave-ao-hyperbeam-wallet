@@ -1,5 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { addressEmphasisPick } from "@gleam/core";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   ApprovalRequest,
   DeviceSigningRequest,
@@ -13,6 +12,13 @@ import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
+import {
+  AddressIdentityProvider,
+  loadAddressIdentityKey,
+  makeAddressIdentity,
+  NO_ADDRESS_IDENTITY_KEY,
+  type AddressIdentityKey,
+} from "@/src/address-identity";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
@@ -118,13 +124,17 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
   const [securityPhrase, setSecurityPhrase] = useState<{ phrase: SecurityPhrase; icon: string } | null>(null);
-  const [emphasisPick, setEmphasisPick] = useState<number | null>(null);
+  const [runtime, setRuntime] = useState<RuntimePort | null>(runtimeProp ?? null);
+  const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
+  const addressIdentity = useMemo(
+    () => makeAddressIdentity(identityKey, () => void (runtime && loadAddressIdentityKey(runtime).then(setIdentityKey))),
+    [identityKey, runtime],
+  );
 
   const loadSecurityPhrase = async (runtime: RuntimePort) => {
     try {
       const phrase = await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined });
       setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
-      setEmphasisPick(await addressEmphasisPick(phrase?.word ?? null));
     } catch {
       setSecurityPhrase(null);
     }
@@ -177,7 +187,13 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       try {
         const runtime = runtimeProp ?? (await import("@/src/adapters/runtime")).runtimePort;
         if (cancelled) return;
-        await Promise.all([load(runtime, requestId), applyTheme(runtime), loadSecurityPhrase(runtime)]);
+        setRuntime(runtime);
+        await Promise.all([
+          load(runtime, requestId),
+          applyTheme(runtime),
+          loadSecurityPhrase(runtime),
+          loadAddressIdentityKey(runtime).then(setIdentityKey),
+        ]);
       } catch (error) {
         if (cancelled) return;
         setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -330,7 +346,6 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
           origin={request.origin}
           preview={signingPreview}
           assessment={assessment}
-          emphasisPick={emphasisPick}
           onReject={() => void handleReject()}
           onSign={() => handleApprove("Signed.", "Signing failed")}
         />
@@ -343,14 +358,16 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
   const showSecurityPhrase = securityPhrase !== null && (state.kind === "ready" || state.kind === "awaiting-device");
 
   return (
-    <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
-      {showSecurityPhrase ? (
-        <div className="flex justify-center px-6 pt-3">
-          <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
-        </div>
-      ) : null}
-      {content}
-    </div>
+    <AddressIdentityProvider value={addressIdentity}>
+      <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
+        {showSecurityPhrase ? (
+          <div className="flex justify-center px-6 pt-3">
+            <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
+          </div>
+        ) : null}
+        {content}
+      </div>
+    </AddressIdentityProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { isHardwareWalletMethod, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
@@ -13,7 +13,7 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
+import { useAddressIdentity } from "@/src/address-identity";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -60,7 +60,8 @@ export function WalletDetailView({
   onRemoved,
   requestDownloadPermission = requestDownloadsPermission,
 }: WalletDetailViewProps) {
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(wallet.address);
 
   const [name, setName] = useState(wallet.name);
   const [savingName, setSavingName] = useState(false);

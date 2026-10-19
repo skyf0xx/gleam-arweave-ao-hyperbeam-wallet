@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
-import { useAddressEmphasis } from "@/src/use-address-emphasis";
+import { useAddressIdentity } from "@/src/address-identity";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { AddressRow } from "../../activity/src/AddressRow";
@@ -199,7 +198,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const ownWalletFor = (address: string): WalletSummary | undefined =>
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
   const knownNameFor = (address: string): string | undefined => (contactFor(address) ?? ownWalletFor(address))?.name;
-  const emphasisPick = useAddressEmphasis(runtime);
+  const { emphasisPick } = useAddressIdentity();
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
@@ -629,7 +628,8 @@ export function RecipientField({
 }) {
   const [editing, setEditing] = useState<"no" | "focused" | "refocus">("no");
   const address = recipientSchema.safeParse(recipient).data;
-  const avatarSvg = useMemo(() => (address ? generateAccountAvatarSvg(address) : undefined), [address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = address ? identity.avatarSvg(address) : undefined;
   const showCard = editing === "no" && !recipientError && address !== undefined && avatarSvg !== undefined;
 
   return (
@@ -789,8 +789,9 @@ function ReviewStep({
   const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
   const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
   const knownName = contact?.name ?? ownWallet?.name;
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(step.recipient), [step.recipient]);
-  const lookalikeAvatarSvg = useMemo(() => (lookalikeOf ? generateAccountAvatarSvg(lookalikeOf) : undefined), [lookalikeOf]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(step.recipient);
+  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -1024,7 +1025,7 @@ function SkeletonPickerRow() {
  * per the reviewer's spec. Selecting any row fills the recipient field
  * with the full address; truncated display only. Every row — contact,
  * wallet or plain recent address — uses the same dicebear identicon as
- * `WalletSwitcherView`'s own rows (`generateAccountAvatarSvg` + `AccountAvatar`),
+ * `WalletSwitcherView`'s own rows (`useAddressIdentity().avatarSvg` + `AccountAvatar`),
  * not initials in a circle, so an address looks the same wherever it's
  * shown across the extension.
  */

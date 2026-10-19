@@ -1,23 +1,21 @@
-import { useMemo } from "react";
-import type { RuntimePort, WalletSummary } from "@gleam/core";
+import type { WalletSummary } from "@gleam/core";
 import { AccountAvatar, AddressDisplay, QrCode } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
-import { useAddressEmphasis } from "@/src/use-address-emphasis";
+import { useAddressIdentity } from "@/src/address-identity";
 
 /**
  * QR + full address + one-tap copy. See `QrCode`'s own doc comment for
  * the QR-encoding limitation carried into this screen.
  */
 export interface ReceiveViewProps {
-  runtime: RuntimePort;
   wallet: WalletSummary;
   onBack: () => void;
 }
 
-export function ReceiveView({ runtime, wallet, onBack }: ReceiveViewProps) {
-  const emphasisPick = useAddressEmphasis(runtime);
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const avatarSvg = identity.avatarSvg(wallet.address);
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Receive" onBack={onBack} />

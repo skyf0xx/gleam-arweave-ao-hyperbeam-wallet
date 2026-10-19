@@ -4,7 +4,7 @@ import { SecurityPhrasePicker } from "@gleam/ui/src/components/security-phrase/i
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
-import { forgetAddressEmphasis } from "@/src/use-address-emphasis";
+import { useAddressIdentity } from "@/src/address-identity";
 
 export interface SecurityPhraseStepProps {
   runtime: RuntimePort;
@@ -13,6 +13,7 @@ export interface SecurityPhraseStepProps {
 
 /** Onboarding's anti-phishing step. It starts on a suggestion, so Continue alone is enough. */
 export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps) {
+  const { refresh: refreshAddressIdentity } = useAddressIdentity();
   const [phrase, setPhrase] = useState<SecurityPhrase>(() => suggestSecurityPhrase());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -34,7 +35,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
           runtime
             .send<SecurityPhrase, void>({ type: "setSecurityPhrase", payload: phrase })
             .then(() => {
-              forgetAddressEmphasis();
+              refreshAddressIdentity();
               onDone();
             }, (caught: unknown) => {
               setError(caught instanceof Error ? caught.message : String(caught));

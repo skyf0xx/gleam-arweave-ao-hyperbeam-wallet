@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
@@ -15,7 +15,7 @@ import {
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
+import { useAddressIdentity } from "@/src/address-identity";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGrid } from "../../collectibles/index.tsx";
@@ -37,10 +37,8 @@ import { useCopy } from "../../points/src/useCopy";
  * Avatar: `AccountAvatar` (`packages/ui/src/components/wallet/
  * AccountAvatar.tsx`) renders SVG markup generated in-process by
  * `src/account-avatar.ts` (`@dicebear/core` + `@dicebear/styles`,
- * `shapes` style, seeded from `wallet.address`) — no network call.
- * Generation is synchronous, so it's computed inline (via `useMemo`, keyed
- * on the address) rather than through the same async-load state as the
- * balance/activity fetches below.
+ * `shapes` style, seeded from the security phrase and `wallet.address`
+ * through `useAddressIdentity`) — no network call.
  *
  * Chart: `PortfolioChart` (same directory) is fed by `usePortfolioHistory`
  * (`./usePortfolioHistory.ts`), a `useQuery` wrapping the same
@@ -326,7 +324,8 @@ export function MainScreenView({
     enabled: !otherWalletsQuery.isPending,
   });
 
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(wallet.address);
   const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
 
   /**

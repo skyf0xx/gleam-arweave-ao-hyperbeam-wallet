@@ -1,10 +1,9 @@
-import { useMemo } from "react";
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
-import { generateAccountAvatarSvg } from "@/src/account-avatar";
+import { useAddressIdentity } from "@/src/address-identity";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 
 /**
- * One address row with a dicebear identicon (`generateAccountAvatarSvg`,
+ * One address row with a dicebear identicon (`useAddressIdentity().avatarSvg`,
  * same generator as `WalletSwitcherView`) — shared between `SendView`'s
  * "Saved addresses" picker and Settings' Contacts screen so an address
  * looks the same everywhere it's shown. Originally private to
@@ -12,7 +11,8 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
  * the same row.
  */
 export function AddressRow({ address, name, onSelect }: { address: string; name: string | null; onSelect: () => void }) {
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(address), [address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(address);
   return (
     <button
       type="button"
