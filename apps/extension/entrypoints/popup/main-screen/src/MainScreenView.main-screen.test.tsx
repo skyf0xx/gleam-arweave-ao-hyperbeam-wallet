@@ -628,6 +628,32 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBeGreaterThan(0));
   });
 
+  it("shows a swap order as an order placed on the asset, not as an AR send or a receipt", async () => {
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-order",
+          type: "send",
+          address: "processABC",
+          amount: null,
+          status: "confirmed",
+          tags: [],
+          timestamp: Date.now() - 60_000,
+          swap: { process: "processABC" },
+        },
+      ],
+      cursor: null,
+    };
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWith({ tokenBalances: [AO_TOKEN], activity }) }) });
+
+    await waitFor(() => expect(screen.getAllByText("PNTS").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await screen.findByText("Swap order · PNTS");
+    expect(screen.getByText(/Order placed/)).toBeTruthy();
+    expect(screen.queryByText(/^Sent/)).toBeNull();
+  });
+
   it("shows the complete, untruncated token list on the Tokens tab", async () => {
     const tokens: TokenBalance[] = Array.from({ length: 12 }, (_, index) => ({
       address: WALLET.address,

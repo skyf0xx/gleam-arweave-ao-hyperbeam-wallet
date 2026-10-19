@@ -167,6 +167,47 @@ describe("queryActivityTransactions", () => {
     });
   });
 
+  it("reads a market order as a swap order on the asset, not as an AR send or a receive", async () => {
+    const orderId = "o".repeat(43);
+    const fetchImpl = fakeSidedFetch(
+      [
+        edge({
+          id: "order1",
+          ownerAddress: ADDRESS,
+          recipient: "assetProcess",
+          winston: "1",
+          timestamp: 100,
+          tags: [
+            { name: "action", value: "register-interest" },
+            { name: "order-id", value: orderId },
+          ],
+        }),
+        edge({
+          id: "noid",
+          ownerAddress: ADDRESS,
+          recipient: "assetProcess",
+          winston: "1",
+          timestamp: 99,
+          tags: [{ name: "action", value: "register-interest" }],
+        }),
+      ],
+      [],
+    );
+
+    const entries = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entries.find((e) => e.txId === "order1")).toMatchObject({
+      type: "send",
+      status: "confirmed",
+      amount: null,
+      address: "assetProcess",
+      swap: { process: "assetProcess" },
+    });
+    // Without an order id it is not recognised as an order, so stays what it looks like.
+    expect(entries.find((e) => e.txId === "noid")).toMatchObject({ amount: "1" });
+    expect(entries.find((e) => e.txId === "noid")).not.toHaveProperty("swap");
+  });
+
   it("reads a zero-AR transfer of more than one unit as a token send, not a collectible", async () => {
     const recipient = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
     const fetchImpl = fakeSidedFetch(

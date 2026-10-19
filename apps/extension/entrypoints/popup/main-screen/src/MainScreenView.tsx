@@ -213,6 +213,15 @@ function formatActivityAmount(entry: { amount: string | null; token?: string | n
   return `${entry.amount} ${displayTicker(ticker)}`;
 }
 
+/**
+ * A swap order names the asset by its ticker when the user added it, else
+ * by a shortened process id: a discovered token's ticker is its own claim.
+ */
+function swapAssetLabel(processId: string, tokenBalances: TokenBalance[] | undefined): string {
+  const match = tokenBalances?.find((token) => token.processId === processId);
+  return match && match.source !== "discovered" && match.ticker !== processId ? displayTicker(match.ticker) : truncateAddress(processId, 6);
+}
+
 /** A gateway-only entry knows just the asset's process id. */
 function collectibleLabel(collectible: CollectibleRef): string {
   return collectible.name ?? "Collectible";
@@ -684,9 +693,15 @@ export function MainScreenView({
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}
-                    title={`${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`}
+                    title={
+                      entry.swap
+                        ? `Swap order · ${swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances)}`
+                        : `${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`
+                    }
                     subtitle={
-                      entry.unverified
+                      entry.swap && entry.status === "confirmed"
+                        ? `Order placed${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
+                        : entry.unverified
                         ? `Unverified transfer request${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
                         : entry.status === "pending"
                         ? "Pending confirmation"

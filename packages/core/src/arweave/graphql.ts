@@ -164,6 +164,18 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
   // upload, which the local log records as "upload".
   const isUpload = sent && !node.recipient && BigInt(node.quantity.winston || "0") === 0n;
   const type = isUpload ? "upload" : sent ? "send" : "receive";
+  if (sent && node.recipient && isSwapOrder(node.tags)) {
+    return {
+      txId: node.id,
+      type: "send",
+      status: node.block ? "confirmed" : "pending",
+      address: node.recipient,
+      amount: null,
+      tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+      timestamp: node.block ? node.block.timestamp * 1000 : 0,
+      swap: { process: node.recipient },
+    };
+  }
   const l1Transfer = sent && node.recipient ? l1TokenTransferOf(node) : null;
   if (l1Transfer !== null && node.recipient) return toL1TransferEntry(node, "send", l1Transfer.recipient, l1Transfer.quantity, node.recipient);
   return {
@@ -177,6 +189,16 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
   };
+}
+
+/**
+ * A market order the way permawebOS reads one: the `register-interest`
+ * action and a transaction-id `order-id`. Both are the signer's own tags, so this says
+ * what the wallet asked for, not that anything was bought.
+ */
+function isSwapOrder(tags: GraphQLTag[]): boolean {
+  const exact = (name: string) => tags.find((tag) => tag.name === name)?.value;
+  return exact("action") === "register-interest" && /^[A-Za-z0-9_-]{43}$/.test(exact("order-id") ?? "");
 }
 
 /**

@@ -48,6 +48,15 @@ export interface ActivityEntry {
    * row says so instead of presenting it as received.
    */
   unverified?: true;
+  /**
+   * Set on a market order the wallet placed (`register-interest` to an
+   * asset process, `arweave/graphql.ts`). The transaction moves about one
+   * winston, which is not the trade. Whether the order filled, and for how
+   * much, is the asset process's state and isn't on this transaction, so
+   * the row says an order was placed and never that tokens arrived.
+   * `amount` is null.
+   */
+  swap?: { process: string };
 }
 
 export interface ActivityPage {
