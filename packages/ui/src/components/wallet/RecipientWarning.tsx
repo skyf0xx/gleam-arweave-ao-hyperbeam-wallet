@@ -27,8 +27,9 @@ export function RecipientWarning({
       <RiskNotice className={className}>
         <span className="flex min-w-0 flex-col gap-2">
           <span>
-            <strong className="font-bold">This address looks like one you know, but it isn&apos;t.</strong> It starts
-            and ends the same as this one. Scammers copy the edges of an address you used. Compare every character.
+            <strong className="font-bold">This address looks like one you know, but it isn&apos;t.</strong> It
+            closely matches this one. Scammers make near-copies of addresses you use, and a single changed character
+            sends funds elsewhere. Compare every character.
           </span>
           {lookalikeAvatarSvg ? (
             <MemorableAddress address={lookalikeOf} emphasisPick={emphasisPick} avatarSvg={lookalikeAvatarSvg} />

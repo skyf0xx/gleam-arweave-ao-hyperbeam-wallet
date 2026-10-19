@@ -190,11 +190,11 @@ apart from a successful transfer.
 
 ### recipients/
 
-`assess.ts` flags a first-time recipient and detects lookalike-address
-attacks — an address matching a known counterparty's first/last
-characters but not the rest — against both activity history and saved
-contacts. Even a received-only address is checked, since a poisoner's
-dust often arrives as an incoming transfer.
+`assess.ts` flags a first-time recipient and detects lookalike
+addresses (one sharing a known counterparty's first or last characters,
+or most of its characters in place, without being it) against both
+activity history and saved contacts. Even a received-only address is
+checked, since a poisoner's dust often arrives as an incoming transfer.
 
 `memorable-address.ts` cuts an address into 4-character chunks in two
 rows (7 · 4) and picks the chunks to emphasise: the first, the last, and two

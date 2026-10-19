@@ -3,7 +3,7 @@ import type { ActivityEntry } from "../models/activity";
 export interface RecipientAssessment {
   /** No prior activity with this address, and it is not a saved contact or one of your wallets. */
   firstTime: boolean;
-  /** A trusted address that shares this one's first and last characters but differs in between. */
+  /** A trusted address this one closely resembles but isn't: a spoof or a one-character slip. */
   lookalikeOf: string | null;
 }
 
@@ -11,19 +11,31 @@ export interface RecipientAssessment {
 export const LOOKALIKE_EDGE_LENGTH = 4;
 
 /**
- * Whether `recipient` is an address-poisoning lookalike of `known`: same
- * first and last `LOOKALIKE_EDGE_LENGTH` characters, different address.
- * An attacker grinds a vanity address to match a victim's past counterparty
- * and sends dust so it shows up in the history the victim copies from.
+ * Characters in the same position that make two equal-length addresses
+ * "close". Unrelated base64url addresses share a position about once in
+ * 64, so 8 of 43 by chance is around one in a hundred million, while a
+ * one-character edit keeps 42.
+ */
+const SHARED_POSITIONS_FOR_LOOKALIKE = 8;
+
+/**
+ * Whether `recipient` closely resembles `known` without being it. An
+ * attacker grinds a vanity address to match the edges of a victim's past
+ * counterparty and sends dust so it shows up in the history the victim
+ * copies from; matching either edge is far cheaper to grind than both, so
+ * either counts. A near-copy with a character changed anywhere, a typo or
+ * a tampered paste, counts too.
  */
 export function isLookalike(recipient: string, known: string): boolean {
   if (recipient === known) return false;
   const minLength = LOOKALIKE_EDGE_LENGTH * 2 + 1;
   if (recipient.length < minLength || known.length < minLength) return false;
-  return (
-    recipient.startsWith(known.slice(0, LOOKALIKE_EDGE_LENGTH)) &&
-    recipient.endsWith(known.slice(-LOOKALIKE_EDGE_LENGTH))
-  );
+  if (recipient.startsWith(known.slice(0, LOOKALIKE_EDGE_LENGTH))) return true;
+  if (recipient.endsWith(known.slice(-LOOKALIKE_EDGE_LENGTH))) return true;
+  if (recipient.length !== known.length) return false;
+  let shared = 0;
+  for (let i = 0; i < recipient.length; i++) if (recipient[i] === known[i]) shared++;
+  return shared >= SHARED_POSITIONS_FOR_LOOKALIKE;
 }
 
 /**
