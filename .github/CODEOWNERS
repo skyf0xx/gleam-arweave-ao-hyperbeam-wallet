@@ -6,6 +6,12 @@
 # 1 Key material
 /packages/core/src/vault/                                                  @skyf0xx
 /packages/core/src/keys/                                                   @skyf0xx
+/packages/core/src/signer/                                                 @skyf0xx
+/packages/core/src/ports/session-keys.ts                                   @skyf0xx
+/apps/extension/src/keyring/                                               @skyf0xx
+/apps/extension/entrypoints/keyring/                                       @skyf0xx
+/apps/extension/src/adapters/offscreen-keyring.ts                          @skyf0xx
+/apps/extension/src/adapters/session-key-store.ts                          @skyf0xx
 /apps/extension/src/handlers/key-session.ts                                @skyf0xx
 /apps/extension/src/handlers/wallet-lifecycle.ts                           @skyf0xx
 /apps/extension/src/handlers/passkey.ts                                    @skyf0xx
@@ -34,6 +40,7 @@
 /apps/extension/entrypoints/provider/                                      @skyf0xx
 /apps/extension/src/handlers/provider-params.ts                            @skyf0xx
 /apps/extension/src/sender.ts                                              @skyf0xx
+/apps/extension/src/dispatch/methods.ts                                    @skyf0xx
 /packages/messaging/                                                       @skyf0xx
 
 # 4 What you see is what you sign
@@ -52,3 +59,4 @@
 /scripts/release.mjs                                                       @skyf0xx
 /scripts/verify-release.sh                                                 @skyf0xx
 /security/surface.mjs                                                      @skyf0xx
+/security/surface.txt                                                      @skyf0xx
