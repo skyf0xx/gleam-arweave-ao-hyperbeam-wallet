@@ -218,19 +218,6 @@ function collectibleLabel(collectible: CollectibleRef): string {
   return collectible.name ?? "Collectible";
 }
 
-/**
- * How long a range-tab click waits, quiet, before the chart actually
- * fetches that range — a debounce, not a cooldown: each click resets the
- * timer rather than being dropped, so a rapid 7D→1M→ALL→7D tour never
- * fires more than one `getPortfolioHistory` call (for whichever range the
- * user was still on once they stopped clicking) instead of one per tab.
- * This is what keeps a quick tab tour from tripping CoinGecko's free-tier
- * rate limit, which a rapid click-through of all 5 tabs would otherwise
- * hit (see `usePortfolioHistory`'s `staleTime` comment for the caching
- * half of this — this is the request-shaping half).
- */
-const PORTFOLIO_RANGE_DEBOUNCE_MS = 400;
-
 // A per-device view preference, so plain localStorage; it can throw or be empty in some contexts.
 const PORTFOLIO_SCOPE_STORAGE_KEY = "gleam:portfolioScope";
 
@@ -299,21 +286,7 @@ export function MainScreenView({
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
-  /**
-   * `selectedRange` drives the tab highlight and updates the instant a
-   * tab is clicked, so the UI never feels unresponsive to the click
-   * itself. `debouncedRange` drives the actual query and lags behind by
-   * `PORTFOLIO_RANGE_DEBOUNCE_MS` of quiet — every click restarts the
-   * timer, so a fast tour through several tabs shows the chart's loading
-   * state (via `debouncedRange !== selectedRange`, below) the whole time
-   * but only fetches once, for the range the user actually settled on.
-   */
   const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>("7D");
-  const [debouncedRange, setDebouncedRange] = useState<PortfolioHistoryRange>("7D");
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedRange(selectedRange), PORTFOLIO_RANGE_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [selectedRange]);
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
@@ -325,7 +298,7 @@ export function MainScreenView({
     writePortfolioScope(next);
   };
   // Waits for the wallet list so a saved "all" preference doesn't first fetch the single-wallet view.
-  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, debouncedRange, portfolioScope, {
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, {
     enabled: !otherWalletsQuery.isPending,
   });
 
@@ -518,23 +491,7 @@ export function MainScreenView({
               onRangeChange={setSelectedRange}
               scope={portfolioScope}
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
-              /**
-               * True for the whole debounce window too (not just while
-               * the query itself is in flight) — `selectedRange` moves
-               * the instant a tab is clicked, but `debouncedRange` (and
-               * so `portfolioHistoryQuery`) hasn't caught up yet, and
-               * `portfolioHistoryQuery` is still holding the *previous*
-               * range's data/error during that window. Showing loading
-               * here avoids flashing the old range's chart, %-change, or
-               * (see `onRetry` below) its stale error state under a tab
-               * that no longer matches it. `isFetching` rather than
-               * `isLoading`: `isLoading` is only true for a range's very
-               * first fetch (no cached data yet) — clicking the error
-               * banner's Retry re-runs an already-errored query, which
-               * `isLoading` never reflects, so it was leaving the banner
-               * on screen through the whole retry with no visible change.
-               */
-              loading={debouncedRange !== selectedRange || portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
+              loading={portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
               /**
                * `series: []` on a *resolved* response (no thrown query
                * error) is `getPortfolioHistory`'s own signal that both AR
@@ -548,17 +505,14 @@ export function MainScreenView({
                * tabs (rendered inside `PortfolioChart`) stay visible and
                * clickable even while the active range is failed — a
                * failed "ALL" no longer strands the user without a way
-               * back to a previously-cached "7D". Gated on
-               * `debouncedRange === selectedRange` for the same
-               * stale-data reason as `loading` above: never surface the
-               * error banner for a range the user has already clicked
-               * away from. Also gated on `!isFetching` so clicking Retry
-               * hides the banner immediately (`loading` above turns
-               * true from the same `isFetching` flip) instead of leaving
-               * it on screen, inert, for the duration of the refetch.
+               * back to a previously-cached "7D". Gated on `!isFetching`
+               * so clicking Retry hides the banner immediately instead
+               * of leaving it on screen, inert, for the duration of the
+               * refetch. `isFetching` rather than `isLoading` for
+               * `loading`: a Retry re-runs an already-errored query,
+               * which `isLoading` never reflects.
                */
               onRetry={
-                debouncedRange === selectedRange &&
                 !portfolioHistoryQuery.isFetching &&
                 (portfolioHistoryQuery.error || (portfolioHistoryQuery.isSuccess && portfolioHistoryQuery.data.series.length === 0))
                   ? () => void portfolioHistoryQuery.refetch()
