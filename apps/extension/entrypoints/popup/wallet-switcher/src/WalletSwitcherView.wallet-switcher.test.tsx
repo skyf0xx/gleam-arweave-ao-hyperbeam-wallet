@@ -131,7 +131,7 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
     expect(onAddWallet).toHaveBeenCalledOnce();
   });
 
-  it("calls onManage with the wallet's id when its kebab button is pressed", async () => {
+  it("calls onManage with the wallet's id when its manage chevron is pressed", async () => {
     const onManage = vi.fn();
     const send = vi.fn().mockResolvedValue(STATE);
     render(

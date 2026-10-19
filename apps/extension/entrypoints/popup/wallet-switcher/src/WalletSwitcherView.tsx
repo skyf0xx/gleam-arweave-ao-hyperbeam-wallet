@@ -19,7 +19,7 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
  * switches on tap via `switchWallet`.
  *
  * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
- * per-row "manage" kebab opens the wallet detail screen (rename/back up)
+ * per-row "manage" chevron opens the wallet detail screen (rename/back up)
  * through `onManage`.
  *
  * Each wallet's row uses the same dicebear identicon as the main screen's
@@ -189,7 +189,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         onClick={onManage}
         className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-mist hover:text-foreground"
       >
-        <KebabIcon />
+        <ChevronRightIcon />
       </button>
     </div>
   );
@@ -212,12 +212,11 @@ function CopyIcon() {
   );
 }
 
-function KebabIcon() {
+/** Opens the wallet's own page, so it reads as a way in, not a menu. */
+function ChevronRightIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="5" r="1.6" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
-      <circle cx="12" cy="19" r="1.6" fill="currentColor" />
+      <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
