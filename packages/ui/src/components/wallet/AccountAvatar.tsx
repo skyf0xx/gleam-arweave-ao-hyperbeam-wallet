@@ -17,13 +17,16 @@ export interface AccountAvatarProps {
   className?: string;
 }
 
+/** A cut-gem outline: Gleam's avatars are facets, not tiles. */
+const FACETED = "polygon(50% 0%, 79% 10%, 95% 35%, 95% 65%, 79% 90%, 50% 100%, 21% 90%, 5% 65%, 5% 35%, 21% 10%)";
+
 export function AccountAvatar({ svgMarkup, label, size = 28, className }: AccountAvatarProps) {
   return (
     <span
       role="img"
       aria-label={label}
-      className={cn("inline-flex shrink-0 overflow-hidden rounded-[30%] bg-mist", className)}
-      style={{ width: size, height: size }}
+      className={cn("inline-flex shrink-0 overflow-hidden bg-mist", className)}
+      style={{ width: size, height: size, clipPath: FACETED }}
     >
       <img
         src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`}
