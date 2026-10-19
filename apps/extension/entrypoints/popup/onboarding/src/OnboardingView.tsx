@@ -66,38 +66,42 @@ export interface OnboardingViewProps {
   requestDownloadPermission?: RequestDownloadsPermission;
 }
 
-// Colourless on purpose: a wallet's avatar has its own colour, and a name
-// like "Ruby" on a blue avatar would read as the wrong wallet.
+// Crystal- or light-sounding, and colourless on purpose: a wallet's avatar
+// has its own colour, and a name like "Ruby" on a blue avatar would read as
+// the wrong wallet.
 const DEFAULT_WALLET_NAMES = [
-  "Asscher",
-  "Baguette",
-  "Beam",
   "Brilliant",
-  "Cabochon",
-  "Carat",
   "Clarity",
+  "Clear Quartz",
   "Crystal",
+  "Dazzle",
   "Diamond",
   "Facet",
   "Flare",
+  "Flicker",
   "Glimmer",
   "Glint",
+  "Glisten",
+  "Glow",
   "Halo",
-  "Lens",
+  "Lucent",
   "Lumen",
   "Lustre",
-  "Marquise",
   "Mirror",
   "Nova",
+  "Photon",
   "Prism",
   "Quartz",
   "Radiant",
   "Ray",
+  "Rock Crystal",
+  "Sheen",
   "Shimmer",
-  "Solitaire",
   "Spark",
+  "Sparkle",
   "Spectrum",
-  "Trillion",
+  "Starlight",
+  "Twinkle",
   "Zircon",
 ];
 
