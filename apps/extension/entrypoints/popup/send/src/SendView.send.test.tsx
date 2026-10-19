@@ -469,7 +469,7 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
     fireEvent.click(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6))));
 
     await waitFor(() => expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Change recipient/ }));
     const textarea = screen.getByPlaceholderText("Paste an address") as HTMLTextAreaElement;
     expect(textarea.value).toBe(RECENT_RECIPIENT_A);
     expect(document.activeElement).toBe(textarea);
