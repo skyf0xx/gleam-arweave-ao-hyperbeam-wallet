@@ -446,8 +446,13 @@ const PERMAWEB_EVENT_SOURCES: Record<string, ReadonlyArray<[string, (detail: unk
   ],
 };
 
-/** A `window.permawebConnect` in PermawebOS's shape whose every call goes to Gleam. */
-function permawebConnectShim(gleam: GleamProvider): WalletLike {
+type PermawebMethod = (typeof PERMAWEB_CONNECT_METHODS)[number];
+
+/**
+ * A `window.permawebConnect` in PermawebOS's shape. Every call goes through
+ * `callGleam`, which applies the site's wallet choice first.
+ */
+function permawebConnectShim(callGleam: (method: PermawebMethod, args: unknown[]) => Promise<unknown>): WalletLike {
   const bridges = new Map<PermawebListener, Array<[string, EventListener]>>();
   const events = {
     on(name: unknown, listener: unknown): void {
@@ -476,7 +481,7 @@ function permawebConnectShim(gleam: GleamProvider): WalletLike {
   };
   const shim: WalletLike = { walletName: WALLET_NAME, walletVersion: WALLET_VERSION, events };
   for (const method of PERMAWEB_CONNECT_METHODS) {
-    shim[method] = (...args: unknown[]) => (gleam[method] as (...rest: unknown[]) => unknown).apply(gleam, args);
+    shim[method] = (...args: unknown[]) => callGleam(method, args);
   }
   return Object.freeze(shim);
 }
@@ -495,7 +500,8 @@ function install(): () => void {
   }
   let permawebShim: WalletLike | null = null;
   if (!("permawebConnect" in window)) {
-    const shim = permawebConnectShim(gleamProvider);
+    // `callThroughShim` is defined below, and runs only once a call arrives.
+    const shim = permawebConnectShim((method, args) => callThroughShim(method, args));
     try {
       // Configurable, so PermawebOS's own `defineProperty` replaces it.
       Object.defineProperty(window, "permawebConnect", { value: shim, configurable: true, enumerable: true, writable: false });
@@ -595,6 +601,17 @@ function install(): () => void {
   };
 
   const target = (): WalletLike => (useGleam === true ? gleam : (other() ?? gleam));
+
+  // The shim answers only for the wallet the site uses, the same choice the
+  // router makes: a site the user left on Wander gets no Gleam prompt from
+  // its PermawebOS button.
+  const callThroughShim = async (method: PermawebMethod, args: unknown[]): Promise<unknown> => {
+    if (!decided()) await whenDecided();
+    if (target() !== gleam) {
+      throw new Error("This site uses another wallet. Choose Gleam for it in the Gleam popup to connect with Gleam.");
+    }
+    return (gleamProvider[method] as (...rest: unknown[]) => unknown).apply(gleamProvider, args);
+  };
 
   const invoke = (prop: PropertyKey, args: unknown[]): unknown => {
     const wallet = target();

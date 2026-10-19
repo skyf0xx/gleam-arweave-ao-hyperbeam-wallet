@@ -830,10 +830,14 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
       expect(shim.walletVersion).toBe(PACKAGE_VERSION);
     });
 
-    it("sends the connect button's calls to Gleam with their arguments", () => {
+    it("sends the connect button's calls to Gleam with their arguments", async () => {
+      vi.useFakeTimers();
       teardown = install();
       void permawebSlot().connect!(["ACCESS_ADDRESS", "SIGNATURE"], { name: "Bazar" });
       void (permawebSlot().getActivePublicKey as () => Promise<unknown>)();
+      // Held, like the router's calls, until other wallets have had the chance to install.
+      expect(gleamRequests()).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(150);
       const sent = gleamRequests().map(([message]: [unknown]) => message as { method: string; params: unknown });
       expect(sent.map((message: { method: string }) => message.method)).toEqual(["connect", "getActivePublicKey"]);
       expect(sent[0]!.params).toMatchObject({ permissions: ["ACCESS_ADDRESS", "SIGNATURE"], appInfo: { name: "Bazar" } });
@@ -847,6 +851,28 @@ describe("provider.ts: install() routes window.arweaveWallet (point 7)", () => {
       expect(modeRequests()).toHaveLength(0);
       expect(otherWalletReports()).toHaveLength(0);
       expect(gleamRequests()).toHaveLength(1);
+    });
+
+    it("refuses, without a Gleam prompt, on a site the user left on another wallet", async () => {
+      const other = wander();
+      installOther(other);
+      teardown = install();
+      const pending = permawebSlot().connect!(["ACCESS_ADDRESS"]) as Promise<unknown>;
+      expect(modeRequests()).toHaveLength(1);
+      sendSiteMode(false);
+
+      await expect(pending).rejects.toThrow("This site uses another wallet.");
+      expect(gleamRequests()).toHaveLength(0);
+      expect(other.connect).not.toHaveBeenCalled();
+    });
+
+    it("answers through Gleam once the user picked Gleam for a site that also has another wallet", async () => {
+      installOther(wander());
+      teardown = install();
+      const pending = permawebSlot().connect!(["ACCESS_ADDRESS"]) as Promise<unknown>;
+      sendSiteMode(true);
+      await vi.waitFor(() => expect(gleamRequests()).toHaveLength(1));
+      void pending.catch(() => undefined);
     });
 
     it("leaves a slot PermawebOS already filled", () => {
