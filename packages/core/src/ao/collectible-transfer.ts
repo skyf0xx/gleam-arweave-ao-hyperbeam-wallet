@@ -1,26 +1,18 @@
-import { prepareTransfer } from "../arweave/transfer";
 import type { ArweaveTransactionJson } from "../arweave/transaction";
 import type { Winston } from "../models/balance";
 import type { UploadTag } from "../models/upload";
+import { l1TransferTags, prepareL1TokenTransfer, readL1TokenTransfer } from "./l1-transfer";
 
 /**
- * Collectibles run on `arweave-scheduler@1.0`, which reads its messages
- * from Arweave L1, so a send is a plain L1 transaction to the asset
- * process rather than an ANS-104 item posted to the MU. It moves no AR;
- * the transfer is in the tags, whose lowercase names are what that
- * scheduler matches. The sender pays the network reward.
+ * A collectible is an `arweave-scheduler@1.0` asset with a supply of one,
+ * so sending it is `ao/l1-transfer.ts`'s L1 transfer of quantity 1.
  */
 export const COLLECTIBLE_TRANSFER_QUANTITY = "1";
 
-const ADDRESS = /^[A-Za-z0-9_-]{43}$/;
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
 export function collectibleTransferTags(recipient: string): UploadTag[] {
-  return [
-    { name: "action", value: "transfer" },
-    { name: "recipient", value: recipient },
-    { name: "quantity", value: COLLECTIBLE_TRANSFER_QUANTITY },
-  ];
+  return l1TransferTags(recipient, COLLECTIBLE_TRANSFER_QUANTITY);
 }
 
 /** The unsigned transaction that moves collectible `assetId` from `ownerB64Url` to `recipient`. */
@@ -30,10 +22,7 @@ export async function prepareCollectibleTransfer(
   assetId: string,
   recipient: string,
 ): Promise<ArweaveTransactionJson> {
-  if (!ADDRESS.test(recipient)) {
-    throw new Error(`Collectible recipient must be an Arweave address (43 base64url characters), got "${recipient}".`);
-  }
-  return prepareTransfer(gatewayUrl, ownerB64Url, assetId, "0", collectibleTransferTags(recipient));
+  return prepareL1TokenTransfer(gatewayUrl, ownerB64Url, assetId, recipient, COLLECTIBLE_TRANSFER_QUANTITY);
 }
 
 /**
@@ -46,22 +35,9 @@ export function readCollectibleTransfer(transaction: {
   data_size: string;
   tags: UploadTag[];
 }): { assetId: string; recipient: string } | null {
-  const [action, recipient, quantity, ...rest] = transaction.tags;
-  if (
-    !ADDRESS.test(transaction.target) ||
-    (transaction.quantity || "0") !== "0" ||
-    transaction.data_size !== "0" ||
-    rest.length > 0 ||
-    action?.name !== "action" ||
-    action.value !== "transfer" ||
-    recipient?.name !== "recipient" ||
-    !ADDRESS.test(recipient.value) ||
-    quantity?.name !== "quantity" ||
-    quantity.value !== COLLECTIBLE_TRANSFER_QUANTITY
-  ) {
-    return null;
-  }
-  return { assetId: transaction.target, recipient: recipient.value };
+  const transfer = readL1TokenTransfer(transaction);
+  if (!transfer || transfer.quantity !== COLLECTIBLE_TRANSFER_QUANTITY) return null;
+  return { assetId: transfer.processId, recipient: transfer.recipient };
 }
 
 /** Throws when `arBalance` can't pay `fee`. */
