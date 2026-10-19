@@ -38,8 +38,11 @@ package or app root), not inside it.
   Explain a directory as a whole when that's sufficient; list individual
   files only when their specific responsibilities matter.
 - **Component explanations** — for each important component, cover what
-  responsibility it has, why it exists, and when/how it's used, as
-  concise prose rather than mechanically repeated labels.
+  responsibility it has, why it exists, and when/how it's used. Prefer a
+  short titled list (bolded name, then a one- or two-sentence
+  explanation) over a dense paragraph that chains several components
+  together with commas and dashes. Give each component its own line so
+  a reader can scan instead of parse.
 - **Relationships and data flow** — who calls or depends on whom, how
   data/control flows, where responsibilities begin and end, and who owns
   state or persistence. Prioritize relationships that build a reader's
@@ -51,11 +54,27 @@ package or app root), not inside it.
 
 Write for a technically capable reader unfamiliar with this part of the
 codebase. Target Flesch–Kincaid grade 6–8 where practical: familiar
-words, short sentences, concrete explanations. Keep necessary technical
-terms, explained briefly where context doesn't already make them clear.
-Avoid restating what the code already makes obvious, generic
-introductions, filler, and boilerplate. Document the architecture, not
-every implementation detail.
+words, short sentences, concrete explanations. One idea per sentence —
+split any sentence that chains two or more claims with commas,
+semicolons, parentheticals, or "and"/"but" into separate sentences or
+list items. This applies as much to a relationship explanation (layering,
+dependency direction, an exception, an analogy) as it does to a list of
+files — a paragraph that packs "what depends on what, with one
+exception, summarized by an analogy" into three long sentences is still
+too dense, even with zero files named. If a paragraph's sentences each
+need re-reading to parse, break it into shorter sentences or a short
+list before moving on. Keep necessary technical terms, explained briefly
+where context doesn't already make them clear. Avoid restating what the
+code already makes obvious, generic introductions, filler, and
+boilerplate. Document the architecture, not every implementation
+detail.
+
+Default to titled lists over dense paragraphs. When explaining a set of
+files, components, or steps, use a bulleted or numbered list with a
+bolded title per item rather than a paragraph that packs them all
+together. Reserve paragraphs for the directory overview and for
+relationships/data flow that genuinely need connected prose; even there,
+keep sentences short and break up any sentence doing too much work.
 
 ## 4. Keep documentation up to date
 
