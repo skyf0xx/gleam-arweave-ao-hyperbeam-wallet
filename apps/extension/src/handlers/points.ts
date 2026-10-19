@@ -243,18 +243,18 @@ export class PointsHandler {
 
   /**
    * `POST /attestations/check`: the server's dry run of the local checks plus the
-   * latest release and the challenge's expiry and use. Asked before a signature
+   * latest release, the challenge's expiry and use, and (given the wallet's address) whether it already attested. Asked before a signature
    * is requested, so a hardware wallet user isn't told it failed only after
    * signing on the device.
    */
-  async checkAttestation(attestation: ParsedAttestation): Promise<AttestationCheck> {
+  async checkAttestation(attestation: ParsedAttestation, address?: string): Promise<AttestationCheck> {
     let response: Response;
     let body: Record<string, unknown> | null;
     try {
       response = await this.fetchImpl(`${this.deps.apiUrl}/attestations/check`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ attestation }),
+        body: JSON.stringify(address ? { attestation, address } : { attestation }),
         signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
       });
       body = (await response.json().catch(() => null)) as Record<string, unknown> | null;

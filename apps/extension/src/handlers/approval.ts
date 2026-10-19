@@ -296,7 +296,7 @@ export type TransferSubmitter = AoTransferSubmitter & Partial<DeviceTransferSubm
 export interface ScanAttestationSubmitter {
   attest(req: { walletId: string; attestation: ParsedAttestation }): Promise<SiteAttestResponse>;
   submitAttestation(attestation: ParsedAttestation, proof: OwnershipProof): Promise<SiteAttestResponse>;
-  check(attestation: ParsedAttestation): Promise<AttestationCheck>;
+  check(attestation: ParsedAttestation, address?: string): Promise<AttestationCheck>;
 }
 
 /**
@@ -1151,7 +1151,8 @@ export class ApprovalHandler {
     if (entry.request.kind !== "scanAttestation") {
       throw new Error(`Approval request "${req.requestId}" isn't a scan attestation.`);
     }
-    return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)));
+    const wallet = entry.walletId ? await getStoredWallet(entry.walletId) : null;
+    return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)), wallet?.address);
   }
 
   /** `ProtocolMap.deviceActivity`. */

@@ -694,6 +694,21 @@ describe("POST /attestations/check", () => {
     expect(json.code).toBe("challenge_used");
   });
 
+  it("reports already_attested up front when it is given the wallet's address", async () => {
+    const s = await setup();
+    await s.register(alice);
+    await s.post("/attestations", await attestBody(alice, attestationFor(s, await s.challenge())));
+    const next = attestationFor(s, await s.challenge());
+
+    const named = await s.post("/attestations/check", { attestation: next, address: alice.address });
+    expect(named.status).toBe(409);
+    expect(named.json.code).toBe("already_attested");
+
+    expect((await s.post("/attestations/check", { attestation: next, address: bob.address })).status).toBe(200);
+    expect((await s.post("/attestations/check", { attestation: next })).status).toBe(200);
+    expect((await s.post("/attestations/check", { attestation: next, address: "not an address!" })).status).toBe(400);
+  });
+
   it("answers no_release when none exists", async () => {
     const s = await setup({ latest: null });
     const spans = functionsOf(s.files).slice(0, 3);

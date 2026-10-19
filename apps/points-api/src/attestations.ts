@@ -35,9 +35,12 @@ const SCAN_REWARD_DIVISOR = 1000n;
 
 export interface CheckRequest {
   attestation: unknown;
+  /** The wallet that will sign. With it the dry run also reports `already_attested`, which is wallet-specific. */
+  address?: string;
 }
 
-export interface SubmitRequest extends CheckRequest {
+export interface SubmitRequest {
+  attestation: unknown;
   message: string;
   signature: string;
   owner: string;
@@ -47,12 +50,15 @@ export interface SubmitRequest extends CheckRequest {
 
 export function parseCheckRequest(body: unknown): CheckRequest | null {
   if (body === null || typeof body !== "object" || !("attestation" in body)) return null;
-  return { attestation: (body as { attestation: unknown }).attestation };
+  const { attestation, address } = body as { attestation: unknown; address?: unknown };
+  if (address === undefined) return { attestation };
+  if (typeof address !== "string" || address.length > MAX_OWNER_LENGTH || !BASE64URL.test(address)) return null;
+  return { attestation, address };
 }
 
 export function parseSubmitRequest(body: unknown): SubmitRequest | null {
-  const check = parseCheckRequest(body);
-  if (!check) return null;
+  if (body === null || typeof body !== "object" || !("attestation" in body)) return null;
+  const check = { attestation: (body as { attestation: unknown }).attestation };
   const { owner, message, signature, proof = "message" } = body as Record<string, unknown>;
   if (typeof owner !== "string" || owner.length > MAX_OWNER_LENGTH || !BASE64URL.test(owner)) return null;
   if (typeof message !== "string" || message.length > MAX_MESSAGE_LENGTH) return null;
@@ -166,7 +172,7 @@ async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
   return Math.max(0, PAID_SCANS_PER_RELEASE - Number(rows[0]!.taken));
 }
 
-/** Everything `POST /attestations` checks except the signature, wallet and one-per-release rule. */
+/** Everything `POST /attestations` checks except the signature, wallet liveness and registration; the one-per-release rule only when the request names the wallet. */
 export async function checkAttestation(
   db: Queryable,
   github: GithubClient,
@@ -178,6 +184,13 @@ export async function checkAttestation(
   try {
     const checked = await checkAgainstRelease(db, github, parsed.attestation, now);
     if (!checked.ok) return checked;
+    if (request.address !== undefined) {
+      const attested = await db.query("SELECT 1 FROM attestations WHERE address = $1 AND release = $2", [
+        request.address,
+        parsed.attestation.release,
+      ]);
+      if (attested.rows.length > 0) return alreadyAttested(parsed.attestation.release);
+    }
     const id = await attestationId(parsed.attestation);
     return {
       ok: true,
@@ -280,12 +293,7 @@ export async function submitAttestation(
     // 4. One scan per wallet per release.
     const attested = await tx.query("SELECT 1 FROM attestations WHERE address = $1 AND release = $2", [address, attestation.release]);
     if (attested.rows.length > 0) {
-      return failure(
-        409,
-        "already_attested",
-        "owner",
-        `This wallet already attested v${attestation.release}; each wallet can attest a release once, so wait for the next release.`,
-      );
+      return alreadyAttested(attestation.release);
     }
 
     // 5. Paid places. A scan past them is still recorded. A scan that
@@ -316,6 +324,15 @@ export async function submitAttestation(
   });
   if (outcome.ok) listings.clear();
   return outcome;
+}
+
+function alreadyAttested(release: string): ScanFailure {
+  return failure(
+    409,
+    "already_attested",
+    "owner",
+    `This wallet already attested v${release}; each wallet can attest a release once, so wait for the next release.`,
+  );
 }
 
 function notRegistered(): ScanFailure {

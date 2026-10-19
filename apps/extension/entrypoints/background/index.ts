@@ -126,7 +126,7 @@ const approval: ApprovalHandler = new ApprovalHandler(
   {
     attest: (req) => points.attest(req),
     submitAttestation: (attestation, proof) => points.submitAttestation(attestation, proof),
-    check: (attestation) => points.checkAttestation(attestation),
+    check: (attestation, address) => points.checkAttestation(attestation, address),
   },
 );
 

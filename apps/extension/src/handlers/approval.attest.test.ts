@@ -233,7 +233,7 @@ describe("ApprovalHandler: scan attestations", () => {
     const { requestId } = await open(KEYFILE_ID);
 
     await expect(handler.checkScanAttestation({ requestId })).resolves.toEqual({ ok: true });
-    expect(submitter.check).toHaveBeenCalledWith(ATTESTATION);
+    expect(submitter.check).toHaveBeenCalledWith(ATTESTATION, await addressFromOwner(keyfileJwk.n));
 
     submitter.check = vi.fn(async () => ({ ok: false, error: "The scan's challenge expired." }));
     await expect(handler.checkScanAttestation({ requestId })).resolves.toEqual({ ok: false, error: "The scan's challenge expired." });

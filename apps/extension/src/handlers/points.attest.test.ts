@@ -192,6 +192,14 @@ describe("PointsHandler.checkAttestation", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ attestation: ATTESTATION });
   });
 
+  it("sends the wallet's address when it has one", async () => {
+    const { handler, fetchImpl } = setup(json({ ok: true }));
+
+    await handler.checkAttestation(attestation, "addr-1");
+
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]![1]?.body))).toEqual({ attestation: ATTESTATION, address: "addr-1" });
+  });
+
   it("turns a refusal into the sentence saying what to do next, and a dead network into offline", async () => {
     const expired = await setup(json({ error: "x", code: "challenge_expired" }, 409)).handler.checkAttestation(attestation);
     expect(expired).toMatchObject({ ok: false, error: expect.stringContaining("pnpm scan start") });
