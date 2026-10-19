@@ -196,6 +196,11 @@ characters but not the rest — against both activity history and saved
 contacts. Even a received-only address is checked, since a poisoner's
 dust often arrives as an incoming transfer.
 
+`memorable-address.ts` cuts an address into 4-character chunks grouped
+4 · 4 · 3 and picks the chunks to emphasise: the first, the last, and two
+middle ones chosen per user from HMAC-SHA256 of their security phrase, so
+a ground lookalike can't know which middle chunks the user checks.
+
 ### pricing/
 
 USD price lookups for AR, AO, and registered tokens. Lookups fall from

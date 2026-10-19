@@ -60,6 +60,12 @@ entries, collectibles) but not where the data comes from: `TokenRow`,
 
 These are the main screen's building blocks.
 
+`MemorableAddress` renders a full address in emphasised 4-character
+chunks (see `core/recipients/memorable-address.ts`), and `RecipientCard`
+pairs it with the address's avatar and name wherever a send or signing
+request names a recipient. Addresses use the bundled JetBrains Mono
+(`tokens/fonts/`), which keeps l/I/1 and O/0 apart.
+
 ### components/onboarding/
 
 Screens and pieces for wallet creation/import: `PasswordField`,

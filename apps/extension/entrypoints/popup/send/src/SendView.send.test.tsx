@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ActivityPage, Contact, FeeEstimate, RuntimePort, TokenBalance, WalletState, WalletSummary } from "@gleam/core";
+import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { SendView, type SendViewProps } from "./SendView";
 
 afterEach(() => {
@@ -467,10 +468,32 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
     await waitFor(() => expect(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6)))).toBeTruthy());
     fireEvent.click(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6))));
 
-    await waitFor(() => {
-      const textarea = screen.getByPlaceholderText("Paste an address") as HTMLTextAreaElement;
-      expect(textarea.value).toBe(RECENT_RECIPIENT_A);
-    });
+    await waitFor(() => expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    const textarea = screen.getByPlaceholderText("Paste an address") as HTMLTextAreaElement;
+    expect(textarea.value).toBe(RECENT_RECIPIENT_A);
+    expect(document.activeElement).toBe(textarea);
+  });
+
+  it("shows a pasted address as a card once the field loses focus", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.focus(textarea);
+    fireEvent.change(textarea, { target: { value: RECENT_RECIPIENT_A } });
+    expect(screen.queryByText(addressText(RECENT_RECIPIENT_A))).toBeNull();
+
+    fireEvent.blur(textarea);
+    expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy();
+    expect(screen.getByText("New address")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Paste an address")).toBeNull();
+  });
+
+  it("keeps the input for an address that isn't valid", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.change(textarea, { target: { value: "not-an-address" } });
+    fireEvent.blur(textarea);
+    expect(screen.getByPlaceholderText("Paste an address")).toBeTruthy();
   });
 
   it("shows the full, untruncated recipient address on the review screen regardless of selection method", async () => {
@@ -487,17 +510,14 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
     await waitFor(() => expect(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6)))).toBeTruthy());
     fireEvent.click(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6))));
 
-    await waitFor(() => {
-      const textarea = screen.getByPlaceholderText("Paste an address") as HTMLTextAreaElement;
-      expect(textarea.value).toBe(RECENT_RECIPIENT_A);
-    });
+    await waitFor(() => expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy());
 
     // Leaves room for the default fee mock's fee, unlike the whole balance.
     fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "0.5" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
-    expect(screen.getByText(RECENT_RECIPIENT_A)).toBeTruthy();
+    expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy();
   });
 
   it("lists the vault's other wallets under a 'Your wallets' section, excluding the active wallet", async () => {
@@ -702,7 +722,7 @@ describe("SendView recipient lookalike warning", () => {
   it("names the address a lookalike recipient imitates, and still lets the user send", async () => {
     await reviewWith({ firstSeenRecipient: false, lookalikeOf: LOOKALIKE_OF });
     expect(screen.getByText(/looks like one you know/)).toBeTruthy();
-    expect(screen.getByText(LOOKALIKE_OF)).toBeTruthy();
+    expect(screen.getByText(addressText(LOOKALIKE_OF))).toBeTruthy();
     expect(screen.getByRole("button", { name: /sign and send/i }).hasAttribute("disabled")).toBe(false);
   });
 

@@ -13,7 +13,7 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
-import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
+import { generateAccountAvatarSvg } from "@/src/account-avatar";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -161,7 +161,7 @@ export function WalletDetailView({
 
       <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-7">
         <div className="flex items-center gap-3">
-          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} className="rounded-2xl" />
+          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
             <span className="truncate text-caption text-faint">

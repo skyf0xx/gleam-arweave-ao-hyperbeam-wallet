@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { EmptyState, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { generateAccountAvatarSvg } from "@/src/account-avatar";
+import { useAddressEmphasis } from "@/src/use-address-emphasis";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { AddressRow } from "../../activity/src/AddressRow";
@@ -196,6 +198,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const ownWalletFor = (address: string): WalletSummary | undefined =>
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
+  const knownNameFor = (address: string): string | undefined => (contactFor(address) ?? ownWalletFor(address))?.name;
+  const emphasisPick = useAddressEmphasis(runtime);
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
@@ -291,6 +295,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         balancesQuery={balancesQuery}
         arFeeAtomic={arFeeQuery.data}
         step={step}
+        knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
+        emphasisPick={emphasisPick}
         onBack={onBack}
         onChange={(patch) =>
           setStep({
@@ -406,6 +412,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         step={step}
         contact={contactFor(step.recipient)}
         ownWallet={ownWalletFor(step.recipient)}
+        emphasisPick={emphasisPick}
         signsOnDevice={isHardwareWalletMethod(wallet.method)}
         onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient })}
         onSign={() => void handleSign()}
@@ -431,6 +438,8 @@ function ComposeStep({
   balancesQuery,
   arFeeAtomic,
   step,
+  knownName,
+  emphasisPick,
   onBack,
   onChange,
   onBlurRecipient,
@@ -449,6 +458,8 @@ function ComposeStep({
   balancesQuery: UseQueryResult<WalletBalances>;
   arFeeAtomic: string | undefined;
   step: Extract<Step, { kind: "compose" }>;
+  knownName: string | undefined;
+  emphasisPick: number | null;
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
   onBlurRecipient: () => void;
@@ -500,6 +511,8 @@ function ComposeStep({
         <RecipientField
           recipient={step.recipient}
           recipientError={step.recipientError}
+          knownName={knownName}
+          emphasisPick={emphasisPick}
           onChangeRecipient={(recipient) => onChange({ recipient })}
           onBlurRecipient={onBlurRecipient}
           onOpenSavedAddresses={onOpenSavedAddresses}
@@ -574,10 +587,18 @@ function ComposeStep({
   );
 }
 
-/** The "To" field: address input, the saved-addresses link and the quiet "Save this address" line. */
+/**
+ * The "To" field: address input, the saved-addresses link and the quiet
+ * "Save this address" line. Once a valid address loses focus, the input
+ * gives way to a card with the address's avatar and chunked form, so it
+ * can be checked at a glance before Continue. "Change" brings the input
+ * back.
+ */
 export function RecipientField({
   recipient,
   recipientError,
+  knownName,
+  emphasisPick,
   onChangeRecipient,
   onBlurRecipient,
   onOpenSavedAddresses,
@@ -591,6 +612,9 @@ export function RecipientField({
 }: {
   recipient: string;
   recipientError: string | undefined;
+  /** The saved contact's or own wallet's name for `recipient`, if it is one. */
+  knownName: string | undefined;
+  emphasisPick: number | null;
   onChangeRecipient: (recipient: string) => void;
   onBlurRecipient: () => void;
   onOpenSavedAddresses: () => void;
@@ -603,6 +627,11 @@ export function RecipientField({
   onConfirmSaveAddress: () => void;
   savingAddress: boolean;
 }) {
+  const [editing, setEditing] = useState<"no" | "focused" | "refocus">("no");
+  const address = recipientSchema.safeParse(recipient).data;
+  const avatarSvg = useMemo(() => (address ? generateAccountAvatarSvg(address) : undefined), [address]);
+  const showCard = editing === "no" && !recipientError && address !== undefined && avatarSvg !== undefined;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -615,14 +644,30 @@ export function RecipientField({
           Saved addresses
         </button>
       </div>
-      <textarea
-        rows={2}
-        value={recipient}
-        onChange={(event) => onChangeRecipient(event.target.value)}
-        onBlur={onBlurRecipient}
-        placeholder="Paste an address"
-        className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
-      />
+      {showCard ? (
+        <RecipientCard
+          address={address}
+          name={knownName ?? null}
+          avatarSvg={avatarSvg}
+          emphasisPick={emphasisPick}
+          onEdit={() => setEditing("refocus")}
+        />
+      ) : (
+        <textarea
+          rows={2}
+          aria-label="Recipient address"
+          autoFocus={editing === "refocus"}
+          value={recipient}
+          onChange={(event) => onChangeRecipient(event.target.value)}
+          onFocus={() => setEditing("focused")}
+          onBlur={() => {
+            setEditing("no");
+            onBlurRecipient();
+          }}
+          placeholder="Paste an address"
+          className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
+        />
+      )}
       {recipientError ? (
         <div role="alert" className="text-label leading-snug text-warning">
           {recipientError}
@@ -710,6 +755,7 @@ function ReviewStep({
   step,
   contact,
   ownWallet,
+  emphasisPick,
   signsOnDevice,
   onBack,
   onSign,
@@ -720,6 +766,7 @@ function ReviewStep({
   contact: Contact | undefined;
   /** One of the vault's own other wallets, if `step.recipient` is its address — same known-recipient treatment as a saved contact. */
   ownWallet: WalletSummary | undefined;
+  emphasisPick: number | null;
   /** A hardware wallet signs in the approval window the background opens; the popup may close when it takes focus. */
   signsOnDevice: boolean;
   onBack: () => void;
@@ -742,6 +789,8 @@ function ReviewStep({
   const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
   const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
   const knownName = contact?.name ?? ownWallet?.name;
+  const avatarSvg = useMemo(() => generateAccountAvatarSvg(step.recipient), [step.recipient]);
+  const lookalikeAvatarSvg = useMemo(() => (lookalikeOf ? generateAccountAvatarSvg(lookalikeOf) : undefined), [lookalikeOf]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -754,7 +803,12 @@ function ReviewStep({
         </div>
 
         {irreversible ? (
-          <RecipientWarning firstTime lookalikeOf={lookalikeOf} />
+          <RecipientWarning
+            firstTime
+            lookalikeOf={lookalikeOf}
+            lookalikeAvatarSvg={lookalikeAvatarSvg}
+            emphasisPick={emphasisPick}
+          />
         ) : (
           <p className="text-label leading-relaxed text-muted">
             You&apos;re sending {formatAmount(step.amountAtomic, token)} {ticker} to this address. This can&apos;t
@@ -762,15 +816,18 @@ function ReviewStep({
           </p>
         )}
 
-        {knownName ? (
-          <div className="-mb-2 flex items-center justify-between text-label">
-            <span className="text-muted">Recipient</span>
-            <span className="font-semibold text-foreground">{knownName}</span>
-          </div>
-        ) : null}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-label font-semibold text-muted">To</span>
+          <RecipientCard
+            address={step.recipient}
+            name={knownName ?? null}
+            avatarSvg={avatarSvg}
+            emphasisPick={emphasisPick}
+            tone="confirm"
+          />
+        </div>
 
         <div className="flex flex-col">
-          <ReviewRow label={knownName ? "Address" : "Recipient"} value={step.recipient} mono />
           <ReviewRow
             label="Fee"
             value={step.estimate.fee === null ? "No network fee" : `${formatWinstonAsAr(step.estimate.fee)} AR`}

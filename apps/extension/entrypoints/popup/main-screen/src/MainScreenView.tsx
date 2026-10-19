@@ -15,7 +15,7 @@ import {
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
-import { generateAccountAvatarSvg } from "./generateAccountAvatar";
+import { generateAccountAvatarSvg } from "@/src/account-avatar";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGrid } from "../../collectibles/index.tsx";
@@ -36,8 +36,8 @@ import { useCopy } from "../../points/src/useCopy";
  *
  * Avatar: `AccountAvatar` (`packages/ui/src/components/wallet/
  * AccountAvatar.tsx`) renders SVG markup generated in-process by
- * `./generateAccountAvatar.ts` (`@dicebear/core` + `@dicebear/styles`,
- * `weave` style, seeded from `wallet.address`) — no network call.
+ * `src/account-avatar.ts` (`@dicebear/core` + `@dicebear/styles`,
+ * `shapes` style, seeded from `wallet.address`) — no network call.
  * Generation is synchronous, so it's computed inline (via `useMemo`, keyed
  * on the address) rather than through the same async-load state as the
  * balance/activity fetches below.

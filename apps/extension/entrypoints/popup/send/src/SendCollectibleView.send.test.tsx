@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Collectible, FeeEstimate, RuntimePort, WalletSummary } from "@gleam/core";
+import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { SendCollectibleView } from "./SendCollectibleView";
 
@@ -87,7 +88,7 @@ describe("SendCollectibleView", () => {
         collectible: { id: COLLECTIBLE.id, name: COLLECTIBLE.name, imageUrl: COLLECTIBLE.imageUrl },
       },
     });
-    expect(screen.getByText(RECIPIENT)).toBeTruthy();
+    expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
 

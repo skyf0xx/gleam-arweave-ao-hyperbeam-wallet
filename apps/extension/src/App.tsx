@@ -264,7 +264,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else if (subView.kind === "points") {
     content = <PointsView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "receive") {
-    content = <ReceiveView wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
+    content = <ReceiveView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
   } else if (subView.kind === "wallet-switcher") {
     content = (
       <WalletSwitcherView

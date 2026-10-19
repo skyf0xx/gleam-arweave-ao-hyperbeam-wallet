@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
-import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
+import { generateAccountAvatarSvg } from "@/src/account-avatar";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 
 /**
@@ -19,7 +19,7 @@ export function AddressRow({ address, name, onSelect }: { address: string; name:
       onClick={onSelect}
       className="flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 hover:bg-mist"
     >
-      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={32} className="rounded-2xl" />
+      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={32} />
       {name ? (
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-label font-semibold text-foreground">{name}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { addressEmphasisPick } from "@gleam/core";
 import type {
   ApprovalRequest,
   DeviceSigningRequest,
@@ -117,11 +118,13 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
   const [securityPhrase, setSecurityPhrase] = useState<{ phrase: SecurityPhrase; icon: string } | null>(null);
+  const [emphasisPick, setEmphasisPick] = useState<number | null>(null);
 
   const loadSecurityPhrase = async (runtime: RuntimePort) => {
     try {
       const phrase = await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined });
       setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
+      setEmphasisPick(await addressEmphasisPick(phrase?.word ?? null));
     } catch {
       setSecurityPhrase(null);
     }
@@ -327,6 +330,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
           origin={request.origin}
           preview={signingPreview}
           assessment={assessment}
+          emphasisPick={emphasisPick}
           onReject={() => void handleReject()}
           onSign={() => handleApprove("Signed.", "Signing failed")}
         />

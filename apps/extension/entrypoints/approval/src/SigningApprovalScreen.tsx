@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { CollectibleThumbnail, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
+import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
+import { generateAccountAvatarSvg } from "@/src/account-avatar";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
@@ -10,8 +11,8 @@ import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-scree
  * The highest-stakes screen in the product: recipient, amount, fee, a
  * decoded-data preview, tags, and a SHA-256 hash of the exact signing
  * payload with its own copy affordance, all shown before signing is
- * possible. Full addresses only, never truncated (`break-all`, not
- * `AddressDisplay`'s truncated variant). Never uses the beam as anything
+ * possible. Full addresses only, never truncated: addresses render in
+ * `MemorableAddress`'s chunked form with their avatar. Never uses the beam as anything
  * but the small identity mark, and never uses humor here — maximum
  * clarity, zero cleverness. The irreversible-tier `RiskNotice`/
  * `destructive` Button pairing is the same one `RiskNotice`'s own doc
@@ -23,6 +24,8 @@ export interface SigningApprovalScreenProps {
   preview: SigningApprovalPreview;
   /** Recipient checks for a transfer; omitted or null shows none. */
   assessment?: RecipientAssessment | null;
+  /** The user's address emphasis pick (`addressEmphasisPick`). */
+  emphasisPick?: number | null;
   onReject: () => void;
   /** Rejects (surfacing its message inline) if signing fails — e.g. the wallet's unlocked session has since expired. */
   onSign: () => Promise<void>;
@@ -140,7 +143,16 @@ async function copyToClipboard(value: string): Promise<void> {
   }
 }
 
-export function SigningApprovalScreen({ origin, preview, assessment, onReject, onSign }: SigningApprovalScreenProps) {
+export function SigningApprovalScreen({
+  origin,
+  preview,
+  assessment,
+  emphasisPick = null,
+  onReject,
+  onSign,
+}: SigningApprovalScreenProps) {
+  const lookalikeOf = assessment?.lookalikeOf ?? null;
+  const lookalikeAvatarSvg = useMemo(() => (lookalikeOf ? generateAccountAvatarSvg(lookalikeOf) : undefined), [lookalikeOf]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const isTransfer = preview.recipient !== null;
@@ -196,9 +208,14 @@ export function SigningApprovalScreen({ origin, preview, assessment, onReject, o
               before signing.
             </RiskNotice>
 
-            <RecipientWarning firstTime={assessment?.firstTime ?? false} lookalikeOf={assessment?.lookalikeOf} />
+            <RecipientWarning
+              firstTime={assessment?.firstTime ?? false}
+              lookalikeOf={lookalikeOf}
+              lookalikeAvatarSvg={lookalikeAvatarSvg}
+              emphasisPick={emphasisPick}
+            />
 
-            <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
+            <RecipientBlock address={preview.recipient ?? ""} emphasisPick={emphasisPick} />
 
             <div className="flex flex-col">
               <ReviewRow label="Network fee" value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
@@ -224,9 +241,14 @@ export function SigningApprovalScreen({ origin, preview, assessment, onReject, o
               </RiskNotice>
             ) : null}
 
-            <RecipientWarning firstTime={assessment?.firstTime ?? false} lookalikeOf={assessment?.lookalikeOf} />
+            <RecipientWarning
+              firstTime={assessment?.firstTime ?? false}
+              lookalikeOf={lookalikeOf}
+              lookalikeAvatarSvg={lookalikeAvatarSvg}
+              emphasisPick={emphasisPick}
+            />
 
-            <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
+            <RecipientBlock address={preview.recipient ?? ""} emphasisPick={emphasisPick} />
 
             <div className="flex flex-col">
               <ReviewRow label="Fee" value={formatFee(preview.fee)} />
@@ -245,7 +267,7 @@ export function SigningApprovalScreen({ origin, preview, assessment, onReject, o
               {preview.items.length} item{preview.items.length === 1 ? "" : "s"} to sign
             </span>
             {preview.items.map((item, index) => (
-              <DataItemPreview key={index} index={index} item={item} />
+              <DataItemPreview key={index} index={index} item={item} emphasisPick={emphasisPick} />
             ))}
           </div>
         ) : (
@@ -308,10 +330,13 @@ export function SigningApprovalScreen({ origin, preview, assessment, onReject, o
 function DataItemPreview({
   index,
   item,
+  emphasisPick,
 }: {
   index: number;
   item: NonNullable<SigningApprovalPreview["items"]>[number];
+  emphasisPick: number | null;
 }) {
+  const targetAvatarSvg = useMemo(() => (item.target ? generateAccountAvatarSvg(item.target) : undefined), [item.target]);
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
       <span className="text-caption font-semibold text-foreground">Item {index + 1}</span>
@@ -319,7 +344,7 @@ function DataItemPreview({
       {item.target !== null ? (
         <div className="flex flex-col gap-0.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">Target</span>
-          <span className="break-all font-mono text-caption text-foreground">{item.target}</span>
+          <MemorableAddress address={item.target} emphasisPick={emphasisPick} avatarSvg={targetAvatarSvg} />
         </div>
       ) : null}
 
@@ -349,6 +374,26 @@ function DataItemPreview({
         <span className="text-caption font-semibold uppercase tracking-wide text-muted">Payload (SHA-256)</span>
         <span className="break-all font-mono text-[11px] text-foreground">{item.payloadHash}</span>
       </div>
+    </div>
+  );
+}
+
+function RecipientBlock({ address, emphasisPick }: { address: string; emphasisPick: number | null }) {
+  const avatarSvg = useMemo(() => generateAccountAvatarSvg(address), [address]);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-caption font-semibold uppercase tracking-wide text-muted">Recipient</span>
+        <button
+          type="button"
+          aria-label="Copy recipient"
+          onClick={() => void copyToClipboard(address)}
+          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-muted"
+        >
+          <CopyIcon />
+        </button>
+      </div>
+      <RecipientCard address={address} avatarSvg={avatarSvg} emphasisPick={emphasisPick} tone="confirm" />
     </div>
   );
 }

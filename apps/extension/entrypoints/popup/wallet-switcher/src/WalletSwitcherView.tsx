@@ -3,7 +3,7 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
+import { generateAccountAvatarSvg } from "@/src/account-avatar";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -23,7 +23,7 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
  * through `onManage`.
  *
  * Each wallet's row uses the same dicebear identicon as the main screen's
- * account pill (`AccountAvatar` + `./generateAccountAvatar.ts`'s
+ * account pill (`AccountAvatar` + `src/account-avatar.ts`'s
  * `generateAccountAvatarSvg`, keyed on `wallet.address`, computed locally
  * with no network call) so the same wallet shows the same identity mark on
  * both screens.
@@ -157,7 +157,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         aria-current={active ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-2.5 py-3 text-left hover:bg-mist disabled:opacity-60"
       >
-        <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} className="rounded-2xl" />
+        <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} />
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
           <span className="truncate text-caption text-faint">
