@@ -481,6 +481,17 @@ export interface AttestationListing {
 }
 
 /**
+ * Non-voided attestations of one release, and nothing else: no coverage and
+ * no GitHub call. A release with none is 0, whether or not it exists.
+ */
+export async function countAttestations(db: Queryable, query: { release?: string }): Promise<{ ok: true; release: string; total: number } | ScanFailure> {
+  if (query.release === undefined || !isRelease(query.release)) {
+    return failure(400, "malformed_request", "release", "release must be a version like 1.4.0 (no leading v).");
+  }
+  return { ok: true, release: query.release, total: await attestationTotal(db, query.release) };
+}
+
+/**
  * Everything needed to verify each attestation without trusting Gleam.
  * Voided ones are left out. Only the latest release and releases that
  * already have attestations are answered, so a caller can't make the server

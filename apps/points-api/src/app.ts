@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import {
   AttestationListCache,
   checkAttestation,
+  countAttestations,
   listAttestations,
   parseListQuery,
   parseCheckRequest,
@@ -82,7 +83,7 @@ export function createApp(deps: AppDeps): Hono {
 
   // Scan endpoints are open to any origin: the CLI sends no origin, scan.html
   // reads the list, and the signature (not the origin) authorises a submission.
-  for (const path of [...ATTESTATION_PATHS, "/scan/challenge"]) app.use(path, cors({ origin: "*" }));
+  for (const path of [...ATTESTATION_PATHS, "/attestations/count", "/scan/challenge"]) app.use(path, cors({ origin: "*" }));
 
   app.get("/health", async (c) => {
     await deps.db.query("SELECT 1");
@@ -199,6 +200,14 @@ export function createApp(deps: AppDeps): Hono {
     if (!request) return scanMalformed(c);
     const outcome = await submitAttestation(deps.db, github, request, now(), attestationListings);
     return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
+  });
+
+  app.get("/attestations/count", async (c) => {
+    if (!attestationsListByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, attestationsListByIp, now().getTime());
+    const outcome = await countAttestations(deps.db, c.req.query());
+    if (!outcome.ok) return scanFailure(c, outcome);
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json({ release: outcome.release, total: outcome.total });
   });
 
   app.get("/attestations", async (c) => {

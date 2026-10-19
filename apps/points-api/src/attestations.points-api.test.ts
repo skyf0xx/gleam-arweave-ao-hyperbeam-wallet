@@ -734,6 +734,33 @@ describe("POST /attestations/check", () => {
   });
 });
 
+describe("GET /attestations/count", () => {
+  it("counts a release's non-voided scans without GitHub, and answers 0 for one with none", async () => {
+    const s = await setup();
+    await s.register(alice);
+    await s.post("/attestations", await attestBody(alice, attestationFor(s, await s.challenge())));
+    s.github.calls.length = 0;
+
+    const latest = await s.get("/attestations/count?release=1.0.0");
+    const none = await s.get("/attestations/count?release=0.5.0");
+
+    expect(latest.json).toEqual({ release: "1.0.0", total: 1 });
+    expect(none.status).toBe(200);
+    expect(none.json).toEqual({ release: "0.5.0", total: 0 });
+    expect(latest.headers.get("access-control-allow-origin")).toBe("*");
+    expect(s.github.calls).toEqual([]);
+  });
+
+  it("400 for a missing or malformed release", async () => {
+    const s = await setup();
+    for (const query of ["", "?release=v1.0.0", "?release=x"]) {
+      const { status, json } = await s.get(`/attestations/count${query}`);
+      expect(status, query).toBe(400);
+      expect(json.code).toBe("malformed_request");
+    }
+  });
+});
+
 describe("GET /attestations", () => {
   async function withScans() {
     const s = await setup();
