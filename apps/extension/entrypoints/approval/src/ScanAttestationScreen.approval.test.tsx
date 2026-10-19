@@ -58,7 +58,10 @@ function runtimeWith(handlers: Record<string, (payload: unknown) => unknown>, st
   return { runtime, send };
 }
 
-const member = { getPointsMemberships: () => ({ "wallet-1": { address: "addr-1", inviteCode: "ME", referred: false, joinedAt: 0 } }) };
+const member = {
+  getPointsMemberships: () => ({ "wallet-1": { address: "addr-1", inviteCode: "ME", referred: false, joinedAt: 0 } }),
+  checkScanAttestation: () => ({ ok: true }),
+};
 
 describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
   it("shows every field, and the report as plain text, never as HTML or markdown", async () => {
@@ -121,6 +124,24 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
     await screen.findByText("+12.50 points", {}, SLOW);
     expect(send).toHaveBeenCalledWith({ type: "resolveApproval", payload: { requestId: "req-attest", approved: true } });
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+  });
+
+  it("checks the attestation first, and a failed check asks for no signature and says what to do", async () => {
+    const error = "The scan's challenge expired after 24 hours. To start over, ask your agent to run `pnpm scan start` and finish a new scan.";
+    const resolveApproval = vi.fn();
+    const { runtime, send } = runtimeWith({
+      ...member,
+      checkScanAttestation: () => ({ ok: false, error }),
+      resolveApproval,
+    });
+    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
+
+    expect((await screen.findByRole("alert", {}, SLOW)).textContent).toBe(error);
+    expect(send).toHaveBeenCalledWith({ type: "checkScanAttestation", payload: { requestId: "req-attest" } });
+    expect(resolveApproval).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "Sign" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("shows the server's refusal as one sentence", async () => {

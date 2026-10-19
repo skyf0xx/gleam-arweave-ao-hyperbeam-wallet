@@ -181,3 +181,25 @@ describe("PointsHandler.attest", () => {
     expect(await odd.handler.attest({ walletId: "w1", attestation })).toMatchObject({ ok: false, code: "offline" });
   });
 });
+
+describe("PointsHandler.checkAttestation", () => {
+  it("posts only the attestation to /attestations/check and passes when the server accepts it", async () => {
+    const { handler, fetchImpl } = setup(json({ ok: true, attestationId: id, paidPlacesLeft: 3 }));
+
+    expect(await handler.checkAttestation(attestation)).toEqual({ ok: true });
+
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe(`${API}/attestations/check`);
+    expect(JSON.parse(String(init?.body))).toEqual({ attestation: ATTESTATION });
+  });
+
+  it("turns a refusal into the sentence saying what to do next, and a dead network into offline", async () => {
+    const expired = await setup(json({ error: "x", code: "challenge_expired" }, 409)).handler.checkAttestation(attestation);
+    expect(expired).toMatchObject({ ok: false, error: expect.stringContaining("pnpm scan start") });
+
+    const down = setup(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await down.handler.checkAttestation(attestation)).toMatchObject({ ok: false, error: expect.stringContaining("couldn't reach the points server") });
+  });
+});

@@ -9,6 +9,7 @@ import {
   type WalletState,
   type WalletSummary,
 } from "@gleam/core";
+import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { FoundingGate } from "@/entrypoints/popup/onboarding/src/FoundingGate";
@@ -28,6 +29,8 @@ export interface ScanAttestationScreenProps {
   origin: string;
   preview: ScanAttestationApprovalPreview;
   onReject: () => void;
+  /** The points API's dry run, asked before the signature so a stale scan fails before the device is involved. */
+  onCheck: () => Promise<AttestationCheck>;
   /**
    * Never rejects: the window moves on to the result, the device step, or
    * the final error, since a failed request is already dropped.
@@ -50,7 +53,7 @@ type Membership =
   | { status: "not-joined"; wallet: WalletSummary | null }
   | { status: "error"; message: string };
 
-function ScanAttestationFlow({ runtime, origin, preview, onReject, onSign }: ScanAttestationScreenProps) {
+function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSign }: ScanAttestationScreenProps) {
   const [membership, setMembership] = useState<Membership>({ status: "loading" });
 
   useEffect(() => {
@@ -89,7 +92,7 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onSign }: Sca
           onCancel={onReject}
         />
       ) : (
-        <AttestationReview preview={preview} wallet={membership.wallet} onReject={onReject} onSign={onSign} />
+        <AttestationReview preview={preview} wallet={membership.wallet} onReject={onReject} onCheck={onCheck} onSign={onSign} />
       )}
     </div>
   );
@@ -180,17 +183,32 @@ function AttestationReview({
   preview,
   wallet,
   onReject,
+  onCheck,
   onSign,
 }: {
   preview: ScanAttestationApprovalPreview;
   wallet: WalletSummary | null;
   onReject: () => void;
+  onCheck: () => Promise<AttestationCheck>;
   onSign: () => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [checkError, setCheckError] = useState<string>();
 
-  const handleSign = () => {
+  const handleSign = async () => {
     setSubmitting(true);
+    setCheckError(undefined);
+    let check: AttestationCheck;
+    try {
+      check = await onCheck();
+    } catch (error) {
+      check = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    if (!check.ok) {
+      setCheckError(check.error);
+      setSubmitting(false);
+      return;
+    }
     void onSign();
   };
 
@@ -246,6 +264,12 @@ function AttestationReview({
         <span className="break-all font-mono text-[11px] text-foreground">{preview.attestationId}</span>
       </Field>
 
+      {checkError ? (
+        <p role="alert" className="text-center text-label leading-relaxed text-warning">
+          {checkError}
+        </p>
+      ) : null}
+
       <div className="mt-auto flex gap-2.5 pt-1">
         <Button type="button" variant="secondary" disabled={submitting} onClick={onReject} className="flex-1">
           Reject
@@ -254,7 +278,7 @@ function AttestationReview({
           type="button"
           disabled={submitting}
           aria-busy={submitting}
-          onClick={handleSign}
+          onClick={() => void handleSign()}
           className="flex-1"
         >
           {submitting ? "Signing…" : "Sign"}

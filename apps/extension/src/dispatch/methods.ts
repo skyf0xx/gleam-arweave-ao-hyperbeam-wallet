@@ -313,6 +313,7 @@ export const BACKGROUND_MESSAGES = {
   getApproval: EXTENSION,
   resolveApproval: EXTENSION,
   submitDeviceSignature: EXTENSION,
+  checkScanAttestation: EXTENSION,
   deviceActivity: EXTENSION,
 
   // settings

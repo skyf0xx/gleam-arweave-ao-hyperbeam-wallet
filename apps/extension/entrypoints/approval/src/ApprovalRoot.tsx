@@ -8,7 +8,7 @@ import type {
   ThemeSettings,
   WalletState,
 } from "@gleam/core";
-import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
+import type { ApprovalShown, AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
@@ -336,6 +336,12 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
           origin={request.origin}
           preview={request.preview}
           onReject={() => void handleReject()}
+          onCheck={() =>
+            runtime.send<{ requestId: string }, AttestationCheck>({
+              type: "checkScanAttestation",
+              payload: { requestId: request.requestId },
+            })
+          }
           onSign={() => handleApprove("Signed.", "Couldn't sign the attestation")}
         />
       );

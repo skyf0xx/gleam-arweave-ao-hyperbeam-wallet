@@ -126,6 +126,7 @@ const approval: ApprovalHandler = new ApprovalHandler(
   {
     attest: (req) => points.attest(req),
     submitAttestation: (attestation, proof) => points.submitAttestation(attestation, proof),
+    check: (attestation) => points.checkAttestation(attestation),
   },
 );
 
@@ -819,6 +820,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   getApproval: (data) => approval.getApproval(data),
   resolveApproval: (data) => approval.resolveApproval(data),
   submitDeviceSignature: (data) => approval.submitDeviceSignature(data),
+  checkScanAttestation: (data) => approval.checkScanAttestation(data),
   deviceActivity: (data) => approval.deviceActivity(data),
 
   // settings

@@ -38,6 +38,8 @@ import type {
 import type { ProviderSurfaceMethod } from "./page-protocol";
 import type { SiteAttestResponse } from "./site-protocol";
 
+export type AttestationCheck = { ok: true } | { ok: false; error: string };
+
 /**
  * What a finished request shows in its window, for the kinds whose window
  * stays open after approval. A scan attestation shows the points it
@@ -213,6 +215,11 @@ export interface ProtocolMap {
    * request completes as `resolveApproval` would for a keyfile wallet.
    */
   submitDeviceSignature(req: { requestId: string; signatures: string[] }): ApprovalShown | void;
+  /**
+   * A scan attestation's dry run against the points API, asked before the
+   * signature is. `error` says what to do next.
+   */
+  checkScanAttestation(req: { requestId: string }): AttestationCheck;
   /** Heartbeat while the window talks to the device; pushes the timeout back, up to `APPROVAL_MAX_MS`. */
   deviceActivity(req: { requestId: string }): { deadline: number };
 

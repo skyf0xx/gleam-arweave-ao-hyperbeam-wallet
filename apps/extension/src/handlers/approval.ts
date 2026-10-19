@@ -69,6 +69,7 @@ import {
   type ParsedAttestation,
 } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
+import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
@@ -295,6 +296,7 @@ export type TransferSubmitter = AoTransferSubmitter & Partial<DeviceTransferSubm
 export interface ScanAttestationSubmitter {
   attest(req: { walletId: string; attestation: ParsedAttestation }): Promise<SiteAttestResponse>;
   submitAttestation(attestation: ParsedAttestation, proof: OwnershipProof): Promise<SiteAttestResponse>;
+  check(attestation: ParsedAttestation): Promise<AttestationCheck>;
 }
 
 /**
@@ -1141,6 +1143,15 @@ export class ApprovalHandler {
       throw new Error("This request ended while it was being prepared for your device. Start again from the app.");
     }
     return this.requestView({ ...entry, device });
+  }
+
+  /** `ProtocolMap.checkScanAttestation`. */
+  async checkScanAttestation(req: { requestId: string }): Promise<AttestationCheck> {
+    const entry = await this.findLive(req.requestId, false);
+    if (entry.request.kind !== "scanAttestation") {
+      throw new Error(`Approval request "${req.requestId}" isn't a scan attestation.`);
+    }
+    return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)));
   }
 
   /** `ProtocolMap.deviceActivity`. */

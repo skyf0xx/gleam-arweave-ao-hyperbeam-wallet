@@ -32,6 +32,7 @@ import { attestationId, type ParsedAttestation } from "@gleam/core/src/scan/atte
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { DeviceKey } from "../adapters/device-key";
 import { attestFailure, serverAttestFailure } from "./attest-errors";
+import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -71,6 +72,10 @@ export const POINTS_SEATS_SEEN_KEY = "local:points:seatsSeen";
 const HEARTBEAT_INTERVAL_MS = 20 * 3_600_000;
 
 const ATTEST_TIMEOUT_MS = 30_000;
+
+function failureOf(response: SiteAttestResponse): AttestationCheck {
+  return { ok: false, error: response.ok ? "The points server refused the attestation." : response.error };
+}
 
 /** A wallet's signed proof that it owns its address, in the body shape `/register`, `/leave` and `/attestations` take. */
 export interface OwnershipProof {
@@ -234,6 +239,30 @@ export class PointsHandler {
     const message = buildAttestMessage(req.attestation.release, await attestationId(req.attestation));
     const proof = await this.proveOwnership(req.walletId, ATTEST, () => message);
     return this.submitAttestation(req.attestation, proof);
+  }
+
+  /**
+   * `POST /attestations/check`: the server's dry run of the local checks plus the
+   * latest release and the challenge's expiry and use. Asked before a signature
+   * is requested, so a hardware wallet user isn't told it failed only after
+   * signing on the device.
+   */
+  async checkAttestation(attestation: ParsedAttestation): Promise<AttestationCheck> {
+    let response: Response;
+    let body: Record<string, unknown> | null;
+    try {
+      response = await this.fetchImpl(`${this.deps.apiUrl}/attestations/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ attestation }),
+        signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
+      });
+      body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    } catch {
+      return failureOf(attestFailure("offline", attestation.release));
+    }
+    if (!response.ok) return failureOf(serverAttestFailure(response.status, body, attestation.release));
+    return { ok: true };
   }
 
   /** `POST /attestations` with a proof already made, by `attest` or on a hardware wallet in the approval window. */

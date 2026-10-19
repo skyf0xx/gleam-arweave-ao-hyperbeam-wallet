@@ -130,7 +130,7 @@ const PAID: SiteAttestResponse = { ok: true, attestationId: "x", points: "500000
 
 let storage: StoragePort;
 let windows: ReturnType<typeof createFakeWindows>;
-let submitter: { attest: ReturnType<typeof vi.fn>; submitAttestation: ReturnType<typeof vi.fn> };
+let submitter: { attest: ReturnType<typeof vi.fn>; submitAttestation: ReturnType<typeof vi.fn>; check: ReturnType<typeof vi.fn> };
 let handler: ApprovalHandler;
 let keyfileJwk: JWKInterface;
 let deviceJwk: JWKInterface;
@@ -174,7 +174,7 @@ beforeEach(async () => {
   storage = createWatchableStorage();
   await storage.set("local:wallets", wallets);
   windows = createFakeWindows();
-  submitter = { attest: vi.fn(async () => PAID), submitAttestation: vi.fn(async () => PAID) };
+  submitter = { attest: vi.fn(async () => PAID), submitAttestation: vi.fn(async () => PAID), check: vi.fn(async () => ({ ok: true })) };
   // The active wallet is the hardware one, so a test that signs with the
   // keyfile proves the request keeps the wallet it was opened for.
   handler = new ApprovalHandler(
@@ -228,6 +228,17 @@ describe("ApprovalHandler: scan attestations", () => {
     expect(submitter.attest).toHaveBeenCalledWith({ walletId: KEYFILE_ID, attestation: ATTESTATION });
     expect(windows.closed).not.toContain(requestId);
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
+  });
+
+  it("checks the pending attestation with the points API, and refuses to check anything else", async () => {
+    const { requestId } = await open(KEYFILE_ID);
+
+    await expect(handler.checkScanAttestation({ requestId })).resolves.toEqual({ ok: true });
+    expect(submitter.check).toHaveBeenCalledWith(ATTESTATION);
+
+    submitter.check = vi.fn(async () => ({ ok: false, error: "The scan's challenge expired." }));
+    await expect(handler.checkScanAttestation({ requestId })).resolves.toEqual({ ok: false, error: "The scan's challenge expired." });
+    await expect(handler.checkScanAttestation({ requestId: "nope" })).rejects.toThrow(/No pending approval/);
   });
 
   it("a refusal from the points API is shown too, not thrown", async () => {
