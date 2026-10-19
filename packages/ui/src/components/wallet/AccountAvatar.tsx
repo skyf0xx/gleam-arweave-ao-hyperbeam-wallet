@@ -22,7 +22,7 @@ export function AccountAvatar({ svgMarkup, label, size = 28, className }: Accoun
     <span
       role="img"
       aria-label={label}
-      className={cn("inline-flex shrink-0 overflow-hidden rounded-[30%] bg-background ring-1 ring-inset ring-line", className)}
+      className={cn("inline-flex shrink-0 overflow-hidden rounded-[30%] bg-mist", className)}
       style={{ width: size, height: size }}
     >
       <img
