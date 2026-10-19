@@ -62,7 +62,7 @@ import {
  *   key material).
  * - `local:activeWalletId` — `string | null`.
  * - `local:lockSettings` — `LockSettings`, default `{ autoLockTimeout:
- *   "never" }`.
+ *   "1hr" }`.
  * - `local:themeSettings` — `ThemeSettings`, default `{ theme: "light" }`
  *   (no OS-driven default, light always wins when nothing is stored).
  * - `session:unlockedSession` — `Session`, routed to `chrome.storage.session`
