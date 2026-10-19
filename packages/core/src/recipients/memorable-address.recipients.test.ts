@@ -4,11 +4,11 @@ import { addressEmphasisPick, chunkAddress, middleChunks } from "./memorable-add
 const ADDRESS = "weY8dOVhGi9BhGV3B-pkKVWA1ox_n8gzSKOHOJ14uFk";
 
 describe("chunkAddress", () => {
-  it("groups a 43-character address as 4 · 4 · 3 chunks that rejoin to the address", () => {
+  it("splits a 43-character address into rows of 7 and 4 chunks that rejoin to the address", () => {
     const groups = chunkAddress(ADDRESS, null);
-    expect(groups.map((group) => group.length)).toEqual([4, 4, 3]);
+    expect(groups.map((group) => group.length)).toEqual([7, 4]);
     expect(groups.flat().map((chunk) => chunk.text).join("")).toBe(ADDRESS);
-    expect(groups[2]!.at(-1)!.text).toBe("uFk");
+    expect(groups[1]!.at(-1)!.text).toBe("uFk");
   });
 
   it("emphasises the ends and chunks 3 and 7 without a pick", () => {

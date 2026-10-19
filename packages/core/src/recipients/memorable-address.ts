@@ -1,7 +1,6 @@
 import { securityPhraseSeed } from "../models/security-phrase";
 
 export const ADDRESS_CHUNK_LENGTH = 4;
-const CHUNKS_PER_GROUP = 4;
 
 /** One 4-character slice of an address, by its position among all the chunks. */
 export interface AddressChunk {
@@ -11,8 +10,8 @@ export interface AddressChunk {
 }
 
 /**
- * The address cut into 4-character chunks, grouped four chunks to a group
- * (a 43-character Arweave address reads 4 · 4 · 3). The first and last
+ * The address cut into 4-character chunks in two rows, the first one
+ * chunk longer than half (a 43-character Arweave address reads 7 · 4). The first and last
  * chunks are emphasised, plus two middle ones picked by `emphasisPick`.
  * An attacker grinding a lookalike matches the ends people check; the
  * middle pair is the user's own, so a fake can't know which chunks to copy.
@@ -23,12 +22,10 @@ export function chunkAddress(address: string, emphasisPick: number | null): Addr
     texts.push(address.slice(start, start + ADDRESS_CHUNK_LENGTH));
   }
   const emphasized = new Set([0, texts.length - 1, ...middleChunks(texts.length, emphasisPick)]);
-  const groups: AddressChunk[][] = [];
-  texts.forEach((text, index) => {
-    if (index % CHUNKS_PER_GROUP === 0) groups.push([]);
-    groups.at(-1)!.push({ index, text, emphasized: emphasized.has(index) });
-  });
-  return groups;
+  const firstRow = Math.min(texts.length, Math.ceil(texts.length / 2) + 1);
+  const toChunk = (text: string, index: number): AddressChunk => ({ index, text, emphasized: emphasized.has(index) });
+  const chunks = texts.map(toChunk);
+  return [chunks.slice(0, firstRow), chunks.slice(firstRow)].filter((row) => row.length > 0);
 }
 
 /**

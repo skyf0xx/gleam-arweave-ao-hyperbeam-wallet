@@ -15,7 +15,7 @@ export interface MemorableAddressProps {
 }
 
 /**
- * A full address as a block of three rows (4 · 4 · 3 chunks of 4
+ * A full address as a block of two rows (7 · 4 chunks of 4
  * characters). The block keeps one shape for every address, so the
  * emphasised chunks always sit in the same places and the user learns
  * where to look. They are set on a quiet fill in full contrast; the rest
