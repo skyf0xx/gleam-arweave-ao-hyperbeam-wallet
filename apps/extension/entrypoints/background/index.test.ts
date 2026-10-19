@@ -1,12 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
-  generateJWK,
   METHOD_PERMISSIONS,
   PERMISSION_TYPES,
   PROVIDER_METHODS,
   type JWKInterface,
   type PermissionType,
 } from "@gleam/core";
+import { generateJWK } from "@gleam/core/signer";
 import { APPROVAL_GATED_METHODS, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**

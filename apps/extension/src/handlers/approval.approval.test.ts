@@ -2,13 +2,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   addressFromOwner,
   decrypt,
-  generateJWK,
   verifyMessage,
   type JWKInterface,
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 

@@ -1,20 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { deriveAddress, generateJWK, validateJWKShape } from "./jwk";
-
-describe("generateJWK", () => {
-  it("produces a JWK with the expected RSA fields", async () => {
-    const jwk = await generateJWK();
-    expect(jwk.kty).toBe("RSA");
-    expect(typeof jwk.n).toBe("string");
-    expect(typeof jwk.d).toBe("string");
-  }, 20_000);
-
-  it("produces a keyfile that passes shape validation", async () => {
-    const jwk = await generateJWK();
-    const result = validateJWKShape(jwk);
-    expect(result.valid).toBe(true);
-  }, 20_000);
-});
+import Arweave from "arweave";
+import { deriveAddress, validateJWKShape } from "./jwk";
+import { generateJWK } from "../signer/keys";
 
 describe("deriveAddress", () => {
   it("is deterministic for the same JWK", async () => {
@@ -31,6 +18,11 @@ describe("deriveAddress", () => {
     const addressA = await deriveAddress(jwkA);
     const addressB = await deriveAddress(jwkB);
     expect(addressA).not.toBe(addressB);
+  }, 20_000);
+
+  it("matches arweave-js's address for the same key", async () => {
+    const jwk = await generateJWK();
+    expect(await deriveAddress(jwk)).toBe(await Arweave.init({}).wallets.jwkToAddress(jwk));
   }, 20_000);
 });
 

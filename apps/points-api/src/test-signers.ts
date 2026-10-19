@@ -12,10 +12,10 @@ import {
   type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
 import { signTransactionWithSigner } from "@gleam/core/src/arweave/transaction.ts";
-import { deriveAddress, generateJWK } from "@gleam/core/src/keys/jwk.ts";
+import { deriveAddress } from "@gleam/core/src/keys/jwk.ts";
 import { bytesToBase64Url } from "@gleam/core/src/vault/base64.ts";
 import { signMessage } from "@gleam/core/src/vault/message-signing.ts";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import type { Signer } from "@gleam/core/src/vault/signer.ts";
 
 export interface TestWallet {

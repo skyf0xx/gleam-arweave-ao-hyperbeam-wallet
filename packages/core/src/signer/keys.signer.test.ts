@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import Arweave from "arweave";
-import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
+import { validateJWKShape } from "../keys/jwk";
 import { verifyRsaPss } from "../arweave/rsa-pss";
 import { applyTransactionSignature, buildUnsignedTransaction, signTransactionWithSigner } from "../arweave/transaction";
 import { buildUnsignedDataItem, createSignedDataItem, verifyDataItemSignature } from "../arweave/data-item";
@@ -10,7 +10,7 @@ import { encrypt } from "../vault/encryption";
 import { signMessage, verifyMessage } from "../vault/message-signing";
 import { Keyring } from "./keyring";
 import type { Signer } from "../vault/signer";
-import { importSessionKeys, signerFromJwk, signerFromKeyStore, type SessionKeyHandles } from "./keys";
+import { importSessionKeys, signerFromJwk, signerFromKeyStore, type SessionKeyHandles, generateJWK } from "./keys";
 
 const bytes = (text: string) => new TextEncoder().encode(text) as Uint8Array<ArrayBuffer>;
 
@@ -20,6 +20,31 @@ async function verifyPss(owner: string, hash: string, saltLength: number, data: 
   ]);
   return crypto.subtle.verify({ name: "RSA-PSS", saltLength }, key, new Uint8Array(signature), new Uint8Array(data));
 }
+
+describe("generateJWK", () => {
+  it("returns exactly the nine Arweave keyfile fields for an RSA-4096, e=65537 key", async () => {
+    const key = await generateJWK();
+    expect(Object.keys(key).sort()).toEqual(["d", "dp", "dq", "e", "kty", "n", "p", "q", "qi"]);
+    expect(key.kty).toBe("RSA");
+    expect(key.e).toBe("AQAB");
+    // 512 modulus bytes in unpadded base64url.
+    expect(key.n).toHaveLength(683);
+    expect(validateJWKShape(key).valid).toBe(true);
+  }, 20_000);
+
+  it("produces a key arweave-js signs and verifies with", async () => {
+    const key = await generateJWK();
+    const arweave = Arweave.init({});
+    const data = bytes("keyfile round trip");
+    const signature = await arweave.crypto.sign(key, data);
+    expect(await arweave.crypto.verify(key.n, data, signature)).toBe(true);
+  }, 20_000);
+
+  it("produces a different key each call", async () => {
+    const [a, b] = await Promise.all([generateJWK(), generateJWK()]);
+    expect(a.n).not.toBe(b.n);
+  }, 30_000);
+});
 
 let jwk: JWKInterface;
 

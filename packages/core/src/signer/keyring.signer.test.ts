@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import Arweave from "arweave";
-import { generateJWK } from "../keys/jwk";
+import { generateJWK } from "./keys";
 import type { JWKInterface } from "../models/wallet";
 import { encrypt } from "../vault/encryption";
 import { Keyring, KeyringLockedError } from "./keyring";

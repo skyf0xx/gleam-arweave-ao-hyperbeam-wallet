@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { deriveAddress, generateJWK, type JWKInterface, type StoragePort, type Wallet } from "@gleam/core";
+import { deriveAddress, type JWKInterface, type StoragePort, type Wallet } from "@gleam/core";
+import { generateJWK } from "@gleam/core/signer";
 import { TransferHandler } from "./transfer";
 import { cacheKey, clearKeyCache } from "./key-session";
 

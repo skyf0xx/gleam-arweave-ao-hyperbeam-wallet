@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { verifyRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
-import { generateJWK, verifyMessage, signMessage, type JWKInterface } from "@gleam/core";
-import { KeyringLockedError } from "@gleam/core/signer";
+import { verifyMessage, signMessage, type JWKInterface } from "@gleam/core";
+import { KeyringLockedError, generateJWK } from "@gleam/core/signer";
 import { sessionKeyStore } from "../adapters/session-key-store";
 
 /**

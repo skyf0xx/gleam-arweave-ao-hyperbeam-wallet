@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { signerFromJwk } from "../signer/keys";
-import { generateJWK } from "../keys/jwk";
+import { signerFromJwk, generateJWK } from "../signer/keys";
 import type { JWKInterface } from "../models/wallet";
 import { clientForGateway } from "./client";
 import { signRsaPss } from "./rsa-pss";

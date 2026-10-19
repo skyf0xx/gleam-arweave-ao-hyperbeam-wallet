@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeAll, afterEach, vi } from "vitest";
-import { signerFromJwk } from "../signer/keys";
-import { generateJWK } from "../keys/jwk";
+import { signerFromJwk, generateJWK } from "../signer/keys";
 import { encrypt, decrypt, normalizeEncryptAlgorithm } from "./encryption";
 import type { JWKInterface } from "../models/wallet";
 import type { RsaOaepParams } from "../models/signing";

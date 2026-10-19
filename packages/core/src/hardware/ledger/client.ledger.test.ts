@@ -1,10 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { signerFromJwk } from "../../signer/keys";
+import { signerFromJwk, generateJWK } from "../../signer/keys";
 import { clientForGateway } from "../../arweave/client";
 import { buildUnsignedDataItem, dataItemSignatureData } from "../../arweave/data-item";
 import { sha256, signRsaPss } from "../../arweave/rsa-pss";
 import { buildUnsignedTransaction, type ArweaveTransactionJson } from "../../arweave/transaction";
-import { generateJWK } from "../../keys/jwk";
 import type { JWKInterface } from "../../models/wallet";
 import { base64UrlToBytes, bytesToBase64Url } from "../../vault/base64";
 import { verifyDeviceSignature } from "../../vault/signing";

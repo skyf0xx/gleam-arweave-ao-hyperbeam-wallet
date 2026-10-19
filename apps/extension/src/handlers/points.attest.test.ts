@@ -1,14 +1,13 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   deriveAddress,
-  generateJWK,
   type BadgePort,
   type JWKInterface,
   type Signer,
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/index.ts";
 import { attestationId, parseAttestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import { PointsHandler } from "./points";

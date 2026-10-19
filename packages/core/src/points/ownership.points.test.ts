@@ -1,8 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { signerFromJwk } from "../signer/keys";
+import { signerFromJwk, generateJWK } from "../signer/keys";
 import { signTransactionWithSigner } from "../arweave/transaction";
 import { encodeTransactionForLedger } from "../hardware/ledger/serialize";
-import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { signMessage } from "../vault/message-signing";

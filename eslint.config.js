@@ -141,7 +141,7 @@ export default tseslint.config(
       // Caches the key on unlock/import/create, and decrypts it for export.
       "apps/extension/src/handlers/wallet-lifecycle.ts",
       "packages/core/src/signer/**",
-      // Generates, validates and addresses keyfiles.
+      // Validates and addresses keyfiles.
       "packages/core/src/keys/jwk.ts",
       // Where `JWKInterface` is defined and re-exported.
       "packages/core/src/models/wallet.ts",

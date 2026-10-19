@@ -2,12 +2,12 @@ import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import {
   bytesToBase64,
   deriveAddress,
-  generateJWK,
   type JWKInterface,
   type StoragePort,
   type UploadTag,
   type Wallet,
 } from "@gleam/core";
+import { generateJWK } from "@gleam/core/signer";
 import { UploadHandler } from "./upload";
 import { cacheKey, clearKeyCache } from "./key-session";
 

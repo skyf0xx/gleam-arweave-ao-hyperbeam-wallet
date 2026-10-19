@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { signerFromJwk } from "../signer/keys";
+import { signerFromJwk, generateJWK } from "../signer/keys";
 import Arweave from "arweave";
-import { generateJWK } from "../keys/jwk";
 import { signMessage, signature, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
 import { base64UrlToBytes } from "./base64";
 import type { JWKInterface } from "../models/wallet";

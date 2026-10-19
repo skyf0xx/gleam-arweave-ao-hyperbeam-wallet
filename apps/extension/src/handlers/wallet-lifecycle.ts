@@ -2,7 +2,6 @@ import {
   addressFromOwner,
   base64UrlToBytes,
   deriveAddress,
-  generateJWK,
   capabilitiesFor,
   isHardwareWalletMethod,
   keyfileFilename,
@@ -34,6 +33,7 @@ import {
   VaultKeys,
   zeroize,
   type EncryptOptions,
+  generateJWK,
 } from "@gleam/core/signer";
 import {
   cacheKey,

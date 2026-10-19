@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeAll, afterEach } from "vitest";
-import { signerFromJwk } from "../signer/keys";
+import { signerFromJwk, generateJWK } from "../signer/keys";
 import { DataItem } from "@dha-team/arbundles/web";
-import { generateJWK } from "../keys/jwk";
 import type { JWKInterface } from "../models/wallet";
 import {
   AO_LEGACY_MU_URL,

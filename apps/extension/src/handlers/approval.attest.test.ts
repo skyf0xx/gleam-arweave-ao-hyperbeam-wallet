@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addressFromOwner,
   bytesToBase64Url,
-  generateJWK,
   signPayloadWithSigner,
   type ApprovalRequest,
   type DeviceSigningRequest,
@@ -11,7 +10,7 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/index.ts";
 import { attestationId, parseAttestation, type Attestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
