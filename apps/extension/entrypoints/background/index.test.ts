@@ -21,6 +21,8 @@ vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock 
 type Sender = { url?: string; origin?: string; frameId?: number; tab?: { id?: number; url?: string } };
 type Handler = (message: { data: unknown; sender?: Sender }) => unknown;
 
+const TRANSFER_TOKEN = "t".repeat(43);
+const TRANSFER_RECIPIENT = "r".repeat(43);
 const POPUP_SENDER: Sender = { url: "chrome-extension://test/popup.html" };
 const contentSender = (origin: string): Sender => ({ url: `${origin}/app`, frameId: 0, tab: { id: 7, url: `${origin}/app` } });
 
@@ -735,7 +737,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
       method: "transferAoTokens",
-      params: { token: aoProcessId, recipient: "recipient-addr", amount: "1000" },
+      params: { token: aoProcessId, recipient: TRANSFER_RECIPIENT, amount: "1000" },
     });
 
     await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
@@ -748,7 +750,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     expect(request.kind).toBe("transferAoTokens");
     expect(request.preview).toMatchObject({
       kind: "transferAoTokens",
-      recipient: "recipient-addr",
+      recipient: TRANSFER_RECIPIENT,
       amount: "1000",
       token: aoProcessId,
       tokenDenomination: 12,
@@ -800,7 +802,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
       method: "transferAoTokens",
-      params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+      params: { token: TRANSFER_TOKEN, recipient: TRANSFER_RECIPIENT, amount: "1000" },
     });
     resultPromise.catch(() => {});
 
@@ -811,7 +813,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     }>;
     expect(pendingRaw).toHaveLength(1);
     expect(pendingRaw[0]!.request.preview).toMatchObject({
-      token: "ao-process-id",
+      token: TRANSFER_TOKEN,
       tokenDenomination: null,
       tokenTicker: null,
     });
@@ -846,7 +848,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       const resultPromise = providerCall({
         origin: "https://bazar.arweave.net",
         method: "transferAoTokens",
-        params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+        params: { token: TRANSFER_TOKEN, recipient: TRANSFER_RECIPIENT, amount: "1000" },
       });
       resultPromise.catch(() => {});
 
@@ -860,7 +862,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       }>;
       expect(pendingRaw).toHaveLength(1);
       expect(pendingRaw[0]!.request.preview).toMatchObject({
-        token: "ao-process-id",
+        token: TRANSFER_TOKEN,
         tokenDenomination: null,
         tokenTicker: null,
       });
@@ -874,7 +876,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       providerCall({
         origin: "https://not-connected.example",
         method: "transferAoTokens",
-        params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+        params: { token: TRANSFER_TOKEN, recipient: TRANSFER_RECIPIENT, amount: "1000" },
       }),
     ).rejects.toThrow(/not connected/i);
     expect(windowsCreate).not.toHaveBeenCalled();
@@ -893,7 +895,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     ]);
 
     await expect(
-      providerCall({ origin: "https://bazar.arweave.net", method: "transferAoTokens", params: { token: "ao-process-id" } }),
+      providerCall({ origin: "https://bazar.arweave.net", method: "transferAoTokens", params: { token: TRANSFER_TOKEN } }),
     ).rejects.toThrow(/requires token, recipient, and amount/i);
   });
 

@@ -136,6 +136,16 @@ function readRequestedPermissions(value: unknown): PermissionType[] {
 
 const TRANSFER_FIELDS_MESSAGE = "transferAoTokens requires token, recipient, and amount.";
 const transferField = z.string({ error: TRANSFER_FIELDS_MESSAGE }).min(1, TRANSFER_FIELDS_MESSAGE);
+// The recipient and amount go verbatim into the signed Transfer tags, and
+// the approval screen can only render an address and an atomic integer
+// faithfully, so anything else is refused before a window opens.
+const TRANSFER_ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const transferAddress = (field: "token" | "recipient", what: string) =>
+  transferField.regex(TRANSFER_ADDRESS_PATTERN, `transferAoTokens: ${field} must be ${what} (43 base64url characters).`);
+const transferAmount = transferField.regex(
+  /^[1-9]\d*$/,
+  "transferAoTokens: amount must be a positive whole number in the token's smallest unit.",
+);
 
 /** Methods that only read the grant or the wallet take no params; extra keys are dropped. */
 const NO_PARAMS = z.object({});
@@ -231,7 +241,11 @@ export const PAGE_METHODS = {
   transferAoTokens: page({
     approval: true,
     grant: true,
-    params: z.object({ token: transferField, recipient: transferField, amount: transferField }),
+    params: z.object({
+      token: transferAddress("token", "an AO process id"),
+      recipient: transferAddress("recipient", "an Arweave address"),
+      amount: transferAmount,
+    }),
   }),
   tokenBalance: page({
     approval: false,

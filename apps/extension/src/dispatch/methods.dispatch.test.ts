@@ -70,6 +70,30 @@ describe("dispatch/methods: page params", () => {
     }
   });
 
+  it.each(["1e12", "1.5", "-1", "0", "007", " 1", "1\u202e", "0x10", "１"])(
+    "refuses the transferAoTokens amount %j, which isn't a positive atomic integer",
+    (amount) => {
+      expect(() =>
+        parseParams(PAGE_METHODS.transferAoTokens.params, { token: PROCESS_ID, recipient: PROCESS_ID, amount }),
+      ).toThrow("transferAoTokens: amount must be a positive whole number in the token's smallest unit.");
+    },
+  );
+
+  it.each(["recipient-addr", `${PROCESS_ID}x`, `${PROCESS_ID.slice(0, 42)}=`, `${PROCESS_ID.slice(0, 42)}\u202e`])(
+    "refuses the transferAoTokens recipient %j, which isn't an Arweave address",
+    (recipient) => {
+      expect(() =>
+        parseParams(PAGE_METHODS.transferAoTokens.params, { token: PROCESS_ID, recipient, amount: "1" }),
+      ).toThrow("transferAoTokens: recipient must be an Arweave address (43 base64url characters).");
+    },
+  );
+
+  it("refuses a transferAoTokens token that isn't a process id", () => {
+    expect(() =>
+      parseParams(PAGE_METHODS.transferAoTokens.params, { token: "ao-process-id", recipient: PROCESS_ID, amount: "1" }),
+    ).toThrow("transferAoTokens: token must be an AO process id (43 base64url characters).");
+  });
+
   it("drops keys a method doesn't take", () => {
     expect(parseParams(PAGE_METHODS.getPermissions.params, { extra: true })).toEqual({});
     expect(parseParams(PAGE_METHODS.tokenBalance.params, { id: PROCESS_ID, extra: true })).toEqual({ id: PROCESS_ID });
