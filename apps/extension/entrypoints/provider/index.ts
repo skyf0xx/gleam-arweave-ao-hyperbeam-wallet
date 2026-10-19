@@ -137,7 +137,7 @@ class GleamProvider {
     window.addEventListener("message", (event: MessageEvent) => {
       // (1) Origin/source check — only ever trust messages this exact
       // window posted to itself (the content script relays into `window`
-      // via `window.postMessage(..., "*")` targeting this same document,
+      // via `window.postMessage(..., location.origin)` to this same document,
       // never a message actually sent cross-frame).
       if (event.source !== window) return;
 
@@ -208,10 +208,9 @@ class GleamProvider {
         method,
         params: encodeTaggedBinary(params),
       };
-      // The page posts to its own window and the content script's listener
-      // checks event.source, so no other window or origin receives this.
-      // nosemgrep: javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration
-      window.postMessage(request, "*");
+      // Targeted at this document's own origin, so the request is dropped
+      // if the window has navigated elsewhere by the time it is delivered.
+      window.postMessage(request, location.origin);
     });
   }
 

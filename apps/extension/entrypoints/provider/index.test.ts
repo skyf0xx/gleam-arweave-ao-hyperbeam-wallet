@@ -72,6 +72,12 @@ describe("provider.ts: GleamProvider bridge", () => {
     await expect(callPromise).resolves.toBe("some-address");
   });
 
+  it("posts requests to the page's own origin, never a wildcard", () => {
+    void provider.getActiveAddress();
+    const call = postMessageSpy.mock.calls.find(([message]: [unknown]) => (message as { type?: string })?.type === REQUEST);
+    expect(call?.[1]).toBe(location.origin);
+  });
+
   it("still sends a request on a plain-http page, where crypto.randomUUID is missing", async () => {
     vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto), subtle: crypto.subtle });
     try {
