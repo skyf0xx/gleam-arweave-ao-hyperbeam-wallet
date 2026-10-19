@@ -1,4 +1,5 @@
-import type { TokenMetadata } from "../models/token-metadata";
+import { classifyAsset } from "../ao/asset-scan";
+import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
@@ -79,10 +80,16 @@ export async function queryTokenMetadata(
     );
   }
 
-  return toTokenMetadata(processId, edge.node.tags);
+  return tokenMetadataFromTags(processId, edge.node.tags);
 }
 
-function toTokenMetadata(processId: string, tags: GraphQLTag[]): TokenMetadata {
+/** `arweave-scheduler@1.0` is the one scheduler that takes messages as L1 transactions. */
+export function transportFromTags(tags: GraphQLTag[]): TokenTransport {
+  const scheduler = tags.find((tag) => tag.name.toLowerCase() === "scheduler-device")?.value;
+  return scheduler === "arweave-scheduler@1.0" ? "l1" : "mu";
+}
+
+export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): TokenMetadata {
   const tagValue = (name: string): string | null =>
     tags.find((tag) => tag.name.toLowerCase() === name)?.value ?? null;
 
@@ -92,6 +99,8 @@ function toTokenMetadata(processId: string, tags: GraphQLTag[]): TokenMetadata {
 
   return {
     processId,
+    transport: transportFromTags(tags),
+    assetClass: classifyAsset(tags),
     denomination,
     ticker: tagValue("ticker"),
     name: tagValue("name"),

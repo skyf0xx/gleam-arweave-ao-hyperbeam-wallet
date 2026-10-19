@@ -23,3 +23,4 @@ export {
   type CoinPaprikaId,
   type TokenPrice,
 } from "./token-sources";
+export { impersonatesRegisteredToken, normalizeTokenLabel } from "./impersonation";

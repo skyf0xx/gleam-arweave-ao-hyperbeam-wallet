@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { queryTokenMetadata } from "./token-metadata";
+import { queryTokenMetadata, tokenMetadataFromTags } from "./token-metadata";
 
 const PROCESS_ID = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
 
@@ -32,6 +32,8 @@ describe("queryTokenMetadata", () => {
 
     expect(metadata).toEqual({
       processId: PROCESS_ID,
+      transport: "mu",
+      assetClass: null,
       denomination: 6,
       ticker: "wUSDC",
       name: "Legacy wUSDC",
@@ -111,5 +113,28 @@ describe("queryTokenMetadata", () => {
     const fetchImpl = fakeGraphQLFetch([edge([{ name: "denomination", value: "not-a-number" }])]);
     const metadata = await queryTokenMetadata(PROCESS_ID, "https://arweave.net", fetchImpl);
     expect(metadata.denomination).toBeNull();
+  });
+});
+
+describe("tokenMetadataFromTags", () => {
+  it("routes an arweave-scheduler@1.0 fungible token over L1", () => {
+    const metadata = tokenMetadataFromTags("EuEkh8ZYkoPKXimgjre7W268XXX_qRn5vofc66oRTOw", [
+      { name: "device", value: "process@1.0" },
+      { name: "execution-device", value: "token@1.0" },
+      { name: "scheduler-device", value: "arweave-scheduler@1.0" },
+      { name: "hint-ui-style", value: "fungible" },
+      { name: "ticker", value: "FODDER" },
+      { name: "denomination", value: "12" },
+    ]);
+    expect(metadata).toMatchObject({ transport: "l1", assetClass: "fungible", ticker: "FODDER", denomination: 12 });
+  });
+
+  it("routes a legacynet aos process through the MU", () => {
+    const metadata = tokenMetadataFromTags("xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQD6dh10", [
+      { name: "Data-Protocol", value: "ao" },
+      { name: "Type", value: "Process" },
+      { name: "Name", value: "artoken" },
+    ]);
+    expect(metadata).toMatchObject({ transport: "mu", assetClass: null, ticker: null, name: "artoken" });
   });
 });

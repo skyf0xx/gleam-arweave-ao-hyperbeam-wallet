@@ -32,4 +32,12 @@ export interface TokenBalance {
    * with a confirmed denomination.
    */
   available?: boolean;
+  /** Why `available` is `false`, in words the popup can show as-is. */
+  unavailableReason?: string;
+  /**
+   * `"discovered"` for a token found from the wallet's own on-chain
+   * history rather than added by hand. Such a row can be hidden, and is
+   * never priced.
+   */
+  source?: "default" | "watched" | "discovered";
 }

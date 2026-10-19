@@ -43,6 +43,7 @@ export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collec
 export { collectibleSendRefusal } from "./collectible";
 export type {
   TokenMetadata,
+  TokenTransport,
   TokenBalanceRequest,
   TokenBalanceResult,
   UserTokensOptions,

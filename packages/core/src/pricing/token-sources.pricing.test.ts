@@ -53,6 +53,8 @@ describe("resolveUnregisteredTokenMetadata", () => {
 
     expect(metadata).toEqual({
       processId: UNREGISTERED_PROCESS_ID,
+      transport: "mu",
+      assetClass: null,
       ticker: "wUSDC",
       name: "Legacy wUSDC",
       denomination: 6,

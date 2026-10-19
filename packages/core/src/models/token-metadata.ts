@@ -1,4 +1,13 @@
 /**
+ * `"l1"`: a HyperBEAM-native process on `arweave-scheduler@1.0`. It reads
+ * its messages from Arweave L1, so a transfer is an L1 transaction to the
+ * process and its balance comes from the gateway's HyperBEAM node.
+ * `"mu"`: a legacynet process, messaged through the Messenger Unit and
+ * evaluated by the Compute Unit.
+ */
+export type TokenTransport = "l1" | "mu";
+
+/**
  * Metadata for an AO token discovered outside `DEFAULT_TOKEN_REGISTRY`
  * (`core/pricing/token-sources.ts`), read directly from its process-spawn
  * tags via the gateway's GraphQL endpoint — no dryrun/CU round-trip.
@@ -11,6 +20,14 @@
  */
 export interface TokenMetadata {
   processId: string;
+  /** How the token is read and sent. Derived from the spawn tags' scheduler device. */
+  transport: TokenTransport;
+  /**
+   * `"fungible"`/`"unique"` for a HyperBEAM `token@1.0` process tagged as
+   * one or the other (`ao/asset-scan.ts`'s `classifyAsset`); `null` for
+   * anything else, legacy tokens included.
+   */
+  assetClass: "fungible" | "unique" | null;
   /** Integer count of decimal places the token's atomic quantity uses. `null` if the spawn tags carried no denomination. */
   denomination: number | null;
   ticker: string | null;

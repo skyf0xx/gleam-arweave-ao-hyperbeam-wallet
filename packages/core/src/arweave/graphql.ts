@@ -164,19 +164,8 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
   // upload, which the local log records as "upload".
   const isUpload = sent && !node.recipient && BigInt(node.quantity.winston || "0") === 0n;
   const type = isUpload ? "upload" : sent ? "send" : "receive";
-  const collectibleRecipient = sent && node.recipient ? collectibleTransferRecipient(node) : null;
-  if (collectibleRecipient !== null && node.recipient) {
-    return {
-      txId: node.id,
-      type: "send",
-      status: node.block ? "confirmed" : "pending",
-      address: collectibleRecipient,
-      amount: null,
-      tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-      timestamp: node.block ? node.block.timestamp * 1000 : 0,
-      collectible: { id: node.recipient },
-    };
-  }
+  const l1Transfer = sent && node.recipient ? l1TokenTransferOf(node) : null;
+  if (l1Transfer !== null && node.recipient) return toL1TransferEntry(node, "send", l1Transfer.recipient, l1Transfer.quantity, node.recipient);
   return {
     txId: node.id,
     type,
@@ -191,18 +180,94 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
 }
 
 /**
- * The recipient of a collectible send (`ao/collectible-transfer.ts`): a
- * zero-AR transaction to the asset process whose lowercase tags name the
- * transfer. Other wallets add their own tags, so extra tags are allowed.
- * Only says the wallet asked for the transfer; the asset alone decides
- * whether it moved.
+ * The recipient and quantity of an L1 token transfer (`ao/l1-transfer.ts`):
+ * a zero-AR transaction to the token process whose lowercase tags name
+ * the transfer. Other wallets add their own tags, so extra tags are
+ * allowed. Only says a transfer was asked for; the token process alone
+ * decides whether it moved.
  */
-function collectibleTransferRecipient(node: GraphQLTransactionNode): string | null {
-  if (BigInt(node.quantity.winston || "0") !== 0n) return null;
+function l1TokenTransferOf(node: { quantity?: { winston: string }; tags: GraphQLTag[] }): { recipient: string; quantity: string } | null {
+  if (node.quantity && BigInt(node.quantity.winston || "0") !== 0n) return null;
   const exact = (name: string) => node.tags.find((tag) => tag.name === name)?.value;
   const recipient = exact("recipient");
-  if (exact("action") !== "transfer" || exact("quantity") !== COLLECTIBLE_TRANSFER_QUANTITY) return null;
-  return recipient !== undefined && /^[A-Za-z0-9_-]{43}$/.test(recipient) ? recipient : null;
+  const quantity = exact("quantity");
+  if (exact("action") !== "transfer" || quantity === undefined || !/^[1-9]\d*$/.test(quantity)) return null;
+  return recipient !== undefined && /^[A-Za-z0-9_-]{43}$/.test(recipient) ? { recipient, quantity } : null;
+}
+
+/**
+ * A quantity of exactly 1 is read as a collectible, the common case. A
+ * fungible token sent one atomic unit at a time looks the same here, so
+ * the caller re-reads such an entry once it knows the process's class
+ * from its spawn tags.
+ */
+function toL1TransferEntry(
+  node: { id: string; tags: GraphQLTag[]; block: { timestamp: number } | null },
+  type: "send",
+  counterparty: string,
+  quantity: string,
+  processId: string,
+): ActivityEntry {
+  const base = {
+    txId: node.id,
+    type,
+    status: node.block ? ("confirmed" as const) : ("pending" as const),
+    address: counterparty,
+    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+    timestamp: node.block ? node.block.timestamp * 1000 : 0,
+  };
+  return quantity === COLLECTIBLE_TRANSFER_QUANTITY
+    ? { ...base, amount: null, collectible: { id: processId } }
+    : { ...base, amount: quantity, token: processId };
+}
+
+/**
+ * L1 token transfers to `address` on `arweave-scheduler@1.0` tokens: a
+ * zero-AR transaction to the token process whose `recipient` tag names
+ * `address`. These tokens push no Credit-Notice, so the transfer request
+ * is the only on-chain record of a receive.
+ *
+ * Every field is the signer's claim. Anyone can tag a transaction to any
+ * process with any quantity, so each entry is marked `unverified`, is
+ * always token-shaped (never a collectible), and the caller must keep
+ * only entries whose `token` is one the user already lists.
+ */
+export async function queryL1TokenReceipts(
+  address: string,
+  gatewayUrl: string,
+  limit: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ActivityEntry[]> {
+  const body = await postGraphQLWithFailover<GraphQLTransactionsResponse>(
+    gatewayUrl,
+    `query ($address: [String!]!, $first: Int!) {
+      transactions(first: $first, sort: HEIGHT_DESC, tags: [
+        { name: "action", values: ["transfer"] },
+        { name: "recipient", values: $address }
+      ]) { ${TRANSACTION_FIELDS} }
+    }`,
+    { address: [address], first: limit },
+    fetchImpl,
+    (gw, detail) => `Gateway token-receipt GraphQL query for "${address}" against "${gw}" failed: ${detail}`,
+  );
+  const byId = new Map<string, ActivityEntry>();
+  for (const { node } of body.data?.transactions?.edges ?? []) {
+    if (!node.recipient || node.owner.address === address) continue;
+    const transfer = l1TokenTransferOf(node);
+    if (transfer === null || transfer.recipient !== address) continue;
+    byId.set(node.id, {
+      txId: node.id,
+      type: "receive",
+      status: node.block ? "confirmed" : "pending",
+      address: node.owner.address,
+      amount: transfer.quantity,
+      tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+      timestamp: node.block ? node.block.timestamp * 1000 : 0,
+      token: node.recipient,
+      unverified: true,
+    });
+  }
+  return [...byId.values()];
 }
 
 /**

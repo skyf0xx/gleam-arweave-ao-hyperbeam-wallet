@@ -38,6 +38,42 @@ function createFakeStorage(): StoragePort {
 
 const originalFetch = globalThis.fetch;
 
+const FODDER = "EuEkh8ZYkoPKXimgjre7W268XXX_qRn5vofc66oRTOw";
+const LEGACY = "xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQD6dh10";
+const AO = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
+const PEER = "https://hyperbeam.example.com";
+const noDiscovery = async () => [];
+
+const FODDER_TAGS = [
+  { name: "device", value: "process@1.0" },
+  { name: "execution-device", value: "token@1.0" },
+  { name: "scheduler-device", value: "arweave-scheduler@1.0" },
+  { name: "hint-ui-style", value: "fungible" },
+  { name: "ticker", value: "FODDER" },
+  { name: "name", value: "FODDER" },
+  { name: "denomination", value: "12" },
+];
+const LEGACY_TAGS = [
+  { name: "Ticker", value: "wAR" },
+  { name: "Denomination", value: "12" },
+];
+
+function graphqlNodes(nodes: Array<{ id: string; tags: Array<{ name: string; value: string }> }>) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ data: { transactions: { edges: nodes.map((node) => ({ cursor: node.id, node })) } } }),
+  };
+}
+
+async function peerSettings(storage: StoragePort, activePeerUrl: string | null = PEER) {
+  await storage.set("local:networkSettings", {
+    gatewayUrl: "https://arweave.net",
+    peers: activePeerUrl ? [{ url: activePeerUrl, enabled: true }] : [],
+    activePeerUrl,
+  });
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
@@ -75,42 +111,57 @@ describe("ReadsHandler: getBalance", () => {
 });
 
 describe("ReadsHandler: getTokenBalances", () => {
-  it("throws a named error when no peer is configured (the default AO token is always watched)", async () => {
+  it("reads AO through the CU dry-run when no peer is configured", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [],
-      activePeerUrl: null,
-    });
-    const handler = new ReadsHandler(storage);
-    await expect(handler.getTokenBalances({ address: "addr1" })).rejects.toThrow(
-      /No HyperBEAM peer configured/,
-    );
+    await peerSettings(storage, null);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("cu.ao-testnet.xyz/dry-run")
+        ? { ok: true, status: 200, json: async () => ({ Messages: [{ Data: "7", Tags: [] }] }) }
+        : { ok: false, status: 500, json: async () => ({}) },
+    ) as unknown as typeof fetch;
+
+    const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
+
+    expect(balances).toHaveLength(1);
+    expect(balances[0]).toMatchObject({ processId: AO, ticker: "AO", quantity: "7", source: "default" });
+    expect(balances[0]?.available).not.toBe(false);
   });
 
-  it("reads token balances from the active peer when configured", async () => {
+  it("reads a legacy token's balance from the active peer when configured", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
-    });
+    await storage.set("local:watchedProcessIds:addr1", [LEGACY]);
+    await peerSettings(storage);
 
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => "42",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : { ok: true, status: 200, json: async () => "42" },
+    ) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
-    const balances = await handler.getTokenBalances({ address: "addr1" });
+    const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
 
-    // "proc1" (explicitly watched) plus the default AO token process,
-    // which getTokenBalances always includes regardless of the watch list.
+    // The watched token plus the default AO token, which is always listed.
     expect(balances).toHaveLength(2);
-    const proc1Balance = balances.find((b) => b.processId === "proc1");
-    expect(proc1Balance?.quantity).toBe("42");
+    expect(balances.find((b) => b.processId === LEGACY)).toMatchObject({ quantity: "42", ticker: "wAR", source: "watched" });
+    expect(globalThis.fetch).toHaveBeenCalledWith(`${PEER}/${LEGACY}~process@1.0/compute/balances/addr1`);
+  });
+
+  it("reads an arweave-scheduler token from the gateway's HyperBEAM, not the legacy peer", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", [FODDER]);
+    await peerSettings(storage);
+
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url.includes("/graphql")) return graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]);
+      if (url.startsWith(PEER) && url.includes(FODDER)) return { ok: false, status: 403, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => "1000000000000" };
+    }) as unknown as typeof fetch;
+
+    const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
+
+    expect(balances.find((b) => b.processId === FODDER)).toMatchObject({ ticker: "FODDER", denomination: 12, quantity: "1000000000000" });
+    expect(calls).toContain(`https://arweave.net/${FODDER}~process@1.0/compute/balances/addr1`);
+    expect(calls.some((url) => url.startsWith(PEER) && url.includes(FODDER))).toBe(false);
   });
 
   it("resolves ticker/denomination/name for an unregistered watched token from its spawn tags", async () => {
@@ -424,7 +475,7 @@ describe("ReadsHandler: getTokenBalances", () => {
       return { ok: true, status: 200, json: async () => "42" };
     }) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
     await handler.getTokenBalances({ address: "addr1" });
     await handler.getTokenBalances({ address: "addr1" });
 
@@ -465,7 +516,7 @@ describe("ReadsHandler: getTokenBalances", () => {
       return { ok: true, status: 200, json: async () => "42" };
     }) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
     const first = await handler.getTokenBalances({ address: "addr1" });
     expect(first.find((b) => b.processId === processId)?.ticker).toBe(processId);
     expect(graphqlCalls).toBe(1);
@@ -478,38 +529,27 @@ describe("ReadsHandler: getTokenBalances", () => {
 });
 
 describe("ReadsHandler: tokenBalance", () => {
-  it("throws a named error when no peer is configured", async () => {
+  it("throws naming every source it tried when none answers", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [],
-      activePeerUrl: null,
-    });
-    const handler = new ReadsHandler(storage);
-    await expect(handler.tokenBalance({ address: "addr1", id: "proc1" })).rejects.toThrow(
-      /No HyperBEAM peer configured/,
-    );
+    await peerSettings(storage, null);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : { ok: false, status: 500, json: async () => ({}) },
+    ) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
+    await expect(handler.tokenBalance({ address: "addr1", id: LEGACY })).rejects.toThrow(/Couldn't read your wAR balance.*cu\.ao-testnet\.xyz/);
   });
 
   it("resolves a single process id's balance via the active peer", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
-    });
+    await peerSettings(storage);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : { ok: true, status: 200, json: async () => "123" },
+    ) as unknown as typeof fetch;
 
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => "123",
-    })) as unknown as typeof fetch;
-
-    const handler = new ReadsHandler(storage);
-    const result = await handler.tokenBalance({ address: "addr1", id: "proc1" });
+    const result = await new ReadsHandler(storage, undefined, noDiscovery).tokenBalance({ address: "addr1", id: LEGACY });
 
     expect(result).toBe("123");
-    expect(typeof result).toBe("string");
   });
 });
 
@@ -616,107 +656,113 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
 
   it("previewWatchedToken resolves the balance without storing the process id", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
-    });
-    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "1000000" })) as unknown as typeof fetch;
+    await peerSettings(storage);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: true, status: 200, json: async () => "1000000" },
+    ) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
-    const balance = await handler.previewWatchedToken({ address: "addr1", processId: "proc1" });
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
+    const balance = await handler.previewWatchedToken({ address: "addr1", processId: FODDER });
 
     expect(balance.quantity).toBe("1000000");
     expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
   });
 
+  it("previewWatchedToken still previews a token whose balance can't be read right now, saying why", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: false, status: 403, json: async () => ({}) },
+    ) as unknown as typeof fetch;
+
+    const balance = await new ReadsHandler(storage, undefined, noDiscovery).previewWatchedToken({ address: "addr1", processId: FODDER });
+
+    expect(balance).toMatchObject({ ticker: "FODDER", available: false });
+    expect(balance.unavailableReason).toMatch(/Couldn't read your FODDER balance/);
+  });
+
+  it("previewWatchedToken explains a malformed id, an unknown id and a collectible", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
+    await expect(handler.previewWatchedToken({ address: "addr1", processId: "proc1" })).rejects.toThrow(/isn't a process id/);
+
+    globalThis.fetch = vi.fn(async () => graphqlNodes([])) as unknown as typeof fetch;
+    await expect(handler.previewWatchedToken({ address: "addr1", processId: FODDER })).rejects.toThrow(/No process with that id/);
+
+    const nft = "N".repeat(43);
+    globalThis.fetch = vi.fn(async () =>
+      graphqlNodes([
+        {
+          id: nft,
+          tags: [
+            { name: "device", value: "process@1.0" },
+            { name: "execution-device", value: "token@1.0" },
+            { name: "hint-ui-style", value: "non-fungible" },
+            { name: "denomination", value: "0" },
+            { name: "total-supply", value: "1" },
+            { name: "ticker", value: "ASSET" },
+          ],
+        },
+      ]),
+    ) as unknown as typeof fetch;
+    await expect(handler.previewWatchedToken({ address: "addr1", processId: nft })).rejects.toThrow(/collectible/);
+  });
+
   it("previewWatchedToken rejects an empty process id", async () => {
     const handler = new ReadsHandler(createFakeStorage());
     await expect(handler.previewWatchedToken({ address: "addr1", processId: "  " })).rejects.toThrow(
-      /Enter a process id/,
+      /Paste a token's process id/,
     );
   });
 
-  it("adds a process id after validating its balance resolves, and returns the resolved balance", async () => {
+  it("adds a process id after validating it, returns the resolved balance and un-hides it", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
-    });
+    await peerSettings(storage);
+    await storage.set("local:hiddenProcessIds:addr1", [FODDER]);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: true, status: 200, json: async () => "1000000" },
+    ) as unknown as typeof fetch;
 
-    globalThis.fetch = vi.fn(async (url: string) => {
-      if (url.includes("/graphql")) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            data: {
-              transactions: {
-                edges: [
-                  {
-                    node: {
-                      id: "proc1",
-                      tags: [
-                        { name: "Ticker", value: "wUSDC" },
-                        { name: "Denomination", value: "6" },
-                      ],
-                    },
-                  },
-                ],
-              },
-            },
-          }),
-        };
-      }
-      return { ok: true, status: 200, json: async () => "1000000" };
-    }) as unknown as typeof fetch;
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
+    const balance = await handler.addWatchedToken({ address: "addr1", processId: FODDER });
 
-    const handler = new ReadsHandler(storage);
-    const balance = await handler.addWatchedToken({ address: "addr1", processId: "proc1" });
-
-    expect(balance.processId).toBe("proc1");
+    expect(balance.processId).toBe(FODDER);
     expect(balance.quantity).toBe("1000000");
-    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc1"]);
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([FODDER]);
+    expect(await storage.get("local:hiddenProcessIds:addr1")).toEqual([]);
   });
 
   it("rejects an empty process id without writing to storage", async () => {
     const storage = createFakeStorage();
     const handler = new ReadsHandler(storage);
     await expect(handler.addWatchedToken({ address: "addr1", processId: "  " })).rejects.toThrow(
-      /Enter a process id/,
+      /Paste a token's process id/,
     );
     expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
   });
 
-  it("throws a named error when no peer is configured, rather than silently adding an unresolved token", async () => {
+  it("refuses an id the gateway can't find, rather than silently adding an unresolved token", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [],
-      activePeerUrl: null,
-    });
-    const handler = new ReadsHandler(storage);
-    await expect(handler.addWatchedToken({ address: "addr1", processId: "proc1" })).rejects.toThrow(
-      /No HyperBEAM peer configured/,
-    );
+    await peerSettings(storage);
+    globalThis.fetch = vi.fn(async () => graphqlNodes([])) as unknown as typeof fetch;
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
+    await expect(handler.addWatchedToken({ address: "addr1", processId: FODDER })).rejects.toThrow(/No process with that id/);
     expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([]);
   });
 
   it("does not add a duplicate when the process id is already watched", async () => {
     const storage = createFakeStorage();
-    await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
-    await storage.set("local:networkSettings", {
-      gatewayUrl: "https://arweave.net",
-      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
-      activePeerUrl: "https://hyperbeam.example.com",
-    });
-    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+    await storage.set("local:watchedProcessIds:addr1", [FODDER]);
+    await peerSettings(storage);
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: true, status: 200, json: async () => "5" },
+    ) as unknown as typeof fetch;
 
-    const handler = new ReadsHandler(storage);
-    await handler.addWatchedToken({ address: "addr1", processId: "proc1" });
+    const handler = new ReadsHandler(storage, undefined, noDiscovery);
+    await handler.addWatchedToken({ address: "addr1", processId: FODDER });
 
-    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc1"]);
+    expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual([FODDER]);
   });
 
   it("is a no-op for the default AO process id (already always shown, never stored in the watch list)", async () => {
@@ -744,7 +790,7 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
     expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc2"]);
   });
 
-  it("is a no-op when removing a process id that isn't watched", async () => {
+  it("hides a removed token, watched or not, so discovery doesn't bring it back", async () => {
     const storage = createFakeStorage();
     await storage.set("local:watchedProcessIds:addr1", ["proc1"]);
 
@@ -752,6 +798,7 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
     await handler.removeWatchedToken({ address: "addr1", processId: "not-watched" });
 
     expect(await handler.getWatchedTokens({ address: "addr1" })).toEqual(["proc1"]);
+    expect(await storage.get("local:hiddenProcessIds:addr1")).toEqual(["not-watched"]);
   });
 });
 
@@ -1163,5 +1210,122 @@ describe("ReadsHandler: getNetworkSettings", () => {
       peers: [{ url: "https://state.forward.computer", enabled: true }],
       activePeerUrl: "https://state.forward.computer",
     });
+  });
+});
+
+describe("ReadsHandler: discovered tokens", () => {
+  const WALLET = "W".repeat(43);
+  const SPAM = "S".repeat(43);
+  const FAKE_AO = "F".repeat(43);
+  const EMPTY = "E".repeat(43);
+
+  function meta(processId: string, ticker: string) {
+    return {
+      processId,
+      transport: "l1" as const,
+      assetClass: "fungible" as const,
+      denomination: 12,
+      ticker,
+      name: ticker,
+      description: null,
+      logo: null,
+      totalSupply: null,
+    };
+  }
+
+  it("lists a discovered token with a balance, and drops empty, hidden and AO-impersonating ones", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    await storage.set(`local:hiddenProcessIds:${WALLET}`, [SPAM]);
+    const discover = vi.fn(async () => [meta(FODDER, "FODDER"), meta(SPAM, "SPAM"), meta(FAKE_AO, "w\u200BA0"), meta(EMPTY, "NONE")]);
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes(EMPTY)) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => "1000000000000" };
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage, undefined, discover);
+    const balances = await handler.getTokenBalances({ address: WALLET });
+
+    expect(balances.map((b) => b.processId)).toEqual([AO, FODDER]);
+    expect(balances[1]).toMatchObject({ ticker: "FODDER", source: "discovered", quantity: "1000000000000" });
+    // Seeded metadata means no per-token gateway lookup.
+    expect(vi.mocked(globalThis.fetch).mock.calls.some(([url]) => String(url).includes("/graphql"))).toBe(false);
+
+    await handler.getTokenBalances({ address: WALLET });
+    expect(discover).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves the last result when a later discovery fails", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    await storage.set(`local:discoveredTokens:${WALLET}`, { savedAt: 0, processIds: [FODDER] });
+    await storage.set(`local:tokenMetadata:${FODDER}`, meta(FODDER, "FODDER"));
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+
+    const balances = await new ReadsHandler(storage, undefined, async () => {
+      throw new Error("gateway down");
+    }).getTokenBalances({ address: WALLET });
+
+    expect(balances.map((b) => b.processId)).toEqual([AO, FODDER]);
+  });
+
+  it("shows an L1 receipt for a listed fungible token as unverified, and drops one for any other process", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    await storage.set(`local:tokenMetadata:${FODDER}`, meta(FODDER, "FODDER"));
+    await storage.set(`local:discoveredTokens:${WALLET}`, { savedAt: Date.now(), processIds: [FODDER] });
+    const sender = "U".repeat(43);
+    const receipt = (id: string, quantity: string, target = FODDER) => ({
+      cursor: id,
+      node: {
+        id,
+        owner: { address: sender },
+        recipient: target,
+        quantity: { winston: "0" },
+        tags: [
+          { name: "action", value: "transfer" },
+          { name: "recipient", value: WALLET },
+          { name: "quantity", value: quantity },
+        ],
+        block: { timestamp: 10 },
+      },
+    });
+    globalThis.fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = String(init?.body ?? "");
+      const edges = body.includes("values: $address") ? [receipt("r-many", "311"), receipt("r-one", "1"), receipt("forged", "1000000000", SPAM)] : [];
+      return { ok: true, status: 200, json: async () => ({ data: { transactions: { edges } } }) };
+    }) as unknown as typeof fetch;
+
+    const page = await new ReadsHandler(storage, undefined, noDiscovery).getActivity({ address: WALLET });
+
+    expect(page.entries.find((e) => e.txId === "r-many")).toMatchObject({
+      type: "receive",
+      token: FODDER,
+      amount: "311",
+      address: sender,
+      unverified: true,
+    });
+    const one = page.entries.find((e) => e.txId === "r-one");
+    expect(one).toMatchObject({ type: "receive", token: FODDER, amount: "1" });
+    expect(one?.collectible).toBeUndefined();
+    expect(page.entries.find((e) => e.txId === "forged")).toBeUndefined();
+  });
+});
+
+describe("ReadsHandler: discovered balance validation", () => {
+  it("drops a discovered row whose node answered a non-numeric quantity instead of failing the list", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    const weird = "Q".repeat(43);
+    const discover = async () => [
+      { processId: weird, transport: "l1" as const, assetClass: "fungible" as const, denomination: 6, ticker: "Q", name: "Q", description: null, logo: null, totalSupply: null },
+    ];
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes(weird) ? { ok: true, status: 200, json: async () => ({ balance: "12abc" }) } : { ok: true, status: 200, json: async () => "5" },
+    ) as unknown as typeof fetch;
+
+    const balances = await new ReadsHandler(storage, undefined, discover).getTokenBalances({ address: "W".repeat(43) });
+
+    expect(balances.map((b) => b.processId)).toEqual([AO]);
   });
 });

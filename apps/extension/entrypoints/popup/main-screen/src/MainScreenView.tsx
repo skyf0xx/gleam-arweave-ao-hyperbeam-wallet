@@ -180,6 +180,11 @@ function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance
   return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
 }
 
+/** Found from the wallet's history rather than added; never priced, shown apart. */
+function discoveredTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
+  return (data?.tokenBalances ?? []).filter((token) => token.source === "discovered");
+}
+
 /**
  * `ActivityEntry` carries only the AO token's processId, not its
  * denomination, so an AO entry's amount is scaled using the matching
@@ -662,20 +667,39 @@ export function MainScreenView({
                   />
                 ))}
                 <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />
-                {nonDefaultTokenBalances(balancesQuery.data).map((token) => (
-                  <TokenRow
-                    key={token.processId}
-                    glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                    name={token.ticker}
-                    amount={
-                      token.available === false
-                        ? UNAVAILABLE_BALANCE_LABEL
-                        : formatAtomicAsDisplay(token.quantity, token.denomination)
-                    }
-                    loading={loading}
-                    onClick={token.available === false ? undefined : () => onSendToken(token)}
-                  />
-                ))}
+                {nonDefaultTokenBalances(balancesQuery.data)
+                  .filter((token) => token.source !== "discovered")
+                  .map((token) => (
+                    <TokenRow
+                      key={token.processId}
+                      glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                      name={token.ticker}
+                      amount={
+                        token.available === false
+                          ? UNAVAILABLE_BALANCE_LABEL
+                          : formatAtomicAsDisplay(token.quantity, token.denomination)
+                      }
+                      loading={loading}
+                      onClick={token.available === false ? undefined : () => onSendToken(token)}
+                    />
+                  ))}
+                {discoveredTokenBalances(balancesQuery.data).length > 0 ? (
+                  <>
+                    <div className="border-b border-line px-3.5 pb-2 pt-4 text-caption text-muted">
+                      Unverified · sent to you, not added by you. Names and amounts are the sender&apos;s claim.
+                    </div>
+                    {discoveredTokenBalances(balancesQuery.data).map((token) => (
+                      <TokenRow
+                        key={token.processId}
+                        glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                        name={token.ticker}
+                        amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
+                        loading={loading}
+                        onClick={() => onSendToken(token)}
+                      />
+                    ))}
+                  </>
+                ) : null}
               </>
             )}
           </div>
@@ -708,7 +732,9 @@ export function MainScreenView({
                     activityType={entry.type}
                     title={`${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`}
                     subtitle={
-                      entry.status === "pending"
+                      entry.unverified
+                        ? `Unverified transfer request${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
+                        : entry.status === "pending"
                         ? "Pending confirmation"
                         : entry.status === "failed"
                           ? entry.error
@@ -721,7 +747,7 @@ export function MainScreenView({
                         ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
                         : "—"
                     }
-                    amountTone={entry.type === "receive" ? "positive" : "neutral"}
+                    amountTone={entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
                         ? { name: collectibleLabel(entry.collectible), imageUrl: entry.collectible.imageUrl }

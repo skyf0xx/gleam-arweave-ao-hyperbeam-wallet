@@ -41,6 +41,13 @@ export interface ActivityEntry {
    * `address` is the recipient named in its tags, not the asset.
    */
   collectible?: CollectibleRef | null;
+  /**
+   * Set on an L1 token receive (`arweave/graphql.ts`'s
+   * `queryL1TokenReceipts`): the record is a transfer request anyone can
+   * sign, and nothing on-chain says the token process honoured it. The
+   * row says so instead of presenting it as received.
+   */
+  unverified?: true;
 }
 
 export interface ActivityPage {

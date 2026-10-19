@@ -101,11 +101,27 @@ describe("ManageTokensView", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["addr1", "balances"] });
   });
 
-  it("shows a rejection's error instead of previewing an invalid process id", async () => {
+  it("shows the background's rejection instead of a preview", async () => {
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getWatchedTokens") return [];
       if (type === "getTokenBalances") return [];
-      if (type === "previewWatchedToken") throw new Error("No HyperBEAM peer configured.");
+      if (type === "previewWatchedToken") throw new Error("No process with that id is on Arweave yet.");
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+
+    renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    fireEvent.click(screen.getByText("Preview"));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/No process with that id/));
+  });
+
+  it("explains a malformed id without asking the background", async () => {
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getWatchedTokens") return [];
+      if (type === "getTokenBalances") return [];
       throw new Error(`Unexpected message type "${type}"`);
     }) as RuntimePort["send"];
 
@@ -115,7 +131,46 @@ describe("ManageTokensView", () => {
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: "bad-id" } });
     fireEvent.click(screen.getByText("Preview"));
 
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/No HyperBEAM peer configured/));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/43 letters.*this is 6/));
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "previewWatchedToken" }));
+  });
+
+  it("lets a token whose balance can't be read still be added, saying why", async () => {
+    const unreadable: TokenBalance = { ...BALANCE_1, available: false, unavailableReason: "Couldn't read your wUSDC balance." };
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getWatchedTokens") return [];
+      if (type === "getTokenBalances") return [];
+      if (type === "previewWatchedToken") return unreadable;
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+
+    renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    fireEvent.click(screen.getByText("Preview"));
+
+    await waitFor(() => expect(screen.getByText(/Couldn't read your wUSDC balance\. You can still add it/)).toBeTruthy());
+    expect((screen.getByText("Add wUSDC").closest("button") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("lists discovered tokens separately, and hiding one calls removeWatchedToken", async () => {
+    const found: TokenBalance = { ...BALANCE_1, ticker: "FODDER", source: "discovered" };
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getWatchedTokens") return [];
+      if (type === "getTokenBalances") return [found];
+      if (type === "removeWatchedToken") return undefined;
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+
+    renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Found in your wallet")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Hide FODDER"));
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "removeWatchedToken", payload: { address: "addr1", processId: PROC_1 } }),
+    );
+    await waitFor(() => expect(screen.queryByText("Found in your wallet")).toBeNull());
   });
 
   it("removing a watched token calls removeWatchedToken, drops it from the list, and refreshes balances", async () => {

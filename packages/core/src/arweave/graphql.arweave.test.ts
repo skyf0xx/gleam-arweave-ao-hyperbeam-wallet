@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AO_MU_SIGNERS, queryActivityTransactions, queryAoTransferActivity } from "./graphql";
+import { AO_MU_SIGNERS, queryActivityTransactions, queryAoTransferActivity, queryL1TokenReceipts } from "./graphql";
 
 const ADDRESS = "myAddr";
 
@@ -165,6 +165,32 @@ describe("queryActivityTransactions", () => {
       amount: null,
       collectible: { id: "assetProcess" },
     });
+  });
+
+  it("reads a zero-AR transfer of more than one unit as a token send, not a collectible", async () => {
+    const recipient = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
+    const fetchImpl = fakeSidedFetch(
+      [
+        edge({
+          id: "tok1",
+          ownerAddress: ADDRESS,
+          recipient: "tokenProcess",
+          winston: "0",
+          timestamp: 100,
+          tags: [
+            { name: "action", value: "transfer" },
+            { name: "recipient", value: recipient },
+            { name: "quantity", value: "311" },
+          ],
+        }),
+      ],
+      [],
+    );
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry).toMatchObject({ txId: "tok1", type: "send", address: recipient, amount: "311", token: "tokenProcess" });
+    expect(entry?.collectible).toBeUndefined();
   });
 
   it("keeps a self-send once, as a send", async () => {
@@ -383,5 +409,47 @@ describe("queryAoTransferActivity", () => {
     const [entry] = await queryAoTransferActivity(ADDRESS, "https://arweave.net", 10, fetchImpl);
 
     expect(entry?.txId).toBe("msg4");
+  });
+});
+
+describe("queryL1TokenReceipts", () => {
+  const WALLET = "W".repeat(43);
+  const SENDER = "S".repeat(43);
+  const receipt = (id: string, quantity: string, overrides: { owner?: string; recipientTag?: string; winston?: string } = {}) =>
+    edge({
+      id,
+      ownerAddress: overrides.owner ?? SENDER,
+      recipient: "tokenProcess",
+      winston: overrides.winston ?? "0",
+      timestamp: 5,
+      tags: [
+        { name: "action", value: "transfer" },
+        { name: "recipient", value: overrides.recipientTag ?? WALLET },
+        { name: "quantity", value: quantity },
+      ],
+    });
+
+  it("reads a transfer naming the wallet as a receive of that token from its signer", async () => {
+    const entries = await queryL1TokenReceipts(WALLET, "https://arweave.net", 10, fakeGraphQLFetch([receipt("r1", "311")]));
+    expect(entries).toEqual([
+      expect.objectContaining({ txId: "r1", type: "receive", address: SENDER, amount: "311", token: "tokenProcess", unverified: true }),
+    ]);
+  });
+
+  it("keeps a 1-unit receive token-shaped, and skips self-sends, AR-carrying and mismatched ones", async () => {
+    const entries = await queryL1TokenReceipts(
+      WALLET,
+      "https://arweave.net",
+      10,
+      fakeGraphQLFetch([
+        receipt("one", "1"),
+        receipt("self", "5", { owner: WALLET }),
+        receipt("paid", "5", { winston: "10" }),
+        receipt("other", "5", { recipientTag: "O".repeat(43) }),
+      ]),
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ txId: "one", amount: "1", token: "tokenProcess", unverified: true });
+    expect(entries[0]?.collectible).toBeUndefined();
   });
 });

@@ -150,19 +150,40 @@ neither calls the other.
 
 ### ao/
 
-AO token operations.
+AO token operations. A token is one of two kinds, read from its spawn
+tags (`arweave/token-metadata.ts`'s `transport`): `"l1"` for a
+HyperBEAM-native process on `arweave-scheduler@1.0`, `"mu"` for a
+legacynet process.
 
-- **`balance.ts`** — reads a HyperBEAM compute-path balance.
+- **`balance.ts`** — `getTokenBalance` reads one HyperBEAM compute-path
+  balance. `readTokenBalance` routes by kind: an `"l1"` token is read
+  from the gateway's HyperBEAM node, then the peer; an `"mu"` token from
+  the peer, then a CU dry-run (`legacy-token.ts`).
+- **`legacy-token.ts`** — `Balance` and `Info` dry-runs against the
+  legacynet Compute Unit, for legacy tokens a peer won't serve.
 - **`transfer.ts`** — builds and signs an ANS-104 `Transfer` message
   (via `arweave/data-item.ts`) and POSTs it to the legacynet Messenger
-  Unit. This deliberately skips `@permaweb/aoconnect`, for the same
-  Chrome-signing reason `arweave/` avoids arbundles.
+  Unit, for `"mu"` tokens. This deliberately skips `@permaweb/aoconnect`,
+  for the same Chrome-signing reason `arweave/` avoids arbundles.
+- **`l1-transfer.ts`** — the zero-AR L1 transaction an `"l1"` token
+  takes a transfer as (lowercase `action`/`recipient`/`quantity` tags).
+  `collectible-transfer.ts` is its quantity-1 case.
 - **`result.ts`** — a separate, later poll against the Compute Unit for
-  the actual execution outcome. Submitting only proves the MU scheduled
-  the message, not that the process accepted it.
+  a legacy transfer's execution outcome. Submitting only proves the MU
+  scheduled the message, not that the process accepted it.
+- **`asset-scan.ts`** — bounded gateway scans for the processes an
+  address has touched, and `classifyAsset` (fungible or unique, by
+  spawn tags). Shared by:
+  - **`collectibles.ts`** — the NFTs an address holds.
+  - **`token-discovery.ts`** — the fungible tokens an address has
+    history with: L1 transfers to it, its market orders, initial
+    holdings, and MU-signed `Credit-Notice`s. Every result is
+    unverified: its ticker, name and balance are the process's own
+    claims. Balances are the caller's to read.
 
-Callers chain the two: submit, get a message id, later poll for the
-outcome, then feed that into `activity/merge.ts`.
+Callers chain a legacy send: submit, get a message id, later poll for
+the outcome, then feed that into `activity/merge.ts`. An L1 send settles
+through the gateway index like an AR send.
 
 ### hardware/ledger/
 
@@ -209,6 +230,9 @@ server's `/prices` and `/prices/history` proxy, which falls from CoinGecko
 to CoinPaprika and caches. A lookup reports `null` (or an empty series)
 rather than a fabricated `0` when the server or both providers fail.
 `portfolio.ts` turns price series into portfolio-value estimates over time.
+`impersonation.ts` says whether a token found on-chain presents itself as
+a registry token (lookalike tickers and names such as `A0`, `wAR`, or
+Cyrillic `АО`), so discovery can drop it.
 
 ### policy/
 

@@ -1,7 +1,18 @@
 import { browser } from "wxt/browser";
-import { discoverCollectibles, getTokenBalance, getTransferOutcome } from "@gleam/core/src/ao/index.ts";
+import {
+  discoverCollectibles,
+  discoverTokens,
+  getTransferOutcome,
+  readLegacyTokenInfo,
+  readTokenBalance,
+} from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
-import { queryActivityTransactions, queryAoTransferActivity } from "@gleam/core/src/arweave/graphql.ts";
+import {
+  queryActivityTransactions,
+  queryAoTransferActivity,
+  queryL1TokenReceipts,
+} from "@gleam/core/src/arweave/graphql.ts";
+import { queryTokenMetadata } from "@gleam/core/src/arweave/token-metadata.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
 import {
   AO_TOKEN,
@@ -11,8 +22,7 @@ import {
   estimateHistoricalPortfolioValue,
   getHistoricalUsdPrices,
   getUsdPrice,
-  isRegisteredProcessId,
-  resolveUnregisteredTokenMetadata,
+  impersonatesRegisteredToken,
 } from "@gleam/core/src/pricing/index.ts";
 import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL } from "@gleam/core";
 import type {
@@ -30,6 +40,7 @@ import type {
   TokenBalanceResult,
   TokenMetadata,
   TokenPrice,
+  TokenTransport,
   UserToken,
   UserTokensOptions,
   UserTokensResult,
@@ -47,11 +58,7 @@ import type {
  *
  * Storage schema this handler owns:
  * - `local:networkSettings` — `NetworkSettings`, defaulting to
- *   `arweave.net` with no HyperBEAM peers configured (an AO balance read
- *   with no active peer throws a named "no HyperBEAM peer configured"
- *   error rather than silently returning a zero balance — a value this
- *   handler can't compute is surfaced as unavailable, not as a plausible
- *   default).
+ *   `arweave.net` and the default HyperBEAM peer.
  * - `local:activityLog:{address}` — `ActivityEntry[]`, the local
  *   append-only action log `handlers/transfer.ts` writes optimistic
  *   entries into. Read-only from this handler's side; `transfer.ts` owns
@@ -69,16 +76,28 @@ import type {
  *   `StoragePort`, the same hexagonal boundary every other method in
  *   this file already respects.
  *
- * `getTokenBalances`'s AO process list: resolved against
- * `local:watchedProcessIds:{address}` (a simple `string[]`, defaulting to
- * empty). The default AO process id is always included in
- * `getTokenBalances`'s result regardless of this list's contents (see
- * `DEFAULT_AO_PROCESS_ID`) and is never itself stored in it.
+ * Token lists, per address:
+ * - `local:watchedProcessIds:{address}` — `string[]`, tokens added by
+ *   hand. AO is always listed and never stored here.
+ * - `local:hiddenProcessIds:{address}` — `string[]`, tokens the user
+ *   removed, kept out of discovery's results.
+ * - `local:discoveredTokens:{address}` — `{ savedAt, processIds }`, the
+ *   last `core/ao/token-discovery.ts` result.
+ * - `local:tokenMetadata:{processId}` — `TokenMetadata`, shared by every
+ *   wallet. It carries the token's transport, which decides where its
+ *   balance is read and how it is sent (`core/ao/balance.ts`'s
+ *   `readTokenBalance`).
  */
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 const TOKEN_METADATA_KEY_PREFIX = "local:tokenMetadata:";
+const HIDDEN_PROCESS_IDS_KEY_PREFIX = "local:hiddenProcessIds:";
+const DISCOVERED_TOKENS_KEY_PREFIX = "local:discoveredTokens:";
+// Discovery is a handful of gateway queries; a popup open inside this
+// window reuses the last result.
+const DISCOVERED_TOKENS_TTL_MS = 10 * 60 * 1000;
+const FIRST_DISCOVERY_WAIT_MS = 8_000;
 const COLLECTIBLES_KEY_PREFIX = "local:collectibles:";
 // Holdings change rarely and discovery is dozens of requests, so a popup
 // open within this window reuses the last result.
@@ -111,50 +130,44 @@ const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
 };
 
-/**
- * The AO token (pricing's AO_TOKEN, packages/core's single source of
- * truth for this id) is always shown on the Tokens tab regardless of
- * what's in a user's watch list, so its balance must always be read —
- * `local:watchedProcessIds` has no writer anywhere in the extension yet, so
- * relying on it alone left AO balance reads permanently empty.
- */
+/** Always listed, whatever the watch list holds. */
 const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
 
-/**
- * `getTokenBalance` echoes the process id as `ticker` when a HyperBEAM
- * balance response carries no ticker field (see `ao/balance.ts`'s
- * `parseBalanceResponse`). For any process with a manually-verified
- * ticker in `DEFAULT_TOKEN_REGISTRY` (e.g. AO), that known identity takes
- * precedence over the fallback.
- */
-function withRegisteredTicker(balance: TokenBalance): TokenBalance {
-  const registered = DEFAULT_TOKEN_REGISTRY.find((token) => token.processId === balance.processId);
-  if (!registered) return balance;
-  return {
-    ...balance,
-    ticker: balance.ticker === balance.processId ? registered.ticker : balance.ticker,
-    name: registered.name,
-  };
+const AO_TOKEN_METADATA: TokenMetadata = {
+  processId: DEFAULT_AO_PROCESS_ID,
+  transport: "mu",
+  assetClass: null,
+  denomination: 12,
+  ticker: AO_TOKEN.ticker,
+  name: AO_TOKEN.name,
+  description: null,
+  logo: null,
+  totalSupply: null,
+};
+
+const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
-/**
- * Placeholder row for a process id whose `getTokenBalance` HyperBEAM read
- * itself failed (peer error, timeout, unrecognized response shape) —
- * `getTokenBalances` uses `Promise.allSettled` so one such failure marks
- * only this row unavailable rather than rejecting the whole call and
- * blanking every other token's balance too. Ticker falls back to the raw
- * process id, matching `getTokenBalance`'s own no-ticker convention, so an
- * unavailable row still identifies which token failed.
- */
-function unavailableTokenBalance(processId: string, address: string): TokenBalance {
+/** The row fields that come from metadata alone. The ticker falls back to the process id, as the popup expects. */
+function tokenIdentity(
+  address: string,
+  metadata: TokenMetadata,
+  source: NonNullable<TokenBalance["source"]>,
+): Omit<TokenBalance, "quantity"> {
   return {
     address,
-    processId,
-    ticker: processId,
-    denomination: 0,
-    name: null,
-    quantity: "0",
-    available: false,
+    processId: metadata.processId,
+    ticker: metadata.ticker ?? metadata.processId,
+    denomination: metadata.denomination ?? 0,
+    name: metadata.name,
+    source,
   };
 }
 
@@ -163,6 +176,8 @@ function isValidTokenMetadata(value: unknown): value is TokenMetadata {
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.processId === "string" &&
+    (candidate.transport === "l1" || candidate.transport === "mu") &&
+    (candidate.assetClass === null || candidate.assetClass === "fungible" || candidate.assetClass === "unique") &&
     (candidate.denomination === null || typeof candidate.denomination === "number") &&
     (candidate.ticker === null || typeof candidate.ticker === "string") &&
     (candidate.name === null || typeof candidate.name === "string") &&
@@ -206,6 +221,21 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
   );
 }
 
+interface DiscoveredTokensCache {
+  savedAt: number;
+  processIds: string[];
+}
+
+function isDiscoveredTokensCache(value: unknown): value is DiscoveredTokensCache {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.savedAt === "number" &&
+    Array.isArray(candidate.processIds) &&
+    candidate.processIds.every((id) => typeof id === "string")
+  );
+}
+
 interface CollectiblesCache {
   savedAt: number;
   collectibles: Collectible[];
@@ -229,11 +259,16 @@ function isCollectiblesCache(value: unknown): value is CollectiblesCache {
 
 export class ReadsHandler {
   private readonly collectiblesInFlight = new Map<string, Promise<Collectible[]>>();
+  private readonly discoveryInFlight = new Map<string, Promise<string[]>>();
 
-  /** `pricesApiUrl` is the Gleam server, which proxies CoinGecko/CoinPaprika for users who can't reach them. */
+  /**
+   * `pricesApiUrl` is the Gleam server, which proxies CoinGecko/CoinPaprika
+   * for users who can't reach them. `discover` finds a wallet's tokens.
+   */
   constructor(
     private readonly storage: StoragePort,
     private readonly pricesApiUrl: string = POINTS_API_URL,
+    private readonly discover: (options: { address: string; gatewayUrl: string }) => Promise<TokenMetadata[]> = discoverTokens,
   ) {}
 
   async loadNetworkSettings(): Promise<NetworkSettings> {
@@ -324,126 +359,194 @@ export class ReadsHandler {
     return this.loadWatchedProcessIds(req.address);
   }
 
-  /**
-   * For a `TokenBalance` whose process isn't in `DEFAULT_TOKEN_REGISTRY`
-   * (so `withRegisteredTicker` had nothing to apply), resolves ticker,
-   * denomination and name directly from the process's spawn tags via the
-   * gateway's GraphQL endpoint (`resolveUnregisteredTokenMetadata` —
-   * `core/pricing/token-sources.ts`) rather than leaving the balance
-   * identified only by its raw process id. This is purely additive
-   * identification for watched-but-unregistered tokens: the balance
-   * quantity itself still comes only from the existing HyperBEAM
-   * `~process@1.0` compute path (`getTokenBalance`), and a registered
-   * token's identity (checked first) is never overridden by this lookup.
-   *
-   * Denomination for a non-AO process always comes from this metadata
-   * lookup, never from `getTokenBalance`'s AO-specific denomination-12
-   * default, which is only actually correct for the AO token itself —
-   * HyperBEAM's own response carries no denomination for anything else
-   * (see `ao/balance.ts`). When this lookup can't confirm a denomination
-   * (metadata unresolved, or resolved with no `denomination` tag), the row
-   * is marked `available: false` rather than rendered scaled by AO's
-   * guess, which could be off by orders of magnitude for a token with a
-   * different denomination.
-   *
-   * Cached by process id in `local:tokenMetadata:{processId}` with no
-   * expiry: spawn tags are immutable once a process exists (see
-   * `TokenMetadata`'s own doc comment), so a resolved result never goes
-   * stale. This is what stops `resolveUnregisteredTokenMetadata` from
-   * hitting the gateway on every `getTokenBalances` call for the same
-   * watched token. A lookup failure is never cached — the next call gets
-   * another chance to resolve it.
-   *
-   * A metadata lookup failure (`resolveUnregisteredTokenMetadata` returning
-   * `null` — unreachable gateway, unspawned/unindexed process id) never
-   * throws — one unresolvable token's identity shouldn't fail every other
-   * token's balance read in the same `getTokenBalances` call. It instead
-   * marks this one row unavailable (see above).
-   */
-  private async withUnregisteredMetadata(
-    balance: TokenBalance,
-    gatewayUrl: string,
-  ): Promise<TokenBalance> {
-    if (isRegisteredProcessId(balance.processId)) return balance;
-
-    const metadata = await this.resolveTokenMetadataCached(balance.processId, gatewayUrl);
-    if (metadata === null) return { ...balance, available: false };
-
-    if (metadata.denomination === null) {
-      // Ticker/name did resolve even though denomination didn't — still
-      // applied below. `quantity` is kept as-is (it's a real atomic-unit
-      // count from the HyperBEAM read); only the denomination needed to
-      // scale it for display is unconfirmed, so `available: false` tells
-      // callers not to trust a display formatted from it.
-      return { ...balance, ticker: metadata.ticker ?? balance.ticker, name: metadata.name, available: false };
-    }
-
-    return {
-      ...balance,
-      ticker: metadata.ticker ?? balance.ticker,
-      denomination: metadata.denomination,
-      name: metadata.name,
-    };
+  private async loadHiddenProcessIds(address: string): Promise<string[]> {
+    const raw = await this.storage.get<unknown>(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${address}`);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((id): id is string => typeof id === "string");
   }
 
-  private async resolveTokenMetadataCached(
-    processId: string,
-    gatewayUrl: string,
-  ): Promise<TokenMetadata | null> {
+  /**
+   * A token's identity and transport. AO is fixed. Any other token comes
+   * from its spawn tags, plus, for a legacy token whose Lua sets its
+   * ticker and denomination, its `Info` reply. Cached by process id with
+   * no expiry once complete; spawn tags and a token's Info don't change.
+   * Throws with a message the add-token preview can show as-is.
+   */
+  private async loadTokenMetadata(processId: string, gatewayUrl: string): Promise<TokenMetadata> {
+    if (processId === DEFAULT_AO_PROCESS_ID) return AO_TOKEN_METADATA;
     const cacheKey = `${TOKEN_METADATA_KEY_PREFIX}${processId}`;
     const cached = await this.storage.get<unknown>(cacheKey);
     if (isValidTokenMetadata(cached)) return cached;
 
-    const metadata = await resolveUnregisteredTokenMetadata(processId, gatewayUrl);
-    if (metadata === null) return null;
-
+    let metadata: TokenMetadata;
+    try {
+      metadata = await queryTokenMetadata(processId, gatewayUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        message.startsWith("No spawn transaction")
+          ? "No process with that id is on Arweave yet. Check that you copied the whole id; a token spawned in the last few minutes may not be indexed yet."
+          : `Couldn't reach ${hostOf(gatewayUrl)} to look up that token. Check your connection, or switch gateways in Network settings, then try again.`,
+      );
+    }
+    if (metadata.transport === "mu" && (metadata.ticker === null || metadata.denomination === null)) {
+      try {
+        const info = await readLegacyTokenInfo(processId);
+        metadata = {
+          ...metadata,
+          ticker: info.ticker ?? metadata.ticker,
+          name: info.name ?? metadata.name,
+          denomination: info.denomination ?? metadata.denomination,
+          logo: info.logo ?? metadata.logo,
+        };
+      } catch {
+        // Spawn tags alone; not cached, so the next read retries Info.
+        return metadata;
+      }
+    }
     await this.storage.set(cacheKey, metadata);
     return metadata;
   }
 
-  /**
-   * Shared by `previewWatchedToken` and `addWatchedToken` so a preview and
-   * the value actually stored can never disagree.
-   */
-  private async resolveTokenBalance(address: string, processId: string): Promise<TokenBalance> {
-    const settings = await this.loadNetworkSettings();
-    if (settings.activePeerUrl === null) {
-      throw new Error(
-        "No HyperBEAM peer configured. Add one in Network settings to read AO token balances.",
-      );
+  private async tryTokenMetadata(processId: string, gatewayUrl: string): Promise<TokenMetadata | null> {
+    try {
+      return await this.loadTokenMetadata(processId, gatewayUrl);
+    } catch {
+      return null;
     }
+  }
 
-    const balance = await getTokenBalance(processId, address, settings.activePeerUrl);
-    return this.withUnregisteredMetadata(withRegisteredTicker(balance), settings.gatewayUrl);
+  /**
+   * One token row. A failed read marks only this row unavailable, with the
+   * reason, rather than failing every other token's balance too. A token
+   * whose denomination can't be confirmed is unavailable as well: scaling
+   * its quantity by a guess could be off by orders of magnitude.
+   */
+  private async tokenRow(
+    address: string,
+    processId: string,
+    settings: NetworkSettings,
+    source: NonNullable<TokenBalance["source"]>,
+  ): Promise<TokenBalance> {
+    const metadata = await this.tryTokenMetadata(processId, settings.gatewayUrl);
+    if (metadata === null) {
+      return {
+        address,
+        processId,
+        ticker: processId,
+        denomination: 0,
+        name: null,
+        quantity: "0",
+        available: false,
+        unavailableReason: "Couldn't look up this token's details. Try again in a minute.",
+        source,
+      };
+    }
+    const identity = tokenIdentity(address, metadata, source);
+    try {
+      const quantity = await readTokenBalance({
+        processId,
+        address,
+        transport: metadata.transport,
+        gatewayUrl: settings.gatewayUrl,
+        peerUrl: settings.activePeerUrl,
+        label: identity.ticker === processId ? "token" : identity.ticker,
+      });
+      if (metadata.denomination === null) {
+        return { ...identity, quantity, available: false, unavailableReason: "This token doesn't say how many decimals it uses." };
+      }
+      return { ...identity, quantity };
+    } catch (error) {
+      return {
+        ...identity,
+        quantity: "0",
+        available: false,
+        unavailableReason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Process ids found from the wallet's history (`core/ao/token-discovery.ts`),
+   * cached per wallet for `DISCOVERED_TOKENS_TTL_MS`. A stale cache is
+   * served while a refresh runs in the background, so only a wallet's
+   * first read waits on discovery, and for at most
+   * `FIRST_DISCOVERY_WAIT_MS`. A failed discovery leaves the cache as it
+   * was.
+   */
+  private async discoveredProcessIds(address: string, settings: NetworkSettings): Promise<string[]> {
+    const key = `${DISCOVERED_TOKENS_KEY_PREFIX}${address}`;
+    const raw = await this.storage.get<unknown>(key);
+    const cached = isDiscoveredTokensCache(raw) ? raw : null;
+    if (cached && Date.now() - cached.savedAt < DISCOVERED_TOKENS_TTL_MS) return cached.processIds;
+
+    let running = this.discoveryInFlight.get(address);
+    if (!running) {
+      running = (async () => {
+        try {
+          const found = await this.discover({ address, gatewayUrl: settings.gatewayUrl });
+          await Promise.all(
+            found
+              .filter((metadata) => metadata.transport === "l1" && metadata.denomination !== null)
+              .map((metadata) => this.storage.set(`${TOKEN_METADATA_KEY_PREFIX}${metadata.processId}`, metadata)),
+          );
+          const processIds = found.map((metadata) => metadata.processId);
+          await this.storage.set<DiscoveredTokensCache>(key, { savedAt: Date.now(), processIds });
+          return processIds;
+        } catch (error) {
+          console.warn(`Token discovery for "${address}" failed:`, error);
+          return cached?.processIds ?? [];
+        } finally {
+          this.discoveryInFlight.delete(address);
+        }
+      })();
+      this.discoveryInFlight.set(address, running);
+    }
+    if (cached) return cached.processIds;
+    // A first discovery can take tens of seconds on a slow gateway; past
+    // this wait the balances return without it, and the next read has it.
+    return Promise.race([
+      running,
+      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), FIRST_DISCOVERY_WAIT_MS)),
+    ]);
   }
 
   /**
    * Read-only resolve for the "paste a process id" add-token flow: proves
-   * the id is a live token and returns its ticker/balance without storing
-   * anything, so the popup can show a preview before the user confirms.
+   * the id is a token and returns its ticker and balance without storing
+   * anything. A token whose balance can't be read right now still
+   * previews (as unavailable, with the reason) and can still be added;
+   * only an id that isn't a token is refused.
    */
   async previewWatchedToken(req: { address: string; processId: string }): Promise<TokenBalance> {
     const processId = req.processId.trim();
-    if (processId.length === 0) {
-      throw new Error("Enter a process id.");
+    if (processId.length === 0) throw new Error("Paste a token's process id.");
+    if (!PROCESS_ID.test(processId)) {
+      throw new Error(
+        "That isn't a process id. A process id is 43 letters, digits, - and _; copy it from the token's page or explorer.",
+      );
     }
-    return this.resolveTokenBalance(req.address, processId);
+    if (processId === req.address) throw new Error("That's your wallet address, not a token's process id.");
+    const settings = await this.loadNetworkSettings();
+    const metadata = await this.loadTokenMetadata(processId, settings.gatewayUrl);
+    if (metadata.assetClass === "unique") {
+      throw new Error("That's a collectible, not a token. Collectibles you hold show up in the Collectibles tab on their own.");
+    }
+    if (metadata.ticker === null && metadata.name === null) {
+      throw new Error("That process doesn't describe itself as a token (it has no name or ticker). Check the id.");
+    }
+    return this.tokenRow(req.address, processId, settings, "watched");
   }
 
   /**
-   * Persists a previewed process id to the watch list. Re-resolves rather
-   * than trusting a client-supplied balance, so a stale or forged preview
-   * can't be stored as-is. No-op (but not an error) for an id that's
-   * already watched, or for the default AO process id, which is always
-   * shown without being in this list.
+   * Persists a previewed process id to the watch list, and un-hides it.
+   * Re-resolves rather than trusting a client-supplied preview. No-op
+   * (but not an error) for an id that's already watched, or for the
+   * default AO process id, which is always shown without being stored.
    */
   async addWatchedToken(req: { address: string; processId: string }): Promise<TokenBalance> {
-    const processId = req.processId.trim();
-    if (processId.length === 0) {
-      throw new Error("Enter a process id.");
-    }
-
-    const resolved = await this.resolveTokenBalance(req.address, processId);
+    const resolved = await this.previewWatchedToken(req);
+    const processId = resolved.processId;
 
     if (processId !== DEFAULT_AO_PROCESS_ID) {
       const existing = await this.loadWatchedProcessIds(req.address);
@@ -451,7 +554,13 @@ export class ReadsHandler {
         await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, [...existing, processId]);
       }
     }
-
+    const hidden = await this.loadHiddenProcessIds(req.address);
+    if (hidden.includes(processId)) {
+      await this.storage.set(
+        `${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`,
+        hidden.filter((id) => id !== processId),
+      );
+    }
     return resolved;
   }
 
@@ -461,11 +570,22 @@ export class ReadsHandler {
     return (await this.loadWatchedProcessIds(req.address)).includes(req.processId);
   }
 
+  /**
+   * Drops a token from the list, watched or discovered. It is also hidden,
+   * so discovery doesn't bring it straight back; adding it again by id
+   * un-hides it.
+   */
   async removeWatchedToken(req: { address: string; processId: string }): Promise<void> {
+    if (req.processId === DEFAULT_AO_PROCESS_ID) return;
     const existing = await this.loadWatchedProcessIds(req.address);
     const next = existing.filter((id) => id !== req.processId);
-    if (next.length === existing.length) return;
-    await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, next);
+    if (next.length !== existing.length) {
+      await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, next);
+    }
+    const hidden = await this.loadHiddenProcessIds(req.address);
+    if (!hidden.includes(req.processId)) {
+      await this.storage.set(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`, [...hidden, req.processId]);
+    }
   }
 
   async getBalance(req: { address: string }): Promise<Winston> {
@@ -473,75 +593,78 @@ export class ReadsHandler {
     return getArBalance(req.address, settings.gatewayUrl);
   }
 
+  /**
+   * AO, then the watch list, then tokens discovered from the wallet's
+   * history. Anyone can make a process that credits a wallet, so a
+   * discovered token's ticker, name and balance are the stranger's
+   * claims: it is listed only while it holds a readable, positive balance,
+   * never when it presents itself as a registry token
+   * (`impersonatesRegisteredToken`), and always marked `"discovered"` so
+   * the popup groups it as unverified and never prices it.
+   */
   async getTokenBalances(req: { address: string }): Promise<TokenBalance[]> {
     const settings = await this.loadNetworkSettings();
-    const watchedProcessIds = await this.loadWatchedProcessIds(req.address);
-    const processIds = watchedProcessIds.includes(DEFAULT_AO_PROCESS_ID)
-      ? watchedProcessIds
-      : [DEFAULT_AO_PROCESS_ID, ...watchedProcessIds];
+    const [watched, hidden] = await Promise.all([
+      this.loadWatchedProcessIds(req.address),
+      this.loadHiddenProcessIds(req.address),
+    ]);
+    const baseIds = [...new Set([DEFAULT_AO_PROCESS_ID, ...watched])];
+    const skip = new Set([...baseIds, ...hidden]);
 
-    if (processIds.length === 0) return [];
-
-    if (settings.activePeerUrl === null) {
-      throw new Error(
-        "No HyperBEAM peer configured. Add one in Network settings to read AO token balances.",
-      );
-    }
-
-    const activePeerUrl = settings.activePeerUrl;
-    const settled = await Promise.allSettled(
-      processIds.map((processId) => getTokenBalance(processId, req.address, activePeerUrl)),
-    );
-    const balances = settled.map((result, index) =>
-      result.status === "fulfilled"
-        ? result.value
-        : unavailableTokenBalance(processIds[index] as string, req.address),
-    );
-    const withTickers = balances.map((balance) => withRegisteredTicker(balance));
-    return Promise.all(
-      withTickers.map((balance) =>
-        balance.available === false ? balance : this.withUnregisteredMetadata(balance, settings.gatewayUrl),
+    const [base, discovered] = await Promise.all([
+      Promise.all(
+        baseIds.map((processId) =>
+          this.tokenRow(req.address, processId, settings, processId === DEFAULT_AO_PROCESS_ID ? "default" : "watched"),
+        ),
       ),
+      this.discoveredProcessIds(req.address, settings).then((ids) =>
+        Promise.all(
+          ids.filter((id) => !skip.has(id)).map((id) => this.tokenRow(req.address, id, settings, "discovered")),
+        ),
+      ),
+    ]);
+    const kept = discovered.filter(
+      (row) =>
+        row.available !== false &&
+        /^\d+$/.test(row.quantity) &&
+        BigInt(row.quantity) > 0n &&
+        !impersonatesRegisteredToken({ ticker: row.ticker, name: row.name }),
     );
+    return [...base, ...kept];
   }
 
   /**
-   * `ProtocolMap`'s per-token balance read (`window.arweaveWallet`'s
-   * `tokenBalance(id)`, Wander-shaped) — resolves a single AO process's
-   * balance for the given wallet address via the same HyperBEAM
-   * `~process@1.0` path `getTokenBalances` uses, rather than fetching every
-   * watched token and filtering, since only one process id was asked for.
-   * Read-only: no signing-approval window needed (`provider-bridge` only
-   * needs to gate this behind a connection-approval Grant check).
-   *
-   * Same "no HyperBEAM peer configured" failure mode as
-   * `getTokenBalances` — a balance this handler can't compute is a thrown,
-   * named error, never a fabricated `"0"`.
+   * `window.arweaveWallet.tokenBalance(id)`, Wander-shaped: one token's
+   * atomic balance, read the way that token is routed. Read-only, so only
+   * the connection grant gates it. A balance that can't be read is a
+   * thrown error, never a fabricated `"0"`.
    */
-  async tokenBalance(
-    req: { address: string } & TokenBalanceRequest,
-  ): Promise<TokenBalanceResult> {
+  async tokenBalance(req: { address: string } & TokenBalanceRequest): Promise<TokenBalanceResult> {
     const settings = await this.loadNetworkSettings();
-    if (settings.activePeerUrl === null) {
-      throw new Error(
-        "No HyperBEAM peer configured. Add one in Network settings to read AO token balances.",
-      );
-    }
+    const metadata = await this.loadTokenMetadata(req.id, settings.gatewayUrl);
+    return readTokenBalance({
+      processId: req.id,
+      address: req.address,
+      transport: metadata.transport,
+      gatewayUrl: settings.gatewayUrl,
+      peerUrl: settings.activePeerUrl,
+      label: metadata.ticker ?? "token",
+    });
+  }
 
-    const balance = await getTokenBalance(req.id, req.address, settings.activePeerUrl);
-    return balance.quantity;
+  /** Read for a send: whether `processId` takes transfers as L1 transactions. */
+  async tokenTransport(req: { processId: string }): Promise<TokenTransport> {
+    const settings = await this.loadNetworkSettings();
+    return (await this.loadTokenMetadata(req.processId, settings.gatewayUrl)).transport;
   }
 
   /**
    * `window.arweaveWallet.userTokens(options?)`, in Wander's shape. Reads
    * the same token list as `getTokenBalances`, then reshapes each entry.
-   * `getTokenBalance` falls back to the process id as the ticker when it
-   * finds none, so that fallback is dropped rather than passed off as a
+   * The process-id fallback ticker is dropped rather than passed off as a
    * ticker. A row the popup would show as unavailable reports a `null`
-   * balance: its quantity may be a placeholder. `Denomination` is left out
-   * entirely for such a row rather than sending its placeholder/guessed
-   * value, since a dApp scaling a raw quantity by an unconfirmed
-   * denomination could be off by orders of magnitude.
+   * balance and no `Denomination`: a dApp scaling a raw quantity by an
+   * unconfirmed denomination could be off by orders of magnitude.
    */
   async userTokens(req: { address: string; options?: UserTokensOptions }): Promise<UserTokensResult> {
     const balances = await this.getTokenBalances({ address: req.address });
@@ -560,13 +683,69 @@ export class ReadsHandler {
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
     void req.cursor; // most-recent-N only — no deeper pagination cursor is implemented yet.
     const settings = await this.loadNetworkSettings();
-    const [localLog, arEntries, aoEntries] = await Promise.all([
+    const [localLog, arEntries, aoEntries, l1Receipts] = await Promise.all([
       this.loadActivityLog(req.address),
       queryActivityTransactions(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
       queryAoTransferActivity(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
+      // Receipts are extra detail; a failed query shouldn't blank the feed.
+      queryL1TokenReceipts(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT).catch(() => []),
     ]);
+    const receipts = await this.receiptsForListedTokens(req.address, l1Receipts, settings);
+    const gatewayEntries = [...(await this.resolveSingleUnitTransfers([...arEntries, ...aoEntries], settings)), ...receipts];
 
-    return mergeActivity(localLog, [...arEntries, ...aoEntries], ACTIVITY_PAGE_LIMIT);
+    return mergeActivity(localLog, gatewayEntries, ACTIVITY_PAGE_LIMIT);
+  }
+
+  /**
+   * An L1 receipt is anyone's claim, so one is kept only for a token the
+   * user already lists (watched, or discovered and not hidden) whose
+   * spawn tags make it a fungible `arweave-scheduler@1.0` token. Reads
+   * only cached discovery, never starting one.
+   */
+  private async receiptsForListedTokens(
+    address: string,
+    receipts: ActivityEntry[],
+    settings: NetworkSettings,
+  ): Promise<ActivityEntry[]> {
+    if (receipts.length === 0) return [];
+    const [watched, hidden, rawDiscovered] = await Promise.all([
+      this.loadWatchedProcessIds(address),
+      this.loadHiddenProcessIds(address),
+      this.storage.get<unknown>(`${DISCOVERED_TOKENS_KEY_PREFIX}${address}`),
+    ]);
+    const discovered = isDiscoveredTokensCache(rawDiscovered) ? rawDiscovered.processIds : [];
+    const listed = new Set([...watched, ...discovered].filter((id) => !hidden.includes(id)));
+    const tokens = [...new Set(receipts.flatMap((entry) => (entry.token && listed.has(entry.token) ? [entry.token] : [])))];
+    const fungible = new Set<string>();
+    await Promise.all(
+      tokens.map(async (id) => {
+        const metadata = await this.tryTokenMetadata(id, settings.gatewayUrl);
+        if (metadata?.transport === "l1" && metadata.assetClass === "fungible") fungible.add(id);
+      }),
+    );
+    return receipts.filter((entry) => entry.token && fungible.has(entry.token));
+  }
+
+  /**
+   * The gateway parser reads the wallet's own L1 transfer of exactly 1
+   * unit as a collectible send. Where the process's spawn tags say it is
+   * a fungible token, the entry becomes a 1-unit token send instead.
+   */
+  private async resolveSingleUnitTransfers(entries: ActivityEntry[], settings: NetworkSettings): Promise<ActivityEntry[]> {
+    const ids = [...new Set(entries.flatMap((entry) => (entry.collectible && !entry.token ? [entry.collectible.id] : [])))];
+    if (ids.length === 0) return entries;
+    const fungible = new Set<string>();
+    await Promise.all(
+      ids.map(async (id) => {
+        const metadata = await this.tryTokenMetadata(id, settings.gatewayUrl);
+        if (metadata?.assetClass === "fungible") fungible.add(id);
+      }),
+    );
+    return entries.map((entry) => {
+      if (!entry.collectible || !fungible.has(entry.collectible.id)) return entry;
+      const { collectible, ...rest } = entry;
+      return { ...rest, token: collectible.id, amount: "1" };
+    });
   }
 
   /**
@@ -618,6 +797,9 @@ export class ReadsHandler {
     const resolved = await Promise.all(
       localLog.map(async (entry) => {
         if (entry.status !== "pending" || !entry.token) return entry;
+        // An L1 token send settles through the gateway index, like an AR send.
+        const metadata = await this.storage.get<unknown>(`${TOKEN_METADATA_KEY_PREFIX}${entry.token}`);
+        if (isValidTokenMetadata(metadata) && metadata.transport === "l1") return entry;
         const outcome = await getTransferOutcome(entry.txId, entry.token);
         if (outcome.status === "pending") return entry;
         changed = true;
@@ -729,16 +911,21 @@ export class ReadsHandler {
 
     const tokens = [{ balance: arBalance, priceAt: buildPriceAtFromSeries(arPriceSeries) }];
 
-    if (AO_TOKEN.priceSource && settings.activePeerUrl !== null) {
-      const peerUrl = settings.activePeerUrl;
+    if (AO_TOKEN.priceSource) {
       // A failed read leaves that wallet's AO out rather than failing the
       // whole chart whenever a peer hiccups — there's no way to tell whether
       // the wallet even holds AO.
       const aoQuantities = await Promise.all(
         addresses.map(async (address) => {
           try {
-            const aoBalance = await getTokenBalance(AO_TOKEN.processId as string, address, peerUrl);
-            return Number(aoBalance.quantity) / 10 ** aoBalance.denomination;
+            const quantity = await readTokenBalance({
+              processId: DEFAULT_AO_PROCESS_ID,
+              address,
+              transport: "mu",
+              gatewayUrl: settings.gatewayUrl,
+              peerUrl: settings.activePeerUrl,
+            });
+            return Number(quantity) / 10 ** (AO_TOKEN_METADATA.denomination ?? 12);
           } catch {
             return null;
           }
