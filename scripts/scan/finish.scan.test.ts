@@ -76,6 +76,13 @@ describe("pnpm scan finish: local checks", () => {
     expect(out).toContain("✗ extra: extra isn't part of the attestation format; remove it.");
   });
 
+  it("names an invisible character in the report with what to change", async () => {
+    const out = await lines(setup(goodAttestation({ report: "Checked the vault.\u200B" })));
+    expect(out).toContain(
+      "✗ report: report contains an invisible character (U+00AD, U+200B–U+200D, U+2060, U+FEFF or a tag character U+E0000–U+E007F); remove it.",
+    );
+  });
+
   it("fails on an expired challenge and on a HEAD that isn't the release", async () => {
     const expired = setup(goodAttestation(), { now: () => Date.parse("2026-10-18T00:00:00Z") });
     expect((await lines(expired)).join("\n")).toContain("The challenge expired at 2026-10-17T00:00:00.000Z; run `pnpm scan start` again");

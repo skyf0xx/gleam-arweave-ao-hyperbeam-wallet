@@ -1,6 +1,7 @@
 import type { PermissionType } from "./permission";
 import type { CollectibleRef } from "./collectible";
 import type { HardwareDevice, HardwareWalletMethod } from "./wallet";
+import type { AttestationAnswer, ScanResult } from "../scan/attestation";
 
 export type ApprovalKind =
   | "connect"
@@ -15,7 +16,8 @@ export type ApprovalKind =
   | "signMessage"
   | "addToken"
   | "transfer"
-  | "pointsProof";
+  | "pointsProof"
+  | "scanAttestation";
 
 /**
  * A dApp's self-reported identity, passed to `connect()` per the ArConnect
@@ -109,7 +111,35 @@ export interface AddTokenApprovalPreview {
   address: string;
 }
 
-export type ApprovalPreview = ConnectApprovalPreview | SigningApprovalPreview | AddTokenApprovalPreview;
+/**
+ * The Gleam site asking the wallet to sign a community scan attestation
+ * (SCANS.md). Every text field came from an agent's output through a link,
+ * so the window shows it as plain text only. Signing proves the wallet
+ * vouches for the scan; it signs no transaction and moves nothing.
+ */
+export interface ScanAttestationApprovalPreview {
+  kind: "scanAttestation";
+  /** The wallet that signs, and so the one that gets the points. */
+  walletId: string;
+  address: string;
+  /** Lowercase hex SHA-256 of the canonical attestation. */
+  attestationId: string;
+  /** `gleam-points:attest:v1:<release>:<attestationId>`, what is signed. */
+  message: string;
+  release: string;
+  commit: string;
+  model: string;
+  challenge: string;
+  result: ScanResult;
+  answers: AttestationAnswer[];
+  report: string;
+}
+
+export type ApprovalPreview =
+  | ConnectApprovalPreview
+  | SigningApprovalPreview
+  | AddTokenApprovalPreview
+  | ScanAttestationApprovalPreview;
 
 /**
  * The origin of a request Gleam makes for itself: a send from the popup

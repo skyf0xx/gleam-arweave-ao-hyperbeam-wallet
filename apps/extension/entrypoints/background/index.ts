@@ -78,7 +78,10 @@ import {
 } from "@/src/dispatch/methods";
 import { contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
-import { acceptSiteInvite } from "@/src/points-invite";
+import { redeemSiteInvite } from "@/src/points-invite";
+import { signSiteAttestation } from "@/src/points-attest";
+import { dispatchSiteMessage } from "@/src/dispatch/site";
+import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
 
 /**
@@ -118,6 +121,11 @@ const approval: ApprovalHandler = new ApprovalHandler(
   DEFAULT_BUNDLER_URL,
   async () => (await lifecycle.getState()).activeWalletId,
   reads,
+  // `points` is declared below; attestations reach it only at call time.
+  {
+    attest: (req) => points.attest(req),
+    submitAttestation: (attestation, proof) => points.submitAttestation(attestation, proof),
+  },
 );
 
 // Advances locally-pending activity entries to confirmed on a background
@@ -926,6 +934,23 @@ async function initializeNetworkSettingsIfMissing(): Promise<void> {
   }
 }
 
+function handleSiteMessage(message: unknown, origin: string | undefined): Promise<unknown> {
+  return dispatchSiteMessage(message, origin, {
+    "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, points).catch(() => ({ ok: false })),
+    "gleam-points:attest": (request) =>
+      signSiteAttestation(request, {
+        activeWallet: async () => {
+          const state = await lifecycle.getState();
+          return state.wallets.find((wallet) => wallet.id === state.activeWalletId) ?? null;
+        },
+        requestScanAttestation: (req) => approval.requestScanAttestation(req),
+      }).catch((error: unknown): SiteAttestResponse => {
+        console.error("Couldn't handle a scan attestation from the site.", error);
+        return { ok: false, code: "signing_failed", error: "Gleam couldn't open the attestation. Open the link again." };
+      }),
+  });
+}
+
 export default defineBackground(() => {
   listenForKeyringConnections();
   // Runs synchronously after the module's listeners are registered, so it
@@ -949,10 +974,13 @@ export default defineBackground(() => {
   // `initializeNetworkSettingsIfMissing`'s "nothing written yet" check is
   // meaningful — after that, a written NetworkSettings (default or
   // user-edited) always short-circuits it anyway.
-  // The site's welcome page hands over a Gleam Points invite code here.
-  // Returning true keeps the reply channel open for the async storage write.
+  // The site's pages (SITE_MESSAGES): welcome.html hands over a Gleam
+  // Points invite code, attest.html a scan attestation to sign.
+  // `dispatchSiteMessage` checks the sender's origin and the message's
+  // shape before any handler runs. Returning true keeps the reply channel open until the handler is done,
+  // which for an attestation is when the user has finished in its window.
   browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-    void acceptSiteInvite(message, sender.origin, storage, points).then(sendResponse, () => sendResponse({ ok: false }));
+    void handleSiteMessage(message, sender.origin).then(sendResponse);
     return true;
   });
 

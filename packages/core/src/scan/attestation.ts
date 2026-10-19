@@ -55,6 +55,8 @@ const REPORT_FORBIDDEN = /[\x00-\x08\x0b-\x1f\x7f]/;
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 /** Line separators and bidi controls, which can make public text on scan.html read differently from what was signed. */
 const DECEPTIVE_CHARACTERS = /[\u0085\u2028\u2029\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
+/** Characters that render as nothing, so shown text can hide content or differ from what was signed. */
+const INVISIBLE_CHARACTERS = /[\u00AD\u200B-\u200D\u2060\uFEFF\u{E0000}-\u{E007F}]/u;
 
 const ATTESTATION_KEYS = ["release", "commit", "model", "challenge", "answers", "result", "report"] as const;
 const ANSWER_KEYS = ["file", "symbol", "line", "check"] as const;
@@ -225,7 +227,7 @@ function parseAnswer(entry: unknown, at: string, issues: ScanIssue[]): Attestati
 
 /**
  * Reports string fields holding an unpaired surrogate, and the `shown`
- * fields holding a line separator or bidi control. Returns the fields it
+ * fields holding a line separator, bidi control or invisible character. Returns the fields it
  * reported, so their other rules aren't reported on top.
  */
 function unsafeStrings(
@@ -247,6 +249,14 @@ function unsafeStrings(
         invalid(
           `${prefix}${field}`,
           "contains a line separator (U+0085, U+2028, U+2029) or a bidi control (U+200E, U+200F, U+202A–U+202E, U+2066–U+2069); remove it",
+        ),
+      );
+      flagged.add(field);
+    } else if (shown.includes(field) && INVISIBLE_CHARACTERS.test(text)) {
+      issues.push(
+        invalid(
+          `${prefix}${field}`,
+          "contains an invisible character (U+00AD, U+200B–U+200D, U+2060, U+FEFF or a tag character U+E0000–U+E007F); remove it",
         ),
       );
       flagged.add(field);

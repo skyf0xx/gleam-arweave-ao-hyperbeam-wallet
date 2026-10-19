@@ -164,6 +164,17 @@ describe("parseAttestation on hostile text", () => {
       expect(modelIssues[0]!.message).toContain("remove it");
     },
   );
+
+  it.each(["\u00AD", "\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF", "\u{E0000}", "\u{E0041}", "\u{E007F}"])(
+    "rejects the invisible %j in model, check and report",
+    (character) => {
+      const reportIssues = issuesOf(withField({ report: `Report ${character} text.` }));
+      expect(reportIssues.map((issue) => issue.path)).toEqual(["report"]);
+      expect(reportIssues[0]!.message).toContain("invisible character");
+      expect(issuesOf(withAnswer(2, { check: `Stops a ${character} replay attack.` }))[0]?.path).toBe("answers[2].check");
+      expect(issuesOf(withField({ model: `claude${character}` }))[0]?.path).toBe("model");
+    },
+  );
 });
 
 describe("attestation id", () => {

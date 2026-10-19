@@ -78,8 +78,9 @@ export default defineConfig({
       ]),
     ],
     optional_host_permissions: ['https://*/*'],
-    // Lets the site's welcome page hand over a Gleam Points invite code
-    // (src/points-invite.ts). Only this origin can message the extension.
+    // Lets the site's pages hand over a Gleam Points invite code
+    // (src/points-invite.ts) or a scan attestation to sign
+    // (src/points-attest.ts). Only this origin can message the extension.
     externally_connectable: {
       matches: ['https://gleamwallet.app/*'],
     },

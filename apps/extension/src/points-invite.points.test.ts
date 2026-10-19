@@ -13,7 +13,9 @@ import {
   POINTS_PENDING_INVITE_KEY,
   PointsHandler,
 } from "./handlers/points";
-import { SITE_ORIGIN, acceptSiteInvite } from "./points-invite";
+import { dispatchSiteMessage } from "./dispatch/site";
+import { redeemSiteInvite, type InviteRedeemer } from "./points-invite";
+import { SITE_ORIGIN } from "./site-pages";
 
 vi.mock("wxt/browser", () => ({ browser: {} }));
 
@@ -34,6 +36,16 @@ function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort &
       return () => {};
     },
   };
+}
+
+/** What the background does with an external message: the site dispatcher, then the invite handler. */
+function acceptSiteInvite(message: unknown, origin: string | undefined, storage: StoragePort, redeemer: InviteRedeemer) {
+  return dispatchSiteMessage(message, origin, {
+    "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, redeemer),
+    "gleam-points:attest": async () => {
+      throw new Error("not an invite");
+    },
+  });
 }
 
 const INVITE = { type: "gleam-points:invite", code: "FRIEND42" };
@@ -241,7 +253,7 @@ describe("acceptSiteInvite", () => {
 
       const reply = await acceptSiteInvite(INVITE, SITE_ORIGIN, storage, points);
       expect(reply).toEqual({ ok: true, redeem: "ok" });
-      expect(Object.keys(reply)).toEqual(["ok", "redeem"]);
+      expect(Object.keys(reply as object)).toEqual(["ok", "redeem"]);
     });
   });
 });

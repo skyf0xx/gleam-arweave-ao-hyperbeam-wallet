@@ -67,6 +67,7 @@ export type {
   DeviceSigningRequest,
   DeviceSigningSummary,
   SigningApprovalPreview,
+  ScanAttestationApprovalPreview,
 } from "./approval";
 export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";

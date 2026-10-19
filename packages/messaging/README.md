@@ -2,7 +2,8 @@
 
 The typed wire contracts between the extension's separate JS contexts:
 popup/side panel, background service worker, content script, injected
-page provider, and the keyring offscreen document.
+page provider, and the keyring offscreen document, plus the messages the
+Gleam site's own pages send the extension.
 
 No logic lives here. This package holds only message shapes, constants,
 and the type-level privilege grouping that a later layer (the
@@ -18,6 +19,7 @@ split.
 - [`protocol.ts`](#protocolts) — the extension-wide RPC contract
 - [`page-protocol.ts`](#page-protocolts) — the page ↔ content script wire format
 - [`keyring-protocol.ts`](#keyring-protocolts) — the background ↔ keyring port contract
+- [`site-protocol.ts`](#site-protocolts) — the Gleam site → extension messages
 - [`permissions.ts`](#permissionsts) — re-exported privilege-tier vocabulary
 
 ### protocol.ts
@@ -69,6 +71,16 @@ This is separate from `ProtocolMap` because a port, unlike
 `runtime.sendMessage`, is only ever delivered to the one page that
 opened it. That way, key material (e.g. an imported JWK) never risks
 reaching another open extension page.
+
+### site-protocol.ts
+
+Defines what the Gleam site's pages send over `externally_connectable`
+and what they get back. `SiteAttestRequest` is `attest.html` handing over
+a community scan attestation; `SiteAttestResponse` is the reply once the
+user has finished in Gleam's window: the points earned, or a
+`SiteAttestErrorCode` with one sentence to show. The site reads these
+shapes; the extension's `src/dispatch/methods.ts` holds the schemas it
+checks them with, and `src/dispatch/site.ts` enforces them.
 
 ### permissions.ts
 

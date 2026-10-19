@@ -36,6 +36,17 @@ import type {
   Winston,
 } from "@gleam/core";
 import type { ProviderSurfaceMethod } from "./page-protocol";
+import type { SiteAttestResponse } from "./site-protocol";
+
+/**
+ * What a finished request shows in its window, for the kinds whose window
+ * stays open after approval. A scan attestation shows the points it
+ * earned or why it was refused.
+ */
+export interface ApprovalShown {
+  shown: "scanAttestation";
+  result: SiteAttestResponse;
+}
 
 /**
  * The typed background RPC contract. `@webext-core/messaging`'s
@@ -189,8 +200,11 @@ export interface ProtocolMap {
    * the request with `device` set (its unsigned payloads), and the window
    * answers with `submitDeviceSignature`. Rejecting still works while the
    * request waits for the device.
+   *
+   * A scan attestation returns `ApprovalShown`, and its window stays open
+   * to show it.
    */
-  resolveApproval(req: { requestId: string; approved: boolean }): ApprovalRequest | void;
+  resolveApproval(req: { requestId: string; approved: boolean }): ApprovalRequest | ApprovalShown | void;
   /**
    * The device's signatures (base64url, one per `device.payloads` entry,
    * in order) for a request waiting on a hardware wallet. Each is checked
@@ -198,7 +212,7 @@ export interface ProtocolMap {
    * leaves the request waiting, so the user can sign again. Otherwise the
    * request completes as `resolveApproval` would for a keyfile wallet.
    */
-  submitDeviceSignature(req: { requestId: string; signatures: string[] }): void;
+  submitDeviceSignature(req: { requestId: string; signatures: string[] }): ApprovalShown | void;
   /** Heartbeat while the window talks to the device; pushes the timeout back, up to `APPROVAL_MAX_MS`. */
   deviceActivity(req: { requestId: string }): { deadline: number };
 

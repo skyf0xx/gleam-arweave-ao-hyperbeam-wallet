@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { APPROVAL_METHODS, KEY_METHODS, PROVIDER_METHODS } from "@gleam/core";
 import { APPROVAL_GATED_METHODS } from "@gleam/messaging/src/page-protocol.ts";
-import { BACKGROUND_MESSAGES, PAGE_METHODS, parseParams } from "./methods";
+import { BACKGROUND_MESSAGES, PAGE_METHODS, SITE_MESSAGES, parseParams } from "./methods";
 
 const PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
 
@@ -29,6 +29,14 @@ describe("dispatch/methods: tiers", () => {
       .filter(([, spec]) => spec.tier === "contentScript")
       .map(([method]) => method);
     expect(contentScript.sort()).toEqual(["getSiteWalletMode", "providerCall", "reportOtherWallet"]);
+  });
+
+  it("keeps the site's messages out of every other table", () => {
+    for (const type of Object.keys(SITE_MESSAGES)) {
+      expect(Object.hasOwn(PAGE_METHODS, type), type).toBe(false);
+      expect(Object.hasOwn(BACKGROUND_MESSAGES, type), type).toBe(false);
+    }
+    expect(Object.keys(SITE_MESSAGES).sort()).toEqual(["gleam-points:attest", "gleam-points:invite"]);
   });
 
   it("keeps key and approval methods on the extension tier", () => {
@@ -137,6 +145,13 @@ describe("dispatch/methods: Gleam Points refusals", () => {
       );
     },
   );
+
+  it("refuses a dApp signMessage of a scan attest message", () => {
+    const attest = `gleam-points:attest:v1:1.4.0:${"a".repeat(64)}`;
+    expect(() => parseParams(PAGE_METHODS.signMessage.params, { data: encode(attest) })).toThrow(
+      "Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.",
+    );
+  });
 
   it("refuses the prefix at byte 0 of a view into a larger buffer, and in a bare ArrayBuffer", () => {
     const points = encode(POINTS_MESSAGE);

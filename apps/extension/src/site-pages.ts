@@ -1,5 +1,8 @@
 export const SITE_URL = "https://gleamwallet.app/";
 
+/** The only origin `externally_connectable` lets message the extension. */
+export const SITE_ORIGIN = new URL(SITE_URL).origin;
+
 export const REPO_URL = "https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet";
 
 export function releaseUrl(version: string): string {

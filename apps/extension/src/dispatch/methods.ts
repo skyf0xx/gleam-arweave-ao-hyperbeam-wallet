@@ -5,8 +5,10 @@ import {
   type PermissionType,
   type ProviderMethod,
 } from "@gleam/core";
-import { hasPointsProofTag, isPointsMessage } from "@gleam/core/src/points/index.ts";
+import { hasPointsProofTag, isPointsMessage, isValidInviteCode } from "@gleam/core/src/points/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import { SITE_ATTEST_MESSAGE_TYPE } from "@gleam/messaging/src/site-protocol.ts";
+import { attestFailure } from "@/src/handlers/attest-errors";
 import {
   readBytes,
   readDataItem,
@@ -32,8 +34,10 @@ import {
  *   origin is Chrome's `sender`, never the message body.
  * - `page`: a `window.arweaveWallet` method, relayed through
  *   `providerCall`. Only these are reachable from a web page.
+ * - `site`: a message from the Gleam site's own pages over
+ *   `externally_connectable` (`SITE_MESSAGES`), never from a dApp.
  */
-export type Tier = "extension" | "contentScript" | "page";
+export type Tier = "extension" | "contentScript" | "page" | "site";
 
 /** `ProtocolMap` methods the background pushes to tabs rather than answers. */
 type PushMessage = "providerEvent" | "siteWalletMode";
@@ -370,6 +374,58 @@ export const BACKGROUND_MESSAGES = {
     }),
   },
 } as const satisfies Record<BackgroundMessage, ExtensionMethodSpec | ContentScriptMethodSpec>;
+
+export interface SiteMessageSpec<S extends z.ZodType = z.ZodType> {
+  tier: "site";
+  params: S;
+  /** The reply to a message of this type that fails its origin or schema check. */
+  refused: unknown;
+}
+
+/**
+ * Messages the Gleam site's pages send with
+ * `chrome.runtime.sendMessage(EXTENSION_ID, …)`, keyed by their `type`.
+ * `dispatchSiteMessage` (`dispatch/site.ts`) is the only way in: Chrome
+ * delivers these only from the manifest's `externally_connectable`
+ * origin, and the dispatcher also requires Chrome's `sender.origin` to be
+ * the site's before parsing. A content script's messages arrive on
+ * `onMessage`, never here, so no dApp page can send one. The schemas are
+ * strict: a site page an XSS controls can send anything, so an unknown
+ * key is refused rather than ignored.
+ */
+export const SITE_MESSAGES = {
+  "gleam-points:invite": {
+    tier: "site",
+    params: z.strictObject({
+      type: z.literal("gleam-points:invite"),
+      code: z.string().refine(isValidInviteCode),
+    }),
+    refused: { ok: false },
+  },
+  [SITE_ATTEST_MESSAGE_TYPE]: {
+    tier: "site",
+    // Checked by `parseAttestation` in the handler, which reports why.
+    params: z.strictObject({ type: z.literal(SITE_ATTEST_MESSAGE_TYPE), attestation: z.unknown() }),
+    refused: attestFailure("refused", ""),
+  },
+} as const satisfies Record<string, SiteMessageSpec>;
+
+export type SiteMessageType = keyof typeof SITE_MESSAGES;
+
+export type SiteMessage<T extends SiteMessageType> = z.output<(typeof SITE_MESSAGES)[T]["params"]>;
+
+/**
+ * The message as `SITE_MESSAGES[type]` describes it, or null if it isn't
+ * one. Only a plain object qualifies, since a schema reads inherited
+ * fields as if they were the message's own.
+ */
+export function readSiteMessage<T extends SiteMessageType>(type: T, message: unknown): SiteMessage<T> | null {
+  if (typeof message !== "object" || message === null) return null;
+  const prototype = Object.getPrototypeOf(message);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  const parsed = SITE_MESSAGES[type].params.safeParse(message);
+  return parsed.success ? (parsed.data as SiteMessage<T>) : null;
+}
 
 /** Parses with `schema`, failing with the first issue's message as a plain `Error`. */
 export function parseParams<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
