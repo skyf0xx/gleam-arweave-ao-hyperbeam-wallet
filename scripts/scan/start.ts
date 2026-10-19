@@ -35,7 +35,7 @@ export async function runStart(deps: Deps): Promise<Outcome> {
     return fail("start", [
       {
         path: "git",
-        message: `HEAD is ${head.slice(0, 7)} but the latest release is v${challenge.release} (${challenge.commit.slice(0, 7)}); run \`git fetch --tags && git checkout v${challenge.release}\`, then \`pnpm scan start\` again.`,
+        message: `HEAD is ${head.slice(0, 7)} but the latest release is v${challenge.release} (${challenge.commit.slice(0, 7)}); run \`git fetch --tags && git checkout v${challenge.release} && pnpm install --frozen-lockfile\`, then \`pnpm scan start\` again.`,
       },
     ]);
   }

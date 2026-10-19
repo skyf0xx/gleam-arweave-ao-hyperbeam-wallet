@@ -131,7 +131,7 @@ describe("pnpm scan finish: server and output", () => {
     expect(text).toContain('Replaced release "0.9.0" with 1.4.0 from git.');
     expect(text).toContain(`Attestation id: ${id}`);
     expect(text).toContain("Paid places left: 7");
-    expect(text).toContain(`Put the attestation id ${id} in every PR and advisory`);
+    expect(text).toContain(`put the attestation id ${id} in every PR and advisory`);
     expect(text).toContain("Tell the user: Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.");
 
     const link = /^Link: (.+)$/m.exec(text)![1]!;

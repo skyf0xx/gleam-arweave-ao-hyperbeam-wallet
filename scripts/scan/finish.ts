@@ -175,7 +175,7 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     `Attestation id: ${id}`,
     ...(paidPlacesLeft === undefined ? [] : [`Paid places left: ${paidPlacesLeft}`]),
     ...(paidPlacesLeft === 0 ? ["Warning: no paid places are left, so this scan will be recorded but earns no points."] : []),
-    `Put the attestation id ${id} in every PR and advisory you filed for this scan.`,
+    `Once the user has signed, put the attestation id ${id} in every PR and advisory you draft for this scan.`,
     `Link: ${link}`,
     `Tell the user: ${USER_MESSAGE}`,
   ];

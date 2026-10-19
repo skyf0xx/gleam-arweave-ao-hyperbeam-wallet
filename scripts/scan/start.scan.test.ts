@@ -32,7 +32,7 @@ describe("pnpm scan start", () => {
     const outcome = await runStart(deps);
     expect(outcome.ok).toBe(false);
     expect(render(outcome, false)).toBe(
-      "✗ git: HEAD is ddddddd but the latest release is v1.4.0 (ccccccc); run `git fetch --tags && git checkout v1.4.0`, then `pnpm scan start` again.",
+      "✗ git: HEAD is ddddddd but the latest release is v1.4.0 (ccccccc); run `git fetch --tags && git checkout v1.4.0 && pnpm install --frozen-lockfile`, then `pnpm scan start` again.",
     );
     expect(exists(deps, ".gleam-scan")).toBe(false);
   });

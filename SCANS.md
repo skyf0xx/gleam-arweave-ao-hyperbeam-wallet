@@ -57,7 +57,8 @@ gets the points.
 ```
 
 - `result` is `pass` if the agent reported nothing, and `scanned` if it
-  filed a PR or an advisory. It never says what was found.
+  filed a fix PR or an advisory. A skill or surface PR doesn't count. It
+  never says what was found.
 - `report` describes coverage, not vulnerabilities. Details of a
   medium-or-above issue go only in the advisory.
 - `model` is a self-reported label. It's shown on `scan.html` and has no
@@ -199,7 +200,8 @@ entry names is by design.
 The entries are in
 [`docs/THREAT_MODEL.md` § By design](docs/THREAT_MODEL.md#by-design).
 Each gives the decision, why it was made, and a *Still a finding if*
-clause naming what a reporter could demonstrate that would still count.
+clause naming the harm a reporter must concretely demonstrate, by any
+path, for it to still count.
 When a maintainer rejects a report as by design, they add an entry for
 it.
 
@@ -226,9 +228,8 @@ coding agent to follow literally, with the exact commands. In summary:
    nothing yet, since each one has to quote the attestation id.
 7. Answer the challenge from the code you read by filling in
    `.gleam-scan/attestation.json`. Run `pnpm scan finish` until it
-   passes, then file each draft with the attestation id it prints, and
-   leave the attestation unchanged after that. Give the user the link
-   and the sentence that goes with it.
+   passes, and give the user the link and the sentence that goes with
+   it. Once they have signed, file each draft with the attestation id.
 
 **Report like a working security engineer:**
 

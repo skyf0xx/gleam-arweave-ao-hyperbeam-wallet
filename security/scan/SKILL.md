@@ -65,16 +65,20 @@ gh release view --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --json tagName 
 curl -s https://api.github.com/repos/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest | grep '"tag_name"'
 ```
 
-Either prints a tag such as `v1.26.0`. Check it out and install:
+Either prints a tag such as `v1.26.0`. Check it out:
 
 ```bash
 git checkout v1.26.0           # the tag you found
-pnpm install --frozen-lockfile
 ```
 
-If you can't reach GitHub's API, skip this and run Step 1 from any
-checkout: if `HEAD` isn't the latest release, `pnpm scan start` prints the
-exact `git checkout` command to run.
+If you can't reach GitHub's API, skip the checkout: if `HEAD` isn't the
+latest release, `pnpm scan start` prints the exact command to run.
+
+Install the dependencies. This also installs the pre-commit hook:
+
+```bash
+pnpm install --frozen-lockfile
+```
 
 After the checkout, read `security/scan/SKILL.md` from the checkout. If it
 differs from the copy you started with, follow the checkout's copy.
@@ -85,7 +89,15 @@ binary from https://github.com/google/osv-scanner/releases. If you can't
 install it, use `pnpm audit` instead in Step 3 and say in the report that
 osv-scanner wasn't run.
 
-Note the time you start (`date -u`). The report says how long you spent.
+Install `gitleaks` (`brew install gitleaks`, or a binary from
+https://github.com/gitleaks/gitleaks/releases) if you may commit a fix in
+Step 6. The pre-commit hook refuses every commit without it.
+
+Note the start time. The report says how long you spent:
+
+```bash
+mkdir -p .gleam-scan && date -u | tee .gleam-scan/started
+```
 
 Don't set `GLEAM_POINTS_API` or `GLEAM_SITE_URL` unless the user tells you
 to. The defaults are the live Gleam servers.
@@ -104,9 +116,10 @@ writes two files:
 - `.gleam-scan/attestation.json`: a starter attestation you fill in at
   Step 7.
 
-The challenge expires after 24 hours and can be used once. Run `start` only
-once. Running it again replaces the challenge with new functions (it backs
-up your old attestation to `.gleam-scan/attestation.<old id>.json`).
+The challenge expires after 24 hours. Only the user's signature in Gleam
+uses it up; `pnpm scan finish` doesn't. Run `start` only once. Running it
+again replaces the challenge with new functions (it backs up your old
+attestation to `.gleam-scan/attestation.<old challenge id>.json`).
 
 ## Step 2: Read the threat model
 
@@ -120,12 +133,14 @@ you build on them:
   other extensions with broad permissions. Not findings.
 - **By design**: decisions Gleam made on purpose, each with a *Still a
   finding if* clause. A report that only restates a By design entry is
-  closed. It is a finding only if you show what its *Still a finding if*
-  clause names.
+  closed. It is a finding only if you demonstrate, concretely, the harm its
+  *Still a finding if* clause names. That holds for a path the clause
+  didn't anticipate too: treat it as a finding and cite the clause.
 - **Known limitations**: already known. Not findings.
 
 Where the docs and the code disagree, the code is right. A docs mismatch
-is a low finding: fix the docs in a PR (Step 6).
+is a low finding, unless the mismatch is itself a medium or higher issue.
+Fix a low one in a PR (Step 6).
 
 Done when you can name the attackers and the By design entries.
 
@@ -136,9 +151,11 @@ pnpm vitest run
 osv-scanner scan --config osv-scanner.toml --lockfile pnpm-lock.yaml   # or, if unavailable: pnpm audit
 ```
 
-The tests take a few minutes. Done when both have finished and you have
-noted the results. A test failure
-is not a finding by itself; note it in the report. A vulnerable dependency
+The tests take a few minutes. osv-scanner may print `Starting filesystem
+walk for root: /`; that is harmless. Done when both have finished and you
+have noted the results. A test failure is not a finding by itself: the
+report says only that tests failed. If a failure points at a security
+issue, treat it as a finding under the severity rules. A vulnerable dependency
 is a finding only if Gleam uses the affected code in a way an attacker from
 the threat model can reach; otherwise note it in the report.
 `osv-scanner.toml` lists the advisories Gleam already knows about, each
@@ -175,8 +192,11 @@ if [ -n "$PREV" ]; then git diff --name-only "$PREV" HEAD -- $(awk '!/^#/ && NF 
 
 See what changed in each file with `git diff "$PREV" HEAD -- <file>`.
 
-Review the changed files first, in tier order (1 before 5). Then review the
-rest of the surface, again in tier order. List it all with:
+Review the changed files first, in tier order (1 before 5), and within a
+tier read non-test source before tests. With no previous release, every
+surface file counts as changed: skip `*.test.ts` files and `pnpm-lock.yaml`
+(Step 3 covers the lockfile). Then review the rest of the surface, again in
+tier order. List it all with:
 
 ```bash
 git ls-files -- $(awk '!/^#/ && NF == 2 { print $2 }' security/surface.txt)
@@ -221,8 +241,8 @@ What to look for in each area:
   weaker parameters, and whether there is any fallback to a weaker KDF.
   Correct AES-GCM nonce handling and RSA-PSS salt length.
 
-Done when you have read every changed surface file and as much of the rest
-as you can, and you know which files you didn't reach.
+Done when you have read every changed surface file (as above) and as much
+of the rest as you can, and you know which files you didn't reach.
 
 ## Step 5: Look anywhere else that seems worth it
 
@@ -244,8 +264,9 @@ To show that a suspected bug is real, write a throwaway unit test, for
 example one that feeds a malformed or oversized binary value to the
 decoder in `page-protocol.ts`, and run it with `pnpm vitest run
 <path-fragment>`. A failing test turns "suspected" into "demonstrated".
-Delete the test afterwards, or put it in your fix PR. Never test against
-a real wallet.
+Delete the test afterwards. For a low finding it can go in your fix PR;
+for a medium or higher one it stays local or goes in the advisory. Never
+test against a real wallet.
 
 If a file you reviewed here can leak a key, sign something unapproved or
 let a page past the wallet's boundary, it belongs on the surface. Note it
@@ -261,25 +282,36 @@ Decide the severity of each finding with the calibration rules below. Then:
 - **Medium, high or critical:** draft a private advisory. If you're unsure
   whether it's low or medium, treat it as medium.
 
-Draft everything first, and file nothing yet. A PR or advisory has to
-quote the attestation id, and the id only exists once Step 7 passes.
+Draft everything first, and file nothing yet. Every PR and advisory,
+skill and surface PRs included, quotes the attestation id, which only
+exists after Step 7. Write `{{ATTESTATION_ID}}` in its place. The id goes
+in PR and advisory bodies, never in a commit message.
 
-**PR draft.** Write the fix in a separate worktree off `master`, so the scan
-checkout stays on the tag:
+**PR draft.** Write the fix in a separate worktree, so the scan checkout
+stays on the tag. Base it on `origin/master` if the file to fix exists
+there, else on the release tag (say so in the PR's **What**):
 
 ```bash
 git fetch origin master
-git worktree add -b fix/security-<short-name> ../gleam-fix-<short-name> origin/master
+BASE=origin/master
+git cat-file -e origin/master:<file> || BASE=HEAD   # HEAD is the release tag
+git worktree add -b fix/security-<short-name> ../gleam-fix-<short-name> "$BASE"
 cd ../gleam-fix-<short-name>
+pnpm install --frozen-lockfile    # a new worktree has no node_modules
 # make the change, add or update a test, then:
 pnpm vitest run <path-fragment>
-git commit -am "fix(security): <what the change does>"
+git add -A && git commit -m "fix(security): <what the change does>"
 ```
+
+The pre-commit hook runs gitleaks, eslint and tsc on all six projects. If
+it fails, fix what it names and commit again.
 
 - Title: a Conventional Commit, `fix(security): <what it fixes>`
   (`docs(security): …` for a docs-only fix).
 - Body: follow `.github/PULL_REQUEST_TEMPLATE.md`. Fill **Why** and
-  **What**. The **Attestation id** section gets the id in Step 7.
+  **What**. The **Attestation id** section gets
+  `Attestation id: {{ATTESTATION_ID}}`. Tick only the Checklist boxes you
+  ran; leave the rest unticked and say why in the body.
 - Low details may be public. Medium-and-above details never go in a PR,
   even one that fixes them.
 
@@ -291,7 +323,7 @@ suspect it, and the impact. Keep the draft local, for example in
 
 **Skill or surface PR.** This skill improves through the scans that use
 it. If something would have made your scan better, draft a PR for it, in
-its own worktree off `master` like a fix PR. For example:
+its own worktree like a fix PR. For example:
 
 - a file that belongs in `security/surface.txt`. Add it at its tier, and
   add the same path to `.github/CODEOWNERS` (a test keeps the two
@@ -302,7 +334,9 @@ its own worktree off `master` like a fix PR. For example:
 
 Title it `docs(scan): <what it improves>`, and fill the template's **Why**
 with what happened in your scan. Keep it general: a skill PR never
-describes a vulnerability, not even a low one. It doesn't change
+describes a vulnerability, not even a low one. If it comes from a medium
+or higher finding (a surface entry alone points at the bug), don't file it
+until the advisory is fixed. It doesn't change
 `result`. A maintainer reviews it like any other PR, and nothing merges
 automatically.
 
@@ -342,7 +376,9 @@ Fill it in field by field:
     makes. It must be in the function's body: not the signature or
     parameter lines, not the closing `}`, not a blank line, not a comment,
     not a line of only punctuation such as `});`. Pick a line that makes the
-    check, such as an `if (...)`, a `throw`, or a `return` that rejects.
+    check, such as an `if (...)`, a `throw`, or a `return` that rejects. If
+    the function only delegates or dispatches, pick the line that rejects or
+    validates its input, such as a `default:` case's `throw` or a `.filter`.
     Line numbers are those of the file at the release commit. Get them
     with:
 
@@ -359,7 +395,8 @@ Fill it in field by field:
   both earn the same.
 - `report`: markdown, at most 20,000 characters, `\n` line endings. It
   describes **coverage only**: what you checked, what you didn't, the tools
-  you ran and their outcome in general terms, and how long you spent. Never
+  you ran and their outcome in general terms, and how long you spent
+  (`cat .gleam-scan/started; date -u`, then subtract). Never
   vulnerability details, not even for a low finding. "Filed 1 PR and 1
   advisory" is fine. What they are about is not.
 
@@ -372,7 +409,8 @@ pnpm scan finish          # or: pnpm scan finish --json
 It checks the attestation locally, then asks the points server to run the
 same checks. Each problem prints as one line, `✗ <field>: <what to
 change>`. Fix each one in `.gleam-scan/attestation.json` and run it again.
-On success it prints:
+On success it prints the lines below, sometimes after a `Replaced …`
+note. Read the id from the `Attestation id:` line:
 
 ```text
 ✓ Attestation valid for Gleam v<release>.
@@ -384,24 +422,27 @@ Tell the user: Open this link in Chrome with Gleam installed and click Sign with
 ```
 
 `finish` rewrites `.gleam-scan/attestation.json` with `release` and
-`commit` filled in. That doesn't change the id. You can run it again; the id
-stays the same while the content does.
+`commit` filled in; that doesn't change the id. You can run `finish` again
+at any time, for example after you edit the report. It doesn't use up the
+challenge, and only the id from the last run counts.
 
-### 7c. File the drafts, quoting the id
+### 7c. Get the signature, then file the drafts
 
 The attestation id is the SHA-256 of the attestation's content, so it
 changes if any field changes. In this order:
 
-1. Finish the attestation and run `pnpm scan finish` until it passes.
-2. Copy the `Attestation id`.
-3. File every draft from Step 6, each with this line:
-   `Attestation id: <the 64 hex characters>`
-4. Don't edit `.gleam-scan/attestation.json` after that.
+1. Give the user the `Link:` and the sentence after `Tell the user:`, and
+   ask them to sign now. The challenge expires 24 hours after
+   `pnpm scan start`.
+2. Wait until the user confirms that Gleam accepted the signature. Don't
+   edit `.gleam-scan/attestation.json` after that.
+3. In every draft from Step 6, replace `{{ATTESTATION_ID}}` with the id
+   from the last `pnpm scan finish`. Then file it.
 
-If you must change the attestation afterwards (for example the challenge
-expired and you ran `pnpm scan start` again), run `pnpm scan finish`
-again, take the new id, and update every PR and advisory you filed to
-quote it. Then give the user the new link.
+If the challenge expires first, follow its Troubleshooting row and give
+the user the new link. If signing can't succeed (see the end of
+Troubleshooting), still file every draft, without the `Attestation id:`
+line.
 
 **File a PR** (needs `gh` signed in to the user's GitHub account; ask the
 user first):
@@ -411,7 +452,7 @@ cd ../gleam-fix-<short-name>
 gh repo fork --remote --remote-name fork      # forks origin, adds the fork as remote "fork"
 git push fork HEAD
 gh pr create --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --base master \
-  --title "fix(security): <what it fixes>" --body-file <your filled-in template>
+  --head <your-github-login>:fix/security-<short-name> --title "fix(security): <what it fixes>" --body-file <your filled-in template>
 ```
 
 In the body, the template's `## Attestation id` section holds the line
@@ -434,8 +475,8 @@ If you can't file (no `gh`, or the user would rather do it), give the user
 each draft, ready to paste, with the id already in it. Never publish an
 advisory's text anywhere else.
 
-Done when `pnpm scan finish` passes and every draft is filed, or handed to
-the user, with the id in it.
+Done when the user has signed and every draft is filed, or handed to the
+user, with the id in it.
 
 ## Report like a working security engineer
 
@@ -483,7 +524,7 @@ illustrative; use the ones from your own challenge and checkout.
     }
   ],
   "result": "pass",
-  "report": "## Coverage\n\n- Read docs/THREAT_MODEL.md in full.\n- Ran `pnpm vitest run`: all tests passed.\n- Ran `osv-scanner scan source -L pnpm-lock.yaml`: no advisories that Gleam's code reaches.\n- Reviewed the 6 surface files changed since v1.25.0 line by line, tiers 1-3 first.\n- Reviewed the rest of tiers 1-3 (vault, keys, key session, background, content, provider, sender).\n- Skimmed tier 4 (approval window) and tier 5 (wxt.config.ts, CI workflows).\n\n## Not covered\n\n- Tier 5 release scripts and pnpm-lock.yaml beyond osv-scanner.\n- The popup screens outside the surface.\n- Nothing run in a real browser.\n\nFiled nothing. About 2 hours.",
+  "report": "## Coverage\n\n- Read docs/THREAT_MODEL.md in full.\n- Ran `pnpm vitest run`: all tests passed.\n- Ran `osv-scanner scan --config osv-scanner.toml --lockfile pnpm-lock.yaml`: no advisories that Gleam's code reaches.\n- Reviewed the 6 surface files changed since v1.25.0 line by line, tiers 1-3 first.\n- Reviewed the rest of tiers 1-3 (vault, keys, key session, background, content, provider, sender).\n- Skimmed tier 4 (approval window) and tier 5 (wxt.config.ts, CI workflows).\n\n## Not covered\n\n- Tier 5 release scripts and pnpm-lock.yaml beyond osv-scanner.\n- The popup screens outside the surface.\n- Nothing run in a real browser.\n\nFiled nothing. About 2 hours.",
   "release": "1.26.0",
   "commit": "84f6449691277f9af52fd0be17957541e02cd8d9"
 }
@@ -495,13 +536,7 @@ nothing about what they contain.
 
 ## When you're done
 
-Give the user the `Link:` that `pnpm scan finish` printed and the sentence
-after `Tell the user:`:
-
-> Open this link in Chrome with Gleam installed and click Sign with Gleam;
-> it signs no transaction and moves no funds.
-
-Also tell them the attestation id, which PRs and advisories you filed (or
+Tell the user the attestation id, which PRs and advisories you filed (or
 the drafts for them to file), and, if `finish` printed a warning that no
 paid places are left, that the scan is recorded but earns no points.
 
@@ -519,7 +554,7 @@ Each `✗` line already says what to do. The common ones:
 | `✗ $: Gleam couldn't read the release from GitHub …` | Wait a minute, then run it again. |
 | `✗ release: Gleam hasn't published a release yet …` | Nothing to scan yet. Tell the user. |
 | `✗ $: v<x> has fewer than 3 security functions …` | The challenge pool is broken. Tell the user. |
-| `✗ git: HEAD is … but the latest release is v<x> …` (start) | Run the `git fetch --tags && git checkout v<x>` it prints, then `pnpm scan start`. |
+| `✗ git: HEAD is … but the latest release is v<x> …` (start) | Run the `git fetch --tags && git checkout v<x> && pnpm install --frozen-lockfile` it prints, then `pnpm scan start`. |
 | `✗ git: … has no v<x.y.z> release tag` or `✗ commit: HEAD is … but the challenge is for …` (finish) | Your `HEAD` moved off the tag. Run `git checkout v<release>` in the scan checkout, then `pnpm scan finish`. |
 | `✗ <file>: \`<symbol>\` isn't in <file> at <sha> …` (start) | Run `git fetch --tags` and `pnpm scan start` again; if it repeats, tell the user. |
 | `✗ .gleam-scan/challenge.json: There is no challenge yet …` | Run `pnpm scan start` (from the checkout root). |
@@ -531,7 +566,7 @@ Each `✗` line already says what to do. The common ones:
 | `✗ answers[i].line: … is 0 …`, `… is a comment`, `… is blank`, `… holds only punctuation`, `… is in the signature …`, `… is outside …`, `… closes …` | Pick another line inside the body range the message gives, one that makes a check. Count lines with `git show HEAD:<file> \| cat -n`. |
 | `✗ answers[i].check: …` | One sentence, 10 to 300 characters, one line, no leading or trailing space. |
 | `✗ answers[i].symbol: …` or `✗ answers[i]: … isn't in the challenge …` or `✗ answers: No answer names …` | Restore `file` and `symbol` exactly as `pnpm scan start` wrote them; one answer per challenge function. |
-| `✗ challenge: The challenge expired …` or `This challenge expired` / `was already used` / `id is unknown` / `was issued for …` | Run `pnpm scan start`, answer the 3 new functions, keep your `model`, `result` and `report`, and run `pnpm scan finish`. The id changes: update anything you filed. |
+| `✗ challenge: The challenge expired …` or `This challenge expired` / `was already used` / `id is unknown` / `was issued for …` | Run `pnpm scan start`, answer the 3 new functions, copy `model`, `result` and `report` from the backup `.gleam-scan/attestation.<old challenge id>.json`, and run `pnpm scan finish`. The id changes: give the user the new link. |
 | `✗ release: v<x> isn't the latest release (v<y> is) …` | A new release came out. Check out `v<y>`, run `pnpm scan start` and scan that release. |
 | `✗ attestationId: The server computed a different attestation id …` | Your checkout's scan tools are out of date. Run `git fetch --tags`, check out the latest release again, and rerun `pnpm scan finish`. |
 | `✗ scan: Unexpected error …` | Run it again; if it repeats, tell the user. |
