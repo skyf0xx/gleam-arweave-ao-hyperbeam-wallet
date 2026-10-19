@@ -781,7 +781,7 @@ describe("GET /attestations", () => {
     expect(status).toBe(200);
     expect(headers.get("cache-control")).toBe("public, max-age=60");
     expect(headers.get("access-control-allow-origin")).toBe("*");
-    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, total: 2, paidPlacesLeft: 18 });
+    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, total: 2, paidPlacesLeft: 18, models: ["model-a", "model-b"] });
     expect(json.attestations.map((x: { id: string }) => x.id).sort()).toEqual([a, b].sort());
     const first = json.attestations.find((x: { id: string }) => x.id === a)!;
     expect(first).toMatchObject({
@@ -798,6 +798,16 @@ describe("GET /attestations", () => {
     });
     expect(first.signature).toEqual(expect.any(String));
     expect(json.attestations.find((x: { id: string }) => x.id === b)!.proof).toBe("transaction");
+  });
+
+  it("lists every distinct model of the release on any page, not just the page's", async () => {
+    const { s } = await withScans();
+    await fillPaidPlaces(s.db, "1.0.0", 1);
+    const first = await s.get("/attestations?limit=1");
+    const second = await s.get(`/attestations?limit=1&cursor=${first.json.nextCursor}`);
+
+    expect(first.json.models).toEqual(["model-a", "model-b", "x"]);
+    expect(second.json.models).toEqual(first.json.models);
   });
 
   it("counts the distinct functions answered against all checking functions at the commit", async () => {

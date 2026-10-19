@@ -147,7 +147,9 @@ function renderAttestations() {
   $("[data-attestations-empty]").hidden = state.attestations.length > 0;
   $("[data-more]").hidden = state.nextCursor === null;
 
-  const unused = unusedModels(state.attestations.map((att) => String(att.model)));
+  // The server's list covers every attestation of the release, not just the pages loaded so far.
+  const labels = Array.isArray(state.listing.models) ? state.listing.models : state.attestations.map((att) => att.model);
+  const unused = unusedModels(labels.map(String));
   const version = `v${state.listing.release}`;
   $("[data-models-text]").textContent =
     unused.length > 0
@@ -198,10 +200,10 @@ async function loadRelease() {
   document.title = `Gleam community scans · v${first.listing.release}`;
   $("[data-release-title]").textContent = `Release v${first.listing.release}`;
 
-  // A link to one entry needs it loaded; the models line is only right once enough of the list is.
+  // A link to one entry needs it loaded.
   const wanted = idFromHash(location.hash);
-  for (let page = 1; page < PAGES_UP_FRONT && state.nextCursor !== null; page++) {
-    if (wanted && state.attestations.some((att) => att.id === wanted)) break;
+  for (let page = 1; wanted && page < PAGES_UP_FRONT && state.nextCursor !== null; page++) {
+    if (state.attestations.some((att) => att.id === wanted)) break;
     const next = await loadPage(state.nextCursor);
     if (!next.ok) break;
     state.attestations = state.attestations.concat(next.listing.attestations);

@@ -169,6 +169,15 @@ async function attestationTotal(db: Queryable, release: string): Promise<number>
   return Number(rows[0]!.total);
 }
 
+async function distinctModels(db: Queryable, release: string): Promise<string[]> {
+  const { rows } = await db.query<{ model: string }>(
+    `SELECT DISTINCT body->>'model' AS model FROM attestations
+      WHERE release = $1 AND voided_at IS NULL ORDER BY model LIMIT ${MAX_MODEL_LABELS}`,
+    [release],
+  );
+  return rows.map((row) => row.model);
+}
+
 async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
   const { rows } = await db.query<{ taken: string }>(
     "SELECT count(*)::text AS taken FROM attestations WHERE release = $1 AND paid AND voided_at IS NULL",
@@ -362,6 +371,8 @@ async function scanReward(tx: Queryable, now: Date): Promise<bigint> {
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
+/** Labels are at most 64 characters, so this bounds the field at about 64 KB however many distinct ones are submitted. */
+const MAX_MODEL_LABELS = 1000;
 const LISTING_TTL_MS = 60_000;
 const MAX_CACHED_LISTINGS = 200;
 
@@ -370,6 +381,7 @@ interface ReleaseSummary {
   commit: string;
   total: number;
   paidPlacesLeft: number;
+  models: string[];
   /** Null until a first page (no cursor) has computed it. */
   coverage: AttestationListing["coverage"] | null;
 }
@@ -453,6 +465,8 @@ export interface AttestationListing {
   total: number;
   /** Over every attestation of the release, whatever page this is. */
   paidPlacesLeft: number;
+  /** The distinct model labels of the release's non-voided attestations, whatever page this is, sorted. At most MAX_MODEL_LABELS. */
+  models: string[];
   /**
    * Over every attestation of the release. Null on a page reached by cursor
    * when no first page has computed it in the last minute. `unexamined` is
@@ -548,6 +562,7 @@ export async function listAttestations(
         commit,
         total: await attestationTotal(db, release),
         paidPlacesLeft: await paidPlacesLeft(db, release),
+        models: await distinctModels(db, release),
         coverage: query.cursor === null ? await coverageOf(db, github, { release, commit, isLatest, storedTotal }) : null,
       };
       cache.setSummary(release, summary);
@@ -580,6 +595,7 @@ export async function listAttestations(
       commit,
       total: summary.total,
       paidPlacesLeft: summary.paidPlacesLeft,
+      models: summary.models,
       coverage: summary.coverage,
       attestations: page.map((row) => ({
         id: row.id,
