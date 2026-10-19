@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { render } from "./cli.ts";
@@ -25,6 +25,7 @@ describe("pnpm scan start", () => {
     expect(text).toContain("not your working tree");
     expect(text).toContain("Run `pnpm scan finish`");
     expect(text).toContain(CHALLENGE.expiresAt);
+    expect(readFileSync(join(deps.root, ".gleam-scan/started-at"), "utf8").trim()).toBe(String(deps.now()));
   });
 
   it("writes nothing and says how to check out the release when HEAD differs", async () => {

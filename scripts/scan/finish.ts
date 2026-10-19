@@ -17,6 +17,8 @@ import {
   isChallengeResponse,
   jsonParseProblem,
   readText,
+  STARTED_FILE,
+  formatElapsed,
   showAtCommit,
   writeJson,
   type ChallengeResponse,
@@ -168,11 +170,14 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
   const paidPlacesLeft = typeof result.paidPlacesLeft === "number" ? result.paidPlacesLeft : undefined;
 
   await writeJson(deps, ATTESTATION_FILE, attestation);
+  const startedAt = Number((await readText(deps, STARTED_FILE))?.trim());
+  const elapsedMs = Number.isFinite(startedAt) && startedAt > 0 ? deps.now() - startedAt : undefined;
   const link = `${deps.siteUrl.replace(/\/*$/, "/")}attest.html#${encodeAttestationPayload(attestation)}`;
   const lines = [
     ...notes,
     `Attestation valid for Gleam v${attestation.release}.`,
     `Attestation id: ${id}`,
+    ...(elapsedMs === undefined ? [] : [`Scan time: ${formatElapsed(elapsedMs)}.`]),
     ...(paidPlacesLeft === undefined ? [] : [`Paid places left: ${paidPlacesLeft}`]),
     ...(paidPlacesLeft === 0 ? ["Warning: no paid places are left, so this scan will be recorded but earns no points."] : []),
     `Once the user has signed, put the attestation id ${id} in every PR and advisory you draft for this scan.`,
@@ -184,7 +189,7 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     command: "finish",
     lines,
     issues: [],
-    json: { challenge: challenge.challenge, attestationId: id, link, userMessage: USER_MESSAGE, ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
+    json: { challenge: challenge.challenge, attestationId: id, link, userMessage: USER_MESSAGE, ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }), ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
   };
 }
 

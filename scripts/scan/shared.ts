@@ -5,6 +5,8 @@ import type { ChallengeFunction } from "../../packages/core/src/scan/index.ts";
 export const SCAN_DIR = ".gleam-scan";
 export const CHALLENGE_FILE = `${SCAN_DIR}/challenge.json`;
 export const ATTESTATION_FILE = `${SCAN_DIR}/attestation.json`;
+/** Epoch milliseconds of the last `pnpm scan start`, so `finish` can report the elapsed time. */
+export const STARTED_FILE = `${SCAN_DIR}/started-at`;
 
 /** Runs `git <args>` in the checkout and returns stdout; rejects when git exits non-zero. */
 export type GitRunner = (args: string[]) => Promise<string>;
@@ -102,4 +104,16 @@ export function jsonParseProblem(file: string, text: string, error: unknown): Pr
     where = ` at line ${line}, column ${before.length - before.lastIndexOf("\n")}`;
   }
   return { path: file, message: `${file} isn't valid JSON${where}; fix the syntax (${detail.split("\n")[0]}).` };
+}
+
+/** "42s", "7m 05s" or "1h 02m 03s". */
+export function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (h > 0) return `${h}h ${pad(m)}m ${pad(sec)}s`;
+  if (m > 0) return `${m}m ${pad(sec)}s`;
+  return `${sec}s`;
 }

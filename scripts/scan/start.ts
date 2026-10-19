@@ -4,6 +4,7 @@ import {
   ATTESTATION_FILE,
   CHALLENGE_FILE,
   SCAN_DIR,
+  STARTED_FILE,
   fail,
   gitOrUndefined,
   isChallengeResponse,
@@ -56,6 +57,7 @@ export async function runStart(deps: Deps): Promise<Outcome> {
 
   const notes: string[] = [];
   await writeJson(deps, CHALLENGE_FILE, challenge);
+  await writeFile(join(deps.root, STARTED_FILE), `${deps.now()}\n`);
   const existingText = await readText(deps, ATTESTATION_FILE);
   let existing: unknown;
   let keep = false;

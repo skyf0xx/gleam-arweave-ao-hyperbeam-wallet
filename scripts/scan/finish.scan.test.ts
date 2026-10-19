@@ -150,6 +150,25 @@ describe("pnpm scan finish: server and output", () => {
     expect(readJsonFile(deps, ".gleam-scan/attestation.json")).toMatchObject({ release: "1.4.0", commit: COMMIT });
   });
 
+  it("reports the time since `pnpm scan start`, and omits it when start left no record", async () => {
+    const accept = (deps: ReturnType<typeof setup>) => {
+      deps.fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+        const { attestation } = JSON.parse(String(init?.body)) as { attestation: Parameters<typeof attestationId>[0] };
+        return accepted(await attestationId(attestation))(_url as string, init);
+      }) as typeof fetch;
+      return deps;
+    };
+    const timed = accept(setup(goodAttestation()));
+    writeFileSync(join(timed.root, ".gleam-scan/started-at"), `${timed.now() - 125_000}\n`);
+    const outcome = await runFinish(timed);
+    expect(render(outcome, false)).toContain("Scan time: 2m 05s.");
+    expect(outcome.json).toMatchObject({ elapsedMs: 125_000, elapsed: "2m 05s" });
+
+    const untimed = await runFinish(accept(setup(goodAttestation())));
+    expect(render(untimed, false)).not.toContain("Scan time");
+    expect(untimed.json).not.toHaveProperty("elapsedMs");
+  });
+
   it("warns, without failing, when no paid places are left", async () => {
     const deps = setup(goodAttestation());
     deps.fetchImpl = (async (_url: unknown, init?: RequestInit) => {
