@@ -11,11 +11,6 @@ export interface MemorableAddressProps {
   avatarSvg?: string;
   /** `confirm` is the last look before signing: a size larger, with heavier emphasis. */
   tone?: "default" | "confirm";
-  /**
-   * `compact` is one line of just the emphasised chunks, for list rows: it
-   * keeps the user's eye on the same chunks without the full block.
-   */
-  layout?: "block" | "compact";
   className?: string;
 }
 
@@ -33,30 +28,10 @@ export function MemorableAddress({
   emphasisPick,
   avatarSvg,
   tone = "default",
-  layout = "block",
   className,
 }: MemorableAddressProps) {
   const confirm = tone === "confirm";
   const groups = chunkAddress(address, emphasisPick);
-
-  if (layout === "compact") {
-    const chunks = groups.flat();
-    return (
-      <span translate="no" title={address} className={cn("inline-flex items-center font-mono text-caption", className)}>
-        {chunks.map((chunk, index) =>
-          chunk.emphasized ? (
-            <span key={chunk.index} data-emphasized className="rounded-[4px] bg-foreground/[0.07] px-[0.35ch] font-medium text-foreground">
-              {chunk.text}
-            </span>
-          ) : chunks[index - 1]?.emphasized ? (
-            <span key={chunk.index} aria-hidden="true" className="px-[0.2ch] text-faint">
-              …
-            </span>
-          ) : null,
-        )}
-      </span>
-    );
-  }
 
   const copyRawText = (event: ClipboardEvent<HTMLElement>) => {
     const selection = window.getSelection();

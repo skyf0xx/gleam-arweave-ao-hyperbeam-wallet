@@ -157,15 +157,15 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         disabled={switching}
         onClick={onSwitch}
         aria-current={active ? "true" : undefined}
-        className="flex min-w-0 flex-1 items-center gap-2.5 py-3 text-left hover:bg-mist disabled:opacity-60"
+        className="flex min-w-0 flex-1 items-center gap-3.5 py-3 text-left hover:bg-mist disabled:opacity-60"
       >
-        <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} />
-        <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
-          <span className="flex min-w-0 items-center gap-1.5 text-caption text-faint">
-            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} layout="compact" className="-ml-[0.35ch]" />
-            {methodLabel ? <span className="truncate">· {methodLabel}</span> : null}
+        <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={40} />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate text-label font-semibold text-foreground">
+            {wallet.name}
+            {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
           </span>
+          <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
         </span>
         {active ? (
           <span className="flex-shrink-0 pr-1 text-foreground">
