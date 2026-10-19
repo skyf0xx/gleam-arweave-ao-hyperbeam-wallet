@@ -13,6 +13,12 @@
 
 1 packages/core/src/vault/
 1 packages/core/src/keys/
+1 packages/core/src/signer/
+1 packages/core/src/ports/session-keys.ts
+1 apps/extension/src/keyring/
+1 apps/extension/entrypoints/keyring/
+1 apps/extension/src/adapters/offscreen-keyring.ts
+1 apps/extension/src/adapters/session-key-store.ts
 1 apps/extension/src/handlers/key-session.ts
 1 apps/extension/src/handlers/wallet-lifecycle.ts
 1 apps/extension/src/handlers/passkey.ts
@@ -39,6 +45,7 @@
 3 apps/extension/entrypoints/provider/
 3 apps/extension/src/handlers/provider-params.ts
 3 apps/extension/src/sender.ts
+3 apps/extension/src/dispatch/methods.ts
 3 packages/messaging/
 
 4 apps/extension/src/handlers/approval.ts
@@ -55,3 +62,4 @@
 5 scripts/release.mjs
 5 scripts/verify-release.sh
 5 security/surface.mjs
+5 security/surface.txt
