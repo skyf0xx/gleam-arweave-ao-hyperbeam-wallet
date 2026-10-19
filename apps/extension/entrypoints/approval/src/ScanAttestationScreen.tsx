@@ -60,7 +60,7 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSi
     let cancelled = false;
     Promise.all([
       runtime.send<void, Record<string, PointsMembership>>({ type: "getPointsMemberships", payload: undefined }),
-      runtime.send<void, WalletState>({ type: "getState", payload: undefined }),
+      runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } }),
     ])
       .then(([memberships, state]) => {
         if (cancelled) return;

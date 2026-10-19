@@ -160,7 +160,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
         type: "getApproval",
         payload: { requestId: id },
       });
-      const walletState = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
+      const walletState = await runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } });
       if (request.device) {
         setState({ kind: "awaiting-device", runtime, request, device: request.device });
       } else if (walletState.wallets.length === 0) {

@@ -472,6 +472,29 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       expect(lastActivity()).toBeGreaterThan(stale);
     });
 
+    it("an approval window's load doesn't extend the session, but the user's answer in it does", async () => {
+      await seedUnlockedWalletWithGrant("https://dapp.example");
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: { v: 2 } },
+      ]);
+      const stale = Date.now() - 60_000;
+      await setItem("session:unlockedSession", {
+        unlockedAt: stale,
+        lastActivityAt: stale,
+        autoLockTimeout: "5min",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      const lastActivity = () => (store.get("session:unlockedSession") as { lastActivityAt: number }).lastActivityAt;
+
+      await registeredHandlers.get("getState")!({ data: { recordActivity: false } });
+      expect(lastActivity()).toBe(stale);
+
+      await Promise.resolve(
+        registeredHandlers.get("resolveApproval")!({ data: { requestId: "no-such-request", approved: false } }),
+      ).catch(() => undefined);
+      expect(lastActivity()).toBeGreaterThan(stale);
+    });
+
     it("an https site with a grant still reaches the approval window", async () => {
       await seedUnlockedWalletWithGrant("https://dapp.example");
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });

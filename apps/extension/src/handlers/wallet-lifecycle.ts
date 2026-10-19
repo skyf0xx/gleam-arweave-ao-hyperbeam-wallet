@@ -998,8 +998,9 @@ export class WalletLifecycleHandler {
 
   /**
    * Reads the wallets and session. Only `recordActivity` refreshes
-   * `lastActivityAt`, and only the extension pages' own `getState` message
-   * passes it (popup, side panel and approval window mounts): a connected
+   * `lastActivityAt`, and only the extension pages' own messages pass it
+   * (popup and side panel mounts, and the user's answer in an approval
+   * window, which a site opens and so doesn't count by loading): a connected
    * site's reads and background housekeeping also call this, and counting
    * those would let a polling page keep the vault unlocked past auto-lock.
    * Refreshed only for a session `loadSession` didn't just expire.

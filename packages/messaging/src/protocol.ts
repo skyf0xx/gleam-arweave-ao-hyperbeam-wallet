@@ -113,7 +113,12 @@ export interface ProtocolMap {
   removePasskey(): void;
 
   // reads
-  getState(): WalletState;
+  /**
+   * Counts as auto-lock activity unless `recordActivity` is false. The
+   * approval window passes false: a site opens it, so its mere loading
+   * isn't the user, and only its approve and reject count.
+   */
+  getState(req?: { recordActivity?: boolean }): WalletState;
   getBalance(req: { address: string }): Winston;
   /**
    * A rough, recipient-less fee quote (drives the compose step's "Max"

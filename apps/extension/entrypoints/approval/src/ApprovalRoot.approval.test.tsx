@@ -132,6 +132,17 @@ function runtimeResolvingWith(request: ApprovalRequest, resolveApproval: () => P
   return fakeRuntime({ send: send as never });
 }
 
+describe("ApprovalRoot auto-lock activity", () => {
+  it("reads the wallet state without counting the window's load as activity", async () => {
+    const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, async () => undefined);
+    render(<ApprovalRoot requestId="req-2" runtime={runtime} />);
+
+    await waitFor(() => expect(runtime.send).toHaveBeenCalledWith(expect.objectContaining({ type: "getState" })));
+    const stateCalls = vi.mocked(runtime.send).mock.calls.filter(([message]) => message.type === "getState");
+    for (const [message] of stateCalls) expect(message.payload).toEqual({ recordActivity: false });
+  });
+});
+
 describe("ApprovalRoot outcome", () => {
   it("shows the signing error, not success, when resolveApproval fails", async () => {
     const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, async () => {

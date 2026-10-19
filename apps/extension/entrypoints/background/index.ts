@@ -796,7 +796,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
 
   // reads
   // Extension-tier only, so this is the user looking at a Gleam page.
-  getState: () => lifecycle.getState({ recordActivity: true }),
+  getState: (data) => lifecycle.getState({ recordActivity: data?.recordActivity !== false }),
   getBalance: (data) => reads.getBalance(data),
   getArFee: () => transfer.getArFee(),
   getTokenBalances: (data) => reads.getTokenBalances(data),
@@ -822,8 +822,16 @@ const MESSAGE_HANDLERS: MessageHandlers = {
 
   // approvals
   getApproval: (data) => approval.getApproval(data),
-  resolveApproval: (data) => approval.resolveApproval(data),
-  submitDeviceSignature: (data) => approval.submitDeviceSignature(data),
+  // The approval window's load doesn't count as activity, since a site
+  // opens it; the user's answer in it does.
+  resolveApproval: async (data) => {
+    await lifecycle.getState({ recordActivity: true });
+    return approval.resolveApproval(data);
+  },
+  submitDeviceSignature: async (data) => {
+    await lifecycle.getState({ recordActivity: true });
+    return approval.submitDeviceSignature(data);
+  },
   checkScanAttestation: (data) => approval.checkScanAttestation(data),
   deviceActivity: (data) => approval.deviceActivity(data),
 
