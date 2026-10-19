@@ -19,6 +19,12 @@ describe("MemorableAddress", () => {
     expect(emphasized).toEqual(["weY8", "hGV3", "n8gz", "uFk"]);
   });
 
+  it("shows only the emphasised chunks in the compact layout, with the full address as its title", () => {
+    const { container } = render(<MemorableAddress address={ADDRESS} emphasisPick={null} layout="compact" />);
+    expect(container.textContent).toBe("weY8…hGV3…n8gz…uFk");
+    expect(container.firstElementChild!.getAttribute("title")).toBe(ADDRESS);
+  });
+
   it("copies a selection inside it as the raw address text", () => {
     render(<MemorableAddress address={ADDRESS} emphasisPick={null} />);
     const holder = screen.getByText(addressText(ADDRESS));

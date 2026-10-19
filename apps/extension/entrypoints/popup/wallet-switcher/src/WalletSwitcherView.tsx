@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
-import { AccountAvatar, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "@/src/address-identity";
+import { useCopy } from "../../points/src/useCopy";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -148,9 +148,10 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
   const methodLabel = WALLET_METHOD_LABEL[wallet.method];
+  const { copied, copy } = useCopy(wallet.address);
 
   return (
-    <div className="flex items-center gap-1 border-b border-line last:border-b-0">
+    <div className="group flex items-center gap-1 border-b border-line last:border-b-0">
       <button
         type="button"
         disabled={switching}
@@ -161,9 +162,9 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={34} />
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
-          <span className="truncate text-caption text-faint">
-            <span className="font-mono">{truncateAddress(wallet.address)}</span>
-            {methodLabel ? <> · {methodLabel}</> : null}
+          <span className="flex min-w-0 items-center gap-1.5 text-caption text-faint">
+            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} layout="compact" className="-ml-[0.35ch]" />
+            {methodLabel ? <span className="truncate">· {methodLabel}</span> : null}
           </span>
         </span>
         {active ? (
@@ -172,6 +173,15 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
             <span className="sr-only">Selected</span>
           </span>
         ) : null}
+      </button>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={copied ? `${wallet.name} address copied` : `Copy ${wallet.name} address`}
+        title={copied ? "Copied" : "Copy address"}
+        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+      >
+        {copied ? <CheckIcon size={15} /> : <CopyIcon />}
       </button>
       <button
         type="button"
@@ -185,10 +195,19 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   );
 }
 
-function CheckIcon() {
+function CheckIcon({ size = 17 }: { size?: number }) {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }
