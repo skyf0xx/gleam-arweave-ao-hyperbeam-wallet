@@ -132,7 +132,8 @@ device. Gleam stores only the public key and address.
 - **There is no auto-approval.** No setting lets a site sign without the
   window.
 - **Requests expire.** An unanswered request is rejected after 5 minutes
-  (15 for hardware wallets waiting on the device).
+  (20 for a scan attestation from the Gleam site, 15 for hardware wallets
+  waiting on the device).
 - **AO messages are built and signed with plain WebCrypto**
   (`packages/core/src/ao/transfer.ts`). No third-party library touches
   the key on the signing path.
@@ -149,7 +150,7 @@ device. Gleam stores only the public key and address.
 | Hijacked GitHub account or token | Change the source or CI | 2FA; protected `master`: signed commits, PR with passing CI, no force-push, no admin bypass | An account takeover can change the rules. |
 | Malware on the user's computer | Copy the vault, log keystrokes | Encrypted vault; unlocked keys in memory only, cleared on lock | Malware that can read browser memory or keystrokes wins; no browser wallet can stop it. A stolen vault can be attacked offline: see the password policy under By design. |
 | Someone at an unlocked browser | Send funds, export the key | Export needs the password; sends need confirmation | Auto-lock is 1 hour by default; the user can choose "never", with a warning. |
-| Compromised gleamwallet.app | Message the extension, show announcements | The site can only hand over a points invite code; announcement links are limited to the Gleam site and x.com | Misleading announcement text. |
+| Compromised gleamwallet.app | Message the extension, show announcements | The site can only hand over a points invite code; announcement links are limited to the Gleam site and x.com; a production build accepts site messages only from `https://gleamwallet.app` (`isSiteOrigin` in `apps/extension/src/dispatch/site.ts`) | Misleading announcement text. A development build also accepts them from any `http://localhost` or `http://127.0.0.1` page, so local pages can send a dev build invites and scan attestations. |
 | Lying gateway, AO unit or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input | Wrong balances or history on screen; a dishonest gateway can drop a transaction. |
 
 ## Network
