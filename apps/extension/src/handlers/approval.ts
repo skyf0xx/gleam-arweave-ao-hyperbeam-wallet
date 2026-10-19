@@ -132,8 +132,8 @@ import type { SubmitTransferRequest } from "./transfer";
  * against that key before anything is returned or posted. A signature
  * that fails verification leaves the request waiting so the user can
  * sign again. While waiting, the timeout follows `device.deadline`,
- * which `deviceActivity` pushes back up to `APPROVAL_MAX_MS` from the
- * request's creation.
+ * which `deviceActivity` pushes back up to `deviceDeadline`'s cap
+ * (`APPROVAL_MAX_MS` from creation for a dApp request).
  *
  * Deadlines are also enforced on read, since an evicted service worker
  * loses its timers: a record past its deadline (`device.deadline`, or
@@ -146,6 +146,9 @@ const GRANTS_KEY = "local:grants";
 function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
   return kind === "scanAttestation" ? SCAN_ATTESTATION_TIMEOUT_MS : APPROVAL_TIMEOUT_MS;
 }
+
+/** How long past its review timeout a request can wait on a hardware device. */
+const DEVICE_GRACE_MS = APPROVAL_MAX_MS - APPROVAL_TIMEOUT_MS;
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 const APPROVAL_WINDOW_PATH = "/approval.html";
 
@@ -1116,9 +1119,16 @@ export class ApprovalHandler {
     return method !== null && isHardwareWalletMethod(method);
   }
 
-  /** The earliest of another idle window from now and the request's hard cap. */
+  /**
+   * The earliest of another idle window from now and the request's hard
+   * cap. The cap gives the device the same time past the kind's own
+   * review timeout that a dApp request gets past `APPROVAL_TIMEOUT_MS`,
+   * so a scan attestation approved late in its longer review still gets
+   * that time. For a dApp request it stays `APPROVAL_MAX_MS` from
+   * creation, which the page's own timeout is sized to.
+   */
   private deviceDeadline(request: ApprovalRequest): number {
-    const cap = Math.max(APPROVAL_MAX_MS, reviewTimeoutMs(request.kind));
+    const cap = reviewTimeoutMs(request.kind) + DEVICE_GRACE_MS;
     return Math.min(Date.now() + APPROVAL_TIMEOUT_MS, request.createdAt + cap);
   }
 

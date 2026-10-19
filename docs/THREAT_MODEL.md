@@ -133,8 +133,9 @@ device. Gleam stores only the public key and address.
 - **There is no auto-approval.** No setting lets a site sign without the
   window.
 - **Requests expire.** An unanswered request is rejected after 5 minutes
-  (20 for a scan attestation from the Gleam site, 15 for hardware wallets
-  waiting on the device).
+  (20 for a scan attestation from the Gleam site). A hardware wallet's
+  request waiting on the device can run to 15 minutes from creation (30
+  for a scan attestation) while the window reports device activity.
 - **AO messages are built and signed with plain WebCrypto**
   (`packages/core/src/ao/transfer.ts`). No third-party library touches
   the key on the signing path.

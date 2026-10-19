@@ -225,7 +225,7 @@ export interface ProtocolMap {
    * signature is. `error` says what to do next.
    */
   checkScanAttestation(req: { requestId: string }): AttestationCheck;
-  /** Heartbeat while the window talks to the device; pushes the timeout back, up to `APPROVAL_MAX_MS`. */
+  /** Heartbeat while the window talks to the device; pushes the timeout back, up to the request's device cap. */
   deviceActivity(req: { requestId: string }): { deadline: number };
 
   // settings

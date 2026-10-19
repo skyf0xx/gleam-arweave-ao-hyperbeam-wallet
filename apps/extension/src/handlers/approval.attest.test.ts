@@ -300,6 +300,26 @@ describe("ApprovalHandler: scan attestations", () => {
     }
   });
 
+  it("a hardware wallet approved late in the review still gets the device window", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      const { pending, requestId } = await open(HW_ID);
+      pending.catch(() => {});
+      await vi.advanceTimersByTimeAsync(19 * 60_000);
+      const view = (await handler.resolveApproval({ requestId, approved: true })) as ApprovalRequest;
+      expect(view.device!.deadline - Date.now()).toBe(5 * 60_000);
+
+      for (let minute = 0; minute < 9; minute += 1) {
+        await vi.advanceTimersByTimeAsync(60_000);
+        await handler.deviceActivity({ requestId });
+      }
+      const { deadline } = await handler.deviceActivity({ requestId });
+      expect(deadline).toBe(view.createdAt + 30 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("signs with the wallet it was opened for after the user switches wallets", async () => {
     await cacheKey(KEYFILE_ID, keyfileJwk, await addressFromOwner(keyfileJwk.n));
     const { requestId } = await open(KEYFILE_ID);
