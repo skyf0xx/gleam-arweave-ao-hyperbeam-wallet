@@ -165,21 +165,24 @@ export function WalletDetailView({
         <div className="group flex items-center gap-3.5">
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-label font-semibold text-foreground">
-              {wallet.name}
-              {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
-            </span>
+            {/* Copy sits in the name line so the address keeps the full width. */}
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate text-label font-semibold text-foreground">
+                {wallet.name}
+                {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
+              </span>
+              <button
+                type="button"
+                onClick={copyAddress}
+                aria-label={addressCopied ? "Address copied" : "Copy address"}
+                title={addressCopied ? "Copied" : "Copy address"}
+                className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+              >
+                {addressCopied ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            </div>
             <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
           </div>
-          <button
-            type="button"
-            onClick={copyAddress}
-            aria-label={addressCopied ? "Address copied" : "Copy address"}
-            title={addressCopied ? "Copied" : "Copy address"}
-            className={`flex h-7 w-7 flex-shrink-0 items-center justify-center self-start rounded-lg transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
-          >
-            {addressCopied ? <CheckIcon /> : <CopyIcon />}
-          </button>
         </div>
 
         <TextField
