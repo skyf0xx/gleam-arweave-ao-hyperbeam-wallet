@@ -121,7 +121,7 @@ import type { SubmitTransferRequest } from "./transfer";
  * Closing the approval window with its own close button counts as a
  * rejection: `WindowPort.onApprovalWindowClosed` writes a rejected outcome
  * the same way `resolveApproval` does, so the dApp hears back at once
- * instead of after `APPROVAL_TIMEOUT_MS`.
+ * instead of after the review timeout (`reviewTimeoutMs`).
  *
  * Hardware wallets: the service worker can't reach the camera or WebHID,
  * so every hardware signature is made in the approval window. Approving
@@ -137,7 +137,7 @@ import type { SubmitTransferRequest } from "./transfer";
  *
  * Deadlines are also enforced on read, since an evicted service worker
  * loses its timers: a record past its deadline (`device.deadline`, or
- * `APPROVAL_TIMEOUT_MS` after creation while in review) is hidden from
+ * `reviewTimeoutMs(kind)` after creation while in review) is hidden from
  * every read and pruned on the next write, unless it is being resolved.
  */
 const GRANTS_KEY = "local:grants";
