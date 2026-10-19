@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { queryTokenMetadata, tokenMetadataFromTags } from "./token-metadata";
+import { queryTokenMetadata, tokenLogoUrl, tokenMetadataFromTags } from "./token-metadata";
 
 const PROCESS_ID = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
 
@@ -113,6 +113,23 @@ describe("queryTokenMetadata", () => {
     const fetchImpl = fakeGraphQLFetch([edge([{ name: "denomination", value: "not-a-number" }])]);
     const metadata = await queryTokenMetadata(PROCESS_ID, "https://arweave.net", fetchImpl);
     expect(metadata.denomination).toBeNull();
+  });
+});
+
+describe("tokenLogoUrl", () => {
+  const LOGO = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
+
+  it("serves a transaction-id logo from the gateway's own origin", () => {
+    expect(tokenLogoUrl("https://arweave.net/", LOGO)).toBe(`https://arweave.net/${LOGO}`);
+    expect(tokenLogoUrl("https://g.example/some/path", LOGO)).toBe(`https://g.example/${LOGO}`);
+  });
+
+  it("refuses anything that is not a transaction id, and any non-https gateway", () => {
+    for (const logo of [null, "", "https://evil.example/x.png", "data:image/png;base64,AAAA", `${LOGO}/../x`, LOGO.slice(1)]) {
+      expect(tokenLogoUrl("https://arweave.net", logo)).toBeNull();
+    }
+    expect(tokenLogoUrl("http://arweave.net", LOGO)).toBeNull();
+    expect(tokenLogoUrl("not a url", LOGO)).toBeNull();
   });
 });
 

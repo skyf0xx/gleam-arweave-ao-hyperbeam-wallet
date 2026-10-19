@@ -635,7 +635,7 @@ export function MainScreenView({
                   .map((token) => (
                     <TokenRow
                       key={token.processId}
-                      glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                      glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: token.logoUrl }}
                       name={token.ticker}
                       amount={
                         token.available === false

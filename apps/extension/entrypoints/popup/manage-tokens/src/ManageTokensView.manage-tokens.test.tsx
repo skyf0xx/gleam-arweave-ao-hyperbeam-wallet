@@ -46,6 +46,20 @@ describe("ManageTokensView", () => {
     expect(screen.getByText("1")).toBeTruthy();
   });
 
+  it("shows a watched token's logo, and the plain row when it has none", async () => {
+    const withLogo: TokenBalance = { ...BALANCE_1, logoUrl: "https://arweave.net/logo-tx" };
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getWatchedTokens") return [PROC_1];
+      if (type === "getTokenBalances") return [withLogo];
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+
+    renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("wUSDC")).toBeTruthy());
+    expect(document.querySelector("img")?.getAttribute("src")).toBe("https://arweave.net/logo-tx");
+  });
+
   it("previews a pasted process id (read-only) before it's added to the list", async () => {
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getWatchedTokens") return [];

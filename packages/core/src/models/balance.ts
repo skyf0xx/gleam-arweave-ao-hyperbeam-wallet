@@ -40,4 +40,10 @@ export interface TokenBalance {
    * never priced.
    */
   source?: "default" | "watched" | "discovered";
+  /**
+   * The token's logo on the user's gateway (`tokenLogoUrl`), or `null` when
+   * it has none or it isn't a valid transaction id. Never set for a
+   * discovered token: its logo, like its ticker, is the sender's claim.
+   */
+  logoUrl?: string | null;
 }

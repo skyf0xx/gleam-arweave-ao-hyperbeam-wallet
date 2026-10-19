@@ -1007,7 +1007,7 @@ function TokenPickerStep({
           otherTokenBalances.map((candidate) => (
             <TokenRow
               key={candidate.processId}
-              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2 }}
+              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2, logoUrl: candidate.logoUrl }}
               name={displayTicker(candidate.ticker)}
               amount={
                 candidate.available === false

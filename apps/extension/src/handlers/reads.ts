@@ -12,7 +12,7 @@ import {
   queryAoTransferActivity,
   queryL1TokenReceipts,
 } from "@gleam/core/src/arweave/graphql.ts";
-import { queryTokenMetadata } from "@gleam/core/src/arweave/token-metadata.ts";
+import { queryTokenMetadata, tokenLogoUrl } from "@gleam/core/src/arweave/token-metadata.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
 import {
   AO_TOKEN,
@@ -160,7 +160,9 @@ function tokenIdentity(
   address: string,
   metadata: TokenMetadata,
   source: NonNullable<TokenBalance["source"]>,
+  gatewayUrl: string,
 ): Omit<TokenBalance, "quantity"> {
+  const logoUrl = source === "discovered" ? null : tokenLogoUrl(gatewayUrl, metadata.logo);
   return {
     address,
     processId: metadata.processId,
@@ -168,6 +170,7 @@ function tokenIdentity(
     denomination: metadata.denomination ?? 0,
     name: metadata.name,
     source,
+    ...(logoUrl ? { logoUrl } : {}),
   };
 }
 
@@ -442,7 +445,7 @@ export class ReadsHandler {
         source,
       };
     }
-    const identity = tokenIdentity(address, metadata, source);
+    const identity = tokenIdentity(address, metadata, source, settings.gatewayUrl);
     try {
       const quantity = await readTokenBalance({
         processId,

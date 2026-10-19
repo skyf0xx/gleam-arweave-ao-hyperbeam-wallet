@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort, TokenBalance } from "@gleam/core";
-import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { NetworkErrorBanner, SkeletonRow, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
@@ -174,6 +174,9 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 const balance = state.balances.get(processId);
                 return (
                   <div key={processId} className="flex items-center gap-2.5 py-3.5">
+                    {balance?.logoUrl ? (
+                      <TokenGlyph label={balance.ticker.slice(0, 2).toUpperCase()} tone={2} logoUrl={balance.logoUrl} />
+                    ) : null}
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-label font-semibold text-foreground">
                         {balance?.ticker ?? "Unavailable"}
@@ -261,11 +264,16 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
             {preview ? (
               <div className="flex flex-col gap-1 py-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-label font-semibold text-foreground">
-                    {preview.ticker}
-                    {preview.name && preview.name !== preview.ticker ? (
-                      <span className="font-normal text-muted"> · {preview.name}</span>
+                  <span className="flex items-center gap-2.5 text-label font-semibold text-foreground">
+                    {preview.logoUrl ? (
+                      <TokenGlyph label={preview.ticker.slice(0, 2).toUpperCase()} tone={2} logoUrl={preview.logoUrl} />
                     ) : null}
+                    <span>
+                      {preview.ticker}
+                      {preview.name && preview.name !== preview.ticker ? (
+                        <span className="font-normal text-muted"> · {preview.name}</span>
+                      ) : null}
+                    </span>
                   </span>
                   <span className="font-mono text-label text-muted">
                     {preview.available === false ? "Unavailable" : formatAtomicAsDisplay(preview.quantity, preview.denomination)}

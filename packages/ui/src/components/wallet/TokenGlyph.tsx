@@ -1,13 +1,17 @@
+import { useEffect, useState } from "react";
 import { cn } from "../../primitives/cn";
 
 /**
  * The small colored square token identicon — one/two-letter ticker
  * abbreviation on a flat neutral tone. Neutrals only: the five-color
- * beam is never used to color a token glyph.
+ * beam is never used to color a token glyph. With a `logoUrl` the logo
+ * fills the square instead; it loads only through `<img>`, and the
+ * letters stand in when it is absent or fails to load.
  */
 export interface TokenGlyphProps {
   label: string;
   tone?: 1 | 2 | 3 | 4;
+  logoUrl?: string | null;
   className?: string;
 }
 
@@ -23,7 +27,23 @@ const TONE_CLASSES: Record<1 | 2 | 3 | 4, string> = {
   4: "bg-[#d4d4d8] text-foreground",
 };
 
-export function TokenGlyph({ label, tone = 1, className }: TokenGlyphProps) {
+export function TokenGlyph({ label, tone = 1, logoUrl, className }: TokenGlyphProps) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  useEffect(() => setFailedUrl(null), [logoUrl]);
+
+  if (logoUrl && logoUrl !== failedUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setFailedUrl(logoUrl)}
+        className={cn("h-[30px] w-[30px] flex-shrink-0 rounded-lg bg-mist object-cover", className)}
+      />
+    );
+  }
   return (
     <div
       aria-hidden="true"

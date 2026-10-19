@@ -19,6 +19,24 @@ interface GraphQLTransactionsByIdResponse {
   errors?: Array<{ message: string }>;
 }
 
+const LOGO_TX_ID = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Where to load a token's logo from: the `logo` tag is an Arweave
+ * transaction id, served by the user's own https gateway. Anything else
+ * (a URL, a data URI, a malformed id) is the token's attempt to point the
+ * popup somewhere else, so it yields `null`.
+ */
+export function tokenLogoUrl(gatewayUrl: string, logo: string | null): string | null {
+  if (logo === null || !LOGO_TX_ID.test(logo)) return null;
+  try {
+    const gateway = new URL(gatewayUrl);
+    return gateway.protocol === "https:" ? `${gateway.origin}/${logo}` : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Token metadata read directly from an AO process's spawn tags via the
  * gateway's GraphQL endpoint — no dryrun/CU round-trip. Spawn tags are

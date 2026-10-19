@@ -144,6 +144,29 @@ describe("ReadsHandler: getTokenBalances", () => {
     expect(globalThis.fetch).toHaveBeenCalledWith(`${PEER}/${LEGACY}~process@1.0/compute/balances/addr1`);
   });
 
+  it("gives a watched token its logo as a gateway URL, and none for a malformed logo tag", async () => {
+    const LOGO = "L".repeat(43);
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", [LEGACY, FODDER]);
+    await peerSettings(storage);
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/graphql")) {
+        const ids = JSON.stringify(init?.body ?? "");
+        return graphqlNodes(
+          ids.includes(LEGACY)
+            ? [{ id: LEGACY, tags: [...LEGACY_TAGS, { name: "Logo", value: LOGO }] }]
+            : [{ id: FODDER, tags: [...FODDER_TAGS, { name: "logo", value: "https://evil.example/x.png" }] }],
+        );
+      }
+      return { ok: true, status: 200, json: async () => "1" };
+    }) as unknown as typeof fetch;
+
+    const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
+
+    expect(balances.find((b) => b.processId === LEGACY)?.logoUrl).toBe(`https://arweave.net/${LOGO}`);
+    expect(balances.find((b) => b.processId === FODDER)).not.toHaveProperty("logoUrl");
+  });
+
   it("reads an arweave-scheduler token from the gateway's HyperBEAM, not the legacy peer", async () => {
     const storage = createFakeStorage();
     await storage.set("local:watchedProcessIds:addr1", [FODDER]);
