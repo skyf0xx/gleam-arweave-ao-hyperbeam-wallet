@@ -3,8 +3,42 @@
 // run it (scripts/site-scan.site.test.ts). Everything that comes from the
 // network or the link is data: callers render it with textContent only.
 
-export const EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
-export const STORE_URL = "https://chromewebstore.google.com/detail/gleam/" + EXTENSION_ID;
+export const STORE_EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
+export const STORE_URL = "https://chromewebstore.google.com/detail/gleam/" + STORE_EXTENSION_ID;
+export const DEV_EXTENSION_KEY = "gleam:devExtensionId";
+const EXTENSION_ID_PATTERN = /^[a-p]{32}$/;
+
+/**
+ * The extension to message. A copy of the site served from localhost can
+ * name an unpacked dev build's id with `?ext=<id>`, remembered in
+ * localStorage for the other pages; anywhere else it's the store id.
+ * Keep in step with `devExtensionId` in pages.js.
+ */
+export function extensionIdFor(loc, storage) {
+  if (!loc || (loc.hostname !== "localhost" && loc.hostname !== "127.0.0.1")) return STORE_EXTENSION_ID;
+  try {
+    const fromQuery = new URLSearchParams(loc.search).get("ext");
+    if (fromQuery && EXTENSION_ID_PATTERN.test(fromQuery)) {
+      storage?.setItem(DEV_EXTENSION_KEY, fromQuery);
+      return fromQuery;
+    }
+    const saved = storage?.getItem(DEV_EXTENSION_KEY);
+    if (saved && EXTENSION_ID_PATTERN.test(saved)) return saved;
+  } catch {
+    // Storage blocked: fall back to the store id.
+  }
+  return STORE_EXTENSION_ID;
+}
+
+function pageStorage() {
+  try {
+    return typeof localStorage === "undefined" ? undefined : localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+export const EXTENSION_ID = extensionIdFor(typeof location === "undefined" ? undefined : location, pageStorage());
 export const POINTS_API = "https://api.gleamwallet.app";
 export const ATTEST_MESSAGE_TYPE = "gleam-points:attest";
 

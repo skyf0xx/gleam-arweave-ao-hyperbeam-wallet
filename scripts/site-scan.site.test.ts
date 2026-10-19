@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { encodeAttestationPayload } from "../packages/core/src/scan/index";
 import {
   AGENT_LINE,
+  DEV_EXTENSION_KEY,
   EXTENSION_ID,
+  STORE_EXTENSION_ID,
   coverageSummary,
+  extensionIdFor,
   decodeAttestationFragment,
   describeOutcome,
   fetchListing,
@@ -41,6 +44,39 @@ describe("site scan lib: link payload", () => {
     bad(`#${btoa("\xff\xfe").replace(/=+$/, "")}`); // invalid UTF-8
     bad(`#${btoa(JSON.stringify({ ...attestation, result: "fail" })).replace(/=+$/, "")}`);
     bad(`#${btoa(JSON.stringify({ ...attestation, answers: [{ file: 1 }] })).replace(/=+$/, "")}`);
+  });
+});
+
+describe("site scan lib: extension id", () => {
+  const DEV_ID = "a".repeat(32);
+  const memoryStorage = (initial: Record<string, string> = {}) => {
+    const values = new Map(Object.entries(initial));
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+      values,
+    };
+  };
+  const at = (url: string) => new URL(url);
+
+  it("uses the store id on the live site, whatever the link or storage says", () => {
+    const storage = memoryStorage({ [DEV_EXTENSION_KEY]: DEV_ID });
+    expect(extensionIdFor(at(`https://gleamwallet.app/attest.html?ext=${DEV_ID}`), storage)).toBe(STORE_EXTENSION_ID);
+    expect(extensionIdFor(at(`http://foo.localhost/attest.html?ext=${DEV_ID}`), storage)).toBe(STORE_EXTENSION_ID);
+    expect(extensionIdFor(undefined, storage)).toBe(STORE_EXTENSION_ID);
+  });
+
+  it("on localhost takes ?ext= and remembers it for the other pages", () => {
+    const storage = memoryStorage();
+    expect(extensionIdFor(at(`http://localhost:8080/attest.html?ext=${DEV_ID}`), storage)).toBe(DEV_ID);
+    expect(storage.values.get(DEV_EXTENSION_KEY)).toBe(DEV_ID);
+    expect(extensionIdFor(at("http://127.0.0.1:8080/scan.html"), storage)).toBe(DEV_ID);
+  });
+
+  it("ignores an id that isn't an extension id", () => {
+    const storage = memoryStorage({ [DEV_EXTENSION_KEY]: "not-an-id" });
+    expect(extensionIdFor(at("http://localhost/attest.html?ext=ZZZ"), storage)).toBe(STORE_EXTENSION_ID);
+    expect(storage.values.get(DEV_EXTENSION_KEY)).toBe("not-an-id");
   });
 });
 
