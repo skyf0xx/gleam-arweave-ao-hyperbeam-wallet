@@ -202,10 +202,10 @@ count as a finding.
   its behavior doesn't change (`keepLockTimeoutOnUpdate` in
   `apps/extension/src/handlers/wallet-lifecycle.ts`). A vault holding
   only hardware wallets has no password, so it never locks.
-  *Still a finding if:* a web page, content script or message from
-  outside the extension's pages can change the timeout; the setting
-  changes on update for a vault that already had one stored; or a
-  vault holding a password-encrypted key stays unlocked past the chosen
+  *Still a finding if,* by any path, a web page, content script or
+  message from outside the extension's pages changes the timeout; the
+  setting changes on update for a vault that already had one stored; or
+  a vault holding a password-encrypted key stays unlocked past the chosen
   timeout, or past a screen lock with any timeout other than "never".
 - **The password policy is a minimum length and a blocklist.** The
   vault password must be at least 12 characters and not one of about
@@ -216,10 +216,11 @@ count as a finding.
   predictable password can still be guessed. The background checks the
   policy when the first wallet sets the vault password. Later wallets
   must open the existing vault with the same password instead.
-  *Still a finding if:* a vault password shorter than 12 characters or
-  on the blocklist can be set by calling the background directly, past
-  the UI; or a new envelope is written with weaker parameters than the
-  Argon2id ones under "How the key is kept".
+  *Still a finding if,* by any path (the UI, a direct call to the
+  background, an import), a vault ends up protected by a password
+  shorter than 12 characters or on the blocklist; or a new envelope is
+  written with weaker parameters than the Argon2id ones under "How the
+  key is kept".
 - **Key export saves an unencrypted keyfile once the password is
   given.** A standard keyfile is what every other Arweave wallet
   imports. Export asks for the vault password even while unlocked, and
@@ -230,9 +231,9 @@ count as a finding.
   the background erases that row once the download settles
   (`apps/extension/src/adapters/downloads.ts`). Hardware wallets have no
   keyfile to export.
-  *Still a finding if:* the keyfile is saved or returned without the
-  correct password; the plaintext key reaches the popup, a content
-  script or a page; `downloadKeyfile` is reachable from a page; or the
+  *Still a finding if,* by any path, the plaintext keyfile is saved or
+  returned without the correct password; it reaches the popup, a content
+  script or a page; a page can make the extension download it; or the
   download's history row still holds the key after the download
   completes or is cancelled.
 - **Plain `http://` is allowed on loopback.** Developers run dApps on
@@ -243,9 +244,10 @@ count as a finding.
   `apps/extension/src/sender.ts`, checked on every call in
   `apps/extension/entrypoints/background/index.ts`), so a grant made
   before a site lost https reads nothing.
-  *Still a finding if:* a plain-http origin with any other hostname,
-  such as `foo.localhost`, a LAN address or a public host, can connect,
-  read an address or balance, or open an approval window.
+  *Still a finding if,* by any method, a plain-http origin with any
+  other hostname, such as `foo.localhost`, a LAN address or a public
+  host, connects, reads an address or balance, or opens an approval
+  window.
 - **`privateHash` is refused.** Wander's `privateHash` digests the
   private key itself. Gleam's unlocked keys are non-extractable, so it
   can't compute one, and handing sites a value derived from the key is
@@ -253,9 +255,9 @@ count as a finding.
   cover its uses. Every site gets the same error, before any grant
   check, and no window opens (`REFUSED_PROVIDER_METHODS` in
   `packages/core/src/models/method-privileges.ts`).
-  *Still a finding if:* `privateHash` resolves, or any provider method
-  returns a value derived from private key material other than a
-  signature or decryption the user approved.
+  *Still a finding if,* by any path, `privateHash` resolves, or any
+  provider method returns a value derived from private key material
+  other than a signature or decryption the user approved.
 - **The content security policy limits connections and scripts, not
   hosts or images.** `apps/extension/src/csp.ts` sets `script-src 'self'
   'wasm-unsafe-eval'`, `object-src 'none'`, `base-uri 'none'` and
@@ -265,9 +267,11 @@ count as a finding.
   logos, NFT thumbnails) stay unrestricted, which leaves image, font and
   frame sources open too. Code running inside the extension can
   therefore reach any https host, and an image URL can carry data out.
-  *Still a finding if:* a production `connect-src` permits a non-https
-  scheme, `script-src` permits a remote source, or the extension runs
-  fetched code.
+  *Still a finding if,* by any path, code from a remote source runs in
+  an extension page or the service worker, or the extension sends or
+  receives data over a non-https connection (for example through a
+  production `connect-src` that permits a non-https scheme, or a
+  `script-src` that permits a remote source).
 - **Dependency advisories that touch only development tools.** Neither
   package below has a patched release. `osv-scanner.toml` ignores each
   advisory until 2027-04-16, so the scan fails again and the entry is
@@ -286,9 +290,10 @@ count as a finding.
     signatures. It comes only through `wxt` → `web-ext` → `adbkit`, a
     development tool, and isn't in the build.
 
-  *Still a finding if:* `.output/chrome-mv3` contains code from either
-  package; shipped code signs or verifies with ECDSA or PKCS#1 v1.5; or
-  osv-scanner reports a fixed version for either advisory.
+  *Still a finding if,* by any path, `.output/chrome-mv3` contains code
+  from either package, or shipped code signs or verifies with ECDSA or
+  PKCS#1 v1.5, so the advisory's harm reaches users; or a patched
+  version of either package exists, which ends the ignore.
 
 ## Known limitations
 
