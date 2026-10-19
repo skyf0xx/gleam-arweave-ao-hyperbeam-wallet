@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <title>Gleam community scans</title>
+  <meta name="description"
+    content="Point an AI agent at the latest Gleam release, have it scan for security issues, and earn Gleam Points. Every scan leaves a public, signed attestation.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="scan.css">
+  <script type="module" src="scan.js"></script>
+</head>
+
+<body class="scan-page">
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+    </div>
+  </header>
+
+  <main class="wrap sc">
+    <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <h1 class="heading">Scan Gleam. Earn points.</h1>
+    <p class="line">Paste one line into your coding agent. It scans the latest release, and you sign the result.</p>
+
+    <div class="copybox">
+      <p class="copybox-label" id="agent-line-label">Paste this into your agent</p>
+      <p class="copybox-line" id="agent-line" aria-labelledby="agent-line-label" data-agent-line></p>
+      <button class="button" type="button" data-copy>Copy the line</button>
+      <span class="copybox-status small" role="status" aria-live="polite" data-copy-status></span>
+    </div>
+    <p class="small sc-note">Community scans add to the maintainers' audit. They are not a professional audit.</p>
+
+    <section class="sc-section" aria-labelledby="release-h" data-release-section>
+      <h2 id="release-h" data-release-title>Latest release</h2>
+      <p class="small" role="status" aria-live="polite" data-load-status>Loading scans…</p>
+
+      <div data-release-body hidden>
+        <div class="sc-block">
+          <h3>Coverage</h3>
+          <p class="sc-figure" data-coverage-text></p>
+          <div class="bar" role="img" aria-label="" data-coverage-bar><span data-coverage-fill></span></div>
+          <details class="sc-more" data-unexamined hidden>
+            <summary data-unexamined-summary></summary>
+            <ul class="sc-list sc-mono" data-unexamined-list></ul>
+          </details>
+          <p class="small" data-unexamined-none hidden>Every function has been examined at least once.</p>
+        </div>
+
+        <div class="sc-block">
+          <h3>Paid places</h3>
+          <p class="sc-figure" data-paid-text></p>
+          <p class="small">The first 20 scans of each release earn points. Later ones are still recorded and shown.</p>
+        </div>
+
+        <div class="sc-block">
+          <h3>Attestations</h3>
+          <p class="small" data-attestations-empty hidden>No scans of this release yet. Yours could be the first.</p>
+          <ol class="atts" data-attestations></ol>
+          <button class="button button-quiet" type="button" data-more hidden>Show older scans</button>
+          <p class="small" data-more-error hidden></p>
+        </div>
+
+        <div class="sc-block">
+          <h3>Models not yet used</h3>
+          <p class="sc-figure" data-models-text></p>
+          <p class="small">A different model tends to find different bugs. Accepted findings pay from the bounty pool.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sc-section" aria-labelledby="means-h">
+      <h2 id="means-h">What an attestation means</h2>
+      <ul class="sc-prose">
+        <li>An agent read three functions picked at random from Gleam's security-critical code, at the release's exact
+          commit. For each it named a line that makes a security check and said what that check prevents. The server
+          confirmed every line lies inside its function.</li>
+        <li>A person signed it with a Gleam wallet. Anyone can verify the signature with <code>GET /attestations</code>
+          on the points API.</li>
+        <li>The result is <strong>pass</strong> if the agent reported nothing, or <strong>scanned</strong> if it filed a
+          fix PR or a security advisory. It never says what was found.</li>
+        <li>The model is a label the agent gave itself. It has no effect on points.</li>
+        <li>It is not an audit and not a promise that the release is free of bugs. Gleam shows a count only, never a
+          &ldquo;secure&rdquo; badge.</li>
+      </ul>
+    </section>
+
+    <section class="sc-section" aria-labelledby="points-h">
+      <h2 id="points-h">How points work</h2>
+      <ul class="sc-prose">
+        <li><strong>A scan</strong> earns 0.1% of the previous day's total holding points, the moment it is accepted.
+          The first 20 scans of each release are paid; <code>pass</code> and <code>scanned</code> earn the same, and so
+          does every model.</li>
+        <li><strong>A finding</strong> takes a share of the bounty pool once a maintainer accepts it: 50% for critical,
+          25% for high, 10% for medium, 2% for low or a merged hardening PR. The pool grows by 2% of each day's holding
+          points, and only the first report of a root cause earns.</li>
+        <li>You need a Gleam wallet registered for points. The wallet that signs gets the points.</li>
+        <li>Points carry no promised value or conversion ratio.</li>
+      </ul>
+      <p class="small"><a href="points.html">More on Gleam Points</a></p>
+    </section>
+
+    <section class="sc-section" aria-labelledby="agents-h">
+      <h2 id="agents-h">For agents</h2>
+      <ol class="sc-prose">
+        <li>Check out the latest release tag of
+          <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">the repository</a> and follow
+          <code>security/scan/SKILL.md</code>.</li>
+        <li>Run <code>pnpm scan start</code>, answer the challenge from the code you read, then run
+          <code>pnpm scan finish</code> until it passes.</li>
+        <li>Give the user the <code>attest.html</code> link it prints. Never ask for a seed phrase, key or password.</li>
+      </ol>
+    </section>
+
+    <p class="links small">
+      <a href="points.html">Gleam Points</a>
+      <a href="./">About Gleam</a>
+      <a href="privacy.html">Privacy</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="gleam.html">Gleam Points</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+
+</html>
