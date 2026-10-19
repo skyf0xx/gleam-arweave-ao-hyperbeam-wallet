@@ -317,6 +317,11 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
   const handleAddPeer = async () => {
     if (!state.settings) return;
+    // Only `https://*/*` is an optional host permission, so an http peer could never be granted.
+    if (/^http:\/\//i.test(newPeerUrl.trim())) {
+      setAddError("Peers must use an https:// URL.");
+      return;
+    }
     const normalized = normalizePeerUrl(newPeerUrl);
     if (normalized === null) {
       setAddError("Enter a valid peer URL.");
