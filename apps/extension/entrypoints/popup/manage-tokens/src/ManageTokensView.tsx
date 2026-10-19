@@ -8,8 +8,8 @@ import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 
 /**
- * Reached from Settings. AR and AO aren't listed: they always show on the
- * main screen and can't be removed. Tokens the wallet has received show
+ * Reached from Settings. AR and AO aren't listed: they can't be removed,
+ * only hidden on the main screen. Tokens the wallet has received show
  * up on their own ("Found in your wallet") and can be hidden; adding by id
  * is for a token the wallet hasn't received yet.
  */
@@ -167,7 +167,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               </>
             ) : state.processIds.length === 0 ? (
               <p className="py-3.5 text-caption text-faint">
-                No extra tokens added yet. AR and AO always show on the main screen.
+                No extra tokens added yet.
               </p>
             ) : (
               state.processIds.map((processId) => {
@@ -223,7 +223,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 </span>
                 <button
                   type="button"
-                  aria-label={`Hide ${token.ticker}`}
+                  aria-label={`Ignore ${token.ticker}`}
                   disabled={removingId === token.processId}
                   onClick={() => void handleRemove(token.processId)}
                   className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
@@ -233,7 +233,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               </div>
             ))}
             <p className="pt-1 text-caption leading-relaxed text-faint">
-              Anyone can send you a token, so these aren&apos;t vetted and are never priced. Hide one you don&apos;t want.
+              Anyone can send you a token, so these aren&apos;t vetted and are never priced. Ignore one you don&apos;t want.
             </p>
           </div>
         ) : null}

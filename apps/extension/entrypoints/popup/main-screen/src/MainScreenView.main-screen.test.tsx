@@ -336,7 +336,7 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
     expect(onSendToken).toHaveBeenCalledWith(AO_TOKEN);
   });
 
-  it("lists Gleam Points third, after AR and AO and before other tokens, and opens it on click", async () => {
+  it("lists every row alphabetically by name, and opens Gleam Points on click", async () => {
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getBalance") return BALANCE;
       if (type === "getTokenBalances") return [AO_TOKEN];
@@ -355,7 +355,7 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
       .getAllByText(/^(Arweave|AO|Gleam Points|PNTS)$/)
       .filter((element) => element.classList.contains("font-semibold"))
       .map((element) => element.textContent);
-    expect(rowNames).toEqual(["Arweave", "AO", "Gleam Points", "PNTS"]);
+    expect(rowNames).toEqual(["AO", "Arweave", "Gleam Points", "PNTS"]);
 
     fireEvent.click(screen.getByRole("button", { name: /Gleam Points/ }));
     expect(onOpenPoints).toHaveBeenCalled();
@@ -383,6 +383,133 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
 
     await waitFor(() => expect(screen.getByText("1.5")).toBeTruthy());
     expect(screen.queryByText("1500000")).toBeNull();
+  });
+});
+
+describe("MainScreenView hidden token rows", () => {
+  const DISCOVERED: TokenBalance = {
+    address: WALLET.address,
+    processId: "processSPAM",
+    ticker: "FREE",
+    denomination: 0,
+    name: null,
+    quantity: "100",
+    source: "discovered",
+  };
+
+  function sendWithTokens(tokens: TokenBalance[]): RuntimePort["send"] {
+    const base = successfulSend();
+    return vi.fn(async (message: { type: string }) =>
+      message.type === "getTokenBalances" ? tokens : base(message as never),
+    ) as RuntimePort["send"];
+  }
+
+  it("files a discovered token under Hidden, with Show/Hide controls only while it's expanded", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([DISCOVERED]) }) });
+
+    const toggle = await screen.findByRole("button", { name: "Hidden (1)" });
+    expect(screen.queryByText("FREE")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Hide / })).toBeNull();
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByText("FREE")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show FREE" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hide Arweave" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hide Gleam Points" })).toBeTruthy();
+  });
+
+  function setScrollY(value: number) {
+    Object.defineProperty(window, "scrollY", { value, configurable: true });
+    fireEvent.scroll(window);
+  }
+
+  afterEach(() => {
+    setScrollY(0);
+  });
+
+  it("shows neither the Hidden accordion nor Edit list on the home screen when nothing is hidden", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }) });
+
+    await screen.findByText("Gleam Points");
+    expect(screen.queryByRole("button", { name: /^Hidden/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit list" })).toBeNull();
+  });
+
+  it("offers Edit list in the full token view, and hiding a row opens the accordion with it, remembered for the wallet", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const view = renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }) });
+
+    await screen.findByText("Gleam Points");
+    setScrollY(200);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit list" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide Arweave" }));
+
+    expect(screen.getByRole("button", { name: "Hidden (1)" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Show Arweave" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit list" })).toBeNull();
+
+    view.unmount();
+    setScrollY(0);
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }) });
+
+    await screen.findByRole("button", { name: "Hidden (1)" });
+    expect(screen.queryByText("Arweave")).toBeNull();
+    scrollTo.mockRestore();
+  });
+
+  it("ignores a hidden token only after confirming, removing it from Hidden too", async () => {
+    let tokens = [DISCOVERED];
+    const base = successfulSend();
+    const send = vi.fn(async (message: { type: string; payload?: unknown }) => {
+      if (message.type === "getTokenBalances") return tokens;
+      if (message.type === "removeWatchedToken") {
+        tokens = [];
+        return undefined;
+      }
+      return base(message as never);
+    }) as RuntimePort["send"];
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
+
+    expect(screen.getByText(/Ignore FREE\? It won.t show anywhere in Gleam/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "removeWatchedToken" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore" }));
+
+    await waitFor(() => expect(screen.queryByText("FREE")).toBeNull());
+    expect(send).toHaveBeenCalledWith({
+      type: "removeWatchedToken",
+      payload: { address: WALLET.address, processId: DISCOVERED.processId },
+    });
+    expect(screen.queryByRole("button", { name: /^Hidden/ })).toBeNull();
+  });
+
+  it("offers no Ignore on a hidden default row", async () => {
+    window.localStorage.setItem(`gleam:tokenVisibility:${WALLET.address}`, JSON.stringify({ "default-ar": "hidden" }));
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden (1)" }));
+
+    expect(screen.getByRole("button", { name: "Show Arweave" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ignore Arweave" })).toBeNull();
+  });
+
+  it("drops the accordion once its last row is shown, leaving Done to leave Show/Hide", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([DISCOVERED]) }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show FREE" }));
+
+    expect(screen.queryByRole("button", { name: /^Hidden/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Hide FREE" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("button", { name: "Hide FREE" })).toBeNull();
   });
 });
 

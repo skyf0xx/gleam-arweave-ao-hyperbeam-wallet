@@ -1,5 +1,6 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
@@ -14,12 +15,14 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
+import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
 import { useAddressIdentity } from "@/src/address-identity";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGrid } from "../../collectibles/index.tsx";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
+import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useTokenPrices } from "./useTokenPrices";
@@ -180,11 +183,6 @@ function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance
   return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
 }
 
-/** Found from the wallet's history rather than added; never priced, shown apart. */
-function discoveredTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
-  return (data?.tokenBalances ?? []).filter((token) => token.source === "discovered");
-}
-
 /**
  * `ActivityEntry` carries only the AO token's processId, not its
  * denomination, so an AO entry's amount is scaled using the matching
@@ -246,6 +244,40 @@ function writePortfolioScope(scope: PortfolioScope): void {
   }
 }
 
+/** The user's Show/Hide choices on token rows, keyed by row; a row without one keeps its default. */
+type RowVisibility = Record<string, "hidden" | "shown">;
+
+const ROW_VISIBILITY_KEY_PREFIX = "gleam:tokenVisibility:";
+
+function readRowVisibility(address: string): RowVisibility {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(`${ROW_VISIBILITY_KEY_PREFIX}${address}`) ?? "{}");
+    if (typeof parsed !== "object" || parsed === null) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, "hidden" | "shown"] => entry[1] === "hidden" || entry[1] === "shown"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeRowVisibility(address: string, visibility: RowVisibility): void {
+  try {
+    window.localStorage.setItem(`${ROW_VISIBILITY_KEY_PREFIX}${address}`, JSON.stringify(visibility));
+  } catch {
+    // Not persisting only means the next open shows the default rows.
+  }
+}
+
+interface ListedTokenRow {
+  key: string;
+  label: string;
+  defaultHidden: boolean;
+  /** Set only on a token that Manage tokens can add back by id, so only those can be ignored. */
+  processId?: string;
+  node: ReactNode;
+}
+
 /** Scroll distance (px) past which the header collapses to its compact form. */
 const HEADER_COLLAPSE_THRESHOLD_PX = 24;
 
@@ -286,6 +318,45 @@ export function MainScreenView({
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [listDocked, setListDocked] = useState(false);
+  const [hiddenExpanded, setHiddenExpanded] = useState(false);
+  // Tagged with its address so a wallet switch reads that wallet's choices without an effect.
+  const [storedVisibility, setStoredVisibility] = useState(() => ({
+    address: wallet.address,
+    rows: readRowVisibility(wallet.address),
+  }));
+  const rowVisibility =
+    storedVisibility.address === wallet.address ? storedVisibility.rows : readRowVisibility(wallet.address);
+  const isRowHidden = (row: ListedTokenRow) =>
+    rowVisibility[row.key] === "hidden" || (rowVisibility[row.key] !== "shown" && row.defaultHidden);
+  const toggleRowHidden = (row: ListedTokenRow) => {
+    const rows: RowVisibility = { ...rowVisibility, [row.key]: isRowHidden(row) ? "shown" : "hidden" };
+    setStoredVisibility({ address: wallet.address, rows });
+    writeRowVisibility(wallet.address, rows);
+  };
+  const queryClient = useQueryClient();
+  const [confirmingIgnore, setConfirmingIgnore] = useState<string | null>(null);
+  const [ignoring, setIgnoring] = useState(false);
+  const [ignoreFailed, setIgnoreFailed] = useState(false);
+  const ignoreToken = async (processId: string) => {
+    setIgnoring(true);
+    setIgnoreFailed(false);
+    try {
+      await runtime.send<{ address: string; processId: string }, void>({
+        type: "removeWatchedToken",
+        payload: { address: wallet.address, processId },
+      });
+      // Dropped so a token added back by id isn't still filed under Hidden.
+      const rows: RowVisibility = Object.fromEntries(Object.entries(rowVisibility).filter(([key]) => key !== processId));
+      setStoredVisibility({ address: wallet.address, rows });
+      writeRowVisibility(wallet.address, rows);
+      setConfirmingIgnore(null);
+      await queryClient.invalidateQueries({ queryKey: walletQueryKeys.balances(wallet.address) });
+    } catch {
+      setIgnoreFailed(true);
+    } finally {
+      setIgnoring(false);
+    }
+  };
   const collapseRafRef = useRef<number | null>(null);
   const listSectionRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
@@ -372,9 +443,10 @@ export function MainScreenView({
   }, [headerCollapsed]);
 
   /**
-   * Back at the top, the home screen shows Tokens again. Only an expand
-   * after a collapse counts, so a remount on a tab the caller restored
-   * (returning from a detail screen) keeps that tab.
+   * Back at the top, the home screen shows Tokens again, with the hidden
+   * tokens disclosure collapsed. Only an expand after a collapse counts, so
+   * a remount on a tab the caller restored (returning from a detail screen)
+   * keeps that tab.
    */
   const wasCollapsedRef = useRef(false);
   useEffect(() => {
@@ -385,21 +457,21 @@ export function MainScreenView({
     if (!wasCollapsedRef.current) return;
     wasCollapsedRef.current = false;
     setActiveTab("tokens");
+    setHiddenExpanded(false);
     onTabChange?.("tokens");
     // onTabChange is deliberately left out: only the collapse flip should reset the tab.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [headerCollapsed]);
 
   /**
-   * Picking a tab scrolls the window until the section reaches its docked
-   * position, so the header fades, the section docks, and the whole list
-   * has the popup to itself. Once docked, the section scrolls on its own,
-   * so the click just brings that inner list back to its top.
+   * Scrolls the window until the list section reaches its docked position,
+   * so the header fades, the section docks, and the whole list has the
+   * popup to itself. Once docked, the section scrolls on its own, so this
+   * just brings that inner list back to its top. Shared by tab switches and
+   * by expanding the hidden-tokens disclosure, which both want the list in
+   * full view rather than scrolled to wherever the click happened.
    */
-  const selectTab = (tab: MainScreenTab) => {
-    setActiveTab(tab);
-    if (tab === "collectibles") setCollectiblesOpened(true);
-    onTabChange?.(tab);
+  const scrollListToDockedTop = () => {
     const section = listSectionRef.current;
     if (!section) return;
     const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -409,6 +481,18 @@ export function MainScreenView({
     }
     const top = window.scrollY + section.getBoundingClientRect().top - LIST_DOCK_TOP_PX;
     window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
+  };
+
+  const selectTab = (tab: MainScreenTab) => {
+    setActiveTab(tab);
+    if (tab === "collectibles") setCollectiblesOpened(true);
+    onTabChange?.(tab);
+    scrollListToDockedTop();
+  };
+
+  const toggleHiddenExpanded = () => {
+    setHiddenExpanded((prev) => !prev);
+    scrollListToDockedTop();
   };
 
   /** Scrolling to the top un-collapses the header, which un-docks the list and fades the chart back in. */
@@ -617,53 +701,157 @@ export function MainScreenView({
                 <SkeletonRow />
               </>
             ) : (
-              <>
-                {buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map(({ send, ...row }) => (
-                  <TokenRow
-                    key={row.key}
-                    glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                    name={row.name}
-                    amount={row.amount}
-                    usdValue={row.usdValue}
-                    loading={loading}
-                    onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
-                  />
-                ))}
-                <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />
-                {nonDefaultTokenBalances(balancesQuery.data)
-                  .filter((token) => token.source !== "discovered")
-                  .map((token) => (
-                    <TokenRow
-                      key={token.processId}
-                      glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: token.logoUrl }}
-                      name={token.ticker}
-                      amount={
-                        token.available === false
-                          ? UNAVAILABLE_BALANCE_LABEL
-                          : formatAtomicAsDisplay(token.quantity, token.denomination)
-                      }
-                      loading={loading}
-                      onClick={token.available === false ? undefined : () => onSendToken(token)}
-                    />
-                  ))}
-                {discoveredTokenBalances(balancesQuery.data).length > 0 ? (
-                  <>
-                    <div className="border-b border-line px-3.5 pb-2 pt-4 text-caption text-muted">
-                      Unverified · sent to you, not added by you. Names and amounts are the sender&apos;s claim.
-                    </div>
-                    {discoveredTokenBalances(balancesQuery.data).map((token) => (
+              (() => {
+                const rows: ListedTokenRow[] = [
+                  ...buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map(({ send, ...row }) => ({
+                    key: row.key,
+                    label: row.name,
+                    defaultHidden: false,
+                    node: (
                       <TokenRow
-                        key={token.processId}
-                        glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                        name={token.ticker}
-                        amount={formatAtomicAsDisplay(token.quantity, token.denomination)}
+                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                        name={row.name}
+                        amount={row.amount}
+                        usdValue={row.usdValue}
                         loading={loading}
-                        onClick={() => onSendToken(token)}
+                        onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
+                        className="border-b-0"
                       />
-                    ))}
+                    ),
+                  })),
+                  {
+                    key: "gleam-points",
+                    label: "Gleam Points",
+                    defaultHidden: false,
+                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} className="border-b-0" />,
+                  },
+                  ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
+                    const discovered = token.source === "discovered";
+                    return {
+                      key: token.processId,
+                      label: token.ticker,
+                      processId: token.processId,
+                      // Anyone can send a token, so one the user didn't add starts hidden.
+                      defaultHidden: discovered,
+                      node: (
+                        <TokenRow
+                          glyph={{
+                            label: token.ticker.slice(0, 2).toUpperCase(),
+                            tone: 2,
+                            logoUrl: discovered ? undefined : token.logoUrl,
+                          }}
+                          name={token.ticker}
+                          amount={
+                            token.available === false
+                              ? UNAVAILABLE_BALANCE_LABEL
+                              : formatAtomicAsDisplay(token.quantity, token.denomination)
+                          }
+                          loading={loading}
+                          onClick={token.available === false ? undefined : () => onSendToken(token)}
+                          className="border-b-0"
+                        />
+                      ),
+                    };
+                  }),
+                ].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+                const hiddenRows = rows.filter(isRowHidden);
+                const renderRow = (row: ListedTokenRow) => {
+                  const hidden = isRowHidden(row);
+                  const { processId } = row;
+                  if (processId !== undefined && confirmingIgnore === processId) {
+                    return (
+                      <div key={row.key} className="flex flex-col gap-2 border-b border-line px-3.5 py-3 last:border-b-0">
+                        <p className="text-caption leading-relaxed text-muted">
+                          Ignore {row.label}? It won&apos;t show anywhere in Gleam. To bring it back, add
+                          its process id in Manage tokens.
+                        </p>
+                        {ignoreFailed ? (
+                          <p role="alert" className="text-caption text-warning">
+                            Couldn&apos;t ignore it. Try again.
+                          </p>
+                        ) : null}
+                        <div className="flex justify-end gap-3 text-caption font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingIgnore(null)}
+                            className="text-muted hover:text-foreground"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={ignoring}
+                            onClick={() => void ignoreToken(processId)}
+                            className="text-warning disabled:opacity-60"
+                          >
+                            {ignoring ? "Ignoring…" : "Ignore"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const actionClassName =
+                    "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground";
+                  return (
+                    <div key={row.key} className="group relative border-b border-line last:border-b-0">
+                      {row.node}
+                      {hiddenExpanded ? (
+                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
+                          {hidden && processId !== undefined ? (
+                            <button
+                              type="button"
+                              aria-label={`Ignore ${row.label}`}
+                              onClick={() => {
+                                setIgnoreFailed(false);
+                                setConfirmingIgnore(processId);
+                              }}
+                              className={actionClassName}
+                            >
+                              Ignore
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            aria-label={`${hidden ? "Show" : "Hide"} ${row.label}`}
+                            onClick={() => toggleRowHidden(row)}
+                            className={actionClassName}
+                          >
+                            {hidden ? "Show" : "Hide"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                };
+                return (
+                  <>
+                    {rows.filter((row) => !isRowHidden(row)).map(renderRow)}
+                    {hiddenRows.length > 0 ? (
+                      <>
+                        <button
+                          type="button"
+                          aria-expanded={hiddenExpanded}
+                          onClick={toggleHiddenExpanded}
+                          className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground"
+                        >
+                          <span>Hidden ({hiddenRows.length})</span>
+                          <ChevronIcon open={hiddenExpanded} />
+                        </button>
+                        {hiddenExpanded ? hiddenRows.map(renderRow) : null}
+                      </>
+                    ) : listDocked || hiddenExpanded ? (
+                      // With nothing hidden there's no accordion to open, so this is the way into Show/Hide.
+                      <button
+                        type="button"
+                        onClick={() => setHiddenExpanded((prev) => !prev)}
+                        className="px-3.5 py-3 text-caption text-faint hover:text-foreground"
+                      >
+                        {hiddenExpanded ? "Done" : "Edit list"}
+                      </button>
+                    ) : null}
                   </>
-                ) : null}
-              </>
+                );
+              })()
             )}
           </div>
         ) : activeTab === "collectibles" ? (

@@ -180,7 +180,7 @@ describe("ManageTokensView", () => {
     renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Found in your wallet")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Hide FODDER"));
+    fireEvent.click(screen.getByLabelText("Ignore FODDER"));
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({ type: "removeWatchedToken", payload: { address: "addr1", processId: PROC_1 } }),
     );
