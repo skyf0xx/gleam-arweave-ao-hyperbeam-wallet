@@ -334,9 +334,11 @@ export function ScanAttestationResult({ result, onClose }: { result: SiteAttestR
       <>
         <h1 className="text-body font-bold text-foreground">Attestation recorded</h1>
         <p className="text-label leading-relaxed text-muted">
-          {result.paidPlacesLeft === 0
+          {result.unpaidReason === "places_taken"
             ? "This release's paid places were already taken, so this scan earned no points. Findings still pay when a maintainer accepts them."
-            : "This scan earned no points because the first daily points snapshot hasn't run yet. Findings still pay when a maintainer accepts them."}
+            : result.unpaidReason === "no_snapshot"
+              ? "This scan earned no points because the first daily points snapshot hasn't run yet. Findings still pay when a maintainer accepts them."
+              : "This scan earned no points. Findings still pay when a maintainer accepts them."}
         </p>
       </>
     );

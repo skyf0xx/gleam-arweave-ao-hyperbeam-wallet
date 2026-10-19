@@ -120,8 +120,10 @@ describe("site scan lib: outcomes", () => {
     const paid = describeOutcome({ kind: "reply", reply: { ok: true, attestationId: id, points: "1234500000000000", paid: true, paidPlacesLeft: 4 } });
     expect(paid).toMatchObject({ state: "success", action: "view", attestationId: id });
     expect(paid.message).toContain("1,234.5 points");
-    expect(describeOutcome({ kind: "reply", reply: { ok: true, attestationId: id, points: "0", paid: false, paidPlacesLeft: 0 } }).state).toBe("full");
-    expect(describeOutcome({ kind: "reply", reply: { ok: true, attestationId: id, points: "0", paid: false, paidPlacesLeft: 7 } }).state).toBe("unpaid");
+    expect(describeOutcome({ kind: "reply", reply: { ok: true, attestationId: id, points: "0", paid: false, unpaidReason: "places_taken", paidPlacesLeft: 0 } }).state).toBe("full");
+    expect(describeOutcome({ kind: "reply", reply: { ok: true, attestationId: id, points: "0", paid: false, unpaidReason: "no_snapshot", paidPlacesLeft: 7 } }).state).toBe("unpaid");
+    // Places left alone no longer implies "no snapshot yet".
+    expect(describeOutcome({ kind: "reply", reply: { ok: true, attestationId: id, points: "0", paid: false, paidPlacesLeft: 7 } }).message).toBe("Your attestation is recorded. It earned no points.");
     expect(describeOutcome({ kind: "reply", reply: { ok: true, attestationId: "<b>", points: "0", paid: false, paidPlacesLeft: 7 } }).attestationId).toBeNull();
   });
 

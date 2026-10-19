@@ -223,7 +223,7 @@ describe("POST /attestations", () => {
     const { status, json } = await s.post("/attestations", await attestBody(alice, attestation));
 
     expect(status).toBe(200);
-    expect(json).toMatchObject({ ok: true, points: "10000", paid: true, paidPlacesLeft: 19 });
+    expect(json).toMatchObject({ ok: true, points: "10000", paid: true, unpaidReason: null, paidPlacesLeft: 19 });
     expect(json.attestationId).toMatch(/^[0-9a-f]{64}$/);
     const { rows } = await s.db.query<{ address: string; kind: string; amount_atomic: string; attestation_id: string }>(
       "SELECT address, kind, amount_atomic::text, attestation_id FROM scan_points",
@@ -257,9 +257,10 @@ describe("POST /attestations", () => {
     const { status, json } = await s.post("/attestations", await attestBody(alice, attestationFor(s, await s.challenge())));
 
     expect(status).toBe(200);
-    expect(json).toMatchObject({ points: "0", paid: false, paidPlacesLeft: 20 });
+    expect(json).toMatchObject({ points: "0", paid: false, unpaidReason: "no_snapshot", paidPlacesLeft: 20 });
     expect(await count(s.db, "attestations")).toBe(1);
     expect(await count(s.db, "scan_points")).toBe(0);
+    expect((await s.get("/attestations")).json.attestations[0]).toMatchObject({ paid: false, unpaidReason: "no_snapshot" });
   });
 
   it("accepts a hardware wallet's ownership transaction as the proof", async () => {
@@ -291,7 +292,7 @@ describe("POST /attestations", () => {
     const { status, json } = await s.post("/attestations", await attestBody(alice, attestationFor(s, await s.challenge())));
 
     expect(status).toBe(200);
-    expect(json).toMatchObject({ points: "0", paid: false, paidPlacesLeft: 0 });
+    expect(json).toMatchObject({ points: "0", paid: false, unpaidReason: "places_taken", paidPlacesLeft: 0 });
     expect(await count(s.db, "attestations WHERE address = $1 AND NOT paid", [alice.address])).toBe(1);
     expect(await count(s.db, "scan_points")).toBe(0);
   });
@@ -762,6 +763,7 @@ describe("GET /attestations", () => {
       report: "Alice's report.",
       answers: mine.answers,
       paid: true,
+      unpaidReason: null,
       owner: alice.signer.owner,
       proof: "message",
       message: `gleam-points:attest:v1:1.0.0:${a}`,

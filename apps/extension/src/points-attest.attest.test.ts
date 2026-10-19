@@ -24,7 +24,7 @@ const ATTESTATION = {
 const MESSAGE = { type: "gleam-points:attest", attestation: ATTESTATION };
 
 const WALLET = { id: "w1", address: "addr-1", name: "Main", method: "jwk" } as WalletSummary;
-const PAID: SiteAttestResponse = { ok: true, attestationId: "a".repeat(64), points: "1", paid: true, paidPlacesLeft: 3 };
+const PAID: SiteAttestResponse = { ok: true, attestationId: "a".repeat(64), points: "1", paid: true, unpaidReason: null, paidPlacesLeft: 3 };
 
 /** What the background does with an external message: the site dispatcher, then the attestation handler. */
 function acceptSiteAttestation(message: unknown, origin: string | undefined, deps: SiteAttestationDeps) {

@@ -75,5 +75,13 @@ export type SiteAttestErrorCode =
  * shows.
  */
 export type SiteAttestResponse =
-  | { ok: true; attestationId: string; points: string; paid: boolean; paidPlacesLeft: number }
+  | {
+      ok: true;
+      attestationId: string;
+      points: string;
+      paid: boolean;
+      /** Why `paid` is false; null when paid, or when the server didn't say. */
+      unpaidReason: "places_taken" | "no_snapshot" | null;
+      paidPlacesLeft: number;
+    }
   | { ok: false; code: SiteAttestErrorCode; error: string };

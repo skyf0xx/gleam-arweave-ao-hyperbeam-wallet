@@ -286,7 +286,7 @@ export class PointsHandler {
       return attestFailure("offline", attestation.release);
     }
     if (!response.ok) return serverAttestFailure(response.status, body, attestation.release);
-    const { points, paid, paidPlacesLeft } = body ?? {};
+    const { points, paid, paidPlacesLeft, unpaidReason } = body ?? {};
     if (
       body?.ok !== true ||
       body.attestationId !== id ||
@@ -297,7 +297,14 @@ export class PointsHandler {
     ) {
       return attestFailure("offline", attestation.release);
     }
-    return { ok: true, attestationId: id, points, paid, paidPlacesLeft };
+    return {
+      ok: true,
+      attestationId: id,
+      points,
+      paid,
+      unpaidReason: unpaidReason === "places_taken" || unpaidReason === "no_snapshot" ? unpaidReason : null,
+      paidPlacesLeft,
+    };
   }
 
   async getClaimPending(): Promise<string[]> {

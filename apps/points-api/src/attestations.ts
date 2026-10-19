@@ -74,11 +74,16 @@ export interface CheckResult {
   paidPlacesLeft: number;
 }
 
+/** Why a scan earned nothing: its release's paid places were gone, or no daily snapshot exists yet to base points on. */
+export type UnpaidReason = "places_taken" | "no_snapshot";
+
 export interface SubmitResult {
   attestationId: string;
   /** Atomic points credited now; "0" once the paid places are taken. */
   points: string;
   paid: boolean;
+  /** Null when `paid`, and for a scan recorded before the reason was kept. */
+  unpaidReason: UnpaidReason | null;
   paidPlacesLeft: number;
 }
 
@@ -255,14 +260,14 @@ export async function submitAttestation(
   }
 
   // A retry after a lost response gets the original answer back.
-  const earlier = await db.query<{ paid: boolean; points: string }>(
-    `SELECT a.paid, coalesce((SELECT sum(amount_atomic) FROM scan_points WHERE attestation_id = a.id AND kind = 'scan'), 0)::text AS points
+  const earlier = await db.query<{ paid: boolean; unpaid_reason: UnpaidReason | null; points: string }>(
+    `SELECT a.paid, a.unpaid_reason, coalesce((SELECT sum(amount_atomic) FROM scan_points WHERE attestation_id = a.id AND kind = 'scan'), 0)::text AS points
        FROM attestations a WHERE a.id = $1 AND a.address = $2`,
     [id, address],
   );
   if (earlier.rows[0]) {
-    const { paid, points } = earlier.rows[0];
-    return { ok: true, result: { attestationId: id, points, paid, paidPlacesLeft: await paidPlacesLeft(db, attestation.release) } };
+    const { paid, points, unpaid_reason: unpaidReason } = earlier.rows[0];
+    return { ok: true, result: { attestationId: id, points, paid, unpaidReason, paidPlacesLeft: await paidPlacesLeft(db, attestation.release) } };
   }
 
   // 2 and 3. Release, commit, challenge and answers.
@@ -301,13 +306,14 @@ export async function submitAttestation(
     const left = await paidPlacesLeft(tx, attestation.release);
     const points = left > 0 ? await scanReward(tx, now) : 0n;
     const paid = points > 0n;
+    const unpaidReason: UnpaidReason | null = paid ? null : left > 0 ? "no_snapshot" : "places_taken";
 
     await tx.query(
-      `INSERT INTO attestations (id, release, commit, challenge_id, address, owner, signature, proof, message, body, paid, created_at, function_total)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      `INSERT INTO attestations (id, release, commit, challenge_id, address, owner, signature, proof, message, body, paid, created_at, function_total, unpaid_reason)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         id, attestation.release, attestation.commit, attestation.challenge, address, request.owner,
-        request.signature, request.proof, request.message, JSON.stringify(attestation), paid, now, functionTotal,
+        request.signature, request.proof, request.message, JSON.stringify(attestation), paid, now, functionTotal, unpaidReason,
       ],
     );
     await tx.query("UPDATE challenges SET used_by_attestation = $2 WHERE id = $1", [attestation.challenge, id]);
@@ -319,7 +325,7 @@ export async function submitAttestation(
     }
     return {
       ok: true,
-      result: { attestationId: id, points: points.toString(), paid, paidPlacesLeft: paid ? left - 1 : left },
+      result: { attestationId: id, points: points.toString(), paid, unpaidReason, paidPlacesLeft: paid ? left - 1 : left },
     };
   });
   if (outcome.ok) listings.clear();
@@ -463,6 +469,8 @@ export interface AttestationListing {
     answers: AttestationAnswer[];
     createdAt: string;
     paid: boolean;
+    /** Null when `paid`, and for a scan recorded before the reason was kept. */
+    unpaidReason: UnpaidReason | null;
     owner: string;
     signature: string;
     proof: PointsProofKind;
@@ -540,12 +548,13 @@ export async function listAttestations(
         body: { model: string; result: string; report: string; answers: AttestationAnswer[] };
         created_at: Date;
         paid: boolean;
+        unpaid_reason: UnpaidReason | null;
         owner: string;
         signature: string;
         proof: PointsProofKind;
         message: string;
       }>(
-        `SELECT id, body, created_at, paid, owner, signature, proof, message FROM attestations
+        `SELECT id, body, created_at, paid, unpaid_reason, owner, signature, proof, message FROM attestations
           WHERE release = $1 AND voided_at IS NULL
             AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3))
           ORDER BY created_at DESC, id DESC LIMIT $4`,
@@ -569,6 +578,7 @@ export async function listAttestations(
         answers: row.body.answers,
         createdAt: row.created_at.toISOString(),
         paid: row.paid,
+        unpaidReason: row.unpaid_reason,
         owner: row.owner,
         signature: row.signature,
         proof: row.proof,

@@ -81,7 +81,7 @@ describe("founding numbers", () => {
     await insert("alpha", "2026-01-03T00:00:00Z");
     await insert("omega", "2026-01-01T00:00:00Z");
 
-    expect(await migrate(db)).toEqual(["003_founding_number.sql", "004_original_founder.sql", "005_invites.sql", "006_scans.sql", "007_bounty_daily_unique.sql"]);
+    expect(await migrate(db)).toEqual(["003_founding_number.sql", "004_original_founder.sql", "005_invites.sql", "006_scans.sql", "007_bounty_daily_unique.sql", "008_attestation_unpaid_reason.sql"]);
 
     const { rows } = await db.query<{
       address: string;

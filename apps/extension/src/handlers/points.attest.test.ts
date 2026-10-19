@@ -82,11 +82,11 @@ const json = (body: unknown, status = 200) => async () => new Response(JSON.stri
 
 describe("PointsHandler.attest", () => {
   it("signs the attest message with signMessage and posts exactly the server's submit body", async () => {
-    const { handler, fetchImpl } = setup(json({ ok: true, attestationId: id, points: "5000000000000", paid: true, paidPlacesLeft: 19 }));
+    const { handler, fetchImpl } = setup(json({ ok: true, attestationId: id, points: "5000000000000", paid: true, unpaidReason: null, paidPlacesLeft: 19 }));
 
     const result = await handler.attest({ walletId: "w1", attestation });
 
-    expect(result).toEqual({ ok: true, attestationId: id, points: "5000000000000", paid: true, paidPlacesLeft: 19 });
+    expect(result).toEqual({ ok: true, attestationId: id, points: "5000000000000", paid: true, unpaidReason: null, paidPlacesLeft: 19 });
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toBe(`${API}/attestations`);
     expect(init?.method).toBe("POST");
@@ -129,6 +129,13 @@ describe("PointsHandler.attest", () => {
       handler.submitAttestation(attestation, { owner: "o", address: "a", message: "gleam-points:attest:v1:1.4.0:" + "0".repeat(64), signature: "s", proof: "message" }),
     ).rejects.toThrow(/isn't for this attestation/);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("passes the server's reason for an unpaid scan through, and reads an unknown one as none", async () => {
+    const reasoned = setup(json({ ok: true, attestationId: id, points: "0", paid: false, unpaidReason: "no_snapshot", paidPlacesLeft: 5 }));
+    expect(await reasoned.handler.attest({ walletId: "w1", attestation })).toMatchObject({ paid: false, unpaidReason: "no_snapshot" });
+    const odd = setup(json({ ok: true, attestationId: id, points: "0", paid: false, unpaidReason: "whatever", paidPlacesLeft: 5 }));
+    expect(await odd.handler.attest({ walletId: "w1", attestation })).toMatchObject({ unpaidReason: null });
   });
 
   it.each([

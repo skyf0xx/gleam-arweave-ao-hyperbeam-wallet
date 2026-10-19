@@ -114,7 +114,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
   it("signs, then shows the points earned and stays open", async () => {
     const shown: ApprovalShown = {
       shown: "scanAttestation",
-      result: { ok: true, attestationId: PREVIEW.attestationId, points: "12500000000000", paid: true, paidPlacesLeft: 4 },
+      result: { ok: true, attestationId: PREVIEW.attestationId, points: "12500000000000", paid: true, unpaidReason: null, paidPlacesLeft: 4 },
     };
     const { runtime, send } = runtimeWith({ ...member, resolveApproval: () => shown });
     render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
@@ -160,7 +160,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
   it("says when a scan was recorded after the paid places were taken", async () => {
     const shown: ApprovalShown = {
       shown: "scanAttestation",
-      result: { ok: true, attestationId: PREVIEW.attestationId, points: "0", paid: false, paidPlacesLeft: 0 },
+      result: { ok: true, attestationId: PREVIEW.attestationId, points: "0", paid: false, unpaidReason: "places_taken", paidPlacesLeft: 0 },
     };
     const { runtime } = runtimeWith({ ...member, resolveApproval: () => shown });
     render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
@@ -168,6 +168,19 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
     fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
 
     await screen.findByText(/paid places were already taken/, {}, SLOW);
+  });
+
+  it("says when a scan earned nothing because no snapshot day exists yet", async () => {
+    const shown: ApprovalShown = {
+      shown: "scanAttestation",
+      result: { ok: true, attestationId: PREVIEW.attestationId, points: "0", paid: false, unpaidReason: "no_snapshot", paidPlacesLeft: 7 },
+    };
+    const { runtime } = runtimeWith({ ...member, resolveApproval: () => shown });
+    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
+
+    await screen.findByText(/snapshot hasn't run yet/, {}, SLOW);
   });
 
   it("a wallet outside Gleam Points is offered the join first, then the attestation", async () => {

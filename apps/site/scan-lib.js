@@ -199,17 +199,19 @@ export function describeOutcome(outcome) {
   if (reply.ok) {
     const id = typeof reply.attestationId === "string" && ID_PATTERN.test(reply.attestationId) ? reply.attestationId : null;
     const paid = reply.paid === true;
-    const left = Number.isInteger(reply.paidPlacesLeft) ? reply.paidPlacesLeft : null;
     let state = "success";
     let message = "Your attestation is signed and recorded.";
     if (paid) {
       message = `Your attestation is signed and recorded. You earned ${formatPoints(reply.points)} points.`;
-    } else if (left === 0) {
+    } else if (reply.unpaidReason === "places_taken") {
       state = "full";
       message = "Your attestation is recorded, but this release's 20 paid places are taken, so it earns no points.";
-    } else {
+    } else if (reply.unpaidReason === "no_snapshot") {
       state = "unpaid";
       message = "Your attestation is recorded. It earned no points yet, because no daily points count exists to base them on.";
+    } else {
+      state = "unpaid";
+      message = "Your attestation is recorded. It earned no points.";
     }
     return { state, message, action: "view", paid, points: paid ? reply.points : "0", attestationId: id };
   }

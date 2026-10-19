@@ -125,7 +125,7 @@ function parsed(): ParsedAttestation {
   return result.attestation;
 }
 
-const PAID: SiteAttestResponse = { ok: true, attestationId: "x", points: "5000000000000", paid: true, paidPlacesLeft: 19 };
+const PAID: SiteAttestResponse = { ok: true, attestationId: "x", points: "5000000000000", paid: true, unpaidReason: null, paidPlacesLeft: 19 };
 
 let storage: StoragePort;
 let windows: ReturnType<typeof createFakeWindows>;
