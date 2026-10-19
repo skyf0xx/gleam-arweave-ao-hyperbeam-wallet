@@ -60,6 +60,7 @@ export default tseslint.config(
       "**/.output/**",
       "**/.wxt/**",
       "**/node_modules/**",
+      "**/.claude/worktrees/**",
     ],
   },
   js.configs.recommended,
