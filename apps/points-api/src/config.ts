@@ -1,4 +1,5 @@
 import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core/src/models/network.ts";
+import { DEFAULT_GITHUB_REPO } from "./github";
 
 export interface Config {
   databaseUrl: string;
@@ -6,6 +7,9 @@ export interface Config {
   arweaveGatewayUrl: string;
   hyperbeamUrl: string;
   pointsPhase: 1 | 2;
+  githubRepo: string;
+  /** Optional; raises GitHub's API rate limit. */
+  githubToken?: string;
 }
 
 export function readConfig(env: Record<string, string | undefined>): Config {
@@ -24,5 +28,7 @@ export function readConfig(env: Record<string, string | undefined>): Config {
     arweaveGatewayUrl: env.ARWEAVE_GATEWAY_URL || "https://arweave.net",
     hyperbeamUrl: env.HYPERBEAM_URL || DEFAULT_HYPERBEAM_PEER_URLS[0]!,
     pointsPhase: phase === "1" ? 1 : 2,
+    githubRepo: env.GITHUB_REPO || DEFAULT_GITHUB_REPO,
+    ...(env.GITHUB_TOKEN ? { githubToken: env.GITHUB_TOKEN } : {}),
   };
 }

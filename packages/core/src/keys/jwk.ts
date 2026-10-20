@@ -1,41 +1,16 @@
-import { Arweave } from "../arweave/client";
+import { addressFromOwner } from "./address";
 import type { JWKInterface } from "../models/wallet";
-
-/**
- * A single Arweave client used only for its offline JWK-generation and
- * address-derivation helpers — neither touches the network, so the
- * gateway config passed to `init` is never dialed. Real network reads use
- * their own client, constructed with an explicit gateway
- * (`Arweave.init({})` silently falls back to `127.0.0.1:80`). Built on
- * first use so importing this module (the popup only needs
- * `validateJWKShape`) does no work.
- */
-let arweave: Arweave | undefined;
-
-function getArweave(): Arweave {
-  arweave ??= Arweave.init({});
-  return arweave;
-}
 
 const REQUIRED_JWK_FIELDS = ["kty", "e", "n", "d", "p", "q", "dp", "dq", "qi"] as const;
 
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /**
- * Generates a fresh RSA JWK keyfile. Callers are responsible for
- * encrypting the result into a `VaultEnvelope` before it touches any
- * storage — this function only produces plaintext key material.
- */
-export async function generateJWK(): Promise<JWKInterface> {
-  return getArweave().wallets.generate();
-}
-
-/**
  * Derives the Arweave address for a JWK. Deterministic: the same JWK
  * always yields the same address.
  */
 export async function deriveAddress(jwk: JWKInterface): Promise<string> {
-  return getArweave().wallets.jwkToAddress(jwk);
+  return addressFromOwner(jwk.n);
 }
 
 export type JWKValidationResult =

@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
@@ -6,6 +7,7 @@ import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/netw
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
 import { extensionPagesCsp } from './src/csp';
+import { DEV_SITE_HOSTS, SITE_ORIGIN } from './src/site-pages';
 
 // Only the sha, never a dirty-tree marker: two builds of one commit must
 // produce identical bytes for reproducible release builds.
@@ -21,7 +23,7 @@ function buildCommit(): string {
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
-  manifest: ({ command }) => ({
+  manifest: ({ command, mode }) => ({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
     name: 'Gleam',
@@ -44,12 +46,12 @@ export default defineConfig({
     optional_permissions: ['downloads'],
     // MV3 requires an explicit host permission for every origin the
     // background service worker fetches, unless that origin answers with
-    // CORS headers (the Gleam Points API does; see POINTS_API_URL). The
+    // CORS headers (the Gleam API does, price proxy included; see POINTS_API_URL). The
     // hosts fetched
     // unconditionally (Arweave gateway, the up.arweave.net bundler used
     // for uploads — a distinct host from arweave.net under MV3's exact
     // match-pattern rules, not covered by 'https://arweave.net/*' —
-    // CoinGecko, CoinPaprika, and the default
+    // and the default
     // HyperBEAM peers AO balance reads use out of the box, from
     // packages/core's
     // DEFAULT_HYPERBEAM_PEER_URLS) are known at build time and granted
@@ -70,18 +72,22 @@ export default defineConfig({
       ...new Set([
         'https://arweave.net/*',
         'https://up.arweave.net/*',
-        'https://api.coingecko.com/*',
-        'https://api.coinpaprika.com/*',
         ...DEFAULT_HYPERBEAM_PEER_URLS.map((url) => `${url}/*`),
         ...FALLBACK_GATEWAY_URLS.map((url) => `${url}/*`),
         ...GRAPHQL_FALLBACK_GATEWAYS.map((url) => `${url}/*`),
       ]),
     ],
     optional_host_permissions: ['https://*/*'],
-    // Lets the site's welcome page hand over a Gleam Points invite code
-    // (src/points-invite.ts). Only this origin can message the extension.
+    // Lets the site's pages hand over a Gleam Points invite code
+    // (src/points-invite.ts) or a scan attestation to sign
+    // (src/points-attest.ts). Only this origin can message the extension;
+    // a development build also lets a local copy of the site in
+    // (src/site-pages.ts's isSiteOrigin), on any port.
     externally_connectable: {
-      matches: ['https://gleamwallet.app/*'],
+      matches: [
+        `${SITE_ORIGIN}/*`,
+        ...(mode === 'development' ? DEV_SITE_HOSTS.map((host) => `http://${host}/*`) : []),
+      ],
     },
     // Required for content.ts's injectScript("/provider.js", ...) to
     // resolve at runtime — WXT does not add this automatically (see its
@@ -112,6 +118,9 @@ export default defineConfig({
       // and keystone/sign-request.ts use.
       nodePolyfills({ include: ['stream', 'events'] }),
     ],
+    resolve: {
+      alias: [{ find: /^function-bind$/, replacement: fileURLToPath(new URL('./src/shims/function-bind.cjs', import.meta.url)) }],
+    },
     build: {
       // Extension pages are same-origin and load in milliseconds; Vite's
       // <link modulepreload> injection for shared chunks (App.js,

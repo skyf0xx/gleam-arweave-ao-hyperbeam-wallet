@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getTokenBalance } from "./balance";
+import { getTokenBalance, readTokenBalance } from "./balance";
 
 function fakeFetch(body: unknown, ok = true, status = 200): typeof fetch {
   return vi.fn(async () => ({
@@ -97,5 +97,46 @@ describe("getTokenBalance", () => {
     const fetchImpl = fakeFetch(huge);
     const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
     expect(result.quantity).toBe(huge);
+  });
+});
+
+describe("readTokenBalance", () => {
+  const PID = "EuEkh8ZYkoPKXimgjre7W268XXX_qRn5vofc66oRTOw";
+  const GATEWAY = "https://arweave.net";
+  const SFC = "https://state.forward.computer";
+
+  function routed(answers: Record<string, () => Response>): { fetchImpl: typeof fetch; calls: string[] } {
+    const calls: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      const key = Object.keys(answers).find((prefix) => url.startsWith(prefix));
+      return key ? answers[key]!() : new Response("x", { status: 500 });
+    }) as typeof fetch;
+    return { fetchImpl, calls };
+  }
+
+  it("reads an L1 token from the gateway's HyperBEAM before the peer", async () => {
+    const { fetchImpl, calls } = routed({ [GATEWAY]: () => Response.json("1000000000000") });
+    const quantity = await readTokenBalance({ processId: PID, address: ADDRESS, transport: "l1", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl });
+    expect(quantity).toBe("1000000000000");
+    expect(calls).toEqual([`${GATEWAY}/${PID}~process@1.0/compute/balances/${ADDRESS}`]);
+  });
+
+  it("falls back from a 403ing peer to the CU dry-run for a legacy token", async () => {
+    const { fetchImpl, calls } = routed({
+      [SFC]: () => new Response("Forbidden", { status: 403 }),
+      "https://cu.ao-testnet.xyz/dry-run": () => Response.json({ Messages: [{ Data: "77", Tags: [] }] }),
+    });
+    const quantity = await readTokenBalance({ processId: PID, address: ADDRESS, transport: "mu", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl });
+    expect(quantity).toBe("77");
+    expect(calls.some((url) => new URL(url).origin === new URL(GATEWAY).origin)).toBe(false);
+  });
+
+  it("names every source and its status when none answers", async () => {
+    const { fetchImpl } = routed({ [SFC]: () => new Response("Forbidden", { status: 403 }) });
+    await expect(
+      readTokenBalance({ processId: PID, address: ADDRESS, transport: "l1", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl, label: "FODDER" }),
+    ).rejects.toThrow("Couldn't read your FODDER balance. Tried arweave.net (HTTP 500), state.forward.computer (HTTP 403).");
   });
 });

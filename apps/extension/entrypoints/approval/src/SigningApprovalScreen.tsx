@@ -2,18 +2,18 @@ import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { CollectibleThumbnail, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
-import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
+import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
+import { useAddressIdentity } from "@/src/address-identity";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../../popup/main-screen/src/formatWinston";
 
 /**
  * The highest-stakes screen in the product: recipient, amount, fee, a
  * decoded-data preview, tags, and a SHA-256 hash of the exact signing
  * payload with its own copy affordance, all shown before signing is
- * possible. Full addresses only, never truncated (`break-all`, not
- * `AddressDisplay`'s truncated variant). Never uses the beam as anything
+ * possible. Full addresses only, never truncated: addresses render in
+ * `MemorableAddress`'s chunked form with their avatar. Never uses the beam as anything
  * but the small identity mark, and never uses humor here — maximum
- * clarity, zero cleverness. The irreversible-tier `RiskNotice`/
+ * clarity, zero cleverness. The irreversible-tier `RecipientWarning`/
  * `destructive` Button pairing is the same one `RiskNotice`'s own doc
  * comment names as this screen's reason for existing as a single shared
  * component.
@@ -140,7 +140,17 @@ async function copyToClipboard(value: string): Promise<void> {
   }
 }
 
-export function SigningApprovalScreen({ origin, preview, assessment, onReject, onSign }: SigningApprovalScreenProps) {
+export function SigningApprovalScreen({
+  origin,
+  preview,
+  assessment,
+  onReject,
+  onSign,
+}: SigningApprovalScreenProps) {
+  const lookalikeOf = assessment?.lookalikeOf ?? null;
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const isTransfer = preview.recipient !== null;
@@ -191,14 +201,14 @@ export function SigningApprovalScreen({ origin, preview, assessment, onReject, o
               </span>
             </div>
 
-            <RiskNotice>
-              <strong className="font-bold">This can&apos;t be undone.</strong> Double-check the recipient
-              before signing.
-            </RiskNotice>
+            <RecipientWarning
+              firstTime={assessment?.firstTime ?? false}
+              lookalikeOf={lookalikeOf}
+              lookalikeAvatarSvg={lookalikeAvatarSvg}
+              emphasisPick={emphasisPick}
+            />
 
-            <RecipientWarning firstTime={assessment?.firstTime ?? false} lookalikeOf={assessment?.lookalikeOf} />
-
-            <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
+            <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
               <ReviewRow label="Network fee" value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
@@ -217,16 +227,14 @@ export function SigningApprovalScreen({ origin, preview, assessment, onReject, o
               ) : null}
             </div>
 
-            {irreversible ? (
-              <RiskNotice>
-                <strong className="font-bold">This can&apos;t be undone.</strong> Double-check the recipient
-                before signing.
-              </RiskNotice>
-            ) : null}
+            <RecipientWarning
+              firstTime={assessment?.firstTime ?? false}
+              lookalikeOf={lookalikeOf}
+              lookalikeAvatarSvg={lookalikeAvatarSvg}
+              emphasisPick={emphasisPick}
+            />
 
-            <RecipientWarning firstTime={assessment?.firstTime ?? false} lookalikeOf={assessment?.lookalikeOf} />
-
-            <AddrBlock label="Recipient" value={preview.recipient ?? ""} />
+            <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
               <ReviewRow label="Fee" value={formatFee(preview.fee)} />
@@ -312,6 +320,9 @@ function DataItemPreview({
   index: number;
   item: NonNullable<SigningApprovalPreview["items"]>[number];
 }) {
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const targetAvatarSvg = item.target ? identity.avatarSvg(item.target) : undefined;
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
       <span className="text-caption font-semibold text-foreground">Item {index + 1}</span>
@@ -319,7 +330,7 @@ function DataItemPreview({
       {item.target !== null ? (
         <div className="flex flex-col gap-0.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">Target</span>
-          <span className="break-all font-mono text-caption text-foreground">{item.target}</span>
+          <MemorableAddress address={item.target} emphasisPick={emphasisPick} avatarSvg={targetAvatarSvg} />
         </div>
       ) : null}
 
@@ -349,6 +360,28 @@ function DataItemPreview({
         <span className="text-caption font-semibold uppercase tracking-wide text-muted">Payload (SHA-256)</span>
         <span className="break-all font-mono text-[11px] text-foreground">{item.payloadHash}</span>
       </div>
+    </div>
+  );
+}
+
+function RecipientBlock({ address }: { address: string }) {
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const avatarSvg = identity.avatarSvg(address);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-caption font-semibold uppercase tracking-wide text-muted">Recipient</span>
+        <button
+          type="button"
+          aria-label="Copy recipient"
+          onClick={() => void copyToClipboard(address)}
+          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-muted"
+        >
+          <CopyIcon />
+        </button>
+      </div>
+      <RecipientCard address={address} avatarSvg={avatarSvg} emphasisPick={emphasisPick} tone="confirm" />
     </div>
   );
 }

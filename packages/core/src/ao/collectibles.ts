@@ -1,23 +1,9 @@
-import { postGraphQLWithFailover } from "../arweave/graphql";
 import type { Collectible } from "../models/collectible";
+import { classifyAsset, createAssetScanner, mapLimit, PROCESS_ID, tagMap, withRequestTimeout, type Tag } from "./asset-scan";
 import { getTokenBalance } from "./balance";
 
-interface Tag {
-  name: string;
-  value: string;
-}
-
-interface Node {
-  id: string;
-  recipient?: string | null;
-  tags: Tag[];
-}
-
-interface ConnectionResponse {
-  data?: { transactions?: { pageInfo?: { hasNextPage: boolean }; edges: Array<{ cursor: string; node: Node }> } };
-}
-
-export type AssetClass = "unique" | "fungible";
+export { classifyAsset } from "./asset-scan";
+export type { AssetClass } from "./asset-scan";
 
 export interface DiscoverCollectiblesOptions {
   address: string;
@@ -33,69 +19,14 @@ export interface DiscoverCollectiblesOptions {
   budgetMs?: number;
 }
 
-const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
-const PAGE_SIZE = 100;
-const REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULTS = { maxPages: 5, maxCandidates: 300, concurrency: 6, budgetMs: 60_000 };
-
-const SCAN_QUERY = `query ($first: Int!, $after: String, $owners: [String!], $tags: [TagFilter!]!) {
-  transactions(first: $first, after: $after, sort: HEIGHT_DESC, owners: $owners, tags: $tags) {
-    pageInfo { hasNextPage }
-    edges { cursor node { id recipient tags { name value } } }
-  }
-}`;
-
-const DESCRIPTOR_QUERY = `query ($ids: [ID!]!, $first: Int!) {
-  transactions(first: $first, ids: $ids) {
-    edges { cursor node { id tags { name value } } }
-  }
-}`;
-
-function tagMap(tags: Tag[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const tag of tags) {
-    if (typeof tag?.name === "string" && typeof tag.value === "string") out[tag.name.toLowerCase()] = tag.value;
-  }
-  return out;
-}
 
 function clean(value: string | undefined, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-/**
- * Classifies a process by its spawn tags. A "unique" is the NFT shape:
- * non-fungible style, denomination 0, supply 1 and the `ASSET` ticker.
- * Anything that isn't a token@1.0 process (or isn't tagged fungible or
- * unique) is rejected, so unrelated processes that merely received a
- * message never reach the balance check.
- */
-export function classifyAsset(tags: Tag[]): AssetClass | null {
-  const t = tagMap(tags);
-  if (t.device !== "process@1.0" || t["execution-device"] !== "token@1.0") return null;
-  const style = t["hint-ui-style"] ?? t["hint-style"] ?? t["asset-type"];
-  if (style === "non-fungible" && t.denomination === "0" && t["total-supply"] === "1" && t.ticker === "ASSET") {
-    return "unique";
-  }
-  return style === "fungible" ? "fungible" : null;
-}
-
 function shortenId(id: string): string {
   return id.length <= 10 ? id : `${id.slice(0, 5)}…${id.slice(-4)}`;
-}
-
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
-        const index = next++;
-        out[index] = await fn(items[index] as T);
-      }
-    }),
-  );
-  return out;
 }
 
 /**
@@ -116,56 +47,30 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
   const maxCandidates = options.maxCandidates ?? DEFAULTS.maxCandidates;
   const concurrency = options.concurrency ?? DEFAULTS.concurrency;
   const deadline = Date.now() + (options.budgetMs ?? DEFAULTS.budgetMs);
-  const baseFetch = options.fetchImpl ?? fetch;
-  const fetchImpl = ((input, init) =>
-    baseFetch(input, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })) as typeof fetch;
-  const describe = (gw: string, detail: string) => `Collectible lookup against "${gw}" failed: ${detail}`;
-
-  const query = async (q: string, variables: Record<string, unknown>) =>
-    (await postGraphQLWithFailover<ConnectionResponse>(gatewayUrl, q, variables, fetchImpl, describe)).data
-      ?.transactions;
-
-  const scan = async (tags: Array<{ name: string; values: string[] }>, owners?: string[], pick?: (node: Node) => string | null | undefined) => {
-    const ids: string[] = [];
-    let after: string | undefined;
-    for (let page = 0; page < maxPages && Date.now() < deadline; page++) {
-      const connection = await query(SCAN_QUERY, { first: PAGE_SIZE, after, owners, tags });
-      const edges = connection?.edges ?? [];
-      for (const { node } of edges) {
-        const id = pick ? pick(node) : node.id;
-        if (id && PROCESS_ID.test(id)) ids.push(id);
-      }
-      if (!connection?.pageInfo?.hasNextPage || edges.length === 0) break;
-      after = edges[edges.length - 1]?.cursor;
-    }
-    return ids;
-  };
+  const fetchImpl = withRequestTimeout(options.fetchImpl ?? fetch);
+  const { scan, fetchTags } = createAssetScanner({
+    gatewayUrl,
+    fetchImpl,
+    maxPages,
+    concurrency,
+    deadline,
+    describe: (gw, detail) => `Collectible lookup against "${gw}" failed: ${detail}`,
+  });
 
   const [initial, market, received] = await Promise.all([
-    scan([{ name: "initial-holder", values: [address] }]),
-    scan([{ name: "action", values: ["register-interest", "make-offer"] }], [address], (node) => node.recipient),
+    scan({ tags: [{ name: "initial-holder", values: [address] }] }),
+    scan({ tags: [{ name: "action", values: ["register-interest", "make-offer"] }], owners: [address] }, (node) => node.recipient),
     scan(
-      [
-        { name: "action", values: ["transfer"] },
-        { name: "recipient", values: [address] },
-      ],
-      undefined,
+      {
+        tags: [
+          { name: "action", values: ["transfer"] },
+          { name: "recipient", values: [address] },
+        ],
+      },
       (node) => node.recipient,
     ),
   ]);
   const candidates = [...new Set([...initial, ...market, ...received])].slice(0, maxCandidates);
-
-  const fetchTags = async (ids: string[]): Promise<Map<string, Tag[]>> => {
-    const batches: string[][] = [];
-    for (let i = 0; i < ids.length; i += PAGE_SIZE) batches.push(ids.slice(i, i + PAGE_SIZE));
-    const found = new Map<string, Tag[]>();
-    await mapLimit(batches, concurrency, async (batch) => {
-      if (Date.now() >= deadline) return;
-      const connection = await query(DESCRIPTOR_QUERY, { ids: batch, first: PAGE_SIZE });
-      for (const { node } of connection?.edges ?? []) found.set(node.id, node.tags);
-    });
-    return found;
-  };
 
   const descriptors = await fetchTags(candidates);
   const uniques = candidates.filter((id) => {

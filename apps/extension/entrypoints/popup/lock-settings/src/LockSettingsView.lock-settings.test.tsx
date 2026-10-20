@@ -130,8 +130,8 @@ describe("LockSettingsView security phrase section", () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("Set up a security phrase")).toBeTruthy());
-    fireEvent.click(screen.getByText("Set up a security phrase"));
+    await waitFor(() => expect(screen.getByText("Set up an anti-phishing phrase")).toBeTruthy());
+    fireEvent.click(screen.getByText("Set up an anti-phishing phrase"));
     fireEvent.change(screen.getByLabelText("Word"), { target: { value: "  " } });
 
     expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);

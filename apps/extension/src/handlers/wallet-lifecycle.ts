@@ -2,7 +2,6 @@ import {
   addressFromOwner,
   base64UrlToBytes,
   deriveAddress,
-  generateJWK,
   capabilitiesFor,
   isHardwareWalletMethod,
   keyfileFilename,
@@ -34,6 +33,7 @@ import {
   VaultKeys,
   zeroize,
   type EncryptOptions,
+  generateJWK,
 } from "@gleam/core/signer";
 import {
   cacheKey,
@@ -62,7 +62,7 @@ import {
  *   key material).
  * - `local:activeWalletId` — `string | null`.
  * - `local:lockSettings` — `LockSettings`, default `{ autoLockTimeout:
- *   "never" }`.
+ *   "1hr" }`.
  * - `local:themeSettings` — `ThemeSettings`, default `{ theme: "light" }`
  *   (no OS-driven default, light always wins when nothing is stored).
  * - `session:unlockedSession` — `Session`, routed to `chrome.storage.session`
@@ -997,20 +997,23 @@ export class WalletLifecycleHandler {
   }
 
   /**
-   * `getState` is called on every popup/sidepanel mount (`App.tsx`), which
-   * makes it the natural place to refresh `lastActivityAt` — "opened the
-   * extension and looked at it" counts as activity for auto-lock purposes,
-   * the same way Rabby's timeout resets on interaction rather than only on
-   * unlock. Refreshed only for a session `loadSession` didn't just expire.
+   * Reads the wallets and session. Only `recordActivity` refreshes
+   * `lastActivityAt`, and only the extension pages' own messages pass it
+   * (popup and side panel mounts, and the user's answer in an approval
+   * window, which a site opens and so doesn't count by loading): a connected
+   * site's reads and background housekeeping also call this, and counting
+   * those would let a polling page keep the vault unlocked past auto-lock.
+   * Refreshed only for a session `loadSession` didn't just expire.
    */
-  async getState(): Promise<WalletState> {
+  async getState({ recordActivity = false }: { recordActivity?: boolean } = {}): Promise<WalletState> {
     return withSessionLock(async () => {
       const wallets = await loadWallets(this.storage);
       const activeWalletId = await loadActiveWalletId(this.storage, wallets);
-      const session = await loadSession(this.storage, wallets);
+      let session = await loadSession(this.storage, wallets);
 
-      if (session !== null) {
-        await saveSession(this.storage, { ...session, lastActivityAt: Date.now() });
+      if (session !== null && recordActivity) {
+        session = { ...session, lastActivityAt: Date.now() };
+        await saveSession(this.storage, session);
       }
 
       return {

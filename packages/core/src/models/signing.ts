@@ -39,11 +39,10 @@ export interface SignRequest {
 }
 
 /**
- * A signed transaction as arweave-js's `Transaction.toJSON()` shows it,
- * without `data`: the dApp already holds the data, and arweave-js's
- * `transactions.sign` copies only `id`, `owner`, `reward`, `tags` and
- * `signature` back onto its own transaction. `tags` are base64url-encoded,
- * the way arweave-js stores them.
+ * A signed transaction as arweave-js's `Transaction.toJSON()` shows it.
+ * `data` is included even though arweave-js's `transactions.sign` ignores
+ * it: some dApps POST the result straight to `/tx`, and the node rejects
+ * a transaction JSON with no `data` key. `tags` and `data` are base64url.
  */
 export interface SignedTransaction {
   format: number;
@@ -53,6 +52,7 @@ export interface SignedTransaction {
   tags: UploadTag[];
   target: string;
   quantity: string;
+  data: string;
   data_size: string;
   data_root: string;
   reward: string;

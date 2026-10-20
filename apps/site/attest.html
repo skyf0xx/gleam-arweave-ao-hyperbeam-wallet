@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <title>Sign your Gleam scan</title>
+  <meta name="description" content="Review your scan's attestation and sign it with Gleam.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="scan.css">
+  <script type="module" src="attest.js"></script>
+</head>
+
+<body class="scan-page">
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+    </div>
+  </header>
+
+  <main class="wrap sc sc-narrow">
+    <div class="beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <h1 class="heading" data-title>Sign your scan</h1>
+
+    <div data-review hidden>
+      <p class="line">Check the summary, then sign it with Gleam. Gleam opens its own window to confirm.</p>
+
+      <dl class="facts">
+        <div><dt>Release</dt><dd data-f-release></dd></div>
+        <div><dt>Model</dt><dd data-f-model></dd></div>
+        <div><dt>Result</dt><dd data-f-result></dd></div>
+        <div><dt>Commit</dt><dd class="sc-mono" data-f-commit></dd></div>
+      </dl>
+
+      <details class="sc-more" open>
+        <summary>Report</summary>
+        <pre class="report" data-f-report></pre>
+      </details>
+      <details class="sc-more">
+        <summary data-f-answers-summary>Challenge answers</summary>
+        <ol class="answers" data-f-answers></ol>
+      </details>
+
+      <div class="sign">
+        <button class="button" type="button" data-sign>Sign with Gleam</button>
+        <p class="small">Your wallet signs one message. The agent never touches a key, and nothing is sent until you
+          approve in Gleam.</p>
+      </div>
+    </div>
+
+    <div class="result" data-result hidden role="status" aria-live="polite" tabindex="-1">
+      <p class="result-message" data-result-message></p>
+      <p class="result-action">
+        <a class="button" data-result-link hidden></a>
+      </p>
+      <p class="small" data-result-help hidden></p>
+    </div>
+
+    <p class="small sc-note" data-footnote hidden>This link carries the attestation in the part after the #, which your
+      browser never sends to a server.</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="scan.html">Community scans</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+
+</html>

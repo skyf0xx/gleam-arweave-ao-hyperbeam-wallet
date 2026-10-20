@@ -2,15 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort, TokenBalance } from "@gleam/core";
-import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { NetworkErrorBanner, SkeletonRow, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 
 /**
- * Reached from Settings; AR/AO themselves aren't listed here since they're
- * always shown on the main screen regardless of the watch list and can't
- * be removed.
+ * Reached from Settings. AR and AO aren't listed: they can't be removed,
+ * only hidden on the main screen. Tokens the wallet has received show
+ * up on their own ("Found in your wallet") and can be hidden; adding by id
+ * is for a token the wallet hasn't received yet.
  */
 export interface ManageTokensViewProps {
   runtime: RuntimePort;
@@ -18,8 +19,11 @@ export interface ManageTokensViewProps {
   onBack: () => void;
 }
 
+const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
+
 interface LoadState {
   processIds: string[];
+  discovered: TokenBalance[];
   balances: Map<string, TokenBalance>;
   loading: boolean;
   error: string | null;
@@ -27,7 +31,13 @@ interface LoadState {
 
 export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewProps) {
   const queryClient = useQueryClient();
-  const [state, setState] = useState<LoadState>({ processIds: [], balances: new Map(), loading: true, error: null });
+  const [state, setState] = useState<LoadState>({
+    processIds: [],
+    discovered: [],
+    balances: new Map(),
+    loading: true,
+    error: null,
+  });
   const [newProcessId, setNewProcessId] = useState("");
   const [preview, setPreview] = useState<TokenBalance | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -43,7 +53,8 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
         runtime.send<{ address: string }, TokenBalance[]>({ type: "getTokenBalances", payload: { address } }),
       ]);
       const balances = new Map(tokenBalances.map((balance) => [balance.processId, balance]));
-      setState({ processIds, balances, loading: false, error: null });
+      const discovered = tokenBalances.filter((balance) => balance.source === "discovered");
+      setState({ processIds, discovered, balances, loading: false, error: null });
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -64,10 +75,16 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
   const handlePreview = async () => {
     const processId = newProcessId.trim();
     if (processId.length === 0) {
-      setAddError("Enter a process id.");
+      setAddError("Paste a token's process id.");
       return;
     }
-    if (state.processIds.includes(processId)) {
+    if (!PROCESS_ID.test(processId)) {
+      setAddError(
+        `A process id is 43 letters, digits, - and _ (this is ${processId.length}). Copy the whole id from the token's page or explorer.`,
+      );
+      return;
+    }
+    if (state.processIds.includes(processId) || state.discovered.some((token) => token.processId === processId)) {
       setAddError("That token is already in your list.");
       return;
     }
@@ -118,7 +135,11 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
         type: "removeWatchedToken",
         payload: { address, processId },
       });
-      setState((prev) => ({ ...prev, processIds: prev.processIds.filter((id) => id !== processId) }));
+      setState((prev) => ({
+        ...prev,
+        processIds: prev.processIds.filter((id) => id !== processId),
+        discovered: prev.discovered.filter((token) => token.processId !== processId),
+      }));
       invalidateBalances();
       if (preview?.processId === processId) setPreview(null);
     } catch (error) {
@@ -146,13 +167,16 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               </>
             ) : state.processIds.length === 0 ? (
               <p className="py-3.5 text-caption text-faint">
-                No extra tokens added yet. AR and AO always show on the main screen.
+                No extra tokens added yet.
               </p>
             ) : (
               state.processIds.map((processId) => {
                 const balance = state.balances.get(processId);
                 return (
                   <div key={processId} className="flex items-center gap-2.5 py-3.5">
+                    {balance?.logoUrl ? (
+                      <TokenGlyph label={balance.ticker.slice(0, 2).toUpperCase()} tone={2} logoUrl={balance.logoUrl} />
+                    ) : null}
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-label font-semibold text-foreground">
                         {balance?.ticker ?? "Unavailable"}
@@ -160,7 +184,10 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                       <span className="truncate font-mono text-caption text-muted">{truncateAddress(processId, 6)}</span>
                     </span>
                     {balance ? (
-                      <span className="flex-shrink-0 font-mono text-label text-muted">
+                      <span
+                        className="flex-shrink-0 font-mono text-label text-muted"
+                        title={balance.available === false ? balance.unavailableReason : undefined}
+                      >
                         {balance.available === false ? "Unavailable" : formatAtomicAsDisplay(balance.quantity, balance.denomination)}
                       </span>
                     ) : null}
@@ -179,6 +206,37 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
             )}
           </div>
         </div>
+
+        {state.discovered.length > 0 ? (
+          <div className="pt-10">
+            <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+              Found in your wallet
+            </div>
+            {state.discovered.map((token) => (
+              <div key={token.processId} className="flex items-center gap-2.5 py-3.5">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-label font-semibold text-foreground">{token.ticker}</span>
+                  <span className="truncate font-mono text-caption text-muted">{truncateAddress(token.processId, 6)}</span>
+                </span>
+                <span className="flex-shrink-0 font-mono text-label text-muted">
+                  {formatAtomicAsDisplay(token.quantity, token.denomination)}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Ignore ${token.ticker}`}
+                  disabled={removingId === token.processId}
+                  onClick={() => void handleRemove(token.processId)}
+                  className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
+                >
+                  <RemoveIcon />
+                </button>
+              </div>
+            ))}
+            <p className="pt-1 text-caption leading-relaxed text-faint">
+              Anyone can send you a token, so these aren&apos;t vetted and are never priced. Ignore one you don&apos;t want.
+            </p>
+          </div>
+        ) : null}
 
         <div className="pt-10">
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
@@ -204,11 +262,29 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
             ) : null}
             {previewing ? <SkeletonRow /> : null}
             {preview ? (
-              <div className="flex items-center justify-between py-1">
-                <span className="text-label font-semibold text-foreground">{preview.ticker}</span>
-                <span className="font-mono text-label text-muted">
-                  {preview.available === false ? "Unavailable" : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
-                </span>
+              <div className="flex flex-col gap-1 py-1">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2.5 text-label font-semibold text-foreground">
+                    {preview.logoUrl ? (
+                      <TokenGlyph label={preview.ticker.slice(0, 2).toUpperCase()} tone={2} logoUrl={preview.logoUrl} />
+                    ) : null}
+                    <span>
+                      {preview.ticker}
+                      {preview.name && preview.name !== preview.ticker ? (
+                        <span className="font-normal text-muted"> · {preview.name}</span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="font-mono text-label text-muted">
+                    {preview.available === false ? "Unavailable" : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
+                  </span>
+                </div>
+                {preview.available === false ? (
+                  <span className="text-caption leading-snug text-muted">
+                    {preview.unavailableReason ?? "Its balance can't be read right now."} You can still add it; the
+                    balance shows once it can be read.
+                  </span>
+                ) : null}
               </div>
             ) : null}
             <button
@@ -222,7 +298,8 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
             </button>
           </div>
           <p className="pt-2.5 text-caption leading-relaxed text-faint">
-            Enter a process id to preview its ticker and balance, then add it to your token list.
+            Tokens you receive show up on their own. To watch one you haven&apos;t received yet, paste its process id,
+            check the preview, then add it. Adding a hidden token by id brings it back.
           </p>
         </div>
       </div>

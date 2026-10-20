@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { queryTokenMetadata } from "./token-metadata";
+import { queryTokenMetadata, tokenLogoUrl, tokenMetadataFromTags } from "./token-metadata";
 
 const PROCESS_ID = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
 
@@ -32,6 +32,8 @@ describe("queryTokenMetadata", () => {
 
     expect(metadata).toEqual({
       processId: PROCESS_ID,
+      transport: "mu",
+      assetClass: null,
       denomination: 6,
       ticker: "wUSDC",
       name: "Legacy wUSDC",
@@ -111,5 +113,45 @@ describe("queryTokenMetadata", () => {
     const fetchImpl = fakeGraphQLFetch([edge([{ name: "denomination", value: "not-a-number" }])]);
     const metadata = await queryTokenMetadata(PROCESS_ID, "https://arweave.net", fetchImpl);
     expect(metadata.denomination).toBeNull();
+  });
+});
+
+describe("tokenLogoUrl", () => {
+  const LOGO = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
+
+  it("serves a transaction-id logo from the gateway's own origin", () => {
+    expect(tokenLogoUrl("https://arweave.net/", LOGO)).toBe(`https://arweave.net/${LOGO}`);
+    expect(tokenLogoUrl("https://g.example/some/path", LOGO)).toBe(`https://g.example/${LOGO}`);
+  });
+
+  it("refuses anything that is not a transaction id, and any non-https gateway", () => {
+    for (const logo of [null, "", "https://evil.example/x.png", "data:image/png;base64,AAAA", `${LOGO}/../x`, LOGO.slice(1)]) {
+      expect(tokenLogoUrl("https://arweave.net", logo)).toBeNull();
+    }
+    expect(tokenLogoUrl("http://arweave.net", LOGO)).toBeNull();
+    expect(tokenLogoUrl("not a url", LOGO)).toBeNull();
+  });
+});
+
+describe("tokenMetadataFromTags", () => {
+  it("routes an arweave-scheduler@1.0 fungible token over L1", () => {
+    const metadata = tokenMetadataFromTags("EuEkh8ZYkoPKXimgjre7W268XXX_qRn5vofc66oRTOw", [
+      { name: "device", value: "process@1.0" },
+      { name: "execution-device", value: "token@1.0" },
+      { name: "scheduler-device", value: "arweave-scheduler@1.0" },
+      { name: "hint-ui-style", value: "fungible" },
+      { name: "ticker", value: "FODDER" },
+      { name: "denomination", value: "12" },
+    ]);
+    expect(metadata).toMatchObject({ transport: "l1", assetClass: "fungible", ticker: "FODDER", denomination: 12 });
+  });
+
+  it("routes a legacynet aos process through the MU", () => {
+    const metadata = tokenMetadataFromTags("xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQD6dh10", [
+      { name: "Data-Protocol", value: "ao" },
+      { name: "Type", value: "Process" },
+      { name: "Name", value: "artoken" },
+    ]);
+    expect(metadata).toMatchObject({ transport: "mu", assetClass: null, ticker: null, name: "artoken" });
   });
 });

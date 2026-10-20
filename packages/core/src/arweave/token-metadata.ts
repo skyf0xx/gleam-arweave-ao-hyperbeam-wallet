@@ -1,4 +1,5 @@
-import type { TokenMetadata } from "../models/token-metadata";
+import { classifyAsset } from "../ao/asset-scan";
+import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
@@ -16,6 +17,24 @@ interface GraphQLTransactionsByIdResponse {
     };
   };
   errors?: Array<{ message: string }>;
+}
+
+const LOGO_TX_ID = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Where to load a token's logo from: the `logo` tag is an Arweave
+ * transaction id, served by the user's own https gateway. Anything else
+ * (a URL, a data URI, a malformed id) is the token's attempt to point the
+ * popup somewhere else, so it yields `null`.
+ */
+export function tokenLogoUrl(gatewayUrl: string, logo: string | null): string | null {
+  if (logo === null || !LOGO_TX_ID.test(logo)) return null;
+  try {
+    const gateway = new URL(gatewayUrl);
+    return gateway.protocol === "https:" ? `${gateway.origin}/${logo}` : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -79,10 +98,16 @@ export async function queryTokenMetadata(
     );
   }
 
-  return toTokenMetadata(processId, edge.node.tags);
+  return tokenMetadataFromTags(processId, edge.node.tags);
 }
 
-function toTokenMetadata(processId: string, tags: GraphQLTag[]): TokenMetadata {
+/** `arweave-scheduler@1.0` is the one scheduler that takes messages as L1 transactions. */
+export function transportFromTags(tags: GraphQLTag[]): TokenTransport {
+  const scheduler = tags.find((tag) => tag.name.toLowerCase() === "scheduler-device")?.value;
+  return scheduler === "arweave-scheduler@1.0" ? "l1" : "mu";
+}
+
+export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): TokenMetadata {
   const tagValue = (name: string): string | null =>
     tags.find((tag) => tag.name.toLowerCase() === name)?.value ?? null;
 
@@ -92,6 +117,8 @@ function toTokenMetadata(processId: string, tags: GraphQLTag[]): TokenMetadata {
 
   return {
     processId,
+    transport: transportFromTags(tags),
+    assetClass: classifyAsset(tags),
     denomination,
     ticker: tagValue("ticker"),
     name: tagValue("name"),

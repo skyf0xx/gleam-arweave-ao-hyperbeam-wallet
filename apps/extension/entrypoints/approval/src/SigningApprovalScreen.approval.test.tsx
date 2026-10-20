@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
+import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
 afterEach(() => {
@@ -96,7 +97,7 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     );
     expect(screen.getByText("Beam #1")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
-    expect(screen.getByText(TRANSFER_PREVIEW.recipient!)).toBeTruthy();
+    expect(screen.getByText(addressText(TRANSFER_PREVIEW.recipient!))).toBeTruthy();
     expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
     expect(screen.queryByText("Total")).toBeNull();
   });
@@ -106,7 +107,7 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
     );
 
-    expect(screen.getByText(TRANSFER_PREVIEW.recipient!)).toBeTruthy();
+    expect(screen.getByText(addressText(TRANSFER_PREVIEW.recipient!))).toBeTruthy();
   });
 
   it("shows the signing payload hash with its own copy affordance", () => {
@@ -230,7 +231,7 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.getByText(/"Action":"Transfer"/)).toBeTruthy();
     expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
     expect(screen.getByText("Notify")).toBeTruthy();
-    expect(screen.getByText(BATCH_PREVIEW.items![1]!.target!)).toBeTruthy();
+    expect(screen.getByText(addressText(BATCH_PREVIEW.items![1]!.target!))).toBeTruthy();
   });
 
   it("batchSignDataItem shows the item count in the heading and the sign action", () => {
@@ -286,7 +287,7 @@ describe("SigningApprovalScreen: a send from the wallet itself", () => {
 
     expect(screen.getByText("Gleam")).toBeTruthy();
     expect(screen.getAllByText("Send").length).toBeGreaterThan(0);
-    expect(screen.getByText(WALLET_SEND_PREVIEW.recipient!)).toBeTruthy();
+    expect(screen.getByText(addressText(WALLET_SEND_PREVIEW.recipient!))).toBeTruthy();
     expect(screen.getByText("Fee")).toBeTruthy();
     expect(screen.queryByText("Decoded data")).toBeNull();
     expect(screen.queryByText("Tags")).toBeNull();
@@ -313,13 +314,22 @@ describe("SigningApprovalScreen recipient warnings", () => {
   it("names the address a lookalike recipient imitates", () => {
     renderWith({ firstTime: true, lookalikeOf: known });
     expect(screen.getByText(/looks like one you know/)).toBeTruthy();
-    expect(screen.getByText(known)).toBeTruthy();
+    expect(screen.getByText(addressText(known))).toBeTruthy();
     expect(screen.getByRole("button", { name: /sign and send/i }).hasAttribute("disabled")).toBe(false);
   });
 
   it("flags a first-time recipient", () => {
     renderWith({ firstTime: true, lookalikeOf: null });
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
+  });
+
+  it("folds every reason into one notice that says \"can't be undone\" once", () => {
+    renderWith({ firstTime: true, lookalikeOf: known });
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    const text = screen.getByRole("alert").textContent ?? "";
+    expect(text.match(/can't be undone/gi)).toHaveLength(1);
+    expect(text).toMatch(/haven't sent to this address before/);
+    expect(text).toMatch(/looks like one you know/);
   });
 
   it("shows no recipient warning for a known recipient", () => {

@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["**/*.{test,spec}.{ts,tsx}"],
-    exclude: ["**/node_modules/**", "**/.output/**", "**/.wxt/**"],
+    exclude: ["**/node_modules/**", "**/.output/**", "**/.wxt/**", "**/.claude/worktrees/**"],
     setupFiles: ["./vitest.setup.ts"],
     // Each points-api test file boots PGlite (~3s, more on a busy machine).
     // PGlite's clone() boots a fresh WASM instance too, so it saves nothing.

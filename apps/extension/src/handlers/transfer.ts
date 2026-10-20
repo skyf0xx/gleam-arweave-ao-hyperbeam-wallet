@@ -8,6 +8,7 @@ import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import { signTransactionWithSigner, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
 import { assertCoversNetworkFee, prepareCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
+import { prepareL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import {
   finishTransfer as finishAoTransfer,
   prepareTransfer as prepareAoTransfer,
@@ -27,6 +28,7 @@ import {
   type NetworkSettings,
   type Signer,
   type StoragePort,
+  type TokenTransport,
   type TransferDraft,
   type UnsignedPayload,
   type Wallet,
@@ -104,12 +106,27 @@ export interface CollectibleCache {
   forgetCollectible(req: { address: string; id: string }): Promise<void>;
 }
 
+/** Where a token's transfers go; `ReadsHandler` behind the scenes, which caches it with the token's metadata. */
+export interface TokenRoutes {
+  tokenTransport(req: { processId: string }): Promise<TokenTransport>;
+}
+
 export class TransferHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly approvals?: DeviceTransferApprovals,
     private readonly collectibles?: CollectibleCache,
+    private readonly tokens?: TokenRoutes,
   ) {}
+
+  /**
+   * `"l1"` for an `arweave-scheduler@1.0` token, which takes a transfer as
+   * an L1 transaction; `"mu"` for a legacy token, or AR.
+   */
+  private async transportOf(req: TransferDraft): Promise<TokenTransport> {
+    if (req.collectible || req.token === null || !this.tokens) return "mu";
+    return this.tokens.tokenTransport({ processId: req.token });
+  }
 
   private async loadNetworkSettings(): Promise<NetworkSettings> {
     const raw = await this.storage.get<unknown>(NETWORK_SETTINGS_KEY);
@@ -176,7 +193,14 @@ export class TransferHandler {
     const { firstSeenRecipient, lookalikeOf } = await this.checkRecipient(settings, wallet.address, req.recipient);
 
     if (req.token !== null) {
-      return { fee: null, firstSeenRecipient, lookalikeOf };
+      if ((await this.transportOf(req)) === "mu") return { fee: null, firstSeenRecipient, lookalikeOf };
+      // An L1 token transfer costs an AR network reward, like a collectible send.
+      const [{ fee }, balance] = await Promise.all([
+        estimateFee(settings.gatewayUrl, req.token),
+        getArBalance(wallet.address, settings.gatewayUrl),
+      ]);
+      assertCoversNetworkFee(balance, fee);
+      return { fee, firstSeenRecipient, lookalikeOf };
     }
 
     const { fee } = await estimateFee(settings.gatewayUrl, req.recipient);
@@ -285,6 +309,19 @@ export class TransferHandler {
     return transaction;
   }
 
+  /** Builds an L1 token transfer and checks the wallet's AR covers its reward, before anything is signed. */
+  private async prepareL1TokenSend(req: SubmitTransferRequest, ownerB64Url: string): Promise<ArweaveTransactionJson> {
+    if (req.token === null) throw new Error("Not a token send.");
+    const settings = await this.loadNetworkSettings();
+    const wallet = await this.loadWallet(req.walletId);
+    const [transaction, balance] = await Promise.all([
+      prepareL1TokenTransfer(settings.gatewayUrl, ownerB64Url, req.token, req.recipient, req.amount),
+      getArBalance(wallet.address, settings.gatewayUrl),
+    ]);
+    assertCoversNetworkFee(balance, transaction.reward);
+    return transaction;
+  }
+
   /**
    * Writes an optimistic `ActivityEntry` immediately after a successful
    * submit, before gateway/network confirmation — the entry is written
@@ -300,15 +337,18 @@ export class TransferHandler {
    */
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
     const method = await getWalletMethod(req.walletId);
-    // An AO send is a data item, which not every hardware wallet can sign.
-    // A collectible send is an L1 transaction.
+    const transport = await this.transportOf(req);
+    // A legacy AO send is a data item, which not every hardware wallet can
+    // sign. A collectible or L1 token send is an L1 transaction.
     const refusal =
       method === null
         ? null
         : req.collectible
           ? capabilityRefusal(method, "signTransaction", "send collectibles")
           : req.token !== null
-            ? capabilityRefusal(method, "signDataItem", "send AO tokens")
+            ? transport === "l1"
+              ? capabilityRefusal(method, "signTransaction", "send this token")
+              : capabilityRefusal(method, "signDataItem", "send AO tokens")
             : null;
     if (refusal) throw new Error(refusal);
     if (method !== null && isHardwareWalletMethod(method)) {
@@ -332,6 +372,14 @@ export class TransferHandler {
         ));
       } else if (req.token === null) {
         ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, signer, req.recipient, req.amount));
+      } else if (transport === "l1") {
+        const unsigned = await this.prepareL1TokenSend(req, signer.owner);
+        ({ txId } = await finishArweaveTransfer(
+          settings.gatewayUrl,
+          unsigned,
+          await signTransactionWithSigner(unsigned, signer),
+          signer.owner,
+        ));
       } else {
         const { messageId } = await submitAoTransfer(signer, req.token, req.recipient, req.amount);
         txId = messageId;
@@ -376,6 +424,9 @@ export class TransferHandler {
       const settings = await this.loadNetworkSettings();
       const transaction = await prepareArweaveTransfer(settings.gatewayUrl, ownerB64Url, req.recipient, req.amount);
       return { kind: "transaction", transaction };
+    }
+    if ((await this.transportOf(req)) === "l1") {
+      return { kind: "transaction", transaction: await this.prepareL1TokenSend(req, ownerB64Url) };
     }
     return { kind: "dataItem", raw: prepareAoTransfer(ownerB64Url, req.token, req.recipient, req.amount) };
   }

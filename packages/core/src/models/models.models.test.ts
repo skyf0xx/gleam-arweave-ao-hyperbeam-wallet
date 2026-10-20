@@ -243,6 +243,8 @@ describe("domain model shapes", () => {
   it("a TokenMetadata carries every spawn-tag-derived field for an unregistered AO token", () => {
     const metadata: TokenMetadata = {
       processId: "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY",
+      transport: "l1",
+      assetClass: "fungible",
       denomination: 6,
       ticker: "wUSDC",
       name: "Legacy wUSDC",
@@ -257,6 +259,8 @@ describe("domain model shapes", () => {
   it("a TokenMetadata field the spawn tags didn't carry is null, never a fabricated default", () => {
     const metadata: TokenMetadata = {
       processId: "some-process-id",
+      transport: "mu",
+      assetClass: null,
       denomination: null,
       ticker: null,
       name: null,

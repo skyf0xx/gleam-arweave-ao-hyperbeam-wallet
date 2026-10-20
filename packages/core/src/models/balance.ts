@@ -32,4 +32,18 @@ export interface TokenBalance {
    * with a confirmed denomination.
    */
   available?: boolean;
+  /** Why `available` is `false`, in words the popup can show as-is. */
+  unavailableReason?: string;
+  /**
+   * `"discovered"` for a token found from the wallet's own on-chain
+   * history rather than added by hand. Such a row can be hidden, and is
+   * never priced.
+   */
+  source?: "default" | "watched" | "discovered";
+  /**
+   * The token's logo on the user's gateway (`tokenLogoUrl`), or `null` when
+   * it has none or it isn't a valid transaction id. Never set for a
+   * discovered token: its logo, like its ticker, is the sender's claim.
+   */
+  logoUrl?: string | null;
 }

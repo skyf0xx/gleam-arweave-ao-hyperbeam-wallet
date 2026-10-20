@@ -20,20 +20,30 @@ function entry(overrides: Partial<ActivityEntry>): ActivityEntry {
 }
 
 describe("isLookalike", () => {
+  const REAL = "weY8dOVhGi9BhGV3B-pkKVWA1ox_n8gzSKOHOJ14uFk";
+
   it("matches the same first 4 and last 4 with a different middle", () => {
     expect(isLookalike(POISON, FRIEND)).toBe(true);
   });
   it("is false for the identical address", () => {
     expect(isLookalike(FRIEND, FRIEND)).toBe(false);
   });
-  it("is false when only the start matches", () => {
-    expect(isLookalike("AbcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYzzzz", FRIEND)).toBe(false);
+  it("matches when only the start matches", () => {
+    expect(isLookalike("AbcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYzzzz", FRIEND)).toBe(true);
   });
-  it("is false when only the end matches", () => {
-    expect(isLookalike("ZZZZYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYwxyz", FRIEND)).toBe(false);
+  it("matches when only the end matches", () => {
+    expect(isLookalike("ZZZZYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYwxyz", FRIEND)).toBe(true);
+  });
+  it("matches a one-character change at either end or in the middle", () => {
+    expect(isLookalike(`${REAL.slice(0, -1)}d`, REAL)).toBe(true);
+    expect(isLookalike(`X${REAL.slice(1)}`, REAL)).toBe(true);
+    expect(isLookalike(`${REAL.slice(0, 20)}Q${REAL.slice(21)}`, REAL)).toBe(true);
+  });
+  it("is false for an unrelated address", () => {
+    expect(isLookalike("FTYahWI3m13z-Ms9mStWjDnqUB-d3jHJqMP_bKrKhHs", REAL)).toBe(false);
   });
   it("is case sensitive", () => {
-    expect(isLookalike("abcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYwxyz", FRIEND)).toBe(false);
+    expect(isLookalike("abcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYWXYZ", FRIEND)).toBe(false);
   });
   it("ignores strings too short to have distinct edges", () => {
     expect(isLookalike("abcdwxyz", "abcdQwxyz")).toBe(false);

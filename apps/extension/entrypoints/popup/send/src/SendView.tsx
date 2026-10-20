@@ -3,7 +3,8 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { EmptyState, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { useAddressIdentity } from "@/src/address-identity";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { AddressRow } from "../../activity/src/AddressRow";
@@ -15,6 +16,7 @@ import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
 import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
+import { useLookalikeOf } from "./useLookalikeOf";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -196,6 +198,15 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const ownWalletFor = (address: string): WalletSummary | undefined =>
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
+  const knownNameFor = (address: string): string | undefined => (contactFor(address) ?? ownWalletFor(address))?.name;
+  const { emphasisPick } = useAddressIdentity();
+  const lookalikeOf = useLookalikeOf(
+    runtime,
+    wallet,
+    step.kind === "compose" ? step.recipient : "",
+    contactsQuery.data ?? [],
+    otherWalletsQuery.data ?? [],
+  );
 
   if (step.kind === "compose") {
     const handleContinue = async () => {
@@ -291,6 +302,9 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         balancesQuery={balancesQuery}
         arFeeAtomic={arFeeQuery.data}
         step={step}
+        knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
+        emphasisPick={emphasisPick}
+        lookalikeOf={lookalikeOf}
         onBack={onBack}
         onChange={(patch) =>
           setStep({
@@ -406,6 +420,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         step={step}
         contact={contactFor(step.recipient)}
         ownWallet={ownWalletFor(step.recipient)}
+        emphasisPick={emphasisPick}
         signsOnDevice={isHardwareWalletMethod(wallet.method)}
         onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient })}
         onSign={() => void handleSign()}
@@ -431,6 +446,9 @@ function ComposeStep({
   balancesQuery,
   arFeeAtomic,
   step,
+  knownName,
+  emphasisPick,
+  lookalikeOf,
   onBack,
   onChange,
   onBlurRecipient,
@@ -449,6 +467,9 @@ function ComposeStep({
   balancesQuery: UseQueryResult<WalletBalances>;
   arFeeAtomic: string | undefined;
   step: Extract<Step, { kind: "compose" }>;
+  knownName: string | undefined;
+  emphasisPick: number | null;
+  lookalikeOf: string | null;
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
   onBlurRecipient: () => void;
@@ -500,6 +521,9 @@ function ComposeStep({
         <RecipientField
           recipient={step.recipient}
           recipientError={step.recipientError}
+          knownName={knownName}
+          emphasisPick={emphasisPick}
+          lookalikeOf={lookalikeOf}
           onChangeRecipient={(recipient) => onChange({ recipient })}
           onBlurRecipient={onBlurRecipient}
           onOpenSavedAddresses={onOpenSavedAddresses}
@@ -574,10 +598,19 @@ function ComposeStep({
   );
 }
 
-/** The "To" field: address input, the saved-addresses link and the quiet "Save this address" line. */
+/**
+ * The "To" field: address input, the saved-addresses link and the quiet
+ * "Save this address" line. Once a valid address loses focus, the input
+ * gives way to a card with the address's avatar and chunked form, so it
+ * can be checked at a glance before Continue. "Change" brings the input
+ * back.
+ */
 export function RecipientField({
   recipient,
   recipientError,
+  knownName,
+  emphasisPick,
+  lookalikeOf,
   onChangeRecipient,
   onBlurRecipient,
   onOpenSavedAddresses,
@@ -591,6 +624,11 @@ export function RecipientField({
 }: {
   recipient: string;
   recipientError: string | undefined;
+  /** The saved contact's or own wallet's name for `recipient`, if it is one. */
+  knownName: string | undefined;
+  emphasisPick: number | null;
+  /** A trusted address this one imitates, warned about while still composing. */
+  lookalikeOf: string | null;
   onChangeRecipient: (recipient: string) => void;
   onBlurRecipient: () => void;
   onOpenSavedAddresses: () => void;
@@ -603,6 +641,12 @@ export function RecipientField({
   onConfirmSaveAddress: () => void;
   savingAddress: boolean;
 }) {
+  const [editing, setEditing] = useState<"no" | "focused" | "refocus">("no");
+  const address = recipientSchema.safeParse(recipient).data;
+  const identity = useAddressIdentity();
+  const avatarSvg = address ? identity.avatarSvg(address) : undefined;
+  const showCard = editing === "no" && !recipientError && address !== undefined && avatarSvg !== undefined;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -615,20 +659,45 @@ export function RecipientField({
           Saved addresses
         </button>
       </div>
-      <textarea
-        rows={2}
-        value={recipient}
-        onChange={(event) => onChangeRecipient(event.target.value)}
-        onBlur={onBlurRecipient}
-        placeholder="Paste an address"
-        className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
-      />
+      {showCard ? (
+        <RecipientCard
+          address={address}
+          name={knownName ?? null}
+          avatarSvg={avatarSvg}
+          emphasisPick={emphasisPick}
+          onEdit={() => setEditing("refocus")}
+        />
+      ) : (
+        <textarea
+          rows={2}
+          aria-label="Recipient address"
+          autoFocus={editing === "refocus"}
+          value={recipient}
+          onChange={(event) => onChangeRecipient(event.target.value)}
+          onFocus={() => setEditing("focused")}
+          onBlur={() => {
+            setEditing("no");
+            onBlurRecipient();
+          }}
+          placeholder="Paste an address"
+          className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
+        />
+      )}
       {recipientError ? (
         <div role="alert" className="text-label leading-snug text-warning">
           {recipientError}
         </div>
       ) : null}
-      {!recipientError && recipientSchema.safeParse(recipient).success && !hideSaveOption ? (
+      {lookalikeOf ? (
+        <RecipientWarning
+          firstTime={false}
+          lookalikeOf={lookalikeOf}
+          lookalikeAvatarSvg={identity.avatarSvg(lookalikeOf)}
+          emphasisPick={emphasisPick}
+        />
+      ) : null}
+      {/* Saving a lookalike would make the fake a trusted contact. */}
+      {!recipientError && !lookalikeOf && recipientSchema.safeParse(recipient).success && !hideSaveOption ? (
         <SaveAddressInline
           expanded={showSaveAddress}
           name={saveAddressName}
@@ -710,6 +779,7 @@ function ReviewStep({
   step,
   contact,
   ownWallet,
+  emphasisPick,
   signsOnDevice,
   onBack,
   onSign,
@@ -720,18 +790,19 @@ function ReviewStep({
   contact: Contact | undefined;
   /** One of the vault's own other wallets, if `step.recipient` is its address — same known-recipient treatment as a saved contact. */
   ownWallet: WalletSummary | undefined;
+  emphasisPick: number | null;
   /** A hardware wallet signs in the approval window the background opens; the popup may close when it takes focus. */
   signsOnDevice: boolean;
   onBack: () => void;
   onSign: () => void;
 }) {
   const ticker = tickerFor(token);
-  // AO transfers have no sender-side fee quote — `estimate.fee` is `null`
-  // for that path (see `core/ao/transfer.ts`'s `AO_TRANSFER_HAS_NO_FEE` doc
-  // comment). The total then equals the send amount itself, and the Fee row
-  // says so explicitly rather than showing a fabricated "0 <TICKER>".
+  // A legacy AO transfer has no sender-side fee (`estimate.fee` is `null`),
+  // so the Fee row says so rather than showing a fabricated "0 <TICKER>".
+  // An L1 token transfer's fee is AR, a different unit from the amount,
+  // so only an AR send folds the fee into its total.
   const total =
-    step.estimate.fee === null
+    step.estimate.fee === null || token !== null
       ? step.amountAtomic
       : (BigInt(step.amountAtomic) + BigInt(step.estimate.fee)).toString();
   // A saved contact or one of your own wallets counts as a known recipient
@@ -742,6 +813,9 @@ function ReviewStep({
   const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
   const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
   const knownName = contact?.name ?? ownWallet?.name;
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(step.recipient);
+  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -754,7 +828,12 @@ function ReviewStep({
         </div>
 
         {irreversible ? (
-          <RecipientWarning firstTime lookalikeOf={lookalikeOf} />
+          <RecipientWarning
+            firstTime={step.estimate.firstSeenRecipient && !known}
+            lookalikeOf={lookalikeOf}
+            lookalikeAvatarSvg={lookalikeAvatarSvg}
+            emphasisPick={emphasisPick}
+          />
         ) : (
           <p className="text-label leading-relaxed text-muted">
             You&apos;re sending {formatAmount(step.amountAtomic, token)} {ticker} to this address. This can&apos;t
@@ -762,15 +841,18 @@ function ReviewStep({
           </p>
         )}
 
-        {knownName ? (
-          <div className="-mb-2 flex items-center justify-between text-label">
-            <span className="text-muted">Recipient</span>
-            <span className="font-semibold text-foreground">{knownName}</span>
-          </div>
-        ) : null}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-label font-semibold text-muted">To</span>
+          <RecipientCard
+            address={step.recipient}
+            name={knownName ?? null}
+            avatarSvg={avatarSvg}
+            emphasisPick={emphasisPick}
+            tone="confirm"
+          />
+        </div>
 
         <div className="flex flex-col">
-          <ReviewRow label={knownName ? "Address" : "Recipient"} value={step.recipient} mono />
           <ReviewRow
             label="Fee"
             value={step.estimate.fee === null ? "No network fee" : `${formatWinstonAsAr(step.estimate.fee)} AR`}
@@ -925,7 +1007,7 @@ function TokenPickerStep({
           otherTokenBalances.map((candidate) => (
             <TokenRow
               key={candidate.processId}
-              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2 }}
+              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2, logoUrl: candidate.logoUrl }}
               name={displayTicker(candidate.ticker)}
               amount={
                 candidate.available === false
@@ -967,7 +1049,7 @@ function SkeletonPickerRow() {
  * per the reviewer's spec. Selecting any row fills the recipient field
  * with the full address; truncated display only. Every row — contact,
  * wallet or plain recent address — uses the same dicebear identicon as
- * `WalletSwitcherView`'s own rows (`generateAccountAvatarSvg` + `AccountAvatar`),
+ * `WalletSwitcherView`'s own rows (`useAddressIdentity().avatarSvg` + `AccountAvatar`),
  * not initials in a circle, so an address looks the same wherever it's
  * shown across the extension.
  */

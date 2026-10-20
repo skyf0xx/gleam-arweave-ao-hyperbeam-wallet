@@ -8,15 +8,16 @@ export interface PointsTokenRowProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
   onOpen: () => void;
+  className?: string;
 }
 
 /**
- * Gleam Points as the token list's third row, after AR and AO. It reads
+ * Gleam Points as a row in the token list. It reads
  * like a balance but isn't a token: no USD value and no send action, and
  * its icon is the Gleam beam rather than a ticker glyph, marking it as
  * Gleam's own. Clicking opens the Points screen.
  */
-export function PointsTokenRow({ runtime, wallet, onOpen }: PointsTokenRowProps) {
+export function PointsTokenRow({ runtime, wallet, onOpen, className }: PointsTokenRowProps) {
   const standing = usePointsStanding(runtime, wallet);
   const amount =
     standing.status === "joined"
@@ -36,6 +37,7 @@ export function PointsTokenRow({ runtime, wallet, onOpen }: PointsTokenRowProps)
       amount={amount}
       amountFull={amountFull !== amount ? amountFull : undefined}
       onClick={onOpen}
+      className={className}
     />
   );
 }

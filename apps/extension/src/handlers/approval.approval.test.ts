@@ -2,13 +2,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   addressFromOwner,
   decrypt,
-  generateJWK,
   verifyMessage,
   type JWKInterface,
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
 import { cacheKey, clearKeyCache } from "./key-session";
 
@@ -690,7 +689,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     const request = await handler.getApproval({ requestId });
     expect(request.kind).toBe("sign");
     expect(request.origin).toBe("https://bazar.arweave.net");
-    if (request.preview.kind !== "connect" && request.preview.kind !== "addToken") {
+    if (request.preview.kind !== "connect" && request.preview.kind !== "addToken" && request.preview.kind !== "scanAttestation") {
       expect(request.preview.recipient).toBe("recipient-address");
       expect(request.preview.amount).toBe("1000");
       expect(request.preview.decodedData).toBe("hello");
@@ -1020,7 +1019,9 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       const requestId = extractRequestId(windows.opened[0]!);
 
       const request = await handler.getApproval({ requestId });
-      if (request.preview.kind === "connect" || request.preview.kind === "addToken") throw new Error("expected a signing preview");
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+        throw new Error("expected a signing preview");
+      }
       const { items } = request.preview;
       expect(items).toHaveLength(3);
       expect(items?.[0]).toMatchObject({ decodedData: "first", tags: [{ name: "Action", value: "Eval" }], target: null });
@@ -1049,7 +1050,9 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       const requestId = extractRequestId(windows.opened[0]!);
 
       const request = await handler.getApproval({ requestId });
-      if (request.preview.kind === "connect" || request.preview.kind === "addToken") throw new Error("expected a signing preview");
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+        throw new Error("expected a signing preview");
+      }
       expect(request.preview.items).toBeNull();
       expect(request.preview.decodedData).toBe("hello");
 

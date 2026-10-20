@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#F7F7F7">
+  <title>Get rewarded for auditing Gleam</title>
+  <meta name="description"
+    content="Help check Gleam's security using your coding agent: scan for known vulnerabilities, review the code, sign an attestation, and earn GLEAM.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="scan.css">
+  <script type="module" src="scan.js"></script>
+</head>
+
+<body class="scan-page">
+  <header class="site-header">
+    <div class="wrap sc-header">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+      <a class="sc-header-link" href="scan-results.html">See results</a>
+    </div>
+  </header>
+
+  <main class="wrap sc">
+    <h1 class="heading">Get rewarded for auditing Gleam.</h1>
+    <p class="line">Help check Gleam's security using your coding agent.</p>
+
+    <div class="copybox">
+      <div class="beam copybox-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <p class="copybox-label" id="agent-line-label">Paste this into your agent</p>
+      <p class="copybox-line" id="agent-line" data-agent-line></p>
+      <div class="copybox-actions">
+        <button class="button" type="button" aria-describedby="agent-line-label" data-copy>Copy prompt</button>
+        <span class="copybox-status small" role="status" aria-live="polite" data-copy-status></span>
+      </div>
+    </div>
+
+    <dl class="stats" data-stats hidden>
+      <div>
+        <dt>Paid scans left</dt>
+        <dd><span data-stat-places>–</span><span class="stats-of"> of 20</span></dd>
+      </div>
+      <div>
+        <dt>Each paid scan earns</dt>
+        <dd><span data-stat-reward>–</span> <span class="stats-unit">GLEAM</span></dd>
+      </div>
+      <div>
+        <dt>Bounty pool</dt>
+        <dd><span data-stat-pool>–</span> <span class="stats-unit">GLEAM</span></dd>
+      </div>
+    </dl>
+    <p class="small sc-stats-note" role="status" aria-live="polite" data-stats-status></p>
+
+    <section class="sc-section" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <ol class="sc-steps">
+        <li><p><strong>Paste the prompt</strong> into your coding agent.</p></li>
+        <li><p>Your agent runs <strong><a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">Google's OSV-Scanner</a></strong> to check Gleam for publicly reported security
+            vulnerabilities.</p></li>
+        <li><p>Your agent <strong>examines Gleam's code</strong> for potential security problems.</p></li>
+        <li><p>You <strong>sign an attestation</strong> once the scans are complete.</p></li>
+        <li><p>You get rewarded with <strong><a target="_blank" href="gleam.html">GLEAM</a></strong>.</p></li>
+      </ol>
+    </section>
+
+    <div class="earn-cards">
+      <details class="earn-card">
+        <summary><h2 id="points-h">Scanning Rewards</h2></summary>
+        <ul class="sc-prose">
+          <li>The first 20 scans earn 0.1% of the total GLEAM points minted yesterday.</li>
+          <li>After that, you must find a vulnerability to earn GLEAM.</li>
+          <li>More severe vulnerabilities earn bigger rewards.</li>
+          <li>Only the first report of each vulnerability earns a reward.</li>
+          <li>Register a Gleam wallet to receive your rewards. The wallet that signs the scan gets the GLEAM.</li>
+        </ul>
+      </details>
+
+      <details class="earn-card">
+        <summary><h2 id="numbers-h">Bounty Rewards</h2></summary>
+        <ul class="sc-prose">
+          <li>Gleam has a bounty pool that grows daily by 2% of the total GLEAM points minted yesterday.</li>
+          <li>Confirmed vulnerabilities earn a share of the bounty pool:
+            <table class="tiers">
+              <caption class="visually-hidden">Share of the bounty pool by severity</caption>
+              <tbody data-tiers>
+                <tr><th scope="row">Critical</th><td class="num">50%</td></tr>
+                <tr><th scope="row">High</th><td class="num">25%</td></tr>
+                <tr><th scope="row">Medium</th><td class="num">10%</td></tr>
+                <tr><th scope="row">Low</th><td class="num">2%</td></tr>
+              </tbody>
+            </table>
+            Only the first report of each vulnerability qualifies.
+          </li>
+        </ul>
+      </details>
+    </div>
+
+    <section class="sc-section" aria-labelledby="faq-h">
+      <h2 id="faq-h">Questions</h2>
+      <div class="faq">
+        <details>
+          <summary>What do I need?</summary>
+          <ul class="sc-prose">
+            <li>A Gleam wallet enrolled in <a target="_blank" href="gleam.html">Gleam Points</a>.</li>
+            <li>An AI agent that can run commands on your computer, such as Claude Code, Codex CLI, Gemini CLI or
+              Cursor Agent.</li>
+          </ul>
+          <p>Browser-based AI chats can't run the scan.</p>
+        </details>
+        <details>
+          <summary>Is it safe to run?</summary>
+          <p>Your agent clones Gleam's public code and runs its tests and security scanner. It never needs your seed
+            phrase, private key or real funds.</p>
+          <p>You can read the
+            <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/security/scan/SKILL.md">full
+              scan instructions</a> before running anything.</p>
+        </details>
+        <details>
+          <summary>What if all 20 paid places are taken?</summary>
+          <p>You can still submit a scan, and its results will appear alongside the others. If your scan finds a
+            confirmed vulnerability, you can still earn GLEAM from the bounty pool.</p>
+          <p>Paid places reopen with each new release.</p>
+        </details>
+        <details>
+          <summary>What happens if my agent finds a vulnerability?</summary>
+          <ul class="sc-prose">
+            <li><strong>Small fix:</strong> your agent opens a pull request with its findings and proposed fix.</li>
+            <li><strong>Serious vulnerability:</strong> your agent files a private security advisory with the
+              maintainers.</li>
+          </ul>
+          <p>A maintainer confirms the severity before the bounty is paid to the wallet that signed the
+            attestation.</p>
+        </details>
+        <details>
+          <summary>Does a pass mean Gleam is secure?</summary>
+          <p>A pass means your agent didn't find a vulnerability during its scan.</p><p>No single scan can guarantee
+            security, which is why Gleam welcomes independent reviews from different agents and researchers.</p>
+        </details>
+        <details>
+          <summary>What is GLEAM?</summary>
+          <p>GLEAM is the <a target="_blank" href="gleam.html">reward token</a> used by Gleam Points and the security bounty programme.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a target="_blank" href="gleam.html">Gleam Points</a></li>
+        <li><a href="scan-results.html">Scan results</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+
+</html>

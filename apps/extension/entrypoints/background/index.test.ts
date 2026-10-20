@@ -1,12 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
-  generateJWK,
   METHOD_PERMISSIONS,
   PERMISSION_TYPES,
   PROVIDER_METHODS,
   type JWKInterface,
   type PermissionType,
 } from "@gleam/core";
+import { generateJWK } from "@gleam/core/signer";
 import { APPROVAL_GATED_METHODS, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
@@ -21,6 +21,8 @@ vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock 
 type Sender = { url?: string; origin?: string; frameId?: number; tab?: { id?: number; url?: string } };
 type Handler = (message: { data: unknown; sender?: Sender }) => unknown;
 
+const TRANSFER_TOKEN = "t".repeat(43);
+const TRANSFER_RECIPIENT = "r".repeat(43);
 const POPUP_SENDER: Sender = { url: "chrome-extension://test/popup.html" };
 const contentSender = (origin: string): Sender => ({ url: `${origin}/app`, frameId: 0, tab: { id: 7, url: `${origin}/app` } });
 
@@ -384,9 +386,40 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     it.each(APPROVAL_GATED_METHODS)("refuses %s from a plain-http site before any window opens", (method) => {
       expect(() => providerCall({ origin: HTTP_ORIGIN, method, params: {} })).toThrow(
-        "Gleam only signs for secure (https) sites.",
+        "Gleam only works with secure (https) sites.",
       );
       expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["getActiveAddress", "getAllAddresses", "getActivePublicKey", "getWalletNames", "getPermissions", "getBalances", "getArweaveConfig"])(
+      "refuses the read %s from a plain-http site that already holds a grant",
+      async (method) => {
+        await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
+        expect(() => providerCall({ origin: HTTP_ORIGIN, method, params: {} })).toThrow(
+          "Gleam only works with secure (https) sites.",
+        );
+      },
+    );
+
+    it("refuses a read from a LAN or *.localhost plain-http origin", async () => {
+      for (const origin of ["http://192.168.1.10", "http://foo.localhost:3000"]) {
+        await seedUnlockedWalletWithGrant(origin);
+        expect(() => providerCall({ origin, method: "getActiveAddress", params: {} })).toThrow(
+          "Gleam only works with secure (https) sites.",
+        );
+      }
+    });
+
+    it("lets a plain-http site drop its own grant", async () => {
+      await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
+      await expect(providerCall({ origin: HTTP_ORIGIN, method: "disconnect", params: {} })).resolves.toBeUndefined();
+    });
+
+    it("still answers reads for a granted loopback http site", async () => {
+      await seedUnlockedWalletWithGrant("http://localhost:3000");
+      await expect(
+        providerCall({ origin: "http://localhost:3000", method: "getActiveAddress", params: {} }),
+      ).resolves.toBe("addr-1");
     });
 
     it("refuses signing from a plain-http site that already holds a grant", async () => {
@@ -394,10 +427,10 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
 
       expect(() => providerCall({ origin: HTTP_ORIGIN, method: "signature", params })).toThrow(
-        "Gleam only signs for secure (https) sites.",
+        "Gleam only works with secure (https) sites.",
       );
       expect(() => providerCall({ origin: HTTP_ORIGIN, method: "connect", params: {} })).toThrow(
-        "Gleam only signs for secure (https) sites.",
+        "Gleam only works with secure (https) sites.",
       );
       expect(windowsCreate).not.toHaveBeenCalled();
     });
@@ -414,6 +447,53 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
       },
     );
+
+    it("a connected site's reads don't extend the session, but a Gleam page's getState does", async () => {
+      await seedUnlockedWalletWithGrant("https://dapp.example");
+      // A password vault, so auto-lock applies to the session.
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: { v: 2 } },
+      ]);
+      const stale = Date.now() - 60_000;
+      await setItem("session:unlockedSession", {
+        unlockedAt: stale,
+        lastActivityAt: stale,
+        autoLockTimeout: "5min",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      const lastActivity = () => (store.get("session:unlockedSession") as { lastActivityAt: number }).lastActivityAt;
+
+      for (const method of ["getActiveAddress", "getAllAddresses", "getPermissions"]) {
+        await providerCall({ origin: "https://dapp.example", method, params: {} });
+      }
+      expect(lastActivity()).toBe(stale);
+
+      await registeredHandlers.get("getState")!({ data: undefined });
+      expect(lastActivity()).toBeGreaterThan(stale);
+    });
+
+    it("an approval window's load doesn't extend the session, but the user's answer in it does", async () => {
+      await seedUnlockedWalletWithGrant("https://dapp.example");
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: { v: 2 } },
+      ]);
+      const stale = Date.now() - 60_000;
+      await setItem("session:unlockedSession", {
+        unlockedAt: stale,
+        lastActivityAt: stale,
+        autoLockTimeout: "5min",
+        unlockedWalletIds: ["wallet-1"],
+      });
+      const lastActivity = () => (store.get("session:unlockedSession") as { lastActivityAt: number }).lastActivityAt;
+
+      await registeredHandlers.get("getState")!({ data: { recordActivity: false } });
+      expect(lastActivity()).toBe(stale);
+
+      await Promise.resolve(
+        registeredHandlers.get("resolveApproval")!({ data: { requestId: "no-such-request", approved: false } }),
+      ).catch(() => undefined);
+      expect(lastActivity()).toBeGreaterThan(stale);
+    });
 
     it("an https site with a grant still reaches the approval window", async () => {
       await seedUnlockedWalletWithGrant("https://dapp.example");
@@ -680,7 +760,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
       method: "transferAoTokens",
-      params: { token: aoProcessId, recipient: "recipient-addr", amount: "1000" },
+      params: { token: aoProcessId, recipient: TRANSFER_RECIPIENT, amount: "1000" },
     });
 
     await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
@@ -693,7 +773,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     expect(request.kind).toBe("transferAoTokens");
     expect(request.preview).toMatchObject({
       kind: "transferAoTokens",
-      recipient: "recipient-addr",
+      recipient: TRANSFER_RECIPIENT,
       amount: "1000",
       token: aoProcessId,
       tokenDenomination: 12,
@@ -745,7 +825,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     const resultPromise = providerCall({
       origin: "https://bazar.arweave.net",
       method: "transferAoTokens",
-      params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+      params: { token: TRANSFER_TOKEN, recipient: TRANSFER_RECIPIENT, amount: "1000" },
     });
     resultPromise.catch(() => {});
 
@@ -756,7 +836,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     }>;
     expect(pendingRaw).toHaveLength(1);
     expect(pendingRaw[0]!.request.preview).toMatchObject({
-      token: "ao-process-id",
+      token: TRANSFER_TOKEN,
       tokenDenomination: null,
       tokenTicker: null,
     });
@@ -791,7 +871,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       const resultPromise = providerCall({
         origin: "https://bazar.arweave.net",
         method: "transferAoTokens",
-        params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+        params: { token: TRANSFER_TOKEN, recipient: TRANSFER_RECIPIENT, amount: "1000" },
       });
       resultPromise.catch(() => {});
 
@@ -805,7 +885,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       }>;
       expect(pendingRaw).toHaveLength(1);
       expect(pendingRaw[0]!.request.preview).toMatchObject({
-        token: "ao-process-id",
+        token: TRANSFER_TOKEN,
         tokenDenomination: null,
         tokenTicker: null,
       });
@@ -819,7 +899,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       providerCall({
         origin: "https://not-connected.example",
         method: "transferAoTokens",
-        params: { token: "ao-process-id", recipient: "recipient-addr", amount: "1000" },
+        params: { token: TRANSFER_TOKEN, recipient: TRANSFER_RECIPIENT, amount: "1000" },
       }),
     ).rejects.toThrow(/not connected/i);
     expect(windowsCreate).not.toHaveBeenCalled();
@@ -838,7 +918,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     ]);
 
     await expect(
-      providerCall({ origin: "https://bazar.arweave.net", method: "transferAoTokens", params: { token: "ao-process-id" } }),
+      providerCall({ origin: "https://bazar.arweave.net", method: "transferAoTokens", params: { token: TRANSFER_TOKEN } }),
     ).rejects.toThrow(/requires token, recipient, and amount/i);
   });
 
@@ -1239,6 +1319,47 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await seedHardwareWallet("ledger");
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]), options: { name: "RSA-OAEP" } });
       void providerCall({ origin: ORIGIN, method: "encrypt", params }).catch(() => undefined);
+
+      await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
+    });
+  });
+
+  describe("requests that could yield a Gleam Points proof are refused before any window opens", () => {
+    const ORIGIN = "https://bazar.arweave.net";
+    const POINTS_MESSAGE = "gleam-points:register:v1:NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs:-:1700000000";
+    const b64url = (text: string) => Buffer.from(text).toString("base64url");
+
+    beforeEach(async () => {
+      await setItem("local:wallets", [
+        { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      ]);
+      await setItem("local:activeWalletId", "wallet-1");
+      await setItem("local:grants", [
+        { origin: ORIGIN, walletId: "wallet-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
+      ]);
+    });
+
+    it.each(["SHA-256", "SHA-384", "SHA-512"])("signMessage of a points payload with %s", async (hashAlgorithm) => {
+      const params = encodeTaggedBinary({ data: new TextEncoder().encode(POINTS_MESSAGE), options: { hashAlgorithm } });
+
+      await expect(providerCall({ origin: ORIGIN, method: "signMessage", params })).rejects.toThrow(
+        "Gleam Points messages can only be signed from Gleam itself.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it.each(["sign", "dispatch"])("%s of a transaction with a Gleam-Points tag", async (method) => {
+      const params = { transaction: { tags: [{ name: b64url("Gleam-Points"), value: b64url(POINTS_MESSAGE) }] } };
+
+      await expect(providerCall({ origin: ORIGIN, method, params })).rejects.toThrow(
+        "a Gleam-Points tag can only be signed from Gleam itself.",
+      );
+      expect(windowsCreate).not.toHaveBeenCalled();
+    });
+
+    it("a message that only mentions the prefix later still reaches the approval window", async () => {
+      const params = encodeTaggedBinary({ data: new TextEncoder().encode(`Hello ${POINTS_MESSAGE}`) });
+      void providerCall({ origin: ORIGIN, method: "signMessage", params }).catch(() => undefined);
 
       await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
     });

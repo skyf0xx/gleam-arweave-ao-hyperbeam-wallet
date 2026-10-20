@@ -434,6 +434,22 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects an http peer URL up front without requesting permission", async () => {
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Add peer")).toBeTruthy());
+    fireEvent.click(screen.getByText("Add peer"));
+    fireEvent.change(screen.getByPlaceholderText("hyperbeam.example.com"), {
+      target: { value: "http://plain-peer.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByText("Peers must use an https:// URL.")).toBeTruthy();
+    expect(permissionsRequest).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a duplicate peer URL without calling setNetworkSettings", async () => {
     const send = vi.fn().mockResolvedValue(SETTINGS);
     render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);

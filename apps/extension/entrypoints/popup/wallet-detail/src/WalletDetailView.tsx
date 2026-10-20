@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
+import { useState } from "react";
 import { isHardwareWalletMethod, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
@@ -7,13 +6,14 @@ import {
   requestDownloadsPermission,
   type RequestDownloadsPermission,
 } from "@/src/keyfile/download";
-import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
-import { generateAccountAvatarSvg } from "../../main-screen/src/generateAccountAvatar";
+import { useAddressIdentity } from "@/src/address-identity";
+import { useCopy } from "../../points/src/useCopy";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -60,7 +60,9 @@ export function WalletDetailView({
   onRemoved,
   requestDownloadPermission = requestDownloadsPermission,
 }: WalletDetailViewProps) {
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(wallet.address);
+  const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
 
   const [name, setName] = useState(wallet.name);
   const [savingName, setSavingName] = useState(false);
@@ -160,14 +162,26 @@ export function WalletDetailView({
       <ScreenHeader title="Wallet" onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-7">
-        <div className="flex items-center gap-3">
-          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} className="rounded-2xl" />
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
-            <span className="truncate text-caption text-faint">
-              <span className="font-mono">{truncateAddress(wallet.address, 8, 6)}</span>
-              {methodLabel ? <> · {methodLabel}</> : null}
-            </span>
+        <div className="group flex items-center gap-3.5">
+          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {/* Copy sits in the name line so the address keeps the full width. */}
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate text-label font-semibold text-foreground">
+                {wallet.name}
+                {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
+              </span>
+              <button
+                type="button"
+                onClick={copyAddress}
+                aria-label={addressCopied ? "Address copied" : "Copy address"}
+                title={addressCopied ? "Copied" : "Copy address"}
+                className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+              >
+                {addressCopied ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            </div>
+            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
           </div>
         </div>
 
@@ -350,5 +364,22 @@ function ExportPasswordStep({
         </Button>
       </form>
     </div>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

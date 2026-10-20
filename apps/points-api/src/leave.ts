@@ -31,7 +31,9 @@ export function parseLeaveRequest(body: unknown): LeaveRequest | null {
 
 /**
  * Deletes a wallet and everything stored about it (cascading to its
- * snapshots and points), plus its device once no other wallet uses it.
+ * snapshots, points and scan points), plus its device once no other wallet
+ * uses it. Its attestations stay: they are signed public records, and
+ * keeping them stops a wallet leaving and rejoining to attest again.
  * Leaving an address that isn't registered succeeds, so a retry after a
  * lost response is harmless.
  */

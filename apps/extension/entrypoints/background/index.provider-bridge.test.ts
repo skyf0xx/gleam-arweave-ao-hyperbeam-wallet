@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { addressFromOwner, generateJWK, type JWKInterface } from "@gleam/core";
+import { addressFromOwner, type JWKInterface } from "@gleam/core";
+import { generateJWK } from "@gleam/core/signer";
 
 /**
  * Drives real `window.arweaveWallet` calls through the injected provider,

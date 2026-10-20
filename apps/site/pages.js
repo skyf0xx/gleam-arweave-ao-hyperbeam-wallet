@@ -11,7 +11,7 @@
   // install can't carry the code, so invite.html keeps it in this site's
   // localStorage and welcome.html, which the extension opens on first
   // install, hands it to the extension.
-  var EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
+  var EXTENSION_ID = devExtensionId() || "einabcphdmlicabnjllaaallnebfkmki";
   var INVITE_KEY = "gleam:inviteCode";
   var INVITE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
   var INVITE_CODE = /^[A-Z0-9]{6,16}$/;
@@ -41,6 +41,27 @@
       // Counts invite visits. The code itself is never sent.
       trackOnce("gleam-invite-open", {});
       handOverToInstalled(code);
+    }
+  }
+
+  // A copy of the site served from localhost can name an unpacked dev
+  // build's id with ?ext=<id>, remembered for the other pages. Same rule
+  // as extensionIdFor in scan-lib.js.
+  function devExtensionId() {
+    if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1")
+      return null;
+    var pattern = /^[a-p]{32}$/;
+    var key = "gleam:devExtensionId";
+    try {
+      var fromQuery = params.get("ext");
+      if (fromQuery && pattern.test(fromQuery)) {
+        localStorage.setItem(key, fromQuery);
+        return fromQuery;
+      }
+      var saved = localStorage.getItem(key);
+      return saved && pattern.test(saved) ? saved : null;
+    } catch {
+      return null;
     }
   }
 

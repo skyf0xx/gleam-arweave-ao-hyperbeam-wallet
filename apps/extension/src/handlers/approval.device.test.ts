@@ -3,7 +3,6 @@ import {
   addressFromOwner,
   base64UrlToBytes,
   bytesToBase64Url,
-  generateJWK,
   signature,
   signPayloadWithSigner,
   verifyMessage,
@@ -15,7 +14,7 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import { dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { verifyPointsProof } from "@gleam/core/src/points/index.ts";

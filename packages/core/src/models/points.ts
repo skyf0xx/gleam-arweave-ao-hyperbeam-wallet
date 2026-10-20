@@ -15,6 +15,8 @@ export interface PointsWalletScore {
   referred: boolean;
   refereeCount: number;
   totalAtomic: string;
+  /** Scan and finding points, already in `totalAtomic`. Absent from servers that predate community scans. */
+  scanPointsAtomic?: string;
   lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
   /** "Top N%" among wallets with points; null until the wallet has some. */
   topPercent: number | null;

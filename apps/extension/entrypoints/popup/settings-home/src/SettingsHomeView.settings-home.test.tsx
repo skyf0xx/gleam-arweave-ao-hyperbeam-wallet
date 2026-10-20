@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SettingsHomeView } from "./SettingsHomeView";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
@@ -27,12 +28,14 @@ function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): Run
     if (type === "getNetworkSettings") return NETWORK_SETTINGS;
     if (type === "getThemePreference") return { theme: overrides.theme ?? "light" } satisfies ThemeSettings;
     if (type === "setThemePreference") return undefined;
+    if (type === "getScanCount") return null;
     throw new Error(`Unexpected message type "${type}"`);
   }) as RuntimePort["send"];
 }
 
 function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeView>[0]> = {}) {
   return render(
+    <QueryClientProvider client={new QueryClient()}>
     <SettingsHomeView
       runtime={fakeRuntime({ send: successfulSend() })}
       onBack={vi.fn()}
@@ -44,7 +47,8 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenUpload={vi.fn()}
       onOpenFeedback={vi.fn()}
       {...overrides}
-    />,
+    />
+    </QueryClientProvider>,
   );
 }
 

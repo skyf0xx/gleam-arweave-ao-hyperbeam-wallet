@@ -18,6 +18,7 @@ import {
   type WalletMethod,
 } from "@gleam/core";
 import {
+  buildAttestMessage,
   buildDeviceMessage,
   buildLeaveMessage,
   buildRedeemMessage,
@@ -27,7 +28,11 @@ import {
   signDeviceMessage,
   type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
+import { attestationId, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
+import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { DeviceKey } from "../adapters/device-key";
+import { attestFailure, serverAttestFailure } from "./attest-errors";
+import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -66,8 +71,14 @@ export const POINTS_SEATS_SEEN_KEY = "local:points:seatsSeen";
  */
 const HEARTBEAT_INTERVAL_MS = 20 * 3_600_000;
 
-/** A wallet's signed proof that it owns its address, in the body shape `/register` and `/leave` take. */
-interface OwnershipProof {
+const ATTEST_TIMEOUT_MS = 30_000;
+
+function failureOf(response: SiteAttestResponse): AttestationCheck {
+  return { ok: false, error: response.ok ? "The points server refused the attestation." : response.error };
+}
+
+/** A wallet's signed proof that it owns its address, in the body shape `/register`, `/leave` and `/attestations` take. */
+export interface OwnershipProof {
   owner: string;
   address: string;
   message: string;
@@ -126,7 +137,7 @@ export class PointsHandler {
    * successful join. Registering counts as a heartbeat.
    */
   async join(req: { walletId: string; inviteCode?: string }): Promise<PointsMembership> {
-    await this.requirePointsCapability(req.walletId, "join Gleam Points");
+    await this.requirePointsCapability(req.walletId, JOIN);
     const typed = req.inviteCode?.trim() ? normalizeInviteCode(req.inviteCode) : null;
     if (typed !== null && !isValidInviteCode(typed)) throw new Error("That invite code isn't valid.");
     const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
@@ -138,7 +149,7 @@ export class PointsHandler {
       inviteCode,
       issuedAt: Math.floor(this.now() / 1000),
     });
-    const proof = await this.proveOwnership(req.walletId, "join", () => message);
+    const proof = await this.proveOwnership(req.walletId, JOIN, () => message);
     const response = await this.fetchImpl(`${this.deps.apiUrl}/register`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -196,16 +207,16 @@ export class PointsHandler {
    */
   private async proveOwnership(
     walletId: string,
-    action: "join" | "leave",
+    action: PointsAction,
     buildMessage: (address: string) => string,
   ): Promise<OwnershipProof> {
     const method = await this.deps.walletMethod(walletId);
     if (method !== null && isHardwareWalletMethod(method)) {
-      if (!this.deps.deviceProof) throw new Error(unsupportedOperationMessage(`${action} Gleam Points`));
+      if (!this.deps.deviceProof) throw new Error(unsupportedOperationMessage(action));
       return { ...(await this.deps.deviceProof({ walletId, message: buildMessage })), proof: "transaction" };
     }
     const signer = await this.deps.signer(walletId);
-    if (!signer) throw new Error(`Unlock this wallet to ${action} Gleam Points.`);
+    if (!signer) throw new Error(`Unlock this wallet to ${action}.`);
     const message = buildMessage(signer.address);
     const signature = await signMessage(signer, new TextEncoder().encode(message).buffer as ArrayBuffer);
     return {
@@ -214,6 +225,85 @@ export class PointsHandler {
       message,
       signature: bytesToBase64Url(new Uint8Array(signature)),
       proof: "message",
+    };
+  }
+
+  /**
+   * Signs a community scan attestation (SCANS.md § The attestation) the
+   * way registration is signed, and submits it. Refusals from the points
+   * API come back as a failed response rather than a throw, so the caller
+   * can tell the user which one it was; only a failure to sign throws.
+   */
+  async attest(req: { walletId: string; attestation: ParsedAttestation }): Promise<SiteAttestResponse> {
+    await this.requirePointsCapability(req.walletId, ATTEST);
+    const message = buildAttestMessage(req.attestation.release, await attestationId(req.attestation));
+    const proof = await this.proveOwnership(req.walletId, ATTEST, () => message);
+    return this.submitAttestation(req.attestation, proof);
+  }
+
+  /**
+   * `POST /attestations/check`: the server's dry run of the local checks plus the
+   * latest release, the challenge's expiry and use, and (given the wallet's address) whether it already attested. Asked before a signature
+   * is requested, so a hardware wallet user isn't told it failed only after
+   * signing on the device.
+   */
+  async checkAttestation(attestation: ParsedAttestation, address?: string): Promise<AttestationCheck> {
+    let response: Response;
+    let body: Record<string, unknown> | null;
+    try {
+      response = await this.fetchImpl(`${this.deps.apiUrl}/attestations/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(address ? { attestation, address } : { attestation }),
+        signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
+      });
+      body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    } catch {
+      return failureOf(attestFailure("offline", attestation.release));
+    }
+    if (!response.ok) return failureOf(serverAttestFailure(response.status, body, attestation.release));
+    return { ok: true };
+  }
+
+  /** `POST /attestations` with a proof already made, by `attest` or on a hardware wallet in the approval window. */
+  async submitAttestation(attestation: ParsedAttestation, proof: OwnershipProof): Promise<SiteAttestResponse> {
+    const id = await attestationId(attestation);
+    if (proof.message !== buildAttestMessage(attestation.release, id)) {
+      throw new Error("The signed message isn't for this attestation.");
+    }
+    let response: Response;
+    let body: Record<string, unknown> | null;
+    try {
+      response = await this.fetchImpl(`${this.deps.apiUrl}/attestations`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ attestation, ...proofBody(proof) }),
+        // The approval window and the site's reply both wait on this.
+        signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
+      });
+      body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    } catch {
+      return attestFailure("offline", attestation.release);
+    }
+    if (!response.ok) return serverAttestFailure(response.status, body, attestation.release);
+    const { points, paid, paidPlacesLeft, unpaidReason } = body ?? {};
+    if (
+      body?.ok !== true ||
+      body.attestationId !== id ||
+      typeof points !== "string" ||
+      !/^\d+$/.test(points) ||
+      typeof paid !== "boolean" ||
+      typeof paidPlacesLeft !== "number"
+    ) {
+      return attestFailure("offline", attestation.release);
+    }
+    return {
+      ok: true,
+      attestationId: id,
+      points,
+      paid,
+      unpaidReason: unpaidReason === "places_taken" || unpaidReason === "no_snapshot" ? unpaidReason : null,
+      paidPlacesLeft,
     };
   }
 
@@ -318,9 +408,9 @@ export class PointsHandler {
    * later join reuses it.
    */
   async leave(req: { walletId: string }): Promise<void> {
-    await this.requirePointsCapability(req.walletId, "leave Gleam Points");
+    await this.requirePointsCapability(req.walletId, LEAVE);
     const issuedAt = Math.floor(this.now() / 1000);
-    const proof = await this.proveOwnership(req.walletId, "leave", (address) => buildLeaveMessage(address, issuedAt));
+    const proof = await this.proveOwnership(req.walletId, LEAVE, (address) => buildLeaveMessage(address, issuedAt));
     const response = await this.fetchImpl(`${this.deps.apiUrl}/leave`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -468,6 +558,11 @@ export class PointsHandler {
     });
   }
 }
+
+type PointsAction = typeof JOIN | typeof LEAVE | typeof ATTEST;
+const JOIN = "join Gleam Points";
+const LEAVE = "leave Gleam Points";
+const ATTEST = "sign a scan attestation";
 
 /** A keyfile's body omits `proof`, which the server reads as `message`. */
 function proofBody({ owner, message, signature, proof }: OwnershipProof): Record<string, string> {

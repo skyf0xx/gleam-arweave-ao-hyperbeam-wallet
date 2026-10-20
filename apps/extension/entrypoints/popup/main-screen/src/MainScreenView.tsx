@@ -1,5 +1,6 @@
-import type { CSSProperties } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
@@ -14,12 +15,14 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
+import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
-import { generateAccountAvatarSvg } from "./generateAccountAvatar";
+import { useAddressIdentity } from "@/src/address-identity";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGrid } from "../../collectibles/index.tsx";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
+import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useTokenPrices } from "./useTokenPrices";
@@ -36,11 +39,9 @@ import { useCopy } from "../../points/src/useCopy";
  *
  * Avatar: `AccountAvatar` (`packages/ui/src/components/wallet/
  * AccountAvatar.tsx`) renders SVG markup generated in-process by
- * `./generateAccountAvatar.ts` (`@dicebear/core` + `@dicebear/styles`,
- * `weave` style, seeded from `wallet.address`) — no network call.
- * Generation is synchronous, so it's computed inline (via `useMemo`, keyed
- * on the address) rather than through the same async-load state as the
- * balance/activity fetches below.
+ * `src/account-avatar.ts` (`@dicebear/core` + `@dicebear/styles`,
+ * `shapes` style, seeded from the security phrase and `wallet.address`
+ * through `useAddressIdentity`) — no network call.
  *
  * Chart: `PortfolioChart` (same directory) is fed by `usePortfolioHistory`
  * (`./usePortfolioHistory.ts`), a `useQuery` wrapping the same
@@ -210,23 +211,19 @@ function formatActivityAmount(entry: { amount: string | null; token?: string | n
   return `${entry.amount} ${displayTicker(ticker)}`;
 }
 
+/**
+ * A swap order names the asset by its ticker when the user added it, else
+ * by a shortened process id: a discovered token's ticker is its own claim.
+ */
+function swapAssetLabel(processId: string, tokenBalances: TokenBalance[] | undefined): string {
+  const match = tokenBalances?.find((token) => token.processId === processId);
+  return match && match.source !== "discovered" && match.ticker !== processId ? displayTicker(match.ticker) : truncateAddress(processId, 6);
+}
+
 /** A gateway-only entry knows just the asset's process id. */
 function collectibleLabel(collectible: CollectibleRef): string {
   return collectible.name ?? "Collectible";
 }
-
-/**
- * How long a range-tab click waits, quiet, before the chart actually
- * fetches that range — a debounce, not a cooldown: each click resets the
- * timer rather than being dropped, so a rapid 7D→1M→ALL→7D tour never
- * fires more than one `getPortfolioHistory` call (for whichever range the
- * user was still on once they stopped clicking) instead of one per tab.
- * This is what keeps a quick tab tour from tripping CoinGecko's free-tier
- * rate limit, which a rapid click-through of all 5 tabs would otherwise
- * hit (see `usePortfolioHistory`'s `staleTime` comment for the caching
- * half of this — this is the request-shaping half).
- */
-const PORTFOLIO_RANGE_DEBOUNCE_MS = 400;
 
 // A per-device view preference, so plain localStorage; it can throw or be empty in some contexts.
 const PORTFOLIO_SCOPE_STORAGE_KEY = "gleam:portfolioScope";
@@ -245,6 +242,40 @@ function writePortfolioScope(scope: PortfolioScope): void {
   } catch {
     // Not persisting only means the next open starts on this wallet.
   }
+}
+
+/** The user's Show/Hide choices on token rows, keyed by row; a row without one keeps its default. */
+type RowVisibility = Record<string, "hidden" | "shown">;
+
+const ROW_VISIBILITY_KEY_PREFIX = "gleam:tokenVisibility:";
+
+function readRowVisibility(address: string): RowVisibility {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(`${ROW_VISIBILITY_KEY_PREFIX}${address}`) ?? "{}");
+    if (typeof parsed !== "object" || parsed === null) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, "hidden" | "shown"] => entry[1] === "hidden" || entry[1] === "shown"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeRowVisibility(address: string, visibility: RowVisibility): void {
+  try {
+    window.localStorage.setItem(`${ROW_VISIBILITY_KEY_PREFIX}${address}`, JSON.stringify(visibility));
+  } catch {
+    // Not persisting only means the next open shows the default rows.
+  }
+}
+
+interface ListedTokenRow {
+  key: string;
+  label: string;
+  defaultHidden: boolean;
+  /** Set only on a token that Manage tokens can add back by id, so only those can be ignored. */
+  processId?: string;
+  node: ReactNode;
 }
 
 /** Scroll distance (px) past which the header collapses to its compact form. */
@@ -287,6 +318,45 @@ export function MainScreenView({
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [listDocked, setListDocked] = useState(false);
+  const [hiddenExpanded, setHiddenExpanded] = useState(false);
+  // Tagged with its address so a wallet switch reads that wallet's choices without an effect.
+  const [storedVisibility, setStoredVisibility] = useState(() => ({
+    address: wallet.address,
+    rows: readRowVisibility(wallet.address),
+  }));
+  const rowVisibility =
+    storedVisibility.address === wallet.address ? storedVisibility.rows : readRowVisibility(wallet.address);
+  const isRowHidden = (row: ListedTokenRow) =>
+    rowVisibility[row.key] === "hidden" || (rowVisibility[row.key] !== "shown" && row.defaultHidden);
+  const toggleRowHidden = (row: ListedTokenRow) => {
+    const rows: RowVisibility = { ...rowVisibility, [row.key]: isRowHidden(row) ? "shown" : "hidden" };
+    setStoredVisibility({ address: wallet.address, rows });
+    writeRowVisibility(wallet.address, rows);
+  };
+  const queryClient = useQueryClient();
+  const [confirmingIgnore, setConfirmingIgnore] = useState<string | null>(null);
+  const [ignoring, setIgnoring] = useState(false);
+  const [ignoreFailed, setIgnoreFailed] = useState(false);
+  const ignoreToken = async (processId: string) => {
+    setIgnoring(true);
+    setIgnoreFailed(false);
+    try {
+      await runtime.send<{ address: string; processId: string }, void>({
+        type: "removeWatchedToken",
+        payload: { address: wallet.address, processId },
+      });
+      // Dropped so a token added back by id isn't still filed under Hidden.
+      const rows: RowVisibility = Object.fromEntries(Object.entries(rowVisibility).filter(([key]) => key !== processId));
+      setStoredVisibility({ address: wallet.address, rows });
+      writeRowVisibility(wallet.address, rows);
+      setConfirmingIgnore(null);
+      await queryClient.invalidateQueries({ queryKey: walletQueryKeys.balances(wallet.address) });
+    } catch {
+      setIgnoreFailed(true);
+    } finally {
+      setIgnoring(false);
+    }
+  };
   const collapseRafRef = useRef<number | null>(null);
   const listSectionRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
@@ -296,21 +366,7 @@ export function MainScreenView({
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
-  /**
-   * `selectedRange` drives the tab highlight and updates the instant a
-   * tab is clicked, so the UI never feels unresponsive to the click
-   * itself. `debouncedRange` drives the actual query and lags behind by
-   * `PORTFOLIO_RANGE_DEBOUNCE_MS` of quiet — every click restarts the
-   * timer, so a fast tour through several tabs shows the chart's loading
-   * state (via `debouncedRange !== selectedRange`, below) the whole time
-   * but only fetches once, for the range the user actually settled on.
-   */
   const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>("7D");
-  const [debouncedRange, setDebouncedRange] = useState<PortfolioHistoryRange>("7D");
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedRange(selectedRange), PORTFOLIO_RANGE_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [selectedRange]);
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
@@ -322,11 +378,12 @@ export function MainScreenView({
     writePortfolioScope(next);
   };
   // Waits for the wallet list so a saved "all" preference doesn't first fetch the single-wallet view.
-  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, debouncedRange, portfolioScope, {
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, {
     enabled: !otherWalletsQuery.isPending,
   });
 
-  const avatarSvg = useMemo(() => generateAccountAvatarSvg(wallet.address), [wallet.address]);
+  const identity = useAddressIdentity();
+  const avatarSvg = identity.avatarSvg(wallet.address);
   const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
 
   /**
@@ -386,9 +443,10 @@ export function MainScreenView({
   }, [headerCollapsed]);
 
   /**
-   * Back at the top, the home screen shows Tokens again. Only an expand
-   * after a collapse counts, so a remount on a tab the caller restored
-   * (returning from a detail screen) keeps that tab.
+   * Back at the top, the home screen shows Tokens again, with the hidden
+   * tokens disclosure collapsed. Only an expand after a collapse counts, so
+   * a remount on a tab the caller restored (returning from a detail screen)
+   * keeps that tab.
    */
   const wasCollapsedRef = useRef(false);
   useEffect(() => {
@@ -399,21 +457,21 @@ export function MainScreenView({
     if (!wasCollapsedRef.current) return;
     wasCollapsedRef.current = false;
     setActiveTab("tokens");
+    setHiddenExpanded(false);
     onTabChange?.("tokens");
     // onTabChange is deliberately left out: only the collapse flip should reset the tab.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [headerCollapsed]);
 
   /**
-   * Picking a tab scrolls the window until the section reaches its docked
-   * position, so the header fades, the section docks, and the whole list
-   * has the popup to itself. Once docked, the section scrolls on its own,
-   * so the click just brings that inner list back to its top.
+   * Scrolls the window until the list section reaches its docked position,
+   * so the header fades, the section docks, and the whole list has the
+   * popup to itself. Once docked, the section scrolls on its own, so this
+   * just brings that inner list back to its top. Shared by tab switches and
+   * by expanding the hidden-tokens disclosure, which both want the list in
+   * full view rather than scrolled to wherever the click happened.
    */
-  const selectTab = (tab: MainScreenTab) => {
-    setActiveTab(tab);
-    if (tab === "collectibles") setCollectiblesOpened(true);
-    onTabChange?.(tab);
+  const scrollListToDockedTop = () => {
     const section = listSectionRef.current;
     if (!section) return;
     const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -423,6 +481,18 @@ export function MainScreenView({
     }
     const top = window.scrollY + section.getBoundingClientRect().top - LIST_DOCK_TOP_PX;
     window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
+  };
+
+  const selectTab = (tab: MainScreenTab) => {
+    setActiveTab(tab);
+    if (tab === "collectibles") setCollectiblesOpened(true);
+    onTabChange?.(tab);
+    scrollListToDockedTop();
+  };
+
+  const toggleHiddenExpanded = () => {
+    setHiddenExpanded((prev) => !prev);
+    scrollListToDockedTop();
   };
 
   /** Scrolling to the top un-collapses the header, which un-docks the list and fades the chart back in. */
@@ -514,23 +584,7 @@ export function MainScreenView({
               onRangeChange={setSelectedRange}
               scope={portfolioScope}
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
-              /**
-               * True for the whole debounce window too (not just while
-               * the query itself is in flight) — `selectedRange` moves
-               * the instant a tab is clicked, but `debouncedRange` (and
-               * so `portfolioHistoryQuery`) hasn't caught up yet, and
-               * `portfolioHistoryQuery` is still holding the *previous*
-               * range's data/error during that window. Showing loading
-               * here avoids flashing the old range's chart, %-change, or
-               * (see `onRetry` below) its stale error state under a tab
-               * that no longer matches it. `isFetching` rather than
-               * `isLoading`: `isLoading` is only true for a range's very
-               * first fetch (no cached data yet) — clicking the error
-               * banner's Retry re-runs an already-errored query, which
-               * `isLoading` never reflects, so it was leaving the banner
-               * on screen through the whole retry with no visible change.
-               */
-              loading={debouncedRange !== selectedRange || portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
+              loading={portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
               /**
                * `series: []` on a *resolved* response (no thrown query
                * error) is `getPortfolioHistory`'s own signal that both AR
@@ -544,17 +598,14 @@ export function MainScreenView({
                * tabs (rendered inside `PortfolioChart`) stay visible and
                * clickable even while the active range is failed — a
                * failed "ALL" no longer strands the user without a way
-               * back to a previously-cached "7D". Gated on
-               * `debouncedRange === selectedRange` for the same
-               * stale-data reason as `loading` above: never surface the
-               * error banner for a range the user has already clicked
-               * away from. Also gated on `!isFetching` so clicking Retry
-               * hides the banner immediately (`loading` above turns
-               * true from the same `isFetching` flip) instead of leaving
-               * it on screen, inert, for the duration of the refetch.
+               * back to a previously-cached "7D". Gated on `!isFetching`
+               * so clicking Retry hides the banner immediately instead
+               * of leaving it on screen, inert, for the duration of the
+               * refetch. `isFetching` rather than `isLoading` for
+               * `loading`: a Retry re-runs an already-errored query,
+               * which `isLoading` never reflects.
                */
               onRetry={
-                debouncedRange === selectedRange &&
                 !portfolioHistoryQuery.isFetching &&
                 (portfolioHistoryQuery.error || (portfolioHistoryQuery.isSuccess && portfolioHistoryQuery.data.series.length === 0))
                   ? () => void portfolioHistoryQuery.refetch()
@@ -650,34 +701,157 @@ export function MainScreenView({
                 <SkeletonRow />
               </>
             ) : (
-              <>
-                {buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map(({ send, ...row }) => (
-                  <TokenRow
-                    key={row.key}
-                    glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                    name={row.name}
-                    amount={row.amount}
-                    usdValue={row.usdValue}
-                    loading={loading}
-                    onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
-                  />
-                ))}
-                <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} />
-                {nonDefaultTokenBalances(balancesQuery.data).map((token) => (
-                  <TokenRow
-                    key={token.processId}
-                    glyph={{ label: token.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
-                    name={token.ticker}
-                    amount={
-                      token.available === false
-                        ? UNAVAILABLE_BALANCE_LABEL
-                        : formatAtomicAsDisplay(token.quantity, token.denomination)
-                    }
-                    loading={loading}
-                    onClick={token.available === false ? undefined : () => onSendToken(token)}
-                  />
-                ))}
-              </>
+              (() => {
+                const rows: ListedTokenRow[] = [
+                  ...buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map(({ send, ...row }) => ({
+                    key: row.key,
+                    label: row.name,
+                    defaultHidden: false,
+                    node: (
+                      <TokenRow
+                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
+                        name={row.name}
+                        amount={row.amount}
+                        usdValue={row.usdValue}
+                        loading={loading}
+                        onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
+                        className="border-b-0"
+                      />
+                    ),
+                  })),
+                  {
+                    key: "gleam-points",
+                    label: "Gleam Points",
+                    defaultHidden: false,
+                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} className="border-b-0" />,
+                  },
+                  ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
+                    const discovered = token.source === "discovered";
+                    return {
+                      key: token.processId,
+                      label: token.ticker,
+                      processId: token.processId,
+                      // Anyone can send a token, so one the user didn't add starts hidden.
+                      defaultHidden: discovered,
+                      node: (
+                        <TokenRow
+                          glyph={{
+                            label: token.ticker.slice(0, 2).toUpperCase(),
+                            tone: 2,
+                            logoUrl: discovered ? undefined : token.logoUrl,
+                          }}
+                          name={token.ticker}
+                          amount={
+                            token.available === false
+                              ? UNAVAILABLE_BALANCE_LABEL
+                              : formatAtomicAsDisplay(token.quantity, token.denomination)
+                          }
+                          loading={loading}
+                          onClick={token.available === false ? undefined : () => onSendToken(token)}
+                          className="border-b-0"
+                        />
+                      ),
+                    };
+                  }),
+                ].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+                const hiddenRows = rows.filter(isRowHidden);
+                const renderRow = (row: ListedTokenRow) => {
+                  const hidden = isRowHidden(row);
+                  const { processId } = row;
+                  if (processId !== undefined && confirmingIgnore === processId) {
+                    return (
+                      <div key={row.key} className="flex flex-col gap-2 border-b border-line px-3.5 py-3 last:border-b-0">
+                        <p className="text-caption leading-relaxed text-muted">
+                          Ignore {row.label}? It won&apos;t show anywhere in Gleam. To bring it back, add
+                          its process id in Manage tokens.
+                        </p>
+                        {ignoreFailed ? (
+                          <p role="alert" className="text-caption text-warning">
+                            Couldn&apos;t ignore it. Try again.
+                          </p>
+                        ) : null}
+                        <div className="flex justify-end gap-3 text-caption font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingIgnore(null)}
+                            className="text-muted hover:text-foreground"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={ignoring}
+                            onClick={() => void ignoreToken(processId)}
+                            className="text-warning disabled:opacity-60"
+                          >
+                            {ignoring ? "Ignoring…" : "Ignore"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const actionClassName =
+                    "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground";
+                  return (
+                    <div key={row.key} className="group relative border-b border-line last:border-b-0">
+                      {row.node}
+                      {hiddenExpanded ? (
+                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
+                          {hidden && processId !== undefined ? (
+                            <button
+                              type="button"
+                              aria-label={`Ignore ${row.label}`}
+                              onClick={() => {
+                                setIgnoreFailed(false);
+                                setConfirmingIgnore(processId);
+                              }}
+                              className={actionClassName}
+                            >
+                              Ignore
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            aria-label={`${hidden ? "Show" : "Hide"} ${row.label}`}
+                            onClick={() => toggleRowHidden(row)}
+                            className={actionClassName}
+                          >
+                            {hidden ? "Show" : "Hide"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                };
+                return (
+                  <>
+                    {rows.filter((row) => !isRowHidden(row)).map(renderRow)}
+                    {hiddenRows.length > 0 ? (
+                      <>
+                        <button
+                          type="button"
+                          aria-expanded={hiddenExpanded}
+                          onClick={toggleHiddenExpanded}
+                          className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground"
+                        >
+                          <span>Hidden ({hiddenRows.length})</span>
+                          <ChevronIcon open={hiddenExpanded} />
+                        </button>
+                        {hiddenExpanded ? hiddenRows.map(renderRow) : null}
+                      </>
+                    ) : listDocked || hiddenExpanded ? (
+                      // With nothing hidden there's no accordion to open, so this is the way into Show/Hide.
+                      <button
+                        type="button"
+                        onClick={() => setHiddenExpanded((prev) => !prev)}
+                        className="px-3.5 py-3 text-caption text-faint hover:text-foreground"
+                      >
+                        {hiddenExpanded ? "Done" : "Edit list"}
+                      </button>
+                    ) : null}
+                  </>
+                );
+              })()
             )}
           </div>
         ) : activeTab === "collectibles" ? (
@@ -707,9 +881,17 @@ export function MainScreenView({
                   <ActivityRow
                     key={entry.txId}
                     activityType={entry.type}
-                    title={`${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`}
+                    title={
+                      entry.swap
+                        ? `Swap order · ${swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances)}`
+                        : `${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`
+                    }
                     subtitle={
-                      entry.status === "pending"
+                      entry.swap && entry.status === "confirmed"
+                        ? `Order placed${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
+                        : entry.unverified
+                        ? `Unverified transfer request${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
+                        : entry.status === "pending"
                         ? "Pending confirmation"
                         : entry.status === "failed"
                           ? entry.error
@@ -722,7 +904,7 @@ export function MainScreenView({
                         ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
                         : "—"
                     }
-                    amountTone={entry.type === "receive" ? "positive" : "neutral"}
+                    amountTone={entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
                         ? { name: collectibleLabel(entry.collectible), imageUrl: entry.collectible.imageUrl }

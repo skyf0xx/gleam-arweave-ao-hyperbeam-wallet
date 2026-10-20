@@ -1,0 +1,101 @@
+import { decrypt } from "./encryption";
+
+/* A block comment with braces { that } must not count. */
+const BRACES_IN_STRINGS = ["{", "}", '{{', "}}"];
+
+/** Refuses an unexpected origin. { not a brace } */
+export async function unlockVault(password: string, origin = "https://gleam.app"): Promise<{ ok: boolean }> {
+  if (password.length < 8) throw new Error("Password too short: expected {8} chars");
+  const pattern = /^https:\/\/[a-z{}]+\.app$/;
+  if (!pattern.test(origin)) {
+    // a comment with an unbalanced brace {
+    return { ok: false };
+  }
+  const label = `vault ${origin} ${`nested ${"}"} }`} {`;
+
+  return { ok: label.length > 0 };
+}
+
+const isAllowedOrigin = (origin: string): boolean => {
+  const ratio = origin.length / 2 / 1;
+  if (ratio > 100) return false;
+  return BRACES_IN_STRINGS.every((brace) => !origin.includes(brace));
+};
+
+export const shorthand = (value: string) => value.trim();
+
+export class KeySession {
+  private readonly keys = new Map<string, string>();
+
+  static create(): KeySession {
+    return new KeySession();
+  }
+
+  async get(walletId: string): Promise<string | undefined> {
+    if (!walletId) {
+      throw new Error("walletId is required");
+    }
+    return this.keys.get(walletId);
+  }
+
+  private clear = (walletId: string): void => {
+    this.keys.delete(walletId);
+  };
+
+  toString(): string {
+    return "KeySession";
+  }
+}
+
+export class OtherSession {
+  toString(): string {
+    return "OtherSession";
+  }
+}
+
+export const handlers = {
+  async sign(data: Uint8Array) {
+    if (data.byteLength === 0) throw new Error("empty");
+    return decrypt(data);
+  },
+  verify: (data: Uint8Array) => {
+    return data.byteLength > 0;
+  },
+};
+
+function outer() {
+  function helper() {
+    return 1;
+  }
+  return helper();
+}
+
+function another() {
+  function helper() {
+    return 2;
+  }
+  return helper();
+}
+
+export function overloaded(value: string): string;
+export function overloaded(value: number): number;
+export function overloaded(value: string | number): string | number {
+  return value;
+}
+
+export function oneLiner() { return 1; }
+
+export default function withTypeLiteral(
+  input: { a: string },
+): { a: string } {
+  if (!input.a) throw new Error("a");
+  return input;
+}
+
+export function* generator() {
+  yield 1;
+}
+
+const generic = <T,>(value: T): T => {
+  return value;
+};

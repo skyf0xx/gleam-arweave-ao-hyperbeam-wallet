@@ -36,6 +36,19 @@ import type {
   Winston,
 } from "@gleam/core";
 import type { ProviderSurfaceMethod } from "./page-protocol";
+import type { SiteAttestResponse } from "./site-protocol";
+
+export type AttestationCheck = { ok: true } | { ok: false; error: string };
+
+/**
+ * What a finished request shows in its window, for the kinds whose window
+ * stays open after approval. A scan attestation shows the points it
+ * earned or why it was refused.
+ */
+export interface ApprovalShown {
+  shown: "scanAttestation";
+  result: SiteAttestResponse;
+}
 
 /**
  * The typed background RPC contract. `@webext-core/messaging`'s
@@ -100,7 +113,12 @@ export interface ProtocolMap {
   removePasskey(): void;
 
   // reads
-  getState(): WalletState;
+  /**
+   * Counts as auto-lock activity unless `recordActivity` is false. The
+   * approval window passes false: a site opens it, so its mere loading
+   * isn't the user, and only its approve and reject count.
+   */
+  getState(req?: { recordActivity?: boolean }): WalletState;
   getBalance(req: { address: string }): Winston;
   /**
    * A rough, recipient-less fee quote (drives the compose step's "Max"
@@ -189,8 +207,11 @@ export interface ProtocolMap {
    * the request with `device` set (its unsigned payloads), and the window
    * answers with `submitDeviceSignature`. Rejecting still works while the
    * request waits for the device.
+   *
+   * A scan attestation returns `ApprovalShown`, and its window stays open
+   * to show it.
    */
-  resolveApproval(req: { requestId: string; approved: boolean }): ApprovalRequest | void;
+  resolveApproval(req: { requestId: string; approved: boolean }): ApprovalRequest | ApprovalShown | void;
   /**
    * The device's signatures (base64url, one per `device.payloads` entry,
    * in order) for a request waiting on a hardware wallet. Each is checked
@@ -198,8 +219,13 @@ export interface ProtocolMap {
    * leaves the request waiting, so the user can sign again. Otherwise the
    * request completes as `resolveApproval` would for a keyfile wallet.
    */
-  submitDeviceSignature(req: { requestId: string; signatures: string[] }): void;
-  /** Heartbeat while the window talks to the device; pushes the timeout back, up to `APPROVAL_MAX_MS`. */
+  submitDeviceSignature(req: { requestId: string; signatures: string[] }): ApprovalShown | void;
+  /**
+   * A scan attestation's dry run against the points API, asked before the
+   * signature is. `error` says what to do next.
+   */
+  checkScanAttestation(req: { requestId: string }): AttestationCheck;
+  /** Heartbeat while the window talks to the device; pushes the timeout back, up to the request's device cap. */
   deviceActivity(req: { requestId: string }): { deadline: number };
 
   // settings
@@ -269,6 +295,11 @@ export interface ProtocolMap {
    * the host allowlist are dropped, and any failure yields an empty list.
    */
   getAnnouncements(): Announcement[];
+  /**
+   * How many community scans attest the running release, from the points
+   * API; null when it can't be read.
+   */
+  getScanCount(): number | null;
   /** Ids of the announcements the user has dismissed. */
   getDismissedAnnouncements(): string[];
   dismissAnnouncement(req: { id: string }): void;

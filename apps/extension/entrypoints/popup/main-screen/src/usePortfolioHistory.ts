@@ -17,13 +17,8 @@ import type { PortfolioHistory, PortfolioHistoryRange, PortfolioScope, RuntimePo
  */
 /**
  * Set well above the app's `QueryClient` default of `staleTime: 0` so
- * switching range tabs doesn't refire `getHistoricalUsdPricesWithFallback`
- * for a range already fetched this session — CoinGecko's free tier
- * rate-limits aggressively, and a quick tour of all 5 tabs firing 5 fresh
- * requests back-to-back would trip the limit partway through (typically
- * on "ALL", the tab usually tried last) and then fail every *other* range
- * too, cache or not, if each tab click always went back to the network
- * regardless of a prior successful fetch.
+ * switching back to a range already loaded this session shows it
+ * instantly instead of refetching from the points API's price proxy.
  */
 const PORTFOLIO_HISTORY_STALE_TIME_MS = 5 * 60 * 1000;
 
@@ -43,7 +38,7 @@ export function usePortfolioHistory(
         payload: { range, scope },
       }),
     staleTime: PORTFOLIO_HISTORY_STALE_TIME_MS,
-    // Bounds how long a rate-limited/offline range spends retrying before
+    // Bounds how long an offline range spends retrying before
     // `NetworkErrorBanner`'s retry button takes over, rather than the
     // default `retry: 3` exponential backoff stalling one range for
     // several seconds. `retryDelay: 0` skips TanStack's default ~1s

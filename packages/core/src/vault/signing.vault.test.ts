@@ -1,8 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { signerFromJwk } from "../signer/keys";
+import { signerFromJwk, generateJWK } from "../signer/keys";
 import Arweave from "arweave";
 import { DataItem } from "@dha-team/arbundles/web";
-import { generateJWK } from "../keys/jwk";
 import {
   signTransaction,
   dispatchTransaction,
@@ -86,7 +85,18 @@ describe("vault/signing", () => {
       });
       expect(result.id).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(result.data_root).toBeTruthy();
-      expect(result).not.toHaveProperty("data");
+      expect(result.data).toBe("aGVsbG8");
+    });
+
+    it("returns an empty data field for a data-less transfer, so the result posts to /tx as-is", async () => {
+      const result = await signTransaction("https://arweave.net", signerFromJwk(jwk, ""), {
+        target,
+        quantity: "1000",
+        reward: "5000",
+        last_tx: lastTx,
+      });
+
+      expect(result).toMatchObject({ data: "", data_size: "0", data_root: "" });
     });
 
     it("fetches last_tx and reward from the gateway when the dApp leaves them out", async () => {

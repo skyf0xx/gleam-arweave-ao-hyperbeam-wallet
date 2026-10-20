@@ -13,3 +13,5 @@ export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { RecipientWarning, type RecipientWarningProps } from "./RecipientWarning";
 export { SkeletonTile } from "./SkeletonTile";
 export { CollectibleThumbnail, type CollectibleThumbnailProps } from "./CollectibleThumbnail";
+export { MemorableAddress, type MemorableAddressProps } from "./MemorableAddress";
+export { RecipientCard, type RecipientCardProps } from "./RecipientCard";

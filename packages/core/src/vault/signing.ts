@@ -158,6 +158,7 @@ export async function finishSignTransaction(
     tags: transaction.tags,
     target: transaction.target,
     quantity: transaction.quantity,
+    data: transaction.data,
     data_size: transaction.data_size,
     data_root: transaction.data_root,
     reward: transaction.reward,

@@ -1,4 +1,7 @@
 import type { TokenBalance } from "../models/balance";
+import type { TokenTransport } from "../models/token-metadata";
+import { readLegacyTokenBalance } from "./legacy-token";
+import { AO_LEGACY_CU_URL } from "./result";
 
 /**
  * Reads an AO token balance via the HyperBEAM `process@1.0` compute path:
@@ -62,7 +65,7 @@ function parseBalanceResponse(
     };
   }
 
-  if (typeof body === "number" && Number.isInteger(body)) {
+  if (typeof body === "number" && Number.isSafeInteger(body) && body >= 0) {
     return {
       address,
       processId,
@@ -79,7 +82,7 @@ function parseBalanceResponse(
     const quantity =
       typeof rawQuantity === "string"
         ? rawQuantity
-        : typeof rawQuantity === "number"
+        : typeof rawQuantity === "number" && Number.isSafeInteger(rawQuantity) && rawQuantity >= 0
           ? String(rawQuantity)
           : undefined;
 
@@ -101,6 +104,80 @@ function parseBalanceResponse(
   throw new Error(
     `Unrecognized AO balance response shape for process "${processId}", address "${address}": ${JSON.stringify(body)}`,
   );
+}
+
+export interface ReadTokenBalanceOptions {
+  processId: string;
+  address: string;
+  transport: TokenTransport;
+  gatewayUrl: string;
+  /** The user's active HyperBEAM peer, or `null` when none is configured. */
+  peerUrl: string | null;
+  cuUrl?: string;
+  fetchImpl?: typeof fetch;
+  /** Names the token in the error, e.g. its ticker. */
+  label?: string;
+}
+
+/**
+ * The atomic balance of `address` on `processId`, read where that kind of
+ * token actually lives:
+ *
+ * - `"l1"` (`arweave-scheduler@1.0`): the gateway's HyperBEAM node first,
+ *   then the peer. Legacy-AO peers such as state.forward.computer answer
+ *   403 or 500 for these processes.
+ * - `"mu"` (legacynet): the peer's compute path first, then a CU
+ *   `dry-run`. state.forward.computer serves only an allowlist of legacy
+ *   processes and answers 403 for the rest.
+ *
+ * Throws one error naming every source tried when none answers.
+ */
+export async function readTokenBalance(options: ReadTokenBalanceOptions): Promise<string> {
+  const { processId, address, transport, gatewayUrl, peerUrl } = options;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const hosts = [
+    ...new Set(
+      (transport === "l1" ? [gatewayUrl, peerUrl] : [peerUrl])
+        .filter((url): url is string => url !== null)
+        .map(trimTrailingSlash),
+    ),
+  ];
+  const failures: string[] = [];
+  for (const host of hosts) {
+    try {
+      return (await getTokenBalance(processId, address, host, fetchImpl)).quantity;
+    } catch (error) {
+      failures.push(`${hostOf(host)} (${shortReason(error)})`);
+    }
+  }
+  if (transport === "mu") {
+    const cuUrl = options.cuUrl ?? AO_LEGACY_CU_URL;
+    try {
+      return await readLegacyTokenBalance(processId, address, cuUrl, fetchImpl);
+    } catch (error) {
+      failures.push(`${hostOf(cuUrl)} (${shortReason(error)})`);
+    }
+  }
+  const label = options.label ?? "token";
+  throw new Error(
+    `Couldn't read your ${label} balance. Tried ${failures.join(", ")}. The token's node may be busy, so try again in a minute.`,
+  );
+}
+
+function shortReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const status = /HTTP (\d{3})|answered (\d{3})/.exec(message);
+  if (status) return `HTTP ${status[1] ?? status[2]}`;
+  if (/timed? ?out|abort/i.test(message)) return "timed out";
+  return "unreadable answer";
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
 function trimTrailingSlash(url: string): string {

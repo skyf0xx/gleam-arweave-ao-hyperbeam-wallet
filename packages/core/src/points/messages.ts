@@ -4,11 +4,26 @@
  * share one definition of each format.
  *
  * Every payload starts with `gleam-points:` and a kind, so a signature
- * over one can never be replayed as another kind, as a transaction, or as
- * a dApp `signMessage` request.
+ * over one can never be replayed as another kind. The extension refuses
+ * any dApp `signMessage` whose data starts with the prefix
+ * (`isPointsMessage`), so a site can't have one signed that way.
  */
 
+import { ATTESTATION_ID_PATTERN, RELEASE_PATTERN } from "../scan/format";
+
 export const POINTS_MESSAGE_PREFIX = "gleam-points:";
+
+const POINTS_MESSAGE_PREFIX_BYTES = new TextEncoder().encode(POINTS_MESSAGE_PREFIX);
+
+/**
+ * True when `data` starts with the UTF-8 bytes of `POINTS_MESSAGE_PREFIX`.
+ * Compared as bytes, since a dApp's data needn't be valid UTF-8 and the
+ * signature covers the bytes, not a decoded string.
+ */
+export function isPointsMessage(data: Uint8Array): boolean {
+  if (data.byteLength < POINTS_MESSAGE_PREFIX_BYTES.byteLength) return false;
+  return POINTS_MESSAGE_PREFIX_BYTES.every((byte, index) => data[index] === byte);
+}
 
 /** How old a signed payload's `issuedAt` may be before the server rejects it. */
 export const POINTS_MESSAGE_MAX_AGE_SECONDS = 600;
@@ -115,6 +130,28 @@ export function parseRedeemMessage(text: string): { code: string; issuedAt: numb
   if (scheme !== "gleam-points" || kind !== "redeem" || version !== "v1") return null;
   if (!isValidInviteCode(code) || !UNIX_SECONDS_PATTERN.test(issuedAt)) return null;
   return { code, issuedAt: Number(issuedAt) };
+}
+
+/**
+ * Signed by the wallet's RSA key to attest a community scan of a release
+ * (SCANS.md § The attestation). It carries no timestamp: the id commits to
+ * the whole attestation, and the server accepts one per wallet per release.
+ */
+export function buildAttestMessage(release: string, attestationId: string): string {
+  if (!RELEASE_PATTERN.test(release)) throw new Error(`"${release}" isn't an x.y.z release.`);
+  if (!ATTESTATION_ID_PATTERN.test(attestationId)) {
+    throw new Error("The attestation id must be a 64-character lowercase hex SHA-256 digest.");
+  }
+  return `gleam-points:attest:v1:${release}:${attestationId}`;
+}
+
+export function parseAttestMessage(text: string): { release: string; attestationId: string } | null {
+  const parts = text.split(":");
+  if (parts.length !== 5) return null;
+  const [scheme, kind, version, release, attestationId] = parts as [string, string, string, string, string];
+  if (scheme !== "gleam-points" || kind !== "attest" || version !== "v1") return null;
+  if (!RELEASE_PATTERN.test(release) || !ATTESTATION_ID_PATTERN.test(attestationId)) return null;
+  return { release, attestationId };
 }
 
 /** Device-key-signed payloads that carry only a timestamp. */

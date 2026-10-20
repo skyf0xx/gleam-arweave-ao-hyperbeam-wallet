@@ -1,4 +1,6 @@
+import { attestationId, parseAttestation } from "@gleam/core/src/scan/index.ts";
 import {
+  buildAttestMessage,
   buildDeviceMessage,
   buildLeaveMessage,
   buildRedeemMessage,
@@ -10,10 +12,10 @@ import {
   type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
 import { signTransactionWithSigner } from "@gleam/core/src/arweave/transaction.ts";
-import { deriveAddress, generateJWK } from "@gleam/core/src/keys/jwk.ts";
+import { deriveAddress } from "@gleam/core/src/keys/jwk.ts";
 import { bytesToBase64Url } from "@gleam/core/src/vault/base64.ts";
 import { signMessage } from "@gleam/core/src/vault/message-signing.ts";
-import { signerFromJwk } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK } from "@gleam/core/signer";
 import type { Signer } from "@gleam/core/src/vault/signer.ts";
 
 export interface TestWallet {
@@ -65,6 +67,24 @@ export async function registerBody(
     signature: await signProof(wallet, message, options.proof ?? "message"),
     ...(options.proof === "transaction" ? { proof: "transaction" } : {}),
     devicePublicKey: device.publicKey,
+  };
+}
+
+export async function attestBody(
+  wallet: TestWallet,
+  attestation: unknown,
+  options: { proof?: PointsProofKind; message?: string } = {},
+) {
+  const parsed = parseAttestation(attestation);
+  if (!parsed.ok) throw new Error(`Test attestation is invalid: ${JSON.stringify(parsed.issues)}`);
+  const proof = options.proof ?? "message";
+  const message = options.message ?? buildAttestMessage(parsed.attestation.release, await attestationId(parsed.attestation));
+  return {
+    attestation,
+    owner: wallet.signer.owner,
+    message,
+    signature: await signProof(wallet, message, proof),
+    ...(proof === "transaction" ? { proof: "transaction" } : {}),
   };
 }
 

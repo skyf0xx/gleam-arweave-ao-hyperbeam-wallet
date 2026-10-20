@@ -43,6 +43,7 @@ import {
   type HardwareDevice,
   type HardwareWalletMethod,
   type PermissionType,
+  type ScanAttestationApprovalPreview,
   type SignTransactionInput,
   type SigningApprovalPreview,
   type StoragePort,
@@ -52,12 +53,29 @@ import {
 import {
   APPROVAL_MAX_MS,
   APPROVAL_TIMEOUT_MS,
+  SCAN_ATTESTATION_TIMEOUT_MS,
   decodeTaggedBinary,
   encodeTaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
-import { buildOwnershipTransaction, POINTS_PROOF_TAG } from "@gleam/core/src/points/index.ts";
+import {
+  buildAttestMessage,
+  buildOwnershipTransaction,
+  POINTS_PROOF_TAG,
+} from "@gleam/core/src/points/index.ts";
+import {
+  attestationId,
+  parseAttestation,
+  type Attestation,
+  type ParsedAttestation,
+} from "@gleam/core/src/scan/attestation.ts";
+import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
+import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
+import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
+import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import { getSigner, getStoredWallet, getWalletMethod } from "./key-session";
+import { attestFailure } from "./attest-errors";
+import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
 
 /**
@@ -103,7 +121,7 @@ import type { SubmitTransferRequest } from "./transfer";
  * Closing the approval window with its own close button counts as a
  * rejection: `WindowPort.onApprovalWindowClosed` writes a rejected outcome
  * the same way `resolveApproval` does, so the dApp hears back at once
- * instead of after `APPROVAL_TIMEOUT_MS`.
+ * instead of after the review timeout (`reviewTimeoutMs`).
  *
  * Hardware wallets: the service worker can't reach the camera or WebHID,
  * so every hardware signature is made in the approval window. Approving
@@ -114,15 +132,23 @@ import type { SubmitTransferRequest } from "./transfer";
  * against that key before anything is returned or posted. A signature
  * that fails verification leaves the request waiting so the user can
  * sign again. While waiting, the timeout follows `device.deadline`,
- * which `deviceActivity` pushes back up to `APPROVAL_MAX_MS` from the
- * request's creation.
+ * which `deviceActivity` pushes back up to `deviceDeadline`'s cap
+ * (`APPROVAL_MAX_MS` from creation for a dApp request).
  *
  * Deadlines are also enforced on read, since an evicted service worker
  * loses its timers: a record past its deadline (`device.deadline`, or
- * `APPROVAL_TIMEOUT_MS` after creation while in review) is hidden from
+ * `reviewTimeoutMs(kind)` after creation while in review) is hidden from
  * every read and pruned on the next write, unless it is being resolved.
  */
 const GRANTS_KEY = "local:grants";
+
+/** How long a request waits for its first answer. */
+function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
+  return kind === "scanAttestation" ? SCAN_ATTESTATION_TIMEOUT_MS : APPROVAL_TIMEOUT_MS;
+}
+
+/** How long past its review timeout a request can wait on a hardware device. */
+const DEVICE_GRACE_MS = APPROVAL_MAX_MS - APPROVAL_TIMEOUT_MS;
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 const APPROVAL_WINDOW_PATH = "/approval.html";
 
@@ -215,6 +241,13 @@ export interface SigningRequestInput {
   hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512";
   /** `signature`'s RSA-PSS salt length. */
   saltLength?: number;
+  /**
+   * `scanAttestation`'s attestation, as `parseAttestation` returned it.
+   * `payload` is then the attest message it signs.
+   */
+  attestation?: Attestation;
+  /** `scanAttestation`'s signing wallet address, for the preview. */
+  address?: string;
 }
 
 /**
@@ -257,6 +290,31 @@ export interface DeviceTransferSubmitter {
 }
 
 export type TransferSubmitter = AoTransferSubmitter & Partial<DeviceTransferSubmitter>;
+
+/**
+ * The `PointsHandler` steps a scan attestation needs. A keyfile signs and
+ * submits in one call; a hardware wallet signs in this window, then hands
+ * its proof over.
+ */
+export interface ScanAttestationSubmitter {
+  attest(req: { walletId: string; attestation: ParsedAttestation }): Promise<SiteAttestResponse>;
+  submitAttestation(attestation: ParsedAttestation, proof: OwnershipProof): Promise<SiteAttestResponse>;
+  check(attestation: ParsedAttestation, address?: string): Promise<AttestationCheck>;
+}
+
+/**
+ * Thrown to whoever awaits a request the user rejected, closed or let time
+ * out, as opposed to one that was approved and then failed.
+ */
+export class ApprovalDeclinedError extends Error {
+  constructor(
+    message: string,
+    readonly timedOut: boolean,
+  ) {
+    super(message);
+    this.name = "ApprovalDeclinedError";
+  }
+}
 
 /** A hardware wallet's verified signature over the Gleam Points ownership transaction. */
 export interface PointsDeviceProof {
@@ -352,6 +410,7 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "transferAoTokens",
   "transfer",
   "pointsProof",
+  "scanAttestation",
   "signMessage",
 ]);
 
@@ -398,6 +457,16 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     const collectible = readCollectibleTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
     if (collectible) {
       return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
+    }
+    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
+    if (tokenTransfer) {
+      return {
+        kind: "l1TokenTransfer",
+        process: tokenTransfer.processId,
+        recipient: tokenTransfer.recipient,
+        quantity: tokenTransfer.quantity,
+        fee: reward,
+      };
     }
     return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
   }
@@ -521,6 +590,16 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
         });
         return;
       }
+      if (payload?.kind === "transaction") {
+        // An arweave-scheduler token takes its transfer as an L1 transaction.
+        checkTransaction(payload, {
+          target: input.token,
+          quantity: "0",
+          tags: l1TransferTags(input.recipient ?? "", input.amount ?? ""),
+          data: new Uint8Array(),
+        });
+        return;
+      }
       const summary = summarize(payload!);
       if (summary.kind !== "aoTransfer") mismatch("AO transfer");
       if (summary.process !== input.token) mismatch("token");
@@ -535,6 +614,7 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
       return;
     }
     case "pointsProof":
+    case "scanAttestation":
       checkTransaction(payloads[0], {
         target: "",
         quantity: "0",
@@ -546,6 +626,13 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
     default:
       return;
   }
+}
+
+/** The stored attestation, checked again: the brand doesn't survive storage. */
+function parsedAttestationOf(input: SigningRequestInput): ParsedAttestation {
+  const parsed = parseAttestation(input.attestation);
+  if (!parsed.ok) throw new Error("This request's attestation isn't valid.");
+  return parsed.attestation;
 }
 
 function toWirePayload(payload: UnsignedPayload): DeviceSigningPayload {
@@ -610,6 +697,33 @@ function buildAddTokenPreview(input: AddTokenRequestInput): AddTokenApprovalPrev
   };
 }
 
+/** What the window shows is derived from the attestation, and the message it signs must be the one for it. */
+async function buildScanAttestationPreview(
+  input: SigningRequestInput & { walletId: string },
+): Promise<ScanAttestationApprovalPreview> {
+  if (!input.address) throw new Error("A scan attestation request needs its signing wallet.");
+  const attestation = parsedAttestationOf(input);
+  const id = await attestationId(attestation);
+  const message = buildAttestMessage(attestation.release, id);
+  if (textDecoder.decode(input.payload) !== message) {
+    throw new Error("The message to sign isn't this attestation's.");
+  }
+  return {
+    kind: "scanAttestation",
+    walletId: input.walletId,
+    address: input.address,
+    attestationId: id,
+    message,
+    release: attestation.release,
+    commit: attestation.commit,
+    model: attestation.model,
+    challenge: attestation.challenge,
+    result: attestation.result,
+    answers: attestation.answers,
+    report: attestation.report,
+  };
+}
+
 function buildConnectPreview(
   requestedPermissions: PermissionType[],
   appInfo: ConnectAppInfo | null,
@@ -640,6 +754,7 @@ async function buildDataItemPreviews(
 }
 
 async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
+  if (input.kind === "scanAttestation") throw new Error("A scan attestation has its own preview.");
   const payloadHash = await sha256Hex(input.payload);
   const isBatch = input.kind === "batchSignDataItem";
   return {
@@ -672,6 +787,9 @@ export class ApprovalHandler {
    */
   private pendingQueue: Promise<void> = Promise.resolve();
 
+  /** Set while a scan attestation is being opened or awaited, so two can't race past the pending check. */
+  private attesting = false;
+
   constructor(
     private readonly storage: StoragePort,
     private readonly windows: WindowPort,
@@ -679,6 +797,7 @@ export class ApprovalHandler {
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
     private readonly activeWalletId: () => Promise<string | null> = async () => null,
     private readonly tokens?: TokenWatchList,
+    private readonly attestations?: ScanAttestationSubmitter,
   ) {
     windows.onApprovalWindowClosed((requestId) => {
       void this.rejectClosedWindow(requestId);
@@ -698,7 +817,7 @@ export class ApprovalHandler {
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
   private pastDeadline(entry: PendingApprovalRecord): boolean {
     if (entry.outcome) return false;
-    const deadline = entry.device?.deadline ?? entry.request.createdAt + APPROVAL_TIMEOUT_MS;
+    const deadline = entry.device?.deadline ?? entry.request.createdAt + reviewTimeoutMs(entry.request.kind);
     return Date.now() > deadline;
   }
 
@@ -769,7 +888,9 @@ export class ApprovalHandler {
         ? buildConnectPreview(input.requestedPermissions, input.appInfo ?? null)
         : input.kind === "addToken"
           ? buildAddTokenPreview(input)
-          : await buildSigningPreview(input);
+          : input.kind === "scanAttestation"
+            ? await buildScanAttestationPreview(input)
+            : await buildSigningPreview(input);
 
     const request: ApprovalRequest = {
       requestId,
@@ -790,7 +911,7 @@ export class ApprovalHandler {
       `${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`,
     );
 
-    return this.awaitResolution(requestId);
+    return this.awaitResolution(requestId, input.kind);
   }
 
   /**
@@ -800,7 +921,7 @@ export class ApprovalHandler {
    * one-tick write `resolveApproval` makes just before removing the
    * record), or rejects on timeout.
    */
-  private async awaitResolution(requestId: string): Promise<unknown> {
+  private async awaitResolution(requestId: string, kind: ApprovalRequest["kind"]): Promise<unknown> {
     return new Promise((resolve, reject) => {
       let timeout: ReturnType<typeof setTimeout>;
       const expireAt = (at: number) => {
@@ -822,9 +943,9 @@ export class ApprovalHandler {
         unwatch();
         void this.dropPending(requestId);
         void this.windows.closeApprovalWindow(requestId);
-        reject(new Error(TIMED_OUT));
+        reject(new ApprovalDeclinedError(TIMED_OUT, true));
       };
-      expireAt(Date.now() + APPROVAL_TIMEOUT_MS);
+      expireAt(Date.now() + reviewTimeoutMs(kind));
 
       const unwatch = this.storage.watch<PendingApprovalRecord[]>(PENDING_APPROVALS_KEY, (value) => {
         const entry = (value ?? []).find((candidate) => candidate.request.requestId === requestId);
@@ -834,7 +955,7 @@ export class ApprovalHandler {
         unwatch();
         const { outcome } = entry;
         if (!outcome.approved) {
-          reject(new Error(outcome.error ?? "The request was rejected."));
+          reject(new ApprovalDeclinedError(outcome.error ?? "The request was rejected.", outcome.error === TIMED_OUT));
         } else if (outcome.error) {
           reject(new Error(outcome.error));
         } else {
@@ -937,7 +1058,7 @@ export class ApprovalHandler {
    * is rejected with that error and this call throws it too. The window
    * stays open so the user sees why instead of a success message.
    */
-  async resolveApproval(req: { requestId: string; approved: boolean }): Promise<ApprovalRequest | void> {
+  async resolveApproval(req: { requestId: string; approved: boolean }): Promise<ApprovalRequest | ApprovalShown | void> {
     const entry = await this.findPending(req.requestId);
     if (this.resolving.has(req.requestId)) {
       throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
@@ -948,17 +1069,19 @@ export class ApprovalHandler {
     this.resolving.add(req.requestId);
     try {
       let outcome: ApprovalOutcome;
+      let result: unknown;
       if (!req.approved) {
         outcome = { approved: false };
       } else {
         try {
           if (await this.signsOnDevice(entry)) return await this.startDeviceSigning(entry);
-          outcome = { approved: true, result: encodeTaggedBinary(await this.finalizeApproval(entry)) };
+          result = await this.finalizeApproval(entry);
+          outcome = { approved: true, result: encodeTaggedBinary(result) };
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
         }
       }
-      await this.complete(req.requestId, outcome);
+      return await this.complete(entry, outcome, result);
     } finally {
       this.resolving.delete(req.requestId);
     }
@@ -967,9 +1090,15 @@ export class ApprovalHandler {
   /**
    * Hands the outcome to whoever awaits the request, drops it, and closes
    * its window. A failed outcome throws instead, leaving the window open
-   * to show why.
+   * to show why. A scan attestation keeps its window open too, and its
+   * result is returned for the window to show.
    */
-  private async complete(requestId: string, outcome: ApprovalOutcome): Promise<void> {
+  private async complete(
+    entry: PendingApprovalRecord,
+    outcome: ApprovalOutcome,
+    result: unknown,
+  ): Promise<ApprovalShown | void> {
+    const { requestId } = entry.request;
     // Written in two steps (outcome attached, then removed) so a watcher
     // observing this key sees the outcome at least once before the record
     // disappears — see this class's doc comment.
@@ -978,6 +1107,9 @@ export class ApprovalHandler {
     );
     await this.dropPending(requestId);
     if (outcome.error !== undefined) throw new Error(outcome.error);
+    if (outcome.approved && entry.request.kind === "scanAttestation") {
+      return { shown: "scanAttestation", result: result as SiteAttestResponse };
+    }
     await this.windows.closeApprovalWindow(requestId);
   }
 
@@ -987,9 +1119,17 @@ export class ApprovalHandler {
     return method !== null && isHardwareWalletMethod(method);
   }
 
-  /** The earliest of another idle window from now and the request's hard cap. */
-  private deviceDeadline(createdAt: number): number {
-    return Math.min(Date.now() + APPROVAL_TIMEOUT_MS, createdAt + APPROVAL_MAX_MS);
+  /**
+   * The earliest of another idle window from now and the request's hard
+   * cap. The cap gives the device the same time past the kind's own
+   * review timeout that a dApp request gets past `APPROVAL_TIMEOUT_MS`,
+   * so a scan attestation approved late in its longer review still gets
+   * that time. For a dApp request it stays `APPROVAL_MAX_MS` from
+   * creation, which the page's own timeout is sized to.
+   */
+  private deviceDeadline(request: ApprovalRequest): number {
+    const cap = reviewTimeoutMs(request.kind) + DEVICE_GRACE_MS;
+    return Math.min(Date.now() + APPROVAL_TIMEOUT_MS, request.createdAt + cap);
   }
 
   private async startDeviceSigning(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
@@ -1000,7 +1140,7 @@ export class ApprovalHandler {
     assertPreparedMatches(input, payloads);
     const device: PendingDeviceSigning = {
       payloads: encodeTaggedBinary(payloads),
-      deadline: this.deviceDeadline(entry.request.createdAt),
+      deadline: this.deviceDeadline(entry.request),
     };
     const requestId = entry.request.requestId;
     let stillPending = false;
@@ -1015,13 +1155,23 @@ export class ApprovalHandler {
     return this.requestView({ ...entry, device });
   }
 
+  /** `ProtocolMap.checkScanAttestation`. */
+  async checkScanAttestation(req: { requestId: string }): Promise<AttestationCheck> {
+    const entry = await this.findLive(req.requestId, false);
+    if (entry.request.kind !== "scanAttestation") {
+      throw new Error(`Approval request "${req.requestId}" isn't a scan attestation.`);
+    }
+    const wallet = entry.walletId ? await getStoredWallet(entry.walletId) : null;
+    return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)), wallet?.address);
+  }
+
   /** `ProtocolMap.deviceActivity`. */
   async deviceActivity(req: { requestId: string }): Promise<{ deadline: number }> {
     const entry = await this.findLive(req.requestId, false);
     if (!entry.device) {
       throw new Error(`Approval request "${req.requestId}" isn't waiting for a device.`);
     }
-    const deadline = this.deviceDeadline(entry.request.createdAt);
+    const deadline = this.deviceDeadline(entry.request);
     await this.updatePending((current) =>
       current.map((candidate) =>
         candidate.request.requestId === req.requestId && candidate.device
@@ -1039,7 +1189,7 @@ export class ApprovalHandler {
    * a later failure (a gateway refusing the transaction) rejects the
    * dApp, as it does for a keyfile wallet.
    */
-  async submitDeviceSignature(req: { requestId: string; signatures: string[] }): Promise<void> {
+  async submitDeviceSignature(req: { requestId: string; signatures: string[] }): Promise<ApprovalShown | void> {
     if (this.resolving.has(req.requestId)) {
       throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
     }
@@ -1055,13 +1205,14 @@ export class ApprovalHandler {
       const signatures = await this.verifiedSignatures(payloads, req.signatures, wallet.publicKey);
 
       let outcome: ApprovalOutcome;
+      let result: unknown;
       try {
-        const result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
+        result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
         outcome = { approved: true, result: encodeTaggedBinary(result) };
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
-      await this.complete(req.requestId, outcome);
+      return await this.complete(entry, outcome, result);
     } finally {
       this.resolving.delete(req.requestId);
     }
@@ -1147,6 +1298,7 @@ export class ApprovalHandler {
       case "transfer":
         return [await this.deviceTransfers().prepareDeviceTransfer(this.transferRequestOf(walletId, input), owner)];
       case "pointsProof":
+      case "scanAttestation":
         return [{ kind: "transaction", transaction: await buildOwnershipTransaction(owner, textDecoder.decode(input.payload)) }];
       case "signMessage": {
         const hashAlgorithm = input.hashAlgorithm ?? HARDWARE_MESSAGE_HASH;
@@ -1192,6 +1344,14 @@ export class ApprovalHandler {
       }
       case "pointsProof":
         return { owner, address: wallet.address, signature: bytesToBase64Url(signature!) } satisfies PointsDeviceProof;
+      case "scanAttestation":
+        return this.attestationSubmitter().submitAttestation(parsedAttestationOf(input), {
+          owner,
+          address: wallet.address,
+          message: textDecoder.decode(input.payload),
+          signature: bytesToBase64Url(signature!),
+          proof: "transaction",
+        });
       case "signMessage":
         return new Uint8Array(signature!);
       default:
@@ -1261,6 +1421,58 @@ export class ApprovalHandler {
       tags: [],
     });
     return result as PointsDeviceProof;
+  }
+
+  /**
+   * Asks the user to sign a community scan attestation the Gleam site
+   * handed over, then submits it to the points API. Resolves to the
+   * server's verdict, which the window also shows; rejects with
+   * `ApprovalDeclinedError` if the user doesn't approve.
+   */
+  async requestScanAttestation(req: {
+    origin: string;
+    walletId: string;
+    address: string;
+    attestation: ParsedAttestation;
+  }): Promise<SiteAttestResponse> {
+    // One at a time: a second link, or the same one sent twice, focuses
+    // the window already open instead of stacking signing prompts.
+    if (this.attesting) {
+      await this.focusPendingAttestation();
+      return attestFailure("busy", req.attestation.release);
+    }
+    this.attesting = true;
+    try {
+      if (await this.focusPendingAttestation()) return attestFailure("busy", req.attestation.release);
+      const message = buildAttestMessage(req.attestation.release, await attestationId(req.attestation));
+      const result = await this.requestApproval({
+        kind: "scanAttestation",
+        origin: req.origin,
+        walletId: req.walletId,
+        address: req.address,
+        attestation: req.attestation,
+        payload: new TextEncoder().encode(message),
+        tags: [],
+      });
+      return result as SiteAttestResponse;
+    } finally {
+      this.attesting = false;
+    }
+  }
+
+  /** Focuses a scan attestation's window if one is pending; says whether there was one. */
+  private async focusPendingAttestation(): Promise<boolean> {
+    const pending = (await this.loadPending()).find((entry) => entry.request.kind === "scanAttestation");
+    if (!pending) return false;
+    await this.windows.focusApprovalWindow(pending.request.requestId);
+    return true;
+  }
+
+  private attestationSubmitter(): ScanAttestationSubmitter {
+    if (!this.attestations) {
+      throw new Error("Scan attestations aren't wired. ApprovalHandler was constructed without a submitter.");
+    }
+    return this.attestations;
   }
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {
@@ -1420,6 +1632,9 @@ export class ApprovalHandler {
       // A keyfile proves ownership with signMessage in PointsHandler and never reaches here.
       case "pointsProof":
         throw new Error("Only a hardware wallet proves ownership through the approval window.");
+
+      case "scanAttestation":
+        return this.attestationSubmitter().attest({ walletId, attestation: parsedAttestationOf(input) });
 
       default: {
         const exhaustiveCheck: never = input.kind;

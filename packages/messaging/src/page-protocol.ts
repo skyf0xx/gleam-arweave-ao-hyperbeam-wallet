@@ -60,6 +60,14 @@ export type ProviderSurfaceMethod = (typeof PROVIDER_SURFACE_METHODS)[number];
 export const APPROVAL_TIMEOUT_MS = 5 * 60_000;
 
 /**
+ * How long a scan attestation waits for an answer. Longer than
+ * `APPROVAL_TIMEOUT_MS`: the user reads a report of up to 20,000
+ * characters and may join Gleam Points first, and a hardware join opens
+ * a second window.
+ */
+export const SCAN_ATTESTATION_TIMEOUT_MS = 20 * 60_000;
+
+/**
  * The longest an approval can stay open, counted from when it was
  * created. A hardware wallet's request waits past `APPROVAL_TIMEOUT_MS`
  * while the page reports device activity, since a Ledger app can take

@@ -5,7 +5,10 @@ import {
   type PermissionType,
   type ProviderMethod,
 } from "@gleam/core";
+import { hasPointsProofTag, isPointsMessage, isValidInviteCode } from "@gleam/core/src/points/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import { SITE_ATTEST_MESSAGE_TYPE } from "@gleam/messaging/src/site-protocol.ts";
+import { attestFailure } from "@/src/handlers/attest-errors";
 import {
   readBytes,
   readDataItem,
@@ -15,6 +18,7 @@ import {
   readProcessId,
   readSaltLength,
   readTransaction,
+  type ProviderTransaction,
 } from "@/src/handlers/provider-params";
 
 /**
@@ -30,8 +34,10 @@ import {
  *   origin is Chrome's `sender`, never the message body.
  * - `page`: a `window.arweaveWallet` method, relayed through
  *   `providerCall`. Only these are reachable from a web page.
+ * - `site`: a message from the Gleam site's own pages over
+ *   `externally_connectable` (`SITE_MESSAGES`), never from a dApp.
  */
-export type Tier = "extension" | "contentScript" | "page";
+export type Tier = "extension" | "contentScript" | "page" | "site";
 
 /** `ProtocolMap` methods the background pushes to tabs rather than answers. */
 type PushMessage = "providerEvent" | "siteWalletMode";
@@ -73,6 +79,30 @@ function reader<T>(read: (value: unknown) => T) {
   });
 }
 
+/**
+ * Gleam Points payloads are signed only by `PointsHandler`. A site holding
+ * one could register or remove the wallet in Gleam Points, so a dApp
+ * `signMessage` of one is refused before any window opens.
+ */
+function refusePointsMessage(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  if (isPointsMessage(data)) {
+    throw new Error("Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.");
+  }
+  return data;
+}
+
+/**
+ * A hardware wallet's Points proof is a transaction with a `Gleam-Points`
+ * tag. Other fields of the proof keep a dApp transaction from matching it
+ * too; refusing the tag means a site can't get close to one at all.
+ */
+function refusePointsProofTag(transaction: ProviderTransaction): ProviderTransaction {
+  if (hasPointsProofTag(transaction.tags)) {
+    throw new Error("Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.");
+  }
+  return transaction;
+}
+
 /** Caps `appInfo.name` so an unbounded dApp-supplied string can't break the approval screen's layout. */
 const APP_INFO_NAME_MAX_LENGTH = 64;
 
@@ -106,6 +136,16 @@ function readRequestedPermissions(value: unknown): PermissionType[] {
 
 const TRANSFER_FIELDS_MESSAGE = "transferAoTokens requires token, recipient, and amount.";
 const transferField = z.string({ error: TRANSFER_FIELDS_MESSAGE }).min(1, TRANSFER_FIELDS_MESSAGE);
+// The recipient and amount go verbatim into the signed Transfer tags, and
+// the approval screen can only render an address and an atomic integer
+// faithfully, so anything else is refused before a window opens.
+const TRANSFER_ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const transferAddress = (field: "token" | "recipient", what: string) =>
+  transferField.regex(TRANSFER_ADDRESS_PATTERN, `transferAoTokens: ${field} must be ${what} (43 base64url characters).`);
+const transferAmount = transferField.regex(
+  /^[1-9]\d*$/,
+  "transferAoTokens: amount must be a positive whole number in the token's smallest unit.",
+);
 
 /** Methods that only read the grant or the wallet take no params; extra keys are dropped. */
 const NO_PARAMS = z.object({});
@@ -138,12 +178,12 @@ export const PAGE_METHODS = {
   sign: page({
     approval: true,
     grant: true,
-    params: z.object({ transaction: reader((value) => readTransaction(value, "sign")) }),
+    params: z.object({ transaction: reader((value) => refusePointsProofTag(readTransaction(value, "sign"))) }),
   }),
   dispatch: page({
     approval: true,
     grant: true,
-    params: z.object({ transaction: reader((value) => readTransaction(value, "dispatch")) }),
+    params: z.object({ transaction: reader((value) => refusePointsProofTag(readTransaction(value, "dispatch"))) }),
   }),
   encrypt: page({
     approval: true,
@@ -173,7 +213,7 @@ export const PAGE_METHODS = {
     approval: true,
     grant: true,
     params: z.object({
-      data: reader((value) => readBytes(value, "data")),
+      data: reader((value) => refusePointsMessage(readBytes(value, "data"))),
       options: reader((value) => readHashAlgorithm(value, "signMessage")),
     }),
   }),
@@ -201,7 +241,11 @@ export const PAGE_METHODS = {
   transferAoTokens: page({
     approval: true,
     grant: true,
-    params: z.object({ token: transferField, recipient: transferField, amount: transferField }),
+    params: z.object({
+      token: transferAddress("token", "an AO process id"),
+      recipient: transferAddress("recipient", "an Arweave address"),
+      amount: transferAmount,
+    }),
   }),
   tokenBalance: page({
     approval: false,
@@ -283,6 +327,7 @@ export const BACKGROUND_MESSAGES = {
   getApproval: EXTENSION,
   resolveApproval: EXTENSION,
   submitDeviceSignature: EXTENSION,
+  checkScanAttestation: EXTENSION,
   deviceActivity: EXTENSION,
 
   // settings
@@ -319,6 +364,7 @@ export const BACKGROUND_MESSAGES = {
   getPointsSeatsSeen: EXTENSION,
   markPointsSeatsSeen: EXTENSION,
   getAnnouncements: EXTENSION,
+  getScanCount: EXTENSION,
   getDismissedAnnouncements: EXTENSION,
   dismissAnnouncement: EXTENSION,
 
@@ -344,6 +390,58 @@ export const BACKGROUND_MESSAGES = {
     }),
   },
 } as const satisfies Record<BackgroundMessage, ExtensionMethodSpec | ContentScriptMethodSpec>;
+
+export interface SiteMessageSpec<S extends z.ZodType = z.ZodType> {
+  tier: "site";
+  params: S;
+  /** The reply to a message of this type that fails its origin or schema check. */
+  refused: unknown;
+}
+
+/**
+ * Messages the Gleam site's pages send with
+ * `chrome.runtime.sendMessage(EXTENSION_ID, …)`, keyed by their `type`.
+ * `dispatchSiteMessage` (`dispatch/site.ts`) is the only way in: Chrome
+ * delivers these only from the manifest's `externally_connectable`
+ * origin, and the dispatcher also requires Chrome's `sender.origin` to be
+ * the site's before parsing. A content script's messages arrive on
+ * `onMessage`, never here, so no dApp page can send one. The schemas are
+ * strict: a site page an XSS controls can send anything, so an unknown
+ * key is refused rather than ignored.
+ */
+export const SITE_MESSAGES = {
+  "gleam-points:invite": {
+    tier: "site",
+    params: z.strictObject({
+      type: z.literal("gleam-points:invite"),
+      code: z.string().refine(isValidInviteCode),
+    }),
+    refused: { ok: false },
+  },
+  [SITE_ATTEST_MESSAGE_TYPE]: {
+    tier: "site",
+    // Checked by `parseAttestation` in the handler, which reports why.
+    params: z.strictObject({ type: z.literal(SITE_ATTEST_MESSAGE_TYPE), attestation: z.unknown() }),
+    refused: attestFailure("refused", ""),
+  },
+} as const satisfies Record<string, SiteMessageSpec>;
+
+export type SiteMessageType = keyof typeof SITE_MESSAGES;
+
+export type SiteMessage<T extends SiteMessageType> = z.output<(typeof SITE_MESSAGES)[T]["params"]>;
+
+/**
+ * The message as `SITE_MESSAGES[type]` describes it, or null if it isn't
+ * one. Only a plain object qualifies, since a schema reads inherited
+ * fields as if they were the message's own.
+ */
+export function readSiteMessage<T extends SiteMessageType>(type: T, message: unknown): SiteMessage<T> | null {
+  if (typeof message !== "object" || message === null) return null;
+  const prototype = Object.getPrototypeOf(message);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  const parsed = SITE_MESSAGES[type].params.safeParse(message);
+  return parsed.success ? (parsed.data as SiteMessage<T>) : null;
+}
 
 /** Parses with `schema`, failing with the first issue's message as a plain `Error`. */
 export function parseParams<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {

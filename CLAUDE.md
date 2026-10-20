@@ -8,8 +8,9 @@ approval window with a decoded preview.
 
 permawebOS, a working wallet we reverse-engineered, is at
 `~/Downloads/permawebOS/` (minified). Check it when a protocol detail is
-unclear. Visual design rules are in `DESIGN.md`. Remaining work is in
-`todo.md`, and the Gleam Points launch steps are in `LAUNCH.md`.
+unclear. Visual design rules are in `DESIGN.md`. The community scans
+design is in `SCANS.md`. Remaining work is in `todo.md`, and the Gleam
+Points launch steps are in `LAUNCH.md`.
 
 ## Stack
 
@@ -34,6 +35,8 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `popup/<screen>/`.
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway). Spec in `POINTS.md`.
+- `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
+  (spec in `SCANS.md`).
 - `apps/extension/src/handlers/`: background handlers such as
   `wallet-lifecycle`, `reads`, `transfer`, `upload`, `approval` and
   `key-session`. `src/adapters/` implements the core ports.
@@ -87,24 +90,26 @@ pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, apps/extension, apps/points-api
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, apps/extension, apps/points-api, scripts/scan
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-five projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
+six projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
 pass. If a change touches signing, network or extension wiring, it also
 needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 
 ## Workflow
 
-Take the top item in `todo.md`. Make one Conventional Commit per item
-(`fix(ao): …`, `feat(activity): …`) on its own branch, open a PR, and
-merge it once CI is green. Then remove the item from `todo.md`. `master`
-accepts only signed commits through a PR with passing CI, and admins get
-no bypass. This repo signs commits with an SSH key (`git config --local
-commit.gpgsign true`), so the key has to be loaded in `ssh-agent`. `todo.md` is not tracked in git. Add anything new you find to `todo.md`'s **Unsorted**
-section instead of fixing it on the side.
+Take items from `todo.md` and group related ones together. Make one
+Conventional Commit per item (`fix(ao): …`, `feat(activity): …`) on a
+shared branch for the group, open one PR for the whole branch, and merge
+it once CI is green. Then remove the completed items from `todo.md`.
+`master` accepts only signed commits through a PR with passing CI, and
+admins get no bypass. This repo signs commits with an SSH key (`git
+config --local commit.gpgsign true`), so the key has to be loaded in
+`ssh-agent`. `todo.md` is not tracked in git. Add anything new you find to
+`todo.md`'s **Unsorted** section instead of fixing it on the side.
 
 ## Releasing
 

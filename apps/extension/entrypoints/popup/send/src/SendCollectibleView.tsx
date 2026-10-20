@@ -13,12 +13,14 @@ import {
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { CollectibleThumbnail, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
+import { CollectibleThumbnail, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
+import { useAddressIdentity } from "@/src/address-identity";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSendCollectible } from "../../activity/src/useSendCollectible";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
+import { useLookalikeOf } from "./useLookalikeOf";
 import { RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
 
 /**
@@ -82,6 +84,19 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
     contactsQuery.data?.find((candidate) => candidate.address === address);
   const ownWalletFor = (address: string): WalletSummary | undefined =>
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const composeLookalikeOf = useLookalikeOf(
+    runtime,
+    wallet,
+    step.kind === "compose" ? step.recipient : "",
+    contactsQuery.data ?? [],
+    otherWalletsQuery.data ?? [],
+  );
+  const reviewRecipient = step.kind === "review" ? step.recipient : null;
+  const lookalikeOf = step.kind === "review" ? (step.estimate.lookalikeOf ?? null) : null;
+  const avatarSvg = reviewRecipient ? identity.avatarSvg(reviewRecipient) : "";
+  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
 
   if (step.kind === "compose") {
     const unsupported = capabilityRefusal(wallet.method, "signTransaction", "send collectibles");
@@ -126,6 +141,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           <RecipientField
             recipient={step.recipient}
             recipientError={step.recipientError}
+            knownName={parsed.success ? (contactFor(parsed.data) ?? ownWalletFor(parsed.data))?.name : undefined}
+            emphasisPick={emphasisPick}
+            lookalikeOf={composeLookalikeOf}
             onChangeRecipient={(recipient) =>
               setStep({ ...step, recipient, recipientError: undefined, error: undefined, showSaveAddress: false, saveAddressName: "" })
             }
@@ -190,8 +208,8 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
   if (step.kind === "review") {
     const known = contactFor(step.recipient) ?? ownWalletFor(step.recipient);
-    const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
-    const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
+    const shownLookalikeOf = known ? null : lookalikeOf;
+    const irreversible = (step.estimate.firstSeenRecipient && !known) || shownLookalikeOf !== null;
     const signsOnDevice = isHardwareWalletMethod(wallet.method);
 
     const handleSign = async () => {
@@ -218,16 +236,30 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           </div>
 
           {irreversible ? (
-            <RecipientWarning firstTime lookalikeOf={lookalikeOf} />
+            <RecipientWarning
+              firstTime={step.estimate.firstSeenRecipient && !known}
+              lookalikeOf={shownLookalikeOf}
+              lookalikeAvatarSvg={lookalikeAvatarSvg}
+              emphasisPick={emphasisPick}
+            />
           ) : (
             <p className="text-label leading-relaxed text-muted">
               You&apos;re sending {collectible.name} to this address. This can&apos;t be undone.
             </p>
           )}
 
+          <div className="flex flex-col gap-1.5">
+            <span className="text-label font-semibold text-muted">To</span>
+            <RecipientCard
+              address={step.recipient}
+              name={known?.name ?? null}
+              avatarSvg={avatarSvg}
+              emphasisPick={emphasisPick}
+              tone="confirm"
+            />
+          </div>
+
           <div className="flex flex-col">
-            {known ? <ReviewRow label="Recipient" value={known.name} /> : null}
-            <ReviewRow label="To" value={step.recipient} mono />
             <ReviewRow
               label="Network fee"
               value={step.estimate.fee === null ? "—" : `${formatWinstonAsAr(step.estimate.fee, FEE_DIGITS)} AR`}

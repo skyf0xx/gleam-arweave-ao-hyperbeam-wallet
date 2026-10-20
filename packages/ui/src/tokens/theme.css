@@ -13,6 +13,17 @@
 @source "../../src";
 
 /*
+ * Bundled so addresses render in a mono that keeps l/I/1 and O/0 apart;
+ * the system fallbacks don't all do that.
+ */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/jetbrains-mono-var-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/*
  * Gleam design tokens — sourced from the sibling ao-wallet repo's
  * brand/identity.md, brand/guidelines.md and screens/shared.css (the
  * mockups' own token sheet). Defined once here as Tailwind 4's native

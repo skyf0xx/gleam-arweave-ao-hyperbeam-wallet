@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   ApprovalRequest,
   DeviceSigningRequest,
@@ -8,14 +8,24 @@ import type {
   ThemeSettings,
   WalletState,
 } from "@gleam/core";
+import type { ApprovalShown, AttestationCheck } from "@gleam/messaging/src/protocol.ts";
+import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { securityPhraseIconSvg } from "@/src/security-phrase-icon";
+import {
+  AddressIdentityProvider,
+  loadAddressIdentityKey,
+  makeAddressIdentity,
+  NO_ADDRESS_IDENTITY_KEY,
+  type AddressIdentityKey,
+} from "@/src/address-identity";
 import { OnboardingView } from "@/entrypoints/popup/onboarding/index.tsx";
 import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
 import { AwaitingDeviceView } from "./AwaitingDeviceView";
 import { DEFAULT_DEVICE_PANELS, type DeviceSignPanels } from "./device/device-panels";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
+import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
 /**
@@ -39,6 +49,10 @@ import { SigningApprovalScreen } from "./SigningApprovalScreen";
  * two surfaces apply identically instead of reimplementing the read
  * differently.
  *
+ * A scan attestation from the Gleam site renders `ScanAttestationScreen`,
+ * and its window stays open after signing to show the points it earned
+ * or why it was refused.
+ *
  * A hardware wallet's request goes on to `AwaitingDeviceView` once
  * approved (or straight there if the window reopens on it), which drives
  * the device with the `DeviceSignPanel` for the wallet's method.
@@ -58,16 +72,24 @@ type LoadState =
   | { kind: "awaiting-device"; runtime: RuntimePort; request: ApprovalRequest; device: DeviceSigningRequest }
   | { kind: "error"; message: string }
   | { kind: "done"; message: string }
+  | { kind: "attested"; result: SiteAttestResponse }
   | { kind: "failed"; message: string };
 
+function isShown(value: unknown): value is ApprovalShown {
+  return typeof value === "object" && value !== null && (value as { shown?: unknown }).shown === "scanAttestation";
+}
+
 /**
- * The request is made for the active wallet, so that's the one that must
- * be unlocked. Unlock opens every wallet that shares the vault password.
+ * The wallet that must be unlocked: the one a scan attestation was opened
+ * for, which stays its signer even if the user switches wallets, or else
+ * the active wallet. Unlock opens every wallet that shares the vault
+ * password.
  */
-function needsUnlock(state: WalletState): boolean {
+function needsUnlock(state: WalletState, request: ApprovalRequest): boolean {
   const unlocked = state.session?.unlockedWalletIds ?? [];
-  if (state.activeWalletId === null) return unlocked.length === 0;
-  return !unlocked.includes(state.activeWalletId);
+  const walletId = request.preview.kind === "scanAttestation" ? request.preview.walletId : state.activeWalletId;
+  if (walletId === null) return unlocked.length === 0;
+  return !unlocked.includes(walletId);
 }
 
 /** Best effort: a failed lookup shows no recipient warning, and the generic one still shows. */
@@ -77,7 +99,8 @@ async function assessRecipientFor(
   walletId: string | null,
 ): Promise<RecipientAssessment | null> {
   const preview = request.preview;
-  if (preview.kind === "connect" || preview.kind === "addToken" || !preview.recipient || !walletId) return null;
+  if (preview.kind === "connect" || preview.kind === "addToken" || preview.kind === "scanAttestation") return null;
+  if (!preview.recipient || !walletId) return null;
   try {
     const assessment = await runtime.send<{ walletId: string; recipient: string }, RecipientAssessment | undefined>({
       type: "assessRecipient",
@@ -101,6 +124,12 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
   const [securityPhrase, setSecurityPhrase] = useState<{ phrase: SecurityPhrase; icon: string } | null>(null);
+  const [runtime, setRuntime] = useState<RuntimePort | null>(runtimeProp ?? null);
+  const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
+  const addressIdentity = useMemo(
+    () => makeAddressIdentity(identityKey, () => void (runtime && loadAddressIdentityKey(runtime).then(setIdentityKey))),
+    [identityKey, runtime],
+  );
 
   const loadSecurityPhrase = async (runtime: RuntimePort) => {
     try {
@@ -131,12 +160,12 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
         type: "getApproval",
         payload: { requestId: id },
       });
-      const walletState = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
+      const walletState = await runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } });
       if (request.device) {
         setState({ kind: "awaiting-device", runtime, request, device: request.device });
       } else if (walletState.wallets.length === 0) {
         setState({ kind: "no-wallet", runtime, request });
-      } else if (needsUnlock(walletState)) {
+      } else if (needsUnlock(walletState, request)) {
         setState({ kind: "locked", runtime, request });
       } else {
         const assessment = await assessRecipientFor(runtime, request, walletState.activeWalletId);
@@ -158,7 +187,13 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
       try {
         const runtime = runtimeProp ?? (await import("@/src/adapters/runtime")).runtimePort;
         if (cancelled) return;
-        await Promise.all([load(runtime, requestId), applyTheme(runtime), loadSecurityPhrase(runtime)]);
+        setRuntime(runtime);
+        await Promise.all([
+          load(runtime, requestId),
+          applyTheme(runtime),
+          loadSecurityPhrase(runtime),
+          loadAddressIdentityKey(runtime).then(setIdentityKey),
+        ]);
       } catch (error) {
         if (cancelled) return;
         setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
@@ -191,6 +226,8 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
     content = <CenteredMessage text={state.message} />;
   } else if (state.kind === "done") {
     content = <CenteredMessage text={state.message} />;
+  } else if (state.kind === "attested") {
+    content = <ScanAttestationResult result={state.result} onClose={() => window.close()} />;
   } else if (state.kind === "failed") {
     content = <CenteredMessage text={state.message} tone="warning" />;
   } else if (state.kind === "no-wallet") {
@@ -218,7 +255,10 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
         device={device}
         Panel={devicePanels[device.method]}
         token={
-          request.preview.kind !== "connect" && request.preview.kind !== "addToken" && request.preview.token !== null
+          request.preview.kind !== "connect" &&
+          request.preview.kind !== "addToken" &&
+          request.preview.kind !== "scanAttestation" &&
+          request.preview.token !== null
             ? {
                 processId: request.preview.token,
                 denomination: request.preview.tokenDenomination,
@@ -227,11 +267,11 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
             : undefined
         }
         onSubmit={async (signatures) => {
-          await runtime.send<{ requestId: string; signatures: string[] }, void>({
+          const shown = await runtime.send<{ requestId: string; signatures: string[] }, ApprovalShown | undefined>({
             type: "submitDeviceSignature",
             payload: { requestId: request.requestId, signatures },
           });
-          setState({ kind: "done", message: "Signed." });
+          setState(isShown(shown) ? { kind: "attested", result: shown.result } : { kind: "done", message: "Signed." });
         }}
         onCancel={() => void rejectRequest(runtime, request)}
         onActivity={() =>
@@ -251,10 +291,14 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
     // request, so there's nothing to retry: show the error and stop.
     const handleApprove = async (doneMessage: string, failurePrefix: string) => {
       try {
-        const next = await runtime.send<{ requestId: string; approved: boolean }, ApprovalRequest | undefined>({
+        const next = await runtime.send<{ requestId: string; approved: boolean }, ApprovalRequest | ApprovalShown | undefined>({
           type: "resolveApproval",
           payload: { requestId: request.requestId, approved: true },
         });
+        if (isShown(next)) {
+          setState({ kind: "attested", result: next.result });
+          return;
+        }
         if (next?.device) {
           setState({ kind: "awaiting-device", runtime, request: next, device: next.device });
           return;
@@ -285,6 +329,22 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
           onAdd={() => handleApprove("Token added.", "Couldn't add the token")}
         />
       );
+    } else if (request.preview.kind === "scanAttestation") {
+      content = (
+        <ScanAttestationScreen
+          runtime={runtime}
+          origin={request.origin}
+          preview={request.preview}
+          onReject={() => void handleReject()}
+          onCheck={() =>
+            runtime.send<{ requestId: string }, AttestationCheck>({
+              type: "checkScanAttestation",
+              payload: { requestId: request.requestId },
+            })
+          }
+          onSign={() => handleApprove("Signed.", "Couldn't sign the attestation")}
+        />
+      );
     } else {
       const signingPreview = request.preview;
       content = (
@@ -304,14 +364,16 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, devicePanels = D
   const showSecurityPhrase = securityPhrase !== null && (state.kind === "ready" || state.kind === "awaiting-device");
 
   return (
-    <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
-      {showSecurityPhrase ? (
-        <div className="flex justify-center px-6 pt-3">
-          <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
-        </div>
-      ) : null}
-      {content}
-    </div>
+    <AddressIdentityProvider value={addressIdentity}>
+      <div data-theme={theme === "dark" ? "dark" : undefined} className="min-h-full">
+        {showSecurityPhrase ? (
+          <div className="flex justify-center px-6 pt-3">
+            <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
+          </div>
+        ) : null}
+        {content}
+      </div>
+    </AddressIdentityProvider>
   );
 }
 

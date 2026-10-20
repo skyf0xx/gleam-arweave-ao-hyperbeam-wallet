@@ -38,6 +38,23 @@ async function decryptOaepWith(key: CryptoKey, ciphertext: Bytes, label?: ArrayB
   return new Uint8Array(await crypto.subtle.decrypt(params, key, ciphertext));
 }
 
+/**
+ * Generates a fresh Arweave keyfile: RSA-4096, public exponent 65537.
+ * The result is plaintext key material, so callers encrypt it into a
+ * `VaultEnvelope` before it touches any storage. The `CryptoKey` has to be
+ * extractable for the export; it is dropped once the JWK is read out.
+ */
+export async function generateJWK(): Promise<JWKInterface> {
+  const pair = await crypto.subtle.generateKey(
+    { name: "RSA-PSS", modulusLength: 4096, publicExponent: new Uint8Array([0x01, 0x00, 0x01]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const { kty, e, n, d, p, q, dp, dq, qi } = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  if (kty !== "RSA" || !e || !n || !d || !p || !q || !dp || !dq || !qi) throw new Error("Key generation returned an incomplete RSA key.");
+  return { kty, e, n, d, p, q, dp, dq, qi };
+}
+
 /** A `Signer` over a decrypted keyfile JWK. The key is imported per call and never cached as a `CryptoKey`. */
 export function signerFromJwk(jwk: JWKInterface, address: string): Signer {
   return {

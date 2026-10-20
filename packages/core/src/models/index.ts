@@ -43,6 +43,7 @@ export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collec
 export { collectibleSendRefusal } from "./collectible";
 export type {
   TokenMetadata,
+  TokenTransport,
   TokenBalanceRequest,
   TokenBalanceResult,
   UserTokensOptions,
@@ -67,6 +68,7 @@ export type {
   DeviceSigningRequest,
   DeviceSigningSummary,
   SigningApprovalPreview,
+  ScanAttestationApprovalPreview,
 } from "./approval";
 export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";

@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { generateJWK, type JWKInterface } from "@gleam/core";
+import { type JWKInterface } from "@gleam/core";
+import { generateJWK } from "@gleam/core/signer";
 
 /**
  * The background's session-key housekeeping: dropping keys the keyring

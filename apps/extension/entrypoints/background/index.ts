@@ -45,6 +45,7 @@ import { TransferHandler } from "@/src/handlers/transfer";
 import { UploadHandler } from "@/src/handlers/upload";
 import { ApprovalHandler } from "@/src/handlers/approval";
 import { AnnouncementsHandler } from "@/src/handlers/announcements";
+import { ScansHandler } from "@/src/handlers/scans";
 import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { SecurityPhraseHandler } from "@/src/handlers/security-phrase";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
@@ -78,7 +79,10 @@ import {
 } from "@/src/dispatch/methods";
 import { contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
-import { acceptSiteInvite } from "@/src/points-invite";
+import { redeemSiteInvite } from "@/src/points-invite";
+import { signSiteAttestation } from "@/src/points-attest";
+import { dispatchSiteMessage } from "@/src/dispatch/site";
+import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
 
 /**
@@ -108,7 +112,7 @@ const transfer: TransferHandler = new TransferHandler(storage, {
     const metadata = req.token === null ? {} : await resolveTokenDenominationAndTicker(await walletAddress(req.walletId), req.token);
     return approval.requestWalletTransfer({ ...req, ...metadata });
   },
-}, reads);
+}, reads, reads);
 const upload = new UploadHandler(storage);
 const contacts = new ContactsHandler(storage);
 const approval: ApprovalHandler = new ApprovalHandler(
@@ -118,6 +122,12 @@ const approval: ApprovalHandler = new ApprovalHandler(
   DEFAULT_BUNDLER_URL,
   async () => (await lifecycle.getState()).activeWalletId,
   reads,
+  // `points` is declared below; attestations reach it only at call time.
+  {
+    attest: (req) => points.attest(req),
+    submitAttestation: (attestation, proof) => points.submitAttestation(attestation, proof),
+    check: (attestation, address) => points.checkAttestation(attestation, address),
+  },
 );
 
 // Advances locally-pending activity entries to confirmed on a background
@@ -142,6 +152,7 @@ const points = new PointsHandler({
 registerPointsHeartbeatAlarm(points);
 
 const announcements = new AnnouncementsHandler({ storage });
+const scans = new ScansHandler({ apiUrl: POINTS_API_URL, version: () => browser.runtime.getManifest().version });
 const securityPhrase = new SecurityPhraseHandler(storage);
 const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) => approval.findActiveGrant(origin) });
 
@@ -590,6 +601,8 @@ async function requestDataItemApproval(
   });
 }
 
+const INSECURE_ORIGIN_ERROR = "Gleam only works with secure (https) sites.";
+
 /**
  * Routes one `window.arweaveWallet` call by its `PAGE_METHODS` entry. The
  * refusals that don't depend on the origin's grant throw synchronously,
@@ -603,10 +616,11 @@ function dispatchProviderCall(origin: string, method: string, rawParams: unknown
     throw new Error(`Provider method "${method}" is not reachable from a web page.`);
   }
   const providerMethod = method as ProviderMethod;
-  // Checked on every call that can open a window, not only at connect, so
-  // a plain-http origin still holding an older grant can't keep signing.
-  if (PAGE_METHODS[providerMethod].approval && !isSecureSigningOrigin(origin)) {
-    throw new Error("Gleam only signs for secure (https) sites.");
+  // Checked on every call, not only at connect, so a plain-http origin
+  // still holding an older grant can neither sign nor read addresses.
+  // `disconnect` only drops the grant, so such a site may still clear it.
+  if (providerMethod !== "disconnect" && !isSecureSigningOrigin(origin)) {
+    throw new Error(INSECURE_ORIGIN_ERROR);
   }
   return runProviderMethod(origin, providerMethod, rawParams);
 }
@@ -781,7 +795,8 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   },
 
   // reads
-  getState: () => lifecycle.getState(),
+  // Extension-tier only, so this is the user looking at a Gleam page.
+  getState: (data) => lifecycle.getState({ recordActivity: data?.recordActivity !== false }),
   getBalance: (data) => reads.getBalance(data),
   getArFee: () => transfer.getArFee(),
   getTokenBalances: (data) => reads.getTokenBalances(data),
@@ -807,8 +822,17 @@ const MESSAGE_HANDLERS: MessageHandlers = {
 
   // approvals
   getApproval: (data) => approval.getApproval(data),
-  resolveApproval: (data) => approval.resolveApproval(data),
-  submitDeviceSignature: (data) => approval.submitDeviceSignature(data),
+  // The approval window's load doesn't count as activity, since a site
+  // opens it; the user's answer in it does.
+  resolveApproval: async (data) => {
+    await lifecycle.getState({ recordActivity: true });
+    return approval.resolveApproval(data);
+  },
+  submitDeviceSignature: async (data) => {
+    await lifecycle.getState({ recordActivity: true });
+    return approval.submitDeviceSignature(data);
+  },
+  checkScanAttestation: (data) => approval.checkScanAttestation(data),
   deviceActivity: (data) => approval.deviceActivity(data),
 
   // settings
@@ -859,6 +883,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   getPointsSeatsSeen: () => points.getSeatsSeen(),
   markPointsSeatsSeen: (data) => points.markSeatsSeen(data),
   getAnnouncements: () => announcements.fetchAnnouncements(),
+  getScanCount: () => scans.count(),
   getDismissedAnnouncements: () => announcements.getDismissed(),
   dismissAnnouncement: (data) => announcements.dismiss(data),
 
@@ -926,6 +951,23 @@ async function initializeNetworkSettingsIfMissing(): Promise<void> {
   }
 }
 
+function handleSiteMessage(message: unknown, origin: string | undefined): Promise<unknown> {
+  return dispatchSiteMessage(message, origin, {
+    "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, points).catch(() => ({ ok: false })),
+    "gleam-points:attest": (request) =>
+      signSiteAttestation(request, {
+        activeWallet: async () => {
+          const state = await lifecycle.getState();
+          return state.wallets.find((wallet) => wallet.id === state.activeWalletId) ?? null;
+        },
+        requestScanAttestation: (req) => approval.requestScanAttestation(req),
+      }).catch((error: unknown): SiteAttestResponse => {
+        console.error("Couldn't handle a scan attestation from the site.", error);
+        return { ok: false, code: "signing_failed", error: "Gleam couldn't open the attestation. Open the link again." };
+      }),
+  });
+}
+
 export default defineBackground(() => {
   listenForKeyringConnections();
   // Runs synchronously after the module's listeners are registered, so it
@@ -949,10 +991,13 @@ export default defineBackground(() => {
   // `initializeNetworkSettingsIfMissing`'s "nothing written yet" check is
   // meaningful — after that, a written NetworkSettings (default or
   // user-edited) always short-circuits it anyway.
-  // The site's welcome page hands over a Gleam Points invite code here.
-  // Returning true keeps the reply channel open for the async storage write.
+  // The site's pages (SITE_MESSAGES): welcome.html hands over a Gleam
+  // Points invite code, attest.html a scan attestation to sign.
+  // `dispatchSiteMessage` checks the sender's origin and the message's
+  // shape before any handler runs. Returning true keeps the reply channel open until the handler is done,
+  // which for an attestation is when the user has finished in its window.
   browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-    void acceptSiteInvite(message, sender.origin, storage, points).then(sendResponse, () => sendResponse({ ok: false }));
+    void handleSiteMessage(message, sender.origin).then(sendResponse);
     return true;
   });
 

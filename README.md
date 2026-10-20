@@ -44,6 +44,13 @@ If `window.gleam` is `undefined` the wallet isn't installed and you can link to 
 [Chrome Web Store](https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki)
 instead.
 
+Use the [Gleam icon](apps/site/favicon.svg) next to the button text, set in
+`Inter` (Gleam's UI font) at medium weight:
+
+```text
+[icon] Connect with Gleam
+```
+
 <details>
 <summary>Example</summary>
 

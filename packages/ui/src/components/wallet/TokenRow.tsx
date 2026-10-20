@@ -25,7 +25,7 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * swapping in `SkeletonRow` instead of mounting `TokenRow` at all.
  */
 export interface TokenRowProps {
-  glyph: Pick<TokenGlyphProps, "label" | "tone">;
+  glyph: Pick<TokenGlyphProps, "label" | "tone" | "logoUrl">;
   /**
    * Replaces the ticker glyph, for a row that isn't a token (the Gleam
    * Points row). `glyph.label` still names the row for tests and snapshots.

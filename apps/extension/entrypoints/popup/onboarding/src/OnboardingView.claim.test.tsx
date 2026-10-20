@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { INVITE_REQUIRED_MESSAGE, type PointsScores, type PointsWalletScore, type RuntimePort } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
@@ -78,6 +78,18 @@ async function reachClaim() {
   fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
 }
 
+/**
+ * TanStack's mutation observer subscribes in a passive effect, and drops the
+ * per-call `onSuccess` of a mutation started before it has. A click right
+ * after the button appears can beat that effect on a loaded machine, so
+ * flush effects before clicking.
+ */
+async function clickWhenSettled(name: string) {
+  const button = await screen.findByRole("button", { name });
+  await act(async () => {});
+  fireEvent.click(button);
+}
+
 describe("claim step", () => {
   it("completes at backup when no claim phase is set", async () => {
     const { send, onComplete } = setup(undefined);
@@ -130,7 +142,7 @@ describe("claim step", () => {
     await reachClaim();
     expect(await screen.findByText("Start earning Gleam Points")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Join Gleam Points" }));
+    await clickWhenSettled("Join Gleam Points");
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
     expect(send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: "w1" } });
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "getPointsScores" }));
@@ -139,7 +151,7 @@ describe("claim step", () => {
   it("Not now skips without joining", async () => {
     const { send, onComplete } = setup("founding");
     await reachClaim();
-    fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
+    await clickWhenSettled("Not now");
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
     expect(send).toHaveBeenCalledWith({ type: "setPointsClaimPending", payload: { walletId: "w1", pending: false } });
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "joinPoints" }));
@@ -148,7 +160,7 @@ describe("claim step", () => {
   it("shows a join failure and stays on the step", async () => {
     const { onComplete } = setup("founding", { joinError: "Couldn't join Gleam Points: server busy." });
     await reachClaim();
-    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+    await clickWhenSettled("Join Gleam Points");
     expect(await screen.findByText("Couldn't join Gleam Points: server busy.")).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
   });
@@ -156,7 +168,7 @@ describe("claim step", () => {
   it("sends an invite-required refusal to the invite gate", async () => {
     const { onComplete } = setup("founding", { joinError: INVITE_REQUIRED_MESSAGE });
     await reachClaim();
-    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+    await clickWhenSettled("Join Gleam Points");
     expect(await screen.findByLabelText("Invite code")).toBeTruthy();
     expect(screen.queryByText(INVITE_REQUIRED_MESSAGE)).toBeNull();
     expect(onComplete).not.toHaveBeenCalled();
@@ -166,7 +178,7 @@ describe("claim step", () => {
 describe("founding reveal after a claim", () => {
   async function claim() {
     await reachClaim();
-    fireEvent.click(await screen.findByRole("button", { name: "Join Gleam Points" }));
+    await clickWhenSettled("Join Gleam Points");
   }
 
   it("shows the welcome, the invites and a Share on X link with the invite link, then Done closes", async () => {

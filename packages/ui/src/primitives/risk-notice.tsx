@@ -28,7 +28,7 @@ export function RiskNotice({ children, className }: RiskNoticeProps) {
       <span className="mt-px flex-shrink-0 text-warning">
         <WarningIcon />
       </span>
-      <p className="m-0 text-label leading-snug text-foreground">{children}</p>
+      <div className="min-w-0 text-label leading-snug text-foreground">{children}</div>
     </div>
   );
 }

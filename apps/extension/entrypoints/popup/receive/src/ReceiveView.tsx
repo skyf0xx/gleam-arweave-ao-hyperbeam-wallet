@@ -1,6 +1,7 @@
 import type { WalletSummary } from "@gleam/core";
-import { AddressDisplay, QrCode } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, AddressDisplay, QrCode } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { useAddressIdentity } from "@/src/address-identity";
 
 /**
  * QR + full address + one-tap copy. See `QrCode`'s own doc comment for
@@ -12,12 +13,16 @@ export interface ReceiveViewProps {
 }
 
 export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
+  const identity = useAddressIdentity();
+  const { emphasisPick } = identity;
+  const avatarSvg = identity.avatarSvg(wallet.address);
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Receive" onBack={onBack} />
 
       <div className="flex flex-1 flex-col items-center gap-5 px-6 pb-6 pt-7">
         <div className="flex items-center gap-2">
+          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="text-label">{wallet.name}</span>
         </div>
 
@@ -27,6 +32,7 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
           <span className="text-center text-label font-semibold text-muted">Your address</span>
           <AddressDisplay
             address={wallet.address}
+            emphasisPick={emphasisPick}
             onCopy={() => void navigator.clipboard?.writeText(wallet.address)}
           />
         </div>

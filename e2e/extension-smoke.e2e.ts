@@ -32,6 +32,9 @@ test.beforeAll(async () => {
       `--load-extension=${extensionPath}`,
     ],
   });
+  // The build opens the live site's welcome page on install; Vercel's bot
+  // check answers it with a 403 console error, so serve it locally.
+  await context.route("https://gleamwallet.app/**", (route) => route.fulfill({ body: "" }));
   context.on("weberror", (e) => errors.push(`[page] ${e.error().stack ?? e.error()}`));
   context.on("console", (msg) => {
     if (msg.type() === "error") errors.push(`[console] ${msg.text()}`);

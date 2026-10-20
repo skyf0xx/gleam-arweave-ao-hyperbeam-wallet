@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { APPROVAL_METHODS, KEY_METHODS, PROVIDER_METHODS } from "@gleam/core";
 import { APPROVAL_GATED_METHODS } from "@gleam/messaging/src/page-protocol.ts";
-import { BACKGROUND_MESSAGES, PAGE_METHODS, parseParams } from "./methods";
+import { BACKGROUND_MESSAGES, PAGE_METHODS, SITE_MESSAGES, parseParams } from "./methods";
 
 const PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
 
@@ -29,6 +29,14 @@ describe("dispatch/methods: tiers", () => {
       .filter(([, spec]) => spec.tier === "contentScript")
       .map(([method]) => method);
     expect(contentScript.sort()).toEqual(["getSiteWalletMode", "providerCall", "reportOtherWallet"]);
+  });
+
+  it("keeps the site's messages out of every other table", () => {
+    for (const type of Object.keys(SITE_MESSAGES)) {
+      expect(Object.hasOwn(PAGE_METHODS, type), type).toBe(false);
+      expect(Object.hasOwn(BACKGROUND_MESSAGES, type), type).toBe(false);
+    }
+    expect(Object.keys(SITE_MESSAGES).sort()).toEqual(["gleam-points:attest", "gleam-points:invite"]);
   });
 
   it("keeps key and approval methods on the extension tier", () => {
@@ -60,6 +68,30 @@ describe("dispatch/methods: page params", () => {
         "transferAoTokens requires token, recipient, and amount.",
       );
     }
+  });
+
+  it.each(["1e12", "1.5", "-1", "0", "007", " 1", "1\u202e", "0x10", "１"])(
+    "refuses the transferAoTokens amount %j, which isn't a positive atomic integer",
+    (amount) => {
+      expect(() =>
+        parseParams(PAGE_METHODS.transferAoTokens.params, { token: PROCESS_ID, recipient: PROCESS_ID, amount }),
+      ).toThrow("transferAoTokens: amount must be a positive whole number in the token's smallest unit.");
+    },
+  );
+
+  it.each(["recipient-addr", `${PROCESS_ID}x`, `${PROCESS_ID.slice(0, 42)}=`, `${PROCESS_ID.slice(0, 42)}\u202e`])(
+    "refuses the transferAoTokens recipient %j, which isn't an Arweave address",
+    (recipient) => {
+      expect(() =>
+        parseParams(PAGE_METHODS.transferAoTokens.params, { token: PROCESS_ID, recipient, amount: "1" }),
+      ).toThrow("transferAoTokens: recipient must be an Arweave address (43 base64url characters).");
+    },
+  );
+
+  it("refuses a transferAoTokens token that isn't a process id", () => {
+    expect(() =>
+      parseParams(PAGE_METHODS.transferAoTokens.params, { token: "ao-process-id", recipient: PROCESS_ID, amount: "1" }),
+    ).toThrow("transferAoTokens: token must be an AO process id (43 base64url characters).");
   });
 
   it("drops keys a method doesn't take", () => {
@@ -120,5 +152,76 @@ describe("dispatch/methods: content-script params", () => {
     expect(() => parseParams(BACKGROUND_MESSAGES.providerCall.params, { method: 3, params: {} })).toThrow(
       "A provider call needs a method name.",
     );
+  });
+});
+
+describe("dispatch/methods: Gleam Points refusals", () => {
+  const encode = (text: string) => new TextEncoder().encode(text);
+  const b64url = (text: string) => Buffer.from(text).toString("base64url");
+  const POINTS_MESSAGE = "gleam-points:leave:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:1700000000";
+
+  it.each([undefined, "SHA-256", "SHA-384", "SHA-512"])(
+    "refuses a signMessage whose data starts with the points prefix (hashAlgorithm %s)",
+    (hashAlgorithm) => {
+      const options = hashAlgorithm === undefined ? undefined : { hashAlgorithm };
+      expect(() => parseParams(PAGE_METHODS.signMessage.params, { data: encode(POINTS_MESSAGE), options })).toThrow(
+        "Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.",
+      );
+    },
+  );
+
+  it("refuses a dApp signMessage of a scan attest message", () => {
+    const attest = `gleam-points:attest:v1:1.4.0:${"a".repeat(64)}`;
+    expect(() => parseParams(PAGE_METHODS.signMessage.params, { data: encode(attest) })).toThrow(
+      "Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.",
+    );
+  });
+
+  it("refuses the prefix at byte 0 of a view into a larger buffer, and in a bare ArrayBuffer", () => {
+    const points = encode(POINTS_MESSAGE);
+    const parent = new Uint8Array(points.byteLength + 5);
+    parent.set([1, 2, 3, 4, 5]);
+    parent.set(points, 5);
+    const view = parent.subarray(5);
+    expect(view.byteOffset).toBe(5);
+
+    for (const data of [view, points.slice().buffer]) {
+      expect(() => parseParams(PAGE_METHODS.signMessage.params, { data })).toThrow(
+        "Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.",
+      );
+    }
+  });
+
+  it("refuses a sign tag name with a UTF-8 BOM before Gleam-Points", () => {
+    const transaction = { tags: [{ name: b64url("\uFEFFGleam-Points"), value: b64url(POINTS_MESSAGE) }] };
+    expect(() => parseParams(PAGE_METHODS.sign.params, { transaction })).toThrow(
+      "Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.",
+    );
+  });
+
+  it("accepts a signMessage that only contains the prefix after byte 0", () => {
+    const data = encode(`Sign in to example.com. ${POINTS_MESSAGE}`);
+    expect(Array.from(parseParams(PAGE_METHODS.signMessage.params, { data }).data)).toEqual(Array.from(data));
+  });
+
+  it.each(["sign", "dispatch"] as const)("refuses a %s transaction carrying a Gleam-Points tag", (method) => {
+    for (const name of ["Gleam-Points", "gleam-points"]) {
+      const transaction = {
+        tags: [
+          { name: b64url("App-Name"), value: b64url("x") },
+          { name: b64url(name), value: b64url(POINTS_MESSAGE) },
+        ],
+      };
+      expect(() => parseParams(PAGE_METHODS[method].params, { transaction })).toThrow(
+        "Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.",
+      );
+    }
+  });
+
+  it.each(["sign", "dispatch"] as const)("accepts a %s transaction whose other tags hold a points message", (method) => {
+    const transaction = { tags: [{ name: b64url("Note"), value: b64url(POINTS_MESSAGE) }] };
+    expect(parseParams(PAGE_METHODS[method].params, { transaction }).transaction.tags).toEqual([
+      { name: "Note", value: POINTS_MESSAGE },
+    ]);
   });
 });
