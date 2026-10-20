@@ -1024,7 +1024,7 @@ describe("GET /attestations", () => {
     await s.get("/attestations?release=1.0.0");
 
     expect(s.github.calls.filter((url) => url.includes("git/trees/"))).toHaveLength(1);
-    expect(s.github.calls.filter((url) => url.includes("raw.githubusercontent.com"))).toHaveLength(4);
+    expect(s.github.calls.filter((url) => new URL(url).host === "raw.githubusercontent.com")).toHaveLength(4);
     expect(s.github.calls.filter((url) => url.endsWith("releases/latest"))).toHaveLength(1);
   });
 });

@@ -176,7 +176,7 @@ describe("ReadsHandler: getTokenBalances", () => {
     globalThis.fetch = vi.fn(async (url: string) => {
       calls.push(url);
       if (url.includes("/graphql")) return graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]);
-      if (url.startsWith(PEER) && url.includes(FODDER)) return { ok: false, status: 403, json: async () => ({}) };
+      if (new URL(url).origin === new URL(PEER).origin && url.includes(FODDER)) return { ok: false, status: 403, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => "1000000000000" };
     }) as unknown as typeof fetch;
 
@@ -184,7 +184,7 @@ describe("ReadsHandler: getTokenBalances", () => {
 
     expect(balances.find((b) => b.processId === FODDER)).toMatchObject({ ticker: "FODDER", denomination: 12, quantity: "1000000000000" });
     expect(calls).toContain(`https://arweave.net/${FODDER}~process@1.0/compute/balances/addr1`);
-    expect(calls.some((url) => url.startsWith(PEER) && url.includes(FODDER))).toBe(false);
+    expect(calls.some((url) => new URL(url).origin === new URL(PEER).origin && url.includes(FODDER))).toBe(false);
   });
 
   it("resolves ticker/denomination/name for an unregistered watched token from its spawn tags", async () => {

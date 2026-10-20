@@ -130,7 +130,7 @@ describe("readTokenBalance", () => {
     });
     const quantity = await readTokenBalance({ processId: PID, address: ADDRESS, transport: "mu", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl });
     expect(quantity).toBe("77");
-    expect(calls.some((url) => url.startsWith(GATEWAY))).toBe(false);
+    expect(calls.some((url) => new URL(url).origin === new URL(GATEWAY).origin)).toBe(false);
   });
 
   it("names every source and its status when none answers", async () => {

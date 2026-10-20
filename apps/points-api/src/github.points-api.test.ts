@@ -53,7 +53,7 @@ describe("github client", () => {
     await client.filesAt(COMMIT);
 
     expect(github.calls.filter((url) => url.includes("git/trees/"))).toHaveLength(1);
-    expect(github.calls.filter((url) => url.includes("raw.githubusercontent.com"))).toHaveLength(4);
+    expect(github.calls.filter((url) => new URL(url).host === "raw.githubusercontent.com")).toHaveLength(4);
   });
 
   it("evicts the least recently used commit but never the latest release's", async () => {
@@ -213,7 +213,7 @@ describe("github client", () => {
     const client = createGithubClient({ fetchImpl: github.fetch, repo: TEST_REPO });
 
     await expect(client.filesAt(COMMIT)).rejects.toThrow(/surface\.txt is larger/);
-    expect(github.calls.some((url) => url.includes("raw.githubusercontent.com"))).toBe(false);
+    expect(github.calls.some((url) => new URL(url).host === "raw.githubusercontent.com")).toBe(false);
   });
 
   it("leaves out a file over the size cap", async () => {
