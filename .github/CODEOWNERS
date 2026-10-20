@@ -49,6 +49,8 @@
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /apps/extension/src/points-invite.ts                                       @skyf0xx
+/apps/extension/src/points-attest.ts                                       @skyf0xx
+/apps/extension/src/handlers/attest-errors.ts                              @skyf0xx
 /apps/extension/wxt.config.ts                                              @skyf0xx
 /.github/                                                                  @skyf0xx
 /pnpm-workspace.yaml                                                       @skyf0xx
