@@ -883,7 +883,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   getPointsSeatsSeen: () => points.getSeatsSeen(),
   markPointsSeatsSeen: (data) => points.markSeatsSeen(data),
   getAnnouncements: () => announcements.fetchAnnouncements(),
-  getScanCount: () => scans.count(),
+  getScanStats: () => scans.stats(),
   getDismissedAnnouncements: () => announcements.getDismissed(),
   dismissAnnouncement: (data) => announcements.dismiss(data),
 

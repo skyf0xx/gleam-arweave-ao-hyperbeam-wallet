@@ -1,32 +1,62 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchScanCount } from "./count";
+import { fetchScanStats } from "./count";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-const run = (fetchImpl: typeof fetch, release = "1.2.3") =>
-  fetchScanCount({ apiUrl: "https://api.example", release, fetchImpl });
+const COUNT = { release: "1.2.3", total: 7, paidPlacesLeft: 93 };
+const REWARDS = { day: "2026-10-19", issuedAtomic: "10000000", scanRewardAtomic: "10000", tailScanRewardAtomic: "2000", bountyPoolAtomic: "0" };
 
-describe("fetchScanCount", () => {
-  it("reads total from the release's count route", async () => {
-    const fetchImpl = vi.fn(async () => json({ release: "1.2.3", total: 7 })) as unknown as typeof fetch;
-    expect(await run(fetchImpl)).toBe(7);
-    expect(vi.mocked(fetchImpl).mock.calls[0]![0]).toBe("https://api.example/attestations/count?release=1.2.3");
+/** Answers each route by its parsed pathname. */
+function api(routes: { count?: () => Response; rewards?: () => Response }): typeof fetch {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const { pathname } = new URL(String(input));
+    const route = pathname === "/attestations/count" ? routes.count : pathname === "/scan/rewards" ? routes.rewards : undefined;
+    if (!route) throw new Error(`unexpected ${pathname}`);
+    return route();
+  }) as unknown as typeof fetch;
+}
+
+const run = (fetchImpl: typeof fetch, release = "1.2.3") =>
+  fetchScanStats({ apiUrl: "https://api.example", release, fetchImpl });
+
+describe("fetchScanStats", () => {
+  it("reads the release's count route and the scan reward", async () => {
+    const fetchImpl = api({ count: () => json(COUNT), rewards: () => json(REWARDS) });
+    expect(await run(fetchImpl)).toEqual({ total: 7, paidPlacesLeft: 93, rewardAtomic: "10000" });
+    expect(vi.mocked(fetchImpl).mock.calls.map(([url]) => String(url))).toContain(
+      "https://api.example/attestations/count?release=1.2.3",
+    );
+  });
+
+  it("answers the tail reward once the full-reward places are taken", async () => {
+    const fetchImpl = api({ count: () => json({ ...COUNT, paidPlacesLeft: 80 }), rewards: () => json(REWARDS) });
+    expect((await run(fetchImpl))?.rewardAtomic).toBe("2000");
   });
 
   it("reads a release with no scans as the zero the server answers", async () => {
-    expect(await run((async () => json({ release: "1.2.3", total: 0 })) as typeof fetch)).toBe(0);
+    const fetchImpl = api({ count: () => json({ release: "1.2.3", total: 0, paidPlacesLeft: 100 }), rewards: () => json(REWARDS) });
+    expect(await run(fetchImpl)).toEqual({ total: 0, paidPlacesLeft: 100, rewardAtomic: "10000" });
   });
 
-  it("is null on other failures and malformed bodies", async () => {
-    expect(await run((async () => json({}, 500)) as typeof fetch)).toBeNull();
-    expect(await run((async () => json({ code: "rate_limited" }, 429)) as typeof fetch)).toBeNull();
-    expect(await run((async () => json({ code: "unknown_release" }, 404)) as typeof fetch)).toBeNull();
-    expect(await run((async () => json({ total: "7" })) as typeof fetch)).toBeNull();
-    expect(await run((async () => json({ total: -1 })) as typeof fetch)).toBeNull();
-    expect(await run((async () => new Response("nope")) as typeof fetch)).toBeNull();
+  it("has no reward before the first snapshot or when the rewards route fails", async () => {
+    const before = { day: null, issuedAtomic: "0", scanRewardAtomic: "0", bountyPoolAtomic: "0" };
+    expect((await run(api({ count: () => json(COUNT), rewards: () => json(before) })))?.rewardAtomic).toBeNull();
+    expect((await run(api({ count: () => json(COUNT), rewards: () => json({}, 503) })))?.rewardAtomic).toBeNull();
+    expect((await run(api({ count: () => json(COUNT), rewards: () => json({ ...REWARDS, scanRewardAtomic: 1 }) })))?.rewardAtomic).toBeNull();
+  });
+
+  it("is null on count failures and malformed count bodies", async () => {
+    const withCount = (count: () => Response) => run(api({ count, rewards: () => json(REWARDS) }));
+    expect(await withCount(() => json({}, 500))).toBeNull();
+    expect(await withCount(() => json({ code: "rate_limited" }, 429))).toBeNull();
+    expect(await withCount(() => json({ code: "unknown_release" }, 404))).toBeNull();
+    expect(await withCount(() => json({ total: "7", paidPlacesLeft: 13 }))).toBeNull();
+    expect(await withCount(() => json({ total: -1, paidPlacesLeft: 20 }))).toBeNull();
+    expect(await withCount(() => json({ total: 7 }))).toBeNull();
+    expect(await withCount(() => new Response("nope"))).toBeNull();
     expect(
-      await run((async () => {
+      await withCount(() => {
         throw new Error("offline");
-      }) as typeof fetch),
+      }),
     ).toBeNull();
   });
 

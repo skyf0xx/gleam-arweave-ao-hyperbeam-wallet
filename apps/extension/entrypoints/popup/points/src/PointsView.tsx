@@ -3,6 +3,7 @@ import {
   capabilitiesFor,
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
+  PAID_SCANS_PER_RELEASE,
   unsupportedOperationMessage,
   type RuntimePort,
   type WalletSummary,
@@ -20,11 +21,12 @@ import {
   xIntentUrl,
 } from "@/src/points-share";
 import { FoundingGate } from "../../onboarding/src/FoundingGate";
-import { gleamUrl, howItWorksUrl, JoinNote } from "./JoinNote";
+import { gleamUrl, howItWorksUrl, JoinNote, scanUrl } from "./JoinNote";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
 import { useCountUp } from "./useCountUp";
+import { useScanStats } from "./useScanStats";
 import {
   useJoinPoints,
   useLeavePoints,
@@ -41,13 +43,8 @@ export interface PointsViewProps {
 /** The seats a member code starts with (POINTS.md § Invites). */
 const MEMBER_SEATS = 3;
 
-/**
- * Rank shows only in the top half. Below that, and for the last-placed
- * wallet that the server reports as "Top 100%", it reads as a put-down
- * rather than a reason to invite. The leader always shows "#1", since an
- * only ranked wallet is also "Top 100%".
- */
-const RANK_SHOWN_MAX_PERCENT = 50;
+/** What a referrer earns on each referee's base points (POINTS.md § Rules). */
+const REFERRAL_PERCENT = 10;
 
 const BEAM_COLORS = [
   "var(--color-beam-red)",
@@ -265,11 +262,21 @@ function JoinedView({
             +{formatPoints(standing.dailyRateAtomic)}
           </InkStat>
           <InkStat label="Rank">
-            {score?.rank === 1
-              ? "#1"
-              : topPercent !== null && topPercent <= RANK_SHOWN_MAX_PERCENT
-                ? `Top ${topPercent}%`
-                : "—"}
+            {/* The leader is "#1" because an only ranked wallet is also "Top 100%". */}
+            {!score ? (
+              "—"
+            ) : score.rank === 1 ? (
+              "#1"
+            ) : topPercent !== null ? (
+              `Top ${topPercent}%`
+            ) : (
+              <span
+                title="You're ranked once a daily snapshot credits your points. Snapshots run just after midnight UTC."
+                className="cursor-help underline decoration-dotted underline-offset-4"
+              >
+                Unranked
+              </span>
+            )}
           </InkStat>
           <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
         </dl>
@@ -280,45 +287,60 @@ function JoinedView({
         ) : null}
       </InkCard>
 
-      <section aria-label="Invite" className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-h3 font-semibold text-foreground">{heading}</h2>
-          {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
-        </div>
-        {full ? (
-          <p className="text-label text-muted">
-            You get another when a friend you invited joins Points.
-          </p>
-        ) : (
-          <>
-            <p className="text-label text-muted">
-              Invite friends to earn more Gleam Points.
-            </p>
-            <div className="mt-1 flex flex-col items-center gap-3">
-              <Button asChild>
-                <a
-                  href={xIntentUrl(post)}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => prompt?.finish()}
-                >
-                  Invite on X
-                </a>
-              </Button>
-              <button
-                type="button"
-                className="text-label text-muted underline hover:text-foreground"
-                onClick={() => {
-                  copy();
-                  prompt?.finish();
-                }}
-              >
-                {copied ? "Copied" : "Copy invite link"}
-              </button>
-            </div>
-          </>
-        )}
-      </section>
+      {standing.linkedElsewhere ? (
+        <ReconnectNotice runtime={runtime} wallet={wallet} />
+      ) : (
+        <section aria-labelledby="ways-to-earn" className="flex flex-col gap-3">
+          <h2 id="ways-to-earn" className="text-h3 font-semibold text-foreground">
+            Ways to earn Gleam
+          </h2>
+          <div className="flex flex-col gap-6">
+            <EarnItem
+              label="Invite"
+              title={heading}
+              aside={seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
+              reward={`+${REFERRAL_PERCENT}% of each friend's daily points`}
+              rewardAction={
+                full ? null : (
+                  <button
+                    type="button"
+                    aria-label={copied ? "Copied" : "Copy invite link"}
+                    title={copied ? "Copied" : "Copy invite link"}
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-md",
+                      copied ? "text-positive" : "text-muted hover:text-foreground",
+                    )}
+                    onClick={() => {
+                      copy();
+                      prompt?.finish();
+                    }}
+                  >
+                    {copied ? <CheckIcon /> : <CopyIcon />}
+                  </button>
+                )
+              }
+            >
+              {full ? (
+                <p className="text-label text-muted">
+                  You get another when a friend you invited joins Points.
+                </p>
+              ) : (
+                <Button asChild>
+                  <a
+                    href={xIntentUrl(post)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => prompt?.finish()}
+                  >
+                    Invite on X
+                  </a>
+                </Button>
+              )}
+            </EarnItem>
+            <AuditItem runtime={runtime} />
+          </div>
+        </section>
+      )}
 
       <AboutPoints className="mt-auto">
         <LeaveControl
@@ -328,6 +350,120 @@ function JoinedView({
         />
       </AboutPoints>
     </div>
+  );
+}
+
+/**
+ * Shown when the server lists this wallet under another install's device.
+ * Joining again from here only moves the wallet to this install (the
+ * server keeps its points, invite code and referrer), so it earns from
+ * this install's heartbeats again. It replaces Ways to earn so the screen
+ * keeps one primary action.
+ */
+function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSummary }) {
+  const join = useJoinPoints(runtime);
+
+  return (
+    <section aria-label="Reconnect" className="flex flex-col gap-3">
+      <h2 className="text-h3 font-semibold text-foreground">Linked to another browser</h2>
+      <p className="text-label text-muted">
+        Your points are linked to another browser and stop growing when Gleam stops running there. Reconnect to earn
+        here. You'll keep your points and invite link.
+      </p>
+      <Button type="button" disabled={join.isPending} onClick={() => join.mutate({ walletId: wallet.id })}>
+        {join.isPending ? "Reconnecting…" : "Reconnect this browser"}
+      </Button>
+      {join.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
+      {join.error instanceof Error ? <p className="text-caption text-warning">{join.error.message}</p> : null}
+    </section>
+  );
+}
+
+/** One way to earn: its title, what it pays, then its action. */
+function EarnItem({
+  label,
+  title,
+  aside,
+  reward,
+  rewardAction,
+  children,
+}: {
+  label: string;
+  title: string;
+  aside?: ReactNode;
+  reward: string | null;
+  rewardAction?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-label={label} className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
+        <h3 className="text-body font-semibold text-foreground">{title}</h3>
+        {aside}
+      </div>
+      {reward ? (
+        <div className="flex items-center gap-1.5">
+          <p className="text-label tabular-nums text-muted">{reward}</p>
+          {rewardAction}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Scans need a registered wallet, so only members see this. The button
+ * stays once the paid places are gone: an unpaid scan is still published
+ * and a confirmed finding still earns from the bounty pool. Outlined, so
+ * Invite on X stays the screen's one primary.
+ */
+function AuditItem({ runtime }: { runtime: RuntimePort }) {
+  const stats = useScanStats(runtime);
+  const placesLeft = stats.data?.paidPlacesLeft ?? null;
+  const rewardAtomic = stats.data?.rewardAtomic ?? null;
+  const paying = placesLeft !== null && placesLeft > 0;
+
+  return (
+    <EarnItem
+      label="Audit"
+      title="Audit Gleam"
+      reward={paying && rewardAtomic ? `+${formatPoints(rewardAtomic)} points per audit` : null}
+    >
+      <p className="text-label text-muted">Have your AI agent audit this release.</p>
+      <div className="flex flex-col items-center gap-3">
+        <Button asChild variant="secondary">
+          <a href={scanUrl()} target="_blank" rel="noreferrer">
+            Start an audit
+            <span aria-hidden="true">↗</span>
+          </a>
+        </Button>
+        {placesLeft === null ? null : (
+          <p className="text-center text-caption text-muted">
+            {paying
+              ? `${placesLeft} of ${PAID_SCANS_PER_RELEASE} paid places left`
+              : "Paid places for this release are taken. Confirmed findings still earn from the bounty pool."}
+          </p>
+        )}
+      </div>
+    </EarnItem>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -359,7 +495,7 @@ function AboutPoints({
       </button>
       {open ? (
         <div id="points-about" className="flex w-full flex-col gap-4">
-          <ul className="flex flex-col divide-y divide-line rounded-lg border border-line">
+          <ul className="flex flex-col gap-6">
             <AboutLink
               href={howItWorksUrl()}
               title="How to earn points"

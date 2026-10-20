@@ -18,11 +18,7 @@ export function releaseUrl(version: string): string {
   return `${REPO_URL}/releases/tag/v${version}`;
 }
 
-export function commitUrl(sha: string): string {
-  return `${REPO_URL}/commit/${sha}`;
-}
-
-export type SitePage = "welcome" | "feedback" | "goodbye" | "gleam" | "points" | "scan-results";
+export type SitePage = "welcome" | "feedback" | "goodbye" | "gleam" | "points" | "scan" | "scan-results";
 
 /**
  * A page on the Gleam website. The extension version is the only thing

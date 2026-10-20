@@ -28,7 +28,7 @@ function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): Run
     if (type === "getNetworkSettings") return NETWORK_SETTINGS;
     if (type === "getThemePreference") return { theme: overrides.theme ?? "light" } satisfies ThemeSettings;
     if (type === "setThemePreference") return undefined;
-    if (type === "getScanCount") return null;
+    if (type === "getScanStats") return null;
     throw new Error(`Unexpected message type "${type}"`);
   }) as RuntimePort["send"];
 }

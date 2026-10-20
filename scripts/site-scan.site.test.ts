@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { encodeAttestationPayload } from "../packages/core/src/scan/index";
+import {
+  FULL_REWARD_SCANS as CORE_FULL_REWARD_SCANS,
+  PAID_SCANS_PER_RELEASE as CORE_PAID_SCANS_PER_RELEASE,
+  encodeAttestationPayload,
+} from "../packages/core/src/scan/index";
 import {
   AGENT_LINE,
   DEV_EXTENSION_KEY,
   EXTENSION_ID,
+  FULL_REWARD_SCANS,
+  PAID_SCANS_PER_RELEASE,
   STORE_EXTENSION_ID,
   bountyTiers,
   coverageSummary,
@@ -15,6 +21,7 @@ import {
   formatPoints,
   idFromHash,
   isFinal,
+  nextScanReward,
   releaseFromSearch,
   resultsHref,
   sendAttestation,
@@ -216,14 +223,25 @@ describe("site scan lib: the points API", () => {
   });
 
   it("reads the scan reward and bounty pool", async () => {
-    const rewards = { day: "2026-10-19", issuedAtomic: "1000000000000000", scanRewardAtomic: "1000000000000", bountyPoolAtomic: "0" };
+    const rewards = { day: "2026-10-19", issuedAtomic: "1000000000000000", scanRewardAtomic: "1000000000000", tailScanRewardAtomic: "200000000000", bountyPoolAtomic: "0" };
     const fetchImpl = reply(200, rewards);
     expect(await fetchRewards(fetchImpl)).toEqual({ ok: true, rewards });
     expect(fetchImpl.mock.calls[0]![0]).toBe("https://api.gleamwallet.app/scan/rewards");
     expect(await fetchRewards(reply(200, { ...rewards, day: null }))).toMatchObject({ ok: true });
     expect(await fetchRewards(reply(200, { ...rewards, scanRewardAtomic: 1.5 }))).toMatchObject({ ok: false });
     expect(await fetchRewards(reply(200, { ...rewards, bountyPoolAtomic: "-1" }))).toMatchObject({ ok: false });
+    expect(await fetchRewards(reply(200, { ...rewards, tailScanRewardAtomic: undefined }))).toMatchObject({ ok: false });
     expect(await fetchRewards(vi.fn(async () => { throw new Error("offline"); }))).toMatchObject({ ok: false, status: 0 });
+  });
+
+  it("gives the first 20 paid places the full reward and the rest the tail reward", () => {
+    const rewards = { scanRewardAtomic: "1000", tailScanRewardAtomic: "200" };
+    expect(nextScanReward(rewards, 100)).toBe("1000");
+    expect(nextScanReward(rewards, 81)).toBe("1000");
+    expect(nextScanReward(rewards, 80)).toBe("200");
+    expect(nextScanReward(rewards, 1)).toBe("200");
+    expect(nextScanReward(rewards, 0)).toBe("0");
+    expect([PAID_SCANS_PER_RELEASE, FULL_REWARD_SCANS]).toEqual([CORE_PAID_SCANS_PER_RELEASE, CORE_FULL_REWARD_SCANS]);
   });
 
   it("works out each bounty tier from the pool, rounding down as the server pays", () => {

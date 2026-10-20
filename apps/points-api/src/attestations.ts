@@ -8,7 +8,10 @@ import {
   attestationId,
   checkAnswers,
   isRelease,
+  nextScanIsFull,
+  PAID_SCANS_PER_RELEASE,
   parseAttestation,
+  scanRewards,
   type AttestationAnswer,
   type ChallengeFunction,
   type ParsedAttestation,
@@ -27,11 +30,6 @@ import {
   type ServerIssue,
 } from "./scan-errors";
 import { LIVENESS_WINDOW_MS } from "./snapshot";
-
-/** Scans paid per release; later ones are recorded and earn nothing. */
-export const PAID_SCANS_PER_RELEASE = 20;
-/** A scan earns 1/1000 (0.1%) of the previous day's total holding points. */
-const SCAN_REWARD_DIVISOR = 1000n;
 
 export interface CheckRequest {
   attestation: unknown;
@@ -313,7 +311,7 @@ export async function submitAttestation(
     // 5. Paid places. A scan past them is still recorded. A scan that
     // earns nothing (no snapshot day yet) doesn't use one up.
     const left = await paidPlacesLeft(tx, attestation.release);
-    const points = left > 0 ? await scanReward(tx, now) : 0n;
+    const points = left > 0 ? await scanReward(tx, now, left) : 0n;
     const paid = points > 0n;
     const unpaidReason: UnpaidReason | null = paid ? null : left > 0 ? "no_snapshot" : "places_taken";
 
@@ -364,8 +362,10 @@ export interface ScanRewardBasis {
   day: string | null;
   /** Total holding points issued on `day`; 0 when it is null. */
   issuedAtomic: bigint;
-  /** What a paid scan submitted now earns: 0.1% of `issuedAtomic`, truncated. */
+  /** What one of a release's first FULL_REWARD_SCANS paid scans earns if submitted now: 0.1% of `issuedAtomic`, truncated. */
   rewardAtomic: bigint;
+  /** What a later paid scan earns: 0.02% of `issuedAtomic`, truncated. */
+  tailRewardAtomic: bigint;
 }
 
 /** The snapshot day a scan submitted at `now` is paid from, and what it pays. */
@@ -378,11 +378,13 @@ export async function scanRewardBasis(db: Queryable, now: Date): Promise<ScanRew
     [now.toISOString().slice(0, 10)],
   );
   const issuedAtomic = BigInt(rows[0]!.total);
-  return { day: rows[0]!.day, issuedAtomic, rewardAtomic: issuedAtomic / SCAN_REWARD_DIVISOR };
+  const { fullAtomic, tailAtomic } = scanRewards(issuedAtomic);
+  return { day: rows[0]!.day, issuedAtomic, rewardAtomic: fullAtomic, tailRewardAtomic: tailAtomic };
 }
 
-async function scanReward(tx: Queryable, now: Date): Promise<bigint> {
-  return (await scanRewardBasis(tx, now)).rewardAtomic;
+async function scanReward(tx: Queryable, now: Date, placesLeft: number): Promise<bigint> {
+  const basis = await scanRewardBasis(tx, now);
+  return nextScanIsFull(placesLeft) ? basis.rewardAtomic : basis.tailRewardAtomic;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -514,11 +516,15 @@ export interface AttestationListing {
  * Non-voided attestations of one release, and nothing else: no coverage and
  * no GitHub call. A release with none is 0, whether or not it exists.
  */
-export async function countAttestations(db: Queryable, query: { release?: string }): Promise<{ ok: true; release: string; total: number } | ScanFailure> {
+export async function countAttestations(
+  db: Queryable,
+  query: { release?: string },
+): Promise<{ ok: true; release: string; total: number; paidPlacesLeft: number } | ScanFailure> {
   if (query.release === undefined || !isRelease(query.release)) {
     return failure(400, "malformed_request", "release", "release must be a version like 1.4.0 (no leading v).");
   }
-  return { ok: true, release: query.release, total: await attestationTotal(db, query.release) };
+  const [total, placesLeft] = await Promise.all([attestationTotal(db, query.release), paidPlacesLeft(db, query.release)]);
+  return { ok: true, release: query.release, total, paidPlacesLeft: placesLeft };
 }
 
 /**

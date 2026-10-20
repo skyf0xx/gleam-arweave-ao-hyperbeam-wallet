@@ -178,7 +178,7 @@ export function SettingsHomeView({
               <FeedbackCard onClick={onOpenFeedback} />
               <SourceLink />
             </div>
-            <AboutBuild runtime={runtime} version={browser.runtime.getManifest().version} commit={import.meta.env.VITE_GLEAM_COMMIT} />
+            <AboutBuild runtime={runtime} version={browser.runtime.getManifest().version} />
           </OptionSection>
         </div>
       </div>

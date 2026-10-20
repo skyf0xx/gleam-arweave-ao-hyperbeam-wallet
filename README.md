@@ -28,7 +28,9 @@ await window.arweaveWallet.connect(["ENCRYPT", "DECRYPT"]);
 const key = crypto.getRandomValues(new Uint8Array(32)); // your app's data key
 const locked = await window.arweaveWallet.encrypt(key, { name: "RSA-OAEP" });
 // Later, on any device:
-const sameKey = await window.arweaveWallet.decrypt(locked, { name: "RSA-OAEP" });
+const sameKey = await window.arweaveWallet.decrypt(locked, {
+  name: "RSA-OAEP",
+});
 ```
 
 </details>
@@ -90,8 +92,8 @@ Load `apps/extension/.output/chrome-mv3` unpacked in Chrome to try it.
 
 </details>
 
-## Verify a release
-
+<details>
+<summary>Verify a release</summary>
 The script will build the tag from source and check that your zip has the
 same hash as the
 [release](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases).
@@ -99,6 +101,8 @@ same hash as the
 ```bash
 scripts/verify-release.sh v1.27.0
 ```
+
+</details>
 
 <details>
 <summary>Build by hand</summary>

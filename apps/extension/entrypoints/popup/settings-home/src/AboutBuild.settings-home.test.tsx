@@ -6,11 +6,11 @@ import { AboutBuild } from "./AboutBuild";
 
 afterEach(cleanup);
 
-function runtimeReturning(count: number | null | Error): RuntimePort {
+function runtimeReturning(total: number | null | Error): RuntimePort {
   return {
     send: vi.fn(async () => {
-      if (count instanceof Error) throw count;
-      return count;
+      if (total instanceof Error) throw total;
+      return total === null ? null : { total, paidPlacesLeft: 20 };
     }),
     onMessage: vi.fn(() => () => {}),
   } as unknown as RuntimePort;
@@ -20,11 +20,9 @@ function render(ui: (runtime: RuntimePort) => React.ReactElement, runtime = runt
   return rtlRender(<QueryClientProvider client={new QueryClient()}>{ui(runtime)}</QueryClientProvider>);
 }
 
-const SHA = "0123456789abcdef0123456789abcdef01234567";
-
 describe("AboutBuild", () => {
   it("shows the version with a link to its release", () => {
-    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit={SHA} />);
+    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" />);
 
     expect(screen.getByText("Version 1.26.0")).toBeTruthy();
     expect(screen.getByRole("link", { name: "View release" }).getAttribute("href")).toBe(
@@ -32,41 +30,24 @@ describe("AboutBuild", () => {
     );
   });
 
-  it("shows the short commit linked to the full sha", () => {
-    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit={SHA} />);
-
-    const link = screen.getByRole("link", { name: "0123456" });
-    expect(link.getAttribute("href")).toBe(`https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/commit/${SHA}`);
-    expect(link.getAttribute("target")).toBe("_blank");
-  });
-
-  it("hides the commit when it is unknown", () => {
-    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit="unknown" />);
-
-    expect(screen.getByText("Version 1.26.0")).toBeTruthy();
-    expect(screen.queryByText("Commit")).toBeNull();
-    expect(screen.queryByText("unknown")).toBeNull();
-    expect(screen.getAllByRole("link")).toHaveLength(2);
-  });
-
   it("links the community audits of this version with their count", async () => {
-    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit={SHA} />, runtimeReturning(7));
+    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" />, runtimeReturning(7));
 
     const link = await screen.findByRole("link", { name: "7 audits →" });
     expect(link.getAttribute("href")).toBe("https://gleamwallet.app/scan-results.html?v=1.26.0");
   });
 
   it("says 1 audit in the singular", async () => {
-    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit={SHA} />, runtimeReturning(1));
+    render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" />, runtimeReturning(1));
 
     expect(await screen.findByRole("link", { name: "1 audit →" })).toBeTruthy();
   });
 
   it.each([null, new Error("boom")])("shows the row without a count when it can't be read (%s)", async (result) => {
     const runtime = runtimeReturning(result);
-    render((r) => <AboutBuild runtime={r} version="1.26.0" commit={SHA} />, runtime);
+    render((r) => <AboutBuild runtime={r} version="1.26.0" />, runtime);
 
-    await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanCount", payload: undefined }));
+    await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
     expect(screen.getByRole("link", { name: "View audits →" }).getAttribute("href")).toBe(
       "https://gleamwallet.app/scan-results.html?v=1.26.0",
     );

@@ -163,13 +163,15 @@ the shared tokenizing/validation logic the client and server both use).
   It runs all of this under a per-release advisory lock, so two scans
   can't both claim the same paid reward slot.
 
-The first `PAID_SCANS_PER_RELEASE` (20) correct attestations per release
-earn points (1/1000 of the previous day's total holding points); later
-ones are still recorded, just unpaid. `/attestations/check` runs the
+The first `PAID_SCANS_PER_RELEASE` (100) correct attestations per release
+earn points: the first `FULL_REWARD_SCANS` (20) earn 1/1000 of the
+previous day's total holding points and the rest 1/5000. Both live in
+`@gleam/core/scan` so the extension shows the same tiers. Later
+attestations are still recorded, just unpaid. `/attestations/check` runs the
 same validation as a dry run, without a signature, so an agent can
 self-correct before asking the user to sign.
 
-`scanRewardBasis` computes that reward and the day it comes from.
+`scanRewardBasis` computes both rewards and the day it comes from.
 `/attestations` credits it, and `/scan/rewards` publishes it with the
 bounty pool's balance (`poolBalance` from `bounty.ts`), so `scan.html`
 shows exactly what a scan is paid.

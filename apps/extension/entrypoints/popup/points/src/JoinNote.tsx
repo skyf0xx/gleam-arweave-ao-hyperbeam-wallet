@@ -11,6 +11,11 @@ export function gleamUrl(): string {
   return sitePageUrl("gleam", browser.runtime.getManifest().version);
 }
 
+/** scan.html, where a member hands their AI agent the steps to audit Gleam for points. */
+export function scanUrl(): string {
+  return sitePageUrl("scan", browser.runtime.getManifest().version);
+}
+
 /**
  * The disclosure shown wherever joining Gleam Points is offered. The
  * Points screen drops the link because its About section carries it.

@@ -1,4 +1,4 @@
-import { fetchScanCount } from "@gleam/core/src/scan/index.ts";
+import { fetchScanStats, type ScanStats } from "@gleam/core/src/scan/index.ts";
 
 export interface ScansHandlerDeps {
   apiUrl: string;
@@ -14,8 +14,8 @@ export class ScansHandler {
     this.fetchImpl = deps.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
-  /** Scans attesting this build's release, or null when the API can't say. */
-  count(): Promise<number | null> {
-    return fetchScanCount({ apiUrl: this.deps.apiUrl, release: this.deps.version(), fetchImpl: this.fetchImpl });
+  /** Scans attesting this build's release and its paid places left, or null when the API can't say. */
+  stats(): Promise<ScanStats | null> {
+    return fetchScanStats({ apiUrl: this.deps.apiUrl, release: this.deps.version(), fetchImpl: this.fetchImpl });
   }
 }

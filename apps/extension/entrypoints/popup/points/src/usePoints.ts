@@ -128,6 +128,12 @@ export type PointsStanding =
       status: "joined";
       membership: PointsMembership;
       score: PointsWalletScore | null;
+      /**
+       * The server answered for this install but doesn't list the wallet:
+       * a later join from another install moved it there, so it earns only
+       * while that install sends heartbeats.
+       */
+      linkedElsewhere: boolean;
       /** Settled total projected forward to now; ticks while mounted. */
       estimateAtomic: string;
       dailyRateAtomic: string;
@@ -173,7 +179,9 @@ export function usePointsStanding(runtime: RuntimePort, wallet: WalletSummary): 
     nowMs,
   });
 
-  return { status: "joined", membership, score, estimateAtomic, dailyRateAtomic };
+  const linkedElsewhere = scores.data != null && score === null;
+
+  return { status: "joined", membership, score, linkedElsewhere, estimateAtomic, dailyRateAtomic };
 }
 
 function rawOf(balances: WalletBalances | undefined): bigint {

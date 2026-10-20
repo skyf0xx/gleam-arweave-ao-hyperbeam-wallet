@@ -10,6 +10,7 @@ vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ vers
 const POINTS_URL = "https://gleamwallet.app/points.html?v=1.2.3";
 const GLEAM_URL = "https://gleamwallet.app/gleam.html?v=1.2.3";
 const LINK = "https://gleamwallet.app/invite.html?c=MYCODE22";
+const SCAN_URL = "https://gleamwallet.app/scan.html?v=1.2.3";
 
 afterEach(() => {
   cleanup();
@@ -64,7 +65,8 @@ const SCORES: PointsScores = {
 function fakeRuntime(handlers: Record<string, (payload: unknown) => unknown>): RuntimePort & { send: ReturnType<typeof vi.fn> } {
   return {
     send: vi.fn(async ({ type, payload }: { type: string; payload: unknown }) => {
-      const handler = handlers[type];
+      // Most tests don't care about the audit section's figures.
+      const handler = handlers[type] ?? (type === "getScanStats" ? () => null : undefined);
       if (!handler) throw new Error(`Unexpected message type "${type}"`);
       return handler(payload);
     }),
@@ -142,6 +144,66 @@ describe("PointsTokenRow", () => {
 });
 
 describe("PointsView", () => {
+  it("offers a member an audit with the paid places left", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+      getScanStats: () => ({ total: 7, paidPlacesLeft: 93, rewardAtomic: "12500000000000" }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    const audit = within(await screen.findByRole("region", { name: "Audit" }));
+    expect(audit.getByRole("heading", { name: "Audit Gleam" })).toBeTruthy();
+    const link = audit.getByRole("link", { name: /Start an audit/ });
+    expect(link.getAttribute("href")).toBe(SCAN_URL);
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(await audit.findByText("93 of 100 paid places left")).toBeTruthy();
+    expect(audit.getByText("+12.50 points per audit")).toBeTruthy();
+  });
+
+  it("keeps the audit link once the paid places are taken", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+      getScanStats: () => ({ total: 131, paidPlacesLeft: 0, rewardAtomic: "12500000000000" }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    const audit = within(await screen.findByRole("region", { name: "Audit" }));
+    expect(await audit.findByText(/Paid places for this release are taken/)).toBeTruthy();
+    expect(audit.getByRole("link", { name: /Start an audit/ })).toBeTruthy();
+    expect(audit.queryByText(/per audit/)).toBeNull();
+  });
+
+  it("drops the places line when the stats can't be read", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => SCORES,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    const audit = within(await screen.findByRole("region", { name: "Audit" }));
+    await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
+    expect(audit.queryByText(/paid places/)).toBeNull();
+    expect(audit.queryByText(/per audit/)).toBeNull();
+  });
+
+  it("hides the audit section until the wallet has joined", async () => {
+    const runtime = fakeRuntime({ ...BALANCES, getPointsMemberships: () => ({}), getPointsPendingInvite: () => null });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Join Gleam Points" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Audit" })).toBeNull();
+    expect(runtime.send).not.toHaveBeenCalledWith({ type: "getScanStats", payload: undefined });
+  });
+
   it("joins with a typed invite code, then shows the wallet's standing", async () => {
     let memberships: Record<string, PointsMembership> = {};
     const runtime = fakeRuntime({
@@ -245,13 +307,14 @@ describe("PointsView", () => {
     expect(standing.getByText("Friends joined").nextElementSibling?.textContent).toBe("3");
 
     expect(screen.getByRole("heading", { name: "3 invites remaining" })).toBeTruthy();
-    expect(screen.getByText("Invite friends to earn more Gleam Points.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Ways to earn Gleam" })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Invite" })).getByText("+10% of each friend's daily points")).toBeTruthy();
     const share = screen.getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
     );
 
-    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X"]);
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X", "Start an audit↗"]);
     expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
     const about = screen.getByRole("button", { name: "About Gleam Points" });
     expect(about.getAttribute("aria-expanded")).toBe("false");
@@ -333,20 +396,64 @@ describe("PointsView", () => {
     expect(await screen.findByText("That invite code isn't valid.")).toBeTruthy();
   });
 
-  it("shows a dash for rank until the wallet is ranked", async () => {
+  it("offers to reconnect a wallet the server lists under another install", async () => {
+    let wallets: PointsScores["wallets"] = [];
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({ settledAt: null, wallets }),
+      joinPoints: () => {
+        wallets = SCORES.wallets;
+        return MEMBERSHIP;
+      },
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    const notice = within(await screen.findByRole("region", { name: "Reconnect" }));
+    expect(notice.getByRole("heading", { name: "Linked to another browser" })).toBeTruthy();
+    expect(screen.getByText("Rank").nextElementSibling?.textContent).toBe("—");
+    expect(screen.queryByRole("heading", { name: "Ways to earn Gleam" })).toBeNull();
+    fireEvent.click(notice.getByRole("button", { name: "Reconnect this browser" }));
+
+    await waitFor(() =>
+      expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id } }),
+    );
+    expect(await screen.findByRole("heading", { name: "Ways to earn Gleam" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Reconnect" })).toBeNull();
+  });
+
+  it("shows why a reconnect failed", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
       getPointsScores: () => ({ settledAt: null, wallets: [] }),
+      joinPoints: () => {
+        throw new Error("Couldn't join Gleam Points: HTTP 503");
+      },
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Reconnect this browser" }));
+
+    expect(await screen.findByText("Couldn't join Gleam Points: HTTP 503")).toBeTruthy();
+  });
+
+  it("doesn't offer a reconnect before the scores load", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => new Promise(() => {}),
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
     expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("—");
+    expect(screen.queryByRole("region", { name: "Reconnect" })).toBeNull();
   });
 
-  it("shows rank only in the top half", async () => {
+  it("shows rank in the bottom half too", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
@@ -356,9 +463,24 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
-    await waitFor(() => expect(standing.getByText("Friends joined").nextElementSibling?.textContent).toBe("3"));
-    expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("—");
-    expect(screen.queryByText(/Top \d+%/)).toBeNull();
+    await waitFor(() => expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("Top 100%"));
+  });
+
+  it("says Unranked, with why, until a snapshot credits the wallet", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({
+        ...SCORES,
+        wallets: [{ ...SCORES.wallets[0]!, rank: null, topPercent: null, pointsToNextRankAtomic: null }],
+      }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    const unranked = await screen.findByText("Unranked");
+    expect(unranked.getAttribute("title")).toMatch(/daily snapshot/);
+    expect(screen.queryByText(/Your rank is/)).toBeNull();
   });
 
   it("shows the private rank and the points needed to pass the next one", async () => {
