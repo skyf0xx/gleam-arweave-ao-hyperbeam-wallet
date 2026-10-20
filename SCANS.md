@@ -11,9 +11,11 @@ professional audit.
 ## How it works
 
 1. **Hand the page to your agent.** `gleamwallet.app/scan.html` has
-   one line to copy into your coding agent:
+   a prompt to copy into your coding agent. It names the skill and every
+   side effect up front, so the agent can check the skill against it
+   before running anything:
 
-   > Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.
+   > Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet. The skill clones the repo, installs its pnpm dependencies (which add a lefthook git hook to the checkout), runs its tests and osv-scanner, and calls the Gleam Points API at api.gleamwallet.app. It never needs a seed phrase, a real key, a wallet or funds. Ask me before any gh action: forking, pushing, opening a PR or filing an advisory.
 2. **The agent scans.** It checks out the latest release tag and runs
    `pnpm scan start`. That fetches a challenge, saves it to
    `.gleam-scan/challenge.json`, writes a starter
