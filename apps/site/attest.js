@@ -27,11 +27,17 @@ const help = $("[data-result-help]");
 const sign = $("[data-sign]");
 const step = $("[data-sign-step]");
 const install = $("[data-install]");
+const SITE_HOST = "gleamwallet.app";
 const LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+// Chrome lets only the extension's externally_connectable origins see it, so a
+// preview deployment looks exactly like a browser without Gleam.
+const ELSEWHERE = !LOCAL && location.hostname !== SITE_HOST;
 
 // The step each readiness shows above the button, and what the button says.
 const STEPS = {
-  "no-extension": LOCAL
+  "no-extension": ELSEWHERE
+    ? `Gleam only answers pages on ${SITE_HOST}, so it can't sign from this copy of the site. Open this link there instead.`
+    : LOCAL
     ? "Gleam isn't reachable from this page. Add it to Chrome and reload, or for an unpacked build add ?ext=<its extension id> to the address."
     : "Gleam isn't installed in this browser. Add it to Chrome, then reload this page.",
   "no-wallet": "Gleam has no wallet yet. Create one and join Gleam Points, then come back to this tab.",
@@ -86,7 +92,8 @@ if (!decoded.ok) {
     step.hidden = !text;
     step.textContent = text || "";
     install.hidden = readiness !== "no-extension";
-    install.href = STORE_URL;
+    install.href = ELSEWHERE ? `https://${SITE_HOST}${location.pathname}${location.hash}` : STORE_URL;
+    install.textContent = ELSEWHERE ? `Open on ${SITE_HOST}` : "Add Gleam to Chrome";
     sign.hidden = final || readiness === "no-extension";
     sign.disabled = false;
     sign.textContent = readiness === "ready" ? (tried ? "Try again" : "Sign with Gleam") : "Check again";
