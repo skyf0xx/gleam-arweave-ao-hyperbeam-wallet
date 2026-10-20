@@ -3,6 +3,7 @@
 // (merge a PR, watch CI, upload to the Chrome Web Store) rather than trying
 // to script past them.
 //
+//   pnpm release:all <major|minor|patch> --kdbx <path-to-keepassxc-db>
 //   pnpm release:all <major|minor|patch> --key <path-to-private-key>
 //
 // Stages:
@@ -17,7 +18,8 @@
 //      release-manifest.json) exists for that tag.
 //   4. Run scripts/pack-release.sh, which re-verifies the release against
 //      the manifest and a from-source rebuild, then signs a .crx with your
-//      local key. The key is never read by CI, only passed to this script.
+//      local key, unlocking the KeePassXC database if you passed --kdbx.
+//      The key is never read by CI, only passed to this script.
 //   5. Remind you to upload the .crx by hand; that step stays manual.
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
@@ -49,9 +51,16 @@ async function pause(prompt) {
 const args = process.argv.slice(2);
 const bump = args.find((a) => ["major", "minor", "patch"].includes(a));
 if (!bump) refuse('pass a bump type: "major", "minor" or "patch"');
-const keyIndex = args.indexOf("--key");
-const key = keyIndex !== -1 ? args[keyIndex + 1] : process.env.GLEAM_CWS_KEY;
-if (!key) refuse("no private key given: pass --key <path> or set GLEAM_CWS_KEY");
+/** @param {string} name */
+function flag(name) {
+  const i = args.indexOf(name);
+  return i !== -1 ? args[i + 1] : undefined;
+}
+const key = flag("--key") ?? process.env.GLEAM_CWS_KEY;
+const kdbx = flag("--kdbx") ?? process.env.GLEAM_CWS_KDBX;
+if (key && kdbx) refuse("both a KeePassXC database and a key file given; pass only one");
+if (!key && !kdbx) refuse("no private key given: pass --kdbx <path> or --key <path>, or set GLEAM_CWS_KDBX or GLEAM_CWS_KEY");
+const signWith = kdbx ? ["--kdbx", kdbx] : ["--key", /** @type {string} */ (key)];
 
 const top = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
 if (!top.ok) refuse("not inside a git repository");
@@ -114,8 +123,11 @@ await pause(`Watch it finish, confirm the GitHub Release for v${next} has its zi
 
 // --- stage 4: pack and sign -------------------------------------------------
 
+// Readline keeps the terminal in raw mode while open, which would swallow the
+// Enter on keepassxc-cli's password prompt.
+rl.close();
 process.stdout.write("\n== Stage 4: verify and sign ==\n");
-run("scripts/pack-release.sh", [`v${next}`, "--key", key], root);
+run("scripts/pack-release.sh", [`v${next}`, ...signWith], root);
 
 // --- stage 5: upload ---------------------------------------------------------
 
@@ -123,4 +135,3 @@ process.stdout.write(
   `\n== Stage 5 ==\nUpload ${root}/v${next}.crx to the Chrome Web Store Developer Dashboard.\n` +
     "That step stays manual: no store credentials live in this script or in CI.\n",
 );
-rl.close();
