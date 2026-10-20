@@ -33,7 +33,9 @@
     <div class="copybox">
       <div class="beam copybox-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
       <p class="copybox-label" id="agent-line-label">Paste this into your agent</p>
-      <p class="copybox-line" id="agent-line" data-agent-line></p>
+      <div class="copybox-scroll" data-agent-scroll>
+        <p class="copybox-line" id="agent-line" tabindex="0" aria-labelledby="agent-line-label" data-agent-line></p>
+      </div>
       <div class="copybox-actions">
         <button class="button" type="button" aria-describedby="agent-line-label" data-copy>Copy prompt</button>
         <span class="copybox-status small" role="status" aria-live="polite" data-copy-status></span>

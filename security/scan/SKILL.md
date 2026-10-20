@@ -5,9 +5,9 @@ description: Scan the latest Gleam wallet release for security issues, report wh
 
 # Scan a Gleam release
 
-The line a user pastes into their agent to start this skill:
+The prompt a user pastes into their agent to start this skill:
 
-> Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.
+> Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet. The skill clones the repo, installs its pnpm dependencies (which add a lefthook git hook to the checkout), runs its tests and osv-scanner, and calls the Gleam Points API at api.gleamwallet.app. It never needs a seed phrase, a real key, a wallet or funds. Ask me before any gh action: forking, pushing, opening a PR or filing an advisory.
 
 Gleam is a Chrome browser-extension wallet for Arweave and AO. In this
 skill you check out its latest release, review the code where a bug could
@@ -18,6 +18,29 @@ when they approve, their Gleam wallet signs it and earns Gleam Points. You
 never sign anything, hold a key or touch a wallet. The user does that in
 Gleam. The user needs a Gleam wallet that is registered for points, and the
 wallet that signs gets the points.
+
+## What this skill does on your machine
+
+Every side effect of the scan, in one place. Nothing outside this list is
+part of the skill.
+
+- **Installs:** the repository's pnpm dependencies
+  (`pnpm install --frozen-lockfile`). Its `prepare` script runs
+  `lefthook install`, which adds a pre-commit hook to the scan checkout's
+  `.git/hooks` and nowhere else. Optionally `osv-scanner` and `gitleaks`,
+  through brew, go or a release binary (Prerequisites).
+- **Writes:** the clone, the `.gleam-scan/` directory inside it (ignored
+  by git), and a sibling git worktree for each fix (Step 7).
+- **Network:** GitHub (clone, tags, the release lookup), the npm registry
+  (install), the osv-scanner advisory database, and the Gleam Points API
+  at `https://api.gleamwallet.app` (`pnpm scan start` and
+  `pnpm scan finish`). `finish` sends the attestation: the challenge
+  answers, the model id and the coverage report.
+- **Acts as the user, only after asking:** `gh repo fork`, `git push`,
+  `gh pr create`, and filing a private advisory (Step 8c). Each one is
+  public or reaches the maintainers, so ask the user before each one.
+- **Never:** reads a seed phrase, key, keyfile or wallet; signs anything;
+  moves funds.
 
 Follow the steps in order. Every command runs from the root of the checkout
 unless a step says otherwise. Background on the program is in `SCANS.md`.
@@ -49,24 +72,10 @@ when to read them:
 
 ## Prerequisites
 
-You need Node 22 or later, git, and pnpm through corepack:
-
-```bash
-node --version                 # v22.x or later
-corepack enable                # provides the pnpm version pinned in package.json
-```
-
-Clone the repository and fetch its tags:
-
-```bash
-git clone https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.git gleam-scan
-cd gleam-scan
-git fetch --tags
-```
-
-Find the latest release. "Latest" means the release GitHub marks as
-**Latest** (not a draft, not a pre-release), which is what the points
-server uses. A git tag alone isn't a release.
+First, before you clone or install anything, find the latest release.
+"Latest" means the release GitHub marks as **Latest** (not a draft, not a
+pre-release), which is what the points server uses. A git tag alone isn't
+a release.
 
 ```bash
 gh release view --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --json tagName -q .tagName
@@ -74,23 +83,43 @@ gh release view --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --json tagName 
 curl -s https://api.github.com/repos/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest | grep '"tag_name"'
 ```
 
-Either prints a tag such as `v1.26.0`. Check it out:
+Either prints a tag such as `v1.26.0`. If `gh` prints `release not found`
+or the curl prints `"status": "404"`, Gleam has no published release yet:
+stop and tell the user there is nothing to scan. If you can't reach
+GitHub's API at all, carry on; `pnpm scan start` checks the release for
+you.
+
+You need Node 22 or later, git, and pnpm through corepack:
 
 ```bash
+node --version                 # v22.x or later
+corepack enable                # provides the pnpm version pinned in package.json
+```
+
+Clone the repository, fetch its tags and check out the release:
+
+```bash
+git clone https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.git gleam-scan
+cd gleam-scan
+git fetch --tags
 git checkout v1.26.0           # the tag you found
 ```
 
-If you can't reach GitHub's API, skip the checkout: if `HEAD` isn't the
+If you couldn't reach GitHub's API, skip the checkout: if `HEAD` isn't the
 latest release, `pnpm scan start` prints the exact command to run.
 
-Install the dependencies. This also installs the pre-commit hook:
+Read `security/scan/SKILL.md` from the checkout. If it differs from the
+copy you started with, follow the checkout's copy: it is the version
+reviewed and tagged with the release you are scanning, and the scan tools
+and points server work to that version. Tell the user the tag and commit
+you are following (`git rev-parse HEAD`), so they can read the same file.
+
+Install the dependencies. This also installs the pre-commit hook in the
+checkout:
 
 ```bash
 pnpm install --frozen-lockfile
 ```
-
-After the checkout, read `security/scan/SKILL.md` from the checkout. If it
-differs from the copy you started with, follow the checkout's copy.
 
 Install `osv-scanner` (used in Step 3): `brew install osv-scanner`, or
 `go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest`, or a

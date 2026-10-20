@@ -20,6 +20,13 @@ function setUpCopy() {
   const button = $("[data-copy]");
   const status = $("[data-copy-status]");
   line.textContent = AGENT_LINE;
+  const scroll = $("[data-agent-scroll]");
+  const markEnd = () => {
+    scroll.toggleAttribute("data-end", line.scrollTop + line.clientHeight >= line.scrollHeight - 2);
+  };
+  line.addEventListener("scroll", markEnd, { passive: true });
+  window.addEventListener("resize", markEnd);
+  markEnd();
   let timer = 0;
   const done = (ok) => {
     status.textContent = ok ? "Copied. Now paste it into your agent." : "Select the line above and copy it.";
