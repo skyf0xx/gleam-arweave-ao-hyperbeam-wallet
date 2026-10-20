@@ -291,6 +291,7 @@
 .sign { margin: 32px 0 0; }
 .sign .button { min-width: 200px; justify-content: center; }
 .sign .small { margin: 14px 0 0; max-width: 34em; }
+.sign .sign-step { margin: 0 0 16px; }
 
 /* The outcome. Colour marks the state: sky for done, red for needs attention. */
 
