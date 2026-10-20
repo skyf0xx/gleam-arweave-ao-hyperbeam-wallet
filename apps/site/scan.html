@@ -33,7 +33,9 @@
     <div class="copybox">
       <div class="beam copybox-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
       <p class="copybox-label" id="agent-line-label">Paste this into your agent</p>
-      <p class="copybox-line" id="agent-line" tabindex="0" aria-labelledby="agent-line-label" data-agent-line></p>
+      <div class="copybox-scroll" data-agent-scroll>
+        <p class="copybox-line" id="agent-line" tabindex="0" aria-labelledby="agent-line-label" data-agent-line></p>
+      </div>
       <div class="copybox-actions">
         <button class="button" type="button" aria-describedby="agent-line-label" data-copy>Copy prompt</button>
         <span class="copybox-status small" role="status" aria-live="polite" data-copy-status></span>
@@ -70,7 +72,7 @@
 
     <div class="earn-cards">
       <details class="earn-card">
-        <summary><h2 id="points-h">Scanning Rewards</h2></summary>
+        <summary><h2 id="points-h">Scanning Rewards</h2><span class="earn-amount" data-earn-scan hidden></span></summary>
         <ul class="sc-prose">
           <li>The first 20 scans earn 0.1% of the total GLEAM points minted yesterday.</li>
           <li>Scans 21 to 100 earn 0.02%.</li>
@@ -82,7 +84,7 @@
       </details>
 
       <details class="earn-card">
-        <summary><h2 id="numbers-h">Bounty Rewards</h2></summary>
+        <summary><h2 id="numbers-h">Bounty Rewards</h2><span class="earn-amount" data-earn-bounty hidden></span></summary>
         <ul class="sc-prose">
           <li>Gleam has a bounty pool that grows daily by 2% of the total GLEAM points minted yesterday.</li>
           <li>Confirmed vulnerabilities earn a share of the bounty pool:

@@ -20,6 +20,13 @@ function setUpCopy() {
   const button = $("[data-copy]");
   const status = $("[data-copy-status]");
   line.textContent = AGENT_LINE;
+  const scroll = $("[data-agent-scroll]");
+  const markEnd = () => {
+    scroll.toggleAttribute("data-end", line.scrollTop + line.clientHeight >= line.scrollHeight - 2);
+  };
+  line.addEventListener("scroll", markEnd, { passive: true });
+  window.addEventListener("resize", markEnd);
+  markEnd();
   let timer = 0;
   const done = (ok) => {
     status.textContent = ok ? "Copied. Now paste it into your agent." : "Select the line above and copy it.";
@@ -82,9 +89,26 @@ function gleam(atomic) {
   return text === "0" && /^0*[1-9]\d*$/.test(atomic) ? "<0.01" : text;
 }
 
+// The accordion headers show the headline figure so it reads without opening them.
+function renderHeaderAmounts(rewards) {
+  // Before the first daily snapshot a scan is recorded unpaid, so a scan reward would mislead.
+  if (rewards.day !== null) {
+    const scan = $("[data-earn-scan]");
+    scan.textContent = `${gleam(rewards.scanRewardAtomic)} GLEAM`;
+    scan.hidden = false;
+  }
+  const critical = bountyTiers(rewards.bountyPoolAtomic)[0];
+  if (critical.amountAtomic !== null) {
+    const bounty = $("[data-earn-bounty]");
+    bounty.textContent = `${gleam(critical.amountAtomic)} GLEAM`;
+    bounty.hidden = false;
+  }
+}
+
 function renderRewards(rewards) {
   $("[data-stat-pool]").textContent = gleam(rewards.bountyPoolAtomic);
   renderTiers(rewards.bountyPoolAtomic);
+  renderHeaderAmounts(rewards);
 }
 
 /** Which reward the next scan gets depends on the release's places left, so it needs both responses. */
