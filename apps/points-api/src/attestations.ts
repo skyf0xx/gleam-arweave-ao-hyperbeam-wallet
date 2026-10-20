@@ -571,7 +571,7 @@ export async function listAttestations(
           404,
           "unknown_release",
           "release",
-          `No scans exist for v${query.release}; ask for the latest release or one that has scans, or leave out release.`,
+          `No scans exist for v${query.release} — scan it now to earn GLEAM`,
         );
       }
       ({ release, commit } = latest!);
