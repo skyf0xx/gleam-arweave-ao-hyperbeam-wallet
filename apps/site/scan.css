@@ -56,7 +56,13 @@
   line-height: 1.6;
   overflow-wrap: anywhere;
   user-select: all;
+  max-height: calc(3 * 1.6em + 28px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
 }
+.copybox-line:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 
 .copybox-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .copybox-actions .button { min-width: 148px; justify-content: center; }
