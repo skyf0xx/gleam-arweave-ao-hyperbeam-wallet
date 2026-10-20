@@ -18,20 +18,19 @@ function el(tag, className, text) {
 
 function setUpCopy() {
   const line = $("[data-agent-line]");
-  const button = $("[data-copy]");
   const status = $("[data-copy-status]");
   line.textContent = AGENT_LINE;
   let timer = 0;
   const done = (ok) => {
-    status.textContent = ok ? "Copied." : "Select the line and copy it.";
-    button.textContent = ok ? "Copied" : "Copy the line";
+    status.textContent = ok ? "Copied" : "Select the line and copy it.";
+    line.toggleAttribute("data-copied", ok);
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       status.textContent = "";
-      button.textContent = "Copy the line";
+      line.removeAttribute("data-copied");
     }, 2500);
   };
-  button.addEventListener("click", () => {
+  line.addEventListener("click", () => {
     const fallback = () => {
       const range = document.createRange();
       range.selectNodeContents(line);

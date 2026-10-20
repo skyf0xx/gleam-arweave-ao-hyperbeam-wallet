@@ -49,17 +49,17 @@ describe("AboutBuild", () => {
     expect(screen.getAllByRole("link")).toHaveLength(2);
   });
 
-  it("links the community scans of this version with their count", async () => {
+  it("links the community audits of this version with their count", async () => {
     render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit={SHA} />, runtimeReturning(7));
 
-    const link = await screen.findByRole("link", { name: "7 scans →" });
+    const link = await screen.findByRole("link", { name: "7 audits →" });
     expect(link.getAttribute("href")).toBe("https://gleamwallet.app/scan.html?v=1.26.0");
   });
 
-  it("says 1 scan in the singular", async () => {
+  it("says 1 audit in the singular", async () => {
     render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" commit={SHA} />, runtimeReturning(1));
 
-    expect(await screen.findByRole("link", { name: "1 scan →" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "1 audit →" })).toBeTruthy();
   });
 
   it.each([null, new Error("boom")])("shows the row without a count when it can't be read (%s)", async (result) => {
@@ -67,7 +67,7 @@ describe("AboutBuild", () => {
     render((r) => <AboutBuild runtime={r} version="1.26.0" commit={SHA} />, runtime);
 
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanCount", payload: undefined }));
-    expect(screen.getByRole("link", { name: "View scans →" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "View audits →" }).getAttribute("href")).toBe(
       "https://gleamwallet.app/scan.html?v=1.26.0",
     );
   });

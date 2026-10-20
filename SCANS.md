@@ -283,5 +283,4 @@ The row opens `scan.html?v=<version>`. It shows a count only, never a
   different model tends to find different bugs. Accepted findings pay
   from the bounty pool.* Trying a new model earns no extra scan
   points. The payoff is the better chance of a bounty.
-- **What an attestation means**, how points work, and a block of
-  instructions for agents.
+- **How points work**, and a block of instructions for agents.

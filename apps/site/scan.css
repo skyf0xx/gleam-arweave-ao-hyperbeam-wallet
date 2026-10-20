@@ -25,19 +25,34 @@
 .copybox-label { margin: 0 0 8px; font-weight: 600; font-size: 0.9375rem; }
 
 .copybox-line {
-  margin: 0 0 16px;
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
   padding: 12px 14px;
+  border: 1px solid transparent;
   border-radius: 8px;
   background: var(--bg);
   font-family: var(--mono);
   font-size: 0.8125rem;
   line-height: 1.6;
+  text-align: left;
   overflow-wrap: anywhere;
-  user-select: all;
+  cursor: pointer;
 }
 
-.copybox .button { min-width: 160px; justify-content: center; }
-.copybox-status { margin-left: 12px; }
+.copybox-line:hover,
+.copybox-line:focus-visible { border-color: var(--line); }
+.copybox-line[data-copied] { color: #16a34a; }
+
+.copybox-status { display: inline-flex; align-items: center; gap: 6px; color: #16a34a; }
+.copybox-status:empty { display: none; }
+.copybox-status::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  clip-path: polygon(39% 62%, 15% 44%, 6% 54%, 40% 82%, 94% 30%, 84% 20%);
+}
 
 /* Sections */
 
@@ -130,7 +145,6 @@
 
 @media (max-width: 520px) {
   .copybox { padding: 16px; }
-  .copybox .button { width: 100%; }
   .copybox-status { display: block; margin: 8px 0 0; min-height: 1.4em; }
   .facts > div { grid-template-columns: 1fr; gap: 2px; }
   .sign .button, .result .button { width: 100%; justify-content: center; }
