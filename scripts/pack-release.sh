@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Sign a verified Gleam release into a .crx for the Chrome Web Store.
 #
-#   scripts/pack-release.sh v1.27.0 [--key <path-to-private-key>]
+#   scripts/pack-release.sh v1.27.0 --kdbx <path-to-keepassxc-db>
+#   scripts/pack-release.sh v1.27.0 --key <path-to-private-key>
 #
 # Runs verify-release.sh first (downloads the Release, checks its sha256
 # against release-manifest.json, and rebuilds the tag from source to
@@ -9,29 +10,42 @@
 # not pass. Only then unzips the verified build and signs it with
 # `chrome --pack-extension`, producing <tag>.crx in the current directory.
 #
-# The private key never goes through CI: pass its path explicitly, or set
-# GLEAM_CWS_KEY. Chrome Web Store Verified CRX Uploads then rejects any
-# upload not signed with the matching key, so this step has to run on a
-# trusted machine with the key in hand, not in release.yml.
+# The private key never goes through CI. Keep it as the attachment
+# "gleam-cws.pem" on the entry "gleam-cws" in a KeePassXC database and pass
+# --kdbx (or set GLEAM_CWS_KDBX); set GLEAM_CWS_KDBX_YUBIKEY=<slot[:serial]>
+# if the database needs a YubiKey. The key is exported into a private temp
+# dir only for the chrome --pack-extension call and deleted on exit, so it
+# never sits on disk in plaintext where any process running as you could
+# read it. --key <path> (or GLEAM_CWS_KEY) still takes a plaintext PEM.
+# Chrome Web Store Verified CRX Uploads rejects any upload not signed with
+# the matching key, so this step has to run on a trusted machine with the
+# key in hand, not in release.yml.
 #
 # Needs the same tools as verify-release.sh, plus a Chrome/Chromium binary
-# (override with CHROME_BIN if it isn't auto-detected).
+# (override with CHROME_BIN if it isn't auto-detected), and keepassxc-cli
+# when signing from a KeePassXC database.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-  echo "usage: $0 v<major>.<minor>.<patch> [--key <path-to-private-key>]" >&2
+  echo "usage: $0 v<major>.<minor>.<patch> (--kdbx <path-to-keepassxc-db> | --key <path-to-private-key>)" >&2
   exit 2
 }
 
 tag=""
 key="${GLEAM_CWS_KEY:-}"
+kdbx="${GLEAM_CWS_KDBX:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --key)
       [ $# -ge 2 ] || usage
       key="$2"
+      shift 2
+      ;;
+    --kdbx)
+      [ $# -ge 2 ] || usage
+      kdbx="$2"
       shift 2
       ;;
     -h | --help) usage ;;
@@ -44,8 +58,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || usage
-[ -n "$key" ] || { echo "no private key given: pass --key or set GLEAM_CWS_KEY" >&2; exit 2; }
-[ -f "$key" ] || { echo "key not found: $key" >&2; exit 2; }
+if [ -n "$kdbx" ]; then
+  [ -z "$key" ] || { echo "both a KeePassXC database and a key file given; pass only one" >&2; exit 2; }
+  [ -f "$kdbx" ] || { echo "KeePassXC database not found: $kdbx" >&2; exit 2; }
+  command -v keepassxc-cli > /dev/null || { echo "keepassxc-cli not found; brew install --cask keepassxc" >&2; exit 2; }
+else
+  [ -n "$key" ] || { echo "no private key given: pass --kdbx or --key, or set GLEAM_CWS_KDBX or GLEAM_CWS_KEY" >&2; exit 2; }
+  [ -f "$key" ] || { echo "key not found: $key" >&2; exit 2; }
+fi
 
 chrome_bin="${CHROME_BIN:-}"
 if [ -z "$chrome_bin" ]; then
@@ -102,6 +122,17 @@ built_zip=("$src"/apps/extension/.output/*-chrome.zip)
 unpacked="$work/unpacked"
 mkdir -p "$unpacked"
 unzip -q "${built_zip[0]}" -d "$unpacked"
+
+if [ -n "$kdbx" ]; then
+  echo "== Unlocking $kdbx =="
+  yubikey=()
+  [ -z "${GLEAM_CWS_KDBX_YUBIKEY:-}" ] || yubikey=(--yubikey "$GLEAM_CWS_KDBX_YUBIKEY")
+  key="$work/gleam-cws.pem"
+  # The ${a[@]+...} form keeps an empty array legal under set -u on macOS bash 3.2.
+  (umask 077 && keepassxc-cli attachment-export ${yubikey[@]+"${yubikey[@]}"} \
+    "$kdbx" gleam-cws gleam-cws.pem "$key") \
+    || { echo "could not export gleam-cws.pem from entry gleam-cws in $kdbx" >&2; exit 1; }
+fi
 
 echo "== Packing and signing =="
 out_dir="$(pwd)"
