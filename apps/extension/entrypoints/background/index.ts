@@ -80,7 +80,7 @@ import {
 import { contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
 import { redeemSiteInvite } from "@/src/points-invite";
-import { signSiteAttestation } from "@/src/points-attest";
+import { signSiteAttestation, siteAttestStatus } from "@/src/points-attest";
 import { dispatchSiteMessage } from "@/src/dispatch/site";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
@@ -951,20 +951,28 @@ async function initializeNetworkSettingsIfMissing(): Promise<void> {
   }
 }
 
+async function activeWallet() {
+  const state = await lifecycle.getState();
+  return state.wallets.find((wallet) => wallet.id === state.activeWalletId) ?? null;
+}
+
 function handleSiteMessage(message: unknown, origin: string | undefined): Promise<unknown> {
   return dispatchSiteMessage(message, origin, {
     "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, points).catch(() => ({ ok: false })),
     "gleam-points:attest": (request) =>
       signSiteAttestation(request, {
-        activeWallet: async () => {
-          const state = await lifecycle.getState();
-          return state.wallets.find((wallet) => wallet.id === state.activeWalletId) ?? null;
-        },
+        activeWallet,
         requestScanAttestation: (req) => approval.requestScanAttestation(req),
       }).catch((error: unknown): SiteAttestResponse => {
         console.error("Couldn't handle a scan attestation from the site.", error);
         return { ok: false, code: "signing_failed", error: "Gleam couldn't open the attestation. Open the link again." };
       }),
+    "gleam-points:attest-status": () =>
+      siteAttestStatus({
+        activeWallet,
+        isMember: async (walletId) => (await points.getMemberships())[walletId] !== undefined,
+        // The check only labels the page's button; Sign still runs the real one and says what failed.
+      }).catch(() => ({ ok: true })),
   });
 }
 

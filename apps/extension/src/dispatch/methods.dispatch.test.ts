@@ -36,7 +36,7 @@ describe("dispatch/methods: tiers", () => {
       expect(Object.hasOwn(PAGE_METHODS, type), type).toBe(false);
       expect(Object.hasOwn(BACKGROUND_MESSAGES, type), type).toBe(false);
     }
-    expect(Object.keys(SITE_MESSAGES).sort()).toEqual(["gleam-points:attest", "gleam-points:invite"]);
+    expect(Object.keys(SITE_MESSAGES).sort()).toEqual(["gleam-points:attest", "gleam-points:attest-status", "gleam-points:invite"]);
   });
 
   it("keeps key and approval methods on the extension tier", () => {

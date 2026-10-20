@@ -3,7 +3,7 @@ import type { WalletSummary } from "@gleam/core";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { ApprovalDeclinedError } from "./handlers/approval";
 import { dispatchSiteMessage } from "./dispatch/site";
-import { signSiteAttestation, type SiteAttestationDeps } from "./points-attest";
+import { signSiteAttestation, siteAttestStatus, type SiteAttestationDeps } from "./points-attest";
 import { SITE_ORIGIN } from "./site-pages";
 
 vi.mock("wxt/browser", () => ({ browser: {} }));
@@ -33,6 +33,9 @@ function acceptSiteAttestation(message: unknown, origin: string | undefined, dep
       throw new Error("not an attestation");
     },
     "gleam-points:attest": (request) => signSiteAttestation(request, deps),
+    "gleam-points:attest-status": async () => {
+      throw new Error("not an attestation");
+    },
   });
 }
 
@@ -129,5 +132,32 @@ describe("acceptSiteAttestation", () => {
       code: "signing_failed",
       error: "Gleam couldn't sign the attestation: Wallet is locked. Try again from the link.",
     });
+  });
+});
+
+describe("siteAttestStatus", () => {
+  const status = (wallet: WalletSummary | null, member: boolean) =>
+    siteAttestStatus({ activeWallet: async () => wallet, isMember: async () => member });
+
+  it("is ready when the active wallet can sign and has joined Points", async () => {
+    expect(await status(WALLET, true)).toEqual({ ok: true });
+  });
+
+  it("names the step that comes first", async () => {
+    expect(await status(null, false)).toEqual({ ok: false, code: "no_wallet" });
+    expect(await status({ ...WALLET, method: "ethereum" } as WalletSummary, true)).toEqual({ ok: false, code: "unsupported_wallet" });
+    expect(await status(WALLET, false)).toEqual({ ok: false, code: "wallet_not_registered" });
+  });
+
+  it("is answered only for the site, through the dispatcher", async () => {
+    const handlers = {
+      "gleam-points:invite": async () => ({}),
+      "gleam-points:attest": async () => ({}),
+      "gleam-points:attest-status": () => status(WALLET, true),
+    };
+    const message = { type: "gleam-points:attest-status" };
+    expect(await dispatchSiteMessage(message, SITE_ORIGIN, handlers)).toEqual({ ok: true });
+    expect(await dispatchSiteMessage(message, "https://evil.example", handlers)).toEqual({ ok: false });
+    expect(await dispatchSiteMessage({ ...message, extra: 1 }, SITE_ORIGIN, handlers)).toEqual({ ok: false });
   });
 });

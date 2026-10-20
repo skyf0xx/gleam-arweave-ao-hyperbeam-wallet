@@ -7,6 +7,7 @@
  */
 
 export const SITE_ATTEST_MESSAGE_TYPE = "gleam-points:attest";
+export const SITE_ATTEST_STATUS_MESSAGE_TYPE = "gleam-points:attest-status";
 
 /**
  * `attest.html` hands over the attestation decoded from its link
@@ -85,3 +86,17 @@ export type SiteAttestResponse =
       paidPlacesLeft: number;
     }
   | { ok: false; code: SiteAttestErrorCode; error: string };
+
+/**
+ * `attest.html` asks this on load, so its button can say the next step
+ * (install, join Points, sign) before anyone clicks it. It opens no
+ * window and says nothing about the wallet beyond whether it can sign.
+ */
+export interface SiteAttestStatusRequest {
+  type: typeof SITE_ATTEST_STATUS_MESSAGE_TYPE;
+}
+
+/** The same check `gleam-points:attest` runs before it opens a window, without the attestation. */
+export type SiteAttestStatusResponse =
+  | { ok: true }
+  | { ok: false; code: "no_wallet" | "unsupported_wallet" | "wallet_not_registered" };

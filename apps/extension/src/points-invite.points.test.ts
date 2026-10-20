@@ -45,6 +45,9 @@ function acceptSiteInvite(message: unknown, origin: string | undefined, storage:
     "gleam-points:attest": async () => {
       throw new Error("not an invite");
     },
+    "gleam-points:attest-status": async () => {
+      throw new Error("not an invite");
+    },
   });
 }
 
