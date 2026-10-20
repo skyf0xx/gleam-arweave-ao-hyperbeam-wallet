@@ -24,6 +24,7 @@ import type {
   PortfolioHistory,
   PortfolioHistoryRange,
   PortfolioScope,
+  ScanStats,
   SecurityPhrase,
   ThemeSettings,
   TokenBalance,
@@ -296,10 +297,10 @@ export interface ProtocolMap {
    */
   getAnnouncements(): Announcement[];
   /**
-   * How many community scans attest the running release, from the points
-   * API; null when it can't be read.
+   * The running release's community scan count and paid places left, from
+   * the points API; null when they can't be read.
    */
-  getScanCount(): number | null;
+  getScanStats(): ScanStats | null;
   /** Ids of the announcements the user has dismissed. */
   getDismissedAnnouncements(): string[];
   dismissAnnouncement(req: { id: string }): void;

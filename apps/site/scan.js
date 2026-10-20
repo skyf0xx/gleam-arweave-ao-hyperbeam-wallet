@@ -1,7 +1,7 @@
 /* global AbortController */
 // scan.html. Everything from the points API is untrusted text: nodes are
 // built with textContent, never markup.
-import { AGENT_LINE, bountyTiers, fetchListing, fetchRewards, formatPoints, resultsHref } from "./scan-lib.js";
+import { AGENT_LINE, bountyTiers, fetchListing, fetchRewards, formatPoints, nextScanReward, resultsHref } from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
 const TIMEOUT_MS = 8000;
@@ -83,17 +83,21 @@ function gleam(atomic) {
 }
 
 function renderRewards(rewards) {
+  $("[data-stat-pool]").textContent = gleam(rewards.bountyPoolAtomic);
+  renderTiers(rewards.bountyPoolAtomic);
+}
+
+/** Which reward the next scan gets depends on the release's places left, so it needs both responses. */
+function renderNextReward(rewards, listing) {
   // Before the first daily snapshot a scan is recorded unpaid, so "0" would mislead.
   const reward = $("[data-stat-reward]");
   if (rewards.day === null) {
     reward.textContent = "After the first snapshot";
     reward.parentElement.classList.add("stats-pending");
   } else {
-    reward.textContent = gleam(rewards.scanRewardAtomic);
+    reward.textContent = gleam(nextScanReward(rewards, listing.paidPlacesLeft));
     reward.parentElement.classList.remove("stats-pending");
   }
-  $("[data-stat-pool]").textContent = gleam(rewards.bountyPoolAtomic);
-  renderTiers(rewards.bountyPoolAtomic);
 }
 
 function renderListing(listing) {
@@ -113,6 +117,7 @@ async function loadFigures() {
   if (listing.ok) renderListing(listing.listing);
 
   if (rewards.ok && listing.ok) {
+    renderNextReward(rewards.rewards, listing.listing);
     $("[data-stats]").hidden = false;
     status.textContent = "";
     return;

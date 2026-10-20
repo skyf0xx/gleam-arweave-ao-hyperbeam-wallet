@@ -88,8 +88,8 @@ Gleam.
 3. The challenge is unexpired and unused, and every answer passes the
    automatic check (see Proof of scan).
 4. The wallet hasn't already attested this release.
-5. The release has fewer than 20 paid scans so far. If it has 20, the
-   attestation is still recorded, with no points.
+5. The release has fewer than 100 paid scans so far. If it has 100,
+   the attestation is still recorded, with no points.
 
 `POST /attestations/check` runs checks 2 and 3 and the attestation's
 shape, without a signature, and fails with the same issues as the
@@ -130,8 +130,9 @@ sign.
 voids it with `scan-void`, which removes its points and frees its paid
 place.
 
-**Limited payoff.** A scan earns a small, fixed amount, and only 20
-scans are paid per release. Finding real problems pays far more, and
+**Limited payoff.** A scan earns a small, fixed amount, and only 100
+scans are paid per release, all but the first 20 at a fifth of the
+rate. Finding real problems pays far more, and
 that can't be faked.
 
 ## Points
@@ -139,12 +140,15 @@ that can't be faked.
 Both amounts scale with the holding points Gleam pays out, so rewards
 rise as the community grows.
 
-**Scans.** A scan earns **0.1% of the previous day's total holding
-points**, credited as soon as it's accepted. The first 20 scans of each
-release are paid. After that, scans are still recorded and shown but
-earn nothing. A scan that earns no points, such as one made before the
-first daily snapshot, doesn't use up a paid place. `scan.html` and
-`scan-results.html` show how many paid places are left. `pass` and `scanned` earn the same, and so
+**Scans.** The first 20 scans of each release earn **0.1% of the
+previous day's total holding points**, and scans 21 to 100 earn
+**0.02%**, credited as soon as they're accepted. The tail keeps
+clean scans worth reporting after the first 20 without letting total
+spend grow with the number of scans. After 100, scans are still
+recorded and shown but earn nothing. A scan that earns no points, such as one made before the
+first daily snapshot, doesn't use up a paid place. `scan.html`,
+`scan-results.html` and the extension's Points screen show how many paid
+places are left. `pass` and `scanned` earn the same, and so
 does every model.
 
 **Findings.** Each day the bounty pool grows by 2% of that day's
@@ -270,7 +274,7 @@ text on both site pages.
 
 `scan.html` is the page for people deciding whether to run a scan, in
 the order they need it: the line to paste, then live figures (paid
-places left, what a paid scan earns now, the bounty pool's balance, from
+places left, what the next scan earns now, the bounty pool's balance, from
 `GET /scan/rewards` and the release listing), what they need first, the
 three steps, what each reward pays, where a scan is most useful (models
 not yet used, functions no one has examined), and common questions.

@@ -239,7 +239,7 @@ export function describeOutcome(outcome) {
       message = `Your attestation is signed and recorded. You earned ${formatPoints(reply.points)} points.`;
     } else if (reply.unpaidReason === "places_taken") {
       state = "full";
-      message = "Your attestation is recorded, but this release's 20 paid places are taken, so it earns no points.";
+      message = `Your attestation is recorded, but this release's ${PAID_SCANS_PER_RELEASE} paid places are taken, so it earns no points.`;
     } else if (reply.unpaidReason === "no_snapshot") {
       state = "unpaid";
       message = "Your attestation is recorded. It earned no points yet, because no daily points count exists to base them on.";
@@ -315,12 +315,23 @@ function isRewards(body) {
     (body.day === null || typeof body.day === "string") &&
     ATOMIC.test(body.issuedAtomic) &&
     ATOMIC.test(body.scanRewardAtomic) &&
+    ATOMIC.test(body.tailScanRewardAtomic) &&
     ATOMIC.test(body.bountyPoolAtomic)
   );
 }
 
+/** Paid scans per release and how many of them earn the full reward; the same as `@gleam/core/scan`. */
+export const PAID_SCANS_PER_RELEASE = 100;
+export const FULL_REWARD_SCANS = 20;
+
+/** What the next scan of a release with `paidPlacesLeft` open places earns, from a `GET /scan/rewards` body. */
+export function nextScanReward(rewards, paidPlacesLeft) {
+  if (paidPlacesLeft <= 0) return "0";
+  return paidPlacesLeft > PAID_SCANS_PER_RELEASE - FULL_REWARD_SCANS ? rewards.scanRewardAtomic : rewards.tailScanRewardAtomic;
+}
+
 /**
- * Reads `GET /scan/rewards`: what a paid scan earns now and the bounty pool's
+ * Reads `GET /scan/rewards`: what a paid scan earns now (full and tail) and the bounty pool's
  * balance. Settles with `{ ok: true, rewards }` or `{ ok: false, … }`.
  */
 export async function fetchRewards(fetchImpl, { signal } = {}) {

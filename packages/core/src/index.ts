@@ -32,3 +32,5 @@ export {
   type TokenPriceSource,
   type TokenPrice,
 } from "./pricing/index";
+export type { ScanStats } from "./scan/count";
+export { FULL_REWARD_SCANS, PAID_SCANS_PER_RELEASE, nextScanIsFull } from "./scan/rewards";

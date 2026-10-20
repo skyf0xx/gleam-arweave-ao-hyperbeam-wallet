@@ -43,6 +43,7 @@ interface ScanRewards {
   day: string | null;
   issuedAtomic: string;
   scanRewardAtomic: string;
+  tailScanRewardAtomic: string;
   bountyPoolAtomic: string;
 }
 
@@ -207,6 +208,7 @@ export function createApp(deps: AppDeps): Hono {
           day: basis.day,
           issuedAtomic: basis.issuedAtomic.toString(),
           scanRewardAtomic: basis.rewardAtomic.toString(),
+          tailScanRewardAtomic: basis.tailRewardAtomic.toString(),
           bountyPoolAtomic: pool.toString(),
         },
         expiresAt: now().getTime() + STATS_TTL_MS,
@@ -237,7 +239,7 @@ export function createApp(deps: AppDeps): Hono {
     const outcome = await countAttestations(deps.db, c.req.query());
     if (!outcome.ok) return scanFailure(c, outcome);
     c.header("Cache-Control", "public, max-age=60");
-    return c.json({ release: outcome.release, total: outcome.total });
+    return c.json({ release: outcome.release, total: outcome.total, paidPlacesLeft: outcome.paidPlacesLeft });
   });
 
   app.get("/attestations", async (c) => {
