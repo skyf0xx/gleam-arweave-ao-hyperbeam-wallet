@@ -7,7 +7,7 @@ import {
 } from "@gleam/core";
 import { hasPointsProofTag, isPointsMessage, isValidInviteCode } from "@gleam/core/src/points/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
-import { SITE_ATTEST_MESSAGE_TYPE } from "@gleam/messaging/src/site-protocol.ts";
+import { SITE_ATTEST_MESSAGE_TYPE, SITE_ATTEST_STATUS_MESSAGE_TYPE } from "@gleam/messaging/src/site-protocol.ts";
 import { attestFailure } from "@/src/handlers/attest-errors";
 import {
   readBytes,
@@ -423,6 +423,11 @@ export const SITE_MESSAGES = {
     // Checked by `parseAttestation` in the handler, which reports why.
     params: z.strictObject({ type: z.literal(SITE_ATTEST_MESSAGE_TYPE), attestation: z.unknown() }),
     refused: attestFailure("refused", ""),
+  },
+  [SITE_ATTEST_STATUS_MESSAGE_TYPE]: {
+    tier: "site",
+    params: z.strictObject({ type: z.literal(SITE_ATTEST_STATUS_MESSAGE_TYPE) }),
+    refused: { ok: false },
   },
 } as const satisfies Record<string, SiteMessageSpec>;
 

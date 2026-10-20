@@ -1,6 +1,14 @@
 // attest.html. The link's fragment is untrusted: it is decoded, then shown as
 // text only. The extension re-checks the whole attestation before it signs.
-import { STORE_URL, decodeAttestationFragment, describeOutcome, isFinal, resultsHref, sendAttestation } from "./scan-lib.js";
+import {
+  STORE_URL,
+  checkGleam,
+  decodeAttestationFragment,
+  describeOutcome,
+  isFinal,
+  resultsHref,
+  sendAttestation,
+} from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -17,6 +25,19 @@ const message = $("[data-result-message]");
 const link = $("[data-result-link]");
 const help = $("[data-result-help]");
 const sign = $("[data-sign]");
+const step = $("[data-sign-step]");
+const install = $("[data-install]");
+const LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+
+// The step each readiness shows above the button, and what the button says.
+const STEPS = {
+  "no-extension": LOCAL
+    ? "Gleam isn't reachable from this page. Add it to Chrome and reload, or for an unpacked build add ?ext=<its extension id> to the address."
+    : "Gleam isn't installed in this browser. Add it to Chrome, then reload this page.",
+  "no-wallet": "Gleam has no wallet yet. Create one and join Gleam Points, then come back to this tab.",
+  unsupported: "Your active wallet can't sign for Gleam Points. Switch to another wallet in Gleam, then come back to this tab.",
+  "not-joined": "Your active wallet hasn't joined Gleam Points. Join from Gleam's Points screen, then come back to this tab.",
+};
 
 function showResult({ text, tone, href, linkText, helpText }) {
   result.hidden = false;
@@ -56,29 +77,56 @@ if (!decoded.ok) {
   $("[data-footnote]").hidden = false;
 
   let busy = false;
+  let final = false;
+  let readiness = null;
+  let tried = false;
+
+  function render() {
+    const text = STEPS[readiness];
+    step.hidden = !text;
+    step.textContent = text || "";
+    install.hidden = readiness !== "no-extension";
+    install.href = STORE_URL;
+    sign.hidden = final || readiness === "no-extension";
+    sign.disabled = false;
+    sign.textContent = readiness === "ready" ? (tried ? "Try again" : "Sign with Gleam") : "Check again";
+  }
+
+  const refresh = async () => {
+    if (busy || final) return;
+    busy = true;
+    const next = await checkGleam(window.chrome && window.chrome.runtime);
+    busy = false;
+    if (final) return;
+    // A message about an earlier attempt no longer applies once the next step has changed.
+    if (readiness !== null && next !== readiness) result.hidden = true;
+    readiness = next;
+    render();
+  };
+
   const submit = async () => {
     if (busy) return;
     busy = true;
+    tried = true;
     sign.disabled = true;
     sign.textContent = "Waiting for Gleam\u2026";
     result.hidden = true;
     const outcome = await sendAttestation(window.chrome && window.chrome.runtime, attestation);
     busy = false;
-    sign.disabled = false;
-    sign.textContent = "Try again";
     show(describeOutcome(outcome), attestation);
   };
 
   function show(out, att) {
+    if (out.state === "no-extension") {
+      readiness = "no-extension";
+      render();
+      return;
+    }
     const view = {
       text: out.message,
       tone: out.state === "success" || out.state === "full" || out.state === "unpaid" ? "good" : "bad",
     };
-    if (out.action === "store") {
-      view.href = STORE_URL;
-      view.linkText = "Add Gleam to Chrome";
-      view.helpText = "Once it's installed and you've joined Gleam Points, click Try again.";
-    } else if (out.action === "view") {
+    if (out.action === "view") {
       view.href = resultsHref(att.release, out.attestationId);
       view.linkText = out.state === "already" ? "See the scans for this release" : "See your scan";
     } else if (out.action === "agent") {
@@ -88,9 +136,16 @@ if (!decoded.ok) {
       view.helpText = "Then click Try again.";
     }
     // Once there is nothing left to sign, or signing can't work, the button steps aside.
-    sign.hidden = isFinal(out);
+    final = isFinal(out);
+    render();
     showResult(view);
   }
 
-  sign.addEventListener("click", submit);
+  sign.addEventListener("click", () => (readiness === "ready" ? submit() : refresh()));
+  // Joining Points or switching wallets happens in Gleam's own window, so look again on the way back.
+  window.addEventListener("focus", refresh);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void refresh();
+  });
+  void refresh();
 }

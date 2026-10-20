@@ -25,6 +25,7 @@ import {
   releaseFromSearch,
   resultsHref,
   sendAttestation,
+  checkGleam,
   unusedModels,
 } from "../apps/site/scan-lib.js";
 
@@ -128,6 +129,25 @@ describe("site scan lib: sending to the extension", () => {
   it("survives sendMessage throwing", async () => {
     const throwing = { sendMessage: () => { throw new Error("nope"); } };
     expect(await sendAttestation(throwing, attestation)).toEqual({ kind: "no-extension" });
+  });
+
+  it("asks Gleam which step comes before signing", async () => {
+    const ready = withRuntime((cb) => cb({ ok: true }));
+    expect(await checkGleam(ready)).toBe("ready");
+    expect(ready.sendMessage).toHaveBeenCalledWith(EXTENSION_ID, { type: "gleam-points:attest-status" }, expect.any(Function));
+    for (const [code, state] of [
+      ["no_wallet", "no-wallet"],
+      ["unsupported_wallet", "unsupported"],
+      ["wallet_not_registered", "not-joined"],
+    ]) {
+      expect(await checkGleam(withRuntime((cb) => cb({ ok: false, code })))).toBe(state);
+    }
+    expect(await checkGleam(undefined)).toBe("no-extension");
+  });
+
+  it("leaves the real check to Sign when the status reply can't be read", async () => {
+    expect(await checkGleam(withRuntime((cb) => cb({ ok: false })))).toBe("ready");
+    expect(await checkGleam(withRuntime((cb) => cb(undefined)))).toBe("ready");
   });
 });
 

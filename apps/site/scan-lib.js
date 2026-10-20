@@ -41,6 +41,7 @@ function pageStorage() {
 export const EXTENSION_ID = extensionIdFor(typeof location === "undefined" ? undefined : location, pageStorage());
 export const POINTS_API = "https://api.gleamwallet.app";
 export const ATTEST_MESSAGE_TYPE = "gleam-points:attest";
+export const ATTEST_STATUS_MESSAGE_TYPE = "gleam-points:attest-status";
 
 // SCANS.md § How it works, step 1.
 export const AGENT_LINE =
@@ -132,27 +133,27 @@ function isShowable(value) {
 // --- attest.html: talking to the extension ---------------------------------
 
 /**
- * Sends the attestation to Gleam and settles with one of:
+ * Sends `message` to Gleam and settles with one of:
  * `{ kind: "no-extension" }`: Gleam isn't installed (or can't be reached from here);
  * `{ kind: "interrupted" }`: the extension went away mid-request (its service
  *   worker restarted, the port closed), so trying again is the right step;
- * `{ kind: "reply", reply }`: a `SiteAttestResponse`.
+ * `{ kind: "reply", reply }`: an object with a boolean `ok`.
  * It never rejects.
  */
-export function sendAttestation(runtime, attestation) {
+function sendToGleam(runtime, message) {
   return new Promise((resolve) => {
     if (!runtime || typeof runtime.sendMessage !== "function") {
       resolve({ kind: "no-extension" });
       return;
     }
     try {
-      runtime.sendMessage(EXTENSION_ID, { type: ATTEST_MESSAGE_TYPE, attestation }, (reply) => {
+      runtime.sendMessage(EXTENSION_ID, message, (reply) => {
         const lastError = runtime.lastError;
         if (lastError) {
-          const message = String((lastError && lastError.message) || "");
+          const text = String((lastError && lastError.message) || "");
           // Chrome's wording when nothing is listening: not installed, disabled, or the wrong id.
           resolve(
-            /receiving end does not exist|extension not found|invalid extension id|could not establish connection/i.test(message)
+            /receiving end does not exist|extension not found|invalid extension id|could not establish connection/i.test(text)
               ? { kind: "no-extension" }
               : { kind: "interrupted" },
           );
@@ -168,6 +169,25 @@ export function sendAttestation(runtime, attestation) {
       resolve({ kind: "no-extension" });
     }
   });
+}
+
+/** Sends the attestation to Gleam; the reply is a `SiteAttestResponse`. Settles as `sendToGleam` does. */
+export function sendAttestation(runtime, attestation) {
+  return sendToGleam(runtime, { type: ATTEST_MESSAGE_TYPE, attestation });
+}
+
+const READINESS_BY_CODE = { no_wallet: "no-wallet", unsupported_wallet: "unsupported", wallet_not_registered: "not-joined" };
+
+/**
+ * What the Sign button should offer before anyone clicks it: "no-extension",
+ * "no-wallet", "unsupported", "not-joined" or "ready". Anything the check
+ * can't read counts as "ready", so Sign runs the real check and says what's wrong.
+ */
+export async function checkGleam(runtime) {
+  const outcome = await sendToGleam(runtime, { type: ATTEST_STATUS_MESSAGE_TYPE });
+  if (outcome.kind === "no-extension") return "no-extension";
+  if (outcome.kind === "reply" && !outcome.reply.ok) return READINESS_BY_CODE[outcome.reply.code] || "ready";
+  return "ready";
 }
 
 // What each state shows. `action` is the one next step the page offers:
