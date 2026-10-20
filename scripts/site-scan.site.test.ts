@@ -5,15 +5,18 @@ import {
   DEV_EXTENSION_KEY,
   EXTENSION_ID,
   STORE_EXTENSION_ID,
+  bountyTiers,
   coverageSummary,
   extensionIdFor,
   decodeAttestationFragment,
   describeOutcome,
   fetchListing,
+  fetchRewards,
   formatPoints,
   idFromHash,
   isFinal,
   releaseFromSearch,
+  resultsHref,
   sendAttestation,
   unusedModels,
 } from "../apps/site/scan-lib.js";
@@ -212,6 +215,29 @@ describe("site scan lib: the points API", () => {
     expect(await fetchListing(vi.fn(async () => { throw new Error("offline"); }))).toMatchObject({ ok: false, status: 0 });
   });
 
+  it("reads the scan reward and bounty pool", async () => {
+    const rewards = { day: "2026-10-19", issuedAtomic: "1000000000000000", scanRewardAtomic: "1000000000000", bountyPoolAtomic: "0" };
+    const fetchImpl = reply(200, rewards);
+    expect(await fetchRewards(fetchImpl)).toEqual({ ok: true, rewards });
+    expect(fetchImpl.mock.calls[0]![0]).toBe("https://api.gleamwallet.app/scan/rewards");
+    expect(await fetchRewards(reply(200, { ...rewards, day: null }))).toMatchObject({ ok: true });
+    expect(await fetchRewards(reply(200, { ...rewards, scanRewardAtomic: 1.5 }))).toMatchObject({ ok: false });
+    expect(await fetchRewards(reply(200, { ...rewards, bountyPoolAtomic: "-1" }))).toMatchObject({ ok: false });
+    expect(await fetchRewards(vi.fn(async () => { throw new Error("offline"); }))).toMatchObject({ ok: false, status: 0 });
+  });
+
+  it("works out each bounty tier from the pool, rounding down as the server pays", () => {
+    expect(bountyTiers("1001").map((tier) => [tier.severity, tier.amountAtomic])).toEqual([
+      ["Critical", "500"],
+      ["High", "250"],
+      ["Medium", "100"],
+      ["Low", "20"],
+    ]);
+    expect(bountyTiers("123456789012345678901234567890")[0]!.amountAtomic).toBe("61728394506172839450617283945");
+    expect(bountyTiers(null).every((tier) => tier.amountAtomic === null)).toBe(true);
+    expect(bountyTiers("1e9")[0]!.amountAtomic).toBeNull();
+  });
+
   it("summarises coverage", () => {
     expect(coverageSummary(listing.coverage)).toEqual({
       share: 41 / 64,
@@ -225,6 +251,13 @@ describe("site scan lib: the points API", () => {
 });
 
 describe("site scan lib: small helpers", () => {
+  it("links a release's results, optionally at one scan", () => {
+    expect(resultsHref("1.4.0")).toBe("scan-results.html?v=1.4.0");
+    expect(resultsHref("1.4.0", "ab".repeat(32))).toBe(`scan-results.html?v=1.4.0#${"ab".repeat(32)}`);
+    expect(resultsHref("1.4.0\"><x", "nope")).toBe("scan-results.html");
+    expect(resultsHref(null)).toBe("scan-results.html");
+  });
+
   it("reads the release and entry id from the URL", () => {
     expect(releaseFromSearch("?v=1.4.0")).toBe("1.4.0");
     expect(releaseFromSearch("?v=v1.4.0")).toBeNull();

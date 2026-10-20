@@ -53,7 +53,7 @@ const REPORT_FORBIDDEN = /[\x00-\x08\x0b-\x1f\x7f]/;
 
 /** Unpaired UTF-16 surrogates: no valid UTF-8 form, so Postgres jsonb and other tools mangle or refuse them. */
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-/** Line separators and bidi controls, which can make public text on scan.html read differently from what was signed. */
+/** Line separators and bidi controls, which can make public text on scan-results.html read differently from what was signed. */
 const DECEPTIVE_CHARACTERS = /[\u0085\u2028\u2029\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
 /** Characters that render as nothing, so shown text can hide content or differ from what was signed. */
 const INVISIBLE_CHARACTERS = /[\u00AD\u200B-\u200D\u2060\uFEFF\u{E0000}-\u{E007F}]/u;

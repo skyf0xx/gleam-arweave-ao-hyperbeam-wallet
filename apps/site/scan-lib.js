@@ -1,5 +1,5 @@
 /* global atob, TextDecoder */
-// Logic shared by scan.html and attest.html, kept free of the DOM so Vitest can
+// Logic shared by scan.html, scan-results.html and attest.html, kept free of the DOM so Vitest can
 // run it (scripts/site-scan.site.test.ts). Everything that comes from the
 // network or the link is data: callers render it with textContent only.
 
@@ -172,7 +172,7 @@ export function sendAttestation(runtime, attestation) {
 
 // What each state shows. `action` is the one next step the page offers:
 // "retry" shows the Sign button again, "store" the install link, "agent" a
-// way back to the instructions for a new scan, "view" the entry on scan.html,
+// way back to the instructions for a new scan, "view" the entry on scan-results.html,
 // "wallet" nothing to click (the sentence says where to go in Gleam).
 const FALLBACK = {
   success: "Your attestation is recorded.",
@@ -270,19 +270,12 @@ export function formatPoints(atomic) {
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
-// --- scan.html: the points API ----------------------------------------------
+// --- scan.html and scan-results.html: the points API -----------------------
 
-/**
- * Reads one page of `GET /attestations`. Settles with `{ ok: true, listing }`
- * or `{ ok: false, status, error }`; it never rejects.
- */
-export async function fetchListing(fetchImpl, { release = null, cursor = null, limit = 100, signal } = {}) {
-  const params = new URLSearchParams();
-  if (release) params.set("release", release);
-  if (cursor) params.set("cursor", cursor);
-  params.set("limit", String(limit));
+/** GETs `path` from the points API. Settles with `{ ok: true, body }` or `{ ok: false, status, error }`; it never rejects. */
+async function getJson(fetchImpl, path, signal, isValid) {
   try {
-    const response = await fetchImpl(`${POINTS_API}/attestations?${params}`, { signal });
+    const response = await fetchImpl(`${POINTS_API}${path}`, { signal });
     let body = null;
     try {
       body = await response.json();
@@ -293,11 +286,69 @@ export async function fetchListing(fetchImpl, { release = null, cursor = null, l
       const error = body && typeof body.error === "string" ? body.error : `The points server answered ${response.status}.`;
       return { ok: false, status: response.status, error };
     }
-    if (!isListing(body)) return { ok: false, status: response.status, error: "The points server sent something this page can't read." };
-    return { ok: true, listing: body };
+    if (!isValid(body)) return { ok: false, status: response.status, error: "The points server sent something this page can't read." };
+    return { ok: true, body };
   } catch {
     return { ok: false, status: 0, error: "The points server couldn't be reached." };
   }
+}
+
+/**
+ * Reads one page of `GET /attestations`. Settles with `{ ok: true, listing }`
+ * or `{ ok: false, status, error }`; it never rejects.
+ */
+export async function fetchListing(fetchImpl, { release = null, cursor = null, limit = 100, signal } = {}) {
+  const params = new URLSearchParams();
+  if (release) params.set("release", release);
+  if (cursor) params.set("cursor", cursor);
+  params.set("limit", String(limit));
+  const result = await getJson(fetchImpl, `/attestations?${params}`, signal, isListing);
+  return result.ok ? { ok: true, listing: result.body } : result;
+}
+
+const ATOMIC = /^\d{1,40}$/;
+
+function isRewards(body) {
+  return (
+    body !== null &&
+    typeof body === "object" &&
+    (body.day === null || typeof body.day === "string") &&
+    ATOMIC.test(body.issuedAtomic) &&
+    ATOMIC.test(body.scanRewardAtomic) &&
+    ATOMIC.test(body.bountyPoolAtomic)
+  );
+}
+
+/**
+ * Reads `GET /scan/rewards`: what a paid scan earns now and the bounty pool's
+ * balance. Settles with `{ ok: true, rewards }` or `{ ok: false, … }`.
+ */
+export async function fetchRewards(fetchImpl, { signal } = {}) {
+  const result = await getJson(fetchImpl, "/scan/rewards", signal, isRewards);
+  return result.ok ? { ok: true, rewards: result.body } : result;
+}
+
+// SCANS.md § Findings: the share of the pool's balance an accepted finding takes.
+export const BOUNTY_TIERS = [
+  { severity: "Critical", percent: 50 },
+  { severity: "High", percent: 25 },
+  { severity: "Medium", percent: 10 },
+  { severity: "Low", percent: 2 },
+];
+
+/** Each tier with what it would pay from a pool of `poolAtomic` today, in atomic units (integer division, as the server pays). */
+export function bountyTiers(poolAtomic) {
+  const pool = typeof poolAtomic === "string" && ATOMIC.test(poolAtomic) ? BigInt(poolAtomic) : null;
+  return BOUNTY_TIERS.map((tier) => ({
+    ...tier,
+    amountAtomic: pool === null ? null : ((pool * BigInt(tier.percent)) / 100n).toString(),
+  }));
+}
+
+/** The results page for a release, optionally opened at one attestation. */
+export function resultsHref(release, attestationId) {
+  const base = release && RELEASE_PATTERN.test(release) ? `scan-results.html?v=${release}` : "scan-results.html";
+  return attestationId && ID_PATTERN.test(attestationId) ? `${base}#${attestationId}` : base;
 }
 
 function isListing(body) {

@@ -10,9 +10,8 @@ professional audit.
 
 ## How it works
 
-1. **Hand the page to your agent.** Settings → Community scans opens
-   `gleamwallet.app/scan.html`. It has one line to copy into your coding
-   agent:
+1. **Hand the page to your agent.** `gleamwallet.app/scan.html` has
+   one line to copy into your coding agent:
 
    > Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.
 2. **The agent scans.** It checks out the latest release tag and runs
@@ -61,7 +60,7 @@ gets the points.
   never says what was found.
 - `report` describes coverage, not vulnerabilities. Details of a
   medium-or-above issue go only in the advisory.
-- `model` is a self-reported label. It's shown on `scan.html` and has no
+- `model` is a self-reported label. It's shown on `scan-results.html` and has no
   effect on points, so there is nothing to gain by faking it.
 
 **Signing.** `attest.html` passes the attestation to the extension
@@ -127,7 +126,7 @@ the same code. The agent sees a failure before the user is asked to
 sign.
 
 **Human check.** Every `report` and every answer is public on
-`scan.html`, so an empty or generic report stands out. A maintainer
+`scan-results.html`, so an empty or generic report stands out. A maintainer
 voids it with `scan-void`, which removes its points and frees its paid
 place.
 
@@ -144,8 +143,8 @@ rise as the community grows.
 points**, credited as soon as it's accepted. The first 20 scans of each
 release are paid. After that, scans are still recorded and shown but
 earn nothing. A scan that earns no points, such as one made before the
-first daily snapshot, doesn't use up a paid place. `scan.html` shows how
-many paid places are left. `pass` and `scanned` earn the same, and so
+first daily snapshot, doesn't use up a paid place. `scan.html` and
+`scan-results.html` show how many paid places are left. `pass` and `scanned` earn the same, and so
 does every model.
 
 **Findings.** Each day the bounty pool grows by 2% of that day's
@@ -265,10 +264,20 @@ Under Version and Commit in Settings:
 Community scans        7 scans  →
 ```
 
-The row opens `scan.html?v=<version>`. It shows a count only, never a
-"secure" or "verified" badge. Text from the API renders as plain text.
+The row opens `scan-results.html?v=<version>`. It shows a count only,
+never a "secure" or "verified" badge. Text from the API renders as plain
+text on both site pages.
 
-`scan.html` shows, for the release:
+`scan.html` is the page for people deciding whether to run a scan, in
+the order they need it: the line to paste, then live figures (paid
+places left, what a paid scan earns now, the bounty pool's balance, from
+`GET /scan/rewards` and the release listing), what they need first, the
+three steps, what each reward pays, where a scan is most useful (models
+not yet used, functions no one has examined), and common questions.
+Without the live figures it still shows the rules.
+
+`scan-results.html` is the public record, for the release in `?v=` or
+the latest. A `#<attestation id>` opens that entry. It shows:
 
 - **Coverage.** For example, "41 of 64 security functions examined by
   at least one scan", with the functions no one has examined yet
@@ -283,4 +292,4 @@ The row opens `scan.html?v=<version>`. It shows a count only, never a
   different model tends to find different bugs. Accepted findings pay
   from the bounty pool.* Trying a new model earns no extra scan
   points. The payoff is the better chance of a bounty.
-- **How points work**, and a block of instructions for agents.
+- **A way back to `scan.html`** to run a scan.

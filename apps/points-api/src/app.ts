@@ -9,8 +9,10 @@ import {
   parseListQuery,
   parseCheckRequest,
   parseSubmitRequest,
+  scanRewardBasis,
   submitAttestation,
 } from "./attestations";
+import { poolBalance } from "./bounty";
 import type { Db } from "./db";
 import { createGithubClient, type GithubClient } from "./github";
 import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./heartbeat";
@@ -34,6 +36,14 @@ export interface AppDeps {
   github?: GithubClient;
   /** Looks up CoinGecko/CoinPaprika prices; defaults to the live providers. */
   prices?: PriceService;
+}
+
+/** `GET /scan/rewards`; amounts are atomic-unit integer strings. */
+interface ScanRewards {
+  day: string | null;
+  issuedAtomic: string;
+  scanRewardAtomic: string;
+  bountyPoolAtomic: string;
 }
 
 const HOUR_MS = 3_600_000;
@@ -66,6 +76,8 @@ export function createApp(deps: AppDeps): Hono {
   const checkByIp = new RateLimiter(120, HOUR_MS);
   const attestByIp = new RateLimiter(20, HOUR_MS);
   const attestationsListByIp = new RateLimiter(600, HOUR_MS);
+  const rewardsByIp = new RateLimiter(600, HOUR_MS);
+  let rewardsCache: { body: ScanRewards; expiresAt: number } | null = null;
   let statsCache: { foundingMembers: number; expiresAt: number } | null = null;
 
   const app = new Hono();
@@ -81,9 +93,9 @@ export function createApp(deps: AppDeps): Hono {
   const extensionCors = cors({ origin: (origin) => (origin.startsWith("chrome-extension://") ? origin : null) });
   for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me", "/prices", "/prices/history"]) app.use(path, extensionCors);
 
-  // Scan endpoints are open to any origin: the CLI sends no origin, scan.html
-  // reads the list, and the signature (not the origin) authorises a submission.
-  for (const path of [...ATTESTATION_PATHS, "/attestations/count", "/scan/challenge"]) app.use(path, cors({ origin: "*" }));
+  // Scan endpoints are open to any origin: the CLI sends no origin, the site
+  // reads the list and rewards, and the signature (not the origin) authorises a submission.
+  for (const path of [...ATTESTATION_PATHS, "/attestations/count", "/scan/challenge", "/scan/rewards"]) app.use(path, cors({ origin: "*" }));
 
   app.get("/health", async (c) => {
     await deps.db.query("SELECT 1");
@@ -184,6 +196,24 @@ export function createApp(deps: AppDeps): Hono {
     if (!challengeByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, challengeByIp, now().getTime());
     const outcome = await issueChallenge(deps.db, github, now());
     return outcome.ok ? c.json(outcome.challenge) : scanFailure(c, outcome);
+  });
+
+  app.get("/scan/rewards", async (c) => {
+    if (!rewardsByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, rewardsByIp, now().getTime());
+    if (!rewardsCache || now().getTime() >= rewardsCache.expiresAt) {
+      const [basis, pool] = await Promise.all([scanRewardBasis(deps.db, now()), poolBalance(deps.db)]);
+      rewardsCache = {
+        body: {
+          day: basis.day,
+          issuedAtomic: basis.issuedAtomic.toString(),
+          scanRewardAtomic: basis.rewardAtomic.toString(),
+          bountyPoolAtomic: pool.toString(),
+        },
+        expiresAt: now().getTime() + STATS_TTL_MS,
+      };
+    }
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json(rewardsCache.body);
   });
 
   app.post("/attestations/check", async (c) => {

@@ -1090,3 +1090,76 @@ describe("/me and /leave", () => {
     expect(json.code).toBe("already_attested");
   });
 });
+
+describe("GET /scan/rewards", () => {
+  it("answers a null day and zeros before any snapshot day or pool row exists", async () => {
+    const s = await setup();
+    const { status, json, headers } = await s.get("/scan/rewards");
+    expect(status).toBe(200);
+    expect(json).toEqual({ day: null, issuedAtomic: "0", scanRewardAtomic: "0", bountyPoolAtomic: "0" });
+    expect(headers.get("cache-control")).toBe("public, max-age=60");
+  });
+
+  it("is open to any origin", async () => {
+    const s = await setup();
+    const response = await s.app.request("/scan/rewards", { headers: { origin: "https://example.com", "x-forwarded-for": "10.0.0.1" } });
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("reads the latest snapshot day before today, never today's", async () => {
+    const s = await setup();
+    await s.register(alice);
+    await s.register(bob);
+    await creditPreviousDay(s.db);
+    await s.db.query("INSERT INTO snapshot_runs (day, completed_at, wallet_count, failed_count) VALUES ('2026-10-08', now(), 1, 0)");
+    await s.db.query("INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, referrer_bonus_atomic) VALUES ('2026-10-08', $1, 5000000, 0, 0)", [alice.address]);
+    const { json } = await s.get("/scan/rewards");
+    expect(json).toMatchObject({ day: "2026-10-07", issuedAtomic: "10000000", scanRewardAtomic: "10000" });
+  });
+
+  it("answers exactly what a paid scan submitted now is credited", async () => {
+    const s = await setup();
+    await s.register(alice);
+    await s.register(bob);
+    await s.db.query("INSERT INTO snapshot_runs (day, completed_at, wallet_count, failed_count) VALUES ('2026-10-07', now(), 2, 0)");
+    for (const [address, holding] of [[alice.address, "1234567"], [bob.address, "8765"]] as const) {
+      await s.db.query("INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, referrer_bonus_atomic) VALUES ('2026-10-07', $1, $2, 0, 0)", [address, holding]);
+    }
+    const rewards = await s.get("/scan/rewards");
+    expect(rewards.json).toMatchObject({ day: "2026-10-07", issuedAtomic: "1243332", scanRewardAtomic: "1243" });
+
+    const { json } = await s.post("/attestations", await attestBody(alice, attestationFor(s, await s.challenge())));
+    expect(json).toMatchObject({ ok: true, paid: true, points: rewards.json.scanRewardAtomic });
+  });
+
+  it("sums the pool's daily and award rows", async () => {
+    const s = await setup();
+    await fillPaidPlaces(s.db, "1.0.0", 1);
+    await s.db.query(
+      `INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ('2026-10-06', 4000000000000, 'daily', now()), ('2026-10-07', 1000000000000, 'daily', now())`,
+    );
+    await s.db.query(
+      "INSERT INTO bounty_pool (delta_atomic, reason, attestation_id, ref, created_at) VALUES (-440000000000, 'award', $1, 'https://github.com/x/y/pull/1', now())",
+      ["0".repeat(64)],
+    );
+    const { json } = await s.get("/scan/rewards");
+    expect(json.bountyPoolAtomic).toBe("4560000000000");
+  });
+
+  it("keeps an answer for a minute", async () => {
+    const s = await setup();
+    expect((await s.get("/scan/rewards")).json.bountyPoolAtomic).toBe("0");
+    await s.db.query("INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ('2026-10-07', 5, 'daily', now())");
+    expect((await s.get("/scan/rewards")).json.bountyPoolAtomic).toBe("0");
+    s.advance(60_000);
+    expect((await s.get("/scan/rewards")).json.bountyPoolAtomic).toBe("5");
+  });
+
+  it("is limited to 600 an hour per IP", async () => {
+    const s = await setup();
+    for (let i = 0; i < 600; i++) expect((await s.get("/scan/rewards")).status).toBe(200);
+    const { status, json } = await s.get("/scan/rewards");
+    expect(status).toBe(429);
+    expect(json.code).toBe("rate_limited");
+  });
+});

@@ -52,8 +52,8 @@ Routes split into two groups by caller:
 - **Extension-only** also covers the price proxy, `GET /prices?ids=` and
   `GET /prices/history?id=&range=`.
 - **Open CORS** — `/stats`, `/invite/check`, `/scan/challenge`,
-  `/attestations*`. These are read by static pages (`invite.html`,
-  `scan.html`) on other origins, or by the `pnpm scan` CLI with no
+  `/scan/rewards`, `/attestations*`. These are read by static pages (`invite.html`,
+  `scan.html`, `scan-results.html`) on other origins, or by the `pnpm scan` CLI with no
   origin at all.
 
 Each route has its own `RateLimiter` (per-IP, some also per-device), and
@@ -168,6 +168,11 @@ earn points (1/1000 of the previous day's total holding points); later
 ones are still recorded, just unpaid. `/attestations/check` runs the
 same validation as a dry run, without a signature, so an agent can
 self-correct before asking the user to sign.
+
+`scanRewardBasis` computes that reward and the day it comes from.
+`/attestations` credits it, and `/scan/rewards` publishes it with the
+bounty pool's balance (`poolBalance` from `bounty.ts`), so `scan.html`
+shows exactly what a scan is paid.
 
 ### github.ts
 

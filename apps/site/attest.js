@@ -1,6 +1,6 @@
 // attest.html. The link's fragment is untrusted: it is decoded, then shown as
 // text only. The extension re-checks the whole attestation before it signs.
-import { STORE_URL, decodeAttestationFragment, describeOutcome, isFinal, sendAttestation } from "./scan-lib.js";
+import { STORE_URL, decodeAttestationFragment, describeOutcome, isFinal, resultsHref, sendAttestation } from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -74,13 +74,12 @@ if (!decoded.ok) {
       text: out.message,
       tone: out.state === "success" || out.state === "full" || out.state === "unpaid" ? "good" : "bad",
     };
-    const entry = `scan.html?v=${encodeURIComponent(att.release)}`;
     if (out.action === "store") {
       view.href = STORE_URL;
       view.linkText = "Add Gleam to Chrome";
       view.helpText = "Once it's installed and you've joined Gleam Points, click Try again.";
     } else if (out.action === "view") {
-      view.href = out.attestationId ? `${entry}#${out.attestationId}` : entry;
+      view.href = resultsHref(att.release, out.attestationId);
       view.linkText = out.state === "already" ? "See the scans for this release" : "See your scan";
     } else if (out.action === "agent") {
       view.href = "scan.html";

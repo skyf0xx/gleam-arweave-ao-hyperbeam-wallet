@@ -1,7 +1,7 @@
-/* scan.html and attest.html. Quiet white pages: the beam appears once, as the
-   identity line at the top, and colour otherwise only marks a state. */
+/* scan.html, scan-results.html and attest.html. Quiet white pages: the beam
+   appears once, on the prompt card, and colour otherwise only marks a state. */
 
-.sc { max-width: 760px; padding-top: 8vh; padding-bottom: 14vh; }
+.sc { max-width: 760px; padding-top: 6vh; padding-bottom: 14vh; }
 .sc-narrow { max-width: 620px; }
 .sc > .beam { margin: 0 0 28px; }
 .sc .line { max-width: 34em; }
@@ -12,37 +12,54 @@
 .sc-mono { font-family: var(--mono); font-size: 0.8125rem; letter-spacing: 0; overflow-wrap: anywhere; }
 .sc-note { margin: 16px 0 0; max-width: 40em; }
 
-/* The line to paste */
+.sc-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sc-header-link { font-size: 0.9375rem; font-weight: 500; color: var(--fg); text-decoration: none; }
+.sc-header-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.sc-eyebrow { margin: 0 0 14px; font-size: 0.8125rem; font-weight: 600; letter-spacing: .04em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc-eyebrow a { color: inherit; text-decoration: none; }
+.sc-eyebrow a:hover { color: var(--fg); }
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* The prompt: the one call to action, so it carries the page's beam. */
 
 .copybox {
+  position: relative;
   margin: 36px 0 0;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: #fff;
+  overflow: hidden;
 }
 
-.copybox-label { margin: 0 0 8px; font-weight: 600; font-size: 0.9375rem; }
+.copybox-beam { position: absolute; inset: 0 0 auto 0; width: auto; }
+.copybox-label { margin: 0 0 10px; font-weight: 600; font-size: 0.9375rem; }
 
 .copybox-line {
-  display: block;
-  width: 100%;
-  margin: 0 0 8px;
-  padding: 12px 14px;
-  border: 1px solid transparent;
+  margin: 0 0 16px;
+  padding: 14px 16px;
   border-radius: 8px;
   background: var(--bg);
   font-family: var(--mono);
   font-size: 0.8125rem;
   line-height: 1.6;
-  text-align: left;
   overflow-wrap: anywhere;
-  cursor: pointer;
+  user-select: all;
 }
 
-.copybox-line:hover,
-.copybox-line:focus-visible { border-color: var(--line); }
-.copybox-line[data-copied] { color: #16a34a; }
+.copybox-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.copybox-actions .button { min-width: 148px; justify-content: center; }
 
 .copybox-status { display: inline-flex; align-items: center; gap: 6px; color: #16a34a; }
 .copybox-status:empty { display: none; }
@@ -54,41 +71,161 @@
   clip-path: polygon(39% 62%, 15% 44%, 6% 54%, 40% 82%, 94% 30%, 84% 20%);
 }
 
+/* Live figures: three numbers big enough to read at a glance. */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 20px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+.stats > div { padding: 16px 20px; min-width: 0; }
+.stats > div + div { border-left: 1px solid var(--line); }
+.stats dt { font-size: 0.8125rem; color: var(--muted); }
+.stats dd {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.stats-pending { font-size: 1rem !important; }
+.stats-pending .stats-unit { display: none; }
+.stats-of, .stats-unit { font-size: 0.875rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.sc-stats-note { margin: 12px 0 0; }
+.sc-stats-note:empty { display: none; }
+.sc-load { margin-top: 32px; }
+
 /* Sections */
 
 .sc-section { margin-top: clamp(48px, 8vh, 80px); padding-top: 28px; border-top: 1px solid var(--line); }
-.sc-section h2 { margin: 0 0 16px; font-size: 1.5rem; line-height: 1.25; letter-spacing: -0.02em; font-weight: 600; }
-.sc-block { margin: 0 0 36px; }
-.sc-block h3 { margin: 0 0 8px; font-size: 0.75rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
-.sc-figure { margin: 0 0 12px; font-size: 1.125rem; line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sc-section h2, .sc-cta h2 { margin: 0 0 20px; font-size: 1.5rem; line-height: 1.25; letter-spacing: -0.02em; font-weight: 600; }
+.sc-section > .small { margin: 16px 0 0; max-width: 42em; }
 
-.sc-prose { margin: 0 0 16px; padding-left: 1.25em; max-width: 42em; }
+.sc-prose { margin: 0 0 16px; padding-left: 1.25em; max-width: 42em; color: var(--muted); }
 .sc-prose li { margin: 0 0 10px; }
-.sc-prose a, .sc .small a { text-underline-offset: 3px; }
+.sc-prose li::marker { color: var(--muted); }
+.sc-prose strong { color: var(--fg); font-weight: 600; }
+.sc-prose a, .sc .small a, .sc-section p a { text-underline-offset: 3px; color: var(--fg); }
 .sc .links { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 48px; }
 
-/* Coverage bar: a hairline track, ink fill. The width is the share examined. */
+/* How it works */
 
-.bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.sc-steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+.sc-steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: baseline;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.sc-steps li:last-child { border-bottom: 1px solid var(--line); }
+.sc-steps li::before { content: counter(step); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
+.sc-steps p { margin: 0; }
+
+/* Rewards and the bounty pool, side by side */
+
+.earn-cards { margin-top: clamp(48px, 8vh, 80px); display: grid; gap: 12px; }
+.earn-card { padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.earn-card summary { list-style: none; cursor: pointer; padding: 4px 0; }
+.earn-card summary::-webkit-details-marker { display: none; }
+.earn-card h2 {
+  margin: 0;
+  padding-right: 24px;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  position: relative;
+}
+.earn-card h2::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -6px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform .2s ease;
+}
+.earn-card[open] h2::after { transform: rotate(-135deg); margin-top: -4px; }
+.earn-card .sc-prose { margin: 16px 0 0; }
+.earn-card .small { margin: 12px 0 0; }
+
+.tiers { width: 100%; margin: 8px 0 10px; border-collapse: collapse; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.tiers th, .tiers td { padding: 6px 12px 6px 0; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.tiers tr:last-child > * { border-bottom: 1px solid var(--line); }
+.tiers tr > :last-child { padding-right: 0; }
+.tiers tbody th { font-weight: 500; }
+.tiers .num { text-align: right; }
+.tiers-amount { color: var(--muted); }
+
+.sc-results-link { margin: 12px 0 0; }
+.sc-results-link a { color: var(--fg); }
+
+/* Questions */
+
+.faq details { border-top: 1px solid var(--line); }
+.faq details:last-child { border-bottom: 1px solid var(--line); }
+.faq summary { padding: 16px 0; font-weight: 600; cursor: pointer; }
+.faq details p { margin: 0 0 18px; max-width: 42em; color: var(--muted); }
+
+/* Results: coverage bar is a hairline track with an ink fill; its width is the share examined. */
+
+.bar { height: 8px; margin: 12px 0 0; border-radius: 4px; background: var(--line); overflow: hidden; }
 .bar span { display: block; height: 100%; width: 0; background: var(--fg); border-radius: 4px; }
+.sc-models { margin: 16px 0 0; }
+.sc-models [data-models-text] { margin: 0 0 10px; }
+.sc-models [data-models-note] { margin: 10px 0 0; }
+.chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+.chip { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 0.875rem; font-weight: 500; }
 
 .sc-more { margin: 14px 0 0; }
 .sc-more summary { cursor: pointer; font-size: 0.9375rem; font-weight: 500; }
 .sc-list { margin: 10px 0 0; padding-left: 1.25em; max-height: 280px; overflow: auto; }
 .sc-list li { margin: 0 0 4px; }
 
-/* Attestations */
+.sc-empty { padding: 24px; border: 1px dashed var(--line); border-radius: var(--radius); background: #fff; }
+.sc-empty p { margin: 0 0 16px; }
+
+.sc-cta { margin-top: clamp(48px, 8vh, 80px); padding: 28px; border-radius: var(--radius); background: #fff; border: 1px solid var(--line); }
+.sc-cta h2 { margin-bottom: 8px; }
+.sc-cta p { margin: 0 0 20px; max-width: 34em; color: var(--muted); }
+
+/* Attestations. Colour marks only "pass" as the quiet, expected outcome; "scanned" is neutral. */
 
 .atts { list-style: none; margin: 0 0 16px; padding: 0; }
-.att { border-top: 1px solid var(--line); }
+.att { border-top: 1px solid var(--line); scroll-margin-top: 96px; }
 .att:last-child { border-bottom: 1px solid var(--line); }
 .att-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 14px 0; cursor: pointer; }
 .att-model { font-weight: 600; overflow-wrap: anywhere; }
 .att-tag { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 0.75rem; line-height: 1.5; }
+.att-tag[data-result="scanned"] { border-color: var(--muted); color: var(--muted); }
+.att-tag[data-result="pass"] { border-color: #bfe8c6; color: #15803d; }
 .att-meta { color: var(--muted); font-size: 0.875rem; }
 .att-body { padding: 0 0 18px; }
 .att-body > .small { margin: 14px 0 6px; font-weight: 600; }
-.att-id { font-weight: 400 !important; color: var(--muted); word-break: break-all; }
+.att-foot { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; }
+.att-id { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  transition: color .2s ease;
+}
+.att-link:hover, .att-link:focus-visible { color: var(--fg); }
+.att-link svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 .att-target { background: #fff; box-shadow: -3px 0 0 var(--beam-sky); padding: 0 12px; }
 
 .report {
@@ -143,9 +280,15 @@
 .result-action:has(a[hidden]) { margin: 0; }
 .result .small { margin: 12px 0 0; }
 
+@media (max-width: 640px) {
+  .stats { grid-template-columns: 1fr; }
+  .stats > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  .sc-steps li { grid-template-columns: 28px 1fr; }
+}
+
 @media (max-width: 520px) {
-  .copybox { padding: 16px; }
-  .copybox-status { display: block; margin: 8px 0 0; min-height: 1.4em; }
+  .copybox { padding: 20px 16px 16px; }
+  .copybox-actions .button { width: 100%; }
   .facts > div { grid-template-columns: 1fr; gap: 2px; }
   .sign .button, .result .button { width: 100%; justify-content: center; }
 }

@@ -100,7 +100,8 @@ async function readAttestation(db: Queryable, id: string, lock = false): Promise
   return rows[0];
 }
 
-async function poolBalance(db: Queryable): Promise<bigint> {
+/** The pool's balance: the sum of its ledger. */
+export async function poolBalance(db: Queryable): Promise<bigint> {
   const { rows } = await db.query<{ balance: string }>("SELECT coalesce(sum(delta_atomic), 0)::text AS balance FROM bounty_pool");
   return BigInt(rows[0]!.balance);
 }

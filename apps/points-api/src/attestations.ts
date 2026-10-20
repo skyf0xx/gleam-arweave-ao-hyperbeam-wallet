@@ -359,14 +359,30 @@ function notRegistered(): ScanFailure {
   );
 }
 
-/** 0.1% of the latest completed snapshot day before today's (UTC); 0 before there is one. */
-async function scanReward(tx: Queryable, now: Date): Promise<bigint> {
-  const { rows } = await tx.query<{ total: string }>(
-    `SELECT coalesce(sum(holding_atomic), 0)::text AS total FROM points
-      WHERE day = (SELECT max(day) FROM snapshot_runs WHERE day < $1::date)`,
+export interface ScanRewardBasis {
+  /** The latest completed snapshot day before today's (UTC), or null before there is one. */
+  day: string | null;
+  /** Total holding points issued on `day`; 0 when it is null. */
+  issuedAtomic: bigint;
+  /** What a paid scan submitted now earns: 0.1% of `issuedAtomic`, truncated. */
+  rewardAtomic: bigint;
+}
+
+/** The snapshot day a scan submitted at `now` is paid from, and what it pays. */
+export async function scanRewardBasis(db: Queryable, now: Date): Promise<ScanRewardBasis> {
+  const { rows } = await db.query<{ day: string | null; total: string }>(
+    `SELECT to_char(d.day, 'YYYY-MM-DD') AS day, coalesce(sum(p.holding_atomic), 0)::text AS total
+       FROM (SELECT max(day) AS day FROM snapshot_runs WHERE day < $1::date) d
+       LEFT JOIN points p ON p.day = d.day
+      GROUP BY d.day`,
     [now.toISOString().slice(0, 10)],
   );
-  return BigInt(rows[0]!.total) / SCAN_REWARD_DIVISOR;
+  const issuedAtomic = BigInt(rows[0]!.total);
+  return { day: rows[0]!.day, issuedAtomic, rewardAtomic: issuedAtomic / SCAN_REWARD_DIVISOR };
+}
+
+async function scanReward(tx: Queryable, now: Date): Promise<bigint> {
+  return (await scanRewardBasis(tx, now)).rewardAtomic;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
