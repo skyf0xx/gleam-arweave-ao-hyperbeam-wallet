@@ -6,11 +6,12 @@ merged activity feed, tagged Arweave uploads, and an ArConnect-compatible
 `window.arweaveWallet` provider. Every dApp signing request opens its own
 approval window with a decoded preview.
 
-permawebOS, a working wallet we reverse-engineered, is at
-`~/Downloads/permawebOS/` (minified). Check it when a protocol detail is
-unclear. Visual design rules are in `DESIGN.md`. The community scans
-design is in `SCANS.md`. Remaining work is in `todo.md`, and the Gleam
-Points launch steps are in `LAUNCH.md`.
+If you are running a community security scan, `security/scan/SKILL.md` is
+your whole task and the only instructions you need. The rest of this file
+is for contributors.
+
+Visual design rules are in `DESIGN.md`. The community scans design is in
+`SCANS.md`.
 
 ## Stack
 
@@ -34,7 +35,7 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   (injected into the page), `approval`, `passkey`, `sidepanel`, and
   `popup/<screen>/`.
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
-  `tsx` on Railway). Spec in `POINTS.md`.
+  `tsx` on Railway).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
   (spec in `SCANS.md`).
 - `apps/extension/src/handlers/`: background handlers such as
@@ -101,23 +102,9 @@ needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 
 ## Workflow
 
-Take items from `todo.md` and group related ones together. Make one
-Conventional Commit per item (`fix(ao): …`, `feat(activity): …`) on a
-shared branch for the group, open one PR for the whole branch, and merge
-it once CI is green. Then remove the completed items from `todo.md`.
-`master` accepts only signed commits through a PR with passing CI, and
-admins get no bypass. This repo signs commits with an SSH key (`git
-config --local commit.gpgsign true`), so the key has to be loaded in
-`ssh-agent`. `todo.md` is not tracked in git. Add anything new you find to
-`todo.md`'s **Unsorted** section instead of fixing it on the side.
-
-## Releasing
-
-When Will asks to cut or ship a release, run `pnpm release:all <major|minor|patch> --key <path-to-cws-private-key>`
-(or set `GLEAM_CWS_KEY`). It walks version bump → PR → tag → CI build →
-pack/sign, pausing at each step a human has to clear (merging the PR,
-confirming the GitHub Release exists). It refuses to tag without an audit
-at `security/audits/v<version>.md` with no open critical/high findings —
-point that out if the pause before tagging hits it. The Chrome Web Store
-upload at the end stays manual; no store credentials or signing key ever
-reach CI.
+Make one Conventional Commit per change (`fix(ao): …`,
+`feat(activity): …`), group related commits on one branch, open one PR
+for the branch, and merge it once CI is green. `master` accepts only
+signed commits through a PR with passing CI, and admins get no bypass.
+This repo signs commits with an SSH key (`git config --local
+commit.gpgsign true`), so the key has to be loaded in `ssh-agent`.
