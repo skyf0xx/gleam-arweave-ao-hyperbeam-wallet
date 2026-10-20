@@ -124,15 +124,7 @@ async function loadFigures() {
   }
   // Half the figures would read as a broken page, so the row shows only when both arrived.
   $("[data-stats]").hidden = true;
-  status.textContent = "Couldn't load live figures.";
-  status.appendChild(document.createTextNode(" "));
-  const retry = el("button", "link-button", "Try again");
-  retry.type = "button";
-  retry.addEventListener("click", () => {
-    status.textContent = "Loading…";
-    loadFigures();
-  });
-  status.appendChild(retry);
+  status.textContent = "";
 }
 
 setUpCopy();
