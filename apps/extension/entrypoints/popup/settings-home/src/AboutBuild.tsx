@@ -1,8 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import type { RuntimePort, ScanStats } from "@gleam/core";
+import type { RuntimePort } from "@gleam/core";
 import { releaseUrl, sitePageUrl } from "@/src/site-pages";
-
-const SCAN_STATS_STALE_MS = 10 * 60_000;
+import { useScanStats } from "../../points/src/useScanStats";
 
 export interface AboutBuildProps {
   runtime: RuntimePort;
@@ -11,12 +9,7 @@ export interface AboutBuildProps {
 
 /** Lets a user match the installed build to a public release. */
 export function AboutBuild({ runtime, version }: AboutBuildProps) {
-  const scanStats = useQuery({
-    queryKey: ["scans", "stats"],
-    queryFn: () => runtime.send<undefined, ScanStats | null>({ type: "getScanStats", payload: undefined }),
-    staleTime: SCAN_STATS_STALE_MS,
-    retry: false,
-  });
+  const scanStats = useScanStats(runtime);
   const count = scanStats.data?.total;
   return (
     <div className="flex flex-col gap-1 px-4 pt-3 text-caption text-muted">

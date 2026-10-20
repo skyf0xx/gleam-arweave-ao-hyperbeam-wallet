@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import {
   capabilitiesFor,
   INVITE_REQUIRED_MESSAGE,
@@ -7,7 +6,6 @@ import {
   PAID_SCANS_PER_RELEASE,
   unsupportedOperationMessage,
   type RuntimePort,
-  type ScanStats,
   type WalletSummary,
 } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
@@ -28,6 +26,7 @@ import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
 import { useCountUp } from "./useCountUp";
+import { useScanStats } from "./useScanStats";
 import {
   useJoinPoints,
   useLeavePoints,
@@ -46,8 +45,6 @@ const MEMBER_SEATS = 3;
 
 /** What a referrer earns on each referee's base points (POINTS.md § Rules). */
 const REFERRAL_PERCENT = 10;
-
-const SCAN_STATS_STALE_MS = 10 * 60_000;
 
 const BEAM_COLORS = [
   "var(--color-beam-red)",
@@ -422,12 +419,7 @@ function EarnItem({
  * Invite on X stays the screen's one primary.
  */
 function AuditItem({ runtime }: { runtime: RuntimePort }) {
-  const stats = useQuery({
-    queryKey: ["scans", "stats"],
-    queryFn: () => runtime.send<undefined, ScanStats | null>({ type: "getScanStats", payload: undefined }),
-    staleTime: SCAN_STATS_STALE_MS,
-    retry: false,
-  });
+  const stats = useScanStats(runtime);
   const placesLeft = stats.data?.paidPlacesLeft ?? null;
   const rewardAtomic = stats.data?.rewardAtomic ?? null;
   const paying = placesLeft !== null && placesLeft > 0;
