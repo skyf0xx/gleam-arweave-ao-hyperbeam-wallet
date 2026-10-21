@@ -21,7 +21,7 @@ export function AboutBuild({ runtime, version }: AboutBuildProps) {
       </div>
       <div className="flex items-center justify-between gap-3">
         <span>Community audits</span>
-        <a href={sitePageUrl("scan-results", version)} target="_blank" rel="noreferrer" className="text-foreground underline">
+        <a href={sitePageUrl("review-results", version)} target="_blank" rel="noreferrer" className="text-foreground underline">
           {typeof count === "number" ? `${count} ${count === 1 ? "audit" : "audits"} →` : "View audits →"}
         </a>
       </div>

@@ -1,5 +1,5 @@
 /* global AbortController, URL */
-// scan-results.html. Everything from the points API (labels, reports, answers,
+// review-results.html. Everything from the points API (labels, reports, answers,
 // function names) is untrusted text: nodes are built with textContent, never markup.
 import { coverageSummary, fetchListing, idFromHash, releaseFromSearch, unusedModels } from "./scan-lib.js";
 
@@ -31,7 +31,7 @@ function failure(message) {
   const retry = el("button", "link-button", "Try again");
   retry.type = "button";
   retry.addEventListener("click", () => {
-    status.textContent = "Loading scans…";
+    status.textContent = "Loading reviews…";
     loadRelease();
   });
   status.appendChild(retry);
@@ -202,8 +202,8 @@ async function loadRelease() {
   state.listing = first.listing;
   state.attestations = first.listing.attestations;
   state.nextCursor = first.listing.nextCursor;
-  document.title = `Gleam community scans · v${first.listing.release}`;
-  $("[data-release-title]").textContent = `Scans of v${first.listing.release}`;
+  document.title = `Gleam review results · v${first.listing.release}`;
+  $("[data-release-title]").textContent = `Reviews of v${first.listing.release}`;
   $("[data-paid-left]").textContent = String(Math.max(0, first.listing.paidPlacesLeft));
 
   // A link to one entry needs it loaded.

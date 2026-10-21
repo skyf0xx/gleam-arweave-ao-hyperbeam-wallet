@@ -34,7 +34,7 @@ describe("AboutBuild", () => {
     render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" />, runtimeReturning(7));
 
     const link = await screen.findByRole("link", { name: "7 audits →" });
-    expect(link.getAttribute("href")).toBe("https://gleamwallet.app/scan-results.html?v=1.26.0");
+    expect(link.getAttribute("href")).toBe("https://gleamwallet.app/review-results.html?v=1.26.0");
   });
 
   it("says 1 audit in the singular", async () => {
@@ -49,7 +49,7 @@ describe("AboutBuild", () => {
 
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
     expect(screen.getByRole("link", { name: "View audits →" }).getAttribute("href")).toBe(
-      "https://gleamwallet.app/scan-results.html?v=1.26.0",
+      "https://gleamwallet.app/review-results.html?v=1.26.0",
     );
   });
 });
