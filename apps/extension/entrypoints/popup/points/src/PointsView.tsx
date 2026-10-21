@@ -239,9 +239,7 @@ function JoinedView({
   const prompt = useSharePrompt({ runtime, wallet, inviteCode, score });
   const post =
     prompt?.post ?? invitePost({ seats: seatsLeft, link: inviteLink });
-  const heading =
-    prompt?.text ??
-    (seatsLeft !== null ? invitesRemainingLine(seatsLeft) : "Invite friends");
+  const status = prompt?.text ?? (seatsLeft !== null ? invitesRemainingLine(seatsLeft) : null);
   // A full code sends friends to a "full" invite page, so there's nothing to share.
   const full = seatsLeft !== null && seatsLeft <= 0;
   const topPercent = score?.topPercent ?? null;
@@ -297,44 +295,42 @@ function JoinedView({
           <div className="flex flex-col gap-6">
             <EarnItem
               label="Invite"
-              title={heading}
-              aside={seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
-              reward={`+${REFERRAL_PERCENT}% of each friend's daily points`}
-              rewardAction={
-                full ? null : (
-                  <button
+              title="Invite a friend"
+              aside={<span className="text-label tabular-nums text-muted">+{REFERRAL_PERCENT}% of their daily points</span>}
+            >
+              <div className="flex flex-col gap-1">
+                <p className="text-label text-muted">Friends who join with your link add to your points every day.</p>
+                {status ? (
+                  <p className="flex items-center gap-2 text-caption text-muted">
+                    {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
+                    {status}
+                  </p>
+                ) : null}
+                {full ? (
+                  <p className="text-caption text-muted">You get another when a friend you invited joins Points.</p>
+                ) : null}
+              </div>
+              {full ? null : (
+                <div className="flex gap-2">
+                  <Button asChild variant="secondary" size="sm">
+                    <a href={xIntentUrl(post)} target="_blank" rel="noreferrer" onClick={() => prompt?.finish()}>
+                      Invite on X
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  </Button>
+                  <Button
                     type="button"
-                    aria-label={copied ? "Copied" : "Copy invite link"}
-                    title={copied ? "Copied" : "Copy invite link"}
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded-md",
-                      copied ? "text-positive" : "text-muted hover:text-foreground",
-                    )}
+                    variant="secondary"
+                    size="sm"
+                    className={cn(copied && "text-positive")}
                     onClick={() => {
                       copy();
                       prompt?.finish();
                     }}
                   >
-                    {copied ? <CheckIcon /> : <CopyIcon />}
-                  </button>
-                )
-              }
-            >
-              {full ? (
-                <p className="text-label text-muted">
-                  You get another when a friend you invited joins Points.
-                </p>
-              ) : (
-                <Button asChild>
-                  <a
-                    href={xIntentUrl(post)}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => prompt?.finish()}
-                  >
-                    Invite on X
-                  </a>
-                </Button>
+                    {copied ? "Copied" : "Copy invite link"}
+                  </Button>
+                </div>
               )}
             </EarnItem>
             <ReviewItem runtime={runtime} />
@@ -380,37 +376,27 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
 }
 
 /**
- * One way to earn: a hairline, its title with an aside, what it pays, then
- * its action. The hairline sits between ways rather than under each title,
- * so each way reads as one block.
+ * One way to earn: a hairline, its title with what it pays, then its
+ * detail and actions. Every way shares this shape and a small outlined
+ * action, so none reads as more important than the others.
  */
 function EarnItem({
   label,
   title,
   aside,
-  reward,
-  rewardAction,
   children,
 }: {
   label: string;
   title: string;
   aside?: ReactNode;
-  reward: string | null;
-  rewardAction?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section aria-label={label} className="flex flex-col gap-3 border-t border-line pt-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-body font-semibold text-foreground">{title}</h3>
         {aside}
       </div>
-      {reward ? (
-        <div className="flex items-center gap-1.5">
-          <p className="text-label tabular-nums text-muted">{reward}</p>
-          {rewardAction}
-        </div>
-      ) : null}
       {children}
     </section>
   );
@@ -419,8 +405,7 @@ function EarnItem({
 /**
  * Reviews need a registered wallet, so only members see this. The button
  * stays once the paid places are gone: an unpaid review is still published
- * and a confirmed vulnerability still earns from the bounty pool. A small
- * outlined button, so Invite on X stays the screen's one primary.
+ * and a confirmed vulnerability still earns from the bounty pool.
  */
 function ReviewItem({ runtime }: { runtime: RuntimePort }) {
   const stats = useScanStats(runtime);
@@ -437,7 +422,6 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
           <span className="text-label tabular-nums text-muted">+{formatPoints(rewardAtomic)} GLEAM per review</span>
         ) : null
       }
-      reward={null}
     >
       <div className="flex flex-col gap-1">
         <p className="text-label text-muted">Have your coding agent review this release to earn.</p>
@@ -456,23 +440,6 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
         </a>
       </Button>
     </EarnItem>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 

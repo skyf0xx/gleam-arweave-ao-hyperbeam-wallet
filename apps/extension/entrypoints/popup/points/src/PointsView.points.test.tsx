@@ -306,15 +306,16 @@ describe("PointsView", () => {
     expect(standing.getByText("Per day").nextElementSibling?.textContent).toBe("+1.00");
     expect(standing.getByText("Friends joined").nextElementSibling?.textContent).toBe("3");
 
-    expect(screen.getByRole("heading", { name: "3 invites remaining" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
+    expect(screen.getByText("3 invites remaining")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Ways to earn" })).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "Invite" })).getByText("+10% of each friend's daily points")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Invite" })).getByText("+10% of their daily points")).toBeTruthy();
     const share = screen.getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
     );
 
-    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X", "Start a review↗"]);
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X↗", "Start a review↗"]);
     expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
     const about = screen.getByRole("button", { name: "About Gleam Points" });
     expect(about.getAttribute("aria-expanded")).toBe("false");
@@ -361,7 +362,7 @@ describe("PointsView", () => {
     expect(await screen.findByText("Top 12%")).toBeTruthy();
 
     expect(screen.queryByText(/invites? remaining/)).toBeNull();
-    expect(screen.getByRole("heading", { name: "Invite friends" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
     const href = screen.getByRole("link", { name: "Invite on X" }).getAttribute("href")!;
     expect(decodeURIComponent(href)).toContain(`Just joined @gleam_wallet and I'm now earning GLEAM.\n${LINK}`);
   });
@@ -375,7 +376,7 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByRole("heading", { name: "All your invites are used" })).toBeTruthy();
+    expect(await screen.findByText("All your invites are used")).toBeTruthy();
     expect(screen.getByText("You get another when a friend you invited joins Points.")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Invite on X" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy invite link" })).toBeNull();
