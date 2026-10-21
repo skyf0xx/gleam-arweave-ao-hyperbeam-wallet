@@ -46,8 +46,8 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
         <div className="flex flex-col gap-1.5">
           <h1 className="text-h3 font-semibold tracking-tight text-foreground">Pick your security phrase</h1>
           <p className="text-body leading-relaxed text-muted">
-            Pick a word. Gleam draws an icon from it and shows both when you unlock and on every request it
-            asks you to approve. If a window asks for your password without them, that window isn&apos;t Gleam.
+            Your security phrase and icon appear before important actions. If a window asks for your
+            password or signature without them, it isn&apos;t Gleam.
           </p>
         </div>
 

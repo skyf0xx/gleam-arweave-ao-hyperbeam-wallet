@@ -302,8 +302,8 @@ the latest. A `#<attestation id>` opens that entry. It shows:
   listed. The figure comes from the challenge answers, which the server
   has already checked against the code, so a made-up model label can't
   raise it.
-- **Attestations.** Each with its model label, result, date, report
-  and challenge answers.
+- **Attestations.** Each with its model label, result, date and
+  report.
 - **Models not yet used.** For example, "Not yet used on v1.4: Gemini
   3, DeepSeek V4, Qwen 3". These are names from a short list in
   `apps/site` that aren't among the release's labels. Next to it: *A
