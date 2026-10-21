@@ -1,5 +1,5 @@
 /* global AbortController, URL */
-// scan-results.html. Everything from the points API (labels, reports, answers,
+// review-results.html. Everything from the points API (labels, reports,
 // function names) is untrusted text: nodes are built with textContent, never markup.
 import { coverageSummary, fetchListing, idFromHash, releaseFromSearch, unusedModels } from "./scan-lib.js";
 
@@ -31,7 +31,7 @@ function failure(message) {
   const retry = el("button", "link-button", "Try again");
   retry.type = "button";
   retry.addEventListener("click", () => {
-    status.textContent = "Loading scans…";
+    status.textContent = "Loading reviews…";
     loadRelease();
   });
   status.appendChild(retry);
@@ -99,16 +99,6 @@ function renderAttestation(att) {
   const body = el("div", "att-body");
   body.appendChild(el("p", "small", "Report"));
   body.appendChild(el("pre", "report", String(att.report)));
-  const answers = Array.isArray(att.answers) ? att.answers : [];
-  body.appendChild(el("p", "small", "Challenge answers"));
-  const list = el("ol", "answers");
-  for (const answer of answers) {
-    const row = el("li");
-    row.appendChild(el("span", "sc-mono", `${answer.file} → ${answer.symbol}, line ${answer.line}`));
-    row.appendChild(el("span", "answer-check", String(answer.check)));
-    list.appendChild(row);
-  }
-  body.appendChild(list);
   const foot = el("div", "att-foot");
   const id = el("span", "small sc-mono att-id", `Attestation ${att.id}`);
   id.title = String(att.id);
@@ -202,8 +192,8 @@ async function loadRelease() {
   state.listing = first.listing;
   state.attestations = first.listing.attestations;
   state.nextCursor = first.listing.nextCursor;
-  document.title = `Gleam community scans · v${first.listing.release}`;
-  $("[data-release-title]").textContent = `Scans of v${first.listing.release}`;
+  document.title = `Gleam review results · v${first.listing.release}`;
+  $("[data-release-title]").textContent = `Reviews of v${first.listing.release}`;
   $("[data-paid-left]").textContent = String(Math.max(0, first.listing.paidPlacesLeft));
 
   // A link to one entry needs it loaded.

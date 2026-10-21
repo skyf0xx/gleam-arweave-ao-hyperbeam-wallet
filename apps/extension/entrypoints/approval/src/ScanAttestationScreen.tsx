@@ -218,8 +218,8 @@ function AttestationReview({
       <p className="text-center text-label leading-relaxed text-muted">
         You vouch that your agent scanned Gleam v{preview.release} as described below.{" "}
         {wallet && isHardwareWalletMethod(wallet.method)
-          ? "Your device signs a 0 AR proof of ownership that is never posted. It moves no funds."
-          : "This signs no transaction and moves no funds."}
+          ? "Your device signs a 0 AR proof of ownership that is never posted."
+          : "This signs a message, not an Arweave transaction."}
       </p>
 
       <Field label="Signing wallet">

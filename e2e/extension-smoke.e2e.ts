@@ -59,11 +59,12 @@ for (const path of PAGES) {
   test(`${path} loads without runtime errors`, async () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/${path}`);
-    await page.waitForLoadState("networkidle");
-    // Checked before the render so a crash reports its error, not a
+    // Not networkidle: approval.html keeps a messaging port open, so the
+    // network never goes quiet and the wait raced the test timeout instead.
+    await expect(page.locator("body")).not.toBeEmpty();
+    // Checked after the render so a crash reports its error, not a
     // blank page. Includes anything the worker logged since the last test.
     expect(errors.splice(0), "runtime errors").toEqual([]);
-    await expect(page.locator("body")).not.toBeEmpty();
     await page.close();
   });
 }

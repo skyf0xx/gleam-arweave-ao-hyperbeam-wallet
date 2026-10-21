@@ -69,7 +69,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
     const { container } = render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
 
     await screen.findByText("Sign scan attestation", {}, SLOW);
-    expect(screen.getByText(/signs no transaction and moves no funds/)).toBeTruthy();
+    expect(screen.getByText(/signs a message, not an Arweave transaction/)).toBeTruthy();
     expect(screen.getByText("v1.4.0")).toBeTruthy();
     expect(screen.getByText("claude-opus-5-5")).toBeTruthy();
     expect(screen.getByText(PREVIEW.commit)).toBeTruthy();

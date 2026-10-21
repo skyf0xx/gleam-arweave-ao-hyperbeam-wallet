@@ -1,7 +1,17 @@
 /* global AbortController */
 // scan.html. Everything from the points API is untrusted text: nodes are
 // built with textContent, never markup.
-import { AGENT_LINE, bountyTiers, fetchListing, fetchRewards, formatPoints, nextScanReward, resultsHref } from "./scan-lib.js";
+import {
+  AGENT_LINE,
+  bountyTiers,
+  coverageSummary,
+  fetchCount,
+  fetchListing,
+  fetchRewards,
+  formatPoints,
+  nextScanReward,
+  resultsHref,
+} from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
 const TIMEOUT_MS = 8000;
@@ -73,7 +83,15 @@ async function withTimeout(load) {
 // The severity rows are static so the shares read without the server; a known pool adds what each pays today.
 function renderTiers(poolAtomic) {
   const rows = document.querySelectorAll("[data-tiers] tr");
-  bountyTiers(poolAtomic).forEach((tier, index) => {
+  const tiers = bountyTiers(poolAtomic);
+  const head = $(".tiers thead tr");
+  if (tiers[0].amountAtomic !== null && !head.querySelector("[data-tier-amount]")) {
+    const th = el("th", "num", "Today");
+    th.scope = "col";
+    th.dataset.tierAmount = "";
+    head.appendChild(th);
+  }
+  tiers.forEach((tier, index) => {
     const row = rows[index];
     if (!row || tier.amountAtomic === null) return;
     row.querySelector("[data-tier-amount]")?.remove();
@@ -89,66 +107,54 @@ function gleam(atomic) {
   return text === "0" && /^0*[1-9]\d*$/.test(atomic) ? "<0.01" : text;
 }
 
-// The accordion headers show the headline figure so it reads without opening them.
-function renderHeaderAmounts(rewards) {
-  // Before the first daily snapshot a scan is recorded unpaid, so a scan reward would mislead.
-  if (rewards.day !== null) {
-    const scan = $("[data-earn-scan]");
-    scan.textContent = `${gleam(rewards.scanRewardAtomic)} GLEAM`;
-    scan.hidden = false;
-  }
-  const critical = bountyTiers(rewards.bountyPoolAtomic)[0];
-  if (critical.amountAtomic !== null) {
-    const bounty = $("[data-earn-bounty]");
-    bounty.textContent = `${gleam(critical.amountAtomic)} GLEAM`;
-    bounty.hidden = false;
-  }
-}
-
-function renderRewards(rewards) {
-  $("[data-stat-pool]").textContent = gleam(rewards.bountyPoolAtomic);
-  renderTiers(rewards.bountyPoolAtomic);
-  renderHeaderAmounts(rewards);
-}
-
-/** Which reward the next scan gets depends on the release's places left, so it needs both responses. */
-function renderNextReward(rewards, listing) {
-  // Before the first daily snapshot a scan is recorded unpaid, so "0" would mislead.
+/** Which reward the next review gets depends on the release's places left, so it needs both responses. */
+function renderReviewFigures(rewards, listing) {
+  $("[data-stat-places]").textContent = String(Math.max(0, listing.paidPlacesLeft));
   const reward = $("[data-stat-reward]");
+  // Before the first daily snapshot a review is recorded unpaid, so "0" would mislead.
   if (rewards.day === null) {
     reward.textContent = "After the first snapshot";
-    reward.parentElement.classList.add("stats-pending");
+    reward.parentElement.classList.add("figures-pending");
   } else {
     reward.textContent = gleam(nextScanReward(rewards, listing.paidPlacesLeft));
-    reward.parentElement.classList.remove("stats-pending");
+    reward.parentElement.classList.remove("figures-pending");
   }
+  $("[data-review-figures]").hidden = false;
 }
 
-function renderListing(listing) {
-  $("[data-stat-places]").textContent = String(Math.max(0, listing.paidPlacesLeft));
-  const href = resultsHref(listing.release);
-  for (const link of document.querySelectorAll("[data-results-link], .sc-header-link")) link.href = href;
+function renderPool(rewards) {
+  $("[data-stat-pool]").textContent = gleam(rewards.bountyPoolAtomic);
+  $("[data-pool-figures]").hidden = false;
+  renderTiers(rewards.bountyPoolAtomic);
+}
+
+// The record is what anyone can check on the results page, so it shows only when every figure arrived.
+function renderRecord(listing, count) {
+  const coverage = coverageSummary(listing.coverage);
+  const models = Array.isArray(listing.models) ? listing.models.length : null;
+  if (!coverage || models === null) return;
+  $("[data-record-release]").textContent = `v${listing.release}`;
+  $("[data-record-reviews]").textContent = String(count.total);
+  $("[data-record-coverage]").textContent = `${listing.coverage.examined} of ${listing.coverage.total}`;
+  $("[data-record-models]").textContent = String(models);
+  $("[data-record]").hidden = false;
 }
 
 async function loadFigures() {
-  const status = $("[data-stats-status]");
-  // One attestation is enough: the listing's paid places cover the whole release.
+  // One attestation is enough: the listing's paid places, coverage and models cover the whole release.
   const [rewards, listing] = await Promise.all([
     withTimeout((signal) => fetchRewards(window.fetch.bind(window), { signal })),
     withTimeout((signal) => fetchListing(window.fetch.bind(window), { limit: 1, signal })),
   ]);
-  if (rewards.ok) renderRewards(rewards.rewards);
-  if (listing.ok) renderListing(listing.listing);
+  if (rewards.ok) renderPool(rewards.rewards);
+  if (!listing.ok) return;
 
-  if (rewards.ok && listing.ok) {
-    renderNextReward(rewards.rewards, listing.listing);
-    $("[data-stats]").hidden = false;
-    status.textContent = "";
-    return;
-  }
-  // Half the figures would read as a broken page, so the row shows only when both arrived.
-  $("[data-stats]").hidden = true;
-  status.textContent = "";
+  const href = resultsHref(listing.listing.release);
+  for (const link of document.querySelectorAll("[data-results-link]")) link.href = href;
+  if (rewards.ok) renderReviewFigures(rewards.rewards, listing.listing);
+
+  const count = await withTimeout((signal) => fetchCount(window.fetch.bind(window), listing.listing.release, { signal }));
+  if (count.ok) renderRecord(listing.listing, count.count);
 }
 
 setUpCopy();

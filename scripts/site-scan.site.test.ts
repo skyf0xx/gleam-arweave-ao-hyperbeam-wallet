@@ -16,6 +16,7 @@ import {
   extensionIdFor,
   decodeAttestationFragment,
   describeOutcome,
+  fetchCount,
   fetchListing,
   fetchRewards,
   formatPoints,
@@ -242,6 +243,14 @@ describe("site scan lib: the points API", () => {
     expect(await fetchListing(vi.fn(async () => { throw new Error("offline"); }))).toMatchObject({ ok: false, status: 0 });
   });
 
+  it("reads a release's review count", async () => {
+    const count = { release: "1.4.0", total: 14, paidPlacesLeft: 86 };
+    const fetchImpl = reply(200, count);
+    expect(await fetchCount(fetchImpl, "1.4.0")).toEqual({ ok: true, count });
+    expect(fetchImpl.mock.calls[0]![0]).toBe("https://api.gleamwallet.app/attestations/count?release=1.4.0");
+    expect(await fetchCount(reply(200, { ...count, total: "14" }), "1.4.0")).toMatchObject({ ok: false });
+  });
+
   it("reads the scan reward and bounty pool", async () => {
     const rewards = { day: "2026-10-19", issuedAtomic: "1000000000000000", scanRewardAtomic: "1000000000000", tailScanRewardAtomic: "200000000000", bountyPoolAtomic: "0" };
     const fetchImpl = reply(200, rewards);
@@ -279,7 +288,7 @@ describe("site scan lib: the points API", () => {
   it("summarises coverage", () => {
     expect(coverageSummary(listing.coverage)).toEqual({
       share: 41 / 64,
-      text: "41 of 64 security functions examined by at least one scan",
+      text: "41 of 64 security functions examined by at least one review",
       unexamined: [{ file: "a.ts", symbol: "f" }],
     });
     expect(coverageSummary({ examined: 3, total: 4, unexamined: null })!.unexamined).toBeNull();
@@ -290,10 +299,10 @@ describe("site scan lib: the points API", () => {
 
 describe("site scan lib: small helpers", () => {
   it("links a release's results, optionally at one scan", () => {
-    expect(resultsHref("1.4.0")).toBe("scan-results.html?v=1.4.0");
-    expect(resultsHref("1.4.0", "ab".repeat(32))).toBe(`scan-results.html?v=1.4.0#${"ab".repeat(32)}`);
-    expect(resultsHref("1.4.0\"><x", "nope")).toBe("scan-results.html");
-    expect(resultsHref(null)).toBe("scan-results.html");
+    expect(resultsHref("1.4.0")).toBe("review-results.html?v=1.4.0");
+    expect(resultsHref("1.4.0", "ab".repeat(32))).toBe(`review-results.html?v=1.4.0#${"ab".repeat(32)}`);
+    expect(resultsHref("1.4.0\"><x", "nope")).toBe("review-results.html");
+    expect(resultsHref(null)).toBe("review-results.html");
   });
 
   it("reads the release and entry id from the URL", () => {

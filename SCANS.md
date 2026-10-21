@@ -62,7 +62,7 @@ gets the points.
   never says what was found.
 - `report` describes coverage, not vulnerabilities. Details of a
   medium-or-above issue go only in the advisory.
-- `model` is a self-reported label. It's shown on `scan-results.html` and has no
+- `model` is a self-reported label. It's shown on `review-results.html` and has no
   effect on points, so there is nothing to gain by faking it.
 
 **Signing.** `attest.html` passes the attestation to the extension
@@ -128,7 +128,7 @@ the same code. The agent sees a failure before the user is asked to
 sign.
 
 **Human check.** Every `report` and every answer is public on
-`scan-results.html`, so an empty or generic report stands out. A maintainer
+`review-results.html`, so an empty or generic report stands out. A maintainer
 voids it with `scan-void`, which removes its points and frees its paid
 place.
 
@@ -149,7 +149,7 @@ clean scans worth reporting after the first 20 without letting total
 spend grow with the number of scans. After 100, scans are still
 recorded and shown but earn nothing. A scan that earns no points, such as one made before the
 first daily snapshot, doesn't use up a paid place. `scan.html`,
-`scan-results.html` and the extension's Points screen show how many paid
+`review-results.html` and the extension's Points screen show how many paid
 places are left. `pass` and `scanned` earn the same, and so
 does every model.
 
@@ -270,32 +270,44 @@ Under Version and Commit in Settings:
 Community scans        7 scans  →
 ```
 
-The row opens `scan-results.html?v=<version>`. It shows a count only,
+The row opens `review-results.html?v=<version>`. It shows a count only,
 never a "secure" or "verified" badge. Text from the API renders as plain
 text on both site pages.
 
-`scan.html` is the page for people deciding whether to run a scan, in
-the order they need it: the line to paste, then live figures (paid
-places left, what the next scan earns now, the bounty pool's balance, from
-`GET /scan/rewards` and the release listing), what they need first, the
-three steps, what each reward pays, where a scan is most useful (models
-not yet used, functions no one has examined), and common questions.
+`scan.html` is the security reviews page. It reads top to bottom as an
+introduction for someone new to reviews:
+
+1. **What it is and the two ways to help:** review a release, or report
+   a vulnerability. The rewards come last, in one line.
+2. **The record** for the current release: the version, how many
+   reviews, functions examined and models used (the release listing
+   and `GET /attestations/count`). Every figure can be checked on
+   `review-results.html`. The row is hidden until all of them arrive.
+3. **Review a release:** the line to paste, the four steps, what you
+   need, and the review rewards with paid places left and what the next
+   review earns (`GET /scan/rewards`).
+4. **Reporting vulnerabilities:** private reporting on GitHub, the
+   bounty pool's balance, and the bounty rules, with severity set by
+   the criteria in `SECURITY.md`.
+5. **A disclaimer** that community reviews don't replace a professional
+   audit, then common questions.
+
 Without the live figures it still shows the rules.
 
-`scan-results.html` is the public record, for the release in `?v=` or
+`review-results.html` is the public record, for the release in `?v=` or
 the latest. A `#<attestation id>` opens that entry. It shows:
 
 - **Coverage.** For example, "41 of 64 security functions examined by
-  at least one scan", with the functions no one has examined yet
+  at least one review", with the functions no one has examined yet
   listed. The figure comes from the challenge answers, which the server
   has already checked against the code, so a made-up model label can't
   raise it.
-- **Attestations.** Each with its model label, result, date, report
-  and challenge answers.
+- **Attestations.** Each with its model label, result, date and
+  report.
 - **Models not yet used.** For example, "Not yet used on v1.4: Gemini
   3, DeepSeek V4, Qwen 3". These are names from a short list in
   `apps/site` that aren't among the release's labels. Next to it: *A
-  different model tends to find different bugs. Accepted findings pay
-  from the bounty pool.* Trying a new model earns no extra scan
+  different model tends to find different bugs. Confirmed
+  vulnerabilities are awarded a share of the bounty pool.* Trying a new model earns no extra scan
   points. The payoff is the better chance of a bounty.
 - **A way back to `scan.html`** to run a scan.

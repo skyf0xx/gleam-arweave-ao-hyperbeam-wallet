@@ -27,6 +27,27 @@ If the report comes from a [community scan](SCANS.md), include its
 attestation id as a line of its own, `Attestation id: <64 hex characters>`,
 so the finding is credited to the wallet that signed the scan.
 
+## Severity
+
+A maintainer sets the severity of each confirmed report by what was
+shown under realistic conditions, not the worst case imaginable.
+
+- **Critical**: a malicious website or network attacker, with nothing
+  from the user beyond ordinary use, gets the key or a signature or
+  transfer the user never approved, on default settings.
+- **High**: a named control is fully defeated with real consequences.
+  For example: the approval preview shows a different transaction from
+  the one signed; a signature needs only one plausible click on a
+  misleading prompt; the key reaches a page, a log or
+  `chrome.storage.local`; the wallet stays unlocked after auto-lock.
+- **Medium**: a real boundary violation with a limited blast radius or
+  uncommon preconditions. For example: a page learns the address without
+  a connect approval; the preview hides a material field only for an
+  unusual transaction shape.
+- **Low**: disclosure of non-secret internals, an effect that takes
+  sustained effort for little gain, or a docs mismatch.
+- **Informational**: true, but with minimal impact on its own.
+
 ## Scope
 
 In scope: the extension itself (`apps/extension`), the core signing/vault

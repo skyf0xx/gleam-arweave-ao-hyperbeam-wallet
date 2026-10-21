@@ -1,5 +1,5 @@
 /* global atob, TextDecoder */
-// Logic shared by scan.html, scan-results.html and attest.html, kept free of the DOM so Vitest can
+// Logic shared by scan.html, review-results.html and attest.html, kept free of the DOM so Vitest can
 // run it (scripts/site-scan.site.test.ts). Everything that comes from the
 // network or the link is data: callers render it with textContent only.
 
@@ -192,7 +192,7 @@ export async function checkGleam(runtime) {
 
 // What each state shows. `action` is the one next step the page offers:
 // "retry" shows the Sign button again, "store" the install link, "agent" a
-// way back to the instructions for a new scan, "view" the entry on scan-results.html,
+// way back to the instructions for a new scan, "view" the entry on review-results.html,
 // "wallet" nothing to click (the sentence says where to go in Gleam).
 const FALLBACK = {
   success: "Your attestation is recorded.",
@@ -290,7 +290,7 @@ export function formatPoints(atomic) {
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
-// --- scan.html and scan-results.html: the points API -----------------------
+// --- scan.html and review-results.html: the points API -----------------------
 
 /** GETs `path` from the points API. Settles with `{ ok: true, body }` or `{ ok: false, status, error }`; it never rejects. */
 async function getJson(fetchImpl, path, signal, isValid) {
@@ -376,9 +376,29 @@ export function bountyTiers(poolAtomic) {
   }));
 }
 
+function isCount(body) {
+  return (
+    body !== null &&
+    typeof body === "object" &&
+    typeof body.release === "string" &&
+    Number.isInteger(body.total) &&
+    Number.isInteger(body.paidPlacesLeft)
+  );
+}
+
+/**
+ * Reads `GET /attestations/count`: how many reviews `release` has. Settles with
+ * `{ ok: true, count }` or `{ ok: false, … }`.
+ */
+export async function fetchCount(fetchImpl, release, { signal } = {}) {
+  const params = new URLSearchParams({ release });
+  const result = await getJson(fetchImpl, `/attestations/count?${params}`, signal, isCount);
+  return result.ok ? { ok: true, count: result.body } : result;
+}
+
 /** The results page for a release, optionally opened at one attestation. */
 export function resultsHref(release, attestationId) {
-  const base = release && RELEASE_PATTERN.test(release) ? `scan-results.html?v=${release}` : "scan-results.html";
+  const base = release && RELEASE_PATTERN.test(release) ? `review-results.html?v=${release}` : "review-results.html";
   return attestationId && ID_PATTERN.test(attestationId) ? `${base}#${attestationId}` : base;
 }
 
@@ -392,13 +412,13 @@ function isListing(body) {
   );
 }
 
-/** "41 of 64 security functions examined by at least one scan", or null before the server has a figure. */
+/** "41 of 64 security functions examined by at least one review", or null before the server has a figure. */
 export function coverageSummary(coverage) {
   if (!coverage || !Number.isInteger(coverage.examined) || !Number.isInteger(coverage.total) || coverage.total <= 0) return null;
   const share = Math.min(1, Math.max(0, coverage.examined / coverage.total));
   return {
     share,
-    text: `${coverage.examined} of ${coverage.total} security functions examined by at least one scan`,
+    text: `${coverage.examined} of ${coverage.total} security functions examined by at least one review`,
     unexamined: Array.isArray(coverage.unexamined) ? coverage.unexamined : null,
   };
 }

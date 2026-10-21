@@ -1,5 +1,6 @@
-/* scan.html, scan-results.html and attest.html. Quiet white pages: the beam
-   appears once, on the prompt card, and colour otherwise only marks a state. */
+/* scan.html, review-results.html and attest.html. Quiet white pages: the beam
+   appears once, on the prompt card, and colour otherwise only marks a state.
+   Structure comes from hairlines and type, not cards. */
 
 .sc { max-width: 760px; padding-top: 6vh; padding-bottom: 14vh; }
 .sc-narrow { max-width: 620px; }
@@ -35,7 +36,7 @@
 
 .copybox {
   position: relative;
-  margin: 36px 0 0;
+  margin: 28px 0 0;
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -115,18 +116,67 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.stats-pending { font-size: 1rem !important; }
-.stats-pending .stats-unit { display: none; }
 .stats-of, .stats-unit { font-size: 0.875rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
 .sc-stats-note { margin: 12px 0 0; }
 .sc-stats-note:empty { display: none; }
 .sc-load { margin-top: 32px; }
+
+/* Hero: a plain title, the two paths as an index, then the record. */
+
+.sc-title { font-size: clamp(1.75rem, 3vw, 2.5rem); }
+
+.sc-paths-label { margin: 32px 0 10px; font-weight: 500; }
+.sc-paths { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.sc-paths li { border-top: 1px solid var(--fg); }
+.sc-paths a { display: grid; gap: 4px; padding: 14px 24px 14px 0; position: relative; color: var(--fg); text-decoration: none; }
+.sc-paths a::after { content: "↓"; position: absolute; top: 14px; right: 0; color: var(--muted); transition: transform .2s var(--ease-out), color .2s ease; }
+.sc-paths a:hover::after, .sc-paths a:focus-visible::after { color: var(--fg); transform: translateY(2px); }
+.sc-paths a:hover .sc-path-title { text-decoration: underline; text-underline-offset: 3px; }
+.sc-path-title { font-weight: 600; }
+.sc-path-text { font-size: 0.9375rem; color: var(--muted); }
+.sc-reward-line { margin: 16px 0 0; max-width: 40em; }
+.sc-reward-line strong { color: var(--fg); font-weight: 500; }
+
+/* The record: what anyone can check on the results page. Hairlines, modest figures. */
+
+.record { margin: 40px 0 0; }
+.record-figures { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.record-figures > div { padding: 14px 16px 14px 0; min-width: 0; }
+.record-figures > div + div { padding-left: 16px; border-left: 1px solid var(--line); }
+.record-figures dt { font-size: 0.8125rem; color: var(--muted); }
+.record-figures dd { margin: 2px 0 0; font-size: 1.125rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.record-link { margin: 10px 0 0; font-size: 0.875rem; }
+.record-link a { color: var(--fg); text-underline-offset: 3px; }
+
+/* Inline figures beside the rules they belong to. */
+
+.figures { display: flex; flex-wrap: wrap; gap: 8px 40px; margin: 0 0 16px; }
+.figures dt { font-size: 0.8125rem; color: var(--muted); }
+.figures dd { margin: 2px 0 0; font-size: 1.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.figures-unit { font-size: 0.875rem; font-weight: 500; color: var(--muted); }
+.figures-pending { font-size: 0.9375rem !important; font-weight: 500 !important; }
+.figures-pending .figures-unit { display: none; }
+
+.sc-report-action { margin: 0 0 16px; }
+.sc-report-action .button { height: 44px; font-size: 0.9375rem; }
+
+/* The disclaimer: set apart, quieter than a section. */
+
+.sc-disclaimer { margin-top: clamp(48px, 8vh, 80px); padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius); }
+.sc-disclaimer h2 { margin: 0 0 8px; font-size: 0.9375rem; line-height: 1.4; font-weight: 600; }
+.sc-disclaimer p { margin: 0 0 8px; max-width: 42em; font-size: 0.9375rem; color: var(--muted); }
+.sc-disclaimer p:last-child { margin-bottom: 0; }
 
 /* Sections */
 
 .sc-section { margin-top: clamp(48px, 8vh, 80px); padding-top: 28px; border-top: 1px solid var(--line); }
 .sc-section h2, .sc-cta h2 { margin: 0 0 20px; font-size: 1.5rem; line-height: 1.25; letter-spacing: -0.02em; font-weight: 600; }
 .sc-section > .small { margin: 16px 0 0; max-width: 42em; }
+.sc-section { scroll-margin-top: 80px; }
+.sc-section h3 { margin: 40px 0 14px; font-size: 1.0625rem; line-height: 1.3; letter-spacing: -0.01em; font-weight: 600; }
+.sc-intro { margin: 0 0 10px; max-width: 38em; }
+.sc-body { margin: 0 0 16px; max-width: 42em; color: var(--muted); }
+.sc-body a { color: var(--fg); }
 
 .sc-prose { margin: 0 0 16px; padding-left: 1.25em; max-width: 42em; color: var(--muted); }
 .sc-prose li { margin: 0 0 10px; }
@@ -150,55 +200,14 @@
 .sc-steps li::before { content: counter(step); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
 .sc-steps p { margin: 0; }
 
-/* Rewards and the bounty pool, side by side */
-
-.earn-cards { margin-top: clamp(48px, 8vh, 80px); display: grid; gap: 12px; }
-.earn-card { padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
-.earn-card summary { list-style: none; cursor: pointer; padding: 4px 28px 4px 0; position: relative; display: flex; align-items: center; gap: 12px; }
-.earn-card summary::-webkit-details-marker { display: none; }
-.earn-card h2 {
-  margin: 0 auto 0 0;
-  font-size: 1.25rem;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  font-weight: 600;
-}
-.earn-amount {
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #F0F0F0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.earn-card summary::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-top: -6px;
-  border-right: 1.5px solid var(--muted);
-  border-bottom: 1.5px solid var(--muted);
-  transform: rotate(45deg);
-  transition: transform .2s ease;
-}
-.earn-card[open] summary::after { transform: rotate(-135deg); margin-top: -4px; }
-.earn-card .sc-prose { margin: 16px 0 0; }
-.earn-card .small { margin: 12px 0 0; }
-
-.tiers { width: 100%; margin: 8px 0 10px; border-collapse: collapse; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.tiers { width: 100%; max-width: 420px; margin: 8px 0 10px; border-collapse: collapse; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 .tiers th, .tiers td { padding: 6px 12px 6px 0; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
 .tiers tr:last-child > * { border-bottom: 1px solid var(--line); }
 .tiers tr > :last-child { padding-right: 0; }
+.tiers thead th { font-size: 0.8125rem; font-weight: 500; color: var(--muted); border-top: 0; }
 .tiers tbody th { font-weight: 500; }
 .tiers .num { text-align: right; }
 .tiers-amount { color: var(--muted); }
-
-.sc-results-link { margin: 12px 0 0; }
-.sc-results-link a { color: var(--fg); }
 
 /* Questions */
 
@@ -313,12 +322,18 @@
 
 @media (max-width: 640px) {
   .stats { grid-template-columns: 1fr; }
+  .sc-paths { grid-template-columns: 1fr; }
+  .record-figures { grid-template-columns: 1fr 1fr; }
+  .record-figures > div + div { padding-left: 0; border-left: 0; }
+  .record-figures > div:nth-child(even) { padding-left: 16px; border-left: 1px solid var(--line); }
+  .record-figures > div:nth-child(n + 3) { border-top: 1px solid var(--line); }
   .stats > div + div { border-left: 0; border-top: 1px solid var(--line); }
   .sc-steps li { grid-template-columns: 28px 1fr; }
 }
 
 @media (max-width: 520px) {
   .copybox { padding: 20px 16px 16px; }
+  .sc-disclaimer { padding: 16px; }
   .copybox-actions .button { width: 100%; }
   .facts > div { grid-template-columns: 1fr; gap: 2px; }
   .sign .button, .result .button { width: 100%; justify-content: center; }

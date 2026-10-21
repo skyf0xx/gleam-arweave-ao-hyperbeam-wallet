@@ -91,21 +91,7 @@ Rate by what you showed under realistic conditions, not the worst case
 you can imagine. The severity can't be higher than the harm you
 demonstrated.
 
-- **Critical**: a malicious website or network attacker, with nothing
-  from the user beyond ordinary use, gets the key or a signature or
-  transfer the user never approved, on default settings.
-- **High**: a named control is fully defeated with real consequences.
-  For example: the approval preview shows a different transaction from
-  the one signed; a signature needs only one plausible click on a
-  misleading prompt; the key reaches a page, a log or
-  `chrome.storage.local`; the wallet stays unlocked after auto-lock.
-- **Medium**: a real boundary violation with a limited blast radius or
-  uncommon preconditions. For example: a page learns the address without
-  a connect approval; the preview hides a material field only for an
-  unusual transaction shape.
-- **Low**: disclosure of non-secret internals, an effect that takes
-  sustained effort for little gain, or a docs mismatch.
-- **Informational**: true, but with minimal impact on its own.
+Use the levels in [SECURITY.md § Severity](../../SECURITY.md#severity).
 
 To tell high from medium, ask: does it fully defeat a control for an
 action with real consequences, or only weaken it? If you can't state
