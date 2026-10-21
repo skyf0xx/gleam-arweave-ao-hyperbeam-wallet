@@ -20,9 +20,9 @@ export function AboutBuild({ runtime, version }: AboutBuildProps) {
         </a>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <span>Community audits</span>
+        <span>Security reviews</span>
         <a href={sitePageUrl("review-results", version)} target="_blank" rel="noreferrer" className="text-foreground underline">
-          {typeof count === "number" ? `${count} ${count === 1 ? "audit" : "audits"} →` : "View audits →"}
+          {typeof count === "number" ? `${count} ${count === 1 ? "review" : "reviews"} →` : "View reviews →"}
         </a>
       </div>
     </div>

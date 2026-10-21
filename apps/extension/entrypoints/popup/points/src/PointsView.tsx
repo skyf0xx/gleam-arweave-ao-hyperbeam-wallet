@@ -292,7 +292,7 @@ function JoinedView({
       ) : (
         <section aria-labelledby="ways-to-earn" className="flex flex-col gap-3">
           <h2 id="ways-to-earn" className="text-h3 font-semibold text-foreground">
-            Ways to earn Gleam
+            Ways to earn
           </h2>
           <div className="flex flex-col gap-6">
             <EarnItem
@@ -337,7 +337,7 @@ function JoinedView({
                 </Button>
               )}
             </EarnItem>
-            <AuditItem runtime={runtime} />
+            <ReviewItem runtime={runtime} />
           </div>
         </section>
       )}
@@ -379,7 +379,11 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
   );
 }
 
-/** One way to earn: its title, what it pays, then its action. */
+/**
+ * One way to earn: a hairline, its title with an aside, what it pays, then
+ * its action. The hairline sits between ways rather than under each title,
+ * so each way reads as one block.
+ */
 function EarnItem({
   label,
   title,
@@ -396,8 +400,8 @@ function EarnItem({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={label} className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
+    <section aria-label={label} className="flex flex-col gap-3 border-t border-line pt-4">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="text-body font-semibold text-foreground">{title}</h3>
         {aside}
       </div>
@@ -413,12 +417,12 @@ function EarnItem({
 }
 
 /**
- * Scans need a registered wallet, so only members see this. The button
- * stays once the paid places are gone: an unpaid scan is still published
- * and a confirmed finding still earns from the bounty pool. Outlined, so
- * Invite on X stays the screen's one primary.
+ * Reviews need a registered wallet, so only members see this. The button
+ * stays once the paid places are gone: an unpaid review is still published
+ * and a confirmed vulnerability still earns from the bounty pool. A small
+ * outlined button, so Invite on X stays the screen's one primary.
  */
-function AuditItem({ runtime }: { runtime: RuntimePort }) {
+function ReviewItem({ runtime }: { runtime: RuntimePort }) {
   const stats = useScanStats(runtime);
   const placesLeft = stats.data?.paidPlacesLeft ?? null;
   const rewardAtomic = stats.data?.rewardAtomic ?? null;
@@ -426,26 +430,31 @@ function AuditItem({ runtime }: { runtime: RuntimePort }) {
 
   return (
     <EarnItem
-      label="Audit"
-      title="Audit Gleam"
-      reward={paying && rewardAtomic ? `+${formatPoints(rewardAtomic)} points per audit` : null}
+      label="Review"
+      title="Review a release"
+      aside={
+        paying && rewardAtomic ? (
+          <span className="text-label tabular-nums text-muted">+{formatPoints(rewardAtomic)} per review</span>
+        ) : null
+      }
+      reward={null}
     >
-      <p className="text-label text-muted">Have your AI agent audit this release.</p>
-      <div className="flex flex-col items-center gap-3">
-        <Button asChild variant="secondary">
-          <a href={scanUrl()} target="_blank" rel="noreferrer">
-            Start an audit
-            <span aria-hidden="true">↗</span>
-          </a>
-        </Button>
+      <div className="flex flex-col gap-1">
+        <p className="text-label text-muted">Have your coding agent review this release and sign the result.</p>
         {placesLeft === null ? null : (
-          <p className="text-center text-caption text-muted">
+          <p className="text-caption text-muted">
             {paying
               ? `${placesLeft} of ${PAID_SCANS_PER_RELEASE} paid places left`
-              : "Paid places for this release are taken. Confirmed findings still earn from the bounty pool."}
+              : "Paid places for this release are taken. Confirmed vulnerabilities still earn a share of the bounty pool."}
           </p>
         )}
       </div>
+      <Button asChild variant="secondary" size="sm" className="self-start">
+        <a href={`${scanUrl()}#review`} target="_blank" rel="noreferrer">
+          Start a review
+          <span aria-hidden="true">↗</span>
+        </a>
+      </Button>
     </EarnItem>
   );
 }
