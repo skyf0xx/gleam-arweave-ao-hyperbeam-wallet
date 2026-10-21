@@ -199,6 +199,8 @@ export class LedgerArweaveClient {
     if (tx.format !== 2) {
       throw new LedgerError("unsupported-payload", "Ledger only signs format-2 Arweave transactions.");
     }
+    // The app renders a Target screen before signing and fails with "Unexpected buffer end" when there is none.
+    if (!tx.target) throw new LedgerError("unsupported-payload", LEDGER_TARGET_REQUIRED_MESSAGE);
     if (tx.tags.length > MAX_TAGS) {
       throw new LedgerError("too-many-tags", `Ledger signs at most ${MAX_TAGS} tags.`);
     }
@@ -314,6 +316,9 @@ function checkPermawebTags(tags: DataItemTag[]): void {
 
 export const LEDGER_PERMAWEB_REQUIRED_MESSAGE =
   "Ledger only supports sending AR for now. To send AO tokens or sign data items, use a Keystone.";
+
+export const LEDGER_TARGET_REQUIRED_MESSAGE =
+  "The Ledger Arweave app only signs transactions sent to an address. Use a Keystone or a keyfile wallet for this one.";
 
 export const LEDGER_MESSAGE_UNSUPPORTED = "The Ledger Arweave app can't sign messages. Use a Keystone or a keyfile wallet.";
 

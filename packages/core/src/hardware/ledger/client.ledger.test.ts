@@ -7,7 +7,8 @@ import { buildUnsignedTransaction, type ArweaveTransactionJson } from "../../arw
 import type { JWKInterface } from "../../models/wallet";
 import { base64UrlToBytes, bytesToBase64Url } from "../../vault/base64";
 import { verifyDeviceSignature } from "../../vault/signing";
-import { LedgerArweaveClient, LEDGER_NANO_S_TARGET_ID, ledgerMaxPayloadBytes, parseLedgerAppInfo } from "./client";
+import { buildOwnershipTransaction } from "../../points/ownership";
+import { LedgerArweaveClient, LEDGER_NANO_S_TARGET_ID, LEDGER_TARGET_REQUIRED_MESSAGE, ledgerMaxPayloadBytes, parseLedgerAppInfo } from "./client";
 import { LedgerError, statusWordError } from "./errors";
 import { encodeTransactionForLedger } from "./serialize";
 import type { LedgerTransport } from "./transport";
@@ -166,6 +167,8 @@ class SimulatedLedger implements LedgerTransport {
     }));
     const dataSize = ascii(element());
     const dataRoot = element();
+    // parser_validate renders every screen before signing; parser_printTarget fails on an empty target.
+    if (target.length === 0) throw new Error("Unexpected buffer end");
     const transaction = clientForGateway(GATEWAY).transactions.fromRaw({
       format: 2,
       owner: bytesToBase64Url(owner),
@@ -282,7 +285,7 @@ describe("LedgerArweaveClient: signTransaction", () => {
     [
       "data with tags",
       () =>
-        unsignedTransaction({ data: utf8("hello from a dApp"), target: "", quantity: "0", reward: "77", last_tx: LAST_TX }, [
+        unsignedTransaction({ data: utf8("hello from a dApp"), target: TARGET, quantity: "0", reward: "77", last_tx: LAST_TX }, [
           { name: "Content-Type", value: "text/plain" },
           { name: "App-Name", value: "Gleam ✓" },
         ]),
@@ -333,7 +336,7 @@ describe("LedgerArweaveClient: signTransaction", () => {
   });
 
   it("replays a recorded session to the same signature", async () => {
-    const tx = await unsignedTransaction({ data: utf8("recorded"), target: "", quantity: "0", reward: "5", last_tx: LAST_TX });
+    const tx = await unsignedTransaction({ data: utf8("recorded"), target: TARGET, quantity: "0", reward: "5", last_tx: LAST_TX });
     const device = new SimulatedLedger();
     const recorded = await new LedgerArweaveClient(device).signTransaction(tx);
 
@@ -342,6 +345,22 @@ describe("LedgerArweaveClient: signTransaction", () => {
 
     expect(hex(replayed)).toBe(hex(recorded));
     expect(replay.remaining()).toBe(0);
+  });
+
+  it("refuses a transaction with no target before talking to the device", async () => {
+    const tx = await unsignedTransaction({ data: utf8("data only"), target: "", quantity: "0", reward: "5", last_tx: LAST_TX });
+    const device = new SimulatedLedger();
+
+    const error = await expectLedgerError(new LedgerArweaveClient(device).signTransaction(tx), "unsupported-payload");
+    expect(error.message).toBe(LEDGER_TARGET_REQUIRED_MESSAGE);
+    expect(device.log).toEqual([]);
+  });
+
+  it("signs the Gleam Points ownership transaction", async () => {
+    const tx = await buildOwnershipTransaction(jwk.n, "gleam-points:leave:v1:someAddress:1700000000");
+    const signature = await new LedgerArweaveClient(new SimulatedLedger()).signTransaction(tx);
+
+    expect(await verifyDeviceSignature({ kind: "transaction", transaction: tx }, signature, jwk.n)).toBe(true);
   });
 
   it("fails on a deep-hash mismatch without fetching the signature", async () => {
