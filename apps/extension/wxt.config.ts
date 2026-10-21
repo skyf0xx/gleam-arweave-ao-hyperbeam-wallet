@@ -8,6 +8,14 @@ import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/c
 import { extensionPagesCsp } from './src/csp';
 import { DEV_SITE_HOSTS, SITE_ORIGIN } from './src/site-pages';
 
+// The Chrome Web Store item's public key, from its CRX header. A
+// development build carries it so an unpacked copy gets the store id
+// (einabcphdmlicabnjllaaallnebfkmki), which is the id gleamwallet.app's
+// pages message. The store refuses an upload with a `key`, so a
+// production build never has one.
+const STORE_PUBLIC_KEY =
+  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtDZnKbW6qjEJnZtf+Os2Vw2RDocHxgB+B7YYdVskVjjGfrKi9Aso6TgmXr3KCwZI8A5lLuBmR92FvIu/CGBP3yjYhskjNPesDubM7kPwFS+ycQZKxiKIe6X5eE4jVmx5K+ol/Q/17NwQiwd54hwRYfeOGC8hUKj39BvBCJttW7bjUISy3vvm1rgbfwUJgPvXByLfURhQSzxVTlVy7iiqBEt7vRSJB4Q0jSGpEMwxYHiP3R5vY7a9D38QSX5IZHlsCP1lFNW3u3Vz7KPIbuBOBy60phPJeIxJFuU92u5GlLKPddJuRRRxoaQ4imrErrdurpxKakMN8OMM/LvWf6AGiwIDAQAB';
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -15,6 +23,7 @@ export default defineConfig({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
     name: 'Gleam',
+    ...(mode === 'development' ? { key: STORE_PUBLIC_KEY } : {}),
     // runtime.getContexts, which the keyring adapter uses to find its
     // offscreen document, arrived in Chrome 116.
     minimum_chrome_version: '116',
