@@ -1,0 +1,42 @@
+/* security.html: how Gleam keeps funds safe. Uses the program's ink hero and
+   angled beam cut, then one quiet numbered list. No motion on this page. */
+
+.sec-hero { position: relative; overflow: hidden; isolation: isolate; }
+.sec-hero-in { padding-top: clamp(40px, 9vh, 112px); padding-bottom: clamp(48px, 9vh, 104px); }
+.sec-hero .p-stack.beam { width: 120px; height: 10px; flex-direction: column; margin: 0 0 28px; }
+.sec-hero .points-kicker { color: var(--on-ink-muted); }
+.sec-title { font-size: clamp(2.75rem, 9vw, 6rem); line-height: .95; letter-spacing: -0.055em; max-width: 10em; }
+.sec-hero .line { max-width: 34em; margin-top: 24px; }
+
+.sec-list-band { padding: clamp(40px, 8vh, 96px) 0 clamp(72px, 12vh, 140px); background: var(--paper); color: var(--fg); }
+
+.sec-steps { position: relative; margin-top: 0; }
+/* The beam runs down behind the numbers, fully lit: the measures stack, they don't progress */
+.sec-steps::before { content: ""; position: absolute; left: 25px; top: 40px; bottom: 40px; width: 10px; background: var(--beam-run); }
+.sec-steps > li { padding: clamp(24px, 4.5vh, 44px) 0 clamp(24px, 4.5vh, 44px) 92px; border-top: 0; }
+.sec-steps > li::before {
+  top: clamp(20px, 4vh, 40px);
+  z-index: 1;
+  width: 60px;
+  height: 60px;
+  background: var(--fg);
+  font-size: 1.375rem;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+}
+.sec-steps h2 { font-size: clamp(1.375rem, 3vw, 2.25rem); letter-spacing: -0.035em; line-height: 1.05; margin: 0 0 10px; }
+.sec-steps p { max-width: 38em; font-size: clamp(1rem, 1.4vw, 1.1875rem); }
+.sec-steps a { color: var(--fg); }
+.sec-steps .sec-tools { list-style: disc; max-width: 40em; margin: 12px 0 0; padding-left: 1.1em; color: var(--muted); font-size: clamp(0.9375rem, 1.2vw, 1.0625rem); }
+.sec-steps .sec-tools li { padding: 0; border: 0; counter-increment: none; }
+.sec-steps .sec-tools li::before { content: none; }
+.sec-steps .sec-tools li + li { margin-top: 6px; }
+
+.sec-report .cta { margin-top: 20px; }
+.sec-steps .sec-report .button { color: #fff; }
+
+@media (max-width: 560px) {
+  .sec-steps::before { left: 19px; width: 8px; }
+  .sec-steps > li { padding-left: 68px; }
+  .sec-steps > li::before { width: 46px; height: 46px; font-size: 1.125rem; }
+}

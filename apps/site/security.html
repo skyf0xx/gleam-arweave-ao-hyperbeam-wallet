@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>How Gleam handles security</title>
+  <meta name="description"
+    content="Here's what Gleam does to keep your funds safe, from audits before every release to hardware wallet support.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Gleam">
+  <meta property="og:title" content="How Gleam handles security">
+  <meta property="og:description"
+    content="Here's what Gleam does to keep your funds safe, from audits before every release to hardware wallet support.">
+  <meta property="og:url" content="https://gleamwallet.app/security.html">
+  <meta property="og:image" content="https://gleamwallet.app/img/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@gleam_wallet">
+  <meta name="twitter:title" content="How Gleam handles security">
+  <meta name="twitter:description"
+    content="Here's what Gleam does to keep your funds safe, from audits before every release to hardware wallet support.">
+  <meta name="twitter:image" content="https://gleamwallet.app/img/og.jpg">
+  <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="program.css">
+  <link rel="stylesheet" href="security.css">
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="e95c25a6-54f3-4cd2-a063-b7d401c606d5"
+    data-domains="gleamwallet.app"></script>
+</head>
+
+<body class="program">
+  <header class="site-header">
+    <div class="wrap">
+      <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="ink sec-hero">
+      <div class="wrap sec-hero-in">
+        <div class="beam p-stack" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <p class="points-kicker">Security</p>
+        <h1 class="display sec-title">How Gleam handles security.</h1>
+        <p class="line">We treat every line of code as something
+          worth protecting. Here are some of the layers that help protect Gleam.</p>
+      </div>
+    </section>
+
+    <div class="cut cut-angle" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polygon points="0,0 100,0 0,100" fill="#0A0A0A" />
+        <line x1="0" y1="92" x2="100" y2="-8" stroke="#FF1717" />
+        <line x1="0" y1="96" x2="100" y2="-4" stroke="#8B12FF" />
+        <line x1="0" y1="100" x2="100" y2="0" stroke="#73C9E8" />
+        <line x1="0" y1="104" x2="100" y2="4" stroke="#FFE45C" />
+        <line x1="0" y1="108" x2="100" y2="8" stroke="#28F02D" />
+      </svg>
+    </div>
+
+    <section class="sec-list-band">
+      <div class="wrap">
+        <ol class="steps sec-steps">
+          <li>
+            <h2>Our code is open</h2>
+            <p>You can read every line of Gleam's code <a
+                href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet" target="_blank" rel="noopener">on GitHub</a>.</p>
+          </li>
+          <li>
+            <h2>All code changes must pass multiple checks</h2>
+            <p>Every change must pass a pull request and our automated checks before it can be merged.</p>
+            <ul class="sec-tools">
+              <li><a href="https://github.com/gitleaks/gitleaks" target="_blank" rel="noopener">Gitleaks</a> checks for passwords and secret keys
+                accidentally committed to the code.</li>
+              <li><a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">OSV-Scanner</a> checks our dependencies against a
+                database of known vulnerabilities.</li>
+              <li><a href="https://github.com/actions/dependency-review-action" target="_blank" rel="noopener">GitHub Dependency Review</a> flags
+                new dependencies with known vulnerabilities.</li>
+              <li><a href="https://semgrep.dev" target="_blank" rel="noopener">Semgrep</a> scans our code for risky patterns.</li>
+              <li><a href="https://docs.zizmor.sh" target="_blank" rel="noopener">zizmor</a> checks our GitHub Actions workflows for security
+                issues.</li>
+              <li><a href="https://github.com/mozilla/web-ext" target="_blank" rel="noopener">Mozilla web-ext</a> checks the finished extension for
+                common problems.</li>
+              <li>Automated tests check that the wallet behaves as expected.
+                <a href="https://playwright.dev" target="_blank" rel="noopener">Playwright</a> also runs the wallet in a real browser.
+              </li>
+            </ul>
+          </li>
+          <li>
+            <h2>Every release gets a security review</h2>
+            <p>Before each release, an AI security review checks every change to the code that handles your keys, and
+              <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/tree/master/security/audits" target="_blank" rel="noopener">we
+                publish the results</a>. If a serious issue is still open, our release pipeline refuses to ship.
+            </p>
+          </li>
+          <li>
+            <h2>Releases you can verify</h2>
+            <p>Every release is built from a signed, approved version of our code.</p>
+            <ul class="sec-tools">
+              <li><strong>Restricted build environment.</strong> <a
+                  href="https://github.com/step-security/harden-runner" target="_blank" rel="noopener">StepSecurity</a>
+                limits which websites our build machine can connect to.</li>
+              <li><strong>Proof of origin.</strong> Each build gets a signed record showing where it came from.
+                Anyone can check this against our <a
+                  href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases" target="_blank" rel="noopener">published
+                  releases</a>.</li>
+              <li><strong>Secure update signing.</strong> We use a securely stored private key to sign Gleam
+                extension updates, helping the Chrome Web Store verify they come from us.</li>
+            </ul>
+          </li>
+          <li>
+            <h2>Anyone can review our code</h2>
+            <p>We invite the public to review each release and <a href="review-results.html">publish every
+                review</a>. Confirmed bugs earn a share of <a href="scan.html">our bounty pool</a>.</p>
+          </li>
+          <li>
+            <h2>Hardware wallet support</h2>
+            <p>Connect a <a href="https://www.ledger.com" target="_blank" rel="noopener">Ledger</a> or <a href="https://keyst.one" target="_blank" rel="noopener">Keystone</a> for
+              maximum security. Your private keys stay on your hardware.</p>
+          </li>
+          <li>
+            <h2>You see exactly what you sign</h2>
+            <p>Every request from an app opens its own approval window. Gleam explains the transaction in plain language
+              before you agree to anything.</p>
+          </li>
+          <li>
+            <h2>Your keys stay encrypted</h2>
+            <p>Your keys are locked with your password or passkey and are never stored in plain form. Gleam also locks
+              itself automatically when you step away.</p>
+          </li>
+          <li>
+            <h2>A pass-phrase for extra security</h2>
+            <p>You choose a security phrase during setup that appears before important actions. If a window asks
+              for your password or signature without it, it isn't Gleam.</p>
+          </li>
+          <li class="sec-report">
+            <h2>Private security reporting</h2>
+            <p>We provide a private channel for reporting security issues so they can be investigated and fixed before
+              they affect users.</p>
+            <div class="cta">
+              <a class="button"
+                href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md" target="_blank" rel="noopener">Report a
+                security issue</a>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span class="footer-mark">gleam</span>
+      <ul>
+        <li><a href="gleam.html">Gleam Points</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+        <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://x.com/gleam_wallet" target="_blank" rel="noopener">X</a></li>
+      </ul>
+      <span class="copy">© 2026 Gleam</span>
+    </div>
+  </footer>
+</body>
+
+</html>
