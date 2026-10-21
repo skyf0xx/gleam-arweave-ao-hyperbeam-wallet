@@ -53,7 +53,7 @@ Routes split into two groups by caller:
   `GET /prices/history?id=&range=`.
 - **Open CORS** — `/stats`, `/invite/check`, `/scan/challenge`,
   `/scan/rewards`, `/attestations*`. These are read by static pages (`invite.html`,
-  `scan.html`, `scan-results.html`) on other origins, or by the `pnpm scan` CLI with no
+  `scan.html`, `review-results.html`) on other origins, or by the `pnpm scan` CLI with no
   origin at all.
 
 Each route has its own `RateLimiter` (per-IP, some also per-device), and

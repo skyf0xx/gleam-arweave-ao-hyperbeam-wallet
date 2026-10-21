@@ -6,35 +6,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#F7F7F7">
-  <title>Gleam community scans</title>
+  <title>Gleam review results</title>
   <meta name="description"
-    content="Every community security scan of a Gleam release: what was examined, by which models, and each signed report.">
+    content="Every community security review of a Gleam release: what was examined, by which models, and each signed report.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var-latin.woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="scan.css">
-  <script type="module" src="scan-results.js"></script>
+  <script type="module" src="review-results.js"></script>
 </head>
 
 <body class="scan-page">
   <header class="site-header">
     <div class="wrap sc-header">
       <a class="wordmark" href="./"><img src="favicon.svg" alt="" width="22" height="22">gleam</a>
-      <a class="sc-header-link" href="scan.html">Scan Gleam</a>
+      <a class="sc-header-link" href="scan.html">Security reviews</a>
     </div>
   </header>
 
   <main class="wrap sc">
-    <h1 class="heading" data-release-title>Scan results</h1>
+    <h1 class="heading" data-release-title>Review results</h1>
 
-    <p class="small sc-load" role="status" aria-live="polite" data-load-status>Loading scans…</p>
+    <p class="small sc-load" role="status" aria-live="polite" data-load-status>Loading reviews…</p>
 
     <div data-release-body hidden>
       <dl class="stats">
         <div>
-          <dt>Paid scans left</dt>
+          <dt>Paid places left</dt>
           <dd><span data-paid-left>–</span><span class="stats-of"> of 100</span></dd>
         </div>
         <div>
@@ -46,7 +46,7 @@
           <dd data-models-used>–</dd>
         </div>
       </dl>
-      <p class="small sc-stats-note">The first 100 scans of each release earn GLEAM. The first 20 earn the most.</p>
+      <p class="small sc-stats-note">The first 100 signed reviews of each release are awarded GLEAM. The first 20 are awarded the most.</p>
 
       <section class="sc-section" aria-labelledby="coverage-h">
         <h2 id="coverage-h">Coverage</h2>
@@ -60,25 +60,25 @@
         <div class="sc-models">
           <p class="small" data-models-text></p>
           <ul class="chips" data-models-list hidden></ul>
-          <p class="small" data-models-note hidden>A different model tends to find different bugs. Accepted findings pay from the bounty pool.</p>
+          <p class="small" data-models-note hidden>A different model tends to find different bugs. Confirmed vulnerabilities are awarded a share of the bounty pool.</p>
         </div>
       </section>
 
       <section class="sc-section" aria-labelledby="atts-h">
-        <h2 id="atts-h">Signed scans</h2>
+        <h2 id="atts-h">Signed reviews</h2>
         <div class="sc-empty" data-attestations-empty hidden>
-          <p>No scans of this release yet. Yours could be the first.</p>
+          <p>No reviews of this release yet.</p>
         </div>
         <ol class="atts" data-attestations></ol>
-        <button class="button button-quiet" type="button" data-more hidden>Show older scans</button>
+        <button class="button button-quiet" type="button" data-more hidden>Show older reviews</button>
         <p class="small" data-more-error hidden></p>
       </section>
     </div>
 
     <aside class="sc-cta" aria-labelledby="cta-h">
-      <h2 id="cta-h">Add your scan</h2>
-      <p>Earn GLEAM by adding your scanned attestation to the list.</p>
-      <a class="button" href="scan.html">Scan Gleam <span class="btn-arrow" aria-hidden="true">→</span></a>
+      <h2 id="cta-h">Add your review</h2>
+      <p>Run a review of this release with your coding agent and sign the result.</p>
+      <a class="button" href="scan.html#review">Review a release <span class="btn-arrow" aria-hidden="true">→</span></a>
     </aside>
   </main>
 
@@ -87,7 +87,7 @@
       <span class="footer-mark">gleam</span>
       <ul>
         <li><a href="gleam.html">Gleam Points</a></li>
-        <li><a href="scan.html">Community scans</a></li>
+        <li><a href="scan.html">Security reviews</a></li>
         <li><a href="privacy.html">Privacy</a></li>
         <li><a href="terms.html">Terms</a></li>
         <li><a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet">GitHub</a></li>
