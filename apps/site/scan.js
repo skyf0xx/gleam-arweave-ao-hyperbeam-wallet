@@ -119,12 +119,18 @@ function renderReviewFigures(rewards, listing) {
     reward.textContent = gleam(nextScanReward(rewards, listing.paidPlacesLeft));
     reward.parentElement.classList.remove("figures-pending");
   }
-  $("[data-review-figures]").hidden = false;
+  reveal($("[data-review-figures]"));
+}
+
+function reveal(figures) {
+  figures.hidden = false;
+  figures.classList.add("sweep");
 }
 
 function renderPool(rewards) {
-  $("[data-stat-pool]").textContent = gleam(rewards.bountyPoolAtomic);
-  $("[data-pool-figures]").hidden = false;
+  const pool = gleam(rewards.bountyPoolAtomic);
+  document.querySelectorAll("[data-stat-pool]").forEach((node) => (node.textContent = pool));
+  document.querySelectorAll("[data-pool-figures]").forEach(reveal);
   renderTiers(rewards.bountyPoolAtomic);
 }
 

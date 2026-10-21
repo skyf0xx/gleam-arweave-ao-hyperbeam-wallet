@@ -27,50 +27,59 @@
   </header>
 
   <main class="wrap sc">
-    <h1 class="heading sc-title">Gleam security reviews</h1>
-    <p class="line">Gleam's source code is public. Anyone can run an independent security review of it with a coding
-      agent.</p>
+    <div class="sc-hero">
+      <h1 class="heading sc-title">Gleam security reviews</h1>
+      <p class="line">Gleam's source code is public. Anyone can run an independent security review of it with a coding
+        agent.</p>
 
-    <p class="sc-paths-label">There are two ways to help:</p>
-    <ol class="sc-paths">
-      <li>
-        <a href="#review">
-          <span class="sc-path-title">Review a release</span>
-          <span class="sc-path-text">Run a review and sign the result with your Gleam wallet.</span>
-        </a>
-      </li>
-      <li>
-        <a href="#report">
-          <span class="sc-path-title">Report a vulnerability</span>
-          <span class="sc-path-text">Report a security issue privately to the maintainers.</span>
-        </a>
-      </li>
-    </ol>
-    <p class="small sc-reward-line"><strong>Signed reviews earn GLEAM</strong>, and confirmed vulnerabilities earn a share of the bounty
-      pool.</p>
-
-    <section class="record" aria-labelledby="record-h" data-record hidden>
-      <h2 class="visually-hidden" id="record-h">Current release</h2>
-      <dl class="record-figures">
+      <dl class="figures sc-hero-figures" data-pool-figures hidden>
         <div>
-          <dt>Current release</dt>
-          <dd data-record-release>–</dd>
-        </div>
-        <div>
-          <dt>Reviews</dt>
-          <dd data-record-reviews>–</dd>
-        </div>
-        <div>
-          <dt>Functions examined</dt>
-          <dd data-record-coverage>–</dd>
-        </div>
-        <div>
-          <dt>Models used</dt>
-          <dd data-record-models>–</dd>
+          <dt>Bounty pool</dt>
+          <dd><span data-stat-pool>–</span> <span class="figures-unit">GLEAM</span></dd>
         </div>
       </dl>
-      <p class="record-link"><a href="review-results.html" data-results-link>View all reviews <span aria-hidden="true">→</span></a></p>
-    </section>
+
+      <h2 class="sc-paths-label">How to help</h2>
+      <ol class="sc-paths">
+        <li>
+          <a href="#review">
+            <span class="sc-path-title">Review a release</span>
+            <span class="sc-path-text">Run a review and sign the result with your Gleam wallet.</span>
+            <span class="sc-path-reward">Earns GLEAM</span>
+          </a>
+        </li>
+        <li>
+          <a href="#report">
+            <span class="sc-path-title">Found something? Report it</span>
+            <span class="sc-path-text">Report it privately to the maintainers.</span>
+            <span class="sc-path-reward">Earns a share of the bounty pool</span>
+          </a>
+        </li>
+      </ol>
+
+      <section class="record" aria-labelledby="record-h" data-record hidden>
+        <h2 class="visually-hidden" id="record-h">Current release</h2>
+        <dl class="record-figures">
+          <div>
+            <dt>Current release</dt>
+            <dd data-record-release>–</dd>
+          </div>
+          <div>
+            <dt>Reviews</dt>
+            <dd data-record-reviews>–</dd>
+          </div>
+          <div>
+            <dt>Functions examined</dt>
+            <dd data-record-coverage>–</dd>
+          </div>
+          <div>
+            <dt>Models used</dt>
+            <dd data-record-models>–</dd>
+          </div>
+        </dl>
+        <p class="record-link"><a href="review-results.html" data-results-link>View all reviews <span aria-hidden="true">→</span></a></p>
+      </section>
+    </div>
 
     <section class="sc-section" id="review" aria-labelledby="review-h">
       <h2 id="review-h">Review a release</h2>
@@ -130,7 +139,7 @@
     </section>
 
     <section class="sc-section" id="report" aria-labelledby="report-h">
-      <h2 id="report-h">Reporting vulnerabilities</h2>
+      <h2 id="report-h">Report a vulnerability</h2>
       <p class="sc-intro">Gleam's bounty pool grows daily. A maintainer checks each report, and confirmed
         vulnerabilities are awarded a share of the pool based on severity.</p>
 
