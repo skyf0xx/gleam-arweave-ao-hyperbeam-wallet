@@ -434,13 +434,13 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
       title="Review a release"
       aside={
         paying && rewardAtomic ? (
-          <span className="text-label tabular-nums text-muted">+{formatPoints(rewardAtomic)} per review</span>
+          <span className="text-label tabular-nums text-muted">+{formatPoints(rewardAtomic)} GLEAM per review</span>
         ) : null
       }
       reward={null}
     >
       <div className="flex flex-col gap-1">
-        <p className="text-label text-muted">Have your coding agent review this release and sign the result.</p>
+        <p className="text-label text-muted">Have your coding agent review this release to earn.</p>
         {placesLeft === null ? null : (
           <p className="text-caption text-muted">
             {paying

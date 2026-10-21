@@ -160,7 +160,7 @@ describe("PointsView", () => {
     expect(link.getAttribute("href")).toBe(`${SCAN_URL}#review`);
     expect(link.getAttribute("target")).toBe("_blank");
     expect(await review.findByText("93 of 100 paid places left")).toBeTruthy();
-    expect(review.getByText("+12.50 per review")).toBeTruthy();
+    expect(review.getByText("+12.50 GLEAM per review")).toBeTruthy();
   });
 
   it("keeps the review link once the paid places are taken", async () => {
