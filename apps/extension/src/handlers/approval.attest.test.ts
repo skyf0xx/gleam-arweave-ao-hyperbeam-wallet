@@ -255,7 +255,7 @@ describe("ApprovalHandler: scan attestations", () => {
 
     const view = (await handler.resolveApproval({ requestId, approved: true })) as ApprovalRequest;
     const device = view.device as DeviceSigningRequest;
-    expect(device.summaries).toEqual([{ kind: "transaction", recipient: null, quantity: "0", fee: "0", dataSize: "0" }]);
+    expect(device.summaries).toEqual([{ kind: "transaction", recipient: await addressFromOwner(deviceJwk.n), quantity: "0", fee: "0", dataSize: "0" }]);
     expect(submitter.attest).not.toHaveBeenCalled();
 
     const [payload] = device.payloads;

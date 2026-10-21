@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { signerFromJwk, generateJWK } from "../signer/keys";
 import { signTransactionWithSigner } from "../arweave/transaction";
 import { encodeTransactionForLedger } from "../hardware/ledger/serialize";
+import { addressFromOwner } from "../keys/address";
 import type { JWKInterface } from "../models/wallet";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { signMessage } from "../vault/message-signing";
@@ -20,7 +21,7 @@ describe("buildOwnershipTransaction", () => {
     const tx = await buildOwnershipTransaction(jwk.n, MESSAGE);
 
     expect(await buildOwnershipTransaction(jwk.n, MESSAGE)).toEqual(tx);
-    expect(tx).toMatchObject({ format: 2, owner: jwk.n, target: "", quantity: "0", reward: "0", data: "", data_size: "0" });
+    expect(tx).toMatchObject({ format: 2, owner: jwk.n, target: await addressFromOwner(jwk.n), quantity: "0", reward: "0", data: "", data_size: "0" });
     expect(new TextDecoder().decode(base64UrlToBytes(tx.tags[0]!.value))).toBe(MESSAGE);
     expect(base64UrlToBytes(tx.last_tx).byteLength).toBe(32);
     expect((await buildOwnershipTransaction(jwk.n, `${MESSAGE}1`)).last_tx).not.toBe(tx.last_tx);
@@ -40,6 +41,14 @@ describe("verifyPointsProof", () => {
     expect(await verifyPointsProof("transaction", jwk.n, `${MESSAGE}1`, signature)).toBe(false);
     expect(await verifyPointsProof("transaction", other.n, MESSAGE, signature)).toBe(false);
     expect(await verifyPointsProof("message", jwk.n, MESSAGE, signature)).toBe(false);
+  });
+
+  it("still accepts the target-less transaction v1.27.0 builds", async () => {
+    const legacy = { ...(await buildOwnershipTransaction(jwk.n, MESSAGE)), target: "" };
+    const signature = bytesToBase64Url(await signTransactionWithSigner(legacy, signerFromJwk(jwk, "")));
+
+    expect(await verifyPointsProof("transaction", jwk.n, MESSAGE, signature)).toBe(true);
+    expect(await verifyPointsProof("transaction", jwk.n, `${MESSAGE}1`, signature)).toBe(false);
   });
 
   it("accepts a signMessage signature as a message proof", async () => {

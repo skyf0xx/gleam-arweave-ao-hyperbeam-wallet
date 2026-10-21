@@ -7,6 +7,7 @@ import { buildUnsignedTransaction, type ArweaveTransactionJson } from "../../arw
 import type { JWKInterface } from "../../models/wallet";
 import { base64UrlToBytes, bytesToBase64Url } from "../../vault/base64";
 import { verifyDeviceSignature } from "../../vault/signing";
+import { buildOwnershipTransaction } from "../../points/ownership";
 import { LedgerArweaveClient, LEDGER_NANO_S_TARGET_ID, LEDGER_TARGET_REQUIRED_MESSAGE, ledgerMaxPayloadBytes, parseLedgerAppInfo } from "./client";
 import { LedgerError, statusWordError } from "./errors";
 import { encodeTransactionForLedger } from "./serialize";
@@ -353,6 +354,13 @@ describe("LedgerArweaveClient: signTransaction", () => {
     const error = await expectLedgerError(new LedgerArweaveClient(device).signTransaction(tx), "unsupported-payload");
     expect(error.message).toBe(LEDGER_TARGET_REQUIRED_MESSAGE);
     expect(device.log).toEqual([]);
+  });
+
+  it("signs the Gleam Points ownership transaction", async () => {
+    const tx = await buildOwnershipTransaction(jwk.n, "gleam-points:leave:v1:someAddress:1700000000");
+    const signature = await new LedgerArweaveClient(new SimulatedLedger()).signTransaction(tx);
+
+    expect(await verifyDeviceSignature({ kind: "transaction", transaction: tx }, signature, jwk.n)).toBe(true);
   });
 
   it("fails on a deep-hash mismatch without fetching the signature", async () => {

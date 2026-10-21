@@ -1,5 +1,6 @@
 import { sha256 } from "../arweave/rsa-pss";
 import { verifyTransactionSignature, type ArweaveTransactionJson } from "../arweave/transaction";
+import { addressFromOwner } from "../keys/address";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { verifyMessage } from "../vault/message-signing";
 
@@ -32,8 +33,17 @@ const encoder = new TextEncoder();
  * travels. It can never be mined: it moves 0 AR, pays a 0 fee, and its
  * anchor is a hash of the message rather than a recent block or
  * transaction.
+ *
+ * It targets the wallet's own address because the Ledger Arweave app
+ * refuses any transaction with an empty target: it can't render the
+ * Target screen and fails with "Unexpected buffer end".
  */
 export async function buildOwnershipTransaction(ownerB64Url: string, message: string): Promise<ArweaveTransactionJson> {
+  return { ...(await legacyOwnershipTransaction(ownerB64Url, message)), target: await addressFromOwner(ownerB64Url) };
+}
+
+/** The target-less form v1.27.0 builds. Keystone wallets on that release still sign it. */
+async function legacyOwnershipTransaction(ownerB64Url: string, message: string): Promise<ArweaveTransactionJson> {
   const anchor = await sha256(encoder.encode(`gleam-points:anchor:${message}`));
   return {
     format: 2,
@@ -61,7 +71,10 @@ export async function verifyPointsProof(
   try {
     const signature = base64UrlToBytes(signatureB64Url);
     if (kind === "transaction") {
-      return await verifyTransactionSignature(await buildOwnershipTransaction(ownerB64Url, message), signature, ownerB64Url);
+      for (const build of [buildOwnershipTransaction, legacyOwnershipTransaction]) {
+        if (await verifyTransactionSignature(await build(ownerB64Url, message), signature, ownerB64Url)) return true;
+      }
+      return false;
     }
     return await verifyMessage(ownerB64Url, encoder.encode(message).buffer as ArrayBuffer, signature.buffer as ArrayBuffer);
   } catch {

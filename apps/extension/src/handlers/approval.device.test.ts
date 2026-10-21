@@ -638,7 +638,7 @@ describe("Gleam Points ownership proofs sign in the approval window", () => {
     );
 
     expect(view).toMatchObject({ kind: "pointsProof", origin: WALLET_APPROVAL_ORIGIN, preview: { decodedData: MESSAGE } });
-    expect(device.summaries).toEqual([{ kind: "transaction", recipient: null, quantity: "0", fee: "0", dataSize: "0" }]);
+    expect(device.summaries).toEqual([{ kind: "transaction", recipient: address, quantity: "0", fee: "0", dataSize: "0" }]);
 
     await handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) });
 

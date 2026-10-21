@@ -537,7 +537,7 @@ function plainTags(tags: SigningRequestInput["tags"]): Array<{ name: string; val
  * the reward after approval; everything else must come out exactly as
  * requested.
  */
-function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPayload[]): void {
+function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPayload[], address: string): void {
   switch (input.kind) {
     case "sign":
     case "dispatch": {
@@ -616,7 +616,7 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
     case "pointsProof":
     case "scanAttestation":
       checkTransaction(payloads[0], {
-        target: "",
+        target: address,
         quantity: "0",
         tags: [{ name: POINTS_PROOF_TAG, value: textDecoder.decode(input.payload) }],
         data: new Uint8Array(),
@@ -1137,7 +1137,7 @@ export class ApprovalHandler {
     const walletId = entry.walletId!;
     const wallet = await this.hardwareWallet(walletId);
     const payloads = await this.prepareDevicePayloads(walletId, wallet, input);
-    assertPreparedMatches(input, payloads);
+    assertPreparedMatches(input, payloads, wallet.address);
     const device: PendingDeviceSigning = {
       payloads: encodeTaggedBinary(payloads),
       deadline: this.deviceDeadline(entry.request),
