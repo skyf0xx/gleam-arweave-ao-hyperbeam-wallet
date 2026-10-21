@@ -77,7 +77,7 @@ const DEFAULT_WALLET_NAMES = [
   "Dazzle",
   "Diamond",
   "Facet",
-  "Flare",
+  "Blaze",
   "Flicker",
   "Glimmer",
   "Glint",
