@@ -8,7 +8,11 @@ export interface ScanStats {
   paidPlacesLeft: number;
   /** Atomic points the release's next paid scan earns now, full or tail; null before the first snapshot day or when it can't be read. */
   rewardAtomic: string | null;
+  /** Atomic points in the bounty pool; null when it's empty or can't be read. */
+  bountyPoolAtomic: string | null;
 }
+
+const isAtomic = (value: unknown): value is string => typeof value === "string" && /^[1-9]\d*$/.test(value);
 
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
 
@@ -26,7 +30,7 @@ async function readJson(fetchImpl: typeof fetch, url: string): Promise<unknown> 
  * A release's scan count and paid places left, from the points API's cheap
  * `GET /attestations/count?release=` route (no coverage, no GitHub call),
  * which answers 0 scans for a release with none, plus what the next paid
- * scan earns from `GET /scan/rewards`. A failed count is null so a caller can show
+ * scan earns and the bounty pool from `GET /scan/rewards`. A failed count is null so a caller can show
  * "unknown" rather than a wrong number; a failed reward only nulls the reward.
  */
 export async function fetchScanStats(deps: {
@@ -41,12 +45,13 @@ export async function fetchScanStats(deps: {
   ]);
   const { total, paidPlacesLeft } = (count ?? {}) as { total?: unknown; paidPlacesLeft?: unknown };
   if (!isCount(total) || !isCount(paidPlacesLeft)) return null;
-  const { day, scanRewardAtomic, tailScanRewardAtomic } = (rewards ?? {}) as {
+  const { day, scanRewardAtomic, tailScanRewardAtomic, bountyPoolAtomic } = (rewards ?? {}) as {
     day?: unknown;
     scanRewardAtomic?: unknown;
     tailScanRewardAtomic?: unknown;
+    bountyPoolAtomic?: unknown;
   };
   const next = nextScanIsFull(paidPlacesLeft) ? scanRewardAtomic : tailScanRewardAtomic;
-  const rewardAtomic = typeof day === "string" && typeof next === "string" && /^[1-9]\d*$/.test(next) ? next : null;
-  return { total, paidPlacesLeft, rewardAtomic };
+  const rewardAtomic = typeof day === "string" && isAtomic(next) ? next : null;
+  return { total, paidPlacesLeft, rewardAtomic, bountyPoolAtomic: isAtomic(bountyPoolAtomic) ? bountyPoolAtomic : null };
 }
