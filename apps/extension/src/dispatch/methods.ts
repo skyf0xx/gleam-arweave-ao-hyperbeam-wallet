@@ -367,6 +367,8 @@ export const BACKGROUND_MESSAGES = {
   getScanStats: EXTENSION,
   getDismissedAnnouncements: EXTENSION,
   dismissAnnouncement: EXTENSION,
+  getReviewPrompt: EXTENSION,
+  finishReviewPrompt: EXTENSION,
 
   // A content script's questions about its own tab, and the one relay a
   // web page has into the wallet.

@@ -143,13 +143,22 @@ describe("PointsTokenRow", () => {
   });
 });
 
+/** Matches a paragraph by its whole text, across the spans that set its reward apart. */
+const sentence = (text: string) => (_: string, element: Element | null) =>
+  element?.tagName === "P" && element.textContent === text;
+
 describe("PointsView", () => {
-  it("offers a member a review with the paid places left", async () => {
+  it("offers a member a paid review", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
       getPointsScores: () => SCORES,
-      getScanStats: () => ({ total: 7, paidPlacesLeft: 93, rewardAtomic: "12500000000000" }),
+      getScanStats: () => ({
+        total: 7,
+        paidPlacesLeft: 93,
+        rewardAtomic: "12500000000000",
+        bountyPoolAtomic: "5000000000000000",
+      }),
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
@@ -159,8 +168,8 @@ describe("PointsView", () => {
     const link = review.getByRole("link", { name: /Start a review/ });
     expect(link.getAttribute("href")).toBe(`${SCAN_URL}#review`);
     expect(link.getAttribute("target")).toBe("_blank");
-    expect(await review.findByText("93 of 100 paid places left")).toBeTruthy();
-    expect(review.getByText("+12.50 GLEAM per review")).toBeTruthy();
+    expect(await review.findByText(sentence("Earn 12.50 GLEAM to review Gleam with your coding agent."))).toBeTruthy();
+    expect(review.getByText("Plus a 5,000 GLEAM bounty pool for confirmed vulnerabilities.")).toBeTruthy();
   });
 
   it("keeps the review link once the paid places are taken", async () => {
@@ -168,15 +177,20 @@ describe("PointsView", () => {
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
       getPointsScores: () => SCORES,
-      getScanStats: () => ({ total: 131, paidPlacesLeft: 0, rewardAtomic: "12500000000000" }),
+      getScanStats: () => ({
+        total: 131,
+        paidPlacesLeft: 0,
+        rewardAtomic: "12500000000000",
+        bountyPoolAtomic: "5000000000000000",
+      }),
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const review = within(await screen.findByRole("region", { name: "Review" }));
-    expect(await review.findByText(/Paid places for this release are taken/)).toBeTruthy();
+    expect(await review.findByText(/taken\. Confirmed vulnerabilities still share the 5,000 GLEAM bounty pool/)).toBeTruthy();
     expect(review.getByRole("link", { name: /Start a review/ })).toBeTruthy();
-    expect(review.queryByText(/per review/)).toBeNull();
+    expect(review.getByText("Review Gleam with your coding agent.")).toBeTruthy();
   });
 
   it("drops the places line when the stats can't be read", async () => {
@@ -190,8 +204,8 @@ describe("PointsView", () => {
 
     const review = within(await screen.findByRole("region", { name: "Review" }));
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
-    expect(review.queryByText(/paid places/)).toBeNull();
-    expect(review.queryByText(/per review/)).toBeNull();
+    expect(review.queryByText(/paid places|bounty pool/i)).toBeNull();
+    expect(review.queryByText(/GLEAM/)).toBeNull();
   });
 
   it("hides the review section until the wallet has joined", async () => {
@@ -309,7 +323,7 @@ describe("PointsView", () => {
     expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
     expect(screen.getByText("3 invites remaining")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Ways to earn" })).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "Invite" })).getByText("+10% of their daily points")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Invite" })).getByText(sentence("Earn an extra 10% daily for every friend who joins."))).toBeTruthy();
     const share = screen.getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
@@ -481,7 +495,7 @@ describe("PointsView", () => {
 
     const unranked = await screen.findByText("Unranked");
     expect(unranked.getAttribute("title")).toMatch(/daily snapshot/);
-    expect(screen.queryByText(/Your rank is/)).toBeNull();
+    expect(screen.queryByText(/points to pass/)).toBeNull();
   });
 
   it("shows the private rank and the points needed to pass the next one", async () => {
@@ -493,7 +507,7 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Your rank is #5. 1.80 points to pass the next one.")).toBeTruthy();
+    expect(await screen.findByText("You're #5. 1.80 points to pass #4.")).toBeTruthy();
   });
 
   it("shows #1 for the leader, even as the only ranked wallet", async () => {
@@ -510,7 +524,7 @@ describe("PointsView", () => {
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
     await waitFor(() => expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("#1"));
-    expect(screen.queryByText(/Your rank is/)).toBeNull();
+    expect(screen.queryByText(/points to pass/)).toBeNull();
   });
 
   it("copies the invite link", async () => {

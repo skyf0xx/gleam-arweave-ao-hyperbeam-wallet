@@ -22,17 +22,17 @@ function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort &
 const OK = { id: "a", level: "info", text: "Hello" };
 
 describe("parseAnnouncements", () => {
-  it("keeps valid entries, with or without a link", () => {
+  it("keeps valid entries, with or without a title or link", () => {
     expect(
       parseAnnouncements([
         OK,
         { id: "b", level: "critical", text: "Update now", url: "https://gleamwallet.app/update.html" },
-        { id: "c", level: "info", text: "Thread", url: "https://x.com/gleam/status/1" },
+        { id: "c", level: "info", title: "News", text: "Thread", url: "https://x.com/gleam/status/1" },
       ]),
     ).toEqual([
       OK,
       { id: "b", level: "critical", text: "Update now", url: "https://gleamwallet.app/update.html" },
-      { id: "c", level: "info", text: "Thread", url: "https://x.com/gleam/status/1" },
+      { id: "c", level: "info", title: "News", text: "Thread", url: "https://x.com/gleam/status/1" },
     ]);
   });
 
@@ -60,6 +60,8 @@ describe("parseAnnouncements", () => {
         { id: "x", level: "warn", text: "t" },
         { id: "y", level: "info", text: "  " },
         { id: "z", level: "info" },
+        { id: "t1", level: "info", title: "", text: "t" },
+        { id: "t2", level: "info", title: 7, text: "t" },
         { id: 1, level: "info", text: "t" },
         OK,
         { ...OK, text: "dup" },

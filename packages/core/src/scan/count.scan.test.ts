@@ -3,7 +3,7 @@ import { fetchScanStats } from "./count";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const COUNT = { release: "1.2.3", total: 7, paidPlacesLeft: 93 };
-const REWARDS = { day: "2026-10-19", issuedAtomic: "10000000", scanRewardAtomic: "10000", tailScanRewardAtomic: "2000", bountyPoolAtomic: "0" };
+const REWARDS = { day: "2026-10-19", issuedAtomic: "10000000", scanRewardAtomic: "10000", tailScanRewardAtomic: "2000", bountyPoolAtomic: "5000000" };
 
 /** Answers each route by its parsed pathname. */
 function api(routes: { count?: () => Response; rewards?: () => Response }): typeof fetch {
@@ -21,7 +21,7 @@ const run = (fetchImpl: typeof fetch, release = "1.2.3") =>
 describe("fetchScanStats", () => {
   it("reads the release's count route and the scan reward", async () => {
     const fetchImpl = api({ count: () => json(COUNT), rewards: () => json(REWARDS) });
-    expect(await run(fetchImpl)).toEqual({ total: 7, paidPlacesLeft: 93, rewardAtomic: "10000" });
+    expect(await run(fetchImpl)).toEqual({ total: 7, paidPlacesLeft: 93, rewardAtomic: "10000", bountyPoolAtomic: "5000000" });
     expect(vi.mocked(fetchImpl).mock.calls.map(([url]) => String(url))).toContain(
       "https://api.example/attestations/count?release=1.2.3",
     );
@@ -34,7 +34,7 @@ describe("fetchScanStats", () => {
 
   it("reads a release with no scans as the zero the server answers", async () => {
     const fetchImpl = api({ count: () => json({ release: "1.2.3", total: 0, paidPlacesLeft: 100 }), rewards: () => json(REWARDS) });
-    expect(await run(fetchImpl)).toEqual({ total: 0, paidPlacesLeft: 100, rewardAtomic: "10000" });
+    expect(await run(fetchImpl)).toEqual({ total: 0, paidPlacesLeft: 100, rewardAtomic: "10000", bountyPoolAtomic: "5000000" });
   });
 
   it("has no reward before the first snapshot or when the rewards route fails", async () => {
@@ -42,6 +42,11 @@ describe("fetchScanStats", () => {
     expect((await run(api({ count: () => json(COUNT), rewards: () => json(before) })))?.rewardAtomic).toBeNull();
     expect((await run(api({ count: () => json(COUNT), rewards: () => json({}, 503) })))?.rewardAtomic).toBeNull();
     expect((await run(api({ count: () => json(COUNT), rewards: () => json({ ...REWARDS, scanRewardAtomic: 1 }) })))?.rewardAtomic).toBeNull();
+  });
+
+  it("has no bounty pool when it's empty or the rewards route fails", async () => {
+    expect((await run(api({ count: () => json(COUNT), rewards: () => json({ ...REWARDS, bountyPoolAtomic: "0" }) })))?.bountyPoolAtomic).toBeNull();
+    expect((await run(api({ count: () => json(COUNT), rewards: () => json({}, 503) })))?.bountyPoolAtomic).toBeNull();
   });
 
   it("is null on count failures and malformed count bodies", async () => {

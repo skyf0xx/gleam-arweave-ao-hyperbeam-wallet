@@ -3,7 +3,6 @@ import {
   capabilitiesFor,
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
-  PAID_SCANS_PER_RELEASE,
   unsupportedOperationMessage,
   type RuntimePort,
   type WalletSummary,
@@ -280,7 +279,7 @@ function JoinedView({
         </dl>
         {score?.rank != null && score.pointsToNextRankAtomic !== null ? (
           <p className="text-label text-on-ink-muted">
-            Your rank is #{score.rank}. {formatPoints(score.pointsToNextRankAtomic)} points to pass the next one.
+            You're #{score.rank}. {formatPoints(score.pointsToNextRankAtomic)} points to pass #{score.rank - 1}.
           </p>
         ) : null}
       </InkCard>
@@ -293,13 +292,11 @@ function JoinedView({
             Ways to earn
           </h2>
           <div className="flex flex-col gap-6">
-            <EarnItem
-              label="Invite"
-              title="Invite a friend"
-              aside={<span className="text-label tabular-nums text-muted">+{REFERRAL_PERCENT}% of their daily points</span>}
-            >
+            <EarnItem label="Invite" title="Invite a friend">
               <div className="flex flex-col gap-1">
-                <p className="text-label text-muted">Friends who join with your link add to your points every day.</p>
+                <p className="text-label text-muted">
+                  Earn an extra <Reward>{REFERRAL_PERCENT}%</Reward> daily for every friend who joins.
+                </p>
                 {status ? (
                   <p className="flex items-center gap-2 text-caption text-muted">
                     {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
@@ -376,30 +373,30 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
 }
 
 /**
- * One way to earn: a hairline, its title with what it pays, then its
- * detail and actions. Every way shares this shape and a small outlined
+ * One way to earn: a hairline, its title, then what it pays and its
+ * actions. Every way shares this shape and a small outlined
  * action, so none reads as more important than the others.
  */
 function EarnItem({
   label,
   title,
-  aside,
   children,
 }: {
   label: string;
   title: string;
-  aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section aria-label={label} className="flex flex-col gap-3 border-t border-line pt-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-body font-semibold text-foreground">{title}</h3>
-        {aside}
-      </div>
+      <h3 className="text-body font-semibold text-foreground">{title}</h3>
       {children}
     </section>
   );
+}
+
+/** What a way to earn pays, picked out of its muted sentence the way the ink card sets its figures. */
+function Reward({ children }: { children: ReactNode }) {
+  return <span className="font-semibold tabular-nums text-foreground">{children}</span>;
 }
 
 /**
@@ -411,27 +408,30 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
   const stats = useScanStats(runtime);
   const placesLeft = stats.data?.paidPlacesLeft ?? null;
   const rewardAtomic = stats.data?.rewardAtomic ?? null;
+  const pool = stats.data?.bountyPoolAtomic ? formatPoints(stats.data.bountyPoolAtomic) : null;
   const paying = placesLeft !== null && placesLeft > 0;
 
   return (
-    <EarnItem
-      label="Review"
-      title="Review a release"
-      aside={
-        paying && rewardAtomic ? (
-          <span className="text-label tabular-nums text-muted">+{formatPoints(rewardAtomic)} GLEAM per review</span>
-        ) : null
-      }
-    >
+    <EarnItem label="Review" title="Review a release">
       <div className="flex flex-col gap-1">
-        <p className="text-label text-muted">Have your coding agent review this release to earn.</p>
-        {placesLeft === null ? null : (
+        <p className="text-label text-muted">
+          {paying && rewardAtomic ? (
+            <>
+              Earn <Reward>{formatPoints(rewardAtomic)} GLEAM</Reward> to review Gleam with your coding agent.
+            </>
+          ) : (
+            "Review Gleam with your coding agent."
+          )}
+        </p>
+        {placesLeft === 0 ? (
           <p className="text-caption text-muted">
-            {paying
-              ? `${placesLeft} of ${PAID_SCANS_PER_RELEASE} paid places left`
+            {pool
+              ? `Paid places for this release are taken. Confirmed vulnerabilities still share the ${pool} GLEAM bounty pool.`
               : "Paid places for this release are taken. Confirmed vulnerabilities still earn a share of the bounty pool."}
           </p>
-        )}
+        ) : pool ? (
+          <p className="text-caption text-muted">{`Plus a ${pool} GLEAM bounty pool for confirmed vulnerabilities.`}</p>
+        ) : null}
       </div>
       <Button asChild variant="secondary" size="sm" className="self-start">
         <a href={`${scanUrl()}#review`} target="_blank" rel="noreferrer">

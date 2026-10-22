@@ -37,6 +37,7 @@ export type {
 } from "./points";
 export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";
+export type { ReviewMoment } from "./review-prompt";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, TokenBalance } from "./balance";
 export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collectible";

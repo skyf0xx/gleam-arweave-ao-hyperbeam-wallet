@@ -31,19 +31,15 @@ export function parseAnnouncements(raw: unknown): Announcement[] {
   const out: Announcement[] = [];
   for (const entry of raw as unknown[]) {
     if (entry === null || typeof entry !== "object") continue;
-    const { id, level, text, url } = entry as Record<string, unknown>;
+    const { id, level, title, text, url } = entry as Record<string, unknown>;
     if (typeof id !== "string" || id === "" || seen.has(id)) continue;
     if (level !== "info" && level !== "critical") continue;
     if (typeof text !== "string" || text.trim() === "") continue;
-    if (url === undefined) {
-      seen.add(id);
-      out.push({ id, level, text });
-      continue;
-    }
-    const safe = allowedUrl(url);
+    if (title !== undefined && (typeof title !== "string" || title.trim() === "")) continue;
+    const safe = url === undefined ? undefined : allowedUrl(url);
     if (safe === null) continue;
     seen.add(id);
-    out.push({ id, level, text, url: safe });
+    out.push({ id, level, ...(title === undefined ? {} : { title }), text, ...(safe === undefined ? {} : { url: safe }) });
   }
   return out;
 }

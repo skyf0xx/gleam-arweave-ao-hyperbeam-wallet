@@ -6,7 +6,7 @@ describe("ScansHandler", () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ total: 1, paidPlacesLeft: 19 }))) as unknown as typeof fetch;
     const handler = new ScansHandler({ apiUrl: "https://api.example", version: () => "1.26.0", fetchImpl });
 
-    expect(await handler.stats()).toEqual({ total: 1, paidPlacesLeft: 19, rewardAtomic: null });
+    expect(await handler.stats()).toEqual({ total: 1, paidPlacesLeft: 19, rewardAtomic: null, bountyPoolAtomic: null });
     expect(vi.mocked(fetchImpl).mock.calls[0]![0]).toContain("release=1.26.0");
   });
 
