@@ -19,7 +19,7 @@ import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from ".
 import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./invite";
 import { randomInviteCode } from "./invite-code";
 import { parseLeaveRequest, leave } from "./leave";
-import { createPriceService, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices";
+import { createPriceService, parseFxQuery, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices";
 import { RateLimiter } from "./rate-limit";
 import { parseRegisterRequest, register } from "./register";
 import { issueChallenge } from "./scan-challenge";
@@ -92,7 +92,7 @@ export function createApp(deps: AppDeps): Hono {
   // builds work too; every one of these requests is checked on its own
   // merits, so the origin is never what authorises it.
   const extensionCors = cors({ origin: (origin) => (origin.startsWith("chrome-extension://") ? origin : null) });
-  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me", "/prices", "/prices/history"]) app.use(path, extensionCors);
+  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me", "/prices", "/prices/history", "/prices/fx"]) app.use(path, extensionCors);
 
   // Scan endpoints are open to any origin: the CLI sends no origin, the site
   // reads the list and rewards, and the signature (not the origin) authorises a submission.
@@ -129,6 +129,13 @@ export function createApp(deps: AppDeps): Hono {
     const query = parseHistoryQuery(c.req.query());
     if (!query) return c.json({ error: "Unknown price id or range." }, 400);
     return c.json({ series: await prices.history(query.id, query.range) });
+  });
+
+  app.get("/prices/fx", async (c) => {
+    if (!pricesByIp.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
+    const currency = parseFxQuery(c.req.query());
+    if (!currency) return c.json({ error: "Unknown or missing currency." }, 400);
+    return c.json({ currency, rate: await prices.fx(currency) });
   });
 
   // Read by invite.html, a static page on another origin.

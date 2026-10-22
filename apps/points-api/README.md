@@ -49,8 +49,8 @@ Routes split into two groups by caller:
   `chrome-extension://` origins (any extension id, so unpacked dev
   builds work). Every request is still checked on its own signature,
   never trusted by origin.
-- **Extension-only** also covers the price proxy, `GET /prices?ids=` and
-  `GET /prices/history?id=&range=`.
+- **Extension-only** also covers the price proxy, `GET /prices?ids=`,
+  `GET /prices/history?id=&range=` and `GET /prices/fx?currency=`.
 - **Open CORS** — `/stats`, `/invite/check`, `/scan/challenge`,
   `/scan/rewards`, `/attestations*`. These are read by static pages (`invite.html`,
   `scan.html`, `review-results.html`) on other origins, or by the `pnpm scan` CLI with no
@@ -68,10 +68,11 @@ to an HTTP response. No business logic lives in `app.ts` itself.
 ### prices.ts
 
 The price proxy for users whose network blocks CoinGecko or CoinPaprika.
-Only ids in core's `DEFAULT_TOKEN_REGISTRY` are accepted. Each lookup
-tries CoinGecko, then CoinPaprika, and answers `null` / an empty series
-if both fail. Results are cached in memory (spot 60 s, history 5 min,
-failures 15 s) and concurrent misses share one upstream call, so many
+Only ids in core's `DEFAULT_TOKEN_REGISTRY` are accepted. `/prices/fx`
+answers units of one currency per US dollar, for the currencies in
+core's `FIAT_CURRENCIES`. Each lookup tries CoinGecko, then CoinPaprika,
+and answers `null` / an empty series if both fail. Results are cached in
+memory (spot 60 s, history 5 min, FX 1 h, failures 15 s) and concurrent misses share one upstream call, so many
 users don't multiply provider requests.
 
 ### db.ts
