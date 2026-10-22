@@ -187,7 +187,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           ) : null}
 
           <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={() => void handleContinue()} className="mt-auto">
-            {step.submitting ? "Estimating fee…" : parsed.success ? "Review send" : "Enter an address"}
+            {step.submitting ? "Estimating fee…" : parsed.success ? "Review and Send" : "Enter an address"}
           </Button>
         </div>
       </div>

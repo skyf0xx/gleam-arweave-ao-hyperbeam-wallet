@@ -8,6 +8,7 @@ import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "@/src/address-identity";
 import { useDisplaySettings } from "@/src/display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useTokenPrices } from "../../main-screen/src/useTokenPrices";
 import { AddressRow } from "../../activity/src/AddressRow";
@@ -386,7 +387,13 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         selectedToken={selectedToken}
         onSelect={(nextToken) => {
           setSelectedToken(nextToken);
-          setStep(savedComposeStep || INITIAL_STEP);
+          // An amount typed for one token means nothing in another's units.
+          const changed = (nextToken?.processId ?? null) !== (selectedToken?.processId ?? null);
+          setStep(
+            savedComposeStep && changed
+              ? { ...savedComposeStep, amountDisplay: "", amountError: undefined }
+              : savedComposeStep || INITIAL_STEP,
+          );
           setSavedComposeStep(null);
         }}
         onBack={() => {
@@ -521,7 +528,7 @@ function ComposeStep({
       ? "Enter an address"
       : !amountValid
         ? "Enter an amount"
-        : "Review send";
+        : "Review and Send";
   // For AR, Max is balance minus the rough fee estimate (clamped to 0),
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
@@ -560,10 +567,19 @@ function ComposeStep({
           <span className="flex min-w-0 items-center gap-2">
             <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label={`${wallet.name} avatar`} size={20} />
             <span className="truncate font-semibold text-foreground">{wallet.name}</span>
-            {balanceDisplay !== undefined ? (
-              <span className="flex-shrink-0 tabular-nums text-muted">
-                · {balanceDisplay} {ticker}
-              </span>
+            <span className="flex-shrink-0 font-mono text-caption text-faint">{truncateAddress(wallet.address, 6)}</span>
+            {/* AR is native and has no process to show. */}
+            {token !== null ? (
+              <a
+                href={`${explorerUrlFor(token.processId)}/info`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${ticker} info`}
+                title={`${ticker} info`}
+                className="-ml-1 flex-shrink-0 rounded px-1 text-muted hover:text-foreground"
+              >
+                ↗
+              </a>
             ) : null}
           </span>
         </div>
@@ -588,19 +604,25 @@ function ComposeStep({
         />
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <span className="text-label font-semibold text-muted">Amount</span>
-            {/* AR is native and has no process to show. */}
-            {token !== null ? (
-              <a
-                href={`${explorerUrlFor(token.processId)}/info`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-label font-medium text-muted underline-offset-2 hover:text-foreground hover:underline"
-              >
-                {ticker} info ↗
-              </a>
-            ) : null}
+            <span className="flex items-center gap-1 text-label">
+              {balanceDisplay !== undefined ? (
+                <span className="tabular-nums text-muted">
+                  {balanceDisplay} {ticker}
+                </span>
+              ) : null}
+              {maxDisplay !== undefined ? (
+                <button
+                  type="button"
+                  aria-label={`Max: ${maxDisplay}`}
+                  onClick={() => onChange({ amountDisplay: maxDisplay })}
+                  className="rounded-full px-2 py-1 text-caption font-semibold uppercase tracking-wide text-foreground hover:bg-mist"
+                >
+                  Max
+                </button>
+              ) : null}
+            </span>
           </div>
           <div className="flex flex-col gap-0.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
             <div className="flex items-center gap-2">
@@ -622,16 +644,6 @@ function ComposeStep({
                 onBlur={onBlurAmount}
                 className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
               />
-              {maxDisplay !== undefined ? (
-                <button
-                  type="button"
-                  aria-label={`Max: ${maxDisplay}`}
-                  onClick={() => onChange({ amountDisplay: maxDisplay })}
-                  className="flex-shrink-0 rounded-full px-2 py-1.5 text-caption font-semibold uppercase tracking-wide text-muted hover:bg-mist hover:text-foreground"
-                >
-                  Max
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={onOpenTokenPicker}
@@ -668,10 +680,10 @@ function ComposeStep({
 }
 
 /**
- * The "To" field: address input, the saved-contacts link and the quiet
- * "Save this address" line. While the input has focus, a short list of
- * named addresses drops down under it, filtered by what's typed, ending in
- * a "Saved contacts" link to the full picker. Once a valid address loses focus, the input
+ * The "To" field: address input and the quiet "Save this address" line.
+ * While the input has focus, a short list of named addresses drops down
+ * under it, filtered by what's typed, ending in a "Saved contacts" link to
+ * the full picker. Once a valid address loses focus, the input
  * gives way to a card with the address's avatar and chunked form, so it
  * can be checked at a glance before Review send. "Change" brings the
  * input back.
@@ -724,28 +736,20 @@ export function RecipientField({
   // out still carries the old text and would flag it as invalid.
   const pickedRef = useRef(false);
   const query = recipient.trim().toLowerCase();
-  const shownSuggestions =
-    editing === "focused" && address === undefined
-      ? suggestions
-          .filter(
-            (candidate) =>
-              query.length === 0 || candidate.name.toLowerCase().includes(query) || candidate.address.toLowerCase().includes(query),
-          )
-          .slice(0, SUGGESTION_LIMIT)
-      : [];
+  // Also the only way into the full picker, so it opens even with nothing to suggest.
+  const showDropdown = editing === "focused" && address === undefined;
+  const shownSuggestions = showDropdown
+    ? suggestions
+        .filter(
+          (candidate) =>
+            query.length === 0 || candidate.name.toLowerCase().includes(query) || candidate.address.toLowerCase().includes(query),
+        )
+        .slice(0, SUGGESTION_LIMIT)
+    : [];
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-label font-semibold text-muted">To</span>
-        <button
-          type="button"
-          onClick={onOpenSavedAddresses}
-          className="text-label font-medium text-muted hover:text-foreground hover:underline"
-        >
-          Saved contacts
-        </button>
-      </div>
+      <span className="text-label font-semibold text-muted">To</span>
       {showCard ? (
         <RecipientCard
           address={address}
@@ -774,7 +778,7 @@ export function RecipientField({
             placeholder="Paste an address"
             className="w-full rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
           />
-          {shownSuggestions.length > 0 ? (
+          {showDropdown ? (
             <div
               role="listbox"
               aria-label="Saved contacts"
@@ -782,26 +786,27 @@ export function RecipientField({
               onMouseDown={(event) => event.preventDefault()}
               className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-line bg-background shadow-lg"
             >
-              {/* Its own wrapper, so the last row drops its separator and the inset rule below is the only line. */}
-              <div>
-                {shownSuggestions.map((candidate) => (
-                  <AddressRow
-                    key={candidate.address}
-                    address={candidate.address}
-                    name={candidate.name}
-                    onSelect={() => {
-                      pickedRef.current = true;
-                      onChangeRecipient(candidate.address);
-                      setEditing("no");
-                    }}
-                  />
-                ))}
-              </div>
-              <div aria-hidden="true" className="mx-3.5 border-t border-line" />
+              {shownSuggestions.length > 0 ? (
+                // Its own wrapper, so the last row drops its separator.
+                <div className="pb-1">
+                  {shownSuggestions.map((candidate) => (
+                    <AddressRow
+                      key={candidate.address}
+                      address={candidate.address}
+                      name={candidate.name}
+                      onSelect={() => {
+                        pickedRef.current = true;
+                        onChangeRecipient(candidate.address);
+                        setEditing("no");
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={onOpenSavedAddresses}
-                className="w-full px-3.5 py-2.5 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
+                className="w-full px-3.5 py-3 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
               >
                 Saved contacts
               </button>
@@ -869,7 +874,8 @@ function SaveAddressInline({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="flex w-fit items-center gap-2 text-label text-muted">
+      {/* Keeps focus in the recipient input: its blur swaps in the shorter card, which moves this checkbox out from under the click. */}
+      <label onMouseDown={(event) => event.preventDefault()} className="flex w-fit items-center gap-2 text-label text-muted">
         <input type="checkbox" checked={expanded} onChange={onToggle} className="h-3.5 w-3.5 accent-foreground" />
         Save this address
       </label>
@@ -960,12 +966,7 @@ function ReviewStep({
             lookalikeAvatarSvg={lookalikeAvatarSvg}
             emphasisPick={emphasisPick}
           />
-        ) : (
-          <p className="text-label leading-relaxed text-muted">
-            You&apos;re sending {formatAmount(step.amountAtomic, token)} {ticker} to this address. This can&apos;t
-            be undone.
-          </p>
-        )}
+        ) : null}
 
         <div className="flex flex-col gap-1.5">
           <span className="text-label font-semibold text-muted">To</span>
@@ -998,20 +999,22 @@ function ReviewStep({
           </p>
         ) : null}
 
-        <Button
-          type="button"
-          variant={irreversible ? "destructive" : "primary"}
-          disabled={step.submitting}
-          aria-busy={step.submitting}
-          onClick={onSign}
-          className="mt-auto"
-        >
-          {step.submitting
-            ? signsOnDevice
-              ? "Waiting for approval…"
-              : "Sending…"
-            : `Send ${formatAmount(step.amountAtomic, token)} ${ticker}`}
-        </Button>
+        <div className="mt-auto flex flex-col gap-3">
+          {irreversible ? null : <p className="text-center text-label text-muted">This cannot be undone.</p>}
+          <Button
+            type="button"
+            variant={irreversible ? "destructive" : "primary"}
+            disabled={step.submitting}
+            aria-busy={step.submitting}
+            onClick={onSign}
+          >
+            {step.submitting
+              ? signsOnDevice
+                ? "Waiting for approval…"
+                : "Sending…"
+              : `Send ${formatAmount(step.amountAtomic, token)} ${ticker}`}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1019,7 +1022,7 @@ function ReviewStep({
 
 export function ReviewRow({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 last:border-t last:pt-3">
+    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0">
       <span className="text-muted">{label}</span>
       <span
         className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-[11px] font-medium" : ""}`}
@@ -1169,7 +1172,7 @@ function SkeletonPickerRow() {
 /**
  * Saved contacts picker, in three sections: saved contacts (`useContacts`,
  * vault-wide), "Your wallets" (`useOtherWallets`, never the active one),
- * then, below a divider, the latest few addresses sent to that have no
+ * then the latest few addresses sent to that have no
  * name. Each section skips addresses an earlier one already shows. The
  * search field filters every section by name or address, and searches
  * every recent address rather than just the few listed. Rows show the
@@ -1263,7 +1266,7 @@ export function SavedAddressesStep({
               </PickerSection>
             ) : null}
             {filteredRecent.length > 0 ? (
-              <PickerSection label="Recent" divided={filteredContacts.length > 0 || filteredWallets.length > 0}>
+              <PickerSection label="Recent">
                 {filteredRecent.map((address) => (
                   <AddressRow key={address} address={address} name={null} onSelect={() => onSelect(address)} />
                 ))}
@@ -1276,9 +1279,9 @@ export function SavedAddressesStep({
   );
 }
 
-function PickerSection({ label, divided, children }: { label: string; divided?: boolean; children: ReactNode }) {
+function PickerSection({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section aria-label={label} className={divided ? "mt-2 border-t border-line" : undefined}>
+    <section aria-label={label}>
       <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-faint">{label}</div>
       {children}
     </section>

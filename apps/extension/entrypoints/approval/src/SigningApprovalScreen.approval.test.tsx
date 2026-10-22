@@ -124,7 +124,7 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
     );
 
-    expect(screen.getByRole("alert").textContent).toMatch(/can't be undone/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/cannot be undone/i);
   });
 
   it("shows decoded data and tags for a non-transfer signDataItem request, without a risk notice", () => {
@@ -313,7 +313,7 @@ describe("SigningApprovalScreen recipient warnings", () => {
 
   it("names the address a lookalike recipient imitates", () => {
     renderWith({ firstTime: true, lookalikeOf: known });
-    expect(screen.getByText(/looks like one you know/)).toBeTruthy();
+    expect(screen.getByText(/looks familiar, but is different/)).toBeTruthy();
     expect(screen.getByText(addressText(known))).toBeTruthy();
     expect(screen.getByRole("button", { name: /sign and send/i }).hasAttribute("disabled")).toBe(false);
   });
@@ -323,18 +323,18 @@ describe("SigningApprovalScreen recipient warnings", () => {
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
   });
 
-  it("folds every reason into one notice that says \"can't be undone\" once", () => {
+  it("folds every reason into one notice that says \"cannot be undone\" once", () => {
     renderWith({ firstTime: true, lookalikeOf: known });
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     const text = screen.getByRole("alert").textContent ?? "";
-    expect(text.match(/can't be undone/gi)).toHaveLength(1);
+    expect(text.match(/cannot be undone/gi)).toHaveLength(1);
     expect(text).toMatch(/haven't sent to this address before/);
-    expect(text).toMatch(/looks like one you know/);
+    expect(text).toMatch(/looks familiar, but is different/);
   });
 
   it("shows no recipient warning for a known recipient", () => {
     renderWith({ firstTime: false, lookalikeOf: null });
     expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
-    expect(screen.queryByText(/looks like one you know/)).toBeNull();
+    expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
   });
 });

@@ -14,7 +14,7 @@ export interface RecipientWarningProps {
 /**
  * The one irreversible-send notice: a single headline with every reason
  * that applies listed under it, so a screen never stacks boxes that repeat
- * "can't be undone". Informs, never blocks. A lookalike leads the list and
+ * "cannot be undone". Informs, never blocks. A lookalike leads the list and
  * names the address it resembles, in full, so the two can be compared.
  */
 export function RecipientWarning({
@@ -26,15 +26,17 @@ export function RecipientWarning({
 }: RecipientWarningProps) {
   return (
     <RiskNotice className={className}>
-      <strong className="font-bold">This can&apos;t be undone.</strong>
+      <strong className="font-bold">This cannot be undone.</strong>
       <ul className="m-0 mt-1.5 flex list-disc flex-col gap-1.5 pl-4">
         {lookalikeOf ? (
           <li>
             <span className="flex min-w-0 flex-col gap-2">
               <span>
-                <strong className="font-bold">This address looks like one you know, but it isn&apos;t.</strong>{" "}
-                Scammers make near-copies of addresses you use, and a single changed character sends funds elsewhere.
-                Compare every character with this one:
+                <strong className="font-bold">This address looks familiar, but is different.</strong>
+                <br />
+                Scammers create lookalike addresses to trick you.
+                <br />
+                Compare every character before sending.
               </span>
               {lookalikeAvatarSvg ? (
                 <MemorableAddress address={lookalikeOf} emphasisPick={emphasisPick} avatarSvg={lookalikeAvatarSvg} />
