@@ -13,12 +13,7 @@ import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
-import {
-  inviteLinkFor,
-  invitePost,
-  invitesRemainingLine,
-  xIntentUrl,
-} from "@/src/points-share";
+import { inviteLinkFor, invitesRemainingLine } from "@/src/points-share";
 import { FoundingGate } from "../../onboarding/src/FoundingGate";
 import { gleamUrl, howItWorksUrl, JoinNote, scanUrl } from "./JoinNote";
 import { useSharePrompt } from "./SharePrompt";
@@ -231,13 +226,9 @@ function JoinedView({
 }) {
   const { score } = standing;
   const total = useCountUp(standing.estimateAtomic, score?.totalAtomic ?? null);
-  const inviteCode = standing.membership.inviteCode;
-  const inviteLink = inviteLinkFor(inviteCode);
-  const { copied, copy } = useCopy(inviteLink);
+  const { copied, copy } = useCopy(inviteLinkFor(standing.membership.inviteCode));
   const seatsLeft = score?.seatsLeft ?? null;
-  const prompt = useSharePrompt({ runtime, wallet, inviteCode, score });
-  const post =
-    prompt?.post ?? invitePost({ seats: seatsLeft, link: inviteLink });
+  const prompt = useSharePrompt({ runtime, wallet, score });
   const status = prompt?.text ?? (seatsLeft !== null ? invitesRemainingLine(seatsLeft) : null);
   // A full code sends friends to a "full" invite page, so there's nothing to share.
   const full = seatsLeft !== null && seatsLeft <= 0;
@@ -304,17 +295,11 @@ function JoinedView({
                   </p>
                 ) : null}
                 {full ? (
-                  <p className="text-caption text-muted">You get another when a friend you invited joins Points.</p>
+                  <p className="text-caption text-muted">You get two more when a friend you invited joins Points.</p>
                 ) : null}
               </div>
               {full ? null : (
                 <div className="flex gap-2">
-                  <Button asChild variant="secondary" size="sm">
-                    <a href={xIntentUrl(post)} target="_blank" rel="noreferrer" onClick={() => prompt?.finish()}>
-                      Invite on X
-                      <span aria-hidden="true">↗</span>
-                    </a>
-                  </Button>
                   <Button
                     type="button"
                     variant="secondary"

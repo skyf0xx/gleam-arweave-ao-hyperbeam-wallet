@@ -1,5 +1,5 @@
 import type { Queryable } from "./db";
-import { memberSeatsLeft, PENDING_MEMBER_REDEMPTIONS_SQL } from "./invite";
+import { MEMBER_SEAT_BALANCE_SQL, memberSeatsLeft } from "./invite";
 
 export interface WalletScore {
   address: string;
@@ -54,7 +54,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
     to_next: string | null;
     founding_number: number | null;
     original_founder: boolean;
-    pending_redemptions: string;
+    seat_balance: string;
     ranked: string;
     holding: string | null;
     referee_bonus: string | null;
@@ -74,7 +74,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
      )
      SELECT w.address, w.invite_code, w.referred_by IS NOT NULL AS referred, w.founding_number, w.original_founder,
             (SELECT count(*) FROM wallets r WHERE r.referred_by = w.address)::text AS referee_count,
-            ${PENDING_MEMBER_REDEMPTIONS_SQL}::text AS pending_redemptions,
+            ${MEMBER_SEAT_BALANCE_SQL}::text AS seat_balance,
             r.total::text AS total,
             (SELECT coalesce(sum(s.amount_atomic), 0) FROM scan_points s WHERE s.address = w.address)::text AS scan_points,
             r.rank::text AS rank,
@@ -111,7 +111,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
             },
       foundingNumber: row.founding_number,
       originalFounder: row.original_founder,
-      seatsLeft: memberSeatsLeft(Number(row.pending_redemptions), pointsPhase),
+      seatsLeft: memberSeatsLeft(Number(row.seat_balance), pointsPhase),
       rank: row.rank === null ? null : Number(row.rank),
       pointsToNextRankAtomic: row.to_next,
       topPercent: row.rank === null ? null : topPercent(Number(row.rank), Number(row.ranked)),

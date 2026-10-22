@@ -58,8 +58,9 @@ describe("readFunnel", () => {
   it("counts refilled and unused member seats", async () => {
     const funnel = await readFunnel(await seed(), NOW);
     expect(funnel.seatsRefilled).toBe(2);
-    // MEMBER01 holds d3 (2 left), MEMBER02 holds d4 (2 left), MEMBER05 and MEMBER09 have 3 each.
-    expect(funnel.memberSeatsUnused).toBe(10);
+    // MEMBER01 holds d3 and gained one each from d2 and d9 (4 left), MEMBER02 holds d4 (2 left),
+    // MEMBER05 and MEMBER09 have 3 each.
+    expect(funnel.memberSeatsUnused).toBe(12);
   });
 
   it("reports each drop code's seats and drain time", async () => {

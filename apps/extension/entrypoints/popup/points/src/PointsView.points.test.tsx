@@ -324,12 +324,12 @@ describe("PointsView", () => {
     expect(screen.getByText("3 invites remaining")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Ways to earn" })).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Invite" })).getByText(sentence("Earn an extra 10% daily for every friend who joins."))).toBeTruthy();
-    const share = screen.getByRole("link", { name: "Invite on X" });
-    expect(share.getAttribute("href")).toBe(
-      `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
-    );
+    const writeText = vi.fn(async () => {});
+    Object.assign(navigator, { clipboard: { writeText } });
+    fireEvent.click(screen.getByRole("button", { name: "Copy invite link" }));
+    expect(writeText).toHaveBeenCalledWith(LINK);
 
-    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Invite on X↗", "Start a review↗"]);
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Start a review↗"]);
     expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
     const about = screen.getByRole("button", { name: "About Gleam Points" });
     expect(about.getAttribute("aria-expanded")).toBe("false");
@@ -377,8 +377,7 @@ describe("PointsView", () => {
 
     expect(screen.queryByText(/invites? remaining/)).toBeNull();
     expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
-    const href = screen.getByRole("link", { name: "Invite on X" }).getAttribute("href")!;
-    expect(decodeURIComponent(href)).toContain(`Just joined @gleam_wallet and I'm now earning GLEAM.\n${LINK}`);
+    expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
   });
 
   it("says the invites are used and offers nothing to share at zero seats", async () => {
@@ -391,8 +390,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     expect(await screen.findByText("All your invites are used")).toBeTruthy();
-    expect(screen.getByText("You get another when a friend you invited joins Points.")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Invite on X" })).toBeNull();
+    expect(screen.getByText("You get two more when a friend you invited joins Points.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy invite link" })).toBeNull();
   });
 

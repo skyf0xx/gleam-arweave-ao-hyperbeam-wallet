@@ -181,16 +181,15 @@ describe("founding reveal after a claim", () => {
     await clickWhenSettled("Join Gleam Points");
   }
 
-  it("shows the welcome, the invites and a Share on X link with the invite link, then Done closes", async () => {
+  it("shows the welcome, the invites and copies the invite link, then Done closes", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.assign(navigator, { clipboard: { writeText } });
     const { onComplete, send } = setup("founding");
     await claim();
     expect(await screen.findByText("You're in")).toBeTruthy();
     expect(await screen.findByText("You have 3 invites")).toBeTruthy();
-    const share = screen.getByRole("link", { name: "Share on X" });
-    const post = decodeURIComponent(share.getAttribute("href")!);
-    expect(post).toContain("https://x.com/intent/post?text=");
-    expect(post).toContain("I have 3 invites if you want to get in early.");
-    expect(post).toContain("invite.html?c=MYCODE22");
+    fireEvent.click(screen.getByRole("button", { name: "Copy invite link" }));
+    expect(writeText).toHaveBeenCalledWith("https://gleamwallet.app/invite.html?c=MYCODE22");
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsRevealSeen" }));
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onComplete).toHaveBeenCalledOnce();
@@ -221,8 +220,6 @@ describe("founding reveal after a claim", () => {
     await claim();
     expect(await screen.findByText("You're in")).toBeTruthy();
     expect(screen.queryByText(/You have/)).toBeNull();
-    expect(decodeURIComponent(screen.getByRole("link", { name: "Share on X" }).getAttribute("href")!)).toContain(
-      "Just got into @gleam_wallet and I'm now earning GLEAM.",
-    );
+    expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
   });
 });

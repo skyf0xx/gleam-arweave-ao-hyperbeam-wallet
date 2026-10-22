@@ -79,8 +79,6 @@ function setup(options: Options = {}) {
   return runtime;
 }
 
-const intent = (post: string) => `https://x.com/intent/post?text=${encodeURIComponent(post)}`;
-
 describe("pickSharePrompt", () => {
   const base = { score: scoreWith({}), shareSeen: [], seatsSeen: 3, revealSeen: true };
 
@@ -111,29 +109,23 @@ describe("pickSharePrompt", () => {
 describe("share prompts on the Points screen", () => {
   const invite = () => within(screen.getByRole("region", { name: "Invite" }));
 
-  it("announces a new invite in the invite status, posts it with the link, and records the count as seen", async () => {
+  it("announces a new invite in the invite status and records the count as seen", async () => {
     const runtime = setup({ seatsSeen: { [WALLET.id]: 2 } });
 
-    expect(await screen.findByText("A friend joined. You got another invite.")).toBeTruthy();
-    expect(invite().getByRole("link", { name: "Invite on X" }).getAttribute("href")).toBe(
-      intent(`I've got a Gleam seat. It's yours if you want it.\n${LINK}\n@ArweaveEco @aoTheComputer`),
-    );
+    expect(await screen.findByText("A friend joined. You got more invites.")).toBeTruthy();
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsSeatsSeen", payload: { walletId: WALLET.id, seats: 3 } }),
     );
-    expect(invite().getByText("A friend joined. You got another invite.")).toBeTruthy();
+    expect(invite().getByText("A friend joined. You got more invites.")).toBeTruthy();
     expect(runtime.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsShareSeen" }));
   });
 
-  it("posts the last seat without a link, copies the link anyway, and marks it seen", async () => {
+  it("marks the last seat seen once the link is copied", async () => {
     const writeText = vi.fn(async () => {});
     Object.assign(navigator, { clipboard: { writeText } });
     const runtime = setup({ score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 1 } });
 
     expect(await screen.findByText("Your last invite")).toBeTruthy();
-    expect(invite().getByRole("link", { name: "Invite on X" }).getAttribute("href")).toBe(
-      intent("I've got one @gleam_wallet invite left. Reply if you want it and I'll send it over.\n@ArweaveEco @aoTheComputer"),
-    );
     fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
 
     expect(writeText).toHaveBeenCalledWith(LINK);
@@ -142,15 +134,12 @@ describe("share prompts on the Points screen", () => {
     );
   });
 
-  it("offers the join post once for a wallet that never saw the reveal, and marks it seen when shared", async () => {
+  it("offers the join prompt once for a wallet that never saw the reveal, and marks it seen when copied", async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => {}) } });
     const runtime = setup({ revealSeen: [] });
 
     expect(await screen.findByText("You're in and earning Gleam Points.")).toBeTruthy();
-    const share = invite().getByRole("link", { name: "Invite on X" });
-    expect(share.getAttribute("href")).toBe(
-      intent(`Just got into @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`),
-    );
-    fireEvent.click(share);
+    fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
 
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsShareSeen", payload: { walletId: WALLET.id, prompt: "joined" } }),
@@ -160,7 +149,7 @@ describe("share prompts on the Points screen", () => {
   it("shows one prompt at a time, the new invite first", async () => {
     setup({ score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 0 }, revealSeen: [] });
 
-    expect(await screen.findByText("A friend joined. You got another invite.")).toBeTruthy();
+    expect(await screen.findByText("A friend joined. You got more invites.")).toBeTruthy();
   });
 
   it("falls back to the invite count once every prompt has been seen", async () => {

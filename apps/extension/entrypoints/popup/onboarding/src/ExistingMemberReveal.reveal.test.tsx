@@ -67,7 +67,7 @@ describe("ExistingMemberReveal", () => {
     const { send } = setup({});
     expect(await screen.findByText("You're in")).toBeTruthy();
     expect(screen.getByText("You have 3 invites")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Share on X" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
     expect(screen.queryByText("home")).toBeNull();
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "markPointsRevealSeen" }));
 

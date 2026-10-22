@@ -7,10 +7,12 @@ import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { browser } from "wxt/browser";
-import { askInvitePost, fullInvitePost, xIntentUrl } from "@/src/points-share";
 import { sitePageUrl } from "@/src/site-pages";
 
 const X_PROFILE_URL = "https://x.com/gleam_wallet";
+// Only the mention, so every ask is in the asker's own words and lands in
+// @gleam_wallet's mentions, where members with a spare seat can find it.
+const X_ASK_URL = "https://x.com/intent/post?text=%40gleam_wallet%20";
 
 const MESSAGES: Record<Exclude<InviteRedeemResult, "ok">, string> = {
   full: "That code is full. Its seats have all been taken.",
@@ -185,22 +187,22 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         </button>
         {showAsk ? (
           <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
+            <Button asChild variant={full ? "primary" : "secondary"}>
+              <a href={X_ASK_URL} target="_blank" rel="noreferrer">
+                Ask for an invite on X
+              </a>
+            </Button>
             <p className="text-center text-caption text-muted">
-              Get an invite from a member or watch{" "}
+              or{" "}
               <a
                 href={X_PROFILE_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline underline-offset-2"
               >
-                for drops on X
+                follow @gleam_wallet for drops
               </a>
             </p>
-            <Button asChild variant={full ? "primary" : "secondary"}>
-              <a href={xIntentUrl(full ? fullInvitePost() : askInvitePost())} target="_blank" rel="noreferrer">
-                Ask for an invite on X
-              </a>
-            </Button>
           </div>
         ) : null}
       </div>
