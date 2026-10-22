@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
-import type { LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
+import type { DisplaySettings, LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SettingsHomeView } from "./SettingsHomeView";
 
@@ -21,6 +21,7 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 const LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const NETWORK_SETTINGS: NetworkSettings = { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
+const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", showChart: true, headline: "total", balancesHidden: false };
 
 function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
@@ -29,6 +30,8 @@ function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): Run
     if (type === "getThemePreference") return { theme: overrides.theme ?? "light" } satisfies ThemeSettings;
     if (type === "setThemePreference") return undefined;
     if (type === "getScanStats") return null;
+    if (type === "getDisplaySettings") return DISPLAY_SETTINGS;
+    if (type === "setDisplaySettings") return undefined;
     throw new Error(`Unexpected message type "${type}"`);
   }) as RuntimePort["send"];
 }
@@ -44,6 +47,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenNetworkPeers={vi.fn()}
       onOpenManageTokens={vi.fn()}
       onOpenContacts={vi.fn()}
+      onOpenDisplayCurrency={vi.fn()}
       onOpenUpload={vi.fn()}
       onOpenFeedback={vi.fn()}
       {...overrides}
@@ -211,5 +215,36 @@ describe("SettingsHomeView", () => {
     await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
     expect(screen.queryByText("Import & export")).toBeNull();
     expect(screen.queryByText("About")).toBeNull();
+  });
+
+  it("shows the display currency and opens the picker from its row", async () => {
+    const onOpenDisplayCurrency = vi.fn();
+    renderSettingsHome({ onOpenDisplayCurrency });
+
+    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Currency" }));
+
+    expect(onOpenDisplayCurrency).toHaveBeenCalled();
+  });
+
+  it("saves the main balance choice and the chart toggle", async () => {
+    const send = successfulSend();
+    renderSettingsHome({ runtime: fakeRuntime({ send }) });
+
+    const select = await screen.findByLabelText("Main balance");
+    await waitFor(() => expect((select as HTMLSelectElement).disabled).toBe(false));
+    fireEvent.change(select, { target: { value: "AO" } });
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, headline: "AO" } }),
+    );
+
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Balance chart/i }));
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "setDisplaySettings",
+        payload: { ...DISPLAY_SETTINGS, headline: "AO", showChart: false },
+      }),
+    );
+    expect(screen.getByRole("menuitemcheckbox", { name: /Balance chart/i }).getAttribute("aria-checked")).toBe("false");
   });
 });
