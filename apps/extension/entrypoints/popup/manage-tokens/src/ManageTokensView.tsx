@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort, TokenBalance } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
+import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
@@ -44,6 +45,8 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  // The id in the field now, so a preview that resolves after the field changed is dropped.
+  const currentIdRef = useRef("");
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -72,12 +75,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
     void queryClient.invalidateQueries({ queryKey: walletQueryKeys.balances(address) });
   };
 
-  const handlePreview = async () => {
-    const processId = newProcessId.trim();
-    if (processId.length === 0) {
-      setAddError("Paste a token's process id.");
-      return;
-    }
+  const handlePreview = async (processId: string) => {
     if (!PROCESS_ID.test(processId)) {
       setAddError(
         `A process id is 43 letters, digits, - and _ (this is ${processId.length}). Copy the whole id from the token's page or explorer.`,
@@ -97,11 +95,11 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
         type: "previewWatchedToken",
         payload: { address, processId },
       });
-      setPreview(balance);
+      if (currentIdRef.current === processId) setPreview(balance);
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : String(error));
+      if (currentIdRef.current === processId) setAddError(error instanceof Error ? error.message : String(error));
     } finally {
-      setPreviewing(false);
+      if (currentIdRef.current === processId) setPreviewing(false);
     }
   };
 
@@ -245,11 +243,19 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               placeholder="AO process id"
               value={newProcessId}
               onChange={(event) => {
+                const processId = event.target.value.trim();
+                currentIdRef.current = processId;
                 setNewProcessId(event.target.value);
                 setAddError(null);
                 setPreview(null);
+                setPreviewing(false);
+                // A whole id previews at once, pasted or typed; anything shorter waits for blur to explain itself.
+                if (PROCESS_ID.test(processId)) void handlePreview(processId);
               }}
-              onBlur={() => void handlePreview()}
+              onBlur={() => {
+                const processId = newProcessId.trim();
+                if (processId.length > 0 && !PROCESS_ID.test(processId)) void handlePreview(processId);
+              }}
               className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
             />
             {addError ? (
@@ -284,15 +290,11 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 ) : null}
               </div>
             ) : null}
-            <button
-              type="button"
-              disabled={previewing || adding || (!preview && newProcessId.trim().length === 0)}
-              onClick={() => void (preview ? handleConfirmAdd() : handlePreview())}
-              className="flex w-full items-center gap-2 py-1 text-left text-label font-semibold text-muted hover:text-foreground disabled:opacity-60"
-            >
-              <PlusIcon />
-              {adding ? "Adding…" : preview ? `Add ${preview.ticker}` : "Preview"}
-            </button>
+            {preview ? (
+              <Button className="mt-1" disabled={adding} onClick={() => void handleConfirmAdd()}>
+                {adding ? "Adding…" : `Add ${preview.ticker}`}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -304,14 +306,6 @@ function RemoveIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
