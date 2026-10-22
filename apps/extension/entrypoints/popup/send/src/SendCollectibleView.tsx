@@ -25,7 +25,7 @@ import { RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./Se
 
 /**
  * Compose → review → success for one collectible: recipient only, since
- * a collectible is sent whole. The network fee is AR, quoted on Continue.
+ * a collectible is sent whole. The network fee is AR, quoted on Review send.
  */
 export interface SendCollectibleViewProps {
   runtime: RuntimePort;
@@ -184,7 +184,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           ) : null}
 
           <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={() => void handleContinue()} className="mt-auto">
-            {step.submitting ? "Checking…" : "Continue"}
+            {step.submitting ? "Estimating fee…" : parsed.success ? "Review send" : "Enter an address"}
           </Button>
         </div>
       </div>
@@ -286,7 +286,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             onClick={() => void handleSign()}
             className="mt-auto"
           >
-            {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Signing…") : "Sign and send"}
+            {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Sending…") : "Send collectible"}
           </Button>
         </div>
       </div>

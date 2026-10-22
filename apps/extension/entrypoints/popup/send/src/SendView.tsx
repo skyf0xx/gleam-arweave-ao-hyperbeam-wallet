@@ -506,11 +506,17 @@ function ComposeStep({
   const ticker = tickerFor(token);
   // Every non-AR send is an AO data item, which a Ledger can't sign yet.
   const unsupported = token === null ? null : capabilityRefusal(wallet.method, "signDataItem", `send ${ticker}`);
-  const canContinue =
-    !step.submitting &&
-    unsupported === null &&
-    recipientSchema.safeParse(step.recipient).success &&
-    amountSchema(denomination).safeParse(step.amountDisplay).success;
+  const recipientValid = recipientSchema.safeParse(step.recipient).success;
+  const amountValid = amountSchema(denomination).safeParse(step.amountDisplay).success;
+  const canContinue = !step.submitting && unsupported === null && recipientValid && amountValid;
+  // A disabled button names what's missing rather than leaving it to guesswork.
+  const continueLabel = step.submitting
+    ? "Estimating fee…"
+    : !recipientValid
+      ? "Enter an address"
+      : !amountValid
+        ? "Enter an amount"
+        : "Review send";
   // For AR, Max is balance minus the rough fee estimate (clamped to 0),
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
@@ -648,7 +654,7 @@ function ComposeStep({
         ) : null}
 
         <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
-          {step.submitting ? "Checking…" : "Continue"}
+          {continueLabel}
         </Button>
       </div>
     </div>
@@ -938,7 +944,11 @@ function ReviewStep({
           onClick={onSign}
           className="mt-auto"
         >
-          {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Signing…") : "Sign and send"}
+          {step.submitting
+            ? signsOnDevice
+              ? "Waiting for approval…"
+              : "Sending…"
+            : `Send ${formatAmount(step.amountAtomic, token)} ${ticker}`}
         </Button>
       </div>
     </div>
