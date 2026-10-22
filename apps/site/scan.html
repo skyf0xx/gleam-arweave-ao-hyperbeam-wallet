@@ -81,8 +81,8 @@
       </section>
     </div>
 
-    <section class="sc-section" id="review" aria-labelledby="review-h">
-      <h2 id="review-h">Review a release</h2>
+    <section class="sc-section sc-section-flush" id="review" aria-labelledby="review-h">
+      <h2 id="review-h"><span class="sc-num">1.</span> Review a release</h2>
       <p class="sc-intro">Your coding agent reviews the current release and writes a report, which you sign with your
         Gleam wallet.</p>
       <p class="sc-intro">The first 100 signed reviews of each release are awarded GLEAM.</p>
@@ -97,25 +97,27 @@
           <button class="button" type="button" aria-describedby="agent-line-label" data-copy>Copy prompt</button>
           <span class="copybox-status small" role="status" aria-live="polite" data-copy-status></span>
         </div>
+        <details class="copybox-note small">
+          <summary>Requirements</summary>
+          <p>You'll need a Gleam wallet enrolled in <a target="_blank" href="gleam.html">Gleam Points</a> and a coding
+            agent that can run commands on your computer. Browser chats can't run it.</p>
+        </details>
       </div>
 
-      <h3>What the review does</h3>
-      <ol class="sc-steps">
-        <li><p>Your agent clones Gleam's public code at the release tag and runs its tests.</p></li>
-        <li><p>It runs <a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">Google's
-              OSV-Scanner</a> to check for publicly reported vulnerabilities in Gleam's dependencies.</p></li>
-        <li><p>It reviews Gleam's security-relevant code and answers questions about specific functions, to show it
-            read the code.</p></li>
-        <li><p>You open a link in your Gleam wallet and sign the review's attestation, which records the release,
-            model and result.</p></li>
-      </ol>
-
-      <h3>What you need</h3>
-      <ul class="sc-prose">
-        <li>A Gleam wallet enrolled in <a target="_blank" href="gleam.html">Gleam Points</a>.</li>
-        <li>A coding agent that can run commands on your computer, such as Claude Code, Codex CLI, Gemini CLI or
-          Cursor Agent. Browser chats can't run it.</li>
-      </ul>
+      <div class="faq sc-faq sc-faq-flush">
+        <details>
+          <summary>Review <span aria-hidden="true">→</span> Sign <span aria-hidden="true">→</span> Earn</summary>
+          <ol class="sc-steps">
+            <li><p>Your agent clones Gleam's public code at the release tag and runs its tests.</p></li>
+            <li><p>It runs <a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">Google's
+                  OSV-Scanner</a> to check for publicly reported vulnerabilities in Gleam's dependencies.</p></li>
+            <li><p>It reviews Gleam's security-relevant code and answers challenges about specific functions, to show it
+                read the code.</p></li>
+            <li><p>You open a link in your Gleam wallet and sign the review's attestation, which records the release,
+                model and result.</p></li>
+          </ol>
+        </details>
+      </div>
 
       <h3>Review rewards</h3>
       <dl class="figures" data-review-figures hidden>
@@ -128,20 +130,25 @@
           <dd><span data-stat-reward>–</span> <span class="figures-unit">GLEAM</span></dd>
         </div>
       </dl>
-      <ul class="sc-prose">
-        <li>Each release has 100 paid reviews.</li>
-        <li>Reviews 1 to 20 earn 0.1% of the GLEAM points minted the previous day. Reviews 21 to 100 earn 0.02%.</li>
-        <li>Each wallet can submit one review per release.</li>
-        <li>After 100, reviews are still recorded and published, but they earn nothing unless they find a
-          vulnerability.</li>
-        <li>Paid places reset with each new release.</li>
-      </ul>
+      <div class="faq sc-faq sc-faq-flush">
+        <details>
+          <summary>Review rules</summary>
+          <ul class="sc-prose">
+            <li>Each release has 100 paid reviews.</li>
+            <li>Reviews 1 to 20 earn 0.1% of the GLEAM points minted the previous day. Reviews 21 to 100 earn 0.02%.</li>
+            <li>Each wallet can submit one review per release.</li>
+            <li>After 100, reviews are still recorded and published, but they earn nothing unless they find a
+              vulnerability.</li>
+            <li>Paid places reset with each new release.</li>
+          </ul>
+        </details>
+      </div>
     </section>
 
-    <section class="sc-section" id="report" aria-labelledby="report-h">
-      <h2 id="report-h">Report a vulnerability</h2>
-      <p class="sc-intro">Gleam's bounty pool grows daily. A maintainer checks each report, and confirmed
-        vulnerabilities are awarded a share of the pool based on severity.</p>
+    <section class="sc-section sc-section-flush" id="report" aria-labelledby="report-h">
+      <h2 id="report-h"><span class="sc-num">2.</span> Report a vulnerability</h2>
+      <p class="sc-intro">If your review finds a vulnerability, your agent will guide you in reporting it and you earn a
+        share of Gleam's bounty pool. The bounty pool grows daily.</p>
 
       <dl class="figures" data-pool-figures hidden>
         <div>
@@ -150,43 +157,48 @@
         </div>
       </dl>
 
-      <h3>How to report</h3>
-      <p class="sc-body">Report privately through GitHub's private vulnerability reporting. If your agent found the
-        problem during a review, it files the report for you and includes the attestation id.</p>
-      <p class="sc-report-action">
-        <a class="button button-quiet"
-          href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/security/advisories/new" target="_blank"
-          rel="noopener">Report privately on GitHub <span class="btn-arrow" aria-hidden="true">↗</span></a>
-      </p>
-      <p class="small sc-body">Maintainers aim to acknowledge reports within a few days. See the
-        <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md" target="_blank"
-          rel="noopener">security policy</a> for scope and what to include.</p>
-
-      <h3>Bounty rules</h3>
-      <ul class="sc-prose">
-        <li>The pool grows each day by 2% of the GLEAM points minted the previous day.</li>
-        <li>A confirmed vulnerability is awarded a share of the pool at the time it's confirmed:
-          <table class="tiers">
-            <caption class="visually-hidden">Share of the bounty pool by severity</caption>
-            <thead>
-              <tr><th scope="col">Severity</th><th scope="col" class="num">Share of pool</th></tr>
-            </thead>
-            <tbody data-tiers>
-              <tr><th scope="row">Critical</th><td class="num">50%</td></tr>
-              <tr><th scope="row">High</th><td class="num">25%</td></tr>
-              <tr><th scope="row">Medium</th><td class="num">10%</td></tr>
-              <tr><th scope="row">Low</th><td class="num">2%</td></tr>
-            </tbody>
-          </table>
-        </li>
-        <li>A maintainer sets the severity using the
-          <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md#severity"
-            target="_blank" rel="noopener">criteria in our security policy</a>.</li>
-        <li>Only the first report of each vulnerability is awarded a share.</li>
-        <li>Small issues may go through a public pull request. Anything that could put keys or funds at risk must go
-          through a private advisory.</li>
-        <li>Unclaimed balance stays in the pool.</li>
-      </ul>
+      <div class="faq sc-faq sc-faq-flush">
+        <details>
+          <summary>How to report</summary>
+          <p class="sc-body">Report privately through GitHub's private vulnerability reporting. If your agent found the
+            problem during a review, it files the report for you and includes the attestation id.</p>
+          <p class="sc-report-action">
+            <a class="button button-quiet"
+              href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/security/advisories/new" target="_blank"
+              rel="noopener">Report privately on GitHub <span class="btn-arrow" aria-hidden="true">↗</span></a>
+          </p>
+          <p class="small sc-body">Maintainers aim to acknowledge reports within a few days. See the
+            <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md" target="_blank"
+              rel="noopener">security policy</a> for scope and what to include.</p>
+        </details>
+        <details>
+          <summary>Bounty rules</summary>
+          <ul class="sc-prose">
+            <li>The pool grows each day by 2% of the GLEAM points minted the previous day.</li>
+            <li>A confirmed vulnerability is awarded a share of the pool at the time it's confirmed:
+              <table class="tiers">
+                <caption class="visually-hidden">Share of the bounty pool by severity</caption>
+                <thead>
+                  <tr><th scope="col">Severity</th><th scope="col" class="num">Share of pool</th></tr>
+                </thead>
+                <tbody data-tiers>
+                  <tr><th scope="row">Critical</th><td class="num">50%</td></tr>
+                  <tr><th scope="row">High</th><td class="num">25%</td></tr>
+                  <tr><th scope="row">Medium</th><td class="num">10%</td></tr>
+                  <tr><th scope="row">Low</th><td class="num">2%</td></tr>
+                </tbody>
+              </table>
+            </li>
+            <li>A maintainer sets the severity using the
+              <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md#severity"
+                target="_blank" rel="noopener">criteria in our security policy</a>.</li>
+            <li>Only the first report of each vulnerability is awarded a share.</li>
+            <li>Small issues may go through a public pull request. Anything that could put keys or funds at risk must go
+              through a private advisory.</li>
+            <li>Unclaimed balance stays in the pool.</li>
+          </ul>
+        </details>
+      </div>
     </section>
 
     <aside class="sc-disclaimer" aria-labelledby="disclaimer-h">
@@ -197,7 +209,7 @@
         possible.</p>
     </aside>
 
-    <section class="sc-section" aria-labelledby="faq-h">
+    <section class="sc-section sc-section-flush" aria-labelledby="faq-h">
       <h2 id="faq-h">Questions</h2>
       <div class="faq">
         <details>

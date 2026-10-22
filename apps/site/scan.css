@@ -84,6 +84,19 @@
 
 .copybox-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .copybox-actions .button { min-width: 148px; justify-content: center; }
+.copybox-note { margin: 14px 0 0; max-width: 40em; }
+.copybox-note summary {
+  display: inline;
+  cursor: pointer;
+  list-style: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.copybox-note summary::-webkit-details-marker { display: none; }
+.copybox-note summary:hover { color: var(--fg); }
+.copybox-note summary:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; border-radius: 2px; }
+.copybox-note p { margin: 8px 0 0; }
+.copybox-note a { color: var(--fg); text-underline-offset: 3px; }
 
 .copybox-status { display: inline-flex; align-items: center; gap: 6px; color: #16a34a; }
 .copybox-status:empty { display: none; }
@@ -157,7 +170,23 @@
 .sc-paths a:hover .sc-path-title { text-decoration: underline; text-underline-offset: 3px; }
 .sc-path-title { font-weight: 600; }
 .sc-path-text { font-size: 0.9375rem; color: var(--muted); }
-.sc-path-reward { margin-top: 2px; font-size: 0.8125rem; font-weight: 500; color: var(--fg); }
+.sc-path-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-self: start;
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.sc-path-reward::before {
+  content: "";
+  flex: none;
+  width: 13px;
+  height: 15px;
+  background: url("favicon.svg") center / contain no-repeat;
+}
 
 /* The record: what anyone can check on the results page. Hairlines, modest figures. */
 
@@ -234,7 +263,9 @@
 /* Sections */
 
 .sc-section { margin-top: clamp(48px, 8vh, 80px); padding-top: 28px; border-top: 1px solid var(--line); }
+.sc-section-flush { padding-top: 0; border-top: 0; }
 .sc-section h2, .sc-cta h2 { margin: 0 0 20px; font-size: clamp(1.625rem, 2.4vw, 2rem); line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; }
+.sc-num { color: var(--muted); font-variant-numeric: tabular-nums; }
 .sc-section > .small { margin: 16px 0 0; max-width: 42em; }
 .sc-section { scroll-margin-top: 80px; }
 .sc-section h3 { margin: 40px 0 14px; font-size: 1.0625rem; line-height: 1.3; letter-spacing: -0.01em; font-weight: 600; }
@@ -279,6 +310,13 @@
 .faq details:last-child { border-bottom: 1px solid var(--line); }
 .faq summary { padding: 16px 0; font-weight: 600; cursor: pointer; }
 .faq details p { margin: 0 0 18px; max-width: 42em; color: var(--muted); }
+.sc-faq { margin-top: 32px; }
+.sc-faq-flush details:first-child { border-top: 0; }
+.sc-faq details > :last-child { margin-bottom: 18px; }
+.sc-faq details p:not(.small) { color: inherit; }
+.sc-faq .sc-steps { margin: 0 0 8px; }
+.sc-faq .sc-steps li:last-child { border-bottom: 0; }
+.sc-faq .sc-steps p { margin: 0; }
 
 /* Results: coverage bar is a hairline track with an ink fill; its width is the share examined. */
 
