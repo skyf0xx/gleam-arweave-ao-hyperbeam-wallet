@@ -34,7 +34,8 @@ import { NetworkErrorBanner } from "./NetworkErrorBanner";
  * `headline` (a token balance), which demotes the total to a smaller line
  * beside the %-change. `onToggleMasked` makes that figure a button that
  * hides or shows balances; `masked` swaps both figures for dots.
- * `showChart: false` drops the chart and range tabs and keeps the figures.
+ * `showChart: false` drops the chart and range tabs and keeps the figures,
+ * moving the %-change down beside the period it covers.
  *
  * Color rule: reuses `--color-positive` for gains and `--color-negative`
  * for losses — both real `@theme` tokens, never `--color-beam-red`/
@@ -205,27 +206,30 @@ export function PortfolioChart({
           <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
             <div className="flex items-baseline gap-2.5">
               <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
-              {headline === undefined ? changeBadge : null}
+              {headline === undefined && showChart ? changeBadge : null}
             </div>
             {headline !== undefined ? (
               <div className="flex items-baseline gap-2.5">
                 <span className="text-label tabular-nums text-muted">{totalLabel}</span>
-                {changeBadge}
+                {showChart ? changeBadge : null}
               </div>
             ) : null}
-            <div className="grid text-caption text-muted">
-              <span
-                aria-hidden={flash ? true : undefined}
-                className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
-              >
-                {periodLabel || " "}
-              </span>
-              <span
-                aria-live="polite"
-                className={cn("col-start-1 row-start-1 transition-opacity duration-300", !flash && "opacity-0")}
-              >
-                {flash ?? lastFlashRef.current}
-              </span>
+            <div className="flex items-baseline gap-2">
+              {showChart ? null : changeBadge}
+              <div className="grid text-caption text-muted">
+                <span
+                  aria-hidden={flash ? true : undefined}
+                  className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
+                >
+                  {periodLabel || " "}
+                </span>
+                <span
+                  aria-live="polite"
+                  className={cn("col-start-1 row-start-1 transition-opacity duration-300", !flash && "opacity-0")}
+                >
+                  {flash ?? lastFlashRef.current}
+                </span>
+              </div>
             </div>
           </div>
 
