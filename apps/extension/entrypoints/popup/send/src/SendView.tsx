@@ -1,12 +1,15 @@
 import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type FeeEstimate, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
+import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "@/src/address-identity";
+import { useDisplaySettings } from "@/src/display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
+import { useTokenPrices } from "../../main-screen/src/useTokenPrices";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useActivity } from "../../activity/src/useActivity";
 import { useArFee } from "../../activity/src/useArFee";
@@ -159,6 +162,12 @@ function formatAmount(atomic: string, token: TokenBalance | null): string {
   return token === null ? formatWinstonAsAr(atomic) : formatAtomicAsDisplay(atomic, token.denomination);
 }
 
+/** `TokenPrice.price` is `null` for a token that couldn't be priced; that reads as no price here. */
+function priceFor(prices: TokenPrice[] | undefined, token: TokenBalance | null): number | undefined {
+  const price = prices?.find((entry) => entry.processId === (token === null ? null : token.processId))?.price;
+  return typeof price === "number" ? price : undefined;
+}
+
 export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewProps) {
   const [step, setStep] = useState<Step>(INITIAL_STEP);
   // Store the compose step state when opening the token picker so we can restore it
@@ -178,6 +187,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   // the compose step's "Max" affordance and its balance check (see
   // `useArFee`'s own doc comment for why it isn't wallet-address-keyed).
   const arFeeQuery = useArFee(runtime);
+  const currency = useDisplaySettings(runtime).settings?.currency;
+  const tokenPricesQuery = useTokenPrices(runtime, currency);
   // Invalidates the shared balances/activity cache for `wallet.address` on
   // success so both Send and Main Screen reflect the updated balance
   // without a manual popup reopen, wrapping the same `submitTransfer` call
@@ -301,6 +312,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         token={selectedToken}
         balancesQuery={balancesQuery}
         arFeeAtomic={arFeeQuery.data}
+        price={priceFor(tokenPricesQuery.data, selectedToken)}
+        currency={currency}
         step={step}
         knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
         emphasisPick={emphasisPick}
@@ -445,6 +458,8 @@ function ComposeStep({
   token,
   balancesQuery,
   arFeeAtomic,
+  price,
+  currency,
   step,
   knownName,
   emphasisPick,
@@ -466,6 +481,9 @@ function ComposeStep({
   token: TokenBalance | null;
   balancesQuery: UseQueryResult<WalletBalances>;
   arFeeAtomic: string | undefined;
+  /** The selected token's spot price in `currency`; `undefined` when unpriced or still loading. */
+  price: number | undefined;
+  currency: DisplayCurrency | undefined;
   step: Extract<Step, { kind: "compose" }>;
   knownName: string | undefined;
   emphasisPick: number | null;
@@ -508,14 +526,35 @@ function ComposeStep({
         : undefined
       : rawMaxAtomic;
   const maxDisplay = maxAtomic === undefined ? undefined : formatAtomicAsDisplay(maxAtomic, denomination);
+  const balanceDisplay = rawMaxAtomic === undefined ? undefined : formatAtomicAsDisplay(rawMaxAtomic, denomination);
+  const amountNumber = Number(step.amountDisplay);
+  // Display only: the value line is an estimate, so a float is fine here.
+  // Priced in the token being sent, it would only repeat the amount.
+  const fiatDisplay =
+    price !== undefined &&
+    currency !== undefined &&
+    currency !== ticker &&
+    step.amountDisplay.length > 0 &&
+    Number.isFinite(amountNumber)
+      ? formatCurrencyValue(amountNumber * price, currency)
+      : undefined;
+  const identity = useAddressIdentity();
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={`Send ${ticker}`} onBack={onBack} />
       <div className="flex flex-1 flex-col gap-6 px-5 py-5">
-        <div className="flex items-center justify-between text-label">
+        <div className="flex items-center justify-between gap-3 text-label">
           <span className="font-semibold text-muted">From</span>
-          <span className="font-semibold text-foreground">{wallet.name}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label={`${wallet.name} avatar`} size={20} />
+            <span className="truncate font-semibold text-foreground">{wallet.name}</span>
+            {balanceDisplay !== undefined ? (
+              <span className="flex-shrink-0 tabular-nums text-muted">
+                · {balanceDisplay} {ticker}
+              </span>
+            ) : null}
+          </span>
         </div>
 
         <RecipientField
@@ -539,43 +578,50 @@ function ComposeStep({
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-label font-semibold text-muted">Amount</span>
-            {maxDisplay !== undefined ? (
+          </div>
+          <div className="flex flex-col gap-0.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                aria-label="Amount"
+                placeholder="0"
+                value={step.amountDisplay}
+                onChange={(event) => {
+                  const sanitized = sanitizeAmountInput(event.target.value);
+                  const denomination = token === null ? 12 : token.denomination;
+                  const atomic = parseDisplayToAtomic(sanitized, denomination);
+                  if (atomic !== null && maxAtomic !== undefined && BigInt(atomic) > BigInt(maxAtomic)) {
+                    return;
+                  }
+                  onChange({ amountDisplay: sanitized });
+                }}
+                onBlur={onBlurAmount}
+                className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
+              />
+              {maxDisplay !== undefined ? (
+                <button
+                  type="button"
+                  aria-label={`Max: ${maxDisplay}`}
+                  onClick={() => onChange({ amountDisplay: maxDisplay })}
+                  className="flex-shrink-0 rounded-full px-2 py-1.5 text-caption font-semibold uppercase tracking-wide text-muted hover:bg-mist hover:text-foreground"
+                >
+                  Max
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => onChange({ amountDisplay: maxDisplay })}
-                className="text-label font-medium text-muted hover:text-foreground hover:underline"
+                onClick={onOpenTokenPicker}
+                aria-haspopup="dialog"
+                className="flex flex-shrink-0 items-center gap-1 rounded-full border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line"
               >
-                Max: {maxDisplay}
+                {ticker}
+                <ChevronDownIcon />
               </button>
+            </div>
+            {fiatDisplay !== undefined ? (
+              <span className="text-caption tabular-nums text-muted">≈ {fiatDisplay}</span>
             ) : null}
-          </div>
-          <div className="flex items-center gap-2.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={step.amountDisplay}
-              onChange={(event) => {
-                const sanitized = sanitizeAmountInput(event.target.value);
-                const denomination = token === null ? 12 : token.denomination;
-                const atomic = parseDisplayToAtomic(sanitized, denomination);
-                if (atomic !== null && maxAtomic !== undefined && BigInt(atomic) > BigInt(maxAtomic)) {
-                  return;
-                }
-                onChange({ amountDisplay: sanitized });
-              }}
-              onBlur={onBlurAmount}
-              className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={onOpenTokenPicker}
-              aria-haspopup="dialog"
-              className="flex flex-shrink-0 items-center gap-1 rounded-full border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line"
-            >
-              {ticker}
-              <ChevronDownIcon />
-            </button>
           </div>
           {step.amountError ? (
             <div role="alert" className="text-label leading-snug text-warning">
@@ -668,8 +714,9 @@ export function RecipientField({
           onEdit={() => setEditing("refocus")}
         />
       ) : (
-        <textarea
-          rows={2}
+        <input
+          type="text"
+          spellCheck={false}
           aria-label="Recipient address"
           autoFocus={editing === "refocus"}
           value={recipient}

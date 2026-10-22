@@ -68,7 +68,7 @@ function enterRecipient(value: string) {
 describe("SendCollectibleView", () => {
   it("has no amount field", () => {
     setup();
-    expect(screen.queryByPlaceholderText("0.00")).toBeNull();
+    expect(screen.queryByPlaceholderText("0")).toBeNull();
     expect(screen.queryByText(/Max/)).toBeNull();
     expect(screen.getByText("Beam #1")).toBeTruthy();
   });
