@@ -11,20 +11,22 @@ import {
 import type { Db, Queryable } from "./db";
 
 export const MEMBER_CODE_SEATS = 3;
+export const SEATS_PER_CONVERSION = 2;
 
 /**
- * Redemptions of a member code whose install hasn't registered a wallet
- * yet, for the code in `wallets` alias `w`. Only these hold a seat: once
- * the let-in install registers, its seat goes back to the member. If that
- * install later leaves, its device and redemption are deleted, so the
- * count doesn't change either way.
+ * The member code's seat balance before the floor at zero, for the code
+ * in `wallets` alias `w`. Each redemption takes a seat, and once the
+ * let-in install registers a wallet it gives back SEATS_PER_CONVERSION,
+ * so seats pile up with members whose invites turn into members and run
+ * out for the rest. If that install later leaves, its device and
+ * redemption are deleted and its extra seat goes with them.
  */
-export const PENDING_MEMBER_REDEMPTIONS_SQL = `(SELECT count(*) FROM invite_redemptions ir
-   WHERE ir.code = w.invite_code
-     AND NOT EXISTS (SELECT 1 FROM wallets x WHERE x.device_id = ir.device_id))`;
+export const MEMBER_SEAT_BALANCE_SQL = `(${MEMBER_CODE_SEATS} + (SELECT coalesce(sum(
+     CASE WHEN EXISTS (SELECT 1 FROM wallets x WHERE x.device_id = ir.device_id) THEN ${SEATS_PER_CONVERSION - 1} ELSE -1 END
+   ), 0) FROM invite_redemptions ir WHERE ir.code = w.invite_code))`;
 
-export function memberSeatsLeft(pendingRedemptions: number, pointsPhase: 1 | 2): number | null {
-  return pointsPhase === 1 ? Math.max(0, MEMBER_CODE_SEATS - pendingRedemptions) : null;
+export function memberSeatsLeft(seatBalance: number, pointsPhase: 1 | 2): number | null {
+  return pointsPhase === 1 ? Math.max(0, seatBalance) : null;
 }
 
 export type InviteCodeKind = "member" | "drop";
@@ -152,7 +154,7 @@ async function seatsForCode(
 ): Promise<{ kind: InviteCodeKind; seatsLeft: number | null } | null> {
   if (lock) await db.query("SELECT 1 FROM wallets WHERE invite_code = $1 FOR NO KEY UPDATE", [code]);
   const member = await db.query<{ n: string }>(
-    `SELECT ${PENDING_MEMBER_REDEMPTIONS_SQL}::text AS n FROM wallets w WHERE w.invite_code = $1`,
+    `SELECT ${MEMBER_SEAT_BALANCE_SQL}::text AS n FROM wallets w WHERE w.invite_code = $1`,
     [code],
   );
   if (member.rows[0]) return { kind: "member", seatsLeft: memberSeatsLeft(Number(member.rows[0].n), pointsPhase) };

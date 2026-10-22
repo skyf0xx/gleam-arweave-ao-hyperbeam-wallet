@@ -1,5 +1,5 @@
 import type { Queryable } from "./db";
-import { MEMBER_CODE_SEATS, PENDING_MEMBER_REDEMPTIONS_SQL } from "./invite";
+import { MEMBER_SEAT_BALANCE_SQL } from "./invite";
 
 const RETENTION_DAYS = 28;
 
@@ -27,7 +27,7 @@ export interface DropCodeStats {
 export interface Funnel {
   member: CodeKindCounts;
   drop: CodeKindCounts;
-  /** Member-code redemptions whose install has registered, returning the seat. */
+  /** Member-code redemptions whose install has registered, each giving seats back. */
   seatsRefilled: number;
   /** Seats left across all member codes under the Phase 1 rule. */
   memberSeatsUnused: number;
@@ -66,8 +66,7 @@ export async function readFunnel(db: Queryable, now: Date): Promise<Funnel> {
   const drop = counts(Number(row(true)?.redemptions ?? 0), Number(row(true)?.claims ?? 0));
 
   const unused = await db.query<{ n: string }>(
-    `SELECT coalesce(sum(greatest(0, $1::int - ${PENDING_MEMBER_REDEMPTIONS_SQL})), 0)::text AS n FROM wallets w`,
-    [MEMBER_CODE_SEATS],
+    `SELECT coalesce(sum(greatest(0, ${MEMBER_SEAT_BALANCE_SQL})), 0)::text AS n FROM wallets w`,
   );
 
   const drops = await db.query<{

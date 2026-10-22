@@ -127,7 +127,7 @@ describe("POST /invite/redeem", () => {
     expect((await db.query("SELECT 1 FROM devices WHERE id = $1", [newcomer.id])).rows).toEqual([]);
   });
 
-  it("hands a seat back when an install it let in registers a wallet", async () => {
+  it("gives two seats back when an install it let in registers a wallet", async () => {
     const { db, check, post, redeem, register, me } = await setup();
     const alicesDevice = await createTestDevice();
     await addMember(db, alice, alicesDevice);
@@ -139,12 +139,12 @@ describe("POST /invite/redeem", () => {
 
     await register(bob, letIn, "ALICE001");
 
-    expect((await check("ALICE001")).json.seatsLeft).toBe(1);
-    expect(((await me(alicesDevice)).json.wallets as { seatsLeft: number }[])[0]?.seatsLeft).toBe(1);
+    expect((await check("ALICE001")).json.seatsLeft).toBe(2);
+    expect(((await me(alicesDevice)).json.wallets as { seatsLeft: number }[])[0]?.seatsLeft).toBe(2);
     expect((await redeem(await createTestDevice(), "ALICE001")).json.result).toBe("ok");
-    expect((await check("ALICE001")).json.seatsLeft).toBe(0);
+    expect((await check("ALICE001")).json.seatsLeft).toBe(1);
 
-    // The let-in install leaving deletes its redemption, which no longer held a seat.
+    // The let-in install leaving deletes its redemption, and the extra seat it gave goes with it.
     expect((await post("/leave", await leaveBody(bob, NOW_SECONDS))).status).toBe(200);
     expect((await check("ALICE001")).json.seatsLeft).toBe(0);
     expect((await redemptions(db)).some((r) => r.device_id === letIn.id)).toBe(false);
