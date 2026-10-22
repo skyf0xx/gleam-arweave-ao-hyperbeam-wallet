@@ -238,13 +238,13 @@ describe("SettingsHomeView", () => {
       expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, headline: "AO" } }),
     );
 
-    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Balance chart/i }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Portfolio chart/i }));
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
         type: "setDisplaySettings",
         payload: { ...DISPLAY_SETTINGS, headline: "AO", showChart: false },
       }),
     );
-    expect(screen.getByRole("menuitemcheckbox", { name: /Balance chart/i }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("menuitemcheckbox", { name: /Portfolio chart/i }).getAttribute("aria-checked")).toBe("false");
   });
 });

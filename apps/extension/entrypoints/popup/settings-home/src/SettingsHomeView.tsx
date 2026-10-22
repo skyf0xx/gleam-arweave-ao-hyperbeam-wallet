@@ -163,24 +163,6 @@ export function SettingsHomeView({
           />
         </OptionSection>
 
-        <OptionSection title="Network">
-          <OptionRow
-            divided={false}
-            title="Network & peers"
-            description="Gateway and AO node endpoints"
-            value={
-              state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
-            }
-            onClick={onOpenNetworkPeers}
-          />
-        </OptionSection>
-
-        <OptionSection title="Tools">
-          {/* Bundler uploads don't yet work reliably with current AO wallets;
-              re-enable by restoring onClick={onOpenUpload} below. */}
-          <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
-        </OptionSection>
-
         <OptionSection title="Display">
           <OptionRow
             divided={false}
@@ -197,7 +179,7 @@ export function SettingsHomeView({
             onChange={(headline) => void updateDisplay({ headline })}
           />
           <ToggleRow
-            title="Balance chart"
+            title="Portfolio chart"
             checked={display?.showChart ?? true}
             disabled={!display}
             onToggle={() => void updateDisplay({ showChart: !(display?.showChart ?? true) })}
@@ -207,6 +189,24 @@ export function SettingsHomeView({
             checked={theme === "dark"}
             disabled={savingTheme}
             onToggle={() => void handleToggleTheme()}
+          />
+        </OptionSection>
+
+        <OptionSection title="Tools">
+          {/* Bundler uploads don't yet work reliably with current AO wallets;
+              re-enable by restoring onClick={onOpenUpload} below. */}
+          <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
+        </OptionSection>
+
+        <OptionSection title="Network">
+          <OptionRow
+            divided={false}
+            title="Network & peers"
+            description="Gateway and AO node endpoints"
+            value={
+              state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
+            }
+            onClick={onOpenNetworkPeers}
           />
         </OptionSection>
 
