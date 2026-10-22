@@ -671,7 +671,7 @@ function ComposeStep({
  * The "To" field: address input, the saved-contacts link and the quiet
  * "Save this address" line. While the input has focus, a short list of
  * named addresses drops down under it, filtered by what's typed, ending in
- * "More" for the full picker. Once a valid address loses focus, the input
+ * a "Saved contacts" link to the full picker. Once a valid address loses focus, the input
  * gives way to a card with the address's avatar and chunked form, so it
  * can be checked at a glance before Review send. "Change" brings the
  * input back.
@@ -782,25 +782,28 @@ export function RecipientField({
               onMouseDown={(event) => event.preventDefault()}
               className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-line bg-background shadow-lg"
             >
-              <div className="px-3.5 pb-1 pt-2.5 text-caption font-semibold uppercase tracking-wide text-faint">Saved contacts</div>
-              {shownSuggestions.map((candidate) => (
-                <AddressRow
-                  key={candidate.address}
-                  address={candidate.address}
-                  name={candidate.name}
-                  onSelect={() => {
-                    pickedRef.current = true;
-                    onChangeRecipient(candidate.address);
-                    setEditing("no");
-                  }}
-                />
-              ))}
+              {/* Its own wrapper, so the last row drops its separator and the inset rule below is the only line. */}
+              <div>
+                {shownSuggestions.map((candidate) => (
+                  <AddressRow
+                    key={candidate.address}
+                    address={candidate.address}
+                    name={candidate.name}
+                    onSelect={() => {
+                      pickedRef.current = true;
+                      onChangeRecipient(candidate.address);
+                      setEditing("no");
+                    }}
+                  />
+                ))}
+              </div>
+              <div aria-hidden="true" className="mx-3.5 border-t border-line" />
               <button
                 type="button"
                 onClick={onOpenSavedAddresses}
-                className="w-full border-t border-line px-3.5 py-2.5 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
+                className="w-full px-3.5 py-2.5 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
               >
-                More
+                Saved contacts
               </button>
             </div>
           ) : null}

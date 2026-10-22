@@ -453,7 +453,7 @@ describe("SendView recipient dropdown", () => {
     await waitFor(() => expect(within(list).getAllByRole("button").map((row) => row.textContent)).toEqual([
       expect.stringContaining("Bob"),
       expect.stringContaining("Alice"),
-      "More",
+      "Saved contacts",
     ]));
   });
 
@@ -474,12 +474,12 @@ describe("SendView recipient dropdown", () => {
     expect(screen.queryByLabelText("Recipient address")).toBeNull();
   });
 
-  it("opens the full Saved contacts screen from More", async () => {
+  it("opens the full Saved contacts screen from the dropdown's link", async () => {
     renderWithContacts();
     fireEvent.focus(screen.getByLabelText("Recipient address"));
     const list = await screen.findByRole("listbox", { name: "Saved contacts" });
 
-    fireEvent.click(within(list).getByRole("button", { name: "More" }));
+    fireEvent.click(within(list).getByRole("button", { name: "Saved contacts" }));
 
     expect(await screen.findByRole("dialog", { name: "Saved contacts" })).toBeTruthy();
   });
