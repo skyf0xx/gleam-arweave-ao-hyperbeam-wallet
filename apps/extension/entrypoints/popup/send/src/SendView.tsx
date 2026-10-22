@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -210,6 +210,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const ownWalletFor = (address: string): WalletSummary | undefined =>
     otherWalletsQuery.data?.find((candidate) => candidate.address === address);
   const knownNameFor = (address: string): string | undefined => (contactFor(address) ?? ownWalletFor(address))?.name;
+  // Shared cache with the main screen; orders the recipient dropdown.
+  const activityQuery = useActivity(runtime, wallet.address);
   const { emphasisPick } = useAddressIdentity();
   const lookalikeOf = useLookalikeOf(
     runtime,
@@ -318,6 +320,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
         emphasisPick={emphasisPick}
         lookalikeOf={lookalikeOf}
+        suggestions={namedSuggestions(contactsQuery.data ?? [], otherWalletsQuery.data ?? [], activityQuery.data)}
         onBack={onBack}
         onChange={(patch) =>
           setStep({
@@ -464,6 +467,7 @@ function ComposeStep({
   knownName,
   emphasisPick,
   lookalikeOf,
+  suggestions,
   onBack,
   onChange,
   onBlurRecipient,
@@ -488,6 +492,7 @@ function ComposeStep({
   knownName: string | undefined;
   emphasisPick: number | null;
   lookalikeOf: string | null;
+  suggestions: NamedAddress[];
   onBack: () => void;
   onChange: (patch: Partial<Extract<Step, { kind: "compose" }>>) => void;
   onBlurRecipient: () => void;
@@ -569,6 +574,7 @@ function ComposeStep({
           knownName={knownName}
           emphasisPick={emphasisPick}
           lookalikeOf={lookalikeOf}
+          suggestions={suggestions}
           onChangeRecipient={(recipient) => onChange({ recipient })}
           onBlurRecipient={onBlurRecipient}
           onOpenSavedAddresses={onOpenSavedAddresses}
@@ -662,11 +668,13 @@ function ComposeStep({
 }
 
 /**
- * The "To" field: address input, the saved-addresses link and the quiet
- * "Save this address" line. Once a valid address loses focus, the input
+ * The "To" field: address input, the saved-contacts link and the quiet
+ * "Save this address" line. While the input has focus, a short list of
+ * named addresses drops down under it, filtered by what's typed, ending in
+ * "More" for the full picker. Once a valid address loses focus, the input
  * gives way to a card with the address's avatar and chunked form, so it
- * can be checked at a glance before Continue. "Change" brings the input
- * back.
+ * can be checked at a glance before Review send. "Change" brings the
+ * input back.
  */
 export function RecipientField({
   recipient,
@@ -674,6 +682,7 @@ export function RecipientField({
   knownName,
   emphasisPick,
   lookalikeOf,
+  suggestions,
   onChangeRecipient,
   onBlurRecipient,
   onOpenSavedAddresses,
@@ -692,6 +701,8 @@ export function RecipientField({
   emphasisPick: number | null;
   /** A trusted address this one imitates, warned about while still composing. */
   lookalikeOf: string | null;
+  /** Named addresses for the focus dropdown, most recently sent to first (`namedSuggestions`). */
+  suggestions: NamedAddress[];
   onChangeRecipient: (recipient: string) => void;
   onBlurRecipient: () => void;
   onOpenSavedAddresses: () => void;
@@ -709,6 +720,19 @@ export function RecipientField({
   const identity = useAddressIdentity();
   const avatarSvg = address ? identity.avatarSvg(address) : undefined;
   const showCard = editing === "no" && !recipientError && address !== undefined && avatarSvg !== undefined;
+  // Picking a row swaps the input for the card; a blur fired on the way
+  // out still carries the old text and would flag it as invalid.
+  const pickedRef = useRef(false);
+  const query = recipient.trim().toLowerCase();
+  const shownSuggestions =
+    editing === "focused" && address === undefined
+      ? suggestions
+          .filter(
+            (candidate) =>
+              query.length === 0 || candidate.name.toLowerCase().includes(query) || candidate.address.toLowerCase().includes(query),
+          )
+          .slice(0, SUGGESTION_LIMIT)
+      : [];
 
   return (
     <div className="flex flex-col gap-2">
@@ -731,21 +755,56 @@ export function RecipientField({
           onEdit={() => setEditing("refocus")}
         />
       ) : (
-        <input
-          type="text"
-          spellCheck={false}
-          aria-label="Recipient address"
-          autoFocus={editing === "refocus"}
-          value={recipient}
-          onChange={(event) => onChangeRecipient(event.target.value)}
-          onFocus={() => setEditing("focused")}
-          onBlur={() => {
-            setEditing("no");
-            onBlurRecipient();
-          }}
-          placeholder="Paste an address"
-          className="w-full resize-none rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            spellCheck={false}
+            aria-label="Recipient address"
+            autoFocus={editing === "refocus"}
+            value={recipient}
+            onChange={(event) => onChangeRecipient(event.target.value)}
+            onFocus={() => {
+              pickedRef.current = false;
+              setEditing("focused");
+            }}
+            onBlur={() => {
+              setEditing("no");
+              if (!pickedRef.current) onBlurRecipient();
+            }}
+            placeholder="Paste an address"
+            className="w-full rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
+          />
+          {shownSuggestions.length > 0 ? (
+            <div
+              role="listbox"
+              aria-label="Saved contacts"
+              // Keeps focus in the input, so a click lands before the blur closes the list.
+              onMouseDown={(event) => event.preventDefault()}
+              className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-line bg-background shadow-lg"
+            >
+              <div className="px-3.5 pb-1 pt-2.5 text-caption font-semibold uppercase tracking-wide text-faint">Saved contacts</div>
+              {shownSuggestions.map((candidate) => (
+                <AddressRow
+                  key={candidate.address}
+                  address={candidate.address}
+                  name={candidate.name}
+                  onSelect={() => {
+                    pickedRef.current = true;
+                    onChangeRecipient(candidate.address);
+                    setEditing("no");
+                  }}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={onOpenSavedAddresses}
+                className="w-full border-t border-line px-3.5 py-2.5 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
+              >
+                More
+              </button>
+            </div>
+          ) : null}
+        </div>
       )}
       {recipientError ? (
         <div role="alert" className="text-label leading-snug text-warning">
@@ -1221,6 +1280,37 @@ function PickerSection({ label, divided, children }: { label: string; divided?: 
       {children}
     </section>
   );
+}
+
+export interface NamedAddress {
+  address: string;
+  name: string;
+}
+
+const SUGGESTION_LIMIT = 4;
+
+/**
+ * Saved contacts and the vault's other wallets, for the recipient field's
+ * dropdown, ordered by how recently each was sent to; never-sent-to ones
+ * keep their list order at the end. A contact wins over a wallet with the
+ * same address.
+ */
+export function namedSuggestions(
+  contacts: Contact[],
+  otherWallets: WalletSummary[],
+  activity: ActivityPage | undefined,
+): NamedAddress[] {
+  const contactAddresses = new Set(contacts.map((contact) => contact.address));
+  const named: NamedAddress[] = [
+    ...contacts.map(({ address, name }) => ({ address, name })),
+    ...otherWallets.filter((candidate) => !contactAddresses.has(candidate.address)).map(({ address, name }) => ({ address, name })),
+  ];
+  const recency = activity ? recentSendRecipients(activity) : [];
+  const rank = (address: string) => {
+    const index = recency.indexOf(address);
+    return index === -1 ? recency.length : index;
+  };
+  return named.sort((a, b) => rank(a.address) - rank(b.address));
 }
 
 /** Older recipients are a search away; the list itself stays short. */

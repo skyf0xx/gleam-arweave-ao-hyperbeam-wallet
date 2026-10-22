@@ -429,6 +429,62 @@ describe("SendView AR Max and balance check account for the network fee", () => 
   });
 });
 
+describe("SendView recipient dropdown", () => {
+  function renderWithContacts() {
+    const send = routedSend({
+      listContacts: () => [
+        { address: RECENT_RECIPIENT_A, name: "Alice", createdAt: 0 },
+        { address: RECENT_RECIPIENT_B, name: "Bob", createdAt: 0 },
+      ],
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_B, amount: "1", tags: [], timestamp: 200 },
+        ]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+  }
+
+  it("lists named addresses on focus, most recently sent to first", async () => {
+    renderWithContacts();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saved contacts" })).toBeTruthy());
+
+    fireEvent.focus(screen.getByLabelText("Recipient address"));
+    const list = await screen.findByRole("listbox", { name: "Saved contacts" });
+    await waitFor(() => expect(within(list).getAllByRole("button").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Bob"),
+      expect.stringContaining("Alice"),
+      "More",
+    ]));
+  });
+
+  it("filters by what's typed, and a pick fills the recipient without an error", async () => {
+    renderWithContacts();
+    const input = screen.getByLabelText("Recipient address");
+    fireEvent.focus(input);
+    await screen.findByRole("listbox", { name: "Saved contacts" });
+
+    fireEvent.change(input, { target: { value: "ali" } });
+    const list = screen.getByRole("listbox", { name: "Saved contacts" });
+    expect(within(list).queryByText("Bob")).toBeNull();
+    fireEvent.click(within(list).getByText("Alice"));
+    fireEvent.blur(input);
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByLabelText("Recipient address")).toBeNull();
+  });
+
+  it("opens the full Saved contacts screen from More", async () => {
+    renderWithContacts();
+    fireEvent.focus(screen.getByLabelText("Recipient address"));
+    const list = await screen.findByRole("listbox", { name: "Saved contacts" });
+
+    fireEvent.click(within(list).getByRole("button", { name: "More" }));
+
+    expect(await screen.findByRole("dialog", { name: "Saved contacts" })).toBeTruthy();
+  });
+});
+
 describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
   it("lists the five latest unnamed recipients under Recent, and search reaches older ones", async () => {
     const recipients = Array.from({ length: 7 }, (_, index) => `R${index}`.padEnd(43, "q"));
