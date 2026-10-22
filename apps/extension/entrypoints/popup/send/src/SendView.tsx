@@ -578,6 +578,17 @@ function ComposeStep({
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-label font-semibold text-muted">Amount</span>
+            {/* AR is native and has no process to show. */}
+            {token !== null ? (
+              <a
+                href={`${explorerUrlFor(token.processId)}/info`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-label font-medium text-muted underline-offset-2 hover:text-foreground hover:underline"
+              >
+                {ticker} info ↗
+              </a>
+            ) : null}
           </div>
           <div className="flex flex-col gap-0.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
             <div className="flex items-center gap-2">

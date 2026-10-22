@@ -301,6 +301,20 @@ describe("SendView compose summary", () => {
 
     expect(await screen.findByText(/≈ \$5\.00/)).toBeTruthy();
   });
+
+  it("links an AO token to its process info on the explorer", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+
+    expect(screen.getByRole("link", { name: /ARDRIVE info/ }).getAttribute("href")).toBe(
+      `https://lunar.arweave.net/#/explorer/${AO_TOKEN.processId}/info`,
+    );
+  });
+
+  it("has no token info link for AR", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    expect(screen.queryByRole("link", { name: /info/ })).toBeNull();
+  });
 });
 
 describe("SendView AR Max and balance check account for the network fee", () => {
