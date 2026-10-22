@@ -41,9 +41,12 @@ describe("GatedOnboarding", () => {
   it("shows the gate for an install with no unlock", async () => {
     setup();
     expect(await screen.findByText("You're early.")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Follow @gleam_wallet for drops" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Ask for an invite on X" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Get an invitation" }));
-    expect(screen.getByRole("link", { name: "Follow @gleam_wallet for drops" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).getAttribute("href")).toBe(
+      "https://x.com/intent/post?text=%40gleam_wallet%20",
+    );
+    expect(screen.getByRole("link", { name: "follow @gleam_wallet for drops" }).getAttribute("href")).toBe(
       "https://x.com/gleam_wallet",
     );
     expect(screen.queryByText("What are Gleam Points?")).toBeNull();
@@ -129,20 +132,20 @@ describe("GatedOnboarding", () => {
     await act(async () => finish(result("GLEAMDROP7", "unknown")));
   });
 
-  it("makes Follow primary when the code is full", async () => {
+  it("makes Ask primary when the code is full", async () => {
     setup({ redeem: (code) => result(code, "full") });
     await screen.findByText("You're early.");
     type("GLEAMDROP7");
     submit();
     expect(await screen.findByText("That code is full. Its seats have all been taken.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Follow @gleam_wallet for drops" }).className).toContain("bg-foreground");
+    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).toContain("bg-foreground");
     expect(field().value).toBe("GLEAMDROP7");
   });
 
-  it("keeps Follow secondary when no code is full", async () => {
+  it("keeps Ask secondary when no code is full", async () => {
     setup();
     fireEvent.click(await screen.findByRole("button", { name: "Get an invitation" }));
-    expect(screen.getByRole("link", { name: "Follow @gleam_wallet for drops" }).className).not.toContain("bg-foreground");
+    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).not.toContain("bg-foreground");
   });
 
   it("says an unknown code wasn't found", async () => {

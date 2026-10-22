@@ -10,6 +10,9 @@ import { browser } from "wxt/browser";
 import { sitePageUrl } from "@/src/site-pages";
 
 const X_PROFILE_URL = "https://x.com/gleam_wallet";
+// Only the mention, so every ask is in the asker's own words and lands in
+// @gleam_wallet's mentions, where members with a spare seat can find it.
+const X_ASK_URL = "https://x.com/intent/post?text=%40gleam_wallet%20";
 
 const MESSAGES: Record<Exclude<InviteRedeemResult, "ok">, string> = {
   full: "That code is full. Its seats have all been taken.",
@@ -184,14 +187,22 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         </button>
         {showAsk ? (
           <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
-            <p className="text-center text-caption text-muted">
-              Get an invite from a member, or ask for one on X.
-            </p>
             <Button asChild variant={full ? "primary" : "secondary"}>
-              <a href={X_PROFILE_URL} target="_blank" rel="noreferrer">
-                Follow @gleam_wallet for drops
+              <a href={X_ASK_URL} target="_blank" rel="noreferrer">
+                Ask for an invite on X
               </a>
             </Button>
+            <p className="text-center text-caption text-muted">
+              or{" "}
+              <a
+                href={X_PROFILE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                follow @gleam_wallet for drops
+              </a>
+            </p>
           </div>
         ) : null}
       </div>
