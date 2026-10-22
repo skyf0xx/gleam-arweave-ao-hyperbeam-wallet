@@ -232,9 +232,6 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 </button>
               </div>
             ))}
-            <p className="pt-1 text-caption leading-relaxed text-faint">
-              Anyone can send you a token, so these aren&apos;t vetted and are never priced. Ignore one you don&apos;t want.
-            </p>
           </div>
         ) : null}
 
@@ -297,10 +294,6 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               {adding ? "Adding…" : preview ? `Add ${preview.ticker}` : "Preview"}
             </button>
           </div>
-          <p className="pt-2.5 text-caption leading-relaxed text-faint">
-            Tokens you receive show up on their own. To watch one you haven&apos;t received yet, paste its process id,
-            check the preview, then add it. Adding a hidden token by id brings it back.
-          </p>
         </div>
       </div>
     </div>
