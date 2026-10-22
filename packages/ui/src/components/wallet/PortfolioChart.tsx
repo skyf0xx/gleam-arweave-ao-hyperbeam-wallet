@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
-import { formatCurrencyValue, HIDDEN_AMOUNT } from "../../format/currency";
+import { formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
@@ -70,8 +70,8 @@ export interface PortfolioChartProps {
   scope?: PortfolioScope;
   /** Makes the chart area toggle `scope`. Leave unset when there's only one wallet. */
   onToggleScope?: () => void;
-  /** Shown as the large figure in place of the total value, e.g. "12.5 AR". */
-  headline?: string;
+  /** Shown as the large figure in place of the total value, e.g. `{ amount: "12.5", unit: "AR" }`. */
+  headline?: CurrencyValueParts;
   masked?: boolean;
   onToggleMasked?: () => void;
   showChart?: boolean;
@@ -189,7 +189,7 @@ export function PortfolioChart({
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
   const totalLabel = masked ? HIDDEN_AMOUNT : formatCurrencyValue(currentValue, currency);
-  const headlineLabel = masked ? HIDDEN_AMOUNT : (headline ?? totalLabel);
+  const headlineParts: CurrencyValueParts = masked ? { amount: HIDDEN_AMOUNT } : (headline ?? formatCurrencyParts(currentValue, currency));
   const changeBadge = (
     <span className="text-label font-semibold tabular-nums" style={{ color: lineColorVar }}>
       {formatPercent(change)}
@@ -204,7 +204,7 @@ export function PortfolioChart({
         <>
           <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
             <div className="flex items-baseline gap-2.5">
-              <Headline label={headlineLabel} masked={masked} onToggle={onToggleMasked} />
+              <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
               {headline === undefined ? changeBadge : null}
             </div>
             {headline !== undefined ? (
@@ -334,7 +334,18 @@ export function PortfolioChart({
 const HEADLINE_CLASS = "text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground";
 
 /** The large figure; a button that hides or shows balances when `onToggle` is set. */
-function Headline({ label, masked, onToggle }: { label: string; masked: boolean; onToggle?: () => void }) {
+function Headline({ parts, masked, onToggle }: { parts: CurrencyValueParts; masked: boolean; onToggle?: () => void }) {
+  const label = (
+    <>
+      {parts.amount}
+      {parts.unit ? (
+        <>
+          {" "}
+          <span className="text-h3 tracking-normal">{parts.unit}</span>
+        </>
+      ) : null}
+    </>
+  );
   if (!onToggle) return <span className={HEADLINE_CLASS}>{label}</span>;
 
   return (
