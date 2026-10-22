@@ -3,9 +3,11 @@ import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
   ActivityPage,
+  DisplaySettings,
   PortfolioHistory,
   RuntimePort,
   TokenBalance,
+  TokenPrice,
   WalletSummary,
   Winston,
 } from "@gleam/core";
@@ -172,6 +174,64 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
     const secondSvg = within(secondPill).getByRole("img", { name: /avatar/i }).innerHTML;
 
     expect(secondSvg).not.toBe(firstSvg);
+  });
+});
+
+describe("MainScreenView display settings", () => {
+  function sendWithDisplay(settings: Partial<DisplaySettings>, prices: TokenPrice[] = []) {
+    const base = successfulSend();
+    const display: DisplaySettings = { currency: "USD", showChart: true, headline: "total", balancesHidden: false, ...settings };
+    return vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type === "getDisplaySettings") return display;
+      if (message.type === "setDisplaySettings") return undefined;
+      if (message.type === "getTokenPrices") return prices;
+      return base(message as never);
+    }) as unknown as RuntimePort["send"] & ReturnType<typeof vi.fn>;
+  }
+
+  it("asks for prices and history in the chosen currency and formats them in it", async () => {
+    const send = sendWithDisplay({ currency: "EUR" }, [{ processId: null, price: 3 }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "EUR" } }),
+    );
+    expect(send).toHaveBeenCalledWith({ type: "getTokenPrices", payload: { currency: "EUR" } });
+    const euros = (value: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(value);
+    await waitFor(() => expect(screen.getByText(euros(12))).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(euros(3))).toBeTruthy());
+  });
+
+  it("leads with the AR balance and keeps the total on a smaller line", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ headline: "AR" }) }) });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Hide balances" }).textContent).toBe("1 AR"));
+    expect(screen.getByText("$12.00")).toBeTruthy();
+  });
+
+  it("drops the chart and range tabs but keeps the total when the chart is off", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ showChart: false }) }) });
+
+    await waitFor(() => expect(screen.getByText("$12.00")).toBeTruthy());
+    expect(screen.queryByRole("tab", { name: "7D" })).toBeNull();
+    expect(screen.queryByRole("img", { name: /Portfolio value/ })).toBeNull();
+  });
+
+  it("hides every balance when the total is tapped, and saves the choice", async () => {
+    const send = sendWithDisplay({}, [{ processId: null, price: 3 }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("$3.00")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Hide balances" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Show balances" }).textContent).toBe("••••••"));
+    expect(screen.queryByText("$12.00")).toBeNull();
+    expect(screen.queryByText("$3.00")).toBeNull();
+    expect(screen.queryByText("1")).toBeNull();
+    expect(send).toHaveBeenCalledWith({
+      type: "setDisplaySettings",
+      payload: { currency: "USD", showChart: true, headline: "total", balancesHidden: true },
+    });
   });
 });
 
@@ -409,7 +469,7 @@ describe("MainScreenView hidden token rows", () => {
 
     const toggle = await screen.findByRole("button", { name: "Hidden (1)" });
     expect(screen.queryByText("FREE")).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Hide / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Hide (?!balances)/ })).toBeNull();
 
     fireEvent.click(toggle);
 

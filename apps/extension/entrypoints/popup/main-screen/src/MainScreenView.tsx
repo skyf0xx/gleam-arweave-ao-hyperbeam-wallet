@@ -13,7 +13,7 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
-import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
+import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
@@ -55,6 +55,11 @@ import { useCopy } from "../../points/src/useCopy";
  * never a stale combination. An empty `series` (both price sources
  * unavailable) falls back to `NetworkErrorBanner`, matching the
  * balance/activity failure path, rather than a broken/blank chart.
+ *
+ * Display settings (`useDisplaySettings`): values are priced in the
+ * chosen currency, the large figure is the total or the AR/AO balance,
+ * the chart and its range tabs can be turned off, and tapping the large
+ * figure hides every balance on this screen until it's tapped again.
  *
  * Tokens/Activity: a single tab control (local `activeTab` state, no
  * routing) switches between the two sections. The tab-button
@@ -374,8 +379,11 @@ export function MainScreenView({
   const listDockOffsetRef = useRef(0);
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
-  const { settings: displaySettings } = useDisplaySettings(runtime);
+  const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
+  const showChart = displaySettings?.showChart ?? true;
+  const masked = displaySettings?.balancesHidden ?? false;
+  const toggleMasked = () => void updateDisplaySettings({ balancesHidden: !masked });
   const tokenPricesQuery = useTokenPrices(runtime, currency);
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
@@ -385,7 +393,8 @@ export function MainScreenView({
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
   // With a single wallet "all" equals "wallet"; resolving it here keeps one cache entry and no toggle.
-  const portfolioScope: PortfolioScope = hasOtherWallets ? preferredScope : "wallet";
+  // The toggle lives on the chart, so without it the figure stays on this wallet.
+  const portfolioScope: PortfolioScope = hasOtherWallets && showChart ? preferredScope : "wallet";
   const togglePortfolioScope = () => {
     const next: PortfolioScope = portfolioScope === "all" ? "wallet" : "all";
     setPreferredScope(next);
@@ -395,6 +404,10 @@ export function MainScreenView({
   const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, currency, {
     enabled: !otherWalletsQuery.isPending,
   });
+
+  const defaultTokenRows = buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data, currency);
+  const headlineRow =
+    displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
@@ -599,6 +612,16 @@ export function MainScreenView({
               onRangeChange={setSelectedRange}
               scope={portfolioScope}
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
+              headline={
+                headlineRow
+                  ? headlineRow.amount === UNAVAILABLE_BALANCE_LABEL
+                    ? `${headlineRow.ticker} unavailable`
+                    : `${headlineRow.amount} ${headlineRow.ticker}`
+                  : undefined
+              }
+              masked={masked}
+              onToggleMasked={displaySettings ? toggleMasked : undefined}
+              showChart={showChart}
               loading={portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
               /**
                * `series: []` on a *resolved* response (no thrown query
@@ -718,7 +741,7 @@ export function MainScreenView({
             ) : (
               (() => {
                 const rows: ListedTokenRow[] = [
-                  ...buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data, currency).map(({ send, ...row }) => ({
+                  ...defaultTokenRows.map(({ send, ...row }) => ({
                     key: row.key,
                     label: row.name,
                     defaultHidden: false,
@@ -726,8 +749,8 @@ export function MainScreenView({
                       <TokenRow
                         glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                         name={row.name}
-                        amount={row.amount}
-                        value={row.value}
+                        amount={masked ? HIDDEN_AMOUNT : row.amount}
+                        value={masked && row.value !== undefined ? HIDDEN_AMOUNT : row.value}
                         loading={loading}
                         onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                         className="border-b-0"
@@ -759,7 +782,9 @@ export function MainScreenView({
                           amount={
                             token.available === false
                               ? UNAVAILABLE_BALANCE_LABEL
-                              : formatAtomicAsDisplay(token.quantity, token.denomination)
+                              : masked
+                                ? HIDDEN_AMOUNT
+                                : formatAtomicAsDisplay(token.quantity, token.denomination)
                           }
                           loading={loading}
                           onClick={token.available === false ? undefined : () => onSendToken(token)}
