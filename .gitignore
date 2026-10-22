@@ -21,3 +21,4 @@ LAUNCH.md
 .playwright-mcp
 .gleam-scan/
 CLAUDE.local.md
+*.crx
