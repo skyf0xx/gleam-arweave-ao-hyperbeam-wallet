@@ -25,7 +25,7 @@ const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
 };
 
 const HEADLINE_OPTIONS: { value: HeadlineBalance; label: string }[] = [
-  { value: "total", label: "Total value" },
+  { value: "total", label: "Total wallet value" },
   { value: "AR", label: "AR balance" },
   { value: "AO", label: "AO balance" },
 ];
@@ -243,19 +243,32 @@ function SelectRow<T extends string>({
       <label htmlFor={id} className="text-label font-semibold text-foreground">
         {title}
       </label>
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value as T)}
-        className="rounded-md border border-line bg-background px-2.5 py-1.5 text-label text-foreground focus:border-foreground focus:outline-none disabled:opacity-60"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      {/* The native arrow ignores padding, so it's hidden and drawn here with room on the right. */}
+      <div className="relative">
+        <select
+          id={id}
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value as T)}
+          className="appearance-none rounded-md border border-line bg-background py-1.5 pl-2.5 pr-8 text-label text-foreground focus:border-foreground focus:outline-none disabled:opacity-60"
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
+        >
+          <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
     </div>
   );
 }
