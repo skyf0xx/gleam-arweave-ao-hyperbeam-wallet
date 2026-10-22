@@ -60,7 +60,13 @@ function setup(options: Setup = {}) {
   return { send, onOpenPoints, view };
 }
 
-const INFO: Announcement = { id: "a", level: "info", text: "Maintenance tonight", url: "https://x.com/gleam/status/1" };
+const INFO: Announcement = {
+  id: "a",
+  level: "info",
+  title: "Heads up",
+  text: "Maintenance tonight",
+  url: "https://x.com/gleam/status/1",
+};
 const CRITICAL: Announcement = { id: "b", level: "critical", text: "Update the extension" };
 
 describe("MainScreenNotice", () => {
@@ -73,7 +79,7 @@ describe("MainScreenNotice", () => {
   it("shows the invite notice, opens Points on tap and marks seats seen on dismiss", async () => {
     const { send, onOpenPoints } = setup({ seatsLeft: 3, seatsSeen: 2 });
 
-    fireEvent.click(await screen.findByRole("button", { name: "You have new invites" }));
+    fireEvent.click(await screen.findByRole("button", { name: /You have new invites/ }));
     expect(onOpenPoints).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
@@ -96,11 +102,16 @@ describe("MainScreenNotice", () => {
 
   it("opens an announcement link in a new tab with neutral styling", async () => {
     setup({ announcements: [INFO] });
-    const link = await screen.findByRole("link", { name: INFO.text });
+    const link = await screen.findByRole("link", { name: /Heads up\s*Maintenance tonight/ });
     expect(link.getAttribute("href")).toBe(INFO.url);
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toContain("noreferrer");
     expect(screen.getByRole("region", { name: "Notice" }).className).not.toContain("warning");
+  });
+
+  it("shows the text alone when an announcement has no title", async () => {
+    setup({ announcements: [CRITICAL] });
+    expect((await screen.findByText(CRITICAL.text)).parentElement?.className).toContain("text-foreground");
   });
 
   it("styles a critical announcement in warning red with an icon", async () => {
