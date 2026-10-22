@@ -98,6 +98,12 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Decoded size of a base64 payload, without decoding it. */
+function base64ByteLength(base64: string): number {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
 function licenseTagFor(license: string): UploadTag | null {
   if (!license) return null;
   return { name: "License", value: license };
@@ -445,7 +451,7 @@ function ReviewStep({
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Review upload" onBack={onBack} />
       <div className="flex flex-1 flex-col gap-5 px-5 py-5">
-        {step.fileName ? <FileRow name={step.fileName} size={0} onRemove={onBack} /> : null}
+        {step.fileName ? <FileRow name={step.fileName} size={base64ByteLength(step.dataBase64)} onRemove={onBack} /> : null}
 
         {tripped ? (
           <RiskNotice>

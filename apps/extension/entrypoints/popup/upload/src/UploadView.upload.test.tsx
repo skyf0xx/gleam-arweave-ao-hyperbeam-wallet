@@ -146,6 +146,26 @@ describe("UploadView", () => {
     expect(onDone).toHaveBeenCalledOnce();
   });
 
+  it("shows the picked file's real size on the review step", async () => {
+    const review: UploadReview = { tagByteSize: 30, secretScanMatch: null };
+    const send = vi.fn(async (message: { type: string }) => {
+      if (message.type === "getNetworkSettings") return NETWORK_SETTINGS;
+      if (message.type === "reviewUpload") return review;
+      throw new Error(`unexpected message type ${message.type}`);
+    }) as RuntimePort["send"];
+    const { container } = renderWithClient(
+      <UploadView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />,
+    );
+
+    const file = new File([new Uint8Array(2048)], "notes.bin");
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByText("notes.bin")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByText("Cost")).toBeTruthy());
+    expect(screen.getByText("2 KB")).toBeTruthy();
+  });
+
   it("uses the configured gateway for the view-content link", async () => {
     const review: UploadReview = { tagByteSize: 30, secretScanMatch: null };
     const customNetworkSettings: NetworkSettings = {
