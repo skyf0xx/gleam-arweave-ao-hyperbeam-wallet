@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Announcement, RuntimePort, WalletSummary } from "@gleam/core";
+import type { Announcement, ReviewMoment, RuntimePort, WalletSummary } from "@gleam/core";
 import { MainScreenNotice } from "./MainScreenNotice";
+
+vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
 afterEach(cleanup);
 
@@ -23,6 +25,7 @@ interface Setup {
   seatsSeen?: number;
   announcements?: unknown;
   dismissed?: string[];
+  review?: ReviewMoment | null;
 }
 
 function setup(options: Setup = {}) {
@@ -44,6 +47,10 @@ function setup(options: Setup = {}) {
         return dismissed;
       case "dismissAnnouncement":
         dismissed.push(payload!.id!);
+        return undefined;
+      case "getReviewPrompt":
+        return options.review ?? null;
+      case "finishReviewPrompt":
         return undefined;
       default:
         throw new Error(`Unexpected message type "${type}"`);
@@ -129,6 +136,33 @@ describe("MainScreenNotice", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "dismissAnnouncement", payload: { id: "b" } }));
     await waitFor(() => expect(screen.queryByText(CRITICAL.text)).toBeNull());
+  });
+
+  it("asks for a review after a good moment, with feedback beside it", async () => {
+    const { send } = setup({ review: { kind: "hardware", device: "Ledger" }, announcements: [INFO] });
+
+    expect(await screen.findByText("Your Ledger is connected.")).toBeTruthy();
+    expect(screen.getByText("Gleam is new. A 30-second review helps others find it.")).toBeTruthy();
+    expect(screen.queryByText(INFO.text)).toBeNull();
+    const feedback = screen.getByRole("link", { name: "Send us feedback" });
+    expect(feedback.getAttribute("href")).toBe("https://gleamwallet.app/feedback.html?v=1.2.3");
+    const review = screen.getByRole("link", { name: /Leave a review/ });
+    expect(review.getAttribute("href")).toBe(
+      "https://chromewebstore.google.com/detail/einabcphdmlicabnjllaaallnebfkmki/reviews",
+    );
+    expect(review.getAttribute("target")).toBe("_blank");
+
+    fireEvent.click(review);
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "finishReviewPrompt", payload: undefined }));
+    expect(await screen.findByText(INFO.text)).toBeTruthy();
+  });
+
+  it("retires the review prompt on dismiss", async () => {
+    const { send } = setup({ review: { kind: "send" } });
+    await screen.findByText("Sent and confirmed.");
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "finishReviewPrompt", payload: undefined }));
+    await waitFor(() => expect(screen.queryByText("Sent and confirmed.")).toBeNull());
   });
 
   it("shows nothing when the announcements read fails", async () => {

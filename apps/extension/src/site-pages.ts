@@ -14,6 +14,9 @@ export const DEV_SITE_HOSTS: readonly string[] = ["localhost", "127.0.0.1"];
 
 export const REPO_URL = "https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet";
 
+/** The Chrome Web Store reviews tab, where the review prompt sends people. */
+export const STORE_REVIEWS_URL = "https://chromewebstore.google.com/detail/einabcphdmlicabnjllaaallnebfkmki/reviews";
+
 export function releaseUrl(version: string): string {
   return `${REPO_URL}/releases/tag/v${version}`;
 }

@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
-import type { RuntimePort, WalletSummary } from "@gleam/core";
+import { browser } from "wxt/browser";
+import type { ReviewMoment, RuntimePort, WalletSummary } from "@gleam/core";
+import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { sitePageUrl, STORE_REVIEWS_URL } from "@/src/site-pages";
 import { useNotice } from "./useNotice";
 
 export interface MainScreenNoticeProps {
@@ -28,6 +31,8 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
         <NoticeContent title="You have new invites" text="Share them from Points" />
       </button>
     );
+  } else if (notice.kind === "review") {
+    body = <ReviewPrompt moment={notice.moment} onAnswer={dismiss} className={bodyClass} />;
   } else {
     const { title, text, url } = notice.announcement;
     const content = <NoticeContent title={title} text={text} critical={critical} />;
@@ -59,6 +64,53 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
         <CloseIcon />
       </button>
     </section>
+  );
+}
+
+/** Names the moment the ask follows, so it reads as earned rather than random. */
+function reviewTitle(moment: ReviewMoment): string {
+  switch (moment.kind) {
+    case "send":
+      return "Sent and confirmed.";
+    case "upload":
+      return "Your file is on Arweave for good.";
+    case "hardware":
+      return `Your ${moment.device} is connected.`;
+    case "settled":
+      return "Glad you're here.";
+  }
+}
+
+/**
+ * The one-time store review ask. Every user sees the same ask, with no
+ * "enjoying Gleam?" step first, and nothing is offered for a review: the
+ * store's policy forbids both. Feedback sits beside it for anyone with a
+ * complaint rather than praise.
+ */
+function ReviewPrompt({ moment, onAnswer, className }: { moment: ReviewMoment; onAnswer: () => void; className: string }) {
+  return (
+    <div className={cn(className, "gap-3 pb-3.5")}>
+      <span className="flex flex-col gap-0.5">
+        <NoticeContent title={reviewTitle(moment)} text="Gleam is new. A 30-second review helps others find it." />
+      </span>
+      <span className="flex items-center gap-4">
+        <Button asChild variant="secondary" size="sm">
+          <a href={STORE_REVIEWS_URL} target="_blank" rel="noreferrer" onClick={onAnswer}>
+            Leave a review
+            <span aria-hidden="true">↗</span>
+          </a>
+        </Button>
+        <a
+          href={sitePageUrl("feedback", browser.runtime.getManifest().version)}
+          target="_blank"
+          rel="noreferrer"
+          onClick={onAnswer}
+          className="text-label text-muted underline-offset-4 hover:text-foreground hover:underline"
+        >
+          Send us feedback
+        </a>
+      </span>
+    </div>
   );
 }
 
