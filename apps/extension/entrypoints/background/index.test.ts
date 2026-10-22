@@ -166,6 +166,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "setNetworkSettings",
       "getThemePreference",
       "setThemePreference",
+      "getDisplaySettings",
+      "setDisplaySettings",
       "revokeGrant",
       "getBalance",
       "getTokenBalances",

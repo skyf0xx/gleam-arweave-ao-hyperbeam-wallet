@@ -3,12 +3,16 @@ import {
   base64UrlToBytes,
   deriveAddress,
   capabilitiesFor,
+  defaultDisplaySettings,
+  isDisplayCurrency,
   isHardwareWalletMethod,
+  isHeadlineBalance,
   keyfileFilename,
   validateJWKShape,
   validatePassword,
   type Argon2idParams,
   type AutoLockTimeout,
+  type DisplaySettings,
   type DownloadPort,
   type FileDownloadResult,
   type HardwareDevice,
@@ -65,6 +69,8 @@ import {
  *   "1hr" }`.
  * - `local:themeSettings` — `ThemeSettings`, default `{ theme: "light" }`
  *   (no OS-driven default, light always wins when nothing is stored).
+ * - `local:displaySettings` — `DisplaySettings`; with nothing stored, the
+ *   currency follows the browser locale's region.
  * - `session:unlockedSession` — `Session`, routed to `chrome.storage.session`
  *   (memory-only, cleared on browser close) by the storage adapter's own
  *   `local:`/`session:` area routing — this handler only ever reads/writes
@@ -91,6 +97,7 @@ import {
 const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const LOCK_SETTINGS_KEY = "local:lockSettings";
 const THEME_SETTINGS_KEY = "local:themeSettings";
+const DISPLAY_SETTINGS_KEY = "local:displaySettings";
 // Written by ReadsHandler and TransferHandler, keyed by address.
 const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
@@ -243,6 +250,25 @@ async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
     return { theme: (raw as ThemeSettings).theme };
   }
   return DEFAULT_THEME_SETTINGS;
+}
+
+function isDisplaySettings(value: unknown): value is DisplaySettings {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    isDisplayCurrency(record.currency) &&
+    typeof record.showChart === "boolean" &&
+    isHeadlineBalance(record.headline) &&
+    typeof record.balancesHidden === "boolean"
+  );
+}
+
+async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
+  const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
+  if (isDisplaySettings(raw)) {
+    return { currency: raw.currency, showChart: raw.showChart, headline: raw.headline, balancesHidden: raw.balancesHidden };
+  }
+  return defaultDisplaySettings(globalThis.navigator?.language);
 }
 
 /**
@@ -1090,5 +1116,19 @@ export class WalletLifecycleHandler {
       throw new Error(`Invalid theme preference "${req.theme}".`);
     }
     await this.storage.set(THEME_SETTINGS_KEY, req);
+  }
+
+  async getDisplaySettings(): Promise<DisplaySettings> {
+    return loadDisplaySettings(this.storage);
+  }
+
+  async setDisplaySettings(req: DisplaySettings): Promise<void> {
+    if (!isDisplaySettings(req)) throw new Error("Invalid display settings.");
+    await this.storage.set(DISPLAY_SETTINGS_KEY, {
+      currency: req.currency,
+      showChart: req.showChart,
+      headline: req.headline,
+      balancesHidden: req.balancesHidden,
+    });
   }
 }

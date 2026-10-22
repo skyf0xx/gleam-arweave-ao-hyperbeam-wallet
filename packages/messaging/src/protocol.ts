@@ -17,6 +17,7 @@ import type {
   JWKInterface,
   LockSettings,
   PasskeyStatus,
+  DisplaySettings,
   NetworkSettings,
   PermissionType,
   PointsMembership,
@@ -171,6 +172,8 @@ export interface ProtocolMap {
    * by trusted extension UI, never proxied through `providerCall`.
    */
   getThemePreference(): ThemeSettings;
+  /** Currency, headline and chart choices for the main screen; same tier as `getThemePreference`. */
+  getDisplaySettings(): DisplaySettings;
   /** Read while locked: the unlock screen shows it before the password is typed. */
   getSecurityPhrase(): SecurityPhrase | null;
   /** One list for the whole vault, most-recently-saved first. */
@@ -234,6 +237,7 @@ export interface ProtocolMap {
   setNetworkSettings(req: NetworkSettings): void;
   setLockSettings(req: LockSettings): void;
   setThemePreference(req: ThemeSettings): void;
+  setDisplaySettings(req: DisplaySettings): void;
   /** Rejects a phrase `readSecurityPhrase` doesn't accept. */
   setSecurityPhrase(req: SecurityPhrase): void;
   revokeGrant(req: { origin: string }): void;
