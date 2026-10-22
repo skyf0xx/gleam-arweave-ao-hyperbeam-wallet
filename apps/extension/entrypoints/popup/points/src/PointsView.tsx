@@ -294,7 +294,9 @@ function JoinedView({
           <div className="flex flex-col gap-6">
             <EarnItem label="Invite" title="Invite a friend">
               <div className="flex flex-col gap-1">
-                <p className="text-label text-muted">Earn an extra {REFERRAL_PERCENT}% daily for every friend who joins.</p>
+                <p className="text-label text-muted">
+                  Earn an extra <Reward>{REFERRAL_PERCENT}%</Reward> daily for every friend who joins.
+                </p>
                 {status ? (
                   <p className="flex items-center gap-2 text-caption text-muted">
                     {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
@@ -392,6 +394,11 @@ function EarnItem({
   );
 }
 
+/** What a way to earn pays, picked out of its muted sentence the way the ink card sets its figures. */
+function Reward({ children }: { children: ReactNode }) {
+  return <span className="font-semibold tabular-nums text-foreground">{children}</span>;
+}
+
 /**
  * Reviews need a registered wallet, so only members see this. The button
  * stays once the paid places are gone: an unpaid review is still published
@@ -408,9 +415,13 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
     <EarnItem label="Review" title="Review a release">
       <div className="flex flex-col gap-1">
         <p className="text-label text-muted">
-          {paying && rewardAtomic
-            ? `Earn ${formatPoints(rewardAtomic)} GLEAM to review Gleam with your coding agent.`
-            : "Review Gleam with your coding agent."}
+          {paying && rewardAtomic ? (
+            <>
+              Earn <Reward>{formatPoints(rewardAtomic)} GLEAM</Reward> to review Gleam with your coding agent.
+            </>
+          ) : (
+            "Review Gleam with your coding agent."
+          )}
         </p>
         {placesLeft === 0 ? (
           <p className="text-caption text-muted">

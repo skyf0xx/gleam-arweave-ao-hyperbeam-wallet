@@ -143,6 +143,10 @@ describe("PointsTokenRow", () => {
   });
 });
 
+/** Matches a paragraph by its whole text, across the spans that set its reward apart. */
+const sentence = (text: string) => (_: string, element: Element | null) =>
+  element?.tagName === "P" && element.textContent === text;
+
 describe("PointsView", () => {
   it("offers a member a paid review", async () => {
     const runtime = fakeRuntime({
@@ -164,7 +168,7 @@ describe("PointsView", () => {
     const link = review.getByRole("link", { name: /Start a review/ });
     expect(link.getAttribute("href")).toBe(`${SCAN_URL}#review`);
     expect(link.getAttribute("target")).toBe("_blank");
-    expect(await review.findByText("Earn 12.50 GLEAM to review Gleam with your coding agent.")).toBeTruthy();
+    expect(await review.findByText(sentence("Earn 12.50 GLEAM to review Gleam with your coding agent."))).toBeTruthy();
     expect(review.getByText("Plus a 5,000 GLEAM bounty pool for confirmed vulnerabilities.")).toBeTruthy();
   });
 
@@ -319,7 +323,7 @@ describe("PointsView", () => {
     expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
     expect(screen.getByText("3 invites remaining")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Ways to earn" })).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "Invite" })).getByText("Earn an extra 10% daily for every friend who joins.")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Invite" })).getByText(sentence("Earn an extra 10% daily for every friend who joins."))).toBeTruthy();
     const share = screen.getByRole("link", { name: "Invite on X" });
     expect(share.getAttribute("href")).toBe(
       `https://x.com/intent/post?text=${encodeURIComponent(`Just joined @gleam_wallet and I'm now earning GLEAM. I have 3 invites if you want to get in early.\n${LINK}\n@ArweaveEco @aoTheComputer`)}`,
