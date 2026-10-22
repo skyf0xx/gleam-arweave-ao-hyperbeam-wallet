@@ -49,14 +49,17 @@ async function typeText(value: string) {
 }
 
 describe("UploadView", () => {
-  it("disables Continue until content is present", async () => {
+  it("names what's missing until content is present, then Review upload", async () => {
     const runtime = fakeRuntime();
     renderWithClient(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />);
 
-    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Choose a file" }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+    expect((screen.getByRole("button", { name: "Enter some content" }) as HTMLButtonElement).disabled).toBe(true);
 
     await typeText("Notes from the field trip.");
-    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Review upload" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("shows a live byte-count warning once tags exceed the cap", async () => {
@@ -70,10 +73,11 @@ describe("UploadView", () => {
     fireEvent.change(valueInputs[valueInputs.length - 1]!, { target: { value: "a".repeat(4090) } });
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/the limit is 4,096/));
-    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+    await typeText("Notes from the field trip.");
+    expect((screen.getByRole("button", { name: "Shorten the tags" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("calls reviewUpload on Continue and shows the secret-scan warning, disabling Sign and upload", async () => {
+  it("calls reviewUpload on Review upload and shows the secret-scan warning, disabling the upload button", async () => {
     const review: UploadReview = { tagByteSize: 30, secretScanMatch: "PEM block" };
     const send = vi.fn(async (message: { type: string }) => {
       if (message.type === "getNetworkSettings") return NETWORK_SETTINGS;
@@ -85,7 +89,7 @@ describe("UploadView", () => {
     renderWithClient(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />);
 
     await typeText("-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----");
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
 
     await waitFor(() =>
       expect(screen.getByText(/This looks like a PEM block\./)).toBeTruthy(),
@@ -93,7 +97,7 @@ describe("UploadView", () => {
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({ type: "reviewUpload" }),
     );
-    expect((screen.getByRole("button", { name: "Sign and upload" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Can't upload this" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("shows a Free cost row on the review step when the scan is clean", async () => {
@@ -108,7 +112,7 @@ describe("UploadView", () => {
     renderWithClient(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />);
 
     await typeText("Notes from the field trip.");
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
 
     await waitFor(() => expect(screen.getByText("Cost")).toBeTruthy());
     expect(screen.getByText("Free")).toBeTruthy();
@@ -128,11 +132,11 @@ describe("UploadView", () => {
     renderWithClient(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={onDone} />);
 
     await typeText("Notes from the field trip.");
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Sign and upload" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Upload \d/ })).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign and upload" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Upload \d/ }));
 
     await waitFor(() => expect(screen.getByText("Signed and uploaded.")).toBeTruthy());
     expect(screen.getByRole("link", { name: "View content" }).getAttribute("href")).toBe(
@@ -160,7 +164,7 @@ describe("UploadView", () => {
     const file = new File([new Uint8Array(2048)], "notes.bin");
     fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
     await waitFor(() => expect(screen.getByText("notes.bin")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
 
     await waitFor(() => expect(screen.getByText("Cost")).toBeTruthy());
     expect(screen.getByText("2 KB")).toBeTruthy();
@@ -184,10 +188,10 @@ describe("UploadView", () => {
     renderWithClient(<UploadView runtime={runtime} wallet={WALLET} onBack={vi.fn()} onDone={vi.fn()} />);
 
     await typeText("Notes from the field trip.");
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review upload" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Sign and upload" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Sign and upload" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Upload \d/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /^Upload \d/ }));
 
     await waitFor(() => expect(screen.getByText("Signed and uploaded.")).toBeTruthy());
     expect(screen.getByRole("link", { name: "View content" }).getAttribute("href")).toBe(

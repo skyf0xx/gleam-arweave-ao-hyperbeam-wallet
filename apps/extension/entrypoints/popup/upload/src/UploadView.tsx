@@ -237,6 +237,16 @@ function ComposeStep({
   const overLimit = totalTagBytes > TAG_BYTES_LIMIT;
   const hasContent = step.source === "file" ? step.dataBase64.length > 0 : step.textValue.trim().length > 0;
   const canContinue = hasContent && !overLimit && !step.submitting;
+  // A disabled button names what's missing rather than leaving it to guesswork.
+  const continueLabel = step.submitting
+    ? "Checking upload…"
+    : !hasContent
+      ? step.source === "file"
+        ? "Choose a file"
+        : "Enter some content"
+      : overLimit
+        ? "Shorten the tags"
+        : "Review upload";
 
   const handleFilePicked = async (file: File) => {
     const buffer = await file.arrayBuffer();
@@ -399,7 +409,7 @@ function ComposeStep({
         ) : null}
 
         <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
-          {step.submitting ? "Checking…" : "Continue"}
+          {continueLabel}
         </Button>
       </div>
     </div>
@@ -499,7 +509,11 @@ function ReviewStep({
           onClick={onSign}
           className="mt-auto"
         >
-          {step.submitting ? "Signing…" : "Sign and upload"}
+          {step.submitting
+            ? "Uploading…"
+            : tripped
+              ? "Can't upload this"
+              : `Upload ${formatFileSize(base64ByteLength(step.dataBase64))}`}
         </Button>
       </div>
       <span className="sr-only">{wallet.name}</span>
