@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort, TokenBalance } from "@gleam/core";
-import { NetworkErrorBanner, SkeletonRow, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
+import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
@@ -159,10 +159,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
           </div>
           <div>
             {state.loading ? (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
+              <TokenSkeletonRow />
             ) : state.processIds.length === 0 ? (
               <p className="py-3.5 text-caption text-faint">
                 No extra tokens added yet.
@@ -263,7 +260,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 {addError}
               </span>
             ) : null}
-            {previewing ? <SkeletonRow /> : null}
+            {previewing ? <TokenSkeletonRow className="py-1" /> : null}
             {preview ? (
               <div className="flex flex-col gap-1 py-1">
                 <div className="flex items-center justify-between">
@@ -307,5 +304,22 @@ function RemoveIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
+  );
+}
+
+/**
+ * Shaped like the rows on this screen (no glyph, no divider), with each
+ * bar as tall as the text line it stands in for, so nothing moves when
+ * the real row replaces it.
+ */
+function TokenSkeletonRow({ className = "py-3.5" }: { className?: string }) {
+  return (
+    <div aria-hidden="true" className={`flex items-center gap-2.5 ${className}`}>
+      <span className="flex flex-1 flex-col gap-0.5">
+        <span className="w-16 rounded-md text-label gleam-shimmer">&nbsp;</span>
+        <span className="w-28 rounded-md text-caption gleam-shimmer">&nbsp;</span>
+      </span>
+      <span className="w-12 rounded-md text-label gleam-shimmer">&nbsp;</span>
+    </div>
   );
 }
