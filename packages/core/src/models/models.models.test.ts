@@ -221,23 +221,23 @@ describe("domain model shapes", () => {
     const history: PortfolioHistory = {
       range: "7D",
       series: [],
-      currentUsdValue: 0,
-      usdChange: 0,
+      currentValue: 0,
+      change: 0,
       periodLabel: "Last 7 days",
     };
     expect(history.series).toEqual([]);
     expect(history.range).toBe("7D");
   });
 
-  it("a PortfolioHistory's usdChange is a fraction, not a pre-formatted string", () => {
+  it("a PortfolioHistory's change is a fraction, not a pre-formatted string", () => {
     const history: PortfolioHistory = {
       range: "24H",
-      series: [{ timestamp: 0, usdValue: 100 }],
-      currentUsdValue: 104.21,
-      usdChange: 0.0421,
+      series: [{ timestamp: 0, value: 100 }],
+      currentValue: 104.21,
+      change: 0.0421,
       periodLabel: "Last 24 hours",
     };
-    expect(typeof history.usdChange).toBe("number");
+    expect(typeof history.change).toBe("number");
   });
 
   it("a TokenMetadata carries every spawn-tag-derived field for an unregistered AO token", () => {

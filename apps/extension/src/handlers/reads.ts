@@ -21,14 +21,17 @@ import {
   buildPriceAtFromSeries,
   estimateHistoricalPortfolioValue,
   getHistoricalUsdPrices,
+  getUsdFxRate,
   getUsdPrice,
   impersonatesRegisteredToken,
+  type HistoricalPricePoint,
 } from "@gleam/core/src/pricing/index.ts";
-import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL } from "@gleam/core";
+import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, isFiatCurrency } from "@gleam/core";
 import type {
   ActivityEntry,
   ActivityPage,
   Collectible,
+  DisplayCurrency,
   HyperBeamPeer,
   NetworkSettings,
   PortfolioHistory,
@@ -880,24 +883,32 @@ export class ReadsHandler {
    * failing the whole chart — a temporary provider hiccup for one token
    * shouldn't blank the entire portfolio value.
    *
+   * The USD series is then converted to `currency`: a fiat currency at
+   * today's exchange rate, AR or AO at that token's price at each point,
+   * so a chart in AR shows what the holdings were worth in AR at the time.
+   *
    * An unrecognized `range` throws a named error (never silently falls
    * back to a different range than the one requested). An empty AR price
-   * series (both sources unavailable) reports `series: []` per
-   * `PortfolioHistory`'s own contract — the popup shows
-   * `NetworkErrorBanner` for that case rather than this handler
+   * series (both sources unavailable), or a currency that can't be priced,
+   * reports `series: []` per `PortfolioHistory`'s own contract — the popup
+   * shows `NetworkErrorBanner` for that case rather than this handler
    * fabricating a flat line.
    */
-  async getPortfolioHistory(req: { range: PortfolioHistoryRange; scope?: PortfolioScope }): Promise<PortfolioHistory> {
+  async getPortfolioHistory(req: {
+    range: PortfolioHistoryRange;
+    scope?: PortfolioScope;
+    currency?: DisplayCurrency;
+  }): Promise<PortfolioHistory> {
     if (!PORTFOLIO_HISTORY_RANGES.includes(req.range)) {
       throw new Error(`Unrecognized portfolio history range "${String(req.range)}".`);
     }
 
     const periodLabel = periodLabelForRange(req.range);
+    const empty: PortfolioHistory = { range: req.range, series: [], currentValue: 0, change: 0, periodLabel };
+    const currency = req.currency ?? "USD";
     const addresses = await this.resolvePortfolioAddresses(req.scope ?? "wallet");
 
-    if (addresses.length === 0) {
-      return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
-    }
+    if (addresses.length === 0) return empty;
 
     const settings = await this.loadNetworkSettings();
     const arBalancesWinston = await Promise.all(addresses.map((address) => getArBalance(address, settings.gatewayUrl)));
@@ -908,11 +919,13 @@ export class ReadsHandler {
       ? await getHistoricalUsdPrices(AR_TOKEN.priceSource, req.range, this.pricesApiUrl)
       : [];
 
-    if (arPriceSeries.length === 0) {
-      return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
-    }
+    if (arPriceSeries.length === 0) return empty;
 
-    const tokens = [{ balance: arBalance, priceAt: buildPriceAtFromSeries(arPriceSeries) }];
+    const arPriceAt = buildPriceAtFromSeries(arPriceSeries);
+    const tokens = [{ balance: arBalance, priceAt: arPriceAt }];
+    let aoPriceSeries: HistoricalPricePoint[] | null = null;
+    const loadAoPriceSeries = async () =>
+      (aoPriceSeries ??= AO_TOKEN.priceSource ? await getHistoricalUsdPrices(AO_TOKEN.priceSource, req.range, this.pricesApiUrl) : []);
 
     if (AO_TOKEN.priceSource) {
       // A failed read leaves that wallet's AO out rather than failing the
@@ -938,46 +951,74 @@ export class ReadsHandler {
 
       if (readQuantities.length > 0) {
         const aoQuantity = readQuantities.reduce((sum, quantity) => sum + quantity, 0);
-        const aoPriceSeries = await getHistoricalUsdPrices(AO_TOKEN.priceSource, req.range, this.pricesApiUrl);
-        if (aoPriceSeries.length > 0) {
-          tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries) });
+        const series = await loadAoPriceSeries();
+        if (series.length > 0) {
+          tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(series) });
         } else if (aoQuantity > 0) {
           // A held AO balance with no price series would silently drop out of
           // the total, so an AO-only portfolio would chart as $0. Reported as
           // a failed range instead, like AR's own empty-series case.
-          return { range: req.range, series: [], currentUsdValue: 0, usdChange: 0, periodLabel };
+          return empty;
         }
       }
     }
 
-    const series = arPriceSeries.map((point) => ({
-      timestamp: point.timestamp,
-      usdValue: estimateHistoricalPortfolioValue(tokens, point.timestamp),
-    }));
+    let unitPriceAt: (timestamp: number) => number;
+    if (currency === "AR") {
+      unitPriceAt = arPriceAt;
+    } else if (currency === "AO") {
+      const series = await loadAoPriceSeries();
+      if (series.length === 0) return empty;
+      unitPriceAt = buildPriceAtFromSeries(series);
+    } else {
+      const rate = await getUsdFxRate(currency, this.pricesApiUrl);
+      if (rate === null) return empty;
+      unitPriceAt = () => 1 / rate;
+    }
 
-    const firstValue = series[0]?.usdValue ?? 0;
-    const currentUsdValue = series[series.length - 1]?.usdValue ?? 0;
-    const usdChange = firstValue !== 0 ? (currentUsdValue - firstValue) / firstValue : 0;
+    const series = arPriceSeries.map((point) => {
+      const unitPrice = unitPriceAt(point.timestamp);
+      const usdValue = estimateHistoricalPortfolioValue(tokens, point.timestamp);
+      return { timestamp: point.timestamp, value: unitPrice > 0 ? usdValue / unitPrice : 0 };
+    });
 
-    return { range: req.range, series, currentUsdValue, usdChange, periodLabel };
+    const firstValue = series[0]?.value ?? 0;
+    const currentValue = series[series.length - 1]?.value ?? 0;
+    const change = firstValue !== 0 ? (currentValue - firstValue) / firstValue : 0;
+
+    return { range: req.range, series, currentValue, change, periodLabel };
   }
 
   /**
-   * Current spot USD price for every token in `DEFAULT_TOKEN_REGISTRY`
-   * (`ProtocolMap.getTokenPrices`) — drives each `TokenRow`'s per-row `$`
-   * value. A token whose price sources both fail comes back with
-   * `usd: null` (never a fabricated `0`); a token with no `priceSource`
+   * Current spot price, in `currency`, for every token in
+   * `DEFAULT_TOKEN_REGISTRY` (`ProtocolMap.getTokenPrices`) — drives each
+   * `TokenRow`'s value line. A token whose price sources fail, or any
+   * token when the currency itself can't be priced, comes back with
+   * `price: null` (never a fabricated `0`); a token with no `priceSource`
    * at all (nothing outside the registry today) is skipped entirely
    * rather than returning a meaningless entry.
    */
-  async getTokenPrices(): Promise<TokenPrice[]> {
+  async getTokenPrices(req: { currency?: DisplayCurrency } = {}): Promise<TokenPrice[]> {
+    const currency = req.currency ?? "USD";
     const priced = DEFAULT_TOKEN_REGISTRY.filter((token) => token.priceSource !== null);
-    return Promise.all(
-      priced.map(async (token) => ({
-        processId: token.processId,
-        usd: await getUsdPrice(token.priceSource as NonNullable<typeof token.priceSource>, this.pricesApiUrl),
-      })),
-    );
+    const [usdPrices, rate] = await Promise.all([
+      Promise.all(
+        priced.map(async (token) => ({
+          token,
+          usd: await getUsdPrice(token.priceSource as NonNullable<typeof token.priceSource>, this.pricesApiUrl),
+        })),
+      ),
+      isFiatCurrency(currency) ? getUsdFxRate(currency, this.pricesApiUrl) : Promise.resolve(null),
+    ]);
+
+    const unitUsd = isFiatCurrency(currency)
+      ? rate === null ? null : 1 / rate
+      : (usdPrices.find(({ token }) => token.ticker === currency)?.usd ?? null);
+
+    return usdPrices.map(({ token, usd }) => ({
+      processId: token.processId,
+      price: usd === null || unitUsd === null || unitUsd <= 0 ? null : usd / unitUsd,
+    }));
   }
 }
 

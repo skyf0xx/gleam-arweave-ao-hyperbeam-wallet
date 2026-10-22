@@ -17,6 +17,8 @@ import type {
   JWKInterface,
   LockSettings,
   PasskeyStatus,
+  DisplayCurrency,
+  DisplaySettings,
   NetworkSettings,
   PermissionType,
   PointsMembership,
@@ -149,18 +151,17 @@ export interface ProtocolMap {
    * `series` means both price sources were unavailable — the popup falls
    * back to `NetworkErrorBanner` rather than rendering a broken chart.
    * `scope` defaults to `"wallet"` (the active wallet); `"all"` totals
-   * every stored wallet.
+   * every stored wallet. Values are in `currency`.
    */
-  getPortfolioHistory(req: { range: PortfolioHistoryRange; scope?: PortfolioScope }): PortfolioHistory;
+  getPortfolioHistory(req: { range: PortfolioHistoryRange; scope?: PortfolioScope; currency: DisplayCurrency }): PortfolioHistory;
   /**
-   * Current spot USD price for every token in `core/pricing`'s
-   * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the per-row `$` value
-   * under each `TokenRow` on the Tokens tab. A token whose price
-   * couldn't be computed comes back with `usd: null`, never a
-   * fabricated `0`. Any watched token outside the registry has no entry
-   * here at all.
+   * Current spot price in `currency` for every token in `core/pricing`'s
+   * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the value line under each
+   * `TokenRow` on the Tokens tab. A token whose price couldn't be
+   * computed comes back with `price: null`, never a fabricated `0`. Any
+   * watched token outside the registry has no entry here at all.
    */
-  getTokenPrices(): TokenPrice[];
+  getTokenPrices(req: { currency: DisplayCurrency }): TokenPrice[];
   getLockSettings(): LockSettings;
   getNetworkSettings(): NetworkSettings;
   /**
@@ -171,6 +172,8 @@ export interface ProtocolMap {
    * by trusted extension UI, never proxied through `providerCall`.
    */
   getThemePreference(): ThemeSettings;
+  /** Currency, headline and chart choices for the main screen; same tier as `getThemePreference`. */
+  getDisplaySettings(): DisplaySettings;
   /** Read while locked: the unlock screen shows it before the password is typed. */
   getSecurityPhrase(): SecurityPhrase | null;
   /** One list for the whole vault, most-recently-saved first. */
@@ -234,6 +237,7 @@ export interface ProtocolMap {
   setNetworkSettings(req: NetworkSettings): void;
   setLockSettings(req: LockSettings): void;
   setThemePreference(req: ThemeSettings): void;
+  setDisplaySettings(req: DisplaySettings): void;
   /** Rejects a phrase `readSecurityPhrase` doesn't accept. */
   setSecurityPhrase(req: SecurityPhrase): void;
   revokeGrant(req: { origin: string }): void;

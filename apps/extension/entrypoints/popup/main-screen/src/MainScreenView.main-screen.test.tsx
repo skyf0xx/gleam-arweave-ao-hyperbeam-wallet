@@ -3,9 +3,11 @@ import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
   ActivityPage,
+  DisplaySettings,
   PortfolioHistory,
   RuntimePort,
   TokenBalance,
+  TokenPrice,
   WalletSummary,
   Winston,
 } from "@gleam/core";
@@ -58,11 +60,11 @@ const BALANCE: Winston = "1000000000000";
 const PORTFOLIO_HISTORY_7D: PortfolioHistory = {
   range: "7D",
   series: [
-    { timestamp: 1000, usdValue: 10 },
-    { timestamp: 2000, usdValue: 12 },
+    { timestamp: 1000, value: 10 },
+    { timestamp: 2000, value: 12 },
   ],
-  currentUsdValue: 12,
-  usdChange: 0.2,
+  currentValue: 12,
+  change: 0.2,
   periodLabel: "Last 7 days",
 };
 
@@ -175,13 +177,71 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
   });
 });
 
+describe("MainScreenView display settings", () => {
+  function sendWithDisplay(settings: Partial<DisplaySettings>, prices: TokenPrice[] = []) {
+    const base = successfulSend();
+    const display: DisplaySettings = { currency: "USD", showChart: true, headline: "total", balancesHidden: false, ...settings };
+    return vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type === "getDisplaySettings") return display;
+      if (message.type === "setDisplaySettings") return undefined;
+      if (message.type === "getTokenPrices") return prices;
+      return base(message as never);
+    }) as unknown as RuntimePort["send"] & ReturnType<typeof vi.fn>;
+  }
+
+  it("asks for prices and history in the chosen currency and formats them in it", async () => {
+    const send = sendWithDisplay({ currency: "EUR" }, [{ processId: null, price: 3 }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "EUR" } }),
+    );
+    expect(send).toHaveBeenCalledWith({ type: "getTokenPrices", payload: { currency: "EUR" } });
+    const euros = (value: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(value);
+    await waitFor(() => expect(screen.getByText(euros(12))).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(euros(3))).toBeTruthy());
+  });
+
+  it("leads with the AR balance and keeps the total on a smaller line", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ headline: "AR" }) }) });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Hide balances" }).textContent).toBe("1 AR"));
+    expect(screen.getByText("$12.00")).toBeTruthy();
+  });
+
+  it("drops the chart and range tabs but keeps the total when the chart is off", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ showChart: false }) }) });
+
+    await waitFor(() => expect(screen.getByText("$12.00")).toBeTruthy());
+    expect(screen.queryByRole("tab", { name: "7D" })).toBeNull();
+    expect(screen.queryByRole("img", { name: /Portfolio value/ })).toBeNull();
+  });
+
+  it("hides every balance when the total is tapped, and saves the choice", async () => {
+    const send = sendWithDisplay({}, [{ processId: null, price: 3 }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("$3.00")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Hide balances" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Show balances" }).textContent).toBe("••••••"));
+    expect(screen.queryByText("$12.00")).toBeNull();
+    expect(screen.queryByText("$3.00")).toBeNull();
+    expect(screen.queryByText("1")).toBeNull();
+    expect(send).toHaveBeenCalledWith({
+      type: "setDisplaySettings",
+      payload: { currency: "USD", showChart: true, headline: "total", balancesHidden: true },
+    });
+  });
+});
+
 describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () => {
   it("fetches getPortfolioHistory for the default 7D range and renders value/%-change/period label together", async () => {
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } }),
     );
     await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
     expect(screen.getByText("+20.00%")).toBeTruthy();
@@ -207,11 +267,11 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     const oneMonthHistory: PortfolioHistory = {
       range: "1M",
       series: [
-        { timestamp: 500, usdValue: 100 },
-        { timestamp: 1500, usdValue: 80 },
+        { timestamp: 500, value: 100 },
+        { timestamp: 1500, value: 80 },
       ],
-      currentUsdValue: 80,
-      usdChange: -0.2,
+      currentValue: 80,
+      change: -0.2,
       periodLabel: "Last 30 days",
     };
     const send = vi.fn(async ({ type, payload }: { type: string; payload?: unknown }) => {
@@ -259,7 +319,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
   });
   it("formats a large %-change with thousands separators", async () => {
-    const send = successfulSend({ portfolioHistory: { ...PORTFOLIO_HISTORY_7D, usdChange: 27.6866 } });
+    const send = successfulSend({ portfolioHistory: { ...PORTFOLIO_HISTORY_7D, change: 27.6866 } });
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("+2,768.66%")).toBeTruthy());
@@ -281,7 +341,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     fireEvent.click(await screen.findByRole("button", { name: "Show all wallets" }));
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all", currency: "USD" } }),
     );
     expect(screen.getByText("All wallets")).toBeTruthy();
     expect(window.localStorage.getItem("gleam:portfolioScope")).toBe("all");
@@ -300,10 +360,10 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all", currency: "USD" } }),
     );
     expect(screen.getByRole("button", { name: "Show this wallet" }).getAttribute("aria-pressed")).toBe("true");
-    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet" } });
+    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } });
   });
 });
 
@@ -409,7 +469,7 @@ describe("MainScreenView hidden token rows", () => {
 
     const toggle = await screen.findByRole("button", { name: "Hidden (1)" });
     expect(screen.queryByText("FREE")).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Hide / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Hide (?!balances)/ })).toBeNull();
 
     fireEvent.click(toggle);
 

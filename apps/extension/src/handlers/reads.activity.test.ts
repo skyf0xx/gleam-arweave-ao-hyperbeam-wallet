@@ -896,8 +896,8 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     expect(history).toEqual({
       range: "7D",
       series: [],
-      currentUsdValue: 0,
-      usdChange: 0,
+      currentValue: 0,
+      change: 0,
       periodLabel: "Last 7 days",
     });
   });
@@ -934,11 +934,11 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     expect(history.range).toBe("7D");
     expect(history.periodLabel).toBe("Last 7 days");
     expect(history.series).toEqual([
-      { timestamp: 1000, usdValue: 20 },
-      { timestamp: 2000, usdValue: 40 },
+      { timestamp: 1000, value: 20 },
+      { timestamp: 2000, value: 40 },
     ]);
-    expect(history.currentUsdValue).toBe(40);
-    expect(history.usdChange).toBeCloseTo(1); // doubled: (40 - 20) / 20
+    expect(history.currentValue).toBe(40);
+    expect(history.change).toBeCloseTo(1); // doubled: (40 - 20) / 20
   });
 
   it("with scope all, prices the summed AR balance of every stored wallet, counting a repeated address once", async () => {
@@ -963,12 +963,12 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     const handler = new ReadsHandler(storage);
     const allWallets = await handler.getPortfolioHistory({ range: "7D", scope: "all" });
     expect(allWallets.series).toEqual([
-      { timestamp: 1000, usdValue: 50 },
-      { timestamp: 2000, usdValue: 100 },
+      { timestamp: 1000, value: 50 },
+      { timestamp: 2000, value: 100 },
     ]);
 
     const activeOnly = await handler.getPortfolioHistory({ range: "7D", scope: "wallet" });
-    expect(activeOnly.currentUsdValue).toBe(40);
+    expect(activeOnly.currentValue).toBe(40);
   });
 
   it("falls back to an empty series (not a thrown error) when both price sources fail", async () => {
@@ -989,8 +989,86 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     const history = await handler.getPortfolioHistory({ range: "1M" });
 
     expect(history.series).toEqual([]);
-    expect(history.currentUsdValue).toBe(0);
-    expect(history.usdChange).toBe(0);
+    expect(history.currentValue).toBe(0);
+    expect(history.change).toBe(0);
+  });
+});
+
+describe("ReadsHandler: display currency", () => {
+  async function walletStorage() {
+    const storage = createFakeStorage();
+    await storage.set("local:wallets", [
+      { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await storage.set("local:activeWalletId", "w1");
+    await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null });
+    return storage;
+  }
+
+  // 2 AR, no AO; AR went from $10 to $20 while EUR is 0.5 per dollar.
+  function pricedFetch({ fxRate = 0.5 as number | null } = {}) {
+    return vi.fn(async (url: string) => {
+      if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" };
+      if (url.includes("/prices/fx")) return { ok: true, status: 200, json: async () => ({ rate: fxRate }) };
+      if (url.includes("/prices/history")) {
+        return { ok: true, status: 200, json: async () => ({ series: [{ timestamp: 1000, usd: 10 }, { timestamp: 2000, usd: 20 }] }) };
+      }
+      if (url.includes("/prices?ids=arweave")) return { ok: true, status: 200, json: async () => ({ prices: { arweave: 20 } }) };
+      if (url.includes("/prices?ids=ao-computer")) return { ok: true, status: 200, json: async () => ({ prices: { "ao-computer": 5 } }) };
+      throw new Error(`Unexpected fetch url: ${url}`);
+    }) as unknown as typeof fetch;
+  }
+
+  it("charts a fiat currency at today's exchange rate", async () => {
+    globalThis.fetch = pricedFetch();
+    const history = await new ReadsHandler(await walletStorage()).getPortfolioHistory({ range: "7D", currency: "EUR" });
+
+    expect(history.series).toEqual([
+      { timestamp: 1000, value: 10 },
+      { timestamp: 2000, value: 20 },
+    ]);
+    expect(history.change).toBeCloseTo(1);
+  });
+
+  it("charts AR at AR's price at each point, so an AR-only wallet is flat", async () => {
+    globalThis.fetch = pricedFetch();
+    const history = await new ReadsHandler(await walletStorage()).getPortfolioHistory({ range: "7D", currency: "AR" });
+
+    expect(history.series).toEqual([
+      { timestamp: 1000, value: 2 },
+      { timestamp: 2000, value: 2 },
+    ]);
+    expect(history.change).toBe(0);
+  });
+
+  it("reports a failed range when the exchange rate is unavailable", async () => {
+    globalThis.fetch = pricedFetch({ fxRate: null });
+    const history = await new ReadsHandler(await walletStorage()).getPortfolioHistory({ range: "7D", currency: "GBP" });
+
+    expect(history.series).toEqual([]);
+  });
+
+  it("prices each token in the display currency", async () => {
+    globalThis.fetch = pricedFetch();
+    const handler = new ReadsHandler(createFakeStorage());
+
+    expect(await handler.getTokenPrices({ currency: "EUR" })).toEqual([
+      { processId: null, price: 10 },
+      { processId: AO, price: 2.5 },
+    ]);
+    expect(await handler.getTokenPrices({ currency: "AO" })).toEqual([
+      { processId: null, price: 4 },
+      { processId: AO, price: 1 },
+    ]);
+  });
+
+  it("leaves every token unpriced when the exchange rate is unavailable", async () => {
+    globalThis.fetch = pricedFetch({ fxRate: null });
+
+    expect(await new ReadsHandler(createFakeStorage()).getTokenPrices({ currency: "EUR" })).toEqual([
+      { processId: null, price: null },
+      { processId: AO, price: null },
+    ]);
   });
 });
 

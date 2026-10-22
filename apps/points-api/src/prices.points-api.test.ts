@@ -179,3 +179,58 @@ describe("GET /prices/history", () => {
     },
   );
 });
+
+describe("GET /prices/fx", () => {
+  const rates: Handler = () => ({ body: { rates: { usd: { value: 100_000 }, eur: { value: 92_000 } } } });
+
+  it("answers units of the currency per US dollar from CoinGecko's BTC quotes", async () => {
+    const { app } = await setup(rates);
+
+    const response = await app.request("/prices/fx?currency=EUR");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ currency: "EUR", rate: 0.92 });
+  });
+
+  it("falls back to CoinPaprika, asking only for the one currency", async () => {
+    const { app, calls } = await setup((url) =>
+      url.includes("coingecko") ? { status: 429 } : { body: { quotes: { USD: { price: 100_000 }, GBP: { price: 79_000 } } } },
+    );
+
+    expect(await (await app.request("/prices/fx?currency=GBP")).json()).toEqual({ currency: "GBP", rate: 0.79 });
+    expect(calls[1]).toContain("/tickers/btc-bitcoin?quotes=USD,GBP");
+  });
+
+  it("answers null when both providers fail", async () => {
+    const { app } = await setup(() => ({ status: 500 }));
+
+    expect(await (await app.request("/prices/fx?currency=EUR")).json()).toEqual({ currency: "EUR", rate: null });
+  });
+
+  it("answers USD without an upstream call", async () => {
+    const { app, calls } = await setup(rates);
+
+    expect(await (await app.request("/prices/fx?currency=USD")).json()).toEqual({ currency: "USD", rate: 1 });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("caches a rate for an hour", async () => {
+    const { app, calls, advance } = await setup(rates);
+
+    await app.request("/prices/fx?currency=EUR");
+    advance(59 * 60_000);
+    await app.request("/prices/fx?currency=EUR");
+    expect(calls).toHaveLength(1);
+
+    advance(2 * 60_000);
+    await app.request("/prices/fx?currency=EUR");
+    expect(calls).toHaveLength(2);
+  });
+
+  it.each(["", "?currency=eur", "?currency=XYZ", "?currency=AR"])("rejects %s", async (query) => {
+    const { app, calls } = await setup(rates);
+
+    expect((await app.request(`/prices/fx${query}`)).status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+});

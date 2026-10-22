@@ -1,3 +1,4 @@
+import { isFiatCurrency, type FiatCurrency } from "@gleam/core/src/models/display.ts";
 import { DEFAULT_TOKEN_REGISTRY, type HistoricalPricePoint, type HistoricalRange } from "@gleam/core/src/pricing/index.ts";
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
@@ -7,6 +8,7 @@ const COINPAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1";
 
 const SPOT_TTL_MS = 60_000;
 const HISTORY_TTL_MS = 5 * 60_000;
+const FX_TTL_MS = 60 * 60_000;
 /** A failed lookup is remembered briefly so an upstream outage isn't hammered once per client. */
 const FAILURE_TTL_MS = 15_000;
 const UPSTREAM_TIMEOUT_MS = 8_000;
@@ -25,6 +27,8 @@ export interface PriceService {
   spot(ids: readonly string[]): Promise<Record<string, number | null>>;
   /** Time-ordered series; empty when neither source could supply it. */
   history(id: string, range: HistoricalRange): Promise<HistoricalPricePoint[]>;
+  /** Units of `currency` per US dollar; null when neither source could supply it. */
+  fx(currency: FiatCurrency): Promise<number | null>;
 }
 
 export function isKnownPriceId(id: string): boolean {
@@ -42,6 +46,10 @@ export function parseHistoryQuery(query: Record<string, string | undefined>): { 
   const { id, range } = query;
   if (!id || !isKnownPriceId(id)) return null;
   return HISTORICAL_RANGES.includes(range as HistoricalRange) ? { id, range: range as HistoricalRange } : null;
+}
+
+export function parseFxQuery(query: Record<string, string | undefined>): FiatCurrency | null {
+  return isFiatCurrency(query.currency) ? query.currency : null;
 }
 
 interface Entry<T> {
@@ -64,6 +72,7 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
   const now = options.now ?? Date.now;
   const spotCache = new Map<string, Entry<number | null>>();
   const historyCache = new Map<string, Entry<HistoricalPricePoint[]>>();
+  const fxCache = new Map<string, Entry<number | null>>();
   const inFlight = new Map<string, Promise<unknown>>();
 
   // Concurrent misses for one key share a single upstream round trip.
@@ -149,6 +158,21 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
     );
   }
 
+  // Both providers quote fiat against BTC, so the USD rate is the ratio of two BTC quotes.
+  async function geckoFx(currency: FiatCurrency): Promise<number | null> {
+    const body = (await getJson(`${COINGECKO_BASE_URL}/exchange_rates?x_cg_demo_api_key=${COINGECKO_DEMO_API_KEY}`)) as {
+      rates?: Record<string, { value?: unknown }>;
+    } | null;
+    return ratio(body?.rates?.[currency.toLowerCase()]?.value, body?.rates?.usd?.value);
+  }
+
+  async function paprikaFx(currency: FiatCurrency): Promise<number | null> {
+    const body = (await getJson(`${COINPAPRIKA_BASE_URL}/tickers/btc-bitcoin?quotes=USD,${currency}`)) as {
+      quotes?: Record<string, { price?: unknown }>;
+    } | null;
+    return ratio(body?.quotes?.[currency]?.price, body?.quotes?.USD?.price);
+  }
+
   return {
     async spot(ids) {
       const entries = await Promise.all(
@@ -167,7 +191,18 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
         firstSuccess<HistoricalPricePoint[]>((value) => value.length === 0, [], () => geckoHistory(id, range), () => paprikaHistory(id, range)),
       );
     },
+
+    fx(currency) {
+      if (currency === "USD") return Promise.resolve(1);
+      return cached(fxCache, currency, FX_TTL_MS, (value) => value === null, () =>
+        firstSuccess<number | null>((value) => value === null, null, () => geckoFx(currency), () => paprikaFx(currency)),
+      );
+    },
   };
+}
+
+function ratio(numerator: unknown, denominator: unknown): number | null {
+  return typeof numerator === "number" && typeof denominator === "number" && denominator > 0 ? numerator / denominator : null;
 }
 
 function sorted(points: HistoricalPricePoint[]): HistoricalPricePoint[] {

@@ -1022,6 +1022,43 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
   });
 });
 
+describe("WalletLifecycleHandler: display settings", () => {
+  const settings = { currency: "EUR", showChart: false, headline: "AO", balancesHidden: true } as const;
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("defaults to the locale's currency with the chart and total value shown", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    vi.spyOn(navigator, "language", "get").mockReturnValue("en-KE");
+
+    expect(await handler.getDisplaySettings()).toEqual({
+      currency: "KES",
+      showChart: true,
+      headline: "total",
+      balancesHidden: false,
+    });
+  });
+
+  it("reflects a value previously written by setDisplaySettings", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    await handler.setDisplaySettings(settings);
+    expect(await handler.getDisplaySettings()).toEqual(settings);
+  });
+
+  it("drops a malformed stored record back to the default", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:displaySettings", { ...settings, currency: "DOGE" });
+    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    expect((await handler.getDisplaySettings()).showChart).toBe(true);
+  });
+
+  it("rejects an unknown currency or headline", async () => {
+    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    await expect(handler.setDisplaySettings({ ...settings, currency: "XYZ" as never })).rejects.toThrow(/invalid display settings/i);
+    await expect(handler.setDisplaySettings({ ...settings, headline: "PI" as never })).rejects.toThrow(/invalid display settings/i);
+  });
+});
+
 describe("WalletLifecycleHandler: setThemePreference", () => {
   it("rejects a value that isn't exactly light or dark", async () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);

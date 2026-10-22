@@ -337,6 +337,8 @@ export const BACKGROUND_MESSAGES = {
   setLockSettings: EXTENSION,
   getThemePreference: EXTENSION,
   setThemePreference: EXTENSION,
+  getDisplaySettings: EXTENSION,
+  setDisplaySettings: EXTENSION,
   getSecurityPhrase: EXTENSION,
   setSecurityPhrase: EXTENSION,
   revokeGrant: EXTENSION,

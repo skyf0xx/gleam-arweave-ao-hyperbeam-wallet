@@ -48,7 +48,7 @@ describe("TokenRow", () => {
         glyph={{ label: "AR", tone: 1 }}
         name="Arweave"
         amount="128.4204"
-        usdValue="$1,438.09"
+        value="$1,438.09"
       />,
     );
     expect(screen.getByText("Arweave")).toBeTruthy();
@@ -63,13 +63,13 @@ describe("TokenRow", () => {
     expect(screen.getByText("1,234 points").className).toContain("sr-only");
   });
 
-  it("keeps the existing usdValue visible (dimmed, not hidden) while loading", () => {
+  it("keeps the existing value visible (dimmed, not hidden) while loading", () => {
     render(
       <TokenRow
         glyph={{ label: "AR", tone: 1 }}
         name="Arweave"
         amount="128.4204"
-        usdValue="$1,438.09"
+        value="$1,438.09"
         loading
       />,
     );

@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { browser } from "wxt/browser";
-import type { AutoLockTimeout, LockSettings, NetworkSettings, RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
+import type {
+  AutoLockTimeout,
+  HeadlineBalance,
+  LockSettings,
+  NetworkSettings,
+  RuntimePort,
+  ThemePreference,
+  ThemeSettings,
+} from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
+import { useDisplaySettings } from "@/src/display-settings";
 import { REPO_URL } from "@/src/site-pages";
 import { AboutBuild } from "./AboutBuild";
 
@@ -15,6 +24,12 @@ const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
   "4hr": "4 hours",
 };
 
+const HEADLINE_OPTIONS: { value: HeadlineBalance; label: string }[] = [
+  { value: "total", label: "Total value" },
+  { value: "AR", label: "AR balance" },
+  { value: "AO", label: "AO balance" },
+];
+
 function gatewayHostname(gatewayUrl: string): string {
   try {
     return new URL(gatewayUrl).hostname;
@@ -25,7 +40,7 @@ function gatewayHostname(gatewayUrl: string): string {
 
 /**
  * The dedicated settings screen the gear icon opens: grouped
- * WALLET/NETWORK/TOOLS/GENERAL sections of navigable rows, each showing
+ * WALLET/NETWORK/TOOLS/DISPLAY sections of navigable rows, each showing
  * its current value on the right, with a Help & About section (feedback
  * card and source link) pinned below them.
  * "Upload to Arweave" is disabled, with a "Coming soon" label, until
@@ -40,6 +55,7 @@ export interface SettingsHomeViewProps {
   onOpenNetworkPeers: () => void;
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
+  onOpenDisplayCurrency: () => void;
   onOpenUpload: () => void;
   onOpenFeedback: () => void;
 }
@@ -58,6 +74,7 @@ export function SettingsHomeView({
   onOpenNetworkPeers,
   onOpenManageTokens,
   onOpenContacts,
+  onOpenDisplayCurrency,
   onOpenUpload,
   onOpenFeedback,
 }: SettingsHomeViewProps) {
@@ -67,6 +84,7 @@ export function SettingsHomeView({
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
+  const { settings: display, update: updateDisplay } = useDisplaySettings(runtime);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
@@ -163,7 +181,27 @@ export function SettingsHomeView({
           <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
         </OptionSection>
 
-        <OptionSection title="General">
+        <OptionSection title="Display">
+          <OptionRow
+            divided={false}
+            title="Currency"
+            description="Balances and prices are shown in"
+            value={display?.currency}
+            onClick={onOpenDisplayCurrency}
+          />
+          <SelectRow
+            title="Main balance"
+            value={display?.headline ?? "total"}
+            options={HEADLINE_OPTIONS}
+            disabled={!display}
+            onChange={(headline) => void updateDisplay({ headline })}
+          />
+          <ToggleRow
+            title="Balance chart"
+            checked={display?.showChart ?? true}
+            disabled={!display}
+            onToggle={() => void updateDisplay({ showChart: !(display?.showChart ?? true) })}
+          />
           <ToggleRow
             title="Dark mode"
             checked={theme === "dark"}
@@ -182,6 +220,42 @@ export function SettingsHomeView({
           </OptionSection>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SelectRow<T extends string>({
+  title,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  title: string;
+  value: T;
+  options: { value: T; label: string }[];
+  disabled: boolean;
+  onChange: (value: T) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="flex w-full items-center justify-between gap-3 py-3.5">
+      <label htmlFor={id} className="text-label font-semibold text-foreground">
+        {title}
+      </label>
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="rounded-md border border-line bg-background px-2.5 py-1.5 text-label text-foreground focus:border-foreground focus:outline-none disabled:opacity-60"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { SettingsHomeView } from "@/entrypoints/popup/settings-home/index.tsx";
 import { ConnectedAppsView } from "@/entrypoints/popup/connected-apps/index.tsx";
 import { ManageTokensView } from "@/entrypoints/popup/manage-tokens/index.tsx";
 import { ContactsView } from "@/entrypoints/popup/contacts/index.tsx";
+import { DisplayCurrencyView } from "@/entrypoints/popup/display-currency/index.tsx";
 import { PointsView } from "@/entrypoints/popup/points/index.tsx";
 import { UploadView } from "@/entrypoints/popup/upload/index.tsx";
 import { UseGleamOnSiteView } from "@/entrypoints/popup/site-wallet/index.tsx";
@@ -101,6 +102,7 @@ type MainSubView =
   | { kind: "connected-apps" }
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
+  | { kind: "display-currency" }
   | { kind: "collectible"; collectible: Collectible }
   | { kind: "send-collectible"; collectible: Collectible }
   | { kind: "points" }
@@ -334,6 +336,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
+        onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
         onOpenUpload={() => setSubView({ kind: "upload" })}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", browser.runtime.getManifest().version), "_blank", "noopener,noreferrer")
@@ -363,6 +366,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     );
   } else if (subView.kind === "contacts") {
     content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+  } else if (subView.kind === "display-currency") {
+    content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "upload") {
     content = (
       <UploadView

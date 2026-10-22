@@ -809,7 +809,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   removeWatchedToken: (data) => reads.removeWatchedToken(data),
   getActivity: (data) => reads.getActivity(data),
   getPortfolioHistory: (data) => reads.getPortfolioHistory(data),
-  getTokenPrices: () => reads.getTokenPrices(),
+  getTokenPrices: (data) => reads.getTokenPrices(data),
   getConnectedApps: () => approval.getConnectedApps(),
   listContacts: () => contacts.listContacts(),
 
@@ -844,6 +844,8 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   setLockSettings: (data) => lifecycle.setLockSettings(data),
   getThemePreference: () => lifecycle.getThemePreference(),
   setThemePreference: (data) => lifecycle.setThemePreference(data),
+  getDisplaySettings: () => lifecycle.getDisplaySettings(),
+  setDisplaySettings: (data) => lifecycle.setDisplaySettings(data),
   getSecurityPhrase: () => securityPhrase.get(),
   setSecurityPhrase: (data) => securityPhrase.set(data),
   revokeGrant: async (data) => {

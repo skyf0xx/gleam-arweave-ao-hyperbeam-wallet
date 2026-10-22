@@ -13,14 +13,15 @@ export type PortfolioScope = "wallet" | "all";
 /** One point on the portfolio-value-over-time chart. */
 export interface PortfolioHistoryPoint {
   timestamp: number;
-  usdValue: number;
+  value: number;
 }
 
 /**
  * The full response for a requested range: the series to plot plus the
  * summary figures the main screen shows alongside it — computed once in
  * the background so the popup never re-derives them from the raw series
- * on every render. `usdChange` is a fraction (e.g. `0.0421` for +4.21%),
+ * on every render. Values are in the currency the request named.
+ * `change` is a fraction (e.g. `0.0421` for +4.21%),
  * not a pre-formatted string. An empty `series` (both price sources
  * unavailable) means "couldn't compute" — the popup shows
  * `NetworkErrorBanner` for that case rather than a fabricated flat line.
@@ -28,7 +29,7 @@ export interface PortfolioHistoryPoint {
 export interface PortfolioHistory {
   range: PortfolioHistoryRange;
   series: PortfolioHistoryPoint[];
-  currentUsdValue: number;
-  usdChange: number;
+  currentValue: number;
+  change: number;
   periodLabel: string;
 }

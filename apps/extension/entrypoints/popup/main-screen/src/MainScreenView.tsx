@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { explorerUrlFor, type Collectible, type CollectibleRef, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, type Collectible, type CollectibleRef, type DisplayCurrency, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -13,11 +13,13 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
+import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
-import { displayTicker, formatAtomicAsDisplay, formatUsd, formatWinstonAsAr } from "./formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "./formatWinston";
 import { useAddressIdentity } from "@/src/address-identity";
+import { useDisplaySettings } from "@/src/display-settings";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGrid } from "../../collectibles/index.tsx";
@@ -53,6 +55,11 @@ import { useCopy } from "../../points/src/useCopy";
  * never a stale combination. An empty `series` (both price sources
  * unavailable) falls back to `NetworkErrorBanner`, matching the
  * balance/activity failure path, rather than a broken/blank chart.
+ *
+ * Display settings (`useDisplaySettings`): values are priced in the
+ * chosen currency, the large figure is the total or the AR/AO balance,
+ * the chart and its range tabs can be turned off, and tapping the large
+ * figure hides every balance on this screen until it's tapped again.
  *
  * Tokens/Activity: a single tab control (local `activeTab` state, no
  * routing) switches between the two sections. The tab-button
@@ -108,17 +115,10 @@ interface DefaultTokenRow {
   ticker: string;
   name: string;
   amount: string;
-  usdValue: string | undefined;
+  value: string | undefined;
   send: "ar" | TokenBalance | null;
 }
 
-/**
- * Looks up a token's price (by AO `processId`, or `null` for AR) from
- * `useTokenPrices()`'s cache and formats `amount * price` as a USD string —
- * `undefined` when the price isn't loaded yet or couldn't be computed
- * (`TokenPrice.usd === null`, per that query's own HONESTY contract), so
- * `TokenRow` renders no `$` line rather than a fabricated `$0.00`.
- */
 /**
  * Shown in place of a formatted amount for a `TokenBalance` whose
  * `available` is `false` (`handlers/reads.ts`: a failed HyperBEAM read, or
@@ -131,9 +131,22 @@ const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
 // The rest of the history is one click away through "View all".
 const ACTIVITY_PREVIEW_LIMIT = 6;
 
-function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null, amount: number): string | undefined {
-  const price = prices?.find((entry) => entry.processId === processId)?.usd;
-  return typeof price === "number" ? formatUsd(amount * price) : undefined;
+/**
+ * Looks up a token's price (by AO `processId`, or `null` for AR) from
+ * `useTokenPrices()`'s cache and formats `amount * price` in the display
+ * currency — `undefined` when the price isn't loaded yet or couldn't be
+ * computed (`TokenPrice.price === null`, per that query's own HONESTY
+ * contract), so `TokenRow` renders no value line rather than a fabricated
+ * `$0.00`.
+ */
+function valueFor(
+  prices: TokenPrice[] | undefined,
+  currency: DisplayCurrency | undefined,
+  processId: string | null,
+  amount: number,
+): string | undefined {
+  const price = prices?.find((entry) => entry.processId === processId)?.price;
+  return typeof price === "number" && currency ? formatCurrencyValue(amount * price, currency) : undefined;
 }
 
 /**
@@ -142,7 +155,11 @@ function usdValueFor(prices: TokenPrice[] | undefined, processId: string | null,
  * `data` (not yet loaded) or no matching `TokenBalance` entry both fall
  * back to `DEFAULT_TOKENS`' own `"0"` constant, never `null`/`undefined`.
  */
-function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPrice[] | undefined): DefaultTokenRow[] {
+function buildDefaultTokenRows(
+  data: WalletBalances | undefined,
+  prices: TokenPrice[] | undefined,
+  currency: DisplayCurrency | undefined,
+): DefaultTokenRow[] {
   const aoBalance = data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
   const aoAvailable = aoBalance !== undefined && aoBalance.available !== false;
   const arAmount = data?.arBalance !== undefined ? Number(formatWinstonAsAr(data.arBalance, 12)) : 0;
@@ -154,7 +171,7 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
       ticker: DEFAULT_AR_TOKEN.ticker,
       name: DEFAULT_AR_TOKEN.name,
       amount: data?.arBalance !== undefined ? formatWinstonAsAr(data.arBalance) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
-      usdValue: data?.arBalance !== undefined ? usdValueFor(prices, null, arAmount) : undefined,
+      value: data?.arBalance !== undefined ? valueFor(prices, currency, null, arAmount) : undefined,
       send: "ar",
     },
     {
@@ -166,7 +183,7 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
         : aoBalance
           ? UNAVAILABLE_BALANCE_LABEL
           : DEFAULT_AO_TOKEN.defaultDisplayAmount,
-      usdValue: aoAvailable ? usdValueFor(prices, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
+      value: aoAvailable ? valueFor(prices, currency, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
       send: aoAvailable ? (aoBalance ?? null) : null,
     },
   ];
@@ -175,8 +192,8 @@ function buildDefaultTokenRows(data: WalletBalances | undefined, prices: TokenPr
 /**
  * The non-default watched tokens rendered below the AR/AO rows — every
  * `TokenBalance` whose `processId` isn't the AO default. These have no
- * entry in `DEFAULT_TOKEN_REGISTRY`, so `usdValueFor` always
- * resolves `undefined` for them today — no `$` line until such a token
+ * entry in `DEFAULT_TOKEN_REGISTRY`, so `valueFor` always
+ * resolves `undefined` for them today — no value line until such a token
  * gets a confirmed price-source mapping.
  */
 function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
@@ -362,7 +379,12 @@ export function MainScreenView({
   const listDockOffsetRef = useRef(0);
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
-  const tokenPricesQuery = useTokenPrices(runtime);
+  const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
+  const currency = displaySettings?.currency;
+  const showChart = displaySettings?.showChart ?? true;
+  const masked = displaySettings?.balancesHidden ?? false;
+  const toggleMasked = () => void updateDisplaySettings({ balancesHidden: !masked });
+  const tokenPricesQuery = useTokenPrices(runtime, currency);
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
@@ -371,16 +393,21 @@ export function MainScreenView({
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
   // With a single wallet "all" equals "wallet"; resolving it here keeps one cache entry and no toggle.
-  const portfolioScope: PortfolioScope = hasOtherWallets ? preferredScope : "wallet";
+  // The toggle lives on the chart, so without it the figure stays on this wallet.
+  const portfolioScope: PortfolioScope = hasOtherWallets && showChart ? preferredScope : "wallet";
   const togglePortfolioScope = () => {
     const next: PortfolioScope = portfolioScope === "all" ? "wallet" : "all";
     setPreferredScope(next);
     writePortfolioScope(next);
   };
   // Waits for the wallet list so a saved "all" preference doesn't first fetch the single-wallet view.
-  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, {
+  const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, currency, {
     enabled: !otherWalletsQuery.isPending,
   });
+
+  const defaultTokenRows = buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data, currency);
+  const headlineRow =
+    displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
@@ -577,13 +604,24 @@ export function MainScreenView({
           <div className="px-6 pb-1 pt-2.5">
             <PortfolioChart
               points={portfolioHistoryQuery.data?.series ?? []}
-              currentUsdValue={portfolioHistoryQuery.data?.currentUsdValue ?? 0}
-              usdChange={portfolioHistoryQuery.data?.usdChange ?? 0}
+              currentValue={portfolioHistoryQuery.data?.currentValue ?? 0}
+              currency={currency ?? "USD"}
+              change={portfolioHistoryQuery.data?.change ?? 0}
               periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
               activeRange={selectedRange}
               onRangeChange={setSelectedRange}
               scope={portfolioScope}
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
+              headline={
+                headlineRow
+                  ? headlineRow.amount === UNAVAILABLE_BALANCE_LABEL
+                    ? `${headlineRow.ticker} unavailable`
+                    : `${headlineRow.amount} ${headlineRow.ticker}`
+                  : undefined
+              }
+              masked={masked}
+              onToggleMasked={displaySettings ? toggleMasked : undefined}
+              showChart={showChart}
               loading={portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
               /**
                * `series: []` on a *resolved* response (no thrown query
@@ -591,7 +629,7 @@ export function MainScreenView({
                * price sources failed (`reads.ts`'s doc comment) — a real
                * zero-balance wallet still gets a non-empty series (AR/USD
                * prices exist independent of the user's balance, just
-               * every point's `usdValue` is 0), so an empty series here
+               * every point's `value` is 0), so an empty series here
                * only ever means the fetch effectively failed. Passed
                * through as `onRetry` rather than swapping `PortfolioChart`
                * out for `NetworkErrorBanner` at this level, so the range
@@ -703,7 +741,7 @@ export function MainScreenView({
             ) : (
               (() => {
                 const rows: ListedTokenRow[] = [
-                  ...buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data).map(({ send, ...row }) => ({
+                  ...defaultTokenRows.map(({ send, ...row }) => ({
                     key: row.key,
                     label: row.name,
                     defaultHidden: false,
@@ -711,8 +749,8 @@ export function MainScreenView({
                       <TokenRow
                         glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2 }}
                         name={row.name}
-                        amount={row.amount}
-                        usdValue={row.usdValue}
+                        amount={masked ? HIDDEN_AMOUNT : row.amount}
+                        value={masked && row.value !== undefined ? HIDDEN_AMOUNT : row.value}
                         loading={loading}
                         onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                         className="border-b-0"
@@ -744,7 +782,9 @@ export function MainScreenView({
                           amount={
                             token.available === false
                               ? UNAVAILABLE_BALANCE_LABEL
-                              : formatAtomicAsDisplay(token.quantity, token.denomination)
+                              : masked
+                                ? HIDDEN_AMOUNT
+                                : formatAtomicAsDisplay(token.quantity, token.denomination)
                           }
                           loading={loading}
                           onClick={token.available === false ? undefined : () => onSendToken(token)}

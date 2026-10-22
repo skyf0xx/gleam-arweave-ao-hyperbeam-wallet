@@ -36,7 +36,7 @@ function runtimeWith(collectibles: () => Promise<Collectible[]>) {
     if (type === "getBalance") return "0";
     if (type === "getTokenBalances") return [];
     if (type === "getActivity") return { entries: [], cursor: null };
-    if (type === "getPortfolioHistory") return { range: "7D", series: [], currentUsdValue: 0, usdChange: 0, periodLabel: "" };
+    if (type === "getPortfolioHistory") return { range: "7D", series: [], currentValue: 0, change: 0, periodLabel: "" };
     if (type === "getTokenPrices") return [];
     if (type === "getPointsMemberships") return {};
     if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
