@@ -141,8 +141,8 @@ describe("MainScreenNotice", () => {
   it("asks for a review after a good moment, with feedback beside it", async () => {
     const { send } = setup({ review: { kind: "hardware", device: "Ledger" }, announcements: [INFO] });
 
-    expect(await screen.findByText("Your Ledger is connected.")).toBeTruthy();
-    expect(screen.getByText("Gleam is new. A 30-second review helps others find it.")).toBeTruthy();
+    expect(await screen.findByText("Enjoying Gleam?")).toBeTruthy();
+    expect(screen.getByText("Leave a review to help others discover us.")).toBeTruthy();
     expect(screen.queryByText(INFO.text)).toBeNull();
     const feedback = screen.getByRole("link", { name: "Send us feedback" });
     expect(feedback.getAttribute("href")).toBe("https://gleamwallet.app/feedback.html?v=1.2.3");
@@ -159,10 +159,10 @@ describe("MainScreenNotice", () => {
 
   it("retires the review prompt on dismiss", async () => {
     const { send } = setup({ review: { kind: "send" } });
-    await screen.findByText("Sent and confirmed.");
+    await screen.findByText("Enjoying Gleam?");
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "finishReviewPrompt", payload: undefined }));
-    await waitFor(() => expect(screen.queryByText("Sent and confirmed.")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Enjoying Gleam?")).toBeNull());
   });
 
   it("shows nothing when the announcements read fails", async () => {
