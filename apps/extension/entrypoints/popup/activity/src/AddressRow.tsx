@@ -5,7 +5,7 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 /**
  * One address row with a dicebear identicon (`useAddressIdentity().avatarSvg`,
  * same generator as `WalletSwitcherView`) — shared between `SendView`'s
- * "Saved addresses" picker and Settings' Contacts screen so an address
+ * "Saved contacts" picker and Settings' Contacts screen so an address
  * looks the same everywhere it's shown. Originally private to
  * `SendView.tsx`; moved here (rather than duplicated) once Contacts needed
  * the same row.

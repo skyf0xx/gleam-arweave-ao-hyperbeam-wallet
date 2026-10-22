@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -34,7 +34,7 @@ const WINSTON_PER_AR = 1_000_000_000_000n;
  * rather than a dropdown/modal primitive.
  *
  * Address book (minimal, per `todo.md`'s "Address book, part 1"): the
- * label that used to read "Recent" is now "Saved addresses" everywhere in
+ * label that used to read "Recent" is now "Saved contacts" everywhere in
  * this view, and that pushed screen shows saved contacts (`useContacts`)
  * above recent send recipients, deduped by address (a saved contact wins
  * over its plain recent-recipient row). Saving a new address is
@@ -719,7 +719,7 @@ export function RecipientField({
           onClick={onOpenSavedAddresses}
           className="text-label font-medium text-muted hover:text-foreground hover:underline"
         >
-          Saved addresses
+          Saved contacts
         </button>
       </div>
       {showCard ? (
@@ -1105,21 +1105,13 @@ function SkeletonPickerRow() {
 }
 
 /**
- * Saved addresses picker — replaces the old "Recent recipients" screen per
- * `todo.md`'s "Address book, part 1" (the user's own minimalism note:
- * "opening that screen can display recent as well as saved"). Three
- * sections, in order: saved contacts (`useContacts`, vault-wide), "Your
- * wallets" (`useOtherWallets` — every other wallet in the vault, never the
- * active one), then recent send recipients (from the shared `useActivity`
- * cache) — each section excludes any address already shown in an earlier
- * one so nothing appears twice. A text field at the top filters every
- * section by name or address substring as you type (case-insensitive),
- * per the reviewer's spec. Selecting any row fills the recipient field
- * with the full address; truncated display only. Every row — contact,
- * wallet or plain recent address — uses the same dicebear identicon as
- * `WalletSwitcherView`'s own rows (`useAddressIdentity().avatarSvg` + `AccountAvatar`),
- * not initials in a circle, so an address looks the same wherever it's
- * shown across the extension.
+ * Saved contacts picker, in three sections: saved contacts (`useContacts`,
+ * vault-wide), "Your wallets" (`useOtherWallets`, never the active one),
+ * then, below a divider, the latest few addresses sent to that have no
+ * name. Each section skips addresses an earlier one already shows. The
+ * search field filters every section by name or address, and searches
+ * every recent address rather than just the few listed. Rows show the
+ * same identicon as everywhere else an address appears.
  */
 export function SavedAddressesStep({
   runtime,
@@ -1154,15 +1146,17 @@ export function SavedAddressesStep({
 
   const filteredContacts = contacts.filter((contact) => matches(contact.name, contact.address));
   const filteredWallets = otherWallets.filter((candidate) => matches(candidate.name, candidate.address));
-  const filteredRecent = recentOnly.filter((address) => matches(null, address));
+  const filteredRecent = recentOnly
+    .filter((address) => matches(null, address))
+    .slice(0, query.length > 0 ? undefined : RECENT_LIMIT);
 
   const loading = contactsLoading || otherWalletsLoading || activityQuery.isLoading;
   const isEmpty =
     !loading && filteredContacts.length === 0 && filteredWallets.length === 0 && filteredRecent.length === 0;
 
   return (
-    <div className="flex min-h-full flex-col" role="dialog" aria-label="Saved addresses">
-      <ScreenHeader title="Saved addresses" onBack={onBack} />
+    <div className="flex min-h-full flex-col" role="dialog" aria-label="Saved contacts">
+      <ScreenHeader title="Saved contacts" onBack={onBack} />
       <div className="px-3.5 pb-2 pt-3">
         <input
           type="text"
@@ -1187,29 +1181,50 @@ export function SavedAddressesStep({
             message={
               query.length > 0
                 ? "No matching addresses."
-                : "No saved addresses yet. Addresses you save or send to will show up here."
+                : "No saved contacts yet. Addresses you save or send to will show up here."
             }
           />
         ) : (
           <>
-            {filteredContacts.map((contact) => (
-              <AddressRow key={contact.address} address={contact.address} name={contact.name} onSelect={() => onSelect(contact.address)} />
-            ))}
-            {filteredWallets.length > 0 ? (
-              <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-faint">Your wallets</div>
+            {filteredContacts.length > 0 ? (
+              <PickerSection label="Contacts">
+                {filteredContacts.map((contact) => (
+                  <AddressRow key={contact.address} address={contact.address} name={contact.name} onSelect={() => onSelect(contact.address)} />
+                ))}
+              </PickerSection>
             ) : null}
-            {filteredWallets.map((candidate) => (
-              <AddressRow key={candidate.address} address={candidate.address} name={candidate.name} onSelect={() => onSelect(candidate.address)} />
-            ))}
-            {filteredRecent.map((address) => (
-              <AddressRow key={address} address={address} name={null} onSelect={() => onSelect(address)} />
-            ))}
+            {filteredWallets.length > 0 ? (
+              <PickerSection label="Your wallets">
+                {filteredWallets.map((candidate) => (
+                  <AddressRow key={candidate.address} address={candidate.address} name={candidate.name} onSelect={() => onSelect(candidate.address)} />
+                ))}
+              </PickerSection>
+            ) : null}
+            {filteredRecent.length > 0 ? (
+              <PickerSection label="Recent" divided={filteredContacts.length > 0 || filteredWallets.length > 0}>
+                {filteredRecent.map((address) => (
+                  <AddressRow key={address} address={address} name={null} onSelect={() => onSelect(address)} />
+                ))}
+              </PickerSection>
+            ) : null}
           </>
         )}
       </div>
     </div>
   );
 }
+
+function PickerSection({ label, divided, children }: { label: string; divided?: boolean; children: ReactNode }) {
+  return (
+    <section aria-label={label} className={divided ? "mt-2 border-t border-line" : undefined}>
+      <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-faint">{label}</div>
+      {children}
+    </section>
+  );
+}
+
+/** Older recipients are a search away; the list itself stays short. */
+const RECENT_LIMIT = 5;
 
 /**
  * Pure extraction — separated from `RecentRecipientsStep` so it's testable
