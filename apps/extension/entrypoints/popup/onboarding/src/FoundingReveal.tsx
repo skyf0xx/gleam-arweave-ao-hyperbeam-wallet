@@ -3,7 +3,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { foundingPost, inviteLinkFor, invitesLine, xIntentUrl } from "@/src/points-share";
+import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { inviteLinkFor, invitesLine } from "@/src/points-share";
+import { useCopy } from "../../points/src/useCopy";
 import { usePointsScores } from "../../points/src/usePoints";
 
 export const REVEAL_SEEN_QUERY_KEY = ["points", "revealSeen"] as const;
@@ -15,9 +17,7 @@ export interface FoundingRevealProps {
 }
 
 export function FoundingReveal({ seatsLeft, inviteCode, onDone }: FoundingRevealProps) {
-  const shareHref = inviteCode
-    ? xIntentUrl(foundingPost({ seats: seatsLeft, link: inviteLinkFor(inviteCode) }))
-    : null;
+  const { copied, copy } = useCopy(inviteCode ? inviteLinkFor(inviteCode) : "");
 
   return (
     <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
@@ -32,15 +32,9 @@ export function FoundingReveal({ seatsLeft, inviteCode, onDone }: FoundingReveal
       </div>
 
       <div className="mt-auto flex w-full flex-col gap-3 pt-6">
-        {shareHref ? (
-          <Button asChild>
-            <a href={shareHref} target="_blank" rel="noreferrer">
-              Share on X
-            </a>
-          </Button>
-        ) : (
-          <Button disabled>Share on X</Button>
-        )}
+        <Button disabled={!inviteCode} className={cn(copied && "text-positive")} onClick={copy}>
+          {copied ? "Copied" : "Copy invite link"}
+        </Button>
         <Button variant="secondary" onClick={onDone}>
           Done
         </Button>

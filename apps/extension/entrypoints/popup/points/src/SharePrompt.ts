@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointsSharePrompt, PointsWalletScore, RuntimePort, WalletSummary } from "@gleam/core";
 import { FOUNDING_GATE } from "@/src/founding-gate";
-import { foundingPost, gainedSeatPost, inviteLinkFor, lastSeatPost } from "@/src/points-share";
 import {
   useMarkSeatsSeen,
   useMarkShareSeen,
@@ -24,9 +23,9 @@ export interface SharePromptState {
 
 /**
  * Picks the one prompt to show. A new invite comes first because it is
- * news and time-bound, then the last seat, then the join moment, which the
- * always-available Invite on X also covers. The join prompt is skipped when
- * the founding reveal already offered the same post.
+ * news and time-bound, then the last seat, then the join moment. The join
+ * prompt is skipped when the founding reveal already offered the invite
+ * link.
  */
 export function pickSharePrompt({ score, shareSeen, seatsSeen, revealSeen }: SharePromptState): SharePromptKind | null {
   const seats = score.seatsLeft;
@@ -40,40 +39,38 @@ export function pickSharePrompt({ score, shareSeen, seatsSeen, revealSeen }: Sha
 export interface PromptContent {
   /** Stands in for the Invite section's heading. */
   text: string;
-  post: string;
 }
 
-function promptContent(kind: SharePromptKind, score: PointsWalletScore, link: string): PromptContent {
+function promptContent(kind: SharePromptKind): PromptContent {
   switch (kind) {
     case "gainedSeat":
-      return { text: "A friend joined. You got another invite.", post: gainedSeatPost({ link }) };
+      return { text: "A friend joined. You got more invites." };
     case "lastSeat":
-      return { text: "Your last invite", post: lastSeatPost() };
+      return { text: "Your last invite" };
     case "joined":
-      return { text: "You're in and earning Gleam Points.", post: foundingPost({ seats: score.seatsLeft, link }) };
+      return { text: "You're in and earning Gleam Points." };
   }
 }
 
 export interface SharePromptArgs {
   runtime: RuntimePort;
   wallet: WalletSummary;
-  inviteCode: string;
   score: PointsWalletScore | null;
 }
 
 export interface ActiveSharePrompt extends PromptContent {
-  /** Records the prompt as acted on; call when the member shares or copies. */
+  /** Records the prompt as acted on; call when the member copies the link. */
   finish: () => void;
 }
 
 /**
  * The Invite section's one-time news (POINTS.md § Share prompts): at most
- * one prompt, which takes over the section's heading and the post behind
- * its Invite on X. Opening the screen records the seat count as seen, which
- * clears the toolbar dot; the prompt stays for this visit, and a named
- * prompt returns until the member shares or copies from it.
+ * one prompt, which takes over the section's heading. Opening the screen
+ * records the seat count as seen, which clears the toolbar dot; the prompt
+ * stays for this visit, and a named prompt returns until the member copies
+ * the invite link from it.
  */
-export function useSharePrompt({ runtime, wallet, inviteCode, score }: SharePromptArgs): ActiveSharePrompt | null {
+export function useSharePrompt({ runtime, wallet, score }: SharePromptArgs): ActiveSharePrompt | null {
   const seats = score?.seatsLeft ?? null;
   const ready = FOUNDING_GATE && seats !== null;
   const shareSeen = usePointsShareSeen(runtime, ready);
@@ -110,7 +107,7 @@ export function useSharePrompt({ runtime, wallet, inviteCode, score }: ShareProm
   const kind = shown ?? pick;
   if (kind === null || score === null) return null;
   return {
-    ...promptContent(kind, score, inviteLinkFor(inviteCode)),
+    ...promptContent(kind),
     // A new invite was marked seen when it showed; the named prompts only once acted on.
     finish: () => {
       if (kind !== "gainedSeat") markShare.mutate({ walletId: wallet.id, prompt: kind });

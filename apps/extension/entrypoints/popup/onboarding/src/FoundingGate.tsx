@@ -7,7 +7,6 @@ import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { browser } from "wxt/browser";
-import { askInvitePost, fullInvitePost, xIntentUrl } from "@/src/points-share";
 import { sitePageUrl } from "@/src/site-pages";
 
 const X_PROFILE_URL = "https://x.com/gleam_wallet";
@@ -186,19 +185,11 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         {showAsk ? (
           <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
             <p className="text-center text-caption text-muted">
-              Get an invite from a member or watch{" "}
-              <a
-                href={X_PROFILE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="text-foreground underline underline-offset-2"
-              >
-                for drops on X
-              </a>
+              Get an invite from a member, or ask for one on X.
             </p>
             <Button asChild variant={full ? "primary" : "secondary"}>
-              <a href={xIntentUrl(full ? fullInvitePost() : askInvitePost())} target="_blank" rel="noreferrer">
-                Ask for an invite on X
+              <a href={X_PROFILE_URL} target="_blank" rel="noreferrer">
+                Follow @gleam_wallet for drops
               </a>
             </Button>
           </div>
