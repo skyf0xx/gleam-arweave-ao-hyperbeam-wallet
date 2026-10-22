@@ -2,6 +2,7 @@ import type {
   ActiveSite,
   ActivityPage,
   Announcement,
+  ReviewMoment,
   Collectible,
   CollectibleSendDraft,
   ApprovalRequest,
@@ -304,6 +305,14 @@ export interface ProtocolMap {
   /** Ids of the announcements the user has dismissed. */
   getDismissedAnnouncements(): string[];
   dismissAnnouncement(req: { id: string }): void;
+  /**
+   * The moment to ask for a store review after, or null once asked or
+   * before one has happened. `since` is when the popup opened: a moment
+   * from the current visit waits for the next one.
+   */
+  getReviewPrompt(req: { since: number }): ReviewMoment | null;
+  /** Records the review prompt as answered, either way; it never shows again. */
+  finishReviewPrompt(): void;
 
   // the site in the active tab
   /** Null when the active tab isn't an http(s) page. */
