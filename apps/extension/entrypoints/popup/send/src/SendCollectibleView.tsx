@@ -247,7 +247,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             />
           ) : (
             <p className="text-label leading-relaxed text-muted">
-              You&apos;re sending {collectible.name} to this address. This can&apos;t be undone.
+              You&apos;re sending {collectible.name} to this address. This cannot be undone.
             </p>
           )}
 

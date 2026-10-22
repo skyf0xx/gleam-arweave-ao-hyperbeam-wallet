@@ -540,7 +540,7 @@ function LeaveControl({
     >
       <p className="text-label text-foreground">
         You'll lose your {points} points and your invite link will stop working.
-        This can't be undone.
+        This cannot be undone.
       </p>
       {leave.error instanceof Error ? (
         <p className="text-caption text-warning">{leave.error.message}</p>
