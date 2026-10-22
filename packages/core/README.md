@@ -33,7 +33,7 @@ and the `scripts/scan/` CLI, not just the extension.
 - [`hardware/ledger/`](#hardwareledger) — Ledger device signing
 - [`activity/`](#activity) — merges local and gateway activity logs
 - [`recipients/`](#recipients) — address-poisoning defense
-- [`pricing/`](#pricing) — USD price lookups with provider fallback
+- [`pricing/`](#pricing) — USD price and exchange-rate lookups with provider fallback
 - [`policy/`](#policy) — upload/sign payload validation
 - [`points/`](#points) — Gleam Points domain logic
 - [`scan/`](#scan) — the community security-scan attestation protocol
@@ -224,10 +224,11 @@ a ground lookalike can't know which middle chunks the user checks.
 
 ### pricing/
 
-USD price lookups for AR, AO, and registered tokens. The extension never
-calls a price provider: `spot.ts` and `historical.ts` read the Gleam
-server's `/prices` and `/prices/history` proxy, which falls from CoinGecko
-to CoinPaprika and caches. A lookup reports `null` (or an empty series)
+USD price lookups for AR, AO, and registered tokens, plus USD exchange
+rates for the display currencies in `models/display.ts`. The extension
+never calls a price provider: `spot.ts`, `historical.ts` and `fx.ts` read
+the Gleam server's `/prices`, `/prices/history` and `/prices/fx` proxy,
+which falls from CoinGecko to CoinPaprika and caches. A lookup reports `null` (or an empty series)
 rather than a fabricated `0` when the server or both providers fail.
 `portfolio.ts` turns price series into portfolio-value estimates over time.
 `impersonation.ts` says whether a token found on-chain presents itself as

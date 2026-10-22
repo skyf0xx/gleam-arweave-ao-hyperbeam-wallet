@@ -809,7 +809,7 @@ const MESSAGE_HANDLERS: MessageHandlers = {
   removeWatchedToken: (data) => reads.removeWatchedToken(data),
   getActivity: (data) => reads.getActivity(data),
   getPortfolioHistory: (data) => reads.getPortfolioHistory(data),
-  getTokenPrices: () => reads.getTokenPrices(),
+  getTokenPrices: (data) => reads.getTokenPrices(data),
   getConnectedApps: () => approval.getConnectedApps(),
   listContacts: () => contacts.listContacts(),
 

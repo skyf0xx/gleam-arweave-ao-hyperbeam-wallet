@@ -47,16 +47,6 @@ export function formatAtomicAsDisplay(atomic: string, denomination: number, maxF
   return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
-/** Same `Intl`-backed USD format as `PortfolioChart`'s own private `formatUsd`. */
-export function formatUsd(value: number): string {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 function isValidArweaveAddress(address: string): boolean {
   return /^[A-Za-z0-9_-]{43}$/.test(address);
 }

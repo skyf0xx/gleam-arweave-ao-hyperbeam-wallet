@@ -1,4 +1,5 @@
 export { getUsdPrice, type PriceSource } from "./spot";
+export { getUsdFxRate } from "./fx";
 export {
   getHistoricalUsdPrices,
   buildPriceAtFromSeries,

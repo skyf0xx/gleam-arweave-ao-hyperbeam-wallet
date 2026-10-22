@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { ProtocolMap } from "./protocol";
+import type { DisplayCurrency } from "@gleam/core";
 
 /**
  * `ProtocolMap` is a type-only contract — there is no runtime dispatcher to
@@ -124,20 +125,21 @@ describe("ProtocolMap", () => {
     }>();
   });
 
-  it("getPortfolioHistory takes one of the 5 range tabs and an optional scope, and returns the series plus its precomputed summary", () => {
+  it("getPortfolioHistory takes one of the 5 range tabs, an optional scope and the display currency, and returns the series plus its precomputed summary", () => {
     expectTypeOf<Parameters<ProtocolMap["getPortfolioHistory"]>[0]>().toEqualTypeOf<{
       range: "24H" | "7D" | "1M" | "1Y" | "ALL";
       scope?: "wallet" | "all";
+      currency: DisplayCurrency;
     }>();
     expectTypeOf<
       ReturnType<ProtocolMap["getPortfolioHistory"]>
     >().toHaveProperty("series");
     expectTypeOf<
       ReturnType<ProtocolMap["getPortfolioHistory"]>
-    >().toHaveProperty("currentUsdValue");
+    >().toHaveProperty("currentValue");
     expectTypeOf<
       ReturnType<ProtocolMap["getPortfolioHistory"]>
-    >().toHaveProperty("usdChange");
+    >().toHaveProperty("change");
     expectTypeOf<
       ReturnType<ProtocolMap["getPortfolioHistory"]>
     >().toHaveProperty("periodLabel");

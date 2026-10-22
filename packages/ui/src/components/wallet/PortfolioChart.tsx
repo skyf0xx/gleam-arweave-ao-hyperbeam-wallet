@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { PortfolioScope } from "@gleam/core";
+import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
+import { formatCurrencyValue } from "../../format/currency";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
@@ -38,7 +39,7 @@ import { NetworkErrorBanner } from "./NetworkErrorBanner";
  */
 export interface PortfolioChartPoint {
   timestamp: number;
-  usdValue: number;
+  value: number;
 }
 
 export type PortfolioChartRange = "24H" | "7D" | "1M" | "1Y" | "ALL";
@@ -47,8 +48,9 @@ const RANGE_TABS: PortfolioChartRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
 
 export interface PortfolioChartProps {
   points: PortfolioChartPoint[];
-  currentUsdValue: number;
-  usdChange: number;
+  currentValue: number;
+  currency: DisplayCurrency;
+  change: number;
   periodLabel: string;
   activeRange: PortfolioChartRange;
   onRangeChange: (range: PortfolioChartRange) => void;
@@ -76,23 +78,14 @@ const CHART_HEIGHT = 40;
  * along. Never shown alongside real values.
  */
 const EMPTY_STATE_POINTS: PortfolioChartPoint[] = [
-  { timestamp: 0, usdValue: 0.3 },
-  { timestamp: 1, usdValue: 0.55 },
-  { timestamp: 2, usdValue: 0.4 },
-  { timestamp: 3, usdValue: 0.7 },
-  { timestamp: 4, usdValue: 0.5 },
-  { timestamp: 5, usdValue: 0.8 },
-  { timestamp: 6, usdValue: 0.65 },
+  { timestamp: 0, value: 0.3 },
+  { timestamp: 1, value: 0.55 },
+  { timestamp: 2, value: 0.4 },
+  { timestamp: 3, value: 0.7 },
+  { timestamp: 4, value: 0.5 },
+  { timestamp: 5, value: 0.8 },
+  { timestamp: 6, value: 0.65 },
 ];
-
-function formatUsd(value: number): string {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 const PERCENT_FORMAT = new Intl.NumberFormat("en-US", {
   style: "percent",
@@ -129,7 +122,7 @@ function buildLinePath(points: PortfolioChartPoint[]): string {
   const maxTimestamp = points[points.length - 1]!.timestamp;
   const timeRange = maxTimestamp - minTimestamp || 1;
 
-  const values = points.map((point) => point.usdValue);
+  const values = points.map((point) => point.value);
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const valueRange = maxValue - minValue || 1;
@@ -137,7 +130,7 @@ function buildLinePath(points: PortfolioChartPoint[]): string {
   return points
     .map((point) => {
       const x = ((point.timestamp - minTimestamp) / timeRange) * CHART_WIDTH;
-      const y = CHART_HEIGHT - ((point.usdValue - minValue) / valueRange) * CHART_HEIGHT;
+      const y = CHART_HEIGHT - ((point.value - minValue) / valueRange) * CHART_HEIGHT;
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
@@ -145,8 +138,9 @@ function buildLinePath(points: PortfolioChartPoint[]): string {
 
 export function PortfolioChart({
   points,
-  currentUsdValue,
-  usdChange,
+  currentValue,
+  currency,
+  change,
   periodLabel,
   activeRange,
   onRangeChange,
@@ -174,8 +168,8 @@ export function PortfolioChart({
   };
 
   if (flash) lastFlashRef.current = flash;
-  const isPositive = usdChange >= 0;
-  const isEmpty = currentUsdValue === 0 && points.every((point) => point.usdValue === 0);
+  const isPositive = change >= 0;
+  const isEmpty = currentValue === 0 && points.every((point) => point.value === 0);
   const linePoints = buildLinePath(isEmpty ? EMPTY_STATE_POINTS : points);
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
@@ -189,10 +183,10 @@ export function PortfolioChart({
           <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
             <div className="flex items-baseline gap-2.5">
               <span className="text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-                {formatUsd(currentUsdValue)}
+                {formatCurrencyValue(currentValue, currency)}
               </span>
               <span className="text-label font-semibold tabular-nums" style={{ color: lineColorVar }}>
-                {formatPercent(usdChange)}
+                {formatPercent(change)}
               </span>
             </div>
             <div className="grid text-caption text-muted">
@@ -267,7 +261,7 @@ export function PortfolioChart({
                 width="100%"
                 height="100%"
                 role="img"
-                aria-label={`Portfolio value ${formatUsd(currentUsdValue)}, ${formatPercent(usdChange)} for ${periodLabel}`}
+                aria-label={`Portfolio value ${formatCurrencyValue(currentValue, currency)}, ${formatPercent(change)} for ${periodLabel}`}
               >
                 <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />
                 <polyline

@@ -86,12 +86,13 @@ export async function resolveUnregisteredTokenMetadata(
 }
 
 /**
- * Current spot USD price for one registered token, keyed the same way
- * `TokenBalance`/`DEFAULT_TOKEN_REGISTRY` entries are (`processId: null`
- * for AR). `usd: null` means the price couldn't be computed (both
- * providers unavailable) — never a fabricated `0`.
+ * Current spot price of one registered token in the currency the request
+ * named, keyed the same way `TokenBalance`/`DEFAULT_TOKEN_REGISTRY`
+ * entries are (`processId: null` for AR). `price: null` means it couldn't
+ * be computed (both providers, or the exchange rate, unavailable) — never
+ * a fabricated `0`.
  */
 export interface TokenPrice {
   processId: string | null;
-  usd: number | null;
+  price: number | null;
 }

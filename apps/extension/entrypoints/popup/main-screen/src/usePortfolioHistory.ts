@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { PortfolioHistory, PortfolioHistoryRange, PortfolioScope, RuntimePort } from "@gleam/core";
+import type { DisplayCurrency, PortfolioHistory, PortfolioHistoryRange, PortfolioScope, RuntimePort } from "@gleam/core";
 
 /**
  * Shared, cached source of truth for the main screen's portfolio-value
@@ -11,9 +11,9 @@ import type { PortfolioHistory, PortfolioHistoryRange, PortfolioScope, RuntimePo
  * reads from/invalidates a disjoint cache entry, matching
  * `walletQueryKeys`' pattern in `../../activity/src/queryKeys.ts` (kept
  * local to this file rather than added to that module). `range` is part
- * (and `scope`) of the key so every range tab keeps its own cached response and
- * clicking back to a previously-loaded range shows it instantly rather
- * than re-fetching.
+ * (and `scope` and `currency`) of the key so every range tab keeps its own
+ * cached response and clicking back to a previously-loaded range shows it
+ * instantly rather than re-fetching.
  */
 /**
  * Set well above the app's `QueryClient` default of `staleTime: 0` so
@@ -27,15 +27,16 @@ export function usePortfolioHistory(
   address: string,
   range: PortfolioHistoryRange,
   scope: PortfolioScope,
+  currency: DisplayCurrency | undefined,
   { enabled = true }: { enabled?: boolean } = {},
 ) {
   return useQuery({
-    enabled,
-    queryKey: [address, "portfolioHistory", range, scope] as const,
+    enabled: enabled && currency !== undefined,
+    queryKey: [address, "portfolioHistory", range, scope, currency] as const,
     queryFn: () =>
-      runtime.send<{ range: PortfolioHistoryRange; scope: PortfolioScope }, PortfolioHistory>({
+      runtime.send<{ range: PortfolioHistoryRange; scope: PortfolioScope; currency: DisplayCurrency }, PortfolioHistory>({
         type: "getPortfolioHistory",
-        payload: { range, scope },
+        payload: { range, scope, currency: currency as DisplayCurrency },
       }),
     staleTime: PORTFOLIO_HISTORY_STALE_TIME_MS,
     // Bounds how long an offline range spends retrying before

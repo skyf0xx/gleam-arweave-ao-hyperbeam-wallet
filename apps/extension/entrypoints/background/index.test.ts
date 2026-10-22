@@ -192,8 +192,8 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await expect(handler({ data: { range: "24H" } })).resolves.toEqual({
       range: "24H",
       series: [],
-      currentUsdValue: 0,
-      usdChange: 0,
+      currentValue: 0,
+      change: 0,
       periodLabel: "Last 24 hours",
     });
   });

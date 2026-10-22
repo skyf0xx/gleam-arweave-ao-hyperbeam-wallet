@@ -5,7 +5,7 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
 /**
  * A token balance row, reused verbatim on the "all tokens" list and
  * token detail's activity section — same row style everywhere, no new
- * visual language just because it's a list page. Amount/usdValue are
+ * visual language just because it's a list page. Amount/value are
  * pre-formatted strings — this component does no numeric formatting or
  * unit conversion itself.
  *
@@ -13,13 +13,13 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * but stays a standalone component rather than composing `ListRow`
  * directly — `ListRow`'s title/subtitle stack puts the subtitle in
  * monospace (built for addresses), while a token row's amount subtitle
- * and right-aligned usdValue don't fit that shape.
+ * and right-aligned value don't fit that shape.
  *
  * Left column is name over holding amount; right column is the
- * holding's dollar value.
+ * holding's value in the display currency.
  *
  * `loading` is for a background refresh of an already-rendered row (e.g.
- * a price re-poll) — it dims the existing usdValue in place rather than
+ * a price re-poll) — it dims the existing value in place rather than
  * tearing the row down to a shimmer skeleton, so a value that's already
  * on screen never disappears. First-ever load is still the caller
  * swapping in `SkeletonRow` instead of mounting `TokenRow` at all.
@@ -38,13 +38,13 @@ export interface TokenRowProps {
    * hover and read by screen readers in place of the short form.
    */
   amountFull?: string;
-  usdValue?: string;
+  value?: string;
   loading?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
-export function TokenRow({ glyph, icon, name, amount, amountFull, usdValue, loading = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -70,9 +70,9 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, usdValue, load
           )}
         </div>
       </div>
-      {usdValue ? (
+      {value ? (
         <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", loading && "opacity-50 transition-opacity")}>
-          {usdValue}
+          {value}
         </div>
       ) : null}
     </Component>
