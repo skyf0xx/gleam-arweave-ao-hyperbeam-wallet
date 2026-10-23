@@ -20,6 +20,7 @@ import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
 import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
+import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
@@ -179,6 +180,9 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   // prop, is authoritative; the prop never changes identity across
   // `SendView`'s lifetime (no `useEffect` re-sync needed).
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(token);
+  // Held here, not in the compose step, so a trip to the token picker
+  // comes back to the view it left.
+  const [showInfo, setShowInfo] = useState(false);
   // Shared cache with `MainScreenView` (`useBalances`, keyed by
   // `wallet.address`) — the compose step's client-side "insufficient
   // balance" check reads this same query's current data rather than
@@ -318,6 +322,8 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         price={priceFor(tokenPricesQuery.data, selectedToken)}
         currency={currency}
         step={step}
+        showInfo={showInfo}
+        onShowInfo={setShowInfo}
         knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
         emphasisPick={emphasisPick}
         lookalikeOf={lookalikeOf}
@@ -463,6 +469,9 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   );
 }
 
+/** What you can do with the token, shown as tabs in the compose header. */
+const TOKEN_ACTIONS = [{ id: "send", label: "Send" }] as const;
+
 function ComposeStep({
   wallet,
   token,
@@ -471,6 +480,8 @@ function ComposeStep({
   price,
   currency,
   step,
+  showInfo,
+  onShowInfo,
   knownName,
   emphasisPick,
   lookalikeOf,
@@ -496,6 +507,9 @@ function ComposeStep({
   price: number | undefined;
   currency: DisplayCurrency | undefined;
   step: Extract<Step, { kind: "compose" }>;
+  /** The Token details view, opened from the ticker in the header's corner. */
+  showInfo: boolean;
+  onShowInfo: (show: boolean) => void;
   knownName: string | undefined;
   emphasisPick: number | null;
   lookalikeOf: string | null;
@@ -556,11 +570,61 @@ function ComposeStep({
     Number.isFinite(amountNumber)
       ? formatCurrencyValue(amountNumber * price, currency)
       : undefined;
+  const balanceNumber = Number(balanceDisplay);
+  const balanceValue =
+    price !== undefined && currency !== undefined && currency !== ticker && balanceDisplay !== undefined && Number.isFinite(balanceNumber)
+      ? formatCurrencyValue(balanceNumber * price, currency)
+      : undefined;
   const identity = useAddressIdentity();
+
+  if (showInfo) {
+    return (
+      <div className="flex min-h-full flex-col">
+        <ScreenHeader title="Token details" onBack={() => onShowInfo(false)} />
+        <div className="px-5 py-5">
+          <TokenInfoPanel
+            token={token}
+            balanceDisplay={balanceDisplay}
+            balanceValue={balanceValue}
+            priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title={`Send ${ticker}`} onBack={onBack} />
+      <ScreenHeader
+        onBack={onBack}
+        center={
+          <div role="tablist" aria-label={`${ticker} actions`} className="flex items-center gap-1">
+            {TOKEN_ACTIONS.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                role="tab"
+                aria-selected={action.id === "send"}
+                className={`rounded-md px-2.5 py-1 text-body ${action.id === "send" ? "font-semibold text-foreground" : "text-muted hover:text-foreground"}`}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        }
+        end={
+          <button
+            type="button"
+            aria-label="Token details"
+            onClick={() => onShowInfo(true)}
+            className="flex max-w-[104px] flex-shrink-0 items-center gap-1 rounded-md px-1 py-1 text-label font-normal text-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+          >
+            <span aria-hidden="true">[</span>
+            <span className="truncate">{ticker}</span>
+            <span aria-hidden="true">]</span>
+          </button>
+        }
+      />
       <div className="flex flex-1 flex-col gap-6 px-5 py-5">
         <div className="flex items-center justify-between gap-3 text-label">
           <span className="font-semibold text-muted">From</span>
@@ -568,19 +632,6 @@ function ComposeStep({
             <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label={`${wallet.name} avatar`} size={20} />
             <span className="truncate font-semibold text-foreground">{wallet.name}</span>
             <span className="flex-shrink-0 font-mono text-caption text-faint">{truncateAddress(wallet.address, 6)}</span>
-            {/* AR is native and has no process to show. */}
-            {token !== null ? (
-              <a
-                href={`${explorerUrlFor(token.processId)}/info`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${ticker} info`}
-                title={`${ticker} info`}
-                className="-ml-1 flex-shrink-0 rounded px-1 text-muted hover:text-foreground"
-              >
-                ↗
-              </a>
-            ) : null}
           </span>
         </div>
 
@@ -648,7 +699,7 @@ function ComposeStep({
                 type="button"
                 onClick={onOpenTokenPicker}
                 aria-haspopup="dialog"
-                className="flex flex-shrink-0 items-center gap-1 rounded-full border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line"
+                className="flex flex-shrink-0 items-center gap-1 rounded-[7px] border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line"
               >
                 {ticker}
                 <ChevronDownIcon />

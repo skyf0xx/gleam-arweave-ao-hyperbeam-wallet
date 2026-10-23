@@ -195,7 +195,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
         .getAllByRole("button")
         .filter((row) => row.getAttribute("aria-label") !== "Back")[1]!,
     );
-    await waitFor(() => expect(screen.getByText(/^Send AO$/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "AO" })).toBeTruthy());
   });
 
   it("updates the AR and AO default rows to real balances once they load, without disturbing other watched tokens", async () => {
@@ -239,7 +239,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     fireEvent.click(screen.getByRole("button", { name: /ARDRIVE/ }));
 
     // Back on compose, now showing the AO token's ticker.
-    await waitFor(() => expect(screen.getByText("Send ARDRIVE")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "ARDRIVE" })).toBeTruthy());
 
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
       target: { value: RECENT_RECIPIENT_A },
@@ -302,12 +302,20 @@ describe("SendView compose summary", () => {
     expect(await screen.findByText(/≈ \$5\.00/)).toBeTruthy();
   });
 
-  it("links an AO token to its process info on the explorer", () => {
+  it("keeps the form across a trip to the token's info, which links it to the explorer", () => {
     renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
 
-    expect(screen.getByRole("link", { name: /ARDRIVE info/ }).getAttribute("href")).toBe(
-      `https://lunar.arweave.net/#/explorer/${AO_TOKEN.processId}/info`,
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.click(screen.getByRole("button", { name: "Token details" }));
+
+    expect(screen.getByText("Decimals")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe(
+      `https://lunar.arweave.net/#/explorer/${AO_TOKEN.processId}`,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    // The address is still filled in, so the button asks for the amount next.
+    expect(screen.getByRole("button", { name: "Enter an amount" })).toBeTruthy();
   });
 
   it("names what's missing on the disabled button, then the next step", () => {
@@ -320,10 +328,14 @@ describe("SendView compose summary", () => {
     expect((screen.getByRole("button", { name: "Review and Send" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("has no token info link for AR", () => {
+  it("shows AR's info without a process, linking to the network's transactions", () => {
     renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
-    expect(screen.queryByRole("link", { name: /info/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Token details" }));
+
+    expect(screen.getByText("Arweave")).toBeTruthy();
+    expect(screen.queryByText("Process")).toBeNull();
+    expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe("https://lunar.arweave.net/#/transactions/");
   });
 });
 
