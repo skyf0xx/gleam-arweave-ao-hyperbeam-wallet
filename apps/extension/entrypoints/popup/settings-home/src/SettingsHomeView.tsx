@@ -250,7 +250,7 @@ function SelectRow<T extends string>({
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value as T)}
-          className="appearance-none rounded-md border border-line bg-background py-1.5 pl-2.5 pr-8 text-label text-foreground focus:border-foreground focus:outline-none disabled:opacity-60"
+          className="appearance-none rounded-md border border-line bg-background py-1.5 pl-2.5 pr-8 text-label text-foreground focus:outline-none focus-visible:border-foreground disabled:opacity-60"
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
