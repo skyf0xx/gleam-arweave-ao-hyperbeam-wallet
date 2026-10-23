@@ -5,7 +5,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
  * Explicit, plainly-worded destructive reset, never a silent delete.
  * Requires an extra confirmation tap before `onReset` fires, on top of the
  * screen's own explicit copy, since wiping every locally stored vault
- * can't be undone. The reset action uses the shared
+ * cannot be undone. The reset action uses the shared
  * `Button variant="destructive"` (the only place the warning-red accent
  * is allowed to render) rather than a hand-rolled red button.
  */
@@ -38,7 +38,7 @@ export function ForgotPassword({
 
       {confirming ? (
         <p role="alert" className="text-body font-medium leading-relaxed text-warning">
-          This can&apos;t be undone. Any wallet without a backup keyfile is lost permanently.
+          This cannot be undone. Any wallet without a backup keyfile is lost permanently.
         </p>
       ) : null}
 

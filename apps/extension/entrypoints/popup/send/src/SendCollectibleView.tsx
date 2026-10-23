@@ -16,16 +16,17 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { CollectibleThumbnail, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "@/src/address-identity";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
+import { useActivity } from "../../activity/src/useActivity";
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSendCollectible } from "../../activity/src/useSendCollectible";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
-import { RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
+import { namedSuggestions, RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
- * a collectible is sent whole. The network fee is AR, quoted on Continue.
+ * a collectible is sent whole. The network fee is AR, quoted on Review send.
  */
 export interface SendCollectibleViewProps {
   runtime: RuntimePort;
@@ -80,6 +81,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
   const contactsQuery = useContacts(runtime);
   const saveContactMutation = useSaveContact(runtime);
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
+  const activityQuery = useActivity(runtime, wallet.address);
   const contactFor = (address: string): Contact | undefined =>
     contactsQuery.data?.find((candidate) => candidate.address === address);
   const ownWalletFor = (address: string): WalletSummary | undefined =>
@@ -144,6 +146,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             knownName={parsed.success ? (contactFor(parsed.data) ?? ownWalletFor(parsed.data))?.name : undefined}
             emphasisPick={emphasisPick}
             lookalikeOf={composeLookalikeOf}
+            suggestions={namedSuggestions(contactsQuery.data ?? [], otherWalletsQuery.data ?? [], activityQuery.data)}
             onChangeRecipient={(recipient) =>
               setStep({ ...step, recipient, recipientError: undefined, error: undefined, showSaveAddress: false, saveAddressName: "" })
             }
@@ -184,7 +187,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           ) : null}
 
           <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={() => void handleContinue()} className="mt-auto">
-            {step.submitting ? "Checking…" : "Continue"}
+            {step.submitting ? "Estimating fee…" : parsed.success ? "Review and Send" : "Enter an address"}
           </Button>
         </div>
       </div>
@@ -244,7 +247,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             />
           ) : (
             <p className="text-label leading-relaxed text-muted">
-              You&apos;re sending {collectible.name} to this address. This can&apos;t be undone.
+              You&apos;re sending {collectible.name} to this address. This cannot be undone.
             </p>
           )}
 
@@ -286,7 +289,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             onClick={() => void handleSign()}
             className="mt-auto"
           >
-            {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Signing…") : "Sign and send"}
+            {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Sending…") : "Send collectible"}
           </Button>
         </div>
       </div>

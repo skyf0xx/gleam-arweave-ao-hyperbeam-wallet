@@ -46,8 +46,8 @@
   --color-muted: #737373;
   --color-faint: #a3a3a3;
 
-  /* Shimmer loading-state base — deliberately a touch lighter than --color-mist (see .gleam-shimmer's own comment below for why it isn't reused). */
-  --color-shimmer-base: #fdfdfd;
+  /* Shimmer loading-state base — a touch darker than --color-mist so a placeholder still reads against a white background. */
+  --color-shimmer-base: #f0f0f0;
 
   /*
    * The single warning-red accent, per guidelines.md Part 3: reserved
@@ -455,11 +455,10 @@ select,
  * rather than a Tailwind utility for the same reason as
  * `.gleam-beam-divider` above: this is a fixed 5-stop gradient sweep,
  * not a themeable scale value. `--color-shimmer-base` is its own token
- * (light: #f8f8f8, dark: #1c1c1c) rather than reusing `--color-mist`
- * (#f5f5f5) — `--color-mist` is a shared neutral-surface token used
- * flat elsewhere (e.g. NetworkErrorBanner's `bg-mist`), and reads
- * visibly grayer than the near-white this shimmer needs as its resting
- * color. Color only ever appears in the moving highlight band via
+ * (light: #f0f0f0, dark: #1c1c1c) rather than reusing `--color-mist`
+ * (#f5f5f5): `--color-mist` is also the rows' hover fill, and a
+ * placeholder needs to sit visibly darker than white so its shape reads
+ * on its own, without row borders to outline it. Color only ever appears in the moving highlight band via
  * `color-mix` against that base — the base itself must never read as
  * flat beam-sky or beam-purple. The highlight band is kept narrow (a
  * tight 49–51% cluster) with low color-mix percentages (7–9%) so the

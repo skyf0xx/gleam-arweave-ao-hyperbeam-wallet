@@ -11,7 +11,7 @@ import { useContacts, useDeleteContact, useSaveContact } from "../../activity/sr
 /**
  * Settings' Contacts screen — "Address book, part 2" per `todo.md`. A flat
  * list of every saved contact (`useContacts`, the same vault-wide query
- * `SendView`'s "Saved addresses" screen reads), each row using the shared
+ * `SendView`'s "Saved contacts" screen reads), each row using the shared
  * `AddressRow` identicon style. "+" reveals an inline add form (name +
  * 43-character address, reusing `isValidArweaveAddress`); tapping a row
  * edits its name in place; deleting removes it immediately with no

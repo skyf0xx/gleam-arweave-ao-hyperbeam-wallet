@@ -60,7 +60,7 @@ describe("ManageTokensView", () => {
     expect(document.querySelector("img")?.getAttribute("src")).toBe("https://arweave.net/logo-tx");
   });
 
-  it("previews a pasted process id (read-only) before it's added to the list", async () => {
+  it("previews a pasted process id at once (read-only), before it's added to the list", async () => {
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getWatchedTokens") return [];
       if (type === "getTokenBalances") return [];
@@ -72,7 +72,6 @@ describe("ManageTokensView", () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
-    fireEvent.click(screen.getByText("Preview"));
 
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
@@ -101,7 +100,6 @@ describe("ManageTokensView", () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
-    fireEvent.click(screen.getByText("Preview"));
 
     await waitFor(() => expect(screen.getByText(`Add ${BALANCE_1.ticker}`)).toBeTruthy());
     fireEvent.click(screen.getByText(`Add ${BALANCE_1.ticker}`));
@@ -127,7 +125,6 @@ describe("ManageTokensView", () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
-    fireEvent.click(screen.getByText("Preview"));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/No process with that id/));
   });
@@ -143,7 +140,8 @@ describe("ManageTokensView", () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: "bad-id" } });
-    fireEvent.click(screen.getByText("Preview"));
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.blur(screen.getByPlaceholderText("AO process id"));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/43 letters.*this is 6/));
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "previewWatchedToken" }));
@@ -162,7 +160,6 @@ describe("ManageTokensView", () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
-    fireEvent.click(screen.getByText("Preview"));
 
     await waitFor(() => expect(screen.getByText(/Couldn't read your wUSDC balance\. You can still add it/)).toBeTruthy());
     expect((screen.getByText("Add wUSDC").closest("button") as HTMLButtonElement).disabled).toBe(false);

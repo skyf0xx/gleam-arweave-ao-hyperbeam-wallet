@@ -217,6 +217,15 @@ describe("MainScreenView display settings", () => {
     expect(screen.queryByRole("img", { name: /Portfolio value/ })).toBeNull();
   });
 
+  it("moves the %-change beside the period label when the chart is off", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ showChart: false }) }) });
+
+    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    const periodRow = screen.getByText("Last 7 days").parentElement!.parentElement!;
+    expect(within(periodRow).getByText("+20.00%")).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: "Hide balances" }).parentElement!).queryByText("+20.00%")).toBeNull();
+  });
+
   it("hides every balance when the total is tapped, and saves the choice", async () => {
     const send = sendWithDisplay({}, [{ processId: null, price: 3 }]);
     renderMainScreen({ runtime: fakeRuntime({ send }) });

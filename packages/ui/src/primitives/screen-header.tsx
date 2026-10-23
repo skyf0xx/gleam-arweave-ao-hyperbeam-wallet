@@ -8,14 +8,16 @@ import { cn } from "./cn";
  * hex values before this package's token layer existed.
  */
 export interface ScreenHeaderProps {
-  title: string;
+  title?: string;
+  /** Takes the title's place, e.g. a row of tabs. */
+  center?: ReactNode;
   onBack?: () => void;
   end?: ReactNode;
   subtitle?: ReactNode;
   className?: string;
 }
 
-export function ScreenHeader({ title, onBack, end, subtitle, className }: ScreenHeaderProps) {
+export function ScreenHeader({ title, center, onBack, end, subtitle, className }: ScreenHeaderProps) {
   return (
     <div className={cn("flex items-center gap-2.5 border-b border-line px-4 py-3.5", className)}>
       {onBack ? (
@@ -31,7 +33,7 @@ export function ScreenHeader({ title, onBack, end, subtitle, className }: Screen
         <div className="h-8 w-8 flex-shrink-0" aria-hidden="true" />
       )}
       <div className="flex flex-1 flex-col items-center gap-px">
-        <span className="text-body font-semibold text-foreground">{title}</span>
+        {center ?? <span className="text-body font-semibold text-foreground">{title}</span>}
         {subtitle}
       </div>
       {end ?? <div className="h-8 w-8 flex-shrink-0" aria-hidden="true" />}

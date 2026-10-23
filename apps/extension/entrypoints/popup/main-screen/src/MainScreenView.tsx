@@ -615,8 +615,8 @@ export function MainScreenView({
               headline={
                 headlineRow
                   ? headlineRow.amount === UNAVAILABLE_BALANCE_LABEL
-                    ? `${headlineRow.ticker} unavailable`
-                    : `${headlineRow.amount} ${headlineRow.ticker}`
+                    ? { amount: `${headlineRow.ticker} unavailable` }
+                    : { amount: headlineRow.amount, unit: headlineRow.ticker }
                   : undefined
               }
               masked={masked}

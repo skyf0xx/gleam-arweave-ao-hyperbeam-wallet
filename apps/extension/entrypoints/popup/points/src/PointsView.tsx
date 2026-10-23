@@ -191,9 +191,13 @@ function InkStat({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** One square per seat on the member's code, lit in beam order while it's open. */
+/**
+ * One square per seat on the member's code, lit in beam order while it's open.
+ * Seats have no cap, so the row stops at one full beam and the text beside it
+ * carries the exact count.
+ */
 function Seats({ left }: { left: number }) {
-  const total = Math.max(left, MEMBER_SEATS);
+  const total = Math.min(Math.max(left, MEMBER_SEATS), BEAM_COLORS.length);
   return (
     <span aria-hidden="true" className="flex items-center gap-1">
       {Array.from({ length: total }, (_, index) => (
@@ -540,7 +544,7 @@ function LeaveControl({
     >
       <p className="text-label text-foreground">
         You'll lose your {points} points and your invite link will stop working.
-        This can't be undone.
+        This cannot be undone.
       </p>
       {leave.error instanceof Error ? (
         <p className="text-caption text-warning">{leave.error.message}</p>

@@ -555,7 +555,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: "About Gleam Points" }));
     fireEvent.click(screen.getByRole("button", { name: "Leave Gleam Points" }));
-    expect(screen.getByText(/can't be undone/)).toBeTruthy();
+    expect(screen.getByText(/cannot be undone/)).toBeTruthy();
     expect(runtime.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "leavePoints" }));
     fireEvent.click(screen.getByRole("button", { name: "Leave" }));
 
@@ -577,7 +577,7 @@ describe("PointsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leave Gleam Points" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByText(/can't be undone/)).toBeNull();
+    expect(screen.queryByText(/cannot be undone/)).toBeNull();
     expect(screen.getByRole("button", { name: "Leave Gleam Points" })).toBeTruthy();
   });
 });
