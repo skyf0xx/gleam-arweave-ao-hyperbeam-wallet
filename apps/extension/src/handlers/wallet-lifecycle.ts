@@ -1047,7 +1047,7 @@ export class WalletLifecycleHandler {
    * `ProtocolMap.getLockSettings`'s backing read — the same
    * `loadLockSettings` module function `setLockSettings`/`unlockWallet`
    * already use internally, exposed as a public method so the dispatcher
-   * (`entrypoints/background/index.ts`) has something to wire
+   * (`src/runtime/create-runtime.ts`) has something to wire
    * `getLockSettings` to.
    */
   async getLockSettings(): Promise<LockSettings> {
@@ -1091,7 +1091,7 @@ export class WalletLifecycleHandler {
   /**
    * `ProtocolMap.getThemePreference`'s backing read — mirrors
    * `getLockSettings`, exposed as a public method so the dispatcher
-   * (`entrypoints/background/index.ts`) has something to wire
+   * (`src/runtime/create-runtime.ts`) has something to wire
    * `getThemePreference` to.
    */
   async getThemePreference(): Promise<ThemeSettings> {

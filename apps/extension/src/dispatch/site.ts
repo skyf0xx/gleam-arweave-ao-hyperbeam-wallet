@@ -1,3 +1,4 @@
+import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { DEV_SITE_HOSTS, SITE_ORIGIN } from "../site-pages";
 import { SITE_MESSAGES, readSiteMessage, type SiteMessage, type SiteMessageType } from "./methods";
 
@@ -20,19 +21,20 @@ export const UNKNOWN_SITE_MESSAGE = { ok: false } as const;
 
 /**
  * The one entry point for `runtime.onMessageExternal`. A message reaches
- * its handler only if Chrome's `sender.origin` is the site's (`isSiteOrigin`) and it
- * matches its `SITE_MESSAGES` schema; otherwise it gets that type's
- * `refused` reply.
+ * its handler only if `caller` is a `site` caller whose origin is the
+ * site's (`isSiteOrigin`) and it matches its `SITE_MESSAGES` schema;
+ * otherwise it gets that type's `refused` reply. An unknown `type` is
+ * answered before the caller is looked at.
  */
 export async function dispatchSiteMessage(
   message: unknown,
-  senderOrigin: string | undefined,
+  caller: CallerContext | null,
   handlers: SiteHandlers,
 ): Promise<unknown> {
   const type = typeof message === "object" && message !== null ? (message as { type?: unknown }).type : undefined;
   if (typeof type !== "string" || !Object.hasOwn(SITE_MESSAGES, type)) return UNKNOWN_SITE_MESSAGE;
   const siteType = type as SiteMessageType;
-  if (!isSiteOrigin(senderOrigin)) return SITE_MESSAGES[siteType].refused;
+  if (caller?.tier !== "site" || !isSiteOrigin(caller.origin)) return SITE_MESSAGES[siteType].refused;
   const parsed = readSiteMessage(siteType, message);
   if (!parsed) return SITE_MESSAGES[siteType].refused;
   return (handlers[siteType] as (message: SiteMessage<SiteMessageType>) => Promise<unknown>)(parsed);

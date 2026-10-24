@@ -64,6 +64,15 @@ export function callerContext(sender: MessageSenderLike | undefined, extensionBa
   return { tier: "contentScript", origin, tabId: sender?.tab?.id };
 }
 
+/**
+ * The `CallerContext` for a `runtime.onMessageExternal` sender, or null when
+ * Chrome reported no origin. Whether that origin is the Gleam site is the
+ * dispatcher's check (`dispatchSiteMessage`), not this one.
+ */
+export function externalCallerContext(sender: MessageSenderLike | undefined): CallerContext | null {
+  return typeof sender?.origin === "string" ? { tier: "site", origin: sender.origin } : null;
+}
+
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /**

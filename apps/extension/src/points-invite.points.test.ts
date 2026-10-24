@@ -13,6 +13,7 @@ import {
   PointsHandler,
 } from "./handlers/points";
 import { dispatchSiteMessage } from "./dispatch/site";
+import { externalCallerContext } from "./sender";
 import { redeemSiteInvite, type InviteRedeemer } from "./points-invite";
 import { SITE_ORIGIN } from "./site-pages";
 
@@ -39,7 +40,7 @@ function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort &
 
 /** What the background does with an external message: the site dispatcher, then the invite handler. */
 function acceptSiteInvite(message: unknown, origin: string | undefined, storage: StoragePort, redeemer: InviteRedeemer) {
-  return dispatchSiteMessage(message, origin, {
+  return dispatchSiteMessage(message, externalCallerContext({ origin }), {
     "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, redeemer),
     "gleam-points:attest": async () => {
       throw new Error("not an invite");

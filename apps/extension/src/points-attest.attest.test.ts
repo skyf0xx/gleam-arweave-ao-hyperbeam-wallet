@@ -3,6 +3,7 @@ import type { WalletSummary } from "@gleam/core";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { ApprovalDeclinedError } from "./handlers/approval";
 import { dispatchSiteMessage } from "./dispatch/site";
+import { externalCallerContext } from "./sender";
 import { signSiteAttestation, siteAttestStatus, type SiteAttestationDeps } from "./points-attest";
 import { SITE_ORIGIN } from "./site-pages";
 
@@ -28,7 +29,7 @@ const PAID: SiteAttestResponse = { ok: true, attestationId: "a".repeat(64), poin
 
 /** What the background does with an external message: the site dispatcher, then the attestation handler. */
 function acceptSiteAttestation(message: unknown, origin: string | undefined, deps: SiteAttestationDeps) {
-  return dispatchSiteMessage(message, origin, {
+  return dispatchSiteMessage(message, externalCallerContext({ origin }), {
     "gleam-points:invite": async () => {
       throw new Error("not an attestation");
     },
@@ -156,8 +157,8 @@ describe("siteAttestStatus", () => {
       "gleam-points:attest-status": () => status(WALLET, true),
     };
     const message = { type: "gleam-points:attest-status" };
-    expect(await dispatchSiteMessage(message, SITE_ORIGIN, handlers)).toEqual({ ok: true });
-    expect(await dispatchSiteMessage(message, "https://evil.example", handlers)).toEqual({ ok: false });
-    expect(await dispatchSiteMessage({ ...message, extra: 1 }, SITE_ORIGIN, handlers)).toEqual({ ok: false });
+    expect(await dispatchSiteMessage(message, externalCallerContext({ origin: SITE_ORIGIN }), handlers)).toEqual({ ok: true });
+    expect(await dispatchSiteMessage(message, externalCallerContext({ origin: "https://evil.example" }), handlers)).toEqual({ ok: false });
+    expect(await dispatchSiteMessage({ ...message, extra: 1 }, externalCallerContext({ origin: SITE_ORIGIN }), handlers)).toEqual({ ok: false });
   });
 });

@@ -41,11 +41,19 @@ the extension by probing for a fixed resource path.
 ### `entrypoints/background`
 
 The MV3 service worker (`index.ts`) and the extension's only privileged
-process. It builds every adapter and handler, registers each
-`ProtocolMap` method from `@gleam/messaging`, and is the single place
-that enforces `src/dispatch/methods.ts`'s privilege table before a
-handler runs. It also owns alarms (auto-lock, activity promotion, the
-points heartbeat), idle-lock, and pushing provider events to open tabs.
+process. It builds the extension's `Platform` from the adapters, passes
+it to `createRuntime`, and connects Chrome's events to the runtime. Each
+`ProtocolMap` message's `CallerContext` is built from Chrome's sender
+(`src/sender.ts`), never from the message body.
+
+### `src/runtime`
+
+`createRuntime(platform)` builds every handler and returns the
+dispatcher. It is the single place that enforces
+`src/dispatch/methods.ts`'s privilege table before a handler runs, and
+it owns the periodic jobs (auto-lock, activity promotion, the points
+heartbeat), idle-lock, and pushing provider events to open tabs. It
+reaches the browser only through `Platform` (`platform.ts`).
 
 ### `entrypoints/content`
 

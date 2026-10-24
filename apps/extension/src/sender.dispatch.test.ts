@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { callerContext, contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "./sender";
+import {
+  callerContext,
+  contentScriptOrigin,
+  externalCallerContext,
+  isExtensionPageSender,
+  isSecureSigningOrigin,
+} from "./sender";
 
 const BASE = "chrome-extension://gleamid/";
 
@@ -77,6 +83,21 @@ describe("callerContext", () => {
     ["a sandboxed page with an opaque origin", { url: "https://dapp.example/", origin: "null", tab, frameId: 0 }],
   ])("gives %s no context", (_label, sender) => {
     expect(callerContext(sender, BASE)).toBeNull();
+  });
+});
+
+describe("externalCallerContext", () => {
+  it("gives an external sender the site tier with Chrome's origin, whatever that origin is", () => {
+    expect(externalCallerContext({ origin: "https://gleam.example", url: "https://gleam.example/welcome.html" })).toEqual({
+      tier: "site",
+      origin: "https://gleam.example",
+    });
+    expect(externalCallerContext({ origin: "https://evil.example" })).toEqual({ tier: "site", origin: "https://evil.example" });
+  });
+
+  it("gives a sender with no origin no context", () => {
+    expect(externalCallerContext(undefined)).toBeNull();
+    expect(externalCallerContext({ url: "https://gleam.example/" })).toBeNull();
   });
 });
 

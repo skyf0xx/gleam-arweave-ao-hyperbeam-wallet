@@ -24,7 +24,7 @@ import {
  * Every method the background answers, with who may call it, whether it
  * can open an approval window, and the schema its caller-supplied
  * params are parsed with before any handler runs. The dispatcher in
- * `entrypoints/background/index.ts` reads nothing else to decide whether
+ * `src/runtime/create-runtime.ts` reads nothing else to decide whether
  * a call goes through, so this table is the privilege boundary to audit.
  *
  * - `extension`: this extension's own pages (popup, side panel, approval

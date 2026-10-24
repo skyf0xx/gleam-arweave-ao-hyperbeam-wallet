@@ -10,9 +10,14 @@
  * - `contentScript`: the bridge for a web page's top frame, on `origin`.
  *   `tabId` names that page's tab so per-tab state can be kept, and is
  *   undefined when the platform didn't report one.
+ * - `site`: a page messaging the wallet from outside it, on `origin` (in
+ *   the extension, `runtime.onMessageExternal`). The transport only
+ *   attests the origin; the dispatcher decides whether it is the Gleam
+ *   site's.
  */
 export type CallerContext =
   | { tier: "extension" }
-  | { tier: "contentScript"; origin: string; tabId: number | undefined };
+  | { tier: "contentScript"; origin: string; tabId: number | undefined }
+  | { tier: "site"; origin: string };
 
 export type CallerTier = CallerContext["tier"];
