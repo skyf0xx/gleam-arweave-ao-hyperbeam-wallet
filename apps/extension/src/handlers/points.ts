@@ -5,6 +5,7 @@ import {
   isHardwareWalletMethod,
   unsupportedOperationMessage,
   type BadgePort,
+  type DeviceKeyPort,
   signMessage,
   type InviteRedeemResult,
   type InviteUnlock,
@@ -30,7 +31,6 @@ import {
 } from "@gleam/core/src/points/index.ts";
 import { attestationId, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
-import type { DeviceKey } from "../adapters/device-key";
 import { attestFailure, serverAttestFailure } from "./attest-errors";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 
@@ -88,7 +88,7 @@ export interface OwnershipProof {
 
 export interface PointsHandlerDeps {
   storage: StoragePort;
-  deviceKey: () => Promise<DeviceKey>;
+  deviceKey: DeviceKeyPort;
   apiUrl: string;
   /** The unlocked wallet's signer, or null if it's locked. */
   signer: (walletId: string) => Promise<Signer | null>;
@@ -143,7 +143,7 @@ export class PointsHandler {
     const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
     const inviteCode = typed ?? (typeof pending === "string" && isValidInviteCode(pending) ? pending : null);
 
-    const device = await this.deps.deviceKey();
+    const device = await this.deps.deviceKey.loadOrCreate();
     const message = buildRegisterMessage({
       deviceKeyThumbprint: device.id,
       inviteCode,
@@ -379,7 +379,7 @@ export class PointsHandler {
 
   private async requestRedeem(code: string): Promise<{ result: InviteRedeemResult; kind?: "member" | "drop" }> {
     try {
-      const device = await this.deps.deviceKey();
+      const device = await this.deps.deviceKey.loadOrCreate();
       const message = buildRedeemMessage(code, Math.floor(this.now() / 1000));
       const response = await this.fetchImpl(`${this.deps.apiUrl}/invite/redeem`, {
         method: "POST",
@@ -545,7 +545,7 @@ export class PointsHandler {
   }
 
   private async postDeviceSigned(kind: "heartbeat" | "me"): Promise<Response> {
-    const device = await this.deps.deviceKey();
+    const device = await this.deps.deviceKey.loadOrCreate();
     const message = buildDeviceMessage(kind, Math.floor(this.now() / 1000));
     return this.fetchImpl(`${this.deps.apiUrl}/${kind}`, {
       method: "POST",

@@ -51,7 +51,7 @@ import { ScansHandler } from "@/src/handlers/scans";
 import { SiteWalletHandler } from "@/src/handlers/site-wallet";
 import { SecurityPhraseHandler } from "@/src/handlers/security-phrase";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
-import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
+import { deviceKeyPort } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
 import { alarmTimer } from "@/src/adapters/timer";
 import { browserDownloads, watchDownloadHistory } from "@/src/adapters/downloads";
@@ -137,7 +137,7 @@ registerActivityPromotionAlarm(reads, alarmTimer);
 
 const points = new PointsHandler({
   storage,
-  deviceKey: loadOrCreateDeviceKey,
+  deviceKey: deviceKeyPort,
   apiUrl: POINTS_API_URL,
   signer: getSigner,
   walletMethod: getWalletMethod,

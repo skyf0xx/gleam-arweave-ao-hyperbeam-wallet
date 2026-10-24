@@ -1,12 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import type { StoragePort } from "@gleam/core";
+import type { DeviceKey, StoragePort } from "@gleam/core";
 import {
   deviceKeyThumbprint,
   parseRedeemMessage,
   verifyDeviceSignature,
   type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
-import type { DeviceKey } from "./adapters/device-key";
 import {
   POINTS_INVITE_UNLOCK_KEY,
   POINTS_MEMBERSHIPS_KEY,
@@ -68,7 +67,7 @@ function setup(initial: Record<string, unknown> = {}, reply: () => Response | Pr
   const fetchImpl = vi.fn<typeof fetch>(async () => reply());
   const points = new PointsHandler({
     storage,
-    deviceKey: async () => device,
+    deviceKey: { loadOrCreate: async () => device },
     apiUrl: "https://points.test",
     signer: async () => null,
     walletMethod: async () => null,

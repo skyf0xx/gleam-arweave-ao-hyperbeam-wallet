@@ -18,6 +18,7 @@ export type { RuntimeMessage, RuntimePort } from "./ports/runtime";
 export type { WindowPort } from "./ports/windows";
 export type { BadgePort } from "./ports/badge";
 export type { TimerPort } from "./ports/timer";
+export type { DeviceKey, DeviceKeyPort } from "./ports/device-key";
 export type { SessionKeyStorePort } from "./ports/session-keys";
 export type { DownloadPort, FileDownloadResult } from "./ports/downloads";
 export {

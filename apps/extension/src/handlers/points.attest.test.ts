@@ -65,8 +65,10 @@ function setup(
   const fetchImpl = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(respond);
   const handler = new PointsHandler({
     storage,
-    deviceKey: async () => {
-      throw new Error("attesting never uses the device key");
+    deviceKey: {
+      loadOrCreate: async () => {
+        throw new Error("attesting never uses the device key");
+      },
     },
     apiUrl: API,
     signer: async () => (options.locked ? null : wallet.signer),

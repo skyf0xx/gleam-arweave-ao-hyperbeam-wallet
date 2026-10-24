@@ -23,7 +23,7 @@ import {
   verifyPointsProof,
   type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
-import type { DeviceKey } from "../adapters/device-key";
+import type { DeviceKey } from "@gleam/core";
 import {
   POINTS_DEVICE_STATE_KEY,
   POINTS_INVITE_UNLOCK_KEY,
@@ -108,7 +108,7 @@ async function setup(
   const badge = createFakeBadge();
   const handler = new PointsHandler({
     storage,
-    deviceKey: async () => device,
+    deviceKey: { loadOrCreate: async () => device },
     apiUrl: "https://points.example",
     signer: async (walletId) => (walletId === "w1" && !options.locked ? wallet.signer : null),
     walletMethod: async () => options.walletMethod ?? "jwk",
@@ -415,7 +415,7 @@ describe("PointsHandler.redeemInvite", () => {
     const storage = createFakeStorage();
     const handler = new PointsHandler({
       storage,
-      deviceKey: createDeviceKey,
+      deviceKey: { loadOrCreate: createDeviceKey },
       apiUrl: "https://points.test",
       signer: async () => null,
       walletMethod: async () => null,
@@ -452,7 +452,7 @@ describe("PointsHandler.markUnlockedForVault", () => {
   function build(storage: ReturnType<typeof createFakeStorage>, fetchImpl: typeof fetch) {
     return new PointsHandler({
       storage,
-      deviceKey: createDeviceKey,
+      deviceKey: { loadOrCreate: createDeviceKey },
       apiUrl: "https://points.test",
       signer: async () => null,
       walletMethod: async () => null,
@@ -491,7 +491,7 @@ describe("PointsHandler.pendingInvite", () => {
     const fetchImpl = vi.fn();
     const handler = new PointsHandler({
       storage: createFakeStorage(initial),
-      deviceKey: createDeviceKey,
+      deviceKey: { loadOrCreate: createDeviceKey },
       apiUrl: "https://points.test",
       signer: async () => null,
       walletMethod: async () => null,
@@ -522,7 +522,7 @@ describe("PointsHandler founding reveal seen", () => {
     const storage = createFakeStorage();
     const handler = new PointsHandler({
       storage,
-      deviceKey: createDeviceKey,
+      deviceKey: { loadOrCreate: createDeviceKey },
       apiUrl: "https://points.test",
       signer: async () => null,
       walletMethod: async () => null,
