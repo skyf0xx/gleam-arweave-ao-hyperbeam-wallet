@@ -37,7 +37,10 @@ export function Backup({ onBack, onDownload, canDownload, downloading, savedAs, 
           </h1>
           <p className="text-body leading-relaxed text-muted">
             No seed phrase to write down. Back up your keyfile instead, whenever you
-            want. Anyone with the file can access your wallet, so store it somewhere safe.
+            want.
+          </p>
+          <p className="text-body font-bold leading-relaxed text-foreground">
+            Anyone with the file can access your wallet, so store it somewhere safe.
           </p>
         </div>
 
