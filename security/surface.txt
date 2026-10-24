@@ -49,6 +49,7 @@
 3 packages/core/src/models/site-origin.ts
 3 apps/extension/entrypoints/content/
 3 apps/extension/entrypoints/provider/
+3 packages/provider/
 3 packages/runtime/src/handlers/provider-params.ts
 3 apps/extension/src/sender.ts
 3 packages/core/src/policy/signing-origin.ts

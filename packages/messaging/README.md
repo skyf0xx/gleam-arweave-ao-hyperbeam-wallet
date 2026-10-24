@@ -108,7 +108,8 @@ can't name its own origin or tier.
   implements each `ProtocolMap` method and enforces the
   `PROVIDER_METHODS`/`APPROVAL_METHODS`/`KEY_METHODS` boundary before a
   handler runs.
-- The content script and injected provider script speak
-  `page-protocol.ts`'s envelope format to each other.
+- The content script and `@gleam/provider`'s window-message transport
+  speak `page-protocol.ts`'s envelope format to each other. The provider
+  imports nothing else from this package.
 - The content script re-encodes page requests as `providerCall`
   messages to reach the background.

@@ -1,8 +1,8 @@
 # @gleam/extension
 
 The Chrome MV3 extension itself: the WXT build that turns `packages/core`,
-`packages/messaging`, `packages/runtime`, `packages/app` and `packages/ui` into the
-installable wallet. It
+`packages/messaging`, `packages/runtime`, `packages/app`, `packages/provider`
+and `packages/ui` into the installable wallet. It
 owns every browser-specific concern — the manifest, the background
 service worker, the content script and injected page provider, and the
 mounts that put `@gleam/app`'s screens in the popup, side panel and
@@ -18,7 +18,7 @@ page.
 - [`wxt.config.ts`](#wxtconfigts) — manifest and build config
 - [`entrypoints/background`](#entrypointsbackground) — the service worker
 - [`entrypoints/content`](#entrypointscontent) — the isolated-world relay
-- [`entrypoints/provider`](#entrypointsprovider) — the injected `window.arweaveWallet`
+- [`entrypoints/provider`](#entrypointsprovider) — builds the injected `provider.js`
 - [`entrypoints/approval`](#entrypointsapproval) — the signing/connect approval window
 - [`entrypoints/passkey`](#entrypointspasskey) — the WebAuthn ceremony window
 - [`entrypoints/connect` / `entrypoints/keyring`](#entrypointsconnect--entrypointskeyring) — hardware wallet support
@@ -61,11 +61,12 @@ a page can't spoof which site is asking.
 ### `entrypoints/provider`
 
 Built into `provider.js` and injected into the page's own world. It
-installs `window.arweaveWallet` (`GleamProvider`) and `window.gleam`,
-turning each call into a `postMessage` round trip to the content
-script with a timeout. It also detects whether another wallet (Wander,
-PermawebOS) is installed and defers to it unless the user has chosen
-Gleam for that site.
+calls `@gleam/provider`'s `installProvider` with
+`createWindowMessageTransport()` and the extension's version, so
+`window.arweaveWallet` and `window.gleam` turn each call into a
+`postMessage` round trip to the content script. The provider itself
+(timeouts, events, and deferring to Wander or PermawebOS unless the user
+chose Gleam for the site) lives in `packages/provider`.
 
 ### `entrypoints/approval`
 

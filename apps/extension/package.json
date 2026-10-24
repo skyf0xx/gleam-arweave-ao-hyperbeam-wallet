@@ -18,6 +18,7 @@
     "@gleam/app": "workspace:*",
     "@gleam/core": "workspace:*",
     "@gleam/messaging": "workspace:*",
+    "@gleam/provider": "workspace:*",
     "@gleam/runtime": "workspace:*",
     "@gleam/ui": "workspace:*",
     "@keystonehq/bc-ur-registry-arweave": "0.5.3",

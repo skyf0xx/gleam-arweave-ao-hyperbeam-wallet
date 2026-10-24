@@ -44,6 +44,7 @@
 /packages/core/src/models/site-origin.ts                                   @skyf0xx
 /apps/extension/entrypoints/content/                                       @skyf0xx
 /apps/extension/entrypoints/provider/                                      @skyf0xx
+/packages/provider/                                                        @skyf0xx
 /packages/runtime/src/handlers/provider-params.ts                          @skyf0xx
 /apps/extension/src/sender.ts                                              @skyf0xx
 /packages/core/src/policy/signing-origin.ts                                @skyf0xx

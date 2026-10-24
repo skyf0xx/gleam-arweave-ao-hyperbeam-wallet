@@ -27,8 +27,9 @@ vi.mock("wxt/utils/inject-script", () => ({ injectScript }));
  * `event.source === null` (a jsdom limitation, not browser-accurate
  * behavior), which would make every test below indistinguishable from a
  * forged cross-origin message under `content.ts`'s own
- * `event.source !== window` guard. See `provider.provider.test.ts`'s
- * identical note for the same reasoning.
+ * `event.source !== window` guard. See
+ * `packages/provider/src/window-transport.provider.test.ts`'s identical
+ * note for the same reasoning.
  */
 function postPageRequest(data: unknown): void {
   window.dispatchEvent(new MessageEvent("message", { data, source: window }));

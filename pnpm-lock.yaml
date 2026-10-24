@@ -81,6 +81,9 @@ importers:
       '@gleam/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@gleam/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       '@gleam/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -241,6 +244,16 @@ importers:
       '@webext-core/messaging':
         specifier: ^4.0.0
         version: 4.0.0
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/provider:
+    dependencies:
+      '@gleam/messaging':
+        specifier: workspace:*
+        version: link:../messaging
     devDependencies:
       typescript:
         specifier: ^5.9.3

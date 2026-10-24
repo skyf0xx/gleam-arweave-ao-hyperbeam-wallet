@@ -86,6 +86,20 @@ const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
   message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
 }));
 
+// `packages/provider` runs in the page's own world, where anything it
+// loads is reachable by the page, and any shell injects it. Beyond the
+// shell fence, it takes no wallet logic: nothing from core, runtime, app
+// or ui, and from messaging only the page wire contract. A relative climb
+// out of the package counts too.
+const PROVIDER_IMPORT =
+  "^@gleam/(core|runtime|app|ui)(/|$)|(^|/)packages/(core|runtime|app|ui|messaging)(/|$)|^(\\.\\./){2,}(core|runtime|app|ui|messaging)(/|$)|^@gleam/messaging(?!/src/page-protocol(\\.ts)?$)";
+const PROVIDER_IMPORT_MESSAGE =
+  "packages/provider is page-world code: no wxt, @capacitor, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
+const PROVIDER_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/provider never touches extension globals. Reach the wallet through `ProviderTransport`.",
+}));
+
 // Flat config replaces a rule's options wholesale when a later block sets
 // the same rule, so every block that sets `no-restricted-syntax` spreads
 // in the full list it needs rather than adding to an earlier block's.
@@ -271,6 +285,30 @@ export default tseslint.config(
         "error",
         { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
         { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    // The provider fence, signer fence included: a later block replaces a
+    // rule's options wholesale.
+    files: ["packages/provider/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+            { regex: RUNTIME_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+            { regex: PROVIDER_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+      "no-restricted-globals": ["error", ...PROVIDER_GLOBALS],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+        { regex: PROVIDER_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
       ],
     },
   },

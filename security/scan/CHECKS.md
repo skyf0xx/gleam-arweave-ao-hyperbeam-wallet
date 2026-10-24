@@ -91,7 +91,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Provider bridge (tier 3)
 
-`entrypoints/provider/`, `entrypoints/content/`,
+`packages/provider/`, `entrypoints/provider/`, `entrypoints/content/`,
 `packages/messaging/src/page-protocol.ts`.
 
 - The `event.source` check, per-request ids, the `settled` flag,
