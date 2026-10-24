@@ -34,6 +34,11 @@ table with the columns `id`, `severity` (`critical`, `high`, `medium`, `low`,
 `info`), `summary` and `status` (`fixed`, `accepted`, `open`). **Notes** holds
 anything else a reader needs, such as why an accepted finding is acceptable.
 
+While reviewing the diff, check `docs/THREAT_MODEL.md`. Remove any By design
+or Known limitations entry the release made untrue, and list the removals in
+**Notes**. Scan agents read that file in full, so stale entries cost every
+scan.
+
 ## Commands
 
 ```bash
