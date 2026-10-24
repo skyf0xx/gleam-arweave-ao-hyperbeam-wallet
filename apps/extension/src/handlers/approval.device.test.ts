@@ -11,7 +11,7 @@ import {
   type DeviceSigningRequest,
   type JWKInterface,
   type StoragePort,
-  type WindowPort,
+  type ApprovalPresenterPort,
 } from "@gleam/core";
 import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
@@ -84,33 +84,40 @@ function createWatchableStorage(): StoragePort {
   };
 }
 
-function createFakeWindows(): WindowPort & { opened: string[]; closed: string[]; userCloses(requestId: string): void } {
-  const opened: string[] = [];
-  const closed: string[] = [];
+function createFakePresenter(): ApprovalPresenterPort & {
+  presented: string[];
+  dismissed: string[];
+  focused: string[];
+  /** Simulates the user dismissing the approval UI themselves. */
+  userDismisses(requestId: string): void;
+} {
+  const presented: string[] = [];
+  const dismissed: string[] = [];
+  const focused: string[] = [];
   const listeners = new Set<(requestId: string) => void>();
   return {
-    opened,
-    closed,
-    async createApprovalWindow(url: string) {
-      opened.push(url);
+    presented,
+    dismissed,
+    focused,
+    async present(requestId: string) {
+      presented.push(requestId);
     },
-    async closeApprovalWindow(requestId: string) {
-      closed.push(requestId);
+    async dismiss(requestId: string) {
+      dismissed.push(requestId);
     },
-    async focusApprovalWindow() {},
-    onApprovalWindowClosed(listener) {
+    async focus(requestId: string) {
+      focused.push(requestId);
+    },
+    onDismissed(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    userCloses(requestId: string) {
+    userDismisses(requestId: string) {
       for (const listener of listeners) listener(requestId);
     },
   };
 }
 
-function requestIdOf(url: string): string {
-  return decodeURIComponent(/requestId=([^&]+)/.exec(url)![1]!);
-}
 
 const HW_ID = "hw-1";
 const ORIGIN = "https://bazar.arweave.net";
@@ -155,7 +162,7 @@ function mockNetwork(): string[] {
 }
 
 let storage: StoragePort;
-let windows: ReturnType<typeof createFakeWindows>;
+let presenter: ReturnType<typeof createFakePresenter>;
 let transfer: TransferHandler;
 let handler: ApprovalHandler;
 let deviceKey: JWKInterface;
@@ -180,9 +187,9 @@ beforeEach(async () => {
   keySessionStore.set("local:wallets", [wallet]);
   storage = createWatchableStorage();
   await storage.set("local:wallets", [wallet]);
-  windows = createFakeWindows();
+  presenter = createFakePresenter();
   transfer = new TransferHandler(storage, keySession, { requestTransfer: (req) => handler.requestWalletTransfer(req) });
-  handler = new ApprovalHandler(storage, keySession, windows, transfer, "https://bundler.example");
+  handler = new ApprovalHandler(storage, keySession, presenter, transfer, "https://bundler.example");
 });
 
 afterEach(() => {
@@ -197,8 +204,8 @@ async function approveOnDevice(input: SigningRequestInput | (() => Promise<unkno
   const pending =
     typeof input === "function" ? input() : handler.requestApproval({ origin: ORIGIN, walletId: HW_ID, ...input });
   pending.catch(() => {});
-  await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-  const requestId = requestIdOf(windows.opened[0]!);
+  await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+  const requestId = presenter.presented[0]!;
   const view = (await handler.resolveApproval({ requestId, approved: true })) as ApprovalRequest;
   return { pending, requestId, view, device: view.device! };
 }
@@ -225,12 +232,12 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     expect(device.payloads[0]).toMatchObject({ kind: "transaction", transaction: { owner: deviceKey.n, signature: "" } });
     // Still pending, and a reopened window sees the same device step.
     expect((await handler.getApproval({ requestId })).device?.payloads).toEqual(device.payloads);
-    expect(windows.closed).not.toContain(requestId);
+    expect(presenter.dismissed).not.toContain(requestId);
 
     await handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) });
 
     await expect(pending).resolves.toMatchObject({ owner: deviceKey.n, target: RECIPIENT, quantity: "10" });
-    expect(windows.closed).toContain(requestId);
+    expect(presenter.dismissed).toContain(requestId);
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
   });
 
@@ -323,7 +330,7 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       /doesn't match this wallet/,
     );
     expect((await handler.getApproval({ requestId })).device).toBeDefined();
-    expect(windows.closed).not.toContain(requestId);
+    expect(presenter.dismissed).not.toContain(requestId);
 
     await handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) });
     await expect(pending).resolves.toBeInstanceOf(ArrayBuffer);
@@ -387,9 +394,9 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       hashAlgorithm: "SHA-512",
     });
     const rejected = expect(pending).rejects.toThrow(/SHA-256 only, not SHA-512/);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
     await expect(
-      handler.resolveApproval({ requestId: requestIdOf(windows.opened[0]!), approved: true }),
+      handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true }),
     ).rejects.toThrow(/SHA-256 only/);
     await rejected;
   });
@@ -407,9 +414,9 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       dataItems: [{ data: btoa("hello") }],
     });
     const rejected = expect(pending).rejects.toThrow(/doesn't match its address/);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
     await expect(
-      handler.resolveApproval({ requestId: requestIdOf(windows.opened[0]!), approved: true }),
+      handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true }),
     ).rejects.toThrow(/doesn't match its address/);
     await rejected;
   });
@@ -425,7 +432,7 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     await handler.resolveApproval({ requestId, approved: false });
 
     await expect(pending).rejects.toThrow(/rejected/);
-    expect(windows.closed).toContain(requestId);
+    expect(presenter.dismissed).toContain(requestId);
   });
 
   it("closing the window while waiting for the device rejects the dApp", async () => {
@@ -435,7 +442,7 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       dataItems: [{ data: btoa("hello") }],
     });
 
-    windows.userCloses(requestId);
+    presenter.userDismisses(requestId);
 
     await expect(pending).rejects.toThrow(/approval window was closed/);
   });
@@ -449,10 +456,10 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       dataItems: [{ data: btoa("hello") }],
     });
     pending.catch(() => {});
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
 
     await expect(
-      handler.submitDeviceSignature({ requestId: requestIdOf(windows.opened[0]!), signatures: [] }),
+      handler.submitDeviceSignature({ requestId: presenter.presented[0]!, signatures: [] }),
     ).rejects.toThrow(/isn't waiting for a device signature/);
   });
 });
@@ -474,8 +481,8 @@ describe("ApprovalHandler: device timeouts", () => {
       () => (settled = "resolved"),
       (error: Error) => (settled = error),
     );
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = requestIdOf(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
     await vi.advanceTimersByTimeAsync(reviewMs);
     await handler.resolveApproval({ requestId, approved: true });
     return { requestId, settled: () => settled };
@@ -507,7 +514,7 @@ describe("ApprovalHandler: device timeouts", () => {
 
     await vi.advanceTimersByTimeAsync(MINUTE + 1);
     expect(settled()).toBeInstanceOf(Error);
-    expect(windows.closed).toContain(requestId);
+    expect(presenter.dismissed).toContain(requestId);
   });
 
   it("deviceActivity is refused for a request still in review", async () => {
@@ -519,9 +526,9 @@ describe("ApprovalHandler: device timeouts", () => {
       dataItems: [{ data: btoa("hello") }],
     });
     pending.catch(() => {});
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
 
-    await expect(handler.deviceActivity({ requestId: requestIdOf(windows.opened[0]!) })).rejects.toThrow(
+    await expect(handler.deviceActivity({ requestId: presenter.presented[0]! })).rejects.toThrow(
       /isn't waiting for a device/,
     );
   });
@@ -670,7 +677,7 @@ describe("ApprovalHandler: device deadlines without the timer", () => {
 
     await expect(handler.submitDeviceSignature({ requestId, signatures })).rejects.toThrow(/timed out/);
     await expect(pending).rejects.toThrow(/timed out/);
-    expect(windows.closed).toContain(requestId);
+    expect(presenter.dismissed).toContain(requestId);
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
   });
 
@@ -697,8 +704,8 @@ describe("ApprovalHandler: device deadlines without the timer", () => {
 
   it("a request still in review is hidden once its review timeout has passed", async () => {
     handler.requestApproval({ ...DATA_ITEM, origin: ORIGIN, walletId: HW_ID }).catch(() => {});
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = requestIdOf(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
     vi.advanceTimersByTime(5 * MINUTE + 1);
 
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/No pending approval/);
@@ -789,9 +796,9 @@ describe("ApprovalHandler: what the device signs is what was approved", () => {
       last_tx: "b".repeat(64),
     });
     const rejected = expect(pending).rejects.toThrow(`prepared ${field} doesn't match`);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
     await expect(
-      handler.resolveApproval({ requestId: requestIdOf(windows.opened[0]!), approved: true }),
+      handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true }),
     ).rejects.toThrow(`prepared ${field} doesn't match`);
     await rejected;
   });

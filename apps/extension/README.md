@@ -119,7 +119,7 @@ no handler re-checks it.
 ### `src/handlers/`
 
 One file per use case, each holding the logic a background message
-maps to. Handlers depend only on ports (`StoragePort`, `WindowPort`,
+maps to. Handlers depend only on ports (`StoragePort`, `ApprovalPresenterPort`,
 etc.), never on `chrome.*` directly.
 
 - **`wallet-lifecycle.ts`** — create, import, lock/unlock, rename, delete, and switch wallets.
@@ -142,7 +142,7 @@ never imports Chrome APIs directly — it only knows about these
 interfaces.
 
 - **`storage.ts`** → `StoragePort` over WXT storage.
-- **`windows.ts`** (`WxtWindowPort`) → `WindowPort`, opens and tracks approval/passkey windows by request id so a restarted service worker can still find them.
+- **`windows.ts`** (`WindowApprovalPresenter`) → `ApprovalPresenterPort`, opens and tracks one approval window per request id so a restarted service worker can still find them.
 - **`runtime.ts`** → `RuntimePort` over `@webext-core/messaging`.
 - **`session-key-store.ts` / `offscreen-keyring.ts`** → bridge to the offscreen keyring document.
 - **`badge.ts`, `downloads.ts`, `device-key.ts`** → the action badge, file downloads, and the Gleam Points device keypair.

@@ -8,7 +8,7 @@ import {
   type JWKInterface,
   type ScanAttestationApprovalPreview,
   type StoragePort,
-  type WindowPort,
+  type ApprovalPresenterPort,
 } from "@gleam/core";
 import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/index.ts";
@@ -66,42 +66,40 @@ function createWatchableStorage(): StoragePort {
   };
 }
 
-function createFakeWindows(): WindowPort & {
-  opened: string[];
-  closed: string[];
+function createFakePresenter(): ApprovalPresenterPort & {
+  presented: string[];
+  dismissed: string[];
   focused: string[];
-  userCloses(requestId: string): void;
+  /** Simulates the user dismissing the approval UI themselves. */
+  userDismisses(requestId: string): void;
 } {
-  const opened: string[] = [];
-  const closed: string[] = [];
+  const presented: string[] = [];
+  const dismissed: string[] = [];
   const focused: string[] = [];
   const listeners = new Set<(requestId: string) => void>();
   return {
-    opened,
-    closed,
+    presented,
+    dismissed,
     focused,
-    async createApprovalWindow(url: string) {
-      opened.push(url);
+    async present(requestId: string) {
+      presented.push(requestId);
     },
-    async closeApprovalWindow(requestId: string) {
-      closed.push(requestId);
+    async dismiss(requestId: string) {
+      dismissed.push(requestId);
     },
-    async focusApprovalWindow(requestId: string) {
+    async focus(requestId: string) {
       focused.push(requestId);
     },
-    onApprovalWindowClosed(listener) {
+    onDismissed(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    userCloses(requestId: string) {
+    userDismisses(requestId: string) {
       for (const listener of listeners) listener(requestId);
     },
   };
 }
 
-function requestIdOf(url: string): string {
-  return decodeURIComponent(/requestId=([^&]+)/.exec(url)![1]!);
-}
 
 const SITE = "https://gleamwallet.app";
 const KEYFILE_ID = "w-keyfile";
@@ -130,7 +128,7 @@ function parsed(): ParsedAttestation {
 const PAID: SiteAttestResponse = { ok: true, attestationId: "x", points: "5000000000000", paid: true, unpaidReason: null, paidPlacesLeft: 19 };
 
 let storage: StoragePort;
-let windows: ReturnType<typeof createFakeWindows>;
+let presenter: ReturnType<typeof createFakePresenter>;
 let submitter: { attest: ReturnType<typeof vi.fn>; submitAttestation: ReturnType<typeof vi.fn>; check: ReturnType<typeof vi.fn> };
 let handler: ApprovalHandler;
 let keyfileJwk: JWKInterface;
@@ -174,14 +172,14 @@ beforeEach(async () => {
   });
   storage = createWatchableStorage();
   await storage.set("local:wallets", wallets);
-  windows = createFakeWindows();
+  presenter = createFakePresenter();
   submitter = { attest: vi.fn(async () => PAID), submitAttestation: vi.fn(async () => PAID), check: vi.fn(async () => ({ ok: true })) };
   // The active wallet is the hardware one, so a test that signs with the
   // keyfile proves the request keeps the wallet it was opened for.
   handler = new ApprovalHandler(
     storage,
     keySession,
-    windows,
+    presenter,
     undefined,
     undefined,
     async () => HW_ID,
@@ -198,8 +196,8 @@ afterEach(async () => {
 async function open(walletId: string) {
   const pending = handler.requestScanAttestation({ origin: SITE, walletId, address: "addr", attestation: parsed() });
   pending.catch(() => {});
-  await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-  return { pending, requestId: requestIdOf(windows.opened[0]!) };
+  await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+  return { pending, requestId: presenter.presented[0]! };
 }
 
 describe("ApprovalHandler: scan attestations", () => {
@@ -228,7 +226,7 @@ describe("ApprovalHandler: scan attestations", () => {
     expect(shown).toEqual({ shown: "scanAttestation", result: PAID });
     await expect(pending).resolves.toEqual(PAID);
     expect(submitter.attest).toHaveBeenCalledWith({ walletId: KEYFILE_ID, attestation: ATTESTATION });
-    expect(windows.closed).not.toContain(requestId);
+    expect(presenter.dismissed).not.toContain(requestId);
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
   });
 
@@ -272,7 +270,7 @@ describe("ApprovalHandler: scan attestations", () => {
     expect(attestation).toEqual(ATTESTATION);
     expect(proof).toMatchObject({ owner: deviceJwk.n, message, proof: "transaction" });
     expect(await verifyPointsProof("transaction", proof.owner, message, proof.signature)).toBe(true);
-    expect(windows.closed).not.toContain(requestId);
+    expect(presenter.dismissed).not.toContain(requestId);
   });
 
   it("rejecting or closing the window rejects the site with ApprovalDeclinedError", async () => {
@@ -281,9 +279,9 @@ describe("ApprovalHandler: scan attestations", () => {
     await expect(rejected.pending).rejects.toBeInstanceOf(ApprovalDeclinedError);
     expect(submitter.attest).not.toHaveBeenCalled();
 
-    windows.opened.length = 0;
+    presenter.presented.length = 0;
     const closed = await open(KEYFILE_ID);
-    windows.userCloses(closed.requestId);
+    presenter.userDismisses(closed.requestId);
     await expect(closed.pending).rejects.toMatchObject({ name: "ApprovalDeclinedError", timedOut: false });
   });
 
@@ -363,7 +361,7 @@ describe("ApprovalHandler: scan attestations", () => {
         payload: new TextEncoder().encode(other),
       }),
     ).rejects.toThrow("The message to sign isn't this attestation's.");
-    expect(windows.opened).toEqual([]);
+    expect(presenter.presented).toEqual([]);
   });
 
   it("allows one pending attestation: another focuses its window and gets busy", async () => {
@@ -372,8 +370,8 @@ describe("ApprovalHandler: scan attestations", () => {
     const second = await handler.requestScanAttestation({ origin: SITE, walletId: KEYFILE_ID, address: "addr", attestation: parsed() });
 
     expect(second).toMatchObject({ ok: false, code: "busy" });
-    expect(windows.opened).toHaveLength(1);
-    expect(windows.focused).toEqual([requestId]);
+    expect(presenter.presented).toHaveLength(1);
+    expect(presenter.focused).toEqual([requestId]);
   });
 
   it("two attestations sent at once open one window", async () => {
@@ -382,6 +380,6 @@ describe("ApprovalHandler: scan attestations", () => {
     const second = handler.requestScanAttestation({ origin: SITE, walletId: KEYFILE_ID, address: "addr", attestation: parsed() });
 
     expect(await second).toMatchObject({ ok: false, code: "busy" });
-    await vi.waitFor(() => expect(windows.opened).toHaveLength(1));
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
   });
 });

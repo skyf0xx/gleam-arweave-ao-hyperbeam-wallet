@@ -5,7 +5,7 @@ import {
   verifyMessage,
   type JWKInterface,
   type StoragePort,
-  type WindowPort,
+  type ApprovalPresenterPort,
 } from "@gleam/core";
 import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
@@ -93,40 +93,40 @@ function createWatchableStorage(): StoragePort {
   };
 }
 
-function createFakeWindows(): WindowPort & {
-  opened: string[];
-  closed: string[];
-  /** Simulates the user closing the window with its own close button. */
-  userCloses(requestId: string): void;
+function createFakePresenter(): ApprovalPresenterPort & {
+  presented: string[];
+  dismissed: string[];
+  focused: string[];
+  /** Simulates the user dismissing the approval UI themselves. */
+  userDismisses(requestId: string): void;
 } {
-  const opened: string[] = [];
-  const closed: string[] = [];
+  const presented: string[] = [];
+  const dismissed: string[] = [];
+  const focused: string[] = [];
   const listeners = new Set<(requestId: string) => void>();
   return {
-    opened,
-    closed,
-    async createApprovalWindow(url: string) {
-      opened.push(url);
+    presented,
+    dismissed,
+    focused,
+    async present(requestId: string) {
+      presented.push(requestId);
     },
-    async closeApprovalWindow(requestId: string) {
-      closed.push(requestId);
+    async dismiss(requestId: string) {
+      dismissed.push(requestId);
     },
-    async focusApprovalWindow() {},
-    onApprovalWindowClosed(listener) {
+    async focus(requestId: string) {
+      focused.push(requestId);
+    },
+    onDismissed(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    userCloses(requestId: string) {
+    userDismisses(requestId: string) {
       for (const listener of listeners) listener(requestId);
     },
   };
 }
 
-function extractRequestId(url: string): string {
-  const match = /requestId=([^&]+)/.exec(url);
-  if (!match) throw new Error(`No requestId in url: ${url}`);
-  return decodeURIComponent(match[1]!);
-}
 
 const WALLET_ID = "wallet-1";
 
@@ -147,17 +147,17 @@ async function seedWallet(storage: StoragePort) {
 
 describe("ApprovalHandler: connect() -> Grant", () => {
   let storage: StoragePort;
-  let windows: ReturnType<typeof createFakeWindows>;
+  let presenter: ReturnType<typeof createFakePresenter>;
   let handler: ApprovalHandler;
 
   beforeEach(async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
   });
 
-  it("opens a dedicated approval window (never inline), never blank before resolution", async () => {
+  it("presents the pending request by its id before resolution", async () => {
     const pending = handler.requestApproval({
       kind: "connect",
       origin: "https://bazar.arweave.net",
@@ -165,11 +165,11 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
 
-    // let requestApproval's synchronous setup (window open + pending write) flush
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    expect(windows.opened[0]).toMatch(/^\/approval\.html\?requestId=/);
+    // let requestApproval's synchronous setup (pending write + present) flush
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
+    await expect(handler.getApproval({ requestId })).resolves.toMatchObject({ requestId, kind: "connect" });
 
-    const requestId = extractRequestId(windows.opened[0]!);
     await handler.resolveApproval({ requestId, approved: true });
     await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
   });
@@ -181,8 +181,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await handler.resolveApproval({ requestId, approved: true });
     await pending;
@@ -211,8 +211,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await handler.resolveApproval({ requestId, approved: false });
     await expect(pending).rejects.toThrow(/rejected/i);
@@ -227,13 +227,13 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await handler.resolveApproval({ requestId, approved: true });
     await pending;
 
-    expect(windows.closed).toEqual([requestId]);
+    expect(presenter.dismissed).toEqual([requestId]);
   });
 
   it("a second connect() from the same origin replaces the prior Grant, not duplicates it", async () => {
@@ -243,8 +243,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true });
     await first;
 
     const second = handler.requestApproval({
@@ -253,8 +253,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS", "ACCESS_TOKENS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(2));
-    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[1]!), approved: true });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(2));
+    await handler.resolveApproval({ requestId: presenter.presented[1]!, approved: true });
     await second;
 
     const grants = await handler.getConnectedApps();
@@ -274,8 +274,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_TOKENS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true });
 
     await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS", "SIGNATURE", "ACCESS_TOKENS"] });
     const grants = await handler.getConnectedApps();
@@ -296,8 +296,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(2));
-    const [firstId, secondId] = windows.opened.map(extractRequestId);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(2));
+    const [firstId, secondId] = presenter.presented;
 
     await expect(handler.getApproval({ requestId: firstId! })).resolves.toMatchObject({ origin: "https://a.test" });
     await expect(handler.getApproval({ requestId: secondId! })).resolves.toMatchObject({ origin: "https://b.test" });
@@ -323,8 +323,8 @@ describe("ApprovalHandler: connect() -> Grant", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true });
 
     await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
   });
@@ -333,9 +333,9 @@ describe("ApprovalHandler: connect() -> Grant", () => {
 describe("ApprovalHandler: connect() before any wallet exists", () => {
   it("grants the wallet that is active when the user approves", async () => {
     const storage = createWatchableStorage();
-    const windows = createFakeWindows();
+    const presenter = createFakePresenter();
     let active: string | null = null;
-    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, async () => active);
+    const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, async () => active);
 
     const pending = handler.requestApproval({
       kind: "connect",
@@ -343,8 +343,8 @@ describe("ApprovalHandler: connect() before any wallet exists", () => {
       walletId: null,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
     // The approval window reads the request before onboarding runs.
     await expect(handler.getApproval({ requestId })).resolves.toMatchObject({ kind: "connect" });
 
@@ -359,8 +359,8 @@ describe("ApprovalHandler: connect() before any wallet exists", () => {
 
   it("rejects the dApp and grants nothing if approved while still no wallet exists", async () => {
     const storage = createWatchableStorage();
-    const windows = createFakeWindows();
-    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, async () => null);
+    const presenter = createFakePresenter();
+    const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, async () => null);
 
     const pending = handler.requestApproval({
       kind: "connect",
@@ -369,8 +369,8 @@ describe("ApprovalHandler: connect() before any wallet exists", () => {
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
     const settled = pending.catch((error: unknown) => error);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/no wallet to connect/i);
     expect(await settled).toBeInstanceOf(Error);
@@ -380,13 +380,13 @@ describe("ApprovalHandler: connect() before any wallet exists", () => {
 
 describe("ApprovalHandler: an abandoned approval window", () => {
   let storage: StoragePort;
-  let windows: ReturnType<typeof createFakeWindows>;
+  let presenter: ReturnType<typeof createFakePresenter>;
   let handler: ApprovalHandler;
 
   beforeEach(async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
   });
 
@@ -406,21 +406,40 @@ describe("ApprovalHandler: an abandoned approval window", () => {
   it("closing the window rejects the request at once and drops it", async () => {
     const pending = requestConnect();
     const assertion = expect(pending).rejects.toThrow(/approval window was closed/i);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
-    windows.userCloses(requestId);
+    presenter.userDismisses(requestId);
 
     await assertion;
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
     expect(await handler.getConnectedApps()).toEqual([]);
   });
 
+  it("a dismissal reported after the request settled changes nothing", async () => {
+    const first = requestConnect();
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const firstId = presenter.presented[0]!;
+    await handler.resolveApproval({ requestId: firstId, approved: false });
+    await expect(first).rejects.toThrow(/request was rejected/i);
+    expect(presenter.dismissed).toEqual([firstId]);
+
+    const second = requestConnect();
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(2));
+    const secondId = presenter.presented[1]!;
+    presenter.userDismisses(firstId);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await expect(handler.getApproval({ requestId: secondId })).resolves.toMatchObject({ requestId: secondId });
+    await handler.resolveApproval({ requestId: secondId, approved: true });
+    await expect(second).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+  });
+
   it("drops a record nothing awaits any more, such as one left by a service-worker restart", async () => {
     const orphan = { requestId: "orphan", kind: "connect", origin: "https://x.test", createdAt: 0, preview: { kind: "connect", requestedPermissions: [] } };
     await storage.set("session:pendingApprovals", [{ request: orphan, walletId: WALLET_ID, signingInput: null }]);
 
-    windows.userCloses("orphan");
+    presenter.userDismisses("orphan");
 
     await vi.waitFor(async () => expect(await storage.get("session:pendingApprovals")).toEqual([]));
   });
@@ -431,8 +450,8 @@ describe("ApprovalHandler: an abandoned approval window", () => {
       submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
     };
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows, transfers);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter, transfers);
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -443,12 +462,12 @@ describe("ApprovalHandler: an abandoned approval window", () => {
       token: "token-process",
       payload: new Uint8Array(),
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const resolving = handler.resolveApproval({ requestId, approved: true });
     await vi.waitFor(() => expect(transfers.submitTransfer).toHaveBeenCalled());
-    windows.userCloses(requestId);
+    presenter.userDismisses(requestId);
     await new Promise((resolve) => setTimeout(resolve, 0));
     finishTransfer({ txId: "tx-1" });
 
@@ -462,8 +481,8 @@ describe("ApprovalHandler: an abandoned approval window", () => {
       submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
     };
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows, transfers);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter, transfers);
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -474,8 +493,8 @@ describe("ApprovalHandler: an abandoned approval window", () => {
       token: "token-process",
       payload: new Uint8Array(),
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const first = handler.resolveApproval({ requestId, approved: true });
     await vi.waitFor(() => expect(transfers.submitTransfer).toHaveBeenCalled());
@@ -491,25 +510,25 @@ describe("ApprovalHandler: an abandoned approval window", () => {
     vi.useFakeTimers();
     const pending = requestConnect();
     const assertion = expect(pending).rejects.toThrow(/timed out/i);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await vi.advanceTimersByTimeAsync(5 * 60_000);
 
     await assertion;
-    expect(windows.closed).toContain(requestId);
+    expect(presenter.dismissed).toContain(requestId);
   });
 });
 
 describe("ApprovalHandler: revocation ends access", () => {
   let storage: StoragePort;
-  let windows: ReturnType<typeof createFakeWindows>;
+  let presenter: ReturnType<typeof createFakePresenter>;
   let handler: ApprovalHandler;
 
   beforeEach(async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
     await storage.set("local:grants", [
       {
@@ -561,8 +580,8 @@ describe("ApprovalHandler: revocation ends access", () => {
       walletId: WALLET_ID,
       requestedPermissions: ["ACCESS_ADDRESS"],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = /requestId=([^&]+)/.exec(windows.opened[0]!)![1]!;
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
     await handler.resolveApproval({ requestId, approved: true });
     await pending;
 
@@ -573,7 +592,7 @@ describe("ApprovalHandler: revocation ends access", () => {
 describe("ApprovalHandler: removing wallets", () => {
   const OTHER_WALLET_ID = "wallet-2";
   let storage: StoragePort;
-  let windows: ReturnType<typeof createFakeWindows>;
+  let presenter: ReturnType<typeof createFakePresenter>;
   let handler: ApprovalHandler;
 
   function grantFor(origin: string, walletId: string) {
@@ -586,8 +605,8 @@ describe("ApprovalHandler: removing wallets", () => {
 
   beforeEach(async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
     await storage.set("local:grants", [
       grantFor("https://a.test", WALLET_ID),
@@ -610,15 +629,15 @@ describe("ApprovalHandler: removing wallets", () => {
   it("rejectWalletApprovals rejects that wallet's pending approvals and closes their windows", async () => {
     const mine = requestConnect("https://d.test", WALLET_ID);
     const mineRejected = expect(mine).rejects.toThrow(/wallet was removed/i);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
     const other = requestConnect("https://e.test", OTHER_WALLET_ID);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(2));
-    const [mineId, otherId] = windows.opened.map(extractRequestId);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(2));
+    const [mineId, otherId] = presenter.presented;
 
     await handler.rejectWalletApprovals(WALLET_ID);
 
     await mineRejected;
-    expect(windows.closed).toEqual([mineId]);
+    expect(presenter.dismissed).toEqual([mineId]);
     await expect(handler.getApproval({ requestId: mineId! })).rejects.toThrow(/No pending approval/);
     await handler.resolveApproval({ requestId: otherId!, approved: true });
     await expect(other).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
@@ -627,7 +646,7 @@ describe("ApprovalHandler: removing wallets", () => {
   it("revokeAllAccess removes every grant and rejects every pending approval", async () => {
     const pending = requestConnect("https://d.test", OTHER_WALLET_ID);
     const rejected = expect(pending).rejects.toThrow(/wallet was reset/i);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
 
     const revoked = await handler.revokeAllAccess();
 
@@ -635,13 +654,13 @@ describe("ApprovalHandler: removing wallets", () => {
     expect(revoked).toEqual(["https://a.test", "https://b.test", "https://c.test"]);
     expect(await handler.getConnectedApps()).toEqual([]);
     expect(await storage.get("session:pendingApprovals")).toEqual([]);
-    expect(windows.closed).toEqual([extractRequestId(windows.opened[0]!)]);
+    expect(presenter.dismissed).toEqual([presenter.presented[0]!]);
   });
 
   it("revokeAllAccess rejects pending approvals with the reason it is given", async () => {
     const pending = requestConnect("https://d.test", WALLET_ID);
     const rejected = expect(pending).rejects.toThrow("The wallet was removed.");
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
 
     await handler.revokeAllAccess("The wallet was removed.");
 
@@ -659,13 +678,13 @@ describe("ApprovalHandler: removing wallets", () => {
 
 describe("ApprovalHandler: signing approval preview + unlocked-session gate", () => {
   let storage: StoragePort;
-  let windows: ReturnType<typeof createFakeWindows>;
+  let presenter: ReturnType<typeof createFakePresenter>;
   let handler: ApprovalHandler;
 
   beforeEach(async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, keySession, windows);
+    presenter = createFakePresenter();
+    handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
   });
 
@@ -684,8 +703,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       payload: new TextEncoder().encode("hello"),
       tags: [{ name: "Action", value: "Transfer" }],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const request = await handler.getApproval({ requestId });
     expect(request.kind).toBe("sign");
@@ -713,14 +732,14 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       walletId: WALLET_ID,
       payload: new TextEncoder().encode("hello"),
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const dappRejected = expect(pending).rejects.toThrow(/locked/i);
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
     await dappRejected;
     // The window stays open to show the error instead of closing as if signed.
-    expect(windows.closed).not.toContain(requestId);
+    expect(presenter.dismissed).not.toContain(requestId);
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
   });
 
@@ -741,8 +760,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
         walletId: WALLET_ID,
         payload: new TextEncoder().encode("hello"),
       });
-      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-      const requestId = extractRequestId(windows.opened[0]!);
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      const requestId = presenter.presented[0]!;
 
       vi.advanceTimersByTime(60 * 1000 + 1);
       const dappRejected = expect(pending).rejects.toThrow(/locked/i);
@@ -764,8 +783,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       walletId: WALLET_ID,
       payload: new TextEncoder().encode("hello"),
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const dappRejected = expect(pending).rejects.toThrow(/gateway url/i);
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/gateway url/i);
@@ -796,8 +815,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       reward: "5000",
       last_tx: "b".repeat(64),
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true });
 
     const signed = (await pending) as Record<string, unknown>;
     expect(signed).toMatchObject({
@@ -826,8 +845,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       payload: message,
       hashAlgorithm: "SHA-384",
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await handler.resolveApproval({ requestId, approved: true });
 
@@ -852,8 +871,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       payload,
       encryptAlgorithm,
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
-    const requestId = extractRequestId(windows.opened.pop()!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBeGreaterThan(0));
+    const requestId = presenter.presented.pop()!;
     await handler.resolveApproval({ requestId, approved: true });
     return (await pending) as Uint8Array;
   }
@@ -907,8 +926,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       payload: new TextEncoder().encode("secret"),
       encryptAlgorithm: { name: "RSA-OAEP" },
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBeGreaterThan(0));
-    const requestId = extractRequestId(windows.opened.pop()!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBeGreaterThan(0));
+    const requestId = presenter.presented.pop()!;
 
     const message = "This wallet's stored public key doesn't match its address. Encryption was refused.";
     const dappRejected = expect(pending).rejects.toThrow(message);
@@ -931,11 +950,11 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
         payload: new Uint8Array(150 * 1024).fill(1),
         gatewayUrl: "https://arweave.net",
       });
-      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
       // Failures reach the test through `pending`; resolveApproval throws the same error.
       pending.catch(() => {});
       await bundlingHandler
-        .resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true })
+        .resolveApproval({ requestId: presenter.presented[0]!, approved: true })
         .catch(() => {});
       return pending;
     }
@@ -944,7 +963,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-      const result = (await dispatchLarge(new ApprovalHandler(storage, keySession, windows, undefined, BUNDLER))) as {
+      const result = (await dispatchLarge(new ApprovalHandler(storage, keySession, presenter, undefined, BUNDLER))) as {
         id: string;
         type: string;
       };
@@ -959,7 +978,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
       vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 500, statusText: "Server Error" }));
 
-      await expect(dispatchLarge(new ApprovalHandler(storage, keySession, windows, undefined, BUNDLER))).rejects.toThrow(
+      await expect(dispatchLarge(new ApprovalHandler(storage, keySession, presenter, undefined, BUNDLER))).rejects.toThrow(
         /bundler.*HTTP 500/,
       );
     });
@@ -983,8 +1002,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
         payload: new TextEncoder().encode(texts[0]!),
         dataItems: texts.map((text) => ({ data: toBase64(text), tags: [{ name: "Action", value: "Eval" }] })),
       });
-      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-      await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true });
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true });
       return pending;
     }
 
@@ -1016,8 +1035,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
           { data: toBase64("third"), tags: [] },
         ],
       });
-      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-      const requestId = extractRequestId(windows.opened[0]!);
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      const requestId = presenter.presented[0]!;
 
       const request = await handler.getApproval({ requestId });
       if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
@@ -1047,8 +1066,8 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
         tags: [{ name: "Action", value: "Eval" }],
         dataItems: [{ data: toBase64("hello"), tags: [{ name: "Action", value: "Eval" }] }],
       });
-      await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-      const requestId = extractRequestId(windows.opened[0]!);
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      const requestId = presenter.presented[0]!;
 
       const request = await handler.getApproval({ requestId });
       if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
@@ -1065,7 +1084,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
 
 describe("ApprovalHandler: transferAoTokens signing approval", () => {
   let storage: StoragePort;
-  let windows: ReturnType<typeof createFakeWindows>;
+  let presenter: ReturnType<typeof createFakePresenter>;
 
   afterEach(async () => {
     await clearKeyCache();
@@ -1073,9 +1092,9 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("finalizes an approved transferAoTokens request via the injected AoTransferSubmitter, returning { id }", async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
+    presenter = createFakePresenter();
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "ao-message-id-123" });
-    const handler = new ApprovalHandler(storage, keySession, windows, { submitTransfer });
+    const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
     await seedWallet(storage);
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
@@ -1090,8 +1109,8 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
       payload: new Uint8Array(),
       tags: [],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const request = await handler.getApproval({ requestId });
     expect(request.preview).toMatchObject({
@@ -1115,9 +1134,9 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("rejecting a transferAoTokens request never calls the submitter", async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
+    presenter = createFakePresenter();
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "should-not-be-called" });
-    const handler = new ApprovalHandler(storage, keySession, windows, { submitTransfer });
+    const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
     await seedWallet(storage);
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
@@ -1132,8 +1151,8 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
       payload: new Uint8Array(),
       tags: [],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     await handler.resolveApproval({ requestId, approved: false });
     await expect(pending).rejects.toThrow(/rejected/i);
@@ -1142,9 +1161,9 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("a locked wallet is rejected before the submitter is ever reached", async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
+    presenter = createFakePresenter();
     const submitTransfer = vi.fn();
-    const handler = new ApprovalHandler(storage, keySession, windows, { submitTransfer });
+    const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
     await seedWallet(storage);
 
     const pending = handler.requestApproval({
@@ -1158,8 +1177,8 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
       payload: new Uint8Array(),
       tags: [],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const dappRejected = expect(pending).rejects.toThrow(/locked/i);
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
@@ -1169,8 +1188,8 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("without an injected AoTransferSubmitter, throws a named wiring error rather than silently succeeding", async () => {
     storage = createWatchableStorage();
-    windows = createFakeWindows();
-    const handler = new ApprovalHandler(storage, keySession, windows);
+    presenter = createFakePresenter();
+    const handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
@@ -1185,8 +1204,8 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
       payload: new Uint8Array(),
       tags: [],
     });
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const dappRejected = expect(pending).rejects.toThrow(/not wired to a transfer submitter/i);
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(
@@ -1213,14 +1232,14 @@ describe("ApprovalHandler: addToken approval", () => {
 
   it("previews the token and the address it joins, without needing a signing key", async () => {
     const storage = createWatchableStorage();
-    const windows = createFakeWindows();
+    const presenter = createFakePresenter();
     const addWatchedToken = vi.fn().mockResolvedValue(undefined);
-    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, undefined, { addWatchedToken });
+    const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });
     keySessionStore.clear();
 
     const pending = requestAddToken(handler);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    const requestId = extractRequestId(windows.opened[0]!);
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
 
     const request = await handler.getApproval({ requestId });
     expect(request.kind).toBe("addToken");
@@ -1239,13 +1258,13 @@ describe("ApprovalHandler: addToken approval", () => {
 
   it("adds nothing when rejected", async () => {
     const storage = createWatchableStorage();
-    const windows = createFakeWindows();
+    const presenter = createFakePresenter();
     const addWatchedToken = vi.fn();
-    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, undefined, { addWatchedToken });
+    const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });
 
     const pending = requestAddToken(handler);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
-    await handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: false });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: false });
 
     await expect(pending).rejects.toThrow(/rejected/);
     expect(addWatchedToken).not.toHaveBeenCalled();
@@ -1253,14 +1272,14 @@ describe("ApprovalHandler: addToken approval", () => {
 
   it("rejects the dApp with the error when the token can't be stored", async () => {
     const storage = createWatchableStorage();
-    const windows = createFakeWindows();
+    const presenter = createFakePresenter();
     const addWatchedToken = vi.fn().mockRejectedValue(new Error("No HyperBEAM peer configured."));
-    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, undefined, { addWatchedToken });
+    const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });
 
     const pending = requestAddToken(handler);
-    await vi.waitFor(() => expect(windows.opened.length).toBe(1));
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
     await expect(
-      handler.resolveApproval({ requestId: extractRequestId(windows.opened[0]!), approved: true }),
+      handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true }),
     ).rejects.toThrow(/No HyperBEAM peer/);
     await expect(pending).rejects.toThrow(/No HyperBEAM peer/);
   });

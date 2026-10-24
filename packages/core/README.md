@@ -58,7 +58,7 @@ It never goes the other way.
 Interfaces by which core reaches the host environment. None of them
 have an implementation in this package.
 
-- `StoragePort`, `RuntimePort`, `WindowPort` (approval windows),
+- `StoragePort`, `RuntimePort`, `ApprovalPresenterPort` (approval UI),
   `BadgePort`, `SessionKeyStorePort`, `DownloadPort`.
 
 Each one's real implementation lives in `apps/extension/src/adapters/*`.

@@ -25,7 +25,7 @@ describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
 
   it("get() forwards a valid local: key to storage.getItem", async () => {
     getItem.mockResolvedValue({ wallets: [] });
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
 
     const result = await storagePort.get("local:wallets");
 
@@ -35,7 +35,7 @@ describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
 
   it("get() forwards a valid session: key to storage.getItem", async () => {
     getItem.mockResolvedValue(null);
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
 
     await storagePort.get("session:unlocked-session");
 
@@ -43,7 +43,7 @@ describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
   });
 
   it("set() forwards to storage.setItem", async () => {
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
 
     await storagePort.set("local:wallets", { wallets: [1, 2] });
 
@@ -51,7 +51,7 @@ describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
   });
 
   it("remove() forwards to storage.removeItem", async () => {
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
 
     await storagePort.remove("local:wallets");
 
@@ -61,7 +61,7 @@ describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
   it("watch() forwards to storage.watch and returns the unsubscribe function", async () => {
     const unsubscribe = vi.fn();
     watch.mockReturnValue(unsubscribe);
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
     const cb = vi.fn();
 
     const result = storagePort.watch("local:wallets", cb);
@@ -74,13 +74,13 @@ describe("adapters/storage: WxtStoragePort (onboarding/unlock wiring)", () => {
   });
 
   it("rejects a key with no valid storage-area prefix", async () => {
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
 
     await expect(storagePort.get("wallets")).rejects.toThrow(/invalid storage key/i);
   });
 
   it("rejects a key with an unrecognized storage-area prefix", async () => {
-    const { storagePort } = await import("./storage");
+    const storagePort = new (await import("./storage")).WxtStoragePort();
 
     await expect(storagePort.get("bogus:wallets")).rejects.toThrow(/invalid storage key/i);
   });

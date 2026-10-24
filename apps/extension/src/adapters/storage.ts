@@ -47,5 +47,3 @@ export class WxtStoragePort implements StoragePort {
     return storage.watch<T>(assertStorageItemKey(key), (newValue) => cb(newValue));
   }
 }
-
-export const storagePort: StoragePort = new WxtStoragePort();

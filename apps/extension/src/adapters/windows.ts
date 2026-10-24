@@ -1,19 +1,12 @@
 import { browser } from "wxt/browser";
-import type { StoragePort, WindowPort } from "@gleam/core";
-import { storagePort } from "./storage";
+import type { ApprovalPresenterPort, StoragePort } from "@gleam/core";
 
 /**
- * Implements `WindowPort` over `browser.windows.*` (WXT's cross-browser
- * `webextension-polyfill`-shaped API surface) — the only place
- * `browser.windows` is reached in this repo, per the same hexagonal
- * boundary `storage.ts`/`runtime.ts` already follow. `core` never imports
- * this file; it only sees `WindowPort`.
+ * Implements `ApprovalPresenterPort` with one `browser.windows` popup per
+ * request (the `approval` entrypoint, ~390x640, focused). The user
+ * closing that window is the dismissal `onDismissed` reports.
  *
- * Every approval window opens as its own `type: "popup"` window, ~390x640,
- * focused — never inline in the extension popup, since a popup closes on
- * focus loss and would silently drop the pending request.
- *
- * Window tracking: `WindowPort` is keyed by `requestId`, but
+ * Window tracking: the port is keyed by `requestId`, but
  * `browser.windows` by numeric window id. The `requestId -> windowId` map
  * lives in `session:approvalWindows`, so a service worker that restarts
  * while an approval window is open can still close, focus, or notice the
@@ -21,20 +14,12 @@ import { storagePort } from "./storage";
  * promise chain, so concurrent creates and closes can't drop each other's
  * entries.
  */
+const APPROVAL_WINDOW_PATH = "/approval.html";
 const APPROVAL_WINDOW_WIDTH = 390;
 const APPROVAL_WINDOW_HEIGHT = 640;
 const APPROVAL_WINDOWS_KEY = "session:approvalWindows";
 
 type ApprovalWindowMap = Record<string, number>;
-
-function extractRequestId(url: string): string | null {
-  try {
-    const parsed = new URL(url, browser.runtime.getURL("/"));
-    return parsed.searchParams.get("requestId");
-  } catch {
-    return null;
-  }
-}
 
 function isApprovalWindowMap(value: unknown): value is ApprovalWindowMap {
   return (
@@ -45,12 +30,12 @@ function isApprovalWindowMap(value: unknown): value is ApprovalWindowMap {
   );
 }
 
-export class WxtWindowPort implements WindowPort {
+export class WindowApprovalPresenter implements ApprovalPresenterPort {
   private queue: Promise<unknown> = Promise.resolve();
-  private readonly closedListeners = new Set<(requestId: string) => void>();
+  private readonly dismissedListeners = new Set<(requestId: string) => void>();
   private listeningForRemovals = false;
 
-  constructor(private readonly storage: StoragePort = storagePort) {}
+  constructor(private readonly storage: StoragePort) {}
 
   private serialize<T>(task: () => Promise<T>): Promise<T> {
     const run = this.queue.then(task, task);
@@ -75,18 +60,17 @@ export class WxtWindowPort implements WindowPort {
     });
   }
 
-  async createApprovalWindow(url: string): Promise<void> {
+  async present(requestId: string): Promise<void> {
     const created = await browser.windows.create({
-      url,
+      url: `${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`,
       type: "popup",
       width: APPROVAL_WINDOW_WIDTH,
       height: APPROVAL_WINDOW_HEIGHT,
       focused: true,
     });
 
-    const requestId = extractRequestId(url);
     const windowId = created?.id;
-    if (requestId === null || typeof windowId !== "number") return;
+    if (typeof windowId !== "number") return;
     await this.serialize(async () => {
       const map = await this.loadMap();
       map[requestId] = windowId;
@@ -94,7 +78,7 @@ export class WxtWindowPort implements WindowPort {
     });
   }
 
-  async closeApprovalWindow(requestId: string): Promise<void> {
+  async dismiss(requestId: string): Promise<void> {
     // Untracked first, so the `onRemoved` this causes isn't reported as
     // the user closing the window.
     const windowId = await this.untrack(requestId);
@@ -106,7 +90,7 @@ export class WxtWindowPort implements WindowPort {
     }
   }
 
-  async focusApprovalWindow(requestId: string): Promise<void> {
+  async focus(requestId: string): Promise<void> {
     const windowId = (await this.loadMap())[requestId];
     if (windowId === undefined) return;
     try {
@@ -121,8 +105,8 @@ export class WxtWindowPort implements WindowPort {
    * the `onRemoved` event that wakes a stopped worker to listeners added
    * in its first turn.
    */
-  onApprovalWindowClosed(listener: (requestId: string) => void): () => void {
-    this.closedListeners.add(listener);
+  onDismissed(listener: (requestId: string) => void): () => void {
+    this.dismissedListeners.add(listener);
     if (!this.listeningForRemovals) {
       this.listeningForRemovals = true;
       browser.windows.onRemoved.addListener((windowId) => {
@@ -130,7 +114,7 @@ export class WxtWindowPort implements WindowPort {
       });
     }
     return () => {
-      this.closedListeners.delete(listener);
+      this.dismissedListeners.delete(listener);
     };
   }
 
@@ -144,8 +128,6 @@ export class WxtWindowPort implements WindowPort {
       return match;
     });
     if (requestId === undefined) return;
-    for (const listener of this.closedListeners) listener(requestId);
+    for (const listener of this.dismissedListeners) listener(requestId);
   }
 }
-
-export const windowPort: WindowPort = new WxtWindowPort();

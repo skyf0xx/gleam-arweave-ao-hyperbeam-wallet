@@ -30,6 +30,7 @@ import {
   type AddTokenApprovalPreview,
   type CollectibleRef,
   type ApprovalKind,
+  type ApprovalPresenterPort,
   type ApprovalPreview,
   type ApprovalRequest,
   type ConnectAppInfo,
@@ -47,7 +48,6 @@ import {
   type SigningApprovalPreview,
   type StoragePort,
   type UnsignedPayload,
-  type WindowPort,
 } from "@gleam/core";
 import {
   APPROVAL_MAX_MS,
@@ -118,7 +118,7 @@ import type { SubmitTransferRequest } from "./transfer";
  * resolution data itself is never only-in-memory.
  *
  * Closing the approval window with its own close button counts as a
- * rejection: `WindowPort.onApprovalWindowClosed` writes a rejected outcome
+ * rejection: `ApprovalPresenterPort.onDismissed` writes a rejected outcome
  * the same way `resolveApproval` does, so the dApp hears back at once
  * instead of after the review timeout (`reviewTimeoutMs`).
  *
@@ -149,7 +149,6 @@ function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
 /** How long past its review timeout a request can wait on a hardware device. */
 const DEVICE_GRACE_MS = APPROVAL_MAX_MS - APPROVAL_TIMEOUT_MS;
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
-const APPROVAL_WINDOW_PATH = "/approval.html";
 
 function isValidPermissionType(value: unknown): value is PermissionType {
   return typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value);
@@ -266,9 +265,9 @@ export interface AoTransferSigningInput {
  * approved `transferAoTokens` (or wallet `transfer`) request — injected
  * rather than imported directly, so `ApprovalHandler` doesn't need to know
  * how a transfer is actually submitted (mirrors the existing
- * `StoragePort`/`WindowPort` ports-style injection this class already
- * uses). Optional constructor param: every existing call site/test that
- * never exercises a transfer is unaffected.
+ * `StoragePort`/`ApprovalPresenterPort` ports-style injection this class
+ * already uses). Optional constructor param: every existing call
+ * site/test that never exercises a transfer is unaffected.
  */
 export interface AoTransferSubmitter {
   submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }>;
@@ -790,15 +789,15 @@ export class ApprovalHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly keySession: KeySession,
-    private readonly windows: WindowPort,
+    private readonly presenter: ApprovalPresenterPort,
     private readonly transfers?: TransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
     private readonly activeWalletId: () => Promise<string | null> = async () => null,
     private readonly tokens?: TokenWatchList,
     private readonly attestations?: ScanAttestationSubmitter,
   ) {
-    windows.onApprovalWindowClosed((requestId) => {
-      void this.rejectClosedWindow(requestId);
+    presenter.onDismissed((requestId) => {
+      void this.rejectDismissed(requestId);
     });
   }
 
@@ -905,9 +904,7 @@ export class ApprovalHandler {
     };
     await this.updatePending((pending) => [...pending, record]);
 
-    await this.windows.createApprovalWindow(
-      `${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`,
-    );
+    await this.presenter.present(requestId);
 
     return this.awaitResolution(requestId, input.kind);
   }
@@ -940,7 +937,7 @@ export class ApprovalHandler {
         }
         unwatch();
         void this.dropPending(requestId);
-        void this.windows.closeApprovalWindow(requestId);
+        void this.presenter.dismiss(requestId);
         reject(new ApprovalDeclinedError(TIMED_OUT, true));
       };
       expireAt(Date.now() + reviewTimeoutMs(kind));
@@ -967,7 +964,7 @@ export class ApprovalHandler {
    * Also drops a record left behind by a service worker that restarted
    * while its window was open, even though nothing is awaiting it.
    */
-  private async rejectClosedWindow(requestId: string): Promise<void> {
+  private async rejectDismissed(requestId: string): Promise<void> {
     const outcome: ApprovalOutcome = { approved: false, error: "The approval window was closed." };
     let rejected = false;
     await this.updatePending((pending) => {
@@ -1016,7 +1013,7 @@ export class ApprovalHandler {
       ),
     );
     await this.dropPending(requestId);
-    await this.windows.closeApprovalWindow(requestId);
+    await this.presenter.dismiss(requestId);
     throw new Error(TIMED_OUT);
   }
 
@@ -1108,7 +1105,7 @@ export class ApprovalHandler {
     if (outcome.approved && entry.request.kind === "scanAttestation") {
       return { shown: "scanAttestation", result: result as SiteAttestResponse };
     }
-    await this.windows.closeApprovalWindow(requestId);
+    await this.presenter.dismiss(requestId);
   }
 
   private async signsOnDevice(entry: PendingApprovalRecord): Promise<boolean> {
@@ -1462,7 +1459,7 @@ export class ApprovalHandler {
   private async focusPendingAttestation(): Promise<boolean> {
     const pending = (await this.loadPending()).find((entry) => entry.request.kind === "scanAttestation");
     if (!pending) return false;
-    await this.windows.focusApprovalWindow(pending.request.requestId);
+    await this.presenter.focus(pending.request.requestId);
     return true;
   }
 
@@ -1724,7 +1721,7 @@ export class ApprovalHandler {
     if (rejected.size === 0) return;
 
     await this.updatePending((current) => current.filter((entry) => !rejected.has(entry.request.requestId)));
-    await Promise.all([...rejected].map((requestId) => this.windows.closeApprovalWindow(requestId)));
+    await Promise.all([...rejected].map((requestId) => this.presenter.dismiss(requestId)));
   }
 
   /** Revokes a Grant — ends all access it covered immediately. */

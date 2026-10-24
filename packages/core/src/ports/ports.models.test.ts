@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
-import type { WindowPort } from "./windows";
+import type { ApprovalPresenterPort } from "./approval-presenter";
 import type { RuntimePort, RuntimeMessage } from "./runtime";
 
-describe("WindowPort", () => {
+describe("ApprovalPresenterPort", () => {
   it("is satisfiable by a plain in-memory implementation", async () => {
-    const opened: string[] = [];
-    const port: WindowPort = {
-      async createApprovalWindow(url) {
-        opened.push(url);
+    const presented: string[] = [];
+    const port: ApprovalPresenterPort = {
+      async present(requestId) {
+        presented.push(requestId);
       },
-      async closeApprovalWindow() {},
-      async focusApprovalWindow() {},
-      onApprovalWindowClosed() {
+      async focus() {},
+      async dismiss() {},
+      onDismissed() {
         return () => {};
       },
     };
 
-    await port.createApprovalWindow("/approval.html?requestId=req-1");
-    expect(opened).toEqual(["/approval.html?requestId=req-1"]);
+    await port.present("req-1");
+    expect(presented).toEqual(["req-1"]);
   });
 });
 

@@ -36,7 +36,7 @@ import {
 } from "@gleam/messaging/src/page-protocol.ts";
 import { WxtStoragePort } from "@/src/adapters/storage";
 import { listenForKeyringConnections, sessionKeyStore } from "@/src/adapters/session-key-store";
-import { WxtWindowPort } from "@/src/adapters/windows";
+import { WindowApprovalPresenter } from "@/src/adapters/windows";
 import { restrictSessionStorageToTrustedContexts } from "@/src/adapters/session-access";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
 import { PasskeyHandler } from "@/src/handlers/passkey";
@@ -96,7 +96,7 @@ const extensionBaseUrl = browser.runtime.getURL("");
 void restrictSessionStorageToTrustedContexts();
 
 const storage = new WxtStoragePort();
-const windows = new WxtWindowPort(storage);
+const approvalPresenter = new WindowApprovalPresenter(storage);
 // The one session lock: every handler that touches unlocked keys gets this instance.
 const keySession = createKeySession({ sessionKeys: sessionKeyStore, storage });
 const { clearKeyCache, enforceAutoLock, getSigner, getStoredWallet, getWalletMethod, reconcileKeyring, withSessionLock } =
@@ -117,7 +117,7 @@ const contacts = new ContactsHandler(storage);
 const approval: ApprovalHandler = new ApprovalHandler(
   storage,
   keySession,
-  windows,
+  approvalPresenter,
   transfer,
   DEFAULT_BUNDLER_URL,
   async () => (await lifecycle.getState()).activeWalletId,
