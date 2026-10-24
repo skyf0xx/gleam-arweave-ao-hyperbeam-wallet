@@ -9,7 +9,7 @@ export { FileDropzone, type FileDropzoneProps } from "./primitives/file-dropzone
 export { RiskNotice, type RiskNoticeProps } from "./primitives/risk-notice";
 export { EmptyState, type EmptyStateProps } from "./primitives/empty-state";
 export { StatusDot, type StatusDotProps } from "./primitives/status-dot";
-export { AO_ICON_URL, AR_ICON_URL } from "./tokens/default-token-icons";
+export { AO_ICON_URL, AR_ICON_URL, GLEAM_POINTS_ICON_URL } from "./tokens/default-token-icons";
 export {
   DEFAULT_AO_PROCESS_ID,
   DEFAULT_AO_TOKEN,
