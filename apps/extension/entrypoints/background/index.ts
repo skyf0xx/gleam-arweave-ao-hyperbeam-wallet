@@ -53,6 +53,7 @@ import { SecurityPhraseHandler } from "@/src/handlers/security-phrase";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
 import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
+import { alarmTimer } from "@/src/adapters/timer";
 import { browserDownloads, watchDownloadHistory } from "@/src/adapters/downloads";
 import {
   clearKeyCache,
@@ -135,7 +136,7 @@ const approval: ApprovalHandler = new ApprovalHandler(
 // Advances locally-pending activity entries to confirmed on a background
 // interval, independent of any popup being open — see reads.ts's own
 // doc comment on registerActivityPromotionAlarm.
-registerActivityPromotionAlarm(reads);
+registerActivityPromotionAlarm(reads, alarmTimer);
 
 const points = new PointsHandler({
   storage,
@@ -151,7 +152,7 @@ const points = new PointsHandler({
   },
   badge: actionBadge,
 });
-registerPointsHeartbeatAlarm(points);
+registerPointsHeartbeatAlarm(points, alarmTimer);
 
 const announcements = new AnnouncementsHandler({ storage });
 const reviewPrompt = new ReviewPromptHandler({ storage });

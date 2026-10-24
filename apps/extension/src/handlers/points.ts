@@ -1,4 +1,3 @@
-import { browser } from "wxt/browser";
 import {
   bytesToBase64Url,
   INVITE_REQUIRED_MESSAGE,
@@ -15,6 +14,7 @@ import {
   type PointsSharePrompt,
   type Signer,
   type StoragePort,
+  type TimerPort,
   type WalletMethod,
 } from "@gleam/core";
 import {
@@ -576,16 +576,10 @@ const POINTS_HEARTBEAT_ALARM_NAME = "points-heartbeat";
  * a browser that was closed through the scheduled time still sends a
  * heartbeat soon after it opens. `heartbeatIfDue` decides whether to
  * actually send.
- *
- * The alarm is created only if missing: re-creating it on every worker
- * start would push its first firing back each time.
  */
-export function registerPointsHeartbeatAlarm(handler: PointsHandler): void {
-  void browser.alarms.get(POINTS_HEARTBEAT_ALARM_NAME).then((existing) => {
-    if (!existing) browser.alarms.create(POINTS_HEARTBEAT_ALARM_NAME, { periodInMinutes: 6 * 60 });
-  });
-  browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === POINTS_HEARTBEAT_ALARM_NAME) void runHeartbeat(handler);
+export function registerPointsHeartbeatAlarm(handler: PointsHandler, timer: TimerPort): void {
+  timer.every(POINTS_HEARTBEAT_ALARM_NAME, 6 * 60, () => {
+    void runHeartbeat(handler);
   });
   void runHeartbeat(handler);
 }

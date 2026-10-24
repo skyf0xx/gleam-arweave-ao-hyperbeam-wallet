@@ -1,4 +1,3 @@
-import { browser } from "wxt/browser";
 import {
   discoverCollectibles,
   discoverTokens,
@@ -43,6 +42,7 @@ import type {
   TokenBalanceResult,
   TokenMetadata,
   TokenPrice,
+  TimerPort,
   TokenTransport,
   UserToken,
   UserTokensOptions,
@@ -1023,7 +1023,7 @@ export class ReadsHandler {
 }
 
 /**
- * Name of the `chrome.alarms` alarm this module registers — namespaced
+ * Name of the timer this module registers — namespaced
  * with the extension's own prefix convention (matches
  * `key-session.ts`/`wallet-lifecycle.ts`'s storage-key prefixes) so it
  * can't collide with an alarm another handler might register later.
@@ -1044,30 +1044,22 @@ export const ACTIVITY_PROMOTION_ALARM_NAME = "gleam:activityPromotion";
 const ACTIVITY_PROMOTION_INTERVAL_MINUTES = 1;
 
 /**
- * Registers the `chrome.alarms`-based interval that actively promotes a
+ * Registers the `TimerPort` interval that actively promotes a
  * locally-pending activity entry to confirmed once the gateway indexes
- * it — independent of any popup being open. Only the alarm registration
- * and the `chrome.alarms.onAlarm` wiring live here (both are `chrome.*`
- * APIs, which `apps/extension/**` is allowed to use, unlike
- * `packages/core`, which must stay pure); all the actual
- * promotion/merge logic is `ReadsHandler.promotePendingActivity`, reusing
+ * it — independent of any popup being open. Only the timer registration
+ * lives here; all the actual promotion/merge logic is `ReadsHandler.promotePendingActivity`, reusing
  * the existing `mergeActivity`-backed `getActivity` path rather than
  * duplicating it.
  *
  * Call once from the background entrypoint with a `ReadsHandler`
  * instance, e.g.: `registerActivityPromotionAlarm(new
- * ReadsHandler(storage))`. Errors from an individual address's promotion
+ * ReadsHandler(storage), timer)`. Errors from an individual address's promotion
  * check are caught and logged per-address so one failing gateway/address
  * never blocks promotion for the wallet's other tracked addresses on the
  * same tick.
  */
-export function registerActivityPromotionAlarm(handler: ReadsHandler): void {
-  browser.alarms.create(ACTIVITY_PROMOTION_ALARM_NAME, {
-    periodInMinutes: ACTIVITY_PROMOTION_INTERVAL_MINUTES,
-  });
-
-  browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name !== ACTIVITY_PROMOTION_ALARM_NAME) return;
+export function registerActivityPromotionAlarm(handler: ReadsHandler, timer: TimerPort): void {
+  timer.every(ACTIVITY_PROMOTION_ALARM_NAME, ACTIVITY_PROMOTION_INTERVAL_MINUTES, () => {
     void runActivityPromotionTick(handler);
   });
 }

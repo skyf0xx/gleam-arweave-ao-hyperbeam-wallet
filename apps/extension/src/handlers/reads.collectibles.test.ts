@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StoragePort } from "@gleam/core";
-
-vi.mock("wxt/browser", () => ({ browser: { alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } } } }));
-
-const { ReadsHandler } = await import("./reads");
+import { ReadsHandler } from "./reads";
 
 const ADDRESS = "W".repeat(43);
 const ASSET = "A".repeat(43);

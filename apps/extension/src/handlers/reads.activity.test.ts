@@ -1,22 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { StoragePort } from "@gleam/core";
-
-const alarmsCreate = vi.fn();
-let onAlarmListener: ((alarm: { name: string }) => void) | undefined;
-const alarmsAddListener = vi.fn((listener: (alarm: { name: string }) => void) => {
-  onAlarmListener = listener;
-});
-
-vi.mock("wxt/browser", () => ({
-  browser: {
-    alarms: {
-      create: alarmsCreate,
-      onAlarm: { addListener: alarmsAddListener },
-    },
-  },
-}));
-
-const { ReadsHandler, ACTIVITY_PROMOTION_ALARM_NAME, registerActivityPromotionAlarm } = await import("./reads");
+import { ReadsHandler, ACTIVITY_PROMOTION_ALARM_NAME, registerActivityPromotionAlarm } from "./reads";
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -1230,7 +1214,7 @@ describe("ReadsHandler: promotePendingActivity", () => {
 });
 
 describe("registerActivityPromotionAlarm", () => {
-  it("creates the named alarm and advances a pending entry to confirmed when it fires", async () => {
+  it("schedules the named timer and advances a pending entry to confirmed when it fires", async () => {
     const storage = createFakeStorage();
     await storage.set("local:wallets", [
       { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
@@ -1264,14 +1248,15 @@ describe("registerActivityPromotionAlarm", () => {
     })) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
-    registerActivityPromotionAlarm(handler);
+    let tick: (() => void) | undefined;
+    const every = vi.fn((_name: string, _periodMinutes: number, run: () => void) => {
+      tick = run;
+    });
+    registerActivityPromotionAlarm(handler, { every });
 
-    expect(alarmsCreate).toHaveBeenCalledWith(
-      ACTIVITY_PROMOTION_ALARM_NAME,
-      expect.objectContaining({ periodInMinutes: expect.any(Number) }),
-    );
+    expect(every).toHaveBeenCalledWith(ACTIVITY_PROMOTION_ALARM_NAME, 1, expect.any(Function));
 
-    onAlarmListener?.({ name: ACTIVITY_PROMOTION_ALARM_NAME });
+    tick?.();
     await vi.waitFor(async () => {
       const updatedLog = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
       expect(updatedLog?.find((e) => e.txId === "tx-pending")?.status).toBe("confirmed");
