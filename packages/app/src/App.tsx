@@ -58,7 +58,7 @@ import { sitePageUrl } from "@gleam/core";
  * The `RuntimePort` comes from `AppPlatform.runtime`; the `runtime` prop
  * replaces it, which tests use to stub the background.
  */
-export type AppLayout = "popup" | "sidepanel" | "approval";
+export type AppLayout = "popup" | "sidepanel" | "phone";
 
 export interface AppProps {
   layout: AppLayout;

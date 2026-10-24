@@ -23,4 +23,12 @@ describe("scaffold: App shell", () => {
     });
     expect(container.querySelector('[data-layout="sidepanel"]')).toBeTruthy();
   });
+
+  it("mounts with the phone layout", async () => {
+    let container!: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<App layout="phone" />));
+    });
+    expect(container.querySelector('[data-layout="phone"]')).toBeTruthy();
+  });
 });

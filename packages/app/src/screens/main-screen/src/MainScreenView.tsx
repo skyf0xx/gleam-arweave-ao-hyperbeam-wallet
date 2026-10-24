@@ -540,7 +540,7 @@ export function MainScreenView({
         />
       ) : null}
 
-      <div className="sticky top-0 z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
+      <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
         {headerCollapsed ? (
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
@@ -686,8 +686,8 @@ export function MainScreenView({
         ref={listSectionRef}
         className={`px-6 pb-6 ${
           listDocked
-            ? "gleam-dock-in fixed inset-x-0 bottom-0 top-16 z-20 overflow-y-auto bg-background"
-            : "min-h-[calc(100vh-4rem)]"
+            ? "gleam-dock-in fixed inset-x-0 bottom-0 top-[calc(4rem+var(--inset-top))] z-20 mx-auto max-w-[var(--content-max)] overflow-y-auto bg-background"
+            : "min-h-[calc(100dvh-4rem)]"
         }`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
       >
