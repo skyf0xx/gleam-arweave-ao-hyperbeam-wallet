@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { fakeAppPlatform, renderWithPlatform as render } from "@/src/app-platform/testing";
 import type { PasskeyStatus, RuntimePort } from "@gleam/core";
 import { UnlockView } from "./UnlockView";
 
@@ -82,21 +83,16 @@ describe("UnlockView with a passkey", () => {
   });
 
   it("hands the prompt to the passkey window from the action popup", async () => {
-    const openPasskeyWindow = vi.fn(async () => undefined);
+    const openPasskeyWindow = vi.fn<(mode: "setup" | "unlock") => Promise<void>>(async () => undefined);
     const runtime = runtimeWith({ getPasskeyStatus: () => ENROLLED });
     render(
-      <UnlockView
-        runtime={runtime}
-        onUnlocked={vi.fn()}
-        onResetComplete={vi.fn()}
-        passkeyMode="window"
-        openPasskeyWindow={openPasskeyWindow}
-      />,
+      <UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />,
+      fakeAppPlatform({ unlock: { passkeyMode: "window", openPasskeyWindow } }),
     );
 
     fireEvent.click(await screen.findByRole("button", { name: /unlock with passkey/i }));
 
-    await waitFor(() => expect(openPasskeyWindow).toHaveBeenCalledOnce());
+    await waitFor(() => expect(openPasskeyWindow).toHaveBeenCalledExactlyOnceWith("unlock"));
     expect(get).not.toHaveBeenCalled();
   });
 

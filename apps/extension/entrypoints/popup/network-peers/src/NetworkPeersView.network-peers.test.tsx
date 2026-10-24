@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { NetworkSettings, RuntimePort } from "@gleam/core";
+import type { ReactElement } from "react";
+import { fakeAppPlatform, renderWithPlatform } from "@/src/app-platform/testing";
 import { NetworkPeersView } from "./NetworkPeersView";
 
 const { permissionsRequest, permissionsContains, sessionStore } = vi.hoisted(() => ({
@@ -9,22 +11,19 @@ const { permissionsRequest, permissionsContains, sessionStore } = vi.hoisted(() 
   sessionStore: new Map<string, unknown>(),
 }));
 
-vi.mock("wxt/browser", () => ({
-  browser: {
-    permissions: { request: permissionsRequest, contains: permissionsContains },
-    storage: {
-      session: {
-        get: vi.fn(async (key: string) => ({ [key]: sessionStore.get(key) })),
-        set: vi.fn(async (items: Record<string, unknown>) => {
-          for (const [key, value] of Object.entries(items)) sessionStore.set(key, value);
-        }),
-        remove: vi.fn(async (key: string) => {
-          sessionStore.delete(key);
-        }),
-      },
+const platform = fakeAppPlatform({
+  hostPermissions: { request: permissionsRequest, contains: permissionsContains },
+  ephemeralState: {
+    get: async (key) => sessionStore.get(key),
+    set: async (key, value) => {
+      sessionStore.set(key, value);
+    },
+    remove: async (key) => {
+      sessionStore.delete(key);
     },
   },
-}));
+});
+const render = (ui: ReactElement) => renderWithPlatform(ui, platform);
 
 afterEach(() => {
   cleanup();
@@ -81,7 +80,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
+      expect(permissionsRequest).toHaveBeenCalledWith(["https://ar-io.example.net/*"]),
     );
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("https://ar-io.example.net/info", { method: "GET" }),
@@ -137,7 +136,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
     await waitFor(() =>
-      expect(permissionsContains).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
+      expect(permissionsContains).toHaveBeenCalledWith(["https://ar-io.example.net/*"]),
     );
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
@@ -158,7 +157,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
     await waitFor(() =>
-      expect(permissionsContains).toHaveBeenCalledWith({ origins: ["https://ar-io.example.net/*"] }),
+      expect(permissionsContains).toHaveBeenCalledWith(["https://ar-io.example.net/*"]),
     );
     await waitFor(() =>
       expect((screen.getByPlaceholderText("https://arweave.net") as HTMLInputElement).value).toBe(
@@ -367,7 +366,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
-      expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://new-peer.example.com/*"] }),
+      expect(permissionsRequest).toHaveBeenCalledWith(["https://new-peer.example.com/*"]),
     );
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
@@ -393,7 +392,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
-      expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://denied-peer.example.com/*"] }),
+      expect(permissionsRequest).toHaveBeenCalledWith(["https://denied-peer.example.com/*"]),
     );
     await waitFor(() =>
       expect(screen.getByText("Permission denied for that origin — the peer was not added.")).toBeTruthy(),

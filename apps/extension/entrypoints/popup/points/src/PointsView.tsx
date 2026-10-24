@@ -15,6 +15,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { inviteLinkFor, invitesRemainingLine } from "@/src/points-share";
 import { FoundingGate } from "../../onboarding/src/FoundingGate";
+import { usePlatform } from "@/src/app-platform/context";
 import { gleamUrl, howItWorksUrl, JoinNote, scanUrl } from "./JoinNote";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
@@ -394,6 +395,7 @@ function Reward({ children }: { children: ReactNode }) {
  * and a confirmed vulnerability still earns from the bounty pool.
  */
 function ReviewItem({ runtime }: { runtime: RuntimePort }) {
+  const { version } = usePlatform().buildInfo;
   const stats = useScanStats(runtime);
   const placesLeft = stats.data?.paidPlacesLeft ?? null;
   const rewardAtomic = stats.data?.rewardAtomic ?? null;
@@ -423,7 +425,7 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
         ) : null}
       </div>
       <Button asChild variant="secondary" size="sm" className="self-start">
-        <a href={`${scanUrl()}#review`} target="_blank" rel="noreferrer">
+        <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer">
           Start a review
           <span aria-hidden="true">↗</span>
         </a>
@@ -444,6 +446,7 @@ function AboutPoints({
   className?: string;
   children?: ReactNode;
 }) {
+  const { version } = usePlatform().buildInfo;
   const [open, setOpen] = useState(false);
 
   return (
@@ -462,12 +465,12 @@ function AboutPoints({
         <div id="points-about" className="flex w-full flex-col gap-4">
           <ul className="flex flex-col gap-6">
             <AboutLink
-              href={howItWorksUrl()}
+              href={howItWorksUrl(version)}
               title="How to earn points"
               detail="Rates, invites and the rules"
             />
             <AboutLink
-              href={gleamUrl()}
+              href={gleamUrl(version)}
               title="The future of Gleam"
               detail="What your points will become"
             />

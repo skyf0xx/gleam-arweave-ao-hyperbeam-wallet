@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState } from "react";
-import { browser } from "wxt/browser";
+import { usePlatform } from "@/src/app-platform/context";
 import type {
   AutoLockTimeout,
   HeadlineBalance,
@@ -81,6 +81,7 @@ export function SettingsHomeView({
   // Upload row is disabled below; onOpenUpload stays in the prop contract
   // so re-enabling it is a one-line change.
   void onOpenUpload;
+  const { version } = usePlatform().buildInfo;
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
@@ -216,7 +217,7 @@ export function SettingsHomeView({
               <FeedbackCard onClick={onOpenFeedback} />
               <SourceLink />
             </div>
-            <AboutBuild runtime={runtime} version={browser.runtime.getManifest().version} />
+            <AboutBuild runtime={runtime} version={version} />
           </OptionSection>
         </div>
       </div>

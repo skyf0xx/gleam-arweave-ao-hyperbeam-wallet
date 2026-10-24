@@ -6,7 +6,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
-import { browser } from "wxt/browser";
+import { usePlatform } from "@/src/app-platform/context";
 import { sitePageUrl } from "@/src/site-pages";
 
 const X_PROFILE_URL = "https://x.com/gleam_wallet";
@@ -52,6 +52,7 @@ export interface FoundingGateProps {
 }
 
 export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGateProps) {
+  const { version } = usePlatform().buildInfo;
   const [code, setCode] = useState(initialUnlock?.code ?? "");
   const [verdict, setVerdict] = useState<Exclude<InviteRedeemResult, "ok"> | null>(
     initialUnlock && initialUnlock.result !== "ok" ? initialUnlock.result : null,
@@ -129,7 +130,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         <h1 className="text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">You&apos;re early.</h1>
         <p className="text-body text-muted">
           Members are earning{" "}
-          <EarningWord href={sitePageUrl("gleam", browser.runtime.getManifest().version)} />
+          <EarningWord href={sitePageUrl("gleam", version)} />
         </p>
       </div>
 

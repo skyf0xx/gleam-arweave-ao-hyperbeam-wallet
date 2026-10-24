@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
+import { renderWithPlatform as render } from "@/src/app-platform/testing";
 import type { DisplaySettings, LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SettingsHomeView } from "./SettingsHomeView";
-
-vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
 afterEach(() => {
   cleanup();

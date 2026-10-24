@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
+import { renderWithPlatform as render } from "@/src/app-platform/testing";
 import App from "./App";
 
 afterEach(() => {

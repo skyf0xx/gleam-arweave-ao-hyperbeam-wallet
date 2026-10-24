@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
+import type { PasskeyWindowMode } from "@/src/app-platform/types";
 
-export type PasskeyWindowMode = "setup" | "unlock";
 
 const PASSKEY_WINDOW_WIDTH = 390;
 const PASSKEY_WINDOW_HEIGHT = 640;

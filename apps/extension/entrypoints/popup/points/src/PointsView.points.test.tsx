@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { renderWithPlatform as render } from "@/src/app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PointsMembership, PointsScores, RuntimePort, WalletSummary } from "@gleam/core";
 import { PointsTokenRow } from "./PointsTokenRow";
 import { PointsView } from "./PointsView";
-
-vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
 const POINTS_URL = "https://gleamwallet.app/points.html?v=1.2.3";
 const GLEAM_URL = "https://gleamwallet.app/gleam.html?v=1.2.3";

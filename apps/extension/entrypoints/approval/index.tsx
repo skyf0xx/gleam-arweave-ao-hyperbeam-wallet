@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@gleam/ui/src/tokens/theme.css";
+import { PlatformProvider } from "@/src/app-platform/context";
+import { createExtensionAppPlatform } from "@/src/adapters/app-platform";
 import { ApprovalRoot } from "./src/ApprovalRoot";
 
 /**
@@ -15,8 +17,12 @@ import { ApprovalRoot } from "./src/ApprovalRoot";
  */
 const requestId = new URLSearchParams(location.search).get("requestId")?.trim() ?? null;
 
+const platform = createExtensionAppPlatform("window");
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ApprovalRoot requestId={requestId} />
+    <PlatformProvider platform={platform}>
+      <ApprovalRoot requestId={requestId} />
+    </PlatformProvider>
   </React.StrictMode>,
 );

@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { renderWithPlatform as render } from "@/src/app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { InviteUnlock, RuntimePort } from "@gleam/core";
 import { GatedOnboarding } from "./GatedOnboarding";
-
-vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
 afterEach(() => {
   cleanup();

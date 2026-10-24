@@ -1,19 +1,19 @@
-import { browser } from "wxt/browser";
+import { usePlatform } from "@/src/app-platform/context";
 import { sitePageUrl } from "@/src/site-pages";
 
 /** points.html, which drops its install CTAs for a visitor the extension sent (?v=). */
-export function howItWorksUrl(): string {
-  return sitePageUrl("points", browser.runtime.getManifest().version);
+export function howItWorksUrl(version: string): string {
+  return sitePageUrl("points", version);
 }
 
 /** gleam.html, what points convert to; it too drops its install CTAs for ?v= visitors. */
-export function gleamUrl(): string {
-  return sitePageUrl("gleam", browser.runtime.getManifest().version);
+export function gleamUrl(version: string): string {
+  return sitePageUrl("gleam", version);
 }
 
 /** scan.html, where a member hands their AI agent the steps to audit Gleam for points. */
-export function scanUrl(): string {
-  return sitePageUrl("scan", browser.runtime.getManifest().version);
+export function scanUrl(version: string): string {
+  return sitePageUrl("scan", version);
 }
 
 /**
@@ -21,13 +21,14 @@ export function scanUrl(): string {
  * Points screen drops the link because its About section carries it.
  */
 export function JoinNote({ withLink = true }: { withLink?: boolean }) {
+  const { version } = usePlatform().buildInfo;
   return (
     <p className="text-center text-caption text-faint">
       Joining links this wallet's address to this browser on the Gleam Points server.
       {withLink ? (
         <>
           {" "}
-          <a href={howItWorksUrl()} target="_blank" rel="noreferrer" className="underline hover:text-muted">
+          <a href={howItWorksUrl(version)} target="_blank" rel="noreferrer" className="underline hover:text-muted">
             How to earn points
           </a>
         </>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { browser } from "wxt/browser";
+import { usePlatform } from "@/src/app-platform/context";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
@@ -74,6 +74,7 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
  * complaint rather than praise.
  */
 function ReviewPrompt({ onAnswer, className }: { onAnswer: () => void; className: string }) {
+  const { version } = usePlatform().buildInfo;
   return (
     <div className={cn(className, "gap-3 pb-3.5")}>
       <span className="flex flex-col gap-0.5">
@@ -87,7 +88,7 @@ function ReviewPrompt({ onAnswer, className }: { onAnswer: () => void; className
           </a>
         </Button>
         <a
-          href={sitePageUrl("feedback", browser.runtime.getManifest().version)}
+          href={sitePageUrl("feedback", version)}
           target="_blank"
           rel="noreferrer"
           onClick={onAnswer}

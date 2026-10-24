@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithPlatform as render } from "@/src/app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { INVITE_REQUIRED_MESSAGE, type PointsScores, type PointsWalletScore, type RuntimePort } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
 import type { ClaimPhase } from "./ClaimStep";
-
-vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.2.3" }) } } }));
 
 afterEach(cleanup);
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { browser } from "wxt/browser";
+import { usePlatform } from "@/src/app-platform/context";
+import type { EphemeralStatePort } from "@/src/app-platform/types";
 import { DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
 import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
@@ -109,10 +110,9 @@ interface PendingNetworkEdit {
 
 const PENDING_EDIT_KEY = "session:pendingNetworkEdit";
 
-async function loadPendingEdit(): Promise<PendingNetworkEdit | null> {
+async function loadPendingEdit(store: EphemeralStatePort): Promise<PendingNetworkEdit | null> {
   try {
-    const result = await browser.storage.session.get(PENDING_EDIT_KEY);
-    const value = result[PENDING_EDIT_KEY] as { kind?: unknown; url?: unknown } | undefined;
+    const value = (await store.get(PENDING_EDIT_KEY)) as { kind?: unknown; url?: unknown } | undefined;
     if (
       value !== undefined &&
       value !== null &&
@@ -128,23 +128,41 @@ async function loadPendingEdit(): Promise<PendingNetworkEdit | null> {
   }
 }
 
-async function savePendingEdit(edit: PendingNetworkEdit): Promise<void> {
+async function savePendingEdit(store: EphemeralStatePort, edit: PendingNetworkEdit): Promise<void> {
   try {
-    await browser.storage.session.set({ [PENDING_EDIT_KEY]: edit });
+    await store.set(PENDING_EDIT_KEY, edit);
   } catch {
     // Best-effort — if this fails, the user just has to re-paste the URL.
   }
 }
 
-async function clearPendingEdit(): Promise<void> {
+async function clearPendingEdit(store: EphemeralStatePort): Promise<void> {
   try {
-    await browser.storage.session.remove(PENDING_EDIT_KEY);
+    await store.remove(PENDING_EDIT_KEY);
   } catch {
     // Nothing to clean up if this fails.
   }
 }
 
 export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
+  const { capabilities, hostPermissions, ephemeralState } = usePlatform();
+  // Without runtime host permissions every origin is already reachable.
+  const hasHostAccess = async (url: string): Promise<boolean> => {
+    if (!capabilities.hostPermissions) return true;
+    try {
+      return await hostPermissions.contains([peerOriginPattern(url)]);
+    } catch {
+      return false;
+    }
+  };
+  const requestHostAccess = async (url: string): Promise<boolean> => {
+    if (!capabilities.hostPermissions) return true;
+    try {
+      return await hostPermissions.request([peerOriginPattern(url)]);
+    } catch {
+      return false;
+    }
+  };
   const [state, setState] = useState<LoadState>({ settings: null, loading: true, error: null });
   const [saving, setSaving] = useState(false);
   const [addingPeer, setAddingPeer] = useState(false);
@@ -185,15 +203,10 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     resumedRef.current = true;
 
     void (async () => {
-      const pending = await loadPendingEdit();
+      const pending = await loadPendingEdit(ephemeralState);
       if (!pending) return;
 
-      let granted: boolean;
-      try {
-        granted = await browser.permissions.contains({ origins: [peerOriginPattern(pending.url)] });
-      } catch {
-        granted = false;
-      }
+      const granted = await hasHostAccess(pending.url);
 
       if (!granted) {
         if (pending.kind === "gateway") {
@@ -203,7 +216,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
           setNewPeerUrl(pending.url);
           setAddingPeer(true);
         }
-        await clearPendingEdit();
+        await clearPendingEdit(ephemeralState);
         return;
       }
 
@@ -228,7 +241,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
           await persist({ ...settings, peers });
         }
       }
-      await clearPendingEdit();
+      await clearPendingEdit(ephemeralState);
     })();
     // state.settings is read fresh inside the async closure via the outer
     // `state` reference at call time, so it isn't in the dependency array.
@@ -286,17 +299,12 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     // Saved before requesting permission: Chrome closes this popup the
     // instant its own prompt appears, so this is the only chance to record
     // what the user typed before a remount needs it back.
-    await savePendingEdit({ kind: "gateway", url: normalized });
+    await savePendingEdit(ephemeralState, { kind: "gateway", url: normalized });
 
-    let granted: boolean;
-    try {
-      granted = await browser.permissions.request({ origins: [peerOriginPattern(normalized)] });
-    } catch {
-      granted = false;
-    }
+    const granted = await requestHostAccess(normalized);
     if (!granted) {
       setGatewayError("Permission denied for that origin — the gateway was not changed.");
-      await clearPendingEdit();
+      await clearPendingEdit(ephemeralState);
       return;
     }
 
@@ -305,14 +313,14 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     setCheckingGateway(false);
     if (!reachable) {
       setGatewayError("That URL didn't answer as an Arweave gateway…");
-      await clearPendingEdit();
+      await clearPendingEdit(ephemeralState);
       return;
     }
 
     await persist({ ...state.settings, gatewayUrl: normalized });
     setEditingGateway(false);
     setGatewayError(null);
-    await clearPendingEdit();
+    await clearPendingEdit(ephemeralState);
   };
 
   const handleAddPeer = async () => {
@@ -332,17 +340,12 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return;
     }
 
-    await savePendingEdit({ kind: "peer", url: normalized });
+    await savePendingEdit(ephemeralState, { kind: "peer", url: normalized });
 
-    let granted: boolean;
-    try {
-      granted = await browser.permissions.request({ origins: [peerOriginPattern(normalized)] });
-    } catch {
-      granted = false;
-    }
+    const granted = await requestHostAccess(normalized);
     if (!granted) {
       setAddError("Permission denied for that origin — the peer was not added.");
-      await clearPendingEdit();
+      await clearPendingEdit(ephemeralState);
       return;
     }
 
@@ -351,7 +354,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     setNewPeerUrl("");
     setAddingPeer(false);
     setAddError(null);
-    await clearPendingEdit();
+    await clearPendingEdit(ephemeralState);
   };
 
   return (

@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithPlatform as render } from "@/src/app-platform/testing";
 import type { ApprovalRequest, RuntimePort, ScanAttestationApprovalPreview, WalletState } from "@gleam/core";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { ApprovalRoot } from "./ApprovalRoot";
-
-vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.4.0" }) } } }));
 
 /** Each flow crosses several async hops; the default 1s is too tight when the whole suite runs at once. */
 const SLOW = { timeout: 10_000 };

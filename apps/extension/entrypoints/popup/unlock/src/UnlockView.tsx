@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PasskeyStatus, RuntimePort, SecurityPhrase } from "@gleam/core";
 import { UnlockScreen, type PasskeyUnlockProps } from "./UnlockScreen";
+import { usePlatform } from "@/src/app-platform/context";
 import { ForgotPassword } from "./ForgotPassword";
 import { PasskeyError } from "@/src/passkey/webauthn";
 import { unlockWithPasskey } from "./passkey-unlock";
@@ -18,14 +19,6 @@ export interface UnlockViewProps {
   /** Called once the real `resetAllWallets` RPC call has resolved successfully. */
   onResetComplete: () => void;
   tagline?: string;
-  /**
-   * `window` hands the passkey prompt to the passkey window, for the
-   * action popup, which closes when the prompt takes focus. `inline` runs
-   * it here, for windows that stay open.
-   */
-  passkeyMode?: "inline" | "window";
-  /** Opens the passkey window. Injected so tests don't need `browser.windows`. */
-  openPasskeyWindow?: () => Promise<void>;
   /** Starts the passkey prompt as soon as the passkey is known, for the passkey window the user just asked for. */
   autoStartPasskey?: boolean;
 }
@@ -37,10 +30,9 @@ export function UnlockView({
   onUnlocked,
   onResetComplete,
   tagline,
-  passkeyMode = "inline",
-  openPasskeyWindow,
   autoStartPasskey = false,
 }: UnlockViewProps) {
+  const { unlock } = usePlatform();
   const [step, setStep] = useState<Step>({ kind: "unlock" });
   const [unlocking, setUnlocking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -55,8 +47,8 @@ export function UnlockView({
     setPasskeyBusy(true);
     setPasskeyNotice(undefined);
     try {
-      if (passkeyMode === "window" && openPasskeyWindow) {
-        await openPasskeyWindow();
+      if (unlock.passkeyMode === "window") {
+        await unlock.openPasskeyWindow("unlock");
         return;
       }
       await unlockWithPasskey(runtime, status);

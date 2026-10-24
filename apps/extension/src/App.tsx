@@ -26,10 +26,9 @@ import { DisplayCurrencyView } from "@/entrypoints/popup/display-currency/index.
 import { PointsView } from "@/entrypoints/popup/points/index.tsx";
 import { UploadView } from "@/entrypoints/popup/upload/index.tsx";
 import { UseGleamOnSiteView } from "@/entrypoints/popup/site-wallet/index.tsx";
-import { browser } from "wxt/browser";
+import { usePlatform } from "@/src/app-platform/context";
 import { FOUNDING_GATE } from "@/src/founding-gate";
 import { sitePageUrl } from "@/src/site-pages";
-import { openPasskeyWindow } from "@/src/passkey/open-window";
 
 /**
  * The one shared shell mounted from every surface (popup, sidepanel, and
@@ -122,6 +121,7 @@ function resolveActiveWallet(state: WalletState): WalletSummary | null {
 }
 
 export function App({ layout, runtime: runtimeProp }: AppProps) {
+  const platform = usePlatform();
   const [view, setView] = useState<TopView>("loading");
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [wallets, setWallets] = useState<WalletSummary[]>([]);
@@ -238,8 +238,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onUnlocked={() => void refresh(runtime)}
         onResetComplete={() => void refresh(runtime)}
-        passkeyMode={layout === "popup" ? "window" : "inline"}
-        openPasskeyWindow={() => openPasskeyWindow("unlock")}
       />
     );
   } else if (!wallet) {
@@ -339,7 +337,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
         onOpenUpload={() => setSubView({ kind: "upload" })}
         onOpenFeedback={() =>
-          window.open(sitePageUrl("feedback", browser.runtime.getManifest().version), "_blank", "noopener,noreferrer")
+          window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }
       />
     );
@@ -349,7 +347,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
-        onSetUpPasskey={() => openPasskeyWindow("setup")}
+        onSetUpPasskey={() => platform.unlock.openPasskeyWindow("setup")}
       />
     );
   } else if (subView.kind === "network-peers") {
