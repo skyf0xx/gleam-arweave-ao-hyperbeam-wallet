@@ -65,6 +65,10 @@
 5 packages/runtime/src/points-attest.ts
 5 packages/runtime/src/handlers/attest-errors.ts
 5 apps/extension/wxt.config.ts
+5 apps/mobile/capacitor.config.ts
+5 apps/mobile/index.html
+5 apps/mobile/ios/App/App/Info.plist
+5 apps/mobile/android/app/src/main/AndroidManifest.xml
 5 .github/
 5 pnpm-workspace.yaml
 5 pnpm-lock.yaml

@@ -147,6 +147,9 @@ export default tseslint.config(
       "**/.wxt/**",
       "**/node_modules/**",
       "**/.claude/worktrees/**",
+      // Generated native projects; `cap sync` copies the built bundle into them.
+      "apps/mobile/ios/**",
+      "apps/mobile/android/**",
     ],
   },
   js.configs.recommended,

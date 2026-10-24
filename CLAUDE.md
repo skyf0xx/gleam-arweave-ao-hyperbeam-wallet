@@ -51,6 +51,11 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `src/adapters/` implements the core and runtime ports and `AppPlatform`
   (`adapters/app-platform.ts`) on `chrome.*`; `src/hardware/` holds the
   Ledger and Keystone transports and the device signing panels.
+- `apps/mobile`: the Capacitor shell for iOS and Android (Vite + React,
+  `ios/` and `android/` native projects). `src/main.tsx` mounts
+  `@gleam/app` with `layout="phone"` and the shell's `AppPlatform`
+  (`src/app-platform.ts`). It loads only its bundled `dist/`: no
+  `server.url` and no live-update plugin (`capacitor.config.mobile.test.ts`).
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
@@ -113,15 +118,17 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
+pnpm mobile:build                          # app web bundle → apps/mobile/dist (mobile:ios / mobile:android sync and open the native project)
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, apps/extension, apps/points-api, scripts/scan
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, apps/extension, apps/mobile, apps/points-api, scripts/scan
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-nine projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
-pass. If a change touches signing, network or extension wiring, it also
-needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
+ten projects. A change is done when tests, tsc, eslint, `pnpm wxt:build`
+and `pnpm mobile:build` pass. If a change touches signing, network or
+extension wiring, it also needs a manual check in Chrome (load
+`.output/chrome-mv3` unpacked).
 
 ## Workflow
 

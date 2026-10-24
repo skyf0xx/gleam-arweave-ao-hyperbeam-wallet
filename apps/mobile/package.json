@@ -1,0 +1,31 @@
+{
+  "name": "@gleam/mobile",
+  "description": "Gleam - Arweave/AO wallet for iOS and Android",
+  "private": true,
+  "version": "1.30.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "ios": "vite build && cap sync ios && cap open ios",
+    "android": "vite build && cap sync android && cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@gleam/app": "workspace:*",
+    "@gleam/core": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "8.3.4"
+  }
+}

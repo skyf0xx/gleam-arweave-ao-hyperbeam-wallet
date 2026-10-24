@@ -62,6 +62,10 @@
 /packages/runtime/src/points-attest.ts                                     @skyf0xx
 /packages/runtime/src/handlers/attest-errors.ts                            @skyf0xx
 /apps/extension/wxt.config.ts                                              @skyf0xx
+/apps/mobile/capacitor.config.ts                                           @skyf0xx
+/apps/mobile/index.html                                                    @skyf0xx
+/apps/mobile/ios/App/App/Info.plist                                        @skyf0xx
+/apps/mobile/android/app/src/main/AndroidManifest.xml                      @skyf0xx
 /.github/                                                                  @skyf0xx
 /pnpm-workspace.yaml                                                       @skyf0xx
 /pnpm-lock.yaml                                                            @skyf0xx

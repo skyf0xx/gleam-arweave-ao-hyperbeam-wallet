@@ -70,6 +70,7 @@ jobs:
       - run: pnpm tsc -p packages/app --noEmit
       - run: pnpm tsc -p packages/provider --noEmit
       - run: pnpm tsc -p apps/extension --noEmit
+      - run: pnpm tsc -p apps/mobile --noEmit
       - run: pnpm tsc -p apps/points-api --noEmit
       - run: pnpm tsc -p scripts/scan --noEmit
 
@@ -121,6 +122,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm wxt:build
+      - run: pnpm mobile:build
       # wxt:build passing doesn't mean the bundle runs; load it in Chromium.
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:smoke
