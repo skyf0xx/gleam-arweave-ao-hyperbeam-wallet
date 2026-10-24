@@ -22,6 +22,7 @@ import { validateSendAmount } from "../../activity/src/validateSendAmount";
 import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
+import { readRowVisibility, shownTokenLogo } from "../../../token-visibility";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -583,7 +584,7 @@ function ComposeStep({
         <ScreenHeader title="Token details" onBack={() => onShowInfo(false)} />
         <div className="px-5 py-5">
           <TokenInfoPanel
-            token={token}
+            token={token && { ...token, logoUrl: shownTokenLogo(token, readRowVisibility(wallet.address)) }}
             balanceDisplay={balanceDisplay}
             balanceValue={balanceValue}
             priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
@@ -1140,6 +1141,7 @@ function TokenPickerStep({
     (candidate) => candidate.processId === DEFAULT_AO_TOKEN.processId,
   );
   const aoToken = aoBalance ?? defaultAoTokenBalance(walletAddress);
+  const visibility = readRowVisibility(walletAddress);
   const otherTokenBalances = (balancesQuery.data?.tokenBalances ?? []).filter(
     (candidate) => candidate.processId !== DEFAULT_AO_TOKEN.processId,
   );
@@ -1191,7 +1193,7 @@ function TokenPickerStep({
           otherTokenBalances.map((candidate) => (
             <TokenRow
               key={candidate.processId}
-              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2, logoUrl: candidate.logoUrl }}
+              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2, logoUrl: shownTokenLogo(candidate, visibility) }}
               name={displayTicker(candidate.ticker)}
               amount={
                 candidate.available === false

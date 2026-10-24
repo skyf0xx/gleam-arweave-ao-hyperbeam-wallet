@@ -12,6 +12,7 @@ import type {
   WalletSummary,
   Winston,
 } from "@gleam/core";
+import { AO_ICON_URL, AR_ICON_URL } from "@gleam/ui";
 import { MainScreenView } from "./MainScreenView";
 
 afterEach(() => {
@@ -489,6 +490,19 @@ describe("MainScreenView hidden token rows", () => {
     expect(screen.getByRole("button", { name: "Hide Gleam Points" })).toBeTruthy();
   });
 
+  it("draws a discovered token's letters while it's hidden, and its logo once the user shows it", async () => {
+    const logoUrl = `https://arweave.net/${"L".repeat(43)}`;
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([{ ...DISCOVERED, logoUrl }]) }) });
+    const sources = () => Array.from(document.querySelectorAll("img")).map((img) => img.getAttribute("src"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden (1)" }));
+    expect(screen.getByText("FREE")).toBeTruthy();
+    expect(sources()).not.toContain(logoUrl);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show FREE" }));
+    await waitFor(() => expect(sources()).toContain(logoUrl));
+  });
+
   function setScrollY(value: number) {
     Object.defineProperty(window, "scrollY", { value, configurable: true });
     fireEvent.scroll(window);
@@ -609,6 +623,15 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
     expect(screen.getAllByText("AO").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0").length).toBe(2);
     expect(screen.queryByText(/Nothing here yet/i)).toBeNull();
+  });
+
+  it("renders the bundled AR and AO icons on the default rows", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWith({ arBalance: "0", tokenBalances: [] }) }) });
+
+    await waitFor(() => expect(screen.getByText("Arweave")).toBeTruthy());
+    const sources = Array.from(document.querySelectorAll("img")).map((img) => img.getAttribute("src"));
+    expect(sources).toContain(AR_ICON_URL);
+    expect(sources).toContain(AO_ICON_URL);
   });
 
   it("updates the AR and AO rows once balancesQuery.data loads with nonzero amounts", async () => {

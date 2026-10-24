@@ -482,6 +482,8 @@ describe("ReadsHandler: getTokenBalances", () => {
           }),
         };
       }
+      // The live-state logo read, which this token answers without a logo.
+      if (url.includes("~process@1.0/compute&")) return new Response(null);
       return { ok: true, status: 200, json: async () => "42" };
     }) as unknown as typeof fetch;
 

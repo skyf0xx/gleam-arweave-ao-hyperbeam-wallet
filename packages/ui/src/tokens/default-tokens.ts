@@ -1,4 +1,5 @@
 import { AO_TOKEN } from "@gleam/core";
+import { AO_ICON_URL, AR_ICON_URL } from "./default-token-icons";
 
 /**
  * The two tokens the Tokens tab always renders, regardless of what the
@@ -35,6 +36,8 @@ export interface DefaultTokenIdentity {
    * the string `"0"`, never `null`/`undefined`/omitted.
    */
   defaultDisplayAmount: "0";
+  /** Bundled mark for the row, so it never depends on a gateway. */
+  logoUrl: string;
 }
 
 export const DEFAULT_AR_TOKEN: DefaultTokenIdentity = {
@@ -43,6 +46,7 @@ export const DEFAULT_AR_TOKEN: DefaultTokenIdentity = {
   name: "Arweave",
   processId: null,
   defaultDisplayAmount: "0",
+  logoUrl: AR_ICON_URL,
 };
 
 export const DEFAULT_AO_TOKEN: DefaultTokenIdentity = {
@@ -51,6 +55,7 @@ export const DEFAULT_AO_TOKEN: DefaultTokenIdentity = {
   name: "AO",
   processId: DEFAULT_AO_PROCESS_ID,
   defaultDisplayAmount: "0",
+  logoUrl: AO_ICON_URL,
 };
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AO_ICON_URL, AR_ICON_URL } from "./default-token-icons";
 import { DEFAULT_AO_PROCESS_ID, DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN, DEFAULT_TOKENS } from "./default-tokens";
 
 describe("default-tokens", () => {
@@ -23,5 +24,12 @@ describe("default-tokens", () => {
   it("AR and AO tickers match the rows they identify", () => {
     expect(DEFAULT_AR_TOKEN.ticker).toBe("AR");
     expect(DEFAULT_AO_TOKEN.ticker).toBe("AO");
+  });
+
+  it("bundles an inline icon for each, so neither depends on a gateway", () => {
+    expect(DEFAULT_AR_TOKEN.logoUrl).toBe(AR_ICON_URL);
+    expect(DEFAULT_AO_TOKEN.logoUrl).toBe(AO_ICON_URL);
+    expect(decodeURIComponent(AR_ICON_URL.split(",")[1] ?? "")).toContain("<svg");
+    expect(AO_ICON_URL.startsWith("data:image/png;base64,")).toBe(true);
   });
 });

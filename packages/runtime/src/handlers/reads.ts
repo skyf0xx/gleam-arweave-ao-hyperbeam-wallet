@@ -3,6 +3,7 @@ import {
   discoverTokens,
   getTransferOutcome,
   readLegacyTokenInfo,
+  readTokenStateLogo,
   readTokenBalance,
 } from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
@@ -158,14 +159,17 @@ function hostOf(url: string): string {
   }
 }
 
-/** The row fields that come from metadata alone. The ticker falls back to the process id, as the popup expects. */
+/**
+ * The row fields that come from metadata alone. The ticker falls back to the process id, as the popup expects.
+ * A discovered token's logo is still the sender's claim; the popup draws it only once the user shows the row.
+ */
 function tokenIdentity(
   address: string,
   metadata: TokenMetadata,
   source: NonNullable<TokenBalance["source"]>,
   gatewayUrl: string,
 ): Omit<TokenBalance, "quantity"> {
-  const logoUrl = source === "discovered" ? null : tokenLogoUrl(gatewayUrl, metadata.logo);
+  const logoUrl = tokenLogoUrl(gatewayUrl, metadata.logo);
   return {
     address,
     processId: metadata.processId,
@@ -378,7 +382,8 @@ export class ReadsHandler {
    * no expiry once complete; spawn tags and a token's Info don't change.
    * Throws with a message the add-token preview can show as-is.
    */
-  private async loadTokenMetadata(processId: string, gatewayUrl: string): Promise<TokenMetadata> {
+  private async loadTokenMetadata(processId: string, settings: NetworkSettings): Promise<TokenMetadata> {
+    const gatewayUrl = settings.gatewayUrl;
     if (processId === DEFAULT_AO_PROCESS_ID) return AO_TOKEN_METADATA;
     const cacheKey = `${TOKEN_METADATA_KEY_PREFIX}${processId}`;
     const cached = await this.storage.get<unknown>(cacheKey);
@@ -410,13 +415,25 @@ export class ReadsHandler {
         return metadata;
       }
     }
+    if (metadata.logo === null && metadata.assetClass !== "unique") {
+      // Current `token@1.0` processes keep `logo` in live state, not in spawn tags.
+      // The host that serves this token's balance: arweave-scheduler tokens live on the gateway's node, legacy ones on the peer.
+      const stateHost = metadata.transport === "l1" ? gatewayUrl : settings.activePeerUrl;
+      try {
+        if (stateHost === null) return metadata;
+        metadata = { ...metadata, logo: await readTokenStateLogo(processId, stateHost) };
+      } catch {
+        // Not cached, so the next read asks again; the row just shows letters meanwhile.
+        return metadata;
+      }
+    }
     await this.storage.set(cacheKey, metadata);
     return metadata;
   }
 
-  private async tryTokenMetadata(processId: string, gatewayUrl: string): Promise<TokenMetadata | null> {
+  private async tryTokenMetadata(processId: string, settings: NetworkSettings): Promise<TokenMetadata | null> {
     try {
-      return await this.loadTokenMetadata(processId, gatewayUrl);
+      return await this.loadTokenMetadata(processId, settings);
     } catch {
       return null;
     }
@@ -434,7 +451,7 @@ export class ReadsHandler {
     settings: NetworkSettings,
     source: NonNullable<TokenBalance["source"]>,
   ): Promise<TokenBalance> {
-    const metadata = await this.tryTokenMetadata(processId, settings.gatewayUrl);
+    const metadata = await this.tryTokenMetadata(processId, settings);
     if (metadata === null) {
       return {
         address,
@@ -478,7 +495,7 @@ export class ReadsHandler {
    * served while a refresh runs in the background, so only a wallet's
    * first read waits on discovery, and for at most
    * `FIRST_DISCOVERY_WAIT_MS`. A failed discovery leaves the cache as it
-   * was.
+   * was, and a successful one adds to it.
    */
   private async discoveredProcessIds(address: string, settings: NetworkSettings): Promise<string[]> {
     const key = `${DISCOVERED_TOKENS_KEY_PREFIX}${address}`;
@@ -496,7 +513,10 @@ export class ReadsHandler {
               .filter((metadata) => metadata.transport === "l1" && metadata.denomination !== null)
               .map((metadata) => this.storage.set(`${TOKEN_METADATA_KEY_PREFIX}${metadata.processId}`, metadata)),
           );
-          const processIds = found.map((metadata) => metadata.processId);
+          // Each gateway scan can fail on its own and discovery still returns, so a token missing
+          // from this run may just be behind a flaky scan. Keep what earlier runs found; one the
+          // wallet no longer holds drops out of the list on its zero balance.
+          const processIds = [...new Set([...found.map((metadata) => metadata.processId), ...(cached?.processIds ?? [])])];
           await this.storage.set<DiscoveredTokensCache>(key, { savedAt: Date.now(), processIds });
           return processIds;
         } catch (error) {
@@ -534,7 +554,7 @@ export class ReadsHandler {
     }
     if (processId === req.address) throw new Error("That's your wallet address, not a token's process id.");
     const settings = await this.loadNetworkSettings();
-    const metadata = await this.loadTokenMetadata(processId, settings.gatewayUrl);
+    const metadata = await this.loadTokenMetadata(processId, settings);
     if (metadata.assetClass === "unique") {
       throw new Error("That's a collectible, not a token. Collectibles you hold show up in the Collectibles tab on their own.");
     }
@@ -647,7 +667,7 @@ export class ReadsHandler {
    */
   async tokenBalance(req: { address: string } & TokenBalanceRequest): Promise<TokenBalanceResult> {
     const settings = await this.loadNetworkSettings();
-    const metadata = await this.loadTokenMetadata(req.id, settings.gatewayUrl);
+    const metadata = await this.loadTokenMetadata(req.id, settings);
     return readTokenBalance({
       processId: req.id,
       address: req.address,
@@ -661,7 +681,7 @@ export class ReadsHandler {
   /** Read for a send: whether `processId` takes transfers as L1 transactions. */
   async tokenTransport(req: { processId: string }): Promise<TokenTransport> {
     const settings = await this.loadNetworkSettings();
-    return (await this.loadTokenMetadata(req.processId, settings.gatewayUrl)).transport;
+    return (await this.loadTokenMetadata(req.processId, settings)).transport;
   }
 
   /**
@@ -725,7 +745,7 @@ export class ReadsHandler {
     const fungible = new Set<string>();
     await Promise.all(
       tokens.map(async (id) => {
-        const metadata = await this.tryTokenMetadata(id, settings.gatewayUrl);
+        const metadata = await this.tryTokenMetadata(id, settings);
         if (metadata?.transport === "l1" && metadata.assetClass === "fungible") fungible.add(id);
       }),
     );
@@ -743,7 +763,7 @@ export class ReadsHandler {
     const fungible = new Set<string>();
     await Promise.all(
       ids.map(async (id) => {
-        const metadata = await this.tryTokenMetadata(id, settings.gatewayUrl);
+        const metadata = await this.tryTokenMetadata(id, settings);
         if (metadata?.assetClass === "fungible") fungible.add(id);
       }),
     );
