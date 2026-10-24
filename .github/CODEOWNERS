@@ -12,16 +12,17 @@
 /apps/extension/entrypoints/keyring/                                       @skyf0xx
 /apps/extension/src/adapters/offscreen-keyring.ts                          @skyf0xx
 /apps/extension/src/adapters/session-key-store.ts                          @skyf0xx
-/apps/extension/src/handlers/key-session.ts                                @skyf0xx
-/apps/extension/src/handlers/wallet-lifecycle.ts                           @skyf0xx
-/apps/extension/src/handlers/passkey.ts                                    @skyf0xx
+/packages/runtime/src/handlers/key-session.ts                              @skyf0xx
+/packages/runtime/src/handlers/wallet-lifecycle.ts                         @skyf0xx
+/packages/runtime/src/handlers/passkey.ts                                  @skyf0xx
 /apps/extension/src/passkey/                                               @skyf0xx
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
 /apps/extension/src/adapters/session-access.ts                             @skyf0xx
-/apps/extension/entrypoints/popup/onboarding/src/Import.tsx                @skyf0xx
-/apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx        @skyf0xx
-/apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx   @skyf0xx
+/packages/app/src/passkey/                                                 @skyf0xx
+/packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
+/packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx
+/packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx           @skyf0xx
 
 # 2 Signing
 /packages/core/src/ao/transfer.ts                                          @skyf0xx
@@ -30,29 +31,36 @@
 /packages/core/src/arweave/transaction.ts                                  @skyf0xx
 /packages/core/src/arweave/transfer.ts                                     @skyf0xx
 /packages/core/src/arweave/upload.ts                                       @skyf0xx
-/apps/extension/src/handlers/transfer.ts                                   @skyf0xx
-/apps/extension/src/handlers/upload.ts                                     @skyf0xx
+/packages/runtime/src/handlers/transfer.ts                                 @skyf0xx
+/packages/runtime/src/handlers/upload.ts                                   @skyf0xx
 /packages/core/src/hardware/                                               @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
-/apps/extension/src/handlers/points.ts                                     @skyf0xx
+/packages/runtime/src/handlers/points.ts                                   @skyf0xx
 
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
+/packages/runtime/src/create-runtime.ts                                    @skyf0xx
+/packages/runtime/src/dispatch/site.ts                                     @skyf0xx
+/packages/core/src/models/site-origin.ts                                   @skyf0xx
 /apps/extension/entrypoints/content/                                       @skyf0xx
 /apps/extension/entrypoints/provider/                                      @skyf0xx
-/apps/extension/src/handlers/provider-params.ts                            @skyf0xx
+/packages/provider/                                                        @skyf0xx
+/packages/runtime/src/handlers/provider-params.ts                          @skyf0xx
 /apps/extension/src/sender.ts                                              @skyf0xx
-/apps/extension/src/dispatch/methods.ts                                    @skyf0xx
+/packages/core/src/policy/signing-origin.ts                                @skyf0xx
+/packages/runtime/src/dispatch/methods.ts                                  @skyf0xx
 /packages/messaging/                                                       @skyf0xx
 
 # 4 What you see is what you sign
-/apps/extension/src/handlers/approval.ts                                   @skyf0xx
+/packages/runtime/src/handlers/approval.ts                                 @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
+/apps/extension/src/hardware/panels/                                       @skyf0xx
+/packages/app/src/approval/                                                @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
-/apps/extension/src/points-invite.ts                                       @skyf0xx
-/apps/extension/src/points-attest.ts                                       @skyf0xx
-/apps/extension/src/handlers/attest-errors.ts                              @skyf0xx
+/packages/runtime/src/points-invite.ts                                     @skyf0xx
+/packages/runtime/src/points-attest.ts                                     @skyf0xx
+/packages/runtime/src/handlers/attest-errors.ts                            @skyf0xx
 /apps/extension/wxt.config.ts                                              @skyf0xx
 /.github/                                                                  @skyf0xx
 /pnpm-workspace.yaml                                                       @skyf0xx

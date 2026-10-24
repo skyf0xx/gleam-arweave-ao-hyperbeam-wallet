@@ -1,3 +1,5 @@
+import type { CallerContext } from "@gleam/messaging/src/caller.ts";
+
 /**
  * The parts of `runtime.MessageSender` the background uses to decide who
  * sent a message. Declared locally so these checks stay plain functions
@@ -49,21 +51,24 @@ export function contentScriptOrigin(sender: MessageSenderLike | undefined, exten
   return urlOrigin;
 }
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+/**
+ * The `CallerContext` for a `runtime.onMessage` sender, or null when it is
+ * neither this extension's own page nor its top-frame content script on
+ * an http(s) page. An extension page is checked first, and
+ * `contentScriptOrigin` refuses one anyway, so no sender gets both tiers.
+ */
+export function callerContext(sender: MessageSenderLike | undefined, extensionBaseUrl: string): CallerContext | null {
+  if (isExtensionPageSender(sender, extensionBaseUrl)) return { tier: "extension" };
+  const origin = contentScriptOrigin(sender, extensionBaseUrl);
+  if (!origin) return null;
+  return { tier: "contentScript", origin, tabId: sender?.tab?.id };
+}
 
 /**
- * True when `origin` may connect or ask for a signature: https, or plain
- * http on a loopback host for local dApp development. On any other plain
- * http page an attacker on the network can inject script, so a request
- * from it can't be trusted to be the site's own.
+ * The `CallerContext` for a `runtime.onMessageExternal` sender, or null when
+ * Chrome reported no origin. Whether that origin is the Gleam site is the
+ * dispatcher's check (`dispatchSiteMessage`), not this one.
  */
-export function isSecureSigningOrigin(origin: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(origin);
-  } catch {
-    return false;
-  }
-  if (url.protocol === "https:") return true;
-  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+export function externalCallerContext(sender: MessageSenderLike | undefined): CallerContext | null {
+  return typeof sender?.origin === "string" ? { tier: "site", origin: sender.origin } : null;
 }

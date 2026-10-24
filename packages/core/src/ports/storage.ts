@@ -23,6 +23,16 @@
 export interface StoragePort {
   get<T>(key: string): Promise<T | null>;
   set<T>(key: string, value: T): Promise<void>;
+  /**
+   * Writes every entry in one atomic step: a reader or watcher sees all of
+   * them or none. All keys must share one area prefix (`local:` or
+   * `session:`); mixed areas reject before anything is written, since not
+   * every platform can commit across both areas atomically. A `null` or
+   * `undefined` value rejects too, before anything is written: `set` treats
+   * those as a removal, which a single atomic write can't express, so use
+   * `remove` to delete. An empty `entries` resolves without writing.
+   */
+  setMany(entries: Record<string, unknown>): Promise<void>;
   remove(key: string): Promise<void>;
   /**
    * Subscribes to changes on `key`, invoking `cb` with the new value (or

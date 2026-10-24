@@ -28,11 +28,12 @@ const SIGNER_IMPORT_MESSAGE =
 // `no-restricted-imports` reads only static `import`/`export … from`, so
 // this catches `import("…")` with a literal path against the same regex.
 const noDynamicImport = {
-  meta: { type: "problem", schema: [{ type: "object", properties: { regex: { type: "string" }, message: { type: "string" } } }] },
+  meta: {
+    type: "problem",
+    schema: { type: "array", items: { type: "object", properties: { regex: { type: "string" }, message: { type: "string" } } } },
+  },
   create(context) {
-    const { regex, message } = context.options[0] ?? {};
-    if (!regex) return {};
-    const re = new RegExp(regex);
+    const fences = context.options.map(({ regex, message }) => ({ re: new RegExp(regex), message }));
     return {
       ImportExpression(node) {
         const src = node.source;
@@ -42,7 +43,10 @@ const noDynamicImport = {
             : src.type === "TemplateLiteral" && src.expressions.length === 0
               ? src.quasis[0].value.cooked
               : null;
-        if (path !== null && re.test(path)) context.report({ node, message: `'${path}' import is restricted. ${message}` });
+        if (path === null) return;
+        for (const { re, message } of fences) {
+          if (re.test(path)) context.report({ node, message: `'${path}' import is restricted. ${message}` });
+        }
       },
     };
   },
@@ -52,6 +56,49 @@ const signerFence = (regex) => ({
   "no-restricted-imports": ["error", { patterns: [{ regex, message: SIGNER_IMPORT_MESSAGE }] }],
   "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
 });
+
+// `packages/runtime` runs in any shell (the extension's service worker, a
+// mobile app), so it reaches a platform only through `Platform`. Block the
+// shells' SDKs, both shells, their `@/` and `~/` aliases, and the extension
+// globals. `(^|/)apps/` also catches a relative climb into `apps/`.
+const RUNTIME_IMPORT = "^(wxt|@capacitor|@webext-core)(/|$)|(^|/)apps/(extension|mobile)(/|$)|^[@~]/";
+const RUNTIME_IMPORT_MESSAGE =
+  "packages/runtime is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `Platform`.";
+const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
+}));
+const runtimeFence = (...extraPatterns) => ({
+  "no-restricted-imports": [
+    "error",
+    { patterns: [...extraPatterns, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
+  ],
+  "no-restricted-globals": ["error", ...RUNTIME_GLOBALS],
+});
+
+// `packages/app` is every screen, and any shell mounts it, so like the
+// runtime it reaches a platform only through `AppPlatform`. The same SDKs,
+// shells, aliases and globals are blocked.
+const APP_IMPORT_MESSAGE =
+  "packages/app is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `AppPlatform`.";
+const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
+}));
+
+// `packages/provider` runs in the page's own world, where anything it
+// loads is reachable by the page, and any shell injects it. Beyond the
+// shell fence, it takes no wallet logic: nothing from core, runtime, app
+// or ui, and from messaging only the page wire contract. A relative climb
+// out of the package counts too.
+const PROVIDER_IMPORT =
+  "^@gleam/(core|runtime|app|ui)(/|$)|(^|/)packages/(core|runtime|app|ui|messaging)(/|$)|^(\\.\\./){2,}(core|runtime|app|ui|messaging)(/|$)|^@gleam/messaging(?!/src/page-protocol(\\.ts)?$)";
+const PROVIDER_IMPORT_MESSAGE =
+  "packages/provider is page-world code: no wxt, @capacitor, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
+const PROVIDER_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/provider never touches extension globals. Reach the wallet through `ProviderTransport`.",
+}));
 
 // Flat config replaces a rule's options wholesale when a later block sets
 // the same rule, so every block that sets `no-restricted-syntax` spreads
@@ -137,9 +184,9 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     ignores: [
       "**/*.test.{ts,tsx}",
-      "apps/extension/src/handlers/key-session.ts",
+      "packages/runtime/src/handlers/key-session.ts",
       // Caches the key on unlock/import/create, and decrypts it for export.
-      "apps/extension/src/handlers/wallet-lifecycle.ts",
+      "packages/runtime/src/handlers/wallet-lifecycle.ts",
       "packages/core/src/signer/**",
       // Validates and addresses keyfiles.
       "packages/core/src/keys/jwk.ts",
@@ -152,8 +199,10 @@ export default tseslint.config(
       "packages/core/src/ports/session-keys.ts",
       "packages/messaging/src/keyring-protocol.ts",
       "apps/extension/src/adapters/offscreen-keyring.ts",
+      // Conformance suites import throwaway keys into a `SessionKeyStorePort`.
+      "packages/runtime/testing/**",
       // Receives the exported keyfile to hand to the user.
-      "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
+      "packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx",
     ],
     rules: {
       "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_RAW_KEY],
@@ -167,8 +216,8 @@ export default tseslint.config(
     ignores: [
       "**/*.test.{ts,tsx}",
       "packages/core/src/signer/**",
-      "apps/extension/src/handlers/key-session.ts",
-      "apps/extension/src/handlers/wallet-lifecycle.ts",
+      "packages/runtime/src/handlers/key-session.ts",
+      "packages/runtime/src/handlers/wallet-lifecycle.ts",
       "apps/extension/src/keyring/server.ts",
       "apps/extension/src/adapters/offscreen-keyring.ts",
       "apps/extension/entrypoints/keyring/main.ts",
@@ -176,8 +225,92 @@ export default tseslint.config(
       "apps/points-api/src/test-signers.ts",
       // Gives tests the in-memory `Keyring` in place of the offscreen one.
       "vitest.setup.ts",
+      "packages/runtime/testing/**",
+      "apps/extension/src/adapters/offscreen-keyring.testing.ts",
     ],
     rules: signerFence(SIGNER_IMPORT),
+  },
+  {
+    // The runtime fence, signer fence included for the files the one above
+    // covers: a later block replaces a rule's options wholesale, so the
+    // signer pattern is repeated here, and the key session and lifecycle
+    // handler (which may import the signer) get the runtime fence alone.
+    files: ["packages/runtime/**/*.{ts,tsx}"],
+    rules: {
+      ...runtimeFence(),
+      "gleam/no-dynamic-import": ["error", { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }],
+    },
+  },
+  {
+    files: ["packages/runtime/**/*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      "packages/runtime/testing/**",
+      "packages/runtime/src/handlers/key-session.ts",
+      "packages/runtime/src/handlers/wallet-lifecycle.ts",
+    ],
+    rules: {
+      ...runtimeFence({ regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE }),
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    // The app fence. A later block replaces a rule's options wholesale, so
+    // the second block repeats it with the signer fence for non-test files.
+    files: ["packages/app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }] }],
+      "no-restricted-globals": ["error", ...APP_GLOBALS],
+      "gleam/no-dynamic-import": ["error", { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }],
+    },
+  },
+  {
+    files: ["packages/app/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+            { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    // The provider fence, signer fence included: a later block replaces a
+    // rule's options wholesale.
+    files: ["packages/provider/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+            { regex: RUNTIME_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+            { regex: PROVIDER_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+      "no-restricted-globals": ["error", ...PROVIDER_GLOBALS],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+        { regex: PROVIDER_IMPORT, message: PROVIDER_IMPORT_MESSAGE },
+      ],
+    },
   },
   {
     // From the top of `core/src`, `./signer` is the signer folder itself.

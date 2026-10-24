@@ -114,6 +114,16 @@ async function approved<T>(call: Promise<unknown>): Promise<{ result: T; request
   return { result: (await call) as T, request };
 }
 
+/** A key session over the same stores the background's was built on. */
+async function backgroundKeySession() {
+  const [{ createKeySession }, { sessionKeyStore }, { WxtStoragePort }] = await Promise.all([
+    import("@gleam/runtime/src/handlers/key-session.ts"),
+    import("@/src/adapters/session-key-store"),
+    import("@/src/adapters/storage"),
+  ]);
+  return createKeySession({ sessionKeys: sessionKeyStore, storage: new WxtStoragePort() });
+}
+
 beforeAll(async () => {
   jwk = await generateJWK();
   ADDRESS = await addressFromOwner(jwk.n);
@@ -140,8 +150,8 @@ beforeEach(async () => {
   await import("./index");
   const content = (await import("../content/index")).default;
   await content.main!({} as never);
-  const { GleamProvider } = await import("../provider/index");
-  wallet = new GleamProvider() as unknown as Wallet;
+  const { GleamProvider, createWindowMessageTransport } = await import("@gleam/provider");
+  wallet = new GleamProvider(createWindowMessageTransport(), "0.0.0") as unknown as Wallet;
 
   store.set("local:wallets", [
     { id: WALLET_ID, address: ADDRESS, name: "Main", method: "jwk", publicKey: jwk.n, createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
@@ -156,8 +166,8 @@ beforeEach(async () => {
     autoLockTimeout: "never",
     unlockedWalletIds: [WALLET_ID],
   });
-  const { cacheKey } = await import("@/src/handlers/key-session");
-  await cacheKey(WALLET_ID, jwk, ADDRESS);
+  const keySession = await backgroundKeySession();
+  await keySession.cacheKey(WALLET_ID, jwk, ADDRESS);
 });
 
 afterEach(() => {

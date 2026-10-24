@@ -1,0 +1,393 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  addressFromOwner,
+  bytesToBase64Url,
+  signPayloadWithSigner,
+  type ApprovalRequest,
+  type DeviceSigningRequest,
+  type JWKInterface,
+  type ScanAttestationApprovalPreview,
+  type StoragePort,
+  type ApprovalPresenterPort,
+} from "@gleam/core";
+import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
+import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/index.ts";
+import { attestationId, parseAttestation, type Attestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
+import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
+import { ApprovalDeclinedError, ApprovalHandler, type ScanAttestationSubmitter } from "./approval";
+import { createKeySession } from "./key-session";
+import type { OwnershipProof } from "./points";
+
+const keySessionStore = new Map<string, unknown>();
+
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
+    },
+    async set<T>(key: string, value: T) {
+      keySessionStore.set(key, value);
+    },
+    async setMany(entries: Record<string, unknown>) {
+      for (const [key, value] of Object.entries(entries)) keySessionStore.set(key, value);
+    },
+    async remove(key: string) {
+      keySessionStore.delete(key);
+    },
+    watch() {
+      return () => {};
+    },
+  },
+});
+const { cacheKey, clearKeyCache } = keySession;
+
+function createWatchableStorage(): StoragePort {
+  const store = new Map<string, unknown>();
+  const watchers = new Map<string, Set<(value: unknown) => void>>();
+  return {
+    async get<T>(key: string) {
+      return store.has(key) ? (store.get(key) as T) : null;
+    },
+    async set<T>(key: string, value: T) {
+      const stored: unknown = JSON.parse(JSON.stringify(value));
+      store.set(key, stored);
+      for (const cb of watchers.get(key) ?? []) cb(stored);
+    },
+    async setMany(entries: Record<string, unknown>) {
+      const stored = Object.entries(entries).map(([key, value]) => [key, JSON.parse(JSON.stringify(value)) as unknown] as const);
+      for (const [key, value] of stored) store.set(key, value);
+      for (const [key, value] of stored) for (const cb of watchers.get(key) ?? []) cb(value);
+    },
+    async remove(key: string) {
+      store.delete(key);
+      for (const cb of watchers.get(key) ?? []) cb(null);
+    },
+    watch<T>(key: string, cb: (value: T | null) => void) {
+      const set = watchers.get(key) ?? new Set();
+      set.add(cb as (value: unknown) => void);
+      watchers.set(key, set);
+      return () => {
+        watchers.get(key)?.delete(cb as (value: unknown) => void);
+      };
+    },
+  };
+}
+
+function createFakePresenter(): ApprovalPresenterPort & {
+  presented: string[];
+  dismissed: string[];
+  focused: string[];
+  /** Simulates the user dismissing the approval UI themselves. */
+  userDismisses(requestId: string): void;
+} {
+  const presented: string[] = [];
+  const dismissed: string[] = [];
+  const focused: string[] = [];
+  const listeners = new Set<(requestId: string) => void>();
+  return {
+    presented,
+    dismissed,
+    focused,
+    async present(requestId: string) {
+      presented.push(requestId);
+    },
+    async dismiss(requestId: string) {
+      dismissed.push(requestId);
+    },
+    async focus(requestId: string) {
+      focused.push(requestId);
+    },
+    onDismissed(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    userDismisses(requestId: string) {
+      for (const listener of listeners) listener(requestId);
+    },
+  };
+}
+
+
+const SITE = "https://gleamwallet.app";
+const KEYFILE_ID = "w-keyfile";
+const HW_ID = "w-keystone";
+
+const ATTESTATION: Attestation = {
+  release: "1.4.0",
+  commit: "0123456789abcdef0123456789abcdef01234567",
+  model: "claude-opus-5-5",
+  challenge: "q7Xh2mB9kLp4Wz0RtY6uVa",
+  answers: [
+    { file: "packages/core/src/vault/encryption.ts", symbol: "decrypt", line: 120, check: "Refuses a ciphertext whose tag doesn't verify." },
+    { file: "packages/runtime/src/handlers/provider-params.ts", symbol: "readTransaction", line: 212, check: "Rejects a transaction with an unknown format." },
+    { file: "packages/runtime/src/handlers/approval.ts", symbol: "ApprovalHandler.resolveApproval", line: 300, check: "Ignores a resolution for an expired request." },
+  ],
+  result: "pass",
+  report: "# Scan\n\n<script>alert(1)</script> Read the vault.\n",
+};
+
+function parsed(): ParsedAttestation {
+  const result = parseAttestation(ATTESTATION);
+  if (!result.ok) throw new Error("fixture is invalid");
+  return result.attestation;
+}
+
+const PAID: SiteAttestResponse = { ok: true, attestationId: "x", points: "5000000000000", paid: true, unpaidReason: null, paidPlacesLeft: 19 };
+
+let storage: StoragePort;
+let presenter: ReturnType<typeof createFakePresenter>;
+let submitter: { attest: ReturnType<typeof vi.fn>; submitAttestation: ReturnType<typeof vi.fn>; check: ReturnType<typeof vi.fn> };
+let handler: ApprovalHandler;
+let keyfileJwk: JWKInterface;
+let deviceJwk: JWKInterface;
+let message: string;
+
+beforeEach(async () => {
+  keySessionStore.clear();
+  keyfileJwk = await generateJWK();
+  deviceJwk = await generateJWK();
+  const wallets = [
+    {
+      id: KEYFILE_ID,
+      address: await addressFromOwner(keyfileJwk.n),
+      name: "Main",
+      method: "jwk",
+      publicKey: keyfileJwk.n,
+      createdAt: 0,
+      updatedAt: 0,
+      encryptedKeyfile: { version: 1, algorithm: "AES-GCM", kdf: "PBKDF2-HMAC-SHA256", iterations: 600000, salt: "s", iv: "i", ciphertext: "c" },
+    },
+    {
+      id: HW_ID,
+      address: await addressFromOwner(deviceJwk.n),
+      name: "Keystone",
+      method: "keystone",
+      publicKey: deviceJwk.n,
+      createdAt: 0,
+      updatedAt: 0,
+      backupConfirmedAt: null,
+      encryptedKeyfile: null,
+      device: { kind: "keystone", xfp: "12345678" },
+    },
+  ];
+  keySessionStore.set("local:wallets", wallets);
+  keySessionStore.set("session:unlockedSession", {
+    unlockedAt: Date.now(),
+    lastActivityAt: Date.now(),
+    autoLockTimeout: "never",
+    unlockedWalletIds: [KEYFILE_ID],
+  });
+  storage = createWatchableStorage();
+  await storage.set("local:wallets", wallets);
+  presenter = createFakePresenter();
+  submitter = { attest: vi.fn(async () => PAID), submitAttestation: vi.fn(async () => PAID), check: vi.fn(async () => ({ ok: true })) };
+  // The active wallet is the hardware one, so a test that signs with the
+  // keyfile proves the request keeps the wallet it was opened for.
+  handler = new ApprovalHandler(
+    storage,
+    keySession,
+    presenter,
+    undefined,
+    undefined,
+    async () => HW_ID,
+    undefined,
+    submitter as unknown as ScanAttestationSubmitter,
+  );
+  message = buildAttestMessage(ATTESTATION.release, await attestationId(parsed()));
+}, 60_000);
+
+afterEach(async () => {
+  await clearKeyCache();
+});
+
+async function open(walletId: string) {
+  const pending = handler.requestScanAttestation({ origin: SITE, walletId, address: "addr", attestation: parsed() });
+  pending.catch(() => {});
+  await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+  return { pending, requestId: presenter.presented[0]! };
+}
+
+describe("ApprovalHandler: scan attestations", () => {
+  it("shows the whole attestation, the attest message and the signing wallet", async () => {
+    const { requestId } = await open(KEYFILE_ID);
+
+    const request = await handler.getApproval({ requestId });
+
+    expect(request).toMatchObject({ kind: "scanAttestation", origin: SITE });
+    expect(request.preview).toEqual({
+      kind: "scanAttestation",
+      walletId: KEYFILE_ID,
+      address: "addr",
+      attestationId: await attestationId(parsed()),
+      message,
+      ...ATTESTATION,
+    } satisfies ScanAttestationApprovalPreview);
+  });
+
+  it("a keyfile signs through PointsHandler, and the window stays open to show the result", async () => {
+    await cacheKey(KEYFILE_ID, keyfileJwk, await addressFromOwner(keyfileJwk.n));
+    const { pending, requestId } = await open(KEYFILE_ID);
+
+    const shown = await handler.resolveApproval({ requestId, approved: true });
+
+    expect(shown).toEqual({ shown: "scanAttestation", result: PAID });
+    await expect(pending).resolves.toEqual(PAID);
+    expect(submitter.attest).toHaveBeenCalledWith({ walletId: KEYFILE_ID, attestation: ATTESTATION });
+    expect(presenter.dismissed).not.toContain(requestId);
+    await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
+  });
+
+  it("checks the pending attestation with the points API, and refuses to check anything else", async () => {
+    const { requestId } = await open(KEYFILE_ID);
+
+    await expect(handler.checkScanAttestation({ requestId })).resolves.toEqual({ ok: true });
+    expect(submitter.check).toHaveBeenCalledWith(ATTESTATION, await addressFromOwner(keyfileJwk.n));
+
+    submitter.check = vi.fn(async () => ({ ok: false, error: "The scan's challenge expired." }));
+    await expect(handler.checkScanAttestation({ requestId })).resolves.toEqual({ ok: false, error: "The scan's challenge expired." });
+    await expect(handler.checkScanAttestation({ requestId: "nope" })).rejects.toThrow(/No pending approval/);
+  });
+
+  it("a refusal from the points API is shown too, not thrown", async () => {
+    await cacheKey(KEYFILE_ID, keyfileJwk, await addressFromOwner(keyfileJwk.n));
+    const refused: SiteAttestResponse = { ok: false, code: "already_attested", error: "Already." };
+    submitter.attest.mockResolvedValueOnce(refused);
+    const { pending, requestId } = await open(KEYFILE_ID);
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).resolves.toEqual({ shown: "scanAttestation", result: refused });
+    await expect(pending).resolves.toEqual(refused);
+  });
+
+  it("a hardware wallet signs the ownership transaction for the attest message on the device", async () => {
+    const { pending, requestId } = await open(HW_ID);
+
+    const view = (await handler.resolveApproval({ requestId, approved: true })) as ApprovalRequest;
+    const device = view.device as DeviceSigningRequest;
+    expect(device.summaries).toEqual([{ kind: "transaction", recipient: await addressFromOwner(deviceJwk.n), quantity: "0", fee: "0", dataSize: "0" }]);
+    expect(submitter.attest).not.toHaveBeenCalled();
+
+    const [payload] = device.payloads;
+    if (payload?.kind !== "transaction") throw new Error("expected the ownership transaction");
+    const signatures = [bytesToBase64Url(await signPayloadWithSigner(payload, signerFromJwk(deviceJwk, "")))];
+    const shown = await handler.submitDeviceSignature({ requestId, signatures });
+
+    expect(shown).toEqual({ shown: "scanAttestation", result: PAID });
+    await expect(pending).resolves.toEqual(PAID);
+    const [attestation, proof] = submitter.submitAttestation.mock.calls[0] as [ParsedAttestation, OwnershipProof];
+    expect(attestation).toEqual(ATTESTATION);
+    expect(proof).toMatchObject({ owner: deviceJwk.n, message, proof: "transaction" });
+    expect(await verifyPointsProof("transaction", proof.owner, message, proof.signature)).toBe(true);
+    expect(presenter.dismissed).not.toContain(requestId);
+  });
+
+  it("rejecting or closing the window rejects the site with ApprovalDeclinedError", async () => {
+    const rejected = await open(KEYFILE_ID);
+    await handler.resolveApproval({ requestId: rejected.requestId, approved: false });
+    await expect(rejected.pending).rejects.toBeInstanceOf(ApprovalDeclinedError);
+    expect(submitter.attest).not.toHaveBeenCalled();
+
+    presenter.presented.length = 0;
+    const closed = await open(KEYFILE_ID);
+    presenter.userDismisses(closed.requestId);
+    await expect(closed.pending).rejects.toMatchObject({ name: "ApprovalDeclinedError", timedOut: false });
+  });
+
+  it("waits 20 minutes for an answer, not the usual 5, then times out", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      const { pending, requestId } = await open(KEYFILE_ID);
+      const timedOut = expect(pending).rejects.toMatchObject({ name: "ApprovalDeclinedError", timedOut: true });
+
+      await vi.advanceTimersByTimeAsync(19 * 60_000);
+      await expect(handler.getApproval({ requestId })).resolves.toMatchObject({ kind: "scanAttestation" });
+
+      await vi.advanceTimersByTimeAsync(61_000);
+      await timedOut;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a hardware wallet approved late in the review still gets the device window", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      const { pending, requestId } = await open(HW_ID);
+      pending.catch(() => {});
+      await vi.advanceTimersByTimeAsync(19 * 60_000);
+      const view = (await handler.resolveApproval({ requestId, approved: true })) as ApprovalRequest;
+      expect(view.device!.deadline - Date.now()).toBe(5 * 60_000);
+
+      for (let minute = 0; minute < 9; minute += 1) {
+        await vi.advanceTimersByTimeAsync(60_000);
+        await handler.deviceActivity({ requestId });
+      }
+      const { deadline } = await handler.deviceActivity({ requestId });
+      expect(deadline).toBe(view.createdAt + 30 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("signs with the wallet it was opened for after the user switches wallets", async () => {
+    await cacheKey(KEYFILE_ID, keyfileJwk, await addressFromOwner(keyfileJwk.n));
+    const { requestId } = await open(KEYFILE_ID);
+    keySessionStore.set("local:activeWalletId", HW_ID);
+    await storage.set("local:activeWalletId", HW_ID);
+
+    await handler.resolveApproval({ requestId, approved: true });
+
+    expect(submitter.attest).toHaveBeenCalledWith(expect.objectContaining({ walletId: KEYFILE_ID }));
+    expect(submitter.submitAttestation).not.toHaveBeenCalled();
+  });
+
+  it("a device signature over anything but the prepared proof is refused, and the request keeps waiting", async () => {
+    const { pending, requestId } = await open(HW_ID);
+    const view = (await handler.resolveApproval({ requestId, approved: true })) as ApprovalRequest;
+    const [payload] = view.device!.payloads;
+    if (payload?.kind !== "transaction") throw new Error("expected the ownership transaction");
+    const other = { ...payload, transaction: { ...payload.transaction, tags: [] } };
+
+    const wrong = [bytesToBase64Url(await signPayloadWithSigner(other, signerFromJwk(deviceJwk, "")))];
+    await expect(handler.submitDeviceSignature({ requestId, signatures: wrong })).rejects.toThrow(/doesn't match this wallet/);
+
+    expect(submitter.submitAttestation).not.toHaveBeenCalled();
+    expect((await handler.getApproval({ requestId })).device).toBeDefined();
+    await handler.resolveApproval({ requestId, approved: false });
+    await expect(pending).rejects.toBeInstanceOf(ApprovalDeclinedError);
+  });
+
+  it("refuses a request whose message isn't the attestation's, before any window opens", async () => {
+    const other = `gleam-points:attest:v1:1.4.0:${"0".repeat(64)}`;
+    await expect(
+      handler.requestApproval({
+        kind: "scanAttestation",
+        origin: SITE,
+        walletId: KEYFILE_ID,
+        address: "addr",
+        attestation: ATTESTATION,
+        payload: new TextEncoder().encode(other),
+      }),
+    ).rejects.toThrow("The message to sign isn't this attestation's.");
+    expect(presenter.presented).toEqual([]);
+  });
+
+  it("allows one pending attestation: another focuses its window and gets busy", async () => {
+    const { requestId } = await open(KEYFILE_ID);
+
+    const second = await handler.requestScanAttestation({ origin: SITE, walletId: KEYFILE_ID, address: "addr", attestation: parsed() });
+
+    expect(second).toMatchObject({ ok: false, code: "busy" });
+    expect(presenter.presented).toHaveLength(1);
+    expect(presenter.focused).toEqual([requestId]);
+  });
+
+  it("two attestations sent at once open one window", async () => {
+    const first = handler.requestScanAttestation({ origin: SITE, walletId: KEYFILE_ID, address: "addr", attestation: parsed() });
+    first.catch(() => {});
+    const second = handler.requestScanAttestation({ origin: SITE, walletId: KEYFILE_ID, address: "addr", attestation: parsed() });
+
+    expect(await second).toMatchObject({ ok: false, code: "busy" });
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
+  });
+});

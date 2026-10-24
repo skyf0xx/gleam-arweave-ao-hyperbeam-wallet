@@ -16,9 +16,19 @@ import { DEV_SITE_HOSTS, SITE_ORIGIN } from './src/site-pages';
 const STORE_PUBLIC_KEY =
   'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtDZnKbW6qjEJnZtf+Os2Vw2RDocHxgB+B7YYdVskVjjGfrKi9Aso6TgmXr3KCwZI8A5lLuBmR92FvIu/CGBP3yjYhskjNPesDubM7kPwFS+ycQZKxiKIe6X5eE4jVmx5K+ol/Q/17NwQiwd54hwRYfeOGC8hUKj39BvBCJttW7bjUISy3vvm1rgbfwUJgPvXByLfURhQSzxVTlVy7iiqBEt7vRSJB4Q0jSGpEMwxYHiP3R5vY7a9D38QSX5IZHlsCP1lFNW3u3Vz7KPIbuBOBy60phPJeIxJFuU92u5GlLKPddJuRRRxoaQ4imrErrdurpxKakMN8OMM/LvWf6AGiwIDAQAB';
 
+// Auto-import would otherwise inject `wxt/*` imports into workspace
+// packages for any free `storage` or `browser` identifier, and packages
+// can't resolve `wxt`. unimport takes `exclude`, but WXT's type omits it,
+// so it goes through a variable to skip the excess-property check.
+const AUTO_IMPORT_OPTIONS = {
+  imports: [],
+  exclude: [/node_modules/, /\.git/, /[\\/]packages[\\/]/],
+};
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  imports: AUTO_IMPORT_OPTIONS,
   manifest: ({ command, mode }) => ({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
@@ -76,10 +86,10 @@ export default defineConfig({
     ],
     optional_host_permissions: ['https://*/*'],
     // Lets the site's pages hand over a Gleam Points invite code
-    // (src/points-invite.ts) or a scan attestation to sign
-    // (src/points-attest.ts). Only this origin can message the extension;
+    // (packages/runtime/src/points-invite.ts) or a scan attestation to sign
+    // (packages/runtime/src/points-attest.ts). Only this origin can message the extension;
     // a development build also lets a local copy of the site in
-    // (src/site-pages.ts's isSiteOrigin), on any port.
+    // (packages/runtime's dispatch/site.ts isSiteOrigin), on any port.
     externally_connectable: {
       matches: [
         `${SITE_ORIGIN}/*`,

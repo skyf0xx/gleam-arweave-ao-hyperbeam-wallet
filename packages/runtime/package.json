@@ -1,0 +1,20 @@
+{
+  "name": "@gleam/runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gleam/core": "workspace:*",
+    "@gleam/messaging": "workspace:*",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "hash-wasm": "4.12.0",
+    "typescript": "^5.9.3"
+  }
+}

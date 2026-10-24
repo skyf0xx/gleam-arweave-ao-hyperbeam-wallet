@@ -66,6 +66,9 @@ jobs:
       - run: pnpm tsc -p packages/core --noEmit
       - run: pnpm tsc -p packages/messaging --noEmit
       - run: pnpm tsc -p packages/ui --noEmit
+      - run: pnpm tsc -p packages/runtime --noEmit
+      - run: pnpm tsc -p packages/app --noEmit
+      - run: pnpm tsc -p packages/provider --noEmit
       - run: pnpm tsc -p apps/extension --noEmit
       - run: pnpm tsc -p apps/points-api --noEmit
       - run: pnpm tsc -p scripts/scan --noEmit

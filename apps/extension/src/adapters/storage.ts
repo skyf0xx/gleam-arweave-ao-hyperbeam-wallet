@@ -39,6 +39,22 @@ export class WxtStoragePort implements StoragePort {
     await storage.setItem<T>(assertStorageItemKey(key), value);
   }
 
+  async setMany(entries: Record<string, unknown>): Promise<void> {
+    const keys = Object.keys(entries).map(assertStorageItemKey);
+    if (keys.length === 0) return;
+    const nullish = Object.keys(entries).find((key) => entries[key] == null);
+    if (nullish !== undefined) {
+      throw new Error(`setMany value for "${nullish}" is null or undefined; use remove to delete a key.`);
+    }
+    const areas = new Set(keys.map((key) => key.slice(0, key.indexOf(":"))));
+    if (areas.size > 1) {
+      throw new Error(`setMany keys must share one storage area, got ${[...areas].join(", ")}.`);
+    }
+    // `setItems` groups by area into a single `chrome.storage.<area>.set`,
+    // which Chrome commits atomically; per-key `setItem` calls would not be.
+    await storage.setItems(keys.map((key) => ({ key, value: entries[key] })));
+  }
+
   async remove(key: string): Promise<void> {
     await storage.removeItem(assertStorageItemKey(key));
   }
@@ -47,5 +63,3 @@ export class WxtStoragePort implements StoragePort {
     return storage.watch<T>(assertStorageItemKey(key), (newValue) => cb(newValue));
   }
 }
-
-export const storagePort: StoragePort = new WxtStoragePort();

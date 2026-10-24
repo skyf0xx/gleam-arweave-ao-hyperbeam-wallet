@@ -1,0 +1,922 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ActivityPage, Contact, FeeEstimate, RuntimePort, TokenBalance, TokenPrice, WalletState, WalletSummary } from "@gleam/core";
+import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
+import { SendView, type SendViewProps } from "./SendView";
+
+afterEach(() => {
+  cleanup();
+});
+
+/**
+ * `SendView` now reads shared balances/activity via `useBalances`/
+ * `useActivity` (TanStack Query), which requires a `QueryClientProvider`
+ * ancestor — mirrors `App.tsx`'s real wiring. A fresh `QueryClient` per
+ * render keeps each test's cache isolated from the others. `retry: false`
+ * (unlike the app's own default-config client) so a mocked `runtime.send`
+ * rejection surfaces as this query's error state on the first attempt
+ * instead of TanStack's default 3-retry backoff dragging error-path tests
+ * past `waitFor`'s timeout.
+ */
+function renderSendView(props: SendViewProps) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SendView {...props} />
+    </QueryClientProvider>,
+  );
+}
+
+function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
+  return {
+    send: vi.fn(),
+    onMessage: vi.fn(() => () => {}),
+    ...overrides,
+  };
+}
+
+const WALLET: WalletSummary = {
+  id: "wallet-1",
+  address: "aB3k4f9qP2xR8m1tN6vW3jL7yH0sD9eK5cF9fQx",
+  name: "Wallet One",
+  method: "jwk",
+  publicKey: "pub1",
+  createdAt: 0,
+  updatedAt: 0,
+  backupConfirmedAt: null,
+};
+
+const OTHER_WALLET: WalletSummary = {
+  id: "wallet-2",
+  address: "CCCCCC3333333333333333333333333333333333333",
+  name: "Savings",
+  method: "jwk",
+  publicKey: "pub2",
+  createdAt: 0,
+  updatedAt: 0,
+  backupConfirmedAt: null,
+};
+
+const AO_TOKEN: TokenBalance = {
+  address: WALLET.address,
+  processId: "process-ao-token-1",
+  ticker: "ARDRIVE",
+  denomination: 6,
+  name: null,
+  quantity: "5000000",
+};
+
+const RECENT_RECIPIENT_A = "AAAAAA1111111111111111111111111111111111111";
+const RECENT_RECIPIENT_B = "BBBBBB2222222222222222222222222222222222222";
+
+function activityPage(entries: ActivityPage["entries"]): ActivityPage {
+  return { entries, cursor: null };
+}
+
+/** Routes a fake `runtime.send` by message `type`, matching each test's needs. */
+function routedSend(handlers: {
+  getBalance?: (payload: { address: string }) => string;
+  getTokenBalances?: (payload: { address: string }) => TokenBalance[];
+  getActivity?: (payload: { address: string }) => ActivityPage;
+  getArFee?: () => string;
+  estimateTransfer?: () => FeeEstimate;
+  submitTransfer?: () => { txId: string };
+  listContacts?: () => Contact[];
+  saveContact?: (payload: { address: string; name: string }) => Contact;
+  getState?: () => WalletState;
+  getTokenPrices?: () => TokenPrice[];
+}): RuntimePort["send"] {
+  return vi.fn(async (message: { type: string; payload: unknown }) => {
+    switch (message.type) {
+      case "getBalance":
+        return handlers.getBalance?.(message.payload as { address: string }) ?? "1000000000000";
+      case "getTokenBalances":
+        return handlers.getTokenBalances?.(message.payload as { address: string }) ?? [];
+      case "getActivity":
+        return handlers.getActivity?.(message.payload as { address: string }) ?? activityPage([]);
+      case "getArFee":
+        return handlers.getArFee?.() ?? "100000000";
+      case "estimateTransfer":
+        return (
+          handlers.estimateTransfer?.() ?? {
+            fee: "100000000",
+            firstSeenRecipient: false,
+          }
+        );
+      case "submitTransfer":
+        return handlers.submitTransfer?.() ?? { txId: "tx-123" };
+      case "listContacts":
+        return handlers.listContacts?.() ?? [];
+      case "getState":
+        return handlers.getState?.() ?? { wallets: [WALLET], activeWalletId: WALLET.id, session: null };
+      case "getDisplaySettings":
+        return { currency: "USD", showChart: true, showTokenLogos: false, headline: "total", balancesHidden: false };
+      case "getTokenPrices":
+        return handlers.getTokenPrices?.() ?? [];
+      case "saveContact":
+        return (
+          handlers.saveContact?.(message.payload as { address: string; name: string }) ?? {
+            address: (message.payload as { address: string; name: string }).address,
+            name: (message.payload as { address: string; name: string }).name,
+            createdAt: 0,
+          }
+        );
+      default:
+        throw new Error(`unhandled message type in test: ${message.type}`);
+    }
+  }) as RuntimePort["send"];
+}
+
+describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
+  it("opening the picker lists AR plus every getTokenBalances token, all selectable", async () => {
+    const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    await waitFor(() => expect(screen.getByText("Arweave")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0));
+    expect(send).toHaveBeenCalledWith({ type: "getTokenBalances", payload: { address: WALLET.address } });
+
+    // Both rows are real buttons (genuinely clickable, no disabled state).
+    const arweaveButton = screen.getByText("Arweave").closest("button");
+    const ardriveButton = screen.getByRole("button", { name: /ARDRIVE/ });
+    expect(arweaveButton).not.toBeNull();
+    expect(arweaveButton?.disabled).toBeFalsy();
+    expect(ardriveButton.getAttribute("disabled")).toBeNull();
+  });
+
+  it("shows AR and a default AO row at '0', both selectable, while balances are still loading", async () => {
+    const send = vi.fn(() => new Promise(() => {})) as unknown as RuntimePort["send"]; // never resolves -- stays in the loading state.
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    const arweaveRow = (await screen.findByText("Arweave")).closest("button");
+    expect(arweaveRow).not.toBeNull();
+    expect(arweaveRow?.textContent).toContain("0");
+    expect(arweaveRow?.disabled).toBeFalsy();
+
+    const aoRow = screen.getAllByText("AO")[0]!.closest("button");
+    expect(aoRow).not.toBeNull();
+    expect(aoRow?.textContent).toContain("0");
+    expect(aoRow?.getAttribute("disabled")).toBeNull();
+  });
+
+  it("always renders a default AO row above other watched AO tokens, even with no AO balance entry", async () => {
+    const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    await waitFor(() => expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0));
+
+    const dialog = screen.getByRole("dialog", { name: "Select token" });
+    const rowNames = within(dialog)
+      .getAllByRole("button")
+      .filter((row) => row.getAttribute("aria-label") !== "Back")
+      .map((row) => row.textContent ?? "");
+
+    const arIndex = rowNames.findIndex((text) => text.includes("Arweave"));
+    const aoIndex = rowNames.findIndex((text) => text.includes("AO") && !text.includes("ARDRIVE"));
+    const ardriveIndex = rowNames.findIndex((text) => text.includes("ARDRIVE"));
+
+    expect(arIndex).toBe(0);
+    expect(aoIndex).toBe(1);
+    expect(ardriveIndex).toBe(2);
+
+    // No live AO balance was returned, so the default AO row still reads "0".
+    expect(rowNames[aoIndex]).toContain("0");
+
+    // The default AO row is genuinely selectable even without a real balance.
+    fireEvent.click(
+      within(dialog)
+        .getAllByRole("button")
+        .filter((row) => row.getAttribute("aria-label") !== "Back")[1]!,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "AO" })).toBeTruthy());
+  });
+
+  it("updates the AR and AO default rows to real balances once they load, without disturbing other watched tokens", async () => {
+    const AO_DEFAULT_TOKEN: TokenBalance = {
+      address: WALLET.address,
+      processId: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc",
+      ticker: "AO",
+      denomination: 12,
+      name: null,
+      quantity: "3000000000000",
+    };
+    const send = routedSend({
+      getBalance: () => "2000000000000",
+      getTokenBalances: () => [AO_DEFAULT_TOKEN, AO_TOKEN],
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+
+    const arweaveRow = await screen.findByText("Arweave");
+    await waitFor(() => expect(arweaveRow.closest("button")?.textContent).toContain("2"));
+
+    await waitFor(() => {
+      const aoRow = screen.getAllByText("AO")[0]!.closest("button");
+      expect(aoRow?.textContent).toContain("3");
+    });
+
+    expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0);
+  });
+
+  it("selecting a non-AR token sets the compose ticker and carries it through estimate/submit", async () => {
+    const send = routedSend({
+      getTokenBalances: () => [AO_TOKEN],
+      estimateTransfer: () => ({ fee: null, firstSeenRecipient: false }),
+      submitTransfer: () => ({ txId: "ao-tx-456" }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: /^AR/ }));
+    await waitFor(() => expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: /ARDRIVE/ }));
+
+    // Back on compose, now showing the AO token's ticker.
+    await waitFor(() => expect(screen.getByRole("button", { name: "ARDRIVE" })).toBeTruthy());
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
+      target: { value: RECENT_RECIPIENT_A },
+    });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "2.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "estimateTransfer",
+        payload: {
+          walletId: WALLET.id,
+          recipient: RECENT_RECIPIENT_A,
+          token: AO_TOKEN.processId,
+          amount: "2500000",
+          fee: null,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send 2.5 ARDRIVE" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Send 2.5 ARDRIVE" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "submitTransfer",
+        payload: {
+          walletId: WALLET.id,
+          recipient: RECENT_RECIPIENT_A,
+          token: AO_TOKEN.processId,
+          amount: "2500000",
+          fee: null,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText("Signed and sent.")).toBeTruthy());
+    expect(screen.getByText(`2.5 ARDRIVE to ${RECENT_RECIPIENT_A}`)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View in explorer" }).getAttribute("href")).toBe(
+      "https://lunar.arweave.net/#/explorer/ao-tx-456",
+    );
+  });
+});
+
+describe("SendView compose summary", () => {
+  it("shows the sending wallet's balance next to its name", async () => {
+    const send = routedSend({ getBalance: () => "2500000000000" });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    expect(await screen.findByText(/2\.5 AR/)).toBeTruthy();
+    expect(screen.getByText("Wallet One")).toBeTruthy();
+  });
+
+  it("values the typed amount in the display currency", async () => {
+    const send = routedSend({ getTokenPrices: () => [{ processId: null, price: 10 }] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+
+    expect(await screen.findByText(/≈ \$5\.00/)).toBeTruthy();
+  });
+
+  it("keeps the form across a trip to the token's info, which links it to the explorer", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.click(screen.getByRole("button", { name: "Token details" }));
+
+    expect(screen.getByText("Decimals")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe(
+      `https://lunar.arweave.net/#/explorer/${AO_TOKEN.processId}`,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    // The address is still filled in, so the button asks for the amount next.
+    expect(screen.getByRole("button", { name: "Enter an amount" })).toBeTruthy();
+  });
+
+  it("names what's missing on the disabled button, then the next step", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    expect((screen.getByRole("button", { name: "Enter an address" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    expect((screen.getByRole("button", { name: "Enter an amount" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
+    expect((screen.getByRole("button", { name: "Review and Send" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows AR's info without a process, linking to the network's transactions", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(screen.getByRole("button", { name: "Token details" }));
+
+    expect(screen.getByText("Arweave")).toBeTruthy();
+    expect(screen.queryByText("Process")).toBeNull();
+    expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe("https://lunar.arweave.net/#/transactions/");
+  });
+});
+
+describe("SendView AR Max and balance check account for the network fee", () => {
+  it("Max fills in balance minus the estimated fee, not the whole balance", async () => {
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    expect(maxButton.getAttribute("aria-label")).toContain("0.95");
+
+    fireEvent.click(maxButton);
+    const amountInput = screen.getByPlaceholderText("0") as HTMLInputElement;
+    expect(amountInput.value).toBe("0.95");
+  });
+
+  it("hides Max until the fee estimate has resolved", async () => {
+    const send = vi.fn((message: { type: string; payload: unknown }) => {
+      if (message.type === "getArFee") return new Promise(() => {}); // never resolves
+      return routedSend({})(message, undefined);
+    }) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    await screen.findByPlaceholderText("0");
+    expect(screen.queryByRole("button", { name: /^Max:/ })).toBeNull();
+  });
+
+  it("rejects typing an amount that alone fits the balance but would overflow once the fee is added", async () => {
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    await screen.findByRole("button", { name: /^Max:/ });
+    const amountInput = screen.getByPlaceholderText("0") as HTMLInputElement;
+    // The whole balance, with nothing left over for the fee — the compose
+    // step's own input clamp (matching its fee-aware Max) rejects it rather
+    // than letting it reach Continue's balance check.
+    fireEvent.change(amountInput, { target: { value: "1" } });
+    expect(amountInput.value).toBe("");
+  });
+
+  it("advances to review when the recipient-specific fee still leaves the amount affordable", async () => {
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR (rough, recipient-less quote)
+      estimateTransfer: () => ({ fee: "50000000000", firstSeenRecipient: false }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
+      target: { value: RECENT_RECIPIENT_A },
+    });
+    // Right at the fee-adjusted Max — allowed.
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    fireEvent.click(maxButton);
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+  });
+
+  it("blocks advancing to review when the recipient-specific fee (larger than the rough getArFee quote) pushes the total over the balance", async () => {
+    // getArFee's rough, recipient-less quote (0.05 AR) underestimates for a
+    // first-seen recipient — estimateTransfer's real quote (0.2 AR) is
+    // larger, and the total then exceeds the balance even though the
+    // amount fit under the rough Max. Continue must not advance to review.
+    const send = routedSend({
+      getBalance: () => "1000000000000", // 1 AR
+      getArFee: () => "50000000000", // 0.05 AR
+      estimateTransfer: () => ({ fee: "200000000000", firstSeenRecipient: true }), // 0.2 AR
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
+      target: { value: RECENT_RECIPIENT_A },
+    });
+    // Right at the rough fee-adjusted Max (0.95 AR) — passes the client
+    // clamp and the pre-estimate check, but not the post-estimate one.
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    fireEvent.click(maxButton);
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByRole("alert").textContent).toContain("This address is new to Arweave, so the network fee is 0.2 AR");
+    expect(screen.queryByRole("button", { name: /^Send \d/ })).toBeNull();
+  });
+
+  it("does not apply the AR fee to an AO token's Max or balance check", async () => {
+    const send = routedSend({
+      getTokenBalances: () => [AO_TOKEN],
+      getArFee: () => "50000000000",
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+
+    const maxButton = await screen.findByRole("button", { name: /^Max:/ });
+    // AO_TOKEN.quantity is 5000000 at denomination 6 -> "5", unaffected by the AR fee.
+    expect(maxButton.getAttribute("aria-label")).toContain("5");
+    expect(maxButton.getAttribute("aria-label")).not.toContain("4.95");
+  });
+});
+
+/** The full picker is reached through the recipient field's dropdown. */
+function openSavedContacts() {
+  fireEvent.focus(screen.getByLabelText("Recipient address"));
+  fireEvent.click(within(screen.getByRole("listbox", { name: "Saved contacts" })).getByRole("button", { name: "Saved contacts" }));
+}
+
+describe("SendView recipient dropdown", () => {
+  function renderWithContacts() {
+    const send = routedSend({
+      listContacts: () => [
+        { address: RECENT_RECIPIENT_A, name: "Alice", createdAt: 0 },
+        { address: RECENT_RECIPIENT_B, name: "Bob", createdAt: 0 },
+      ],
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_B, amount: "1", tags: [], timestamp: 200 },
+        ]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+  }
+
+  it("lists named addresses on focus, most recently sent to first", async () => {
+    renderWithContacts();
+    fireEvent.focus(screen.getByLabelText("Recipient address"));
+    const list = await screen.findByRole("listbox", { name: "Saved contacts" });
+    await waitFor(() => expect(within(list).getAllByRole("button").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Bob"),
+      expect.stringContaining("Alice"),
+      "Saved contacts",
+    ]));
+  });
+
+  it("filters by what's typed, and a pick fills the recipient without an error", async () => {
+    renderWithContacts();
+    const input = screen.getByLabelText("Recipient address");
+    fireEvent.focus(input);
+    await screen.findByRole("listbox", { name: "Saved contacts" });
+
+    fireEvent.change(input, { target: { value: "ali" } });
+    const list = screen.getByRole("listbox", { name: "Saved contacts" });
+    expect(within(list).queryByText("Bob")).toBeNull();
+    fireEvent.click(within(list).getByText("Alice"));
+    fireEvent.blur(input);
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByLabelText("Recipient address")).toBeNull();
+  });
+
+  it("offers the Saved contacts link even with no named addresses", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.focus(screen.getByLabelText("Recipient address"));
+
+    const list = screen.getByRole("listbox", { name: "Saved contacts" });
+    expect(within(list).getAllByRole("button").map((row) => row.textContent)).toEqual(["Saved contacts"]);
+  });
+
+  it("opens the full Saved contacts screen from the dropdown's link", async () => {
+    renderWithContacts();
+    fireEvent.focus(screen.getByLabelText("Recipient address"));
+    const list = await screen.findByRole("listbox", { name: "Saved contacts" });
+
+    fireEvent.click(within(list).getByRole("button", { name: "Saved contacts" }));
+
+    expect(await screen.findByRole("dialog", { name: "Saved contacts" })).toBeTruthy();
+  });
+});
+
+describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
+  it("lists the five latest unnamed recipients under Recent, and search reaches older ones", async () => {
+    const recipients = Array.from({ length: 7 }, (_, index) => `R${index}`.padEnd(43, "q"));
+    const send = routedSend({
+      getActivity: () =>
+        activityPage(
+          recipients.map((address, index) => ({
+            txId: `tx-${index}`,
+            type: "send" as const,
+            status: "confirmed" as const,
+            address,
+            amount: "1",
+            tags: [],
+            timestamp: 1000 - index,
+          })),
+        ),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+    const recent = await screen.findByRole("region", { name: "Recent" });
+    expect(within(recent).getAllByRole("button")).toHaveLength(5);
+    expect(within(recent).queryByText(/^R6/)).toBeNull();
+
+    fireEvent.change(screen.getByPlaceholderText("Search by name or address"), { target: { value: "R6" } });
+    expect(within(screen.getByRole("region", { name: "Recent" })).getByText(/^R6/)).toBeTruthy();
+  });
+
+  it("populates from real send activity, most-recent-first and deduplicated", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 100 },
+          { txId: "tx-2", type: "receive", status: "confirmed", address: "someone-else", amount: "1", tags: [], timestamp: 200 },
+          { txId: "tx-3", type: "send", status: "confirmed", address: RECENT_RECIPIENT_B, amount: "1", tags: [], timestamp: 300 },
+          { txId: "tx-4", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 50 },
+        ]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "getActivity", payload: { address: WALLET.address } }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Saved contacts" });
+    const rows = within(dialog).getAllByRole("button");
+    // Back button in ScreenHeader is a separate `aria-label="Back"` button;
+    // the recipient rows are the remaining ones, most-recent-first, deduped.
+    const recipientRows = rows.filter((row) => row.getAttribute("aria-label") !== "Back");
+    expect(recipientRows).toHaveLength(2);
+    expect(recipientRows[0]!.textContent).toContain(RECENT_RECIPIENT_B.slice(0, 6));
+    expect(recipientRows[1]!.textContent).toContain(RECENT_RECIPIENT_A.slice(0, 6));
+  });
+
+  it("lists saved contacts above recent recipients, with no duplicate row for an address that's both", async () => {
+    const send = routedSend({
+      listContacts: () => [{ address: RECENT_RECIPIENT_A, name: "Alice", createdAt: 0 }],
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 100 },
+          { txId: "tx-2", type: "send", status: "confirmed", address: RECENT_RECIPIENT_B, amount: "1", tags: [], timestamp: 200 },
+        ]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+
+    const dialog = await screen.findByRole("dialog", { name: "Saved contacts" });
+    await waitFor(() => expect(within(dialog).getByText("Alice")).toBeTruthy());
+
+    const recipientRows = within(dialog)
+      .getAllByRole("button")
+      .filter((row) => row.getAttribute("aria-label") !== "Back");
+    expect(recipientRows).toHaveLength(2);
+    expect(recipientRows[0]!.textContent).toContain("Alice");
+    expect(recipientRows[1]!.textContent).toContain(RECENT_RECIPIENT_B.slice(0, 6));
+  });
+
+  it("shows an appropriate empty state, not an error or placeholder address, when there is no prior send activity or saved contact", async () => {
+    const send = routedSend({ getActivity: () => activityPage([]) });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+
+    await waitFor(() => expect(screen.getByText(/No saved contacts yet/)).toBeTruthy());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the error state (not an empty state) when getActivity itself fails", async () => {
+    const failingSend = vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type === "getActivity") throw new Error("unreachable");
+      return routedSend({})(message, undefined);
+    }) as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send: failingSend }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.queryByText(/No saved contacts yet/)).toBeNull();
+  });
+
+  it("selecting a recent recipient fills the recipient field with the full address", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 100 },
+        ]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+    await waitFor(() => expect(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6)))).toBeTruthy());
+    fireEvent.click(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6))));
+
+    await waitFor(() => expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /^Change recipient/ }));
+    const textarea = screen.getByPlaceholderText("Paste an address") as HTMLTextAreaElement;
+    expect(textarea.value).toBe(RECENT_RECIPIENT_A);
+    expect(document.activeElement).toBe(textarea);
+  });
+
+  it("shows a pasted address as a card once the field loses focus", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.focus(textarea);
+    fireEvent.change(textarea, { target: { value: RECENT_RECIPIENT_A } });
+    expect(screen.queryByText(addressText(RECENT_RECIPIENT_A))).toBeNull();
+
+    fireEvent.blur(textarea);
+    expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy();
+    expect(screen.getByText("New address")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Paste an address")).toBeNull();
+  });
+
+  it("keeps the input for an address that isn't valid", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.change(textarea, { target: { value: "not-an-address" } });
+    fireEvent.blur(textarea);
+    expect(screen.getByPlaceholderText("Paste an address")).toBeTruthy();
+  });
+
+  it("shows the full, untruncated recipient address on the review screen regardless of selection method", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 100 },
+        ]),
+      estimateTransfer: () => ({ fee: "100000000", firstSeenRecipient: false }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+    await waitFor(() => expect(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6)))).toBeTruthy());
+    fireEvent.click(screen.getByText(new RegExp(RECENT_RECIPIENT_A.slice(0, 6))));
+
+    await waitFor(() => expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy());
+
+    // Leaves room for the default fee mock's fee, unlike the whole balance.
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+    expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy();
+  });
+
+  it("lists the vault's other wallets under a 'Your wallets' section, excluding the active wallet", async () => {
+    const send = routedSend({
+      getState: () => ({ wallets: [WALLET, OTHER_WALLET], activeWalletId: WALLET.id, session: null }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+
+    const dialog = await screen.findByRole("dialog", { name: "Saved contacts" });
+    await waitFor(() => expect(within(dialog).getByText("Your wallets")).toBeTruthy());
+    expect(within(dialog).getByText(OTHER_WALLET.name)).toBeTruthy();
+    // The active wallet (WALLET itself) never appears as a recipient option.
+    expect(within(dialog).queryByText(WALLET.name)).toBeNull();
+  });
+
+  it("filters saved contacts, wallets and recent recipients by name or address as you type", async () => {
+    const send = routedSend({
+      listContacts: () => [{ address: RECENT_RECIPIENT_A, name: "Alice", createdAt: 0 }],
+      getState: () => ({ wallets: [WALLET, OTHER_WALLET], activeWalletId: WALLET.id, session: null }),
+      getActivity: () =>
+        activityPage([
+          { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_B, amount: "1", tags: [], timestamp: 100 },
+        ]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+    const dialog = await screen.findByRole("dialog", { name: "Saved contacts" });
+    await waitFor(() => expect(within(dialog).getByText("Alice")).toBeTruthy());
+    await waitFor(() => expect(within(dialog).getByText(OTHER_WALLET.name)).toBeTruthy());
+
+    const filterInput = within(dialog).getByPlaceholderText("Search by name or address");
+
+    // Filter by name: only the matching contact remains.
+    fireEvent.change(filterInput, { target: { value: "alic" } });
+    expect(within(dialog).getByText("Alice")).toBeTruthy();
+    expect(within(dialog).queryByText(OTHER_WALLET.name)).toBeNull();
+    expect(within(dialog).queryByText(new RegExp(RECENT_RECIPIENT_B.slice(0, 6)))).toBeNull();
+
+    // Filter by address substring: matches the recent recipient instead.
+    fireEvent.change(filterInput, { target: { value: RECENT_RECIPIENT_B.slice(0, 8).toLowerCase() } });
+    expect(within(dialog).getByText(new RegExp(RECENT_RECIPIENT_B.slice(0, 6)))).toBeTruthy();
+    expect(within(dialog).queryByText("Alice")).toBeNull();
+
+    // No matches: the empty state, not a stale list or an error.
+    fireEvent.change(filterInput, { target: { value: "no such address or name" } });
+    await waitFor(() => expect(within(dialog).getByText("No matching addresses.")).toBeTruthy());
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("SendView address book: your own wallets are known recipients (AO-SEND-UI-WALLET-CORE)", () => {
+  it("shows the wallet's name above the address on Review and skips first-seen framing when sending to your own wallet", async () => {
+    const send = routedSend({
+      getState: () => ({ wallets: [WALLET, OTHER_WALLET], activeWalletId: WALLET.id, session: null }),
+      estimateTransfer: () => ({ fee: "100000000", firstSeenRecipient: true }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), {
+      target: { value: OTHER_WALLET.address },
+    });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+    expect(screen.getByText(OTHER_WALLET.name)).toBeTruthy();
+    // A known recipient (one of your own wallets) skips the first-seen risk framing,
+    // even though the backend's own `firstSeenRecipient` came back true.
+    expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
+  });
+
+  it("does not offer 'Save this address' when the recipient is one of your own wallets", async () => {
+    const send = routedSend({
+      getState: () => ({ wallets: [WALLET, OTHER_WALLET], activeWalletId: WALLET.id, session: null }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.change(textarea, { target: { value: OTHER_WALLET.address } });
+    fireEvent.blur(textarea);
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "getState", payload: undefined }));
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Save this address" })).toBeNull());
+  });
+});
+
+describe("SendView address book: save this address (AO-SEND-UI-WALLET-CORE)", () => {
+  it("shows 'Save this address' after blurring a full, unsaved recipient address, and reveals a name field on toggle", async () => {
+    const send = routedSend({});
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.change(textarea, { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.blur(textarea);
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "listContacts", payload: undefined }));
+    const checkbox = await screen.findByRole("checkbox", { name: "Save this address" });
+    expect(screen.queryByPlaceholderText("Enter address name")).toBeNull();
+
+    fireEvent.click(checkbox);
+    expect(screen.getByPlaceholderText("Enter address name")).toBeTruthy();
+  });
+
+  it("does not offer 'Save this address' for an address that's already a saved contact", async () => {
+    const send = routedSend({
+      listContacts: () => [{ address: RECENT_RECIPIENT_A, name: "Alice", createdAt: 0 }],
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.change(textarea, { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.blur(textarea);
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "listContacts", payload: undefined }));
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Save this address" })).toBeNull());
+  });
+
+  it("saving a name calls saveContact with the trimmed name and address", async () => {
+    const send = routedSend({});
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const textarea = screen.getByPlaceholderText("Paste an address");
+    fireEvent.change(textarea, { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.blur(textarea);
+
+    const checkbox = await screen.findByRole("checkbox", { name: "Save this address" });
+    fireEvent.click(checkbox);
+
+    fireEvent.change(screen.getByPlaceholderText("Enter address name"), { target: { value: "  Alice  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "saveContact",
+        payload: { address: RECENT_RECIPIENT_A, name: "Alice" },
+      }),
+    );
+  });
+});
+
+describe("SendView with a hardware wallet", () => {
+  it("points to the approval window while the device send is pending", async () => {
+    const hardware: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+    const routed = routedSend({ getState: () => ({ wallets: [hardware], activeWalletId: hardware.id, session: null }) });
+    const send = vi.fn((message: { type: string; payload: unknown }) =>
+      message.type === "submitTransfer" ? new Promise(() => {}) : routed(message as never),
+    ) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: hardware, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send 0.1 AR" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Approve on your device in the window that opened.");
+    expect(screen.getByRole("button", { name: "Waiting for approval…" })).toBeTruthy();
+  });
+
+  it("tells a Ledger user it only sends AR and suggests a Keystone", async () => {
+    const ledger: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+    const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: ledger, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "Ledger only supports sending AR for now, so it can't send ARDRIVE. Use a Keystone instead.",
+    );
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "1" } });
+    expect((screen.getByRole("button", { name: "Review and Send" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows no notice for a Ledger AR send or a Keystone AO send", () => {
+    const ledger: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
+    const send = routedSend({});
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: ledger, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    expect(screen.queryByText(/Ledger only supports sending AR/)).toBeNull();
+    cleanup();
+
+    const keystone: WalletSummary = { ...WALLET, method: "keystone", device: { kind: "keystone", xfp: "1" } };
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: keystone, token: AO_TOKEN, onBack: vi.fn(), onDone: vi.fn() });
+    expect(screen.queryByText(/Ledger only supports sending AR/)).toBeNull();
+  });
+});
+
+describe("SendView recipient lookalike warning", () => {
+  const LOOKALIKE_OF = "AAAAAA2222222222222222222222222222222222222";
+
+  async function reviewWith(estimate: { lookalikeOf?: string | null; firstSeenRecipient: boolean }) {
+    const send = routedSend({
+      estimateTransfer: () => ({ fee: "100000000", ...estimate }),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+  }
+
+  it("names the address a lookalike recipient imitates, and still lets the user send", async () => {
+    await reviewWith({ firstSeenRecipient: false, lookalikeOf: LOOKALIKE_OF });
+    expect(screen.getByText(/looks familiar, but is different/)).toBeTruthy();
+    expect(screen.getByText(addressText(LOOKALIKE_OF))).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Send \d/ }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("shows the first-time notice when there is no lookalike", async () => {
+    await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
+    expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
+    expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
+  });
+});
+
+describe("SendView lookalike warning while composing", () => {
+  const SENT_TO = "AAAAAA1111111111111111111111111111111111111";
+  // Same first and last four characters as SENT_TO, different middle.
+  const LOOKALIKE = `AAAA${"9".repeat(35)}1111`;
+
+  it("warns as soon as a pasted address imitates one already sent to, and hides Save", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([{ txId: "tx-1", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 100 }]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: LOOKALIKE } });
+
+    expect(await screen.findByText(/looks familiar, but is different/)).toBeTruthy();
+    expect(screen.getByText(addressText(SENT_TO))).toBeTruthy();
+    expect(screen.queryByText("Save this address")).toBeNull();
+  });
+
+  it("stays quiet for an address that resembles nothing trusted", async () => {
+    const send = routedSend({
+      getActivity: () =>
+        activityPage([{ txId: "tx-1", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 100 }]),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: `BBBB${"2".repeat(39)}` } });
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getActivity" })));
+    expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
+  });
+});

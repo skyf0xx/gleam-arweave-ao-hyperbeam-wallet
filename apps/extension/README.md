@@ -1,29 +1,31 @@
 # @gleam/extension
 
 The Chrome MV3 extension itself: the WXT build that turns `packages/core`,
-`packages/messaging`, and `packages/ui` into the installable wallet. It
+`packages/messaging`, `packages/runtime`, `packages/app`, `packages/provider`
+and `packages/ui` into the installable wallet. It
 owns every browser-specific concern — the manifest, the background
-service worker, the content script and injected page provider, and all
-the popup/sidepanel/approval UI.
+service worker, the content script and injected page provider, and the
+mounts that put `@gleam/app`'s screens in the popup, side panel and
+approval window.
 
 Everything here is a caller or an adapter. Signing, balances, transfers,
-and uploads live in `@gleam/core`; this package wires that domain logic
-to Chrome APIs and to the page.
+and uploads live in `@gleam/core`; the dispatcher and every handler live
+in `@gleam/runtime`. This package wires them to Chrome APIs and to the
+page.
 
 ## Components
 
 - [`wxt.config.ts`](#wxtconfigts) — manifest and build config
 - [`entrypoints/background`](#entrypointsbackground) — the service worker
 - [`entrypoints/content`](#entrypointscontent) — the isolated-world relay
-- [`entrypoints/provider`](#entrypointsprovider) — the injected `window.arweaveWallet`
+- [`entrypoints/provider`](#entrypointsprovider) — builds the injected `provider.js`
 - [`entrypoints/approval`](#entrypointsapproval) — the signing/connect approval window
 - [`entrypoints/passkey`](#entrypointspasskey) — the WebAuthn ceremony window
 - [`entrypoints/connect` / `entrypoints/keyring`](#entrypointsconnect--entrypointskeyring) — hardware wallet support
-- [`entrypoints/sidepanel` / `entrypoints/popup/*`](#entrypointssidepanel--entrypointspopup) — the main wallet UI
-- [`src/dispatch/methods.ts`](#srcdispatchmethodsts) — the privilege table
-- [`src/handlers/`](#srchandlers) — background use-case logic
-- [`src/adapters/`](#srcadapters) — `@gleam/core` port implementations
-- [`src/App.tsx`](#srcapptsx) — the shared UI shell
+- [`entrypoints/sidepanel` / `entrypoints/popup`](#entrypointssidepanel--entrypointspopup) — mounts of the main wallet UI
+- [`src/sender.ts` / `src/site-pages.ts`](#srcsenderts--srcsite-pagests) — sender attestation and site links
+- [`src/adapters/`](#srcadapters) — `@gleam/core` port and `Platform` implementations
+- [`src/hardware/`](#srchardware) — Ledger and Keystone transports and device signing panels
 
 ### `wxt.config.ts`
 
@@ -41,11 +43,10 @@ the extension by probing for a fixed resource path.
 ### `entrypoints/background`
 
 The MV3 service worker (`index.ts`) and the extension's only privileged
-process. It builds every adapter and handler, registers each
-`ProtocolMap` method from `@gleam/messaging`, and is the single place
-that enforces `src/dispatch/methods.ts`'s privilege table before a
-handler runs. It also owns alarms (auto-lock, activity promotion, the
-points heartbeat), idle-lock, and pushing provider events to open tabs.
+process. It builds the extension's `Platform` from the adapters, passes
+it to `createRuntime` (`@gleam/runtime`), and connects Chrome's events to
+the runtime. Each `ProtocolMap` message's `CallerContext` is built from Chrome's sender
+(`src/sender.ts`), never from the message body.
 
 ### `entrypoints/content`
 
@@ -60,21 +61,23 @@ a page can't spoof which site is asking.
 ### `entrypoints/provider`
 
 Built into `provider.js` and injected into the page's own world. It
-installs `window.arweaveWallet` (`GleamProvider`) and `window.gleam`,
-turning each call into a `postMessage` round trip to the content
-script with a timeout. It also detects whether another wallet (Wander,
-PermawebOS) is installed and defers to it unless the user has chosen
-Gleam for that site.
+calls `@gleam/provider`'s `installProvider` with
+`createWindowMessageTransport()` and the extension's version, so
+`window.arweaveWallet` and `window.gleam` turn each call into a
+`postMessage` round trip to the content script. The provider itself
+(timeouts, events, and deferring to Wander or PermawebOS unless the user
+chose Gleam for the site) lives in `packages/provider`.
 
 ### `entrypoints/approval`
 
 A standalone popup window opened by `ApprovalHandler`
-(`src/handlers/approval.ts`) whenever a page's request needs a
-decision: connect, sign, encrypt, decrypt, or add a token. Its screens
+(`packages/runtime/src/handlers/approval.ts`) whenever a page's request needs a
+decision: connect, sign, encrypt, decrypt, or add a token. The entrypoint
+only mounts `ApprovalRoot` from `@gleam/app` and hands it the Keystone and
+Ledger panels (`src/hardware/panels/`) through `AppPlatform`; the screens
 (`ConnectionRequestScreen`, `SigningApprovalScreen`, `AddTokenScreen`)
-show a decoded preview of what's being signed. Hardware-wallet flows
-route through `AwaitingDeviceView` and the Keystone/Ledger panels here
-too. Closing the window without acting counts as a rejection.
+show a decoded preview of what's being signed. Closing the window without
+acting counts as a rejection.
 
 ### `entrypoints/passkey`
 
@@ -96,62 +99,40 @@ outside that pair reaches into the offscreen document directly.
 
 ### `entrypoints/sidepanel` / `entrypoints/popup/*`
 
-The main wallet UI. The side panel and every popup screen (onboarding,
-unlock, send, receive, activity, collectibles, connected apps,
-contacts, settings, points, and the rest) mount the same shared shell,
-`src/App.tsx`, which owns top-level view state across all of them.
+The main wallet UI. The side panel and the popup each mount `<App>` from
+`@gleam/app` inside a `PlatformProvider` built by
+`createExtensionAppPlatform`. The screens (onboarding, unlock, send,
+receive, activity, collectibles, connected apps, contacts, settings,
+points, and the rest) live in `packages/app/src/screens/`.
 
-### `src/dispatch/methods.ts`
+### `src/sender.ts` / `src/site-pages.ts`
 
-The privilege table the background consults before running any
-method. Every `ProtocolMap` method is tiered as `extension`,
-`contentScript`, or `page`. Page-tier methods (the `window.arweaveWallet`
-surface) each declare whether they need an approval, whether they need
-an existing grant, and the Zod schema their params are parsed with.
-`SITE_MESSAGES` lists the `site` tier: what the Gleam site's pages send
-over `externally_connectable`, which no dApp page can reach.
-`src/dispatch/site.ts` is the one entry point for those messages: it
-checks Chrome's `sender.origin` and the message's schema before any
-handler runs.
-This is the one place that decides what a page is allowed to ask for —
-no handler re-checks it.
-
-### `src/handlers/`
-
-One file per use case, each holding the logic a background message
-maps to. Handlers depend only on ports (`StoragePort`, `WindowPort`,
-etc.), never on `chrome.*` directly.
-
-- **`wallet-lifecycle.ts`** — create, import, lock/unlock, rename, delete, and switch wallets.
-- **`reads.ts`** — balances, token balances (AO, watched, and discovered from the wallet's history, minus hidden ones), token metadata and routing, activity, prices, network settings.
-- **`transfer.ts`** — AR/AO transfer estimate and submission. A token on `arweave-scheduler@1.0` is sent as an L1 transaction, a legacy token through the MU.
-- **`upload.ts`** — ANS-104 upload review and submission.
-- **`approval.ts`** — the connect/sign/encrypt/decrypt/add-token/scan-attestation approval lifecycle, including opening and tracking approval windows.
-- **`key-session.ts`** — reads the unlocked signer from `chrome.storage.session` and enforces auto-lock.
-- **`provider-params.ts`** — decodes and validates the wire params for every `window.arweaveWallet` method.
-- **`announcements.ts`, `contacts.ts`, `points.ts`, `security-phrase.ts`, `site-wallet.ts`, `passkey.ts`** — one handler each for their named feature. `points.ts` also signs and submits scan attestations, and `attest-errors.ts` words the points API's refusals for the person signing.
-
-`src/points-invite.ts` and `src/points-attest.ts` handle the site's
-messages once `dispatch/site.ts` has checked them, handing off to
-`points.ts` or `approval.ts`.
+`sender.ts` turns Chrome's `runtime.MessageSender` into the
+`CallerContext` that `@gleam/runtime` sees, from the sender's URL and
+origin rather than the message body. `site-pages.ts` holds the links to
+the Gleam website and opens its pages on install.
 
 ### `src/adapters/`
 
-The implementations of `@gleam/core`'s ports for this extension. Core
-never imports Chrome APIs directly — it only knows about these
+The implementations of `@gleam/core`'s ports and `@gleam/runtime`'s
+`Platform` ports (`tabs.ts`, `badge.ts`) for this extension. Neither
+package imports Chrome APIs directly — they only know about these
 interfaces.
 
 - **`storage.ts`** → `StoragePort` over WXT storage.
-- **`windows.ts`** (`WxtWindowPort`) → `WindowPort`, opens and tracks approval/passkey windows by request id so a restarted service worker can still find them.
+- **`windows.ts`** (`WindowApprovalPresenter`) → `ApprovalPresenterPort`, opens and tracks one approval window per request id so a restarted service worker can still find them.
 - **`runtime.ts`** → `RuntimePort` over `@webext-core/messaging`.
+- **`app-platform.ts`** → `AppPlatform` for the screens: the runtime client, host permissions, session-backed ephemeral state, the passkey window, downloads permission, and the hardware wallet connect pages and signing panels.
 - **`session-key-store.ts` / `offscreen-keyring.ts`** → bridge to the offscreen keyring document.
 - **`badge.ts`, `downloads.ts`, `device-key.ts`** → the action badge, file downloads, and the Gleam Points device keypair.
 
-### `src/App.tsx`
+### `src/hardware/`
 
-The shared UI shell mounted by the side panel, every popup screen, and
-the approval/passkey windows. It drives top-level view state so each
-surface doesn't reimplement its own routing.
+The Ledger (WebHID) and Keystone (camera QR) transports, the helpers that
+open their connect pages, and `panels/`, the `DeviceSignPanel`s the
+approval window uses to sign on a device. They stay here because they
+touch browser APIs; `@gleam/app` reaches them through
+`AppPlatform.hardwareWallets`.
 
 ## Data flow
 
@@ -170,12 +151,12 @@ page (window.arweaveWallet) → content script → background → handler → @g
    call as a `providerCall` message. It attaches no origin — the
    background reads the real origin from Chrome's `sender`, so the
    page can't lie about which site is asking.
-3. **Background enforcement.** The background looks up the method in
-   `src/dispatch/methods.ts`, validates params against its Zod schema,
+3. **Background enforcement.** The runtime looks up the method in
+   `packages/runtime/src/dispatch/methods.ts`, validates params against its Zod schema,
    and checks whether an active grant already covers the request. If
    the method needs approval, it opens an `entrypoints/approval`
    window and waits for the user's decision before continuing.
-4. **Handler → core.** Once allowed, the matching `src/handlers/*`
+4. **Handler → core.** Once allowed, the matching `packages/runtime/src/handlers/*`
    function runs, using `key-session.ts` to get the unlocked signer and
    calling into `@gleam/core` (for example `core/ao/transfer.ts` or
    `core/arweave/transfer.ts`) to actually build, sign, and submit.

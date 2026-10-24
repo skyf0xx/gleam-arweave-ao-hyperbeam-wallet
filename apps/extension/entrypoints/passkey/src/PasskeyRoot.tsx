@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RuntimePort, ThemeSettings } from "@gleam/core";
-import { UnlockView } from "@/entrypoints/popup/unlock/index.tsx";
+import { UnlockView } from "@gleam/app/src/screens/unlock/index.tsx";
 import { PasskeySetup, type PasskeySetupProps } from "./PasskeySetup";
 
 export interface PasskeyRootProps {

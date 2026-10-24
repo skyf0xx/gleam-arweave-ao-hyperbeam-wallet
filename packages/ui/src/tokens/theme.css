@@ -178,8 +178,8 @@
  * on the app root resolves against a box that has already shrunk to fit,
  * collapsing the popup to a narrow sliver. `[data-layout="popup"]` fixes
  * the 400px frame the type scale above is tuned for (see theme.css's type
- * scale comment); sidepanel/approval intentionally don't get this rule —
- * they size to the browser-provided side panel / window instead.
+ * scale comment); the side panel and the approval window size to the
+ * browser-provided panel / window instead.
  *
  * 600px is Chrome's own action-popup rendering ceiling, not a value
  * chosen here — a taller `min-height` doesn't grow the popup window
@@ -206,6 +206,72 @@ body:has([data-layout="popup"]) {
  */
 [data-layout="popup"] > * {
   flex-grow: 1;
+}
+
+/*
+ * Side panel and phone widths run from ~320px up to a wide window.
+ * Capping the screen column and centring it keeps rows readable instead
+ * of stretching edge to edge; the popup is 400px, under the cap, so it
+ * is unaffected. `--content-max` is also read by the docked token list,
+ * which is `position: fixed` and so can't inherit the column's width.
+ * The document stays the scroll container (MainScreenView reads
+ * `window.scrollY`), so none of these frames set an overflow.
+ */
+:root {
+  --content-max: 30rem;
+  --inset-top: 0px;
+}
+
+/*
+ * Neither html nor body has a height, so the root's `min-h-full` resolves
+ * to nothing; filling the viewport here is what lets a screen's `mt-auto`
+ * footer reach the bottom of the panel.
+ */
+[data-layout="sidepanel"],
+[data-layout="phone"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+[data-layout="sidepanel"] > *,
+[data-layout="phone"] > * {
+  flex-grow: 1;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+}
+
+/*
+ * The shell must set `viewport-fit=cover` for `env(safe-area-inset-*)` to
+ * be non-zero, and `interactive-widget=resizes-content` so the keyboard
+ * shrinks the layout viewport: `dvh` then follows it, which keeps
+ * `mt-auto` footers above the keyboard. `scroll-padding-bottom` leaves
+ * room under a focused input when it scrolls into view.
+ */
+[data-layout="phone"] {
+  --inset-top: env(safe-area-inset-top, 0px);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+html:has([data-layout="phone"]) {
+  scroll-padding-bottom: 6rem;
+}
+
+/*
+ * Sticky headers pin below the status bar; this scrim hides content
+ * scrolling up behind the inset.
+ */
+[data-layout="phone"]::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--color-background);
+  z-index: 40;
 }
 
 /*

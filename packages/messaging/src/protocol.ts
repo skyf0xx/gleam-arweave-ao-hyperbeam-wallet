@@ -182,7 +182,7 @@ export interface ProtocolMap {
   // actions
   // `TransferDraft`/`UploadDraft` carry `walletId` directly — signing
   // reads the decrypted JWK from the background's in-memory
-  // unlocked-session cache (`apps/extension/src/handlers/key-session.ts`),
+  // unlocked-session cache (`packages/runtime/src/handlers/key-session.ts`),
   // not a password on the request: once unlocked, no further call needs
   // one until the session is locked or its auto-lock timeout elapses.
   estimateTransfer(req: TransferDraft): FeeEstimate;

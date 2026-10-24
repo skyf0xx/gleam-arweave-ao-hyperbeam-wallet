@@ -2,7 +2,7 @@ import { cn } from "../../primitives/cn";
 
 /**
  * An address's avatar — purely presentational. `svgMarkup` is drawn by
- * the caller (`apps/extension/src/account-avatar.ts`, which wraps
+ * the caller (`packages/app/src/account-avatar.ts`, which wraps
  * `@dicebear/core`); this package has no `@dicebear/*` dependency of its
  * own and never reaches a network host.
  *

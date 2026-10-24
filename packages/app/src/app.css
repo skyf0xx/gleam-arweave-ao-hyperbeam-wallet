@@ -1,0 +1,8 @@
+@import "@gleam/ui/src/tokens/theme.css";
+
+/*
+ * Tailwind 4 scans only the importing app's own tree and the paths named
+ * here, so without this the classes used by the screens in this package
+ * are never generated.
+ */
+@source ".";

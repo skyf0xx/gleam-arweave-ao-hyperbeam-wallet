@@ -30,25 +30,48 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   windows.
 - `packages/messaging`: the typed `ProtocolMap` wire contracts between
   popup, background, content script and page.
+- `packages/runtime`: `createRuntime(platform)`, the dispatcher
+  (`dispatch/`) and every handler (`handlers/`) such as `wallet-lifecycle`,
+  `reads`, `transfer`, `upload`, `approval` and `key-session`. It reaches
+  a platform only through `Platform` (`platform.ts`).
 - `packages/ui`: design tokens, primitives and shared components.
-- `apps/extension/entrypoints/`: `background`, `content`, `provider`
-  (injected into the page), `approval`, `passkey`, `sidepanel`, and
-  `popup/<screen>/`.
+- `packages/app`: every screen (`src/screens/<screen>/`), the router
+  (`src/App.tsx`) and the approval UI (`src/approval/`). It reaches a host
+  only through `AppPlatform` (`src/app-platform/`), so any shell can mount
+  it.
+- `packages/provider`: the page-world `window.arweaveWallet` script
+  (`GleamProvider`, `window.gleam`, the other-wallet router and the
+  `window.permawebConnect` shim). It reaches the wallet only through
+  `ProviderTransport` (`src/transport.ts`); `createWindowMessageTransport`
+  is the extension's `postMessage` half of the content-script relay.
+- `apps/extension`: the WXT shell. `entrypoints/` holds `background`,
+  `content`, `provider` (builds `provider.js` from `@gleam/provider`),
+  `approval`, `passkey`, `sidepanel`, `popup` and `connect`; the popup,
+  side panel and approval entrypoints only mount `@gleam/app`.
+  `src/adapters/` implements the core and runtime ports and `AppPlatform`
+  (`adapters/app-platform.ts`) on `chrome.*`; `src/hardware/` holds the
+  Ledger and Keystone transports and the device signing panels.
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
   (spec in `SCANS.md`).
-- `apps/extension/src/handlers/`: background handlers such as
-  `wallet-lifecycle`, `reads`, `transfer`, `upload`, `approval` and
-  `key-session`. `src/adapters/` implements the core ports.
 
 ## Patterns
 
 - **Hexagonal.** `core` never imports `chrome.*`, WXT or an adapter. Pass
   network access in (`fetchImpl`, URLs) and storage through `StoragePort`.
-  The background entrypoint connects adapters to handlers.
+  `runtime` is held to the same rule (no `chrome`/`browser`, `wxt/*`,
+  `@webext-core/*`, `@capacitor/*` or shell imports; ESLint enforces it).
+  The background entrypoint builds a `Platform` from the adapters and
+  hands it to `createRuntime`. `app` follows the same fence: screens
+  reach the host through `AppPlatform` (runtime client, permissions,
+  downloads, hardware wallets, passkey window), and the shell mounts
+  `<PlatformProvider platform={…}>` around `<App>`. `provider` has the
+  same fence and also may not import `@gleam/core`, `runtime`, `app`,
+  `ui`, or anything from `@gleam/messaging` but `page-protocol.ts`: it
+  runs in the page, and a transport never puts an origin in a request.
 - **UI never imports background code.** Every cross-context call goes
-  through `packages/messaging`. `src/dispatch/methods.ts` is the one table
+  through `packages/messaging`. `packages/runtime/src/dispatch/methods.ts` is the one table
   of each method's caller tier, whether it can open an approval, and the
   zod schema its page-supplied params are parsed with; the background
   dispatcher enforces it before any handler runs.
@@ -91,12 +114,12 @@ pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, apps/extension, apps/points-api, scripts/scan
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, apps/extension, apps/points-api, scripts/scan
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-six projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
+nine projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
 pass. If a change touches signing, network or extension wiring, it also
 needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 

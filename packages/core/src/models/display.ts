@@ -51,6 +51,8 @@ export type HeadlineBalance = "total" | "AR" | "AO";
 export interface DisplaySettings {
   currency: DisplayCurrency;
   showChart: boolean;
+  /** Draws token logos in place of ticker letters; off by default. */
+  showTokenLogos: boolean;
   headline: HeadlineBalance;
   /** Masks balances on the main screen, toggled by tapping the headline. */
   balancesHidden: boolean;
@@ -87,5 +89,5 @@ export function defaultDisplayCurrency(locale: string | undefined): FiatCurrency
 }
 
 export function defaultDisplaySettings(locale: string | undefined): DisplaySettings {
-  return { currency: defaultDisplayCurrency(locale), showChart: true, headline: "total", balancesHidden: false };
+  return { currency: defaultDisplayCurrency(locale), showChart: true, showTokenLogos: false, headline: "total", balancesHidden: false };
 }

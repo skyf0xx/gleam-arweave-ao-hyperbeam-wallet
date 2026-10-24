@@ -1,0 +1,63 @@
+import { render } from "@testing-library/react";
+import type { RuntimePort } from "@gleam/core";
+import type { ReactElement, ReactNode } from "react";
+import { PlatformProvider } from "./context";
+import type { AppPlatform } from "./types";
+
+export type FakeAppPlatformOverrides = Partial<Omit<AppPlatform, "buildInfo" | "capabilities">> & {
+  buildInfo?: Partial<AppPlatform["buildInfo"]>;
+  capabilities?: Partial<AppPlatform["capabilities"]>;
+};
+
+/** Tests that reach the background pass a `runtime` prop or override this. */
+const UNWIRED_RUNTIME: RuntimePort = {
+  send: async (message) => {
+    throw new Error(`fakeAppPlatform has no runtime for "${message.type}"`);
+  },
+  onMessage: () => () => {},
+};
+
+export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPlatform {
+  const state = new Map<string, unknown>();
+  return {
+    runtime: overrides.runtime ?? UNWIRED_RUNTIME,
+    buildInfo: { version: "1.2.3", ...overrides.buildInfo },
+    capabilities: {
+      sidePanel: true,
+      passkey: true,
+      biometrics: false,
+      hardwareWallets: true,
+      dappBrowser: false,
+      hostPermissions: true,
+      ...overrides.capabilities,
+    },
+    hostPermissions: overrides.hostPermissions ?? {
+      contains: async () => true,
+      request: async () => true,
+    },
+    ephemeralState: overrides.ephemeralState ?? {
+      get: async (key) => state.get(key),
+      set: async (key, value) => {
+        state.set(key, value);
+      },
+      remove: async (key) => {
+        state.delete(key);
+      },
+    },
+    unlock: overrides.unlock ?? { passkeyMode: "inline", openPasskeyWindow: async () => {} },
+    activeSite: overrides.activeSite ?? { subscribe: () => () => {} },
+    downloads: overrides.downloads ?? { requestPermission: async () => true },
+    hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },
+  };
+}
+
+/** A `renderHook`/`render` wrapper that supplies a fake platform. */
+export function platformWrapper(platform: AppPlatform = fakeAppPlatform()) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <PlatformProvider platform={platform}>{children}</PlatformProvider>;
+  };
+}
+
+export function renderWithPlatform(ui: ReactElement, platform: AppPlatform = fakeAppPlatform()) {
+  return render(ui, { wrapper: platformWrapper(platform) });
+}

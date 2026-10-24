@@ -4,8 +4,8 @@ import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { PasskeyIcon } from "@/entrypoints/popup/unlock/src/UnlockScreen";
-import { createUnlockPasskey, PasskeyError, type CreatedPasskey } from "@/src/passkey/webauthn";
+import { PasskeyIcon } from "@gleam/app/src/screens/unlock/src/UnlockScreen.tsx";
+import { createUnlockPasskey, PasskeyError, type CreatedPasskey } from "@gleam/app/src/passkey/webauthn.ts";
 
 export interface PasskeySetupProps {
   runtime: RuntimePort;

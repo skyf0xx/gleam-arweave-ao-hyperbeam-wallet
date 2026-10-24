@@ -1,11 +1,5 @@
+import type { DeviceKey, DeviceKeyPort } from "@gleam/core";
 import { deviceKeyThumbprint, type DevicePublicJwk } from "@gleam/core/src/points/index.ts";
-
-export interface DeviceKey {
-  /** RFC 7638 thumbprint of `publicKey`; the server's device id. */
-  id: string;
-  publicKey: DevicePublicJwk;
-  privateKey: CryptoKey;
-}
 
 const DB_NAME = "gleam-points";
 const STORE = "device";
@@ -68,6 +62,8 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
     req.onerror = () => reject(req.error);
   });
 }
+
+export const deviceKeyPort: DeviceKeyPort = { loadOrCreate: loadOrCreateDeviceKey };
 
 /** Test-only: forgets the in-memory promise so a fresh IndexedDB is read. */
 export function resetDeviceKeyCacheForTests(): void {

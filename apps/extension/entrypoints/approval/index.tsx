@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "@gleam/ui/src/tokens/theme.css";
-import { ApprovalRoot } from "./src/ApprovalRoot";
+import "@gleam/app/src/app.css";
+import { PlatformProvider } from "@gleam/app/src/app-platform/context.tsx";
+import { createExtensionAppPlatform } from "@/src/adapters/app-platform";
+import { ApprovalRoot } from "@gleam/app/src/approval/ApprovalRoot.tsx";
+import { DEVICE_SIGN_PANELS } from "@/src/hardware/panels";
 
 /**
  * The approval window's own real WXT entrypoint (`approval.html`) — a
@@ -15,8 +18,12 @@ import { ApprovalRoot } from "./src/ApprovalRoot";
  */
 const requestId = new URLSearchParams(location.search).get("requestId")?.trim() ?? null;
 
+const platform = createExtensionAppPlatform("window", { signPanels: DEVICE_SIGN_PANELS });
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ApprovalRoot requestId={requestId} />
+    <PlatformProvider platform={platform}>
+      <ApprovalRoot requestId={requestId} />
+    </PlatformProvider>
   </React.StrictMode>,
 );
