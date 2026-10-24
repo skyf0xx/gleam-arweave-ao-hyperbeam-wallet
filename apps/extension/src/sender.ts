@@ -1,3 +1,5 @@
+import type { CallerContext } from "@gleam/messaging/src/caller.ts";
+
 /**
  * The parts of `runtime.MessageSender` the background uses to decide who
  * sent a message. Declared locally so these checks stay plain functions
@@ -47,6 +49,19 @@ export function contentScriptOrigin(sender: MessageSenderLike | undefined, exten
 
   if (sender.origin !== undefined && sender.origin !== urlOrigin) return null;
   return urlOrigin;
+}
+
+/**
+ * The `CallerContext` for a `runtime.onMessage` sender, or null when it is
+ * neither this extension's own page nor its top-frame content script on
+ * an http(s) page. An extension page is checked first, and
+ * `contentScriptOrigin` refuses one anyway, so no sender gets both tiers.
+ */
+export function callerContext(sender: MessageSenderLike | undefined, extensionBaseUrl: string): CallerContext | null {
+  if (isExtensionPageSender(sender, extensionBaseUrl)) return { tier: "extension" };
+  const origin = contentScriptOrigin(sender, extensionBaseUrl);
+  if (!origin) return null;
+  return { tier: "contentScript", origin, tabId: sender?.tab?.id };
 }
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);

@@ -21,6 +21,7 @@ split.
 - [`keyring-protocol.ts`](#keyring-protocolts) — the background ↔ keyring port contract
 - [`site-protocol.ts`](#site-protocolts) — the Gleam site → extension messages
 - [`permissions.ts`](#permissionsts) — re-exported privilege-tier vocabulary
+- [`caller.ts`](#callerts) — who sent a message, as the platform attests it
 
 ### protocol.ts
 
@@ -89,6 +90,15 @@ tiers (`PROVIDER_METHODS`, `APPROVAL_METHODS`, `KEY_METHODS`) from
 `@gleam/core`. This package is the messaging contract's named home for
 that vocabulary, even though the tiers themselves are core domain
 concepts.
+
+### caller.ts
+
+Defines `CallerContext`, the caller the background dispatcher sees for
+each message: the `extension` tier for the wallet's own pages, or the
+`contentScript` tier with the page's `origin` and `tabId`. The
+extension's transport builds it from Chrome's `runtime.MessageSender`
+(`apps/extension/src/sender.ts`), never from the message body, so a page
+can't name its own origin or tier.
 
 ## How it's used
 

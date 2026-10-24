@@ -26,6 +26,7 @@ import {
 } from "@gleam/core";
 import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gateway.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import {
   PROVIDER_EVENT,
   type ConnectEventPayload,
@@ -78,7 +79,7 @@ import {
   type PageMethodSpec,
   type PageParams,
 } from "@/src/dispatch/methods";
-import { contentScriptOrigin, isExtensionPageSender, isSecureSigningOrigin } from "@/src/sender";
+import { callerContext, isSecureSigningOrigin } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
 import { redeemSiteInvite } from "@/src/points-invite";
 import { signSiteAttestation, siteAttestStatus } from "@/src/points-attest";
@@ -714,11 +715,7 @@ function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walle
   return draft as T & { walletId: string };
 }
 
-/** A content script's call, from the tab Chrome says sent it. */
-interface ContentScriptCaller {
-  origin: string;
-  tabId: number | undefined;
-}
+type ContentScriptCaller = Extract<CallerContext, { tier: "contentScript" }>;
 
 type MessageHandlers = {
   [K in BackgroundMessage]: (typeof BACKGROUND_MESSAGES)[K] extends ContentScriptMethodSpec<infer S>
@@ -904,26 +901,34 @@ const MESSAGE_HANDLERS: MessageHandlers = {
 };
 
 /**
- * Registers every `BACKGROUND_MESSAGES` method. A content script shares
- * the extension's messaging channel, so each call is checked against
- * Chrome's `sender` before its params are parsed or its handler runs:
- * without that, a compromised page's content script could export keys or
- * approve its own requests.
+ * Runs `type`'s handler if `caller` holds its `BACKGROUND_MESSAGES` tier,
+ * checked before its params are parsed or its handler runs. A content
+ * script shares the extension's messaging channel, so without this a
+ * compromised page's content script could export keys or approve its own
+ * requests. A null `caller` matches no tier.
  */
-function registerMessage(type: BackgroundMessage): void {
+function dispatchMessage(type: BackgroundMessage, data: unknown, caller: CallerContext | null): unknown {
   const spec: ExtensionMethodSpec | ContentScriptMethodSpec = BACKGROUND_MESSAGES[type];
   const handle = MESSAGE_HANDLERS[type] as (data: unknown, caller?: ContentScriptCaller) => unknown;
-  messenger.onMessage(type, (message) => {
-    if (spec.tier === "extension") {
-      if (!isExtensionPageSender(message.sender, extensionBaseUrl)) {
-        throw new Error(`"${type}" can only be called from the Gleam extension.`);
-      }
-      return handle(message.data) as never;
+  if (spec.tier === "extension") {
+    if (caller?.tier !== "extension") {
+      throw new Error(`"${type}" can only be called from the Gleam extension.`);
     }
-    const origin = contentScriptOrigin(message.sender, extensionBaseUrl);
-    if (!origin) throw new Error(`${type} is only accepted from a web page's content script.`);
-    return handle(parseParams(spec.params, message.data), { origin, tabId: message.sender.tab?.id }) as never;
-  });
+    return handle(data);
+  }
+  if (caller?.tier !== "contentScript") throw new Error(`${type} is only accepted from a web page's content script.`);
+  return handle(parseParams(spec.params, data), caller);
+}
+
+/**
+ * Registers every `BACKGROUND_MESSAGES` method. The caller comes from
+ * Chrome's `sender` for the message, never from its body.
+ */
+function registerMessage(type: BackgroundMessage): void {
+  messenger.onMessage(
+    type,
+    (message) => dispatchMessage(type, message.data, callerContext(message.sender, extensionBaseUrl)) as never,
+  );
 }
 
 for (const type of Object.keys(BACKGROUND_MESSAGES) as BackgroundMessage[]) registerMessage(type);
