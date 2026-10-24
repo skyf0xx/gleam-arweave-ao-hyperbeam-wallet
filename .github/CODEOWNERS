@@ -32,6 +32,8 @@
 /packages/core/src/arweave/upload.ts                                       @skyf0xx
 /apps/extension/src/handlers/transfer.ts                                   @skyf0xx
 /apps/extension/src/handlers/upload.ts                                     @skyf0xx
+/packages/core/src/hardware/                                               @skyf0xx
+/packages/core/src/points/ownership.ts                                     @skyf0xx
 /apps/extension/src/handlers/points.ts                                     @skyf0xx
 
 # 3 Trust boundary between pages and the wallet

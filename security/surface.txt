@@ -38,6 +38,8 @@
 2 packages/core/src/arweave/upload.ts
 2 apps/extension/src/handlers/transfer.ts
 2 apps/extension/src/handlers/upload.ts
+2 packages/core/src/hardware/
+2 packages/core/src/points/ownership.ts
 2 apps/extension/src/handlers/points.ts
 
 3 apps/extension/entrypoints/background/
