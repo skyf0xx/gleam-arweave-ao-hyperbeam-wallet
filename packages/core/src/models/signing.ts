@@ -145,28 +145,8 @@ export interface DecryptResult {
 }
 
 /**
- * `signature()`: ArConnect-deprecated (superseded by `sign`/`signMessage`/
- * `signDataItem`), kept because some existing dApp integrations still
- * call it. Produces a raw RSA-PSS signature over arbitrary data —
- * narrower than `signMessage` (which additionally supports
- * `hashAlgorithm`).
- */
-export interface SignatureRequest {
-  walletId: string;
-  /** Base64-encoded data to sign. */
-  data: string;
-  options?: Record<string, unknown>;
-}
-
-export interface SignatureResult {
-  /** Base64-encoded raw signature bytes. */
-  signature: string;
-}
-
-/**
  * `signMessage` accepts an `ArrayBuffer` directly per
- * Wander's convention (not a base64 string like `signature()`'s older
- * shape) — tagged as `TaggedArrayBuffer` at the wire-envelope layer since
+ * Wander's convention — tagged as `TaggedArrayBuffer` at the wire-envelope layer since
  * raw `ArrayBuffer` doesn't survive `@webext-core/messaging`'s envelope
  * as-is; this model only pins the logical shape both sides agree on.
  */

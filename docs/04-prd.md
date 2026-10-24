@@ -49,7 +49,7 @@ rule — Phase 1 mining reads only these two.
   ArConnect-compatible method surface (`connect, disconnect,
   getPermissions, getActiveAddress, getAllAddresses, getActivePublicKey,
   getWalletNames, getArweaveConfig, getBalances, sign, dispatch, encrypt,
-  decrypt, signature, signMessage, verifyMessage,
+  decrypt, signMessage, verifyMessage,
   signDataItem, batchSignDataItem`). A page-originated message can only
   ever reach this method set — never the key-management methods
   (`createWallet`, `importWallet`, `downloadKeyfile`).

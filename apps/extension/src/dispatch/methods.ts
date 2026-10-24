@@ -16,7 +16,6 @@ import {
   readEncryptAlgorithm,
   readHashAlgorithm,
   readProcessId,
-  readSaltLength,
   readTransaction,
   type ProviderTransaction,
 } from "@/src/handlers/provider-params";
@@ -199,14 +198,6 @@ export const PAGE_METHODS = {
     params: z.object({
       data: reader((value) => readBytes(value, "data", "reject")),
       options: reader((value) => readEncryptAlgorithm(value, "decrypt")),
-    }),
-  }),
-  signature: page({
-    approval: true,
-    grant: true,
-    params: z.object({
-      data: reader((value) => readBytes(value, "data")),
-      options: reader((value) => readSaltLength(value, "signature")),
     }),
   }),
   signMessage: page({

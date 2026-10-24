@@ -12,7 +12,6 @@ export type ApprovalKind =
   | "encrypt"
   | "decrypt"
   | "transferAoTokens"
-  | "signature"
   | "signMessage"
   | "addToken"
   | "transfer"
@@ -68,7 +67,6 @@ export interface SigningApprovalPreview {
     | "encrypt"
     | "decrypt"
     | "transferAoTokens"
-    | "signature"
     | "signMessage"
     | "transfer"
     | "pointsProof";

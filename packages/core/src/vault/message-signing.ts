@@ -1,7 +1,7 @@
 import type { Signer } from "./signer";
 
 /**
- * `signMessage()`/`signature()`/`verifyMessage()` over
+ * `signMessage()`/`verifyMessage()` over
  * WebCrypto, built the way Wander (and permawebOS) build them so a
  * signature from either wallet verifies with the other's `verifyMessage`
  * and with arweave-js's `crypto.verify`:
@@ -9,13 +9,11 @@ import type { Signer } from "./signer";
  * - `signMessage` hashes the data with `hashAlgorithm` first, then signs
  *   that digest with RSA-PSS (same hash, salt length 32).
  * - `verifyMessage` recomputes the digest and checks it the same way.
- * - `signature` is the deprecated raw form: RSA-PSS/SHA-256 straight over
- *   the data, salt length from `saltLength` (default 32).
  */
 
 export type MessageHashAlgorithm = "SHA-256" | "SHA-384" | "SHA-512";
 
-/** Wander's fixed salt length for `signMessage`/`verifyMessage`, and `signature`'s default. */
+/** Wander's fixed salt length for `signMessage`/`verifyMessage`. */
 const WANDER_SALT_LENGTH = 32;
 
 async function importRsaPssPublicKey(publicKeyModulus: string, hash: MessageHashAlgorithm): Promise<CryptoKey> {
@@ -36,23 +34,6 @@ export async function signMessage(
 ): Promise<ArrayBuffer> {
   const digest = new Uint8Array(await crypto.subtle.digest(hashAlgorithm, data));
   return (await signer.signPss(digest, { hash: hashAlgorithm, saltLength: WANDER_SALT_LENGTH })).buffer;
-}
-
-export interface SignatureOptions {
-  saltLength?: number;
-}
-
-/** Wander's deprecated `signature()`: RSA-PSS/SHA-256 over the raw data. */
-export async function signature(
-  signer: Signer,
-  data: ArrayBuffer,
-  options: SignatureOptions = {},
-): Promise<ArrayBuffer> {
-  const saltLength = options.saltLength ?? WANDER_SALT_LENGTH;
-  if (!Number.isSafeInteger(saltLength) || saltLength < 0) {
-    throw new Error(`saltLength must be a non-negative integer, got ${String(saltLength)}.`);
-  }
-  return (await signer.signPss(new Uint8Array(data), { hash: "SHA-256", saltLength })).buffer;
 }
 
 /**

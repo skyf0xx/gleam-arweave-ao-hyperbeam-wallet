@@ -45,7 +45,6 @@ describe("method privilege tiers", () => {
         "dispatch",
         "encrypt",
         "decrypt",
-        "signature",
         "signMessage",
         "verifyMessage",
         "signDataItem",

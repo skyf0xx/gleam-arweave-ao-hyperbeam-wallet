@@ -1,14 +1,14 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import { signerFromJwk, generateJWK } from "../signer/keys";
 import Arweave from "arweave";
-import { signMessage, signature, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
+import { signMessage, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
 import { base64UrlToBytes } from "./base64";
 import type { JWKInterface } from "../models/wallet";
 
 type Hash = MessageHashAlgorithm;
 
 /**
- * permawebOS's `signMessage`/`verifyMessage`/`signature`, transcribed from
+ * permawebOS's `signMessage`/`verifyMessage`, transcribed from
  * its bundle (`browserWalletApi`), as the reference for Wander's
  * construction.
  */
@@ -26,16 +26,6 @@ const permawebOS = {
     const digest = await crypto.subtle.digest(hash, data);
     const key = await crypto.subtle.importKey("jwk", { kty: "RSA", e: "AQAB", n, ext: true }, { name: "RSA-PSS", hash }, false, ["verify"]);
     return crypto.subtle.verify({ name: "RSA-PSS", saltLength: 32 }, key, sig, digest);
-  },
-  async verifySignature(n: string, data: ArrayBuffer, sig: ArrayBuffer, saltLength = 32): Promise<boolean> {
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      { kty: "RSA", e: "AQAB", n, ext: true },
-      { name: "RSA-PSS", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-    return crypto.subtle.verify({ name: "RSA-PSS", saltLength }, key, sig, data);
   },
 };
 
@@ -124,43 +114,16 @@ describe("vault/message-signing", () => {
     it("does not verify a signature over the raw data", async () => {
       const data = bytes("raw, not hashed");
 
-      const raw = await signature(signerFromJwk(jwk, ""), data);
+      const raw = (await signerFromJwk(jwk, "").signPss(new Uint8Array(data), { hash: "SHA-256", saltLength: 32 })).buffer;
 
       await expect(verifyMessage(jwk.n, data, raw)).resolves.toBe(false);
-    });
-  });
-
-  describe("signature (deprecated)", () => {
-    it("signs the raw data with salt length 32 by default, as permawebOS does", async () => {
-      const data = bytes("legacy signature payload");
-
-      const sig = await signature(signerFromJwk(jwk, ""), data);
-
-      await expect(permawebOS.verifySignature(jwk.n, data, sig, 32)).resolves.toBe(true);
-      await expect(permawebOS.verifySignature(jwk.n, data, sig, 0)).resolves.toBe(false);
-    });
-
-    it("honours saltLength", async () => {
-      const data = bytes("salted");
-
-      const sig = await signature(signerFromJwk(jwk, ""), data, { saltLength: 0 });
-
-      await expect(permawebOS.verifySignature(jwk.n, data, sig, 0)).resolves.toBe(true);
-      await expect(permawebOS.verifySignature(jwk.n, data, sig, 32)).resolves.toBe(false);
-    });
-
-    it("rejects a negative or fractional saltLength", async () => {
-      await expect(signature(signerFromJwk(jwk, ""), bytes("x"), { saltLength: -1 })).rejects.toThrow(/saltLength/);
-      await expect(signature(signerFromJwk(jwk, ""), bytes("x"), { saltLength: 1.5 })).rejects.toThrow(/saltLength/);
     });
 
     it("signs with a stored JWK whose alg/key_ops name another algorithm", async () => {
       const data = bytes("hinted key");
       const hinted = { ...jwk, alg: "RSA-OAEP-256", key_ops: ["decrypt"] } as JWKInterface;
 
-      await expect(permawebOS.verifySignature(jwk.n, data, await signature(signerFromJwk(hinted, ""), data))).resolves.toBe(true);
       await expect(verifyMessage(jwk.n, data, await signMessage(signerFromJwk(hinted, ""), data))).resolves.toBe(true);
     });
   });
-
 });

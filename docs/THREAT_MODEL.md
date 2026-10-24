@@ -254,13 +254,21 @@ count as a finding.
 - **`privateHash` is refused.** Wander's `privateHash` digests the
   private key itself. Gleam's unlocked keys are non-extractable, so it
   can't compute one, and handing sites a value derived from the key is
-  a risk with no matching need: `encrypt`, `decrypt` and `signature`
+  a risk with no matching need: `encrypt`, `decrypt` and `signMessage`
   cover its uses. Every site gets the same error, before any grant
   check, and no window opens (`REFUSED_PROVIDER_METHODS` in
   `packages/core/src/models/method-privileges.ts`).
   *Still a finding if,* by any path, `privateHash` resolves, or any
   provider method returns a value derived from private key material
   other than a signature or decryption the user approved.
+- **The deprecated `signature` is refused.** Wander's `signature` signs
+  RSA-PSS straight over the bytes a site passes, with a salt length the
+  site picks. A site that passes a hash it computed gets a signature
+  equal to `signMessage` over a message, or to a transaction or data item
+  signature, that no preview can decode, including a Gleam Points proof
+  `signMessage` refuses. It is refused the same way as `privateHash`.
+  *Still a finding if,* by any path, a page gets an RSA-PSS signature
+  over bytes it chose without Gleam hashing or encoding them itself.
 - **The content security policy limits connections and scripts, not
   hosts or images.** `apps/extension/src/csp.ts` sets `script-src 'self'
   'wasm-unsafe-eval'`, `object-src 'none'`, `base-uri 'none'` and
@@ -305,8 +313,7 @@ These are true of the current release.
 - **Hardware wallets sign only part of the API.** Ledger signs AR
   transactions only: the Ledger Arweave app has no data-item command, so
   AO sends and `signDataItem` are off. Keystone signs transactions, data
-  items and messages, but not `signature()`, which needs raw bytes
-  signed. Neither decrypts or exports, since the key stays on the device
+  items and messages. Neither decrypts or exports, since the key stays on the device
   (`core/models/capabilities.ts`).
 - **No independent audit has been completed.**
 

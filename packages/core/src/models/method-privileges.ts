@@ -24,7 +24,6 @@ export const PROVIDER_METHODS = [
   "dispatch",
   "encrypt",
   "decrypt",
-  "signature",
   "signMessage",
   "verifyMessage",
   "signDataItem",
@@ -41,9 +40,13 @@ export const PROVIDER_METHODS = [
  * error instead of `undefined`, but that the background refuses before
  * any grant check or approval window. `privateHash` digests the private
  * exponent's text, which non-extractable session keys can't provide.
+ * `signature` signs dApp-chosen bytes raw, so a site could pass a hash it
+ * computed and get a `signMessage`, transaction or Gleam Points signature
+ * no preview could reveal.
  */
 export const REFUSED_PROVIDER_METHODS = {
   privateHash: "privateHash is not supported. Use encrypt/decrypt instead.",
+  signature: "signature is not supported. Use signMessage or signDataItem instead.",
 } as const;
 
 /** Reachable only from the approval window. */

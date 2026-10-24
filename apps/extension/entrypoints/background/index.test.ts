@@ -366,6 +366,19 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     expect(windowsCreate).not.toHaveBeenCalled();
   });
 
+  it("refuses signature for any site, even one with a grant, without opening a window", async () => {
+    await setItem("local:grants", [
+      { origin: "https://dapp.example", walletId: "wallet-1", permissions: [...PERMISSION_TYPES], createdAt: 0, expiresAt: null, budget: null },
+    ]);
+    const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]), options: { name: "RSA-PSS", saltLength: 32 } });
+    for (const origin of ["https://dapp.example", "https://not-connected.example", "http://dapp.example"]) {
+      expect(() => providerCall({ origin, method: "signature", params })).toThrow(
+        "signature is not supported. Use signMessage or signDataItem instead.",
+      );
+    }
+    expect(windowsCreate).not.toHaveBeenCalled();
+  });
+
   describe("plain-http origins", () => {
     const HTTP_ORIGIN = "http://dapp.example";
 
@@ -428,7 +441,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await seedUnlockedWalletWithGrant(HTTP_ORIGIN);
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
 
-      expect(() => providerCall({ origin: HTTP_ORIGIN, method: "signature", params })).toThrow(
+      expect(() => providerCall({ origin: HTTP_ORIGIN, method: "signMessage", params })).toThrow(
         "Gleam only works with secure (https) sites.",
       );
       expect(() => providerCall({ origin: HTTP_ORIGIN, method: "connect", params: {} })).toThrow(
@@ -445,7 +458,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
           providerCall({ origin, method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } }),
         ).resolves.toBeDefined();
         const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
-        void providerCall({ origin, method: "signature", params }).catch(() => undefined);
+        void providerCall({ origin, method: "signMessage", params }).catch(() => undefined);
         await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
       },
     );
@@ -500,7 +513,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     it("an https site with a grant still reaches the approval window", async () => {
       await seedUnlockedWalletWithGrant("https://dapp.example");
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
-      void providerCall({ origin: "https://dapp.example", method: "signature", params }).catch(() => undefined);
+      void providerCall({ origin: "https://dapp.example", method: "signMessage", params }).catch(() => undefined);
       await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
     });
   });
@@ -1256,7 +1269,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await registeredHandlers.get("switchWallet")!({ data: { walletId: "wallet-2" } });
 
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
-      void providerCall({ origin: ORIGIN, method: "signature", params }).catch(() => undefined);
+      void providerCall({ origin: ORIGIN, method: "signMessage", params }).catch(() => undefined);
 
       await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
       const pending = (await getItem("session:pendingApprovals")) as Array<{ walletId: string }>;
@@ -1295,7 +1308,6 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
     it.each([
       ["ledger", "signMessage", "sign messages"],
-      ["ledger", "signature", "sign with the deprecated signature()"],
       ["ledger", "decrypt", "decrypt data"],
     ] as const)("%s refuses %s", async (walletMethod, method, action) => {
       await seedHardwareWallet(walletMethod);
@@ -1517,7 +1529,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     it("deleting a wallet still rejects the approvals waiting on it", async () => {
       await seed(["wallet-1", "wallet-2"], "wallet-2");
       const params = encodeTaggedBinary({ data: new Uint8Array([1, 2, 3]) });
-      const call = providerCall({ origin: "https://a.example", method: "signature", params });
+      const call = providerCall({ origin: "https://a.example", method: "signMessage", params });
       const rejected = expect(call).rejects.toThrow(/wallet was removed/i);
       await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled());
 

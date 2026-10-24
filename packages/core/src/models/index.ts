@@ -130,8 +130,6 @@ export type {
   EncryptResult,
   DecryptRequest,
   DecryptResult,
-  SignatureRequest,
-  SignatureResult,
   SignMessageRequest,
   SignMessageResult,
   VerifyMessageRequest,

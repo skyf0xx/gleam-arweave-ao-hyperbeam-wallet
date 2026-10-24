@@ -197,29 +197,11 @@ describe("provider message methods, end to end", () => {
     await expect(wallet.verifyMessage(message, signature)).resolves.toBe(false);
   });
 
-  it("signature returns the raw signature bytes", async () => {
-    const { result } = await approved<Uint8Array>(wallet.signature(new Uint8Array([1, 2, 3]), { name: "RSA-PSS", saltLength: 32 }));
-    expect(ArrayBuffer.isView(result)).toBe(true);
-    expect(result.byteLength).toBe(512);
-  });
-
-  it("signature carries saltLength through to the signer", async () => {
-    const data = new Uint8Array([4, 5, 6]);
-    const { result } = await approved<Uint8Array>(wallet.signature(data, { name: "RSA-PSS", saltLength: 0 }));
-
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      { kty: "RSA", e: "AQAB", n: jwk.n },
-      { name: "RSA-PSS", hash: "SHA-256" },
-      false,
-      ["verify"],
+  it("signature is still defined but refused, without opening a window", async () => {
+    expect(typeof wallet.signature).toBe("function");
+    await expect(wallet.signature(new Uint8Array([1, 2, 3]), { name: "RSA-PSS", saltLength: 32 })).rejects.toThrow(
+      "signature is not supported. Use signMessage or signDataItem instead.",
     );
-    await expect(crypto.subtle.verify({ name: "RSA-PSS", saltLength: 0 }, key, new Uint8Array(result), data)).resolves.toBe(true);
-    await expect(crypto.subtle.verify({ name: "RSA-PSS", saltLength: 32 }, key, new Uint8Array(result), data)).resolves.toBe(false);
-  });
-
-  it("signature refuses options that aren't RSA-PSS before asking for approval", async () => {
-    await expect(wallet.signature(new Uint8Array([1]), { name: "RSASSA-PKCS1-v1_5" })).rejects.toThrow(/RSA-PSS/);
     expect(windowsCreate).not.toHaveBeenCalled();
   });
 

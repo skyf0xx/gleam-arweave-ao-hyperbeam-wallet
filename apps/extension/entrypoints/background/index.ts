@@ -494,10 +494,6 @@ const PROVIDER_HANDLERS: ProviderHandlers = {
     });
   },
 
-  async signature({ data, options }, { origin, activeWalletId }) {
-    return approval.requestApproval({ kind: "signature", origin, walletId: activeWalletId(), payload: data, saltLength: options });
-  },
-
   async signMessage({ data, options: hashAlgorithm }, { origin, wallet, activeWalletId }) {
     if (
       wallet &&

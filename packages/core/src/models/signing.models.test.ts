@@ -8,7 +8,6 @@ import type {
   EncryptAlgorithm,
   EncryptRequest,
   RsaOaepParams,
-  SignatureRequest,
   SignDataItemRequest,
   SignDataItemResult,
   SignMessageRequest,
@@ -72,14 +71,6 @@ describe("signing/crypto model shapes", () => {
     const decryptRequest: DecryptRequest = { walletId: "wallet-1", data: "Y2lwaGVydGV4dA==", algorithm: rsaOaep };
     expect(request.algorithm).toBe(rsaOaep);
     expect(decryptRequest.algorithm.name).toBe("RSA-OAEP");
-  });
-
-  it("signature() carries a walletId and base64 data — deprecated in favor of sign/signMessage/signDataItem", () => {
-    const request: SignatureRequest = {
-      walletId: "wallet-1",
-      data: "cGxhaW50ZXh0",
-    };
-    expect(request.walletId).toBe("wallet-1");
   });
 
   it("signMessage accepts ArrayBuffer directly, not a base64 string", () => {
