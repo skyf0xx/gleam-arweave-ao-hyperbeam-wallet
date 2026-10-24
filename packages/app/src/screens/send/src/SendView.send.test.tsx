@@ -111,7 +111,7 @@ function routedSend(handlers: {
       case "getState":
         return handlers.getState?.() ?? { wallets: [WALLET], activeWalletId: WALLET.id, session: null };
       case "getDisplaySettings":
-        return { currency: "USD", showChart: true, headline: "total", balancesHidden: false };
+        return { currency: "USD", showChart: true, showTokenLogos: false, headline: "total", balancesHidden: false };
       case "getTokenPrices":
         return handlers.getTokenPrices?.() ?? [];
       case "saveContact":

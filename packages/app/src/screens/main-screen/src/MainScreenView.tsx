@@ -361,6 +361,7 @@ export function MainScreenView({
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
   const showChart = displaySettings?.showChart ?? true;
+  const showTokenLogos = displaySettings?.showTokenLogos ?? false;
   const masked = displaySettings?.balancesHidden ?? false;
   const toggleMasked = () => void updateDisplaySettings({ balancesHidden: !masked });
   const tokenPricesQuery = useTokenPrices(runtime, currency);
@@ -726,7 +727,7 @@ export function MainScreenView({
                     defaultHidden: false,
                     node: (
                       <TokenRow
-                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: row.logoUrl }}
+                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: showTokenLogos ? row.logoUrl : undefined }}
                         name={row.name}
                         amount={masked ? HIDDEN_AMOUNT : row.amount}
                         value={masked && row.value !== undefined ? HIDDEN_AMOUNT : row.value}
@@ -755,7 +756,7 @@ export function MainScreenView({
                           glyph={{
                             label: token.ticker.slice(0, 2).toUpperCase(),
                             tone: 2,
-                            logoUrl: shownTokenLogo(token, rowVisibility),
+                            logoUrl: shownTokenLogo(token, rowVisibility, showTokenLogos),
                           }}
                           name={token.ticker}
                           amount={

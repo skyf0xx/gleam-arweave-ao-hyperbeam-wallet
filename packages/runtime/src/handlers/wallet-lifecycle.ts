@@ -248,6 +248,7 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
   return (
     isDisplayCurrency(record.currency) &&
     typeof record.showChart === "boolean" &&
+    typeof record.showTokenLogos === "boolean" &&
     isHeadlineBalance(record.headline) &&
     typeof record.balancesHidden === "boolean"
   );
@@ -255,8 +256,16 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
   const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
-  if (isDisplaySettings(raw)) {
-    return { currency: raw.currency, showChart: raw.showChart, headline: raw.headline, balancesHidden: raw.balancesHidden };
+  // Settings saved before the logo toggle existed lack `showTokenLogos`; keep the rest of them.
+  const withLogos = raw !== null && typeof raw === "object" ? { showTokenLogos: false, ...raw } : raw;
+  if (isDisplaySettings(withLogos)) {
+    return {
+      currency: withLogos.currency,
+      showChart: withLogos.showChart,
+      showTokenLogos: withLogos.showTokenLogos,
+      headline: withLogos.headline,
+      balancesHidden: withLogos.balancesHidden,
+    };
   }
   return defaultDisplaySettings(globalThis.navigator?.language);
 }
@@ -1120,6 +1129,7 @@ export class WalletLifecycleHandler {
     await this.storage.set(DISPLAY_SETTINGS_KEY, {
       currency: req.currency,
       showChart: req.showChart,
+      showTokenLogos: req.showTokenLogos,
       headline: req.headline,
       balancesHidden: req.balancesHidden,
     });

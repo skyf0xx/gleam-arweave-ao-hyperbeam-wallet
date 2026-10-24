@@ -26,11 +26,13 @@ export function writeRowVisibility(address: string, visibility: RowVisibility): 
 }
 
 /**
- * The logo to draw for `token`. Anyone can send a wallet a token wearing a
- * lookalike logo, so a discovered token shows its letters until the user
- * chooses Show on its row; from then on they have vouched for it.
+ * The logo to draw for `token`, or none while the Token logos display
+ * setting is off. Anyone can send a wallet a token wearing a lookalike logo,
+ * so a discovered token shows its letters until the user chooses Show on its
+ * row; from then on they have vouched for it.
  */
-export function shownTokenLogo(token: TokenBalance, visibility: RowVisibility): string | undefined {
+export function shownTokenLogo(token: TokenBalance, visibility: RowVisibility, showLogos: boolean): string | undefined {
+  if (!showLogos) return undefined;
   if (token.source === "discovered" && visibility[token.processId] !== "shown") return undefined;
   return token.logoUrl ?? undefined;
 }

@@ -186,6 +186,12 @@ export function SettingsHomeView({
             onToggle={() => void updateDisplay({ showChart: !(display?.showChart ?? true) })}
           />
           <ToggleRow
+            title="Token logos"
+            checked={display?.showTokenLogos ?? false}
+            disabled={!display}
+            onToggle={() => void updateDisplay({ showTokenLogos: !(display?.showTokenLogos ?? false) })}
+          />
+          <ToggleRow
             title="Dark mode"
             checked={theme === "dark"}
             disabled={savingTheme}

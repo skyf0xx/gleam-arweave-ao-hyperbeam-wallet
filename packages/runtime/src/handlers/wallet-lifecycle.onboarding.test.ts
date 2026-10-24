@@ -1030,17 +1030,18 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
 });
 
 describe("WalletLifecycleHandler: display settings", () => {
-  const settings = { currency: "EUR", showChart: false, headline: "AO", balancesHidden: true } as const;
+  const settings = { currency: "EUR", showChart: false, showTokenLogos: true, headline: "AO", balancesHidden: true } as const;
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("defaults to the locale's currency with the chart and total value shown", async () => {
+  it("defaults to the locale's currency with the chart and total value shown and token logos off", async () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     vi.spyOn(navigator, "language", "get").mockReturnValue("en-KE");
 
     expect(await handler.getDisplaySettings()).toEqual({
       currency: "KES",
       showChart: true,
+      showTokenLogos: false,
       headline: "total",
       balancesHidden: false,
     });
@@ -1050,6 +1051,14 @@ describe("WalletLifecycleHandler: display settings", () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await handler.setDisplaySettings(settings);
     expect(await handler.getDisplaySettings()).toEqual(settings);
+  });
+
+  it("keeps a record stored before the token logo toggle, with logos off", async () => {
+    const storage = createFakeStorage();
+    const older = { currency: settings.currency, showChart: settings.showChart, headline: settings.headline, balancesHidden: settings.balancesHidden };
+    await storage.set("local:displaySettings", older);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
+    expect(await handler.getDisplaySettings()).toEqual({ ...older, showTokenLogos: false });
   });
 
   it("drops a malformed stored record back to the default", async () => {
