@@ -84,6 +84,9 @@ importers:
       '@gleam/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@gleam/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       '@gleam/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -202,6 +205,25 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime:
+    dependencies:
+      '@gleam/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gleam/messaging':
+        specifier: workspace:*
+        version: link:../messaging
+      zod:
+        specifier: ^4.6.6
+        version: 4.6.6
+    devDependencies:
+      hash-wasm:
+        specifier: 4.12.0
+        version: 4.12.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

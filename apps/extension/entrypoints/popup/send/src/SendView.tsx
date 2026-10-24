@@ -48,7 +48,7 @@ const WINSTON_PER_AR = 1_000_000_000_000n;
  *
  * No password prompt here: `estimateTransfer`/`submitTransfer` read the
  * signing key from the background's in-memory unlocked-session cache
- * (`apps/extension/src/handlers/key-session.ts`), not from this request —
+ * (`packages/runtime/src/handlers/key-session.ts`), not from this request —
  * see that file's doc comment. `App.tsx`'s `resolveTopView` already keeps
  * an unauthenticated user on the unlock screen, so `SendView` only ever
  * mounts once a wallet is unlocked.

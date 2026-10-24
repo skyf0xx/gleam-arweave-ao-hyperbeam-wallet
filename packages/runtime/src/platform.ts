@@ -8,7 +8,7 @@ import type {
   TimerPort,
 } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
-import type { SiteTab } from "@/src/handlers/site-wallet";
+import type { SiteTab } from "./handlers/site-wallet";
 
 /** `ProtocolMap` messages the runtime pushes to a site's open pages. */
 export type TabPush = "providerEvent" | "siteWalletMode";
@@ -50,4 +50,6 @@ export interface Platform {
   tabs: TabsPort;
   /** The wallet's release version, as reported to the scans API. */
   version(): string;
+  /** True in a development build, which also takes site messages from localhost. */
+  dev: boolean;
 }

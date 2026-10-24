@@ -103,8 +103,9 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Dispatch (tier 3)
 
-`src/dispatch/methods.ts`, `src/dispatch/site.ts`, `src/sender.ts`,
-`handlers/provider-params.ts`.
+`packages/runtime/src/dispatch/methods.ts`, `packages/runtime/src/dispatch/site.ts`,
+`apps/extension/src/sender.ts`, `packages/core/src/policy/signing-origin.ts`,
+`packages/runtime/src/handlers/provider-params.ts`.
 
 - Each method's caller tier, and whether it can open an approval.
 - Does any method's zod schema accept something its handler doesn't

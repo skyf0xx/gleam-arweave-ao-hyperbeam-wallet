@@ -11,11 +11,11 @@ import { actionBadge, actionLockIcon } from "@/src/adapters/badge";
 import { alarmTimer } from "@/src/adapters/timer";
 import { browserDownloads, watchDownloadHistory } from "@/src/adapters/downloads";
 import { createBrowserTabs } from "@/src/adapters/tabs";
-import { BACKGROUND_MESSAGES, type BackgroundMessage } from "@/src/dispatch/methods";
+import { BACKGROUND_MESSAGES, type BackgroundMessage } from "@gleam/runtime/src/dispatch/methods.ts";
 import { callerContext, externalCallerContext } from "@/src/sender";
 import { handleInstalledSitePages } from "@/src/site-pages";
-import { createRuntime } from "@/src/runtime/create-runtime";
-import type { Platform } from "@/src/runtime/platform";
+import { createRuntime } from "@gleam/runtime/src/create-runtime.ts";
+import type { Platform } from "@gleam/runtime/src/platform.ts";
 
 /**
  * The background service worker: the extension's `Platform` and the
@@ -40,6 +40,7 @@ const platform: Platform = {
   downloads: browserDownloads,
   tabs: createBrowserTabs(messenger),
   version: () => browser.runtime.getManifest().version,
+  dev: import.meta.env.DEV,
 };
 // Synchronous at the top level: it adds the alarm and window listeners that
 // MV3 only delivers a waking event to when added in the worker's first turn.

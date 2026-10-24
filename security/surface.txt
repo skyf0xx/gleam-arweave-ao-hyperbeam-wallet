@@ -19,9 +19,9 @@
 1 apps/extension/entrypoints/keyring/
 1 apps/extension/src/adapters/offscreen-keyring.ts
 1 apps/extension/src/adapters/session-key-store.ts
-1 apps/extension/src/handlers/key-session.ts
-1 apps/extension/src/handlers/wallet-lifecycle.ts
-1 apps/extension/src/handlers/passkey.ts
+1 packages/runtime/src/handlers/key-session.ts
+1 packages/runtime/src/handlers/wallet-lifecycle.ts
+1 packages/runtime/src/handlers/passkey.ts
 1 apps/extension/src/passkey/
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
@@ -36,26 +36,30 @@
 2 packages/core/src/arweave/transaction.ts
 2 packages/core/src/arweave/transfer.ts
 2 packages/core/src/arweave/upload.ts
-2 apps/extension/src/handlers/transfer.ts
-2 apps/extension/src/handlers/upload.ts
+2 packages/runtime/src/handlers/transfer.ts
+2 packages/runtime/src/handlers/upload.ts
 2 packages/core/src/hardware/
 2 packages/core/src/points/ownership.ts
-2 apps/extension/src/handlers/points.ts
+2 packages/runtime/src/handlers/points.ts
 
 3 apps/extension/entrypoints/background/
+3 packages/runtime/src/create-runtime.ts
+3 packages/runtime/src/dispatch/site.ts
+3 packages/core/src/models/site-origin.ts
 3 apps/extension/entrypoints/content/
 3 apps/extension/entrypoints/provider/
-3 apps/extension/src/handlers/provider-params.ts
+3 packages/runtime/src/handlers/provider-params.ts
 3 apps/extension/src/sender.ts
-3 apps/extension/src/dispatch/methods.ts
+3 packages/core/src/policy/signing-origin.ts
+3 packages/runtime/src/dispatch/methods.ts
 3 packages/messaging/
 
-4 apps/extension/src/handlers/approval.ts
+4 packages/runtime/src/handlers/approval.ts
 4 apps/extension/entrypoints/approval/
 
-5 apps/extension/src/points-invite.ts
-5 apps/extension/src/points-attest.ts
-5 apps/extension/src/handlers/attest-errors.ts
+5 packages/runtime/src/points-invite.ts
+5 packages/runtime/src/points-attest.ts
+5 packages/runtime/src/handlers/attest-errors.ts
 5 apps/extension/wxt.config.ts
 5 .github/
 5 pnpm-workspace.yaml

@@ -569,13 +569,13 @@ illustrative; use the ones from your own challenge and checkout.
       "check": "Refuses messages from any frame but the top one, so an embedded iframe can't speak for the page's origin."
     },
     {
-      "file": "apps/extension/src/sender.ts",
+      "file": "packages/core/src/policy/signing-origin.ts",
       "symbol": "isSecureSigningOrigin",
-      "line": 68,
+      "line": 9,
       "check": "Allows plain http only on loopback hosts, so a page a network attacker can inject into can't ask for a signature."
     },
     {
-      "file": "apps/extension/src/handlers/provider-params.ts",
+      "file": "packages/runtime/src/handlers/provider-params.ts",
       "symbol": "readAtomicAmount",
       "line": 170,
       "check": "Rejects a transaction amount that isn't a whole number of Winston before it reaches signing."

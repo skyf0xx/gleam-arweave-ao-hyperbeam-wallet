@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
 import type { BadgePort } from "@gleam/core";
-import type { LockIndicatorPort } from "@/src/runtime/platform";
+import type { LockIndicatorPort } from "@gleam/runtime/src/platform.ts";
 
 /**
  * Implements `BadgePort` over `browser.action`. The dot is a badge with a

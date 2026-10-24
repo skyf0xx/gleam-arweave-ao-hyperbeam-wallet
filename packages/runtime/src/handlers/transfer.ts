@@ -114,7 +114,7 @@ export interface TokenRoutes {
 export class TransferHandler {
   constructor(
     private readonly storage: StoragePort,
-    private readonly keySession: KeySession,
+    private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod">,
     private readonly approvals?: DeviceTransferApprovals,
     private readonly collectibles?: CollectibleCache,
     private readonly tokens?: TokenRoutes,

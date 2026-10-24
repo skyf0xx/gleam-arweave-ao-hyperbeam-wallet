@@ -8,7 +8,7 @@ useDefault = true
 description = "Fake keys the upload secret scanner is tested against"
 paths = [
   '''^packages/core/src/policy/secret-scan\.policy\.test\.ts$''',
-  '''^apps/extension/src/handlers/upload\.upload\.test\.ts$''',
+  '''^packages/runtime/src/handlers/upload\.upload\.test\.ts$''',
 ]
 
 [[allowlists]]

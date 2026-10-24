@@ -49,6 +49,9 @@ largest directory, and the one nearly everything else depends on.
 - **Capabilities** — `WalletCapabilities` per wallet method.
 - **Signing shapes** — the provider-signing request/result types
   `vault/signing.ts` operates on.
+- **Site origin** — `SITE_URL`, `SITE_ORIGIN` and `DEV_SITE_HOSTS` in
+  `site-origin.ts`: the Gleam website's address, and the hosts a
+  development build also accepts site messages from.
 
 `packages/messaging` depends on `core/models` to type its RPC contract.
 It never goes the other way.
@@ -243,6 +246,7 @@ Payload-level guard rails applied before a request goes out.
   upload: PEM blocks, JWK-shaped JSON with a private `d` field, long
   bare-base64 blobs.
 - **`tag-size.ts`** — enforces ANS-104's tag-byte cap.
+- **`signing-origin.ts`** — `isSecureSigningOrigin`: https, or plain http on a loopback host, may connect or ask for a signature.
 
 ### points/
 
@@ -303,5 +307,5 @@ A typical signed send works like this:
    later outcome poll) to produce the activity feed the UI reads.
 
 Throughout, core never touches `chrome.storage` or any browser API
-directly. The extension's handlers pass in `ports/` implementations and
+directly. The runtime's handlers pass in `ports/` implementations and
 read results back out.

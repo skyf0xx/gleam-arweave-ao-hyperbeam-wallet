@@ -19,6 +19,7 @@
     "@dicebear/styles": "^10.6.0",
     "@gleam/core": "workspace:*",
     "@gleam/messaging": "workspace:*",
+    "@gleam/runtime": "workspace:*",
     "@gleam/ui": "workspace:*",
     "@keystonehq/bc-ur-registry-arweave": "0.5.3",
     "@ngraveio/bc-ur": "^1.1.13",

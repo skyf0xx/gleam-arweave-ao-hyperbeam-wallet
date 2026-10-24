@@ -3,11 +3,15 @@ import type { WalletSummary } from "@gleam/core";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { ApprovalDeclinedError } from "./handlers/approval";
 import { dispatchSiteMessage } from "./dispatch/site";
-import { externalCallerContext } from "./sender";
+import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { signSiteAttestation, siteAttestStatus, type SiteAttestationDeps } from "./points-attest";
-import { SITE_ORIGIN } from "./site-pages";
+import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 
-vi.mock("wxt/browser", () => ({ browser: {} }));
+/** What `runtime.onMessageExternal` attests: the sender's origin, or nothing. */
+function externalCallerContext({ origin }: { origin?: string }): CallerContext | null {
+  return typeof origin === "string" ? { tier: "site", origin } : null;
+}
+
 
 const ATTESTATION = {
   release: "1.4.0",
@@ -16,8 +20,8 @@ const ATTESTATION = {
   challenge: "q7Xh2mB9kLp4Wz0RtY6uVa",
   answers: [
     { file: "packages/core/src/vault/encryption.ts", symbol: "decrypt", line: 120, check: "Refuses a ciphertext whose tag doesn't verify." },
-    { file: "apps/extension/src/handlers/provider-params.ts", symbol: "readTransaction", line: 212, check: "Rejects a transaction with an unknown format." },
-    { file: "apps/extension/src/handlers/approval.ts", symbol: "ApprovalHandler.resolveApproval", line: 300, check: "Ignores a resolution for an expired request." },
+    { file: "packages/runtime/src/handlers/provider-params.ts", symbol: "readTransaction", line: 212, check: "Rejects a transaction with an unknown format." },
+    { file: "packages/runtime/src/handlers/approval.ts", symbol: "ApprovalHandler.resolveApproval", line: 300, check: "Ignores a resolution for an expired request." },
   ],
   result: "pass",
   report: "# Scan\n\nRead the vault.\n",
@@ -37,7 +41,7 @@ function acceptSiteAttestation(message: unknown, origin: string | undefined, dep
     "gleam-points:attest-status": async () => {
       throw new Error("not an attestation");
     },
-  });
+  }, true);
 }
 
 function deps(overrides: Partial<SiteAttestationDeps> = {}) {
@@ -157,8 +161,8 @@ describe("siteAttestStatus", () => {
       "gleam-points:attest-status": () => status(WALLET, true),
     };
     const message = { type: "gleam-points:attest-status" };
-    expect(await dispatchSiteMessage(message, externalCallerContext({ origin: SITE_ORIGIN }), handlers)).toEqual({ ok: true });
-    expect(await dispatchSiteMessage(message, externalCallerContext({ origin: "https://evil.example" }), handlers)).toEqual({ ok: false });
-    expect(await dispatchSiteMessage({ ...message, extra: 1 }, externalCallerContext({ origin: SITE_ORIGIN }), handlers)).toEqual({ ok: false });
+    expect(await dispatchSiteMessage(message, externalCallerContext({ origin: SITE_ORIGIN }), handlers, true)).toEqual({ ok: true });
+    expect(await dispatchSiteMessage(message, externalCallerContext({ origin: "https://evil.example" }), handlers, true)).toEqual({ ok: false });
+    expect(await dispatchSiteMessage({ ...message, extra: 1 }, externalCallerContext({ origin: SITE_ORIGIN }), handlers, true)).toEqual({ ok: false });
   });
 });

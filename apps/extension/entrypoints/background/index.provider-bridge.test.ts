@@ -117,7 +117,7 @@ async function approved<T>(call: Promise<unknown>): Promise<{ result: T; request
 /** A key session over the same stores the background's was built on. */
 async function backgroundKeySession() {
   const [{ createKeySession }, { sessionKeyStore }, { WxtStoragePort }] = await Promise.all([
-    import("@/src/handlers/key-session"),
+    import("@gleam/runtime/src/handlers/key-session.ts"),
     import("@/src/adapters/session-key-store"),
     import("@/src/adapters/storage"),
   ]);

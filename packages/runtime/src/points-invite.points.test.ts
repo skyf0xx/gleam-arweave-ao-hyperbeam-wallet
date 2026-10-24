@@ -13,11 +13,15 @@ import {
   PointsHandler,
 } from "./handlers/points";
 import { dispatchSiteMessage } from "./dispatch/site";
-import { externalCallerContext } from "./sender";
+import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { redeemSiteInvite, type InviteRedeemer } from "./points-invite";
-import { SITE_ORIGIN } from "./site-pages";
+import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 
-vi.mock("wxt/browser", () => ({ browser: {} }));
+/** What `runtime.onMessageExternal` attests: the sender's origin, or nothing. */
+function externalCallerContext({ origin }: { origin?: string }): CallerContext | null {
+  return typeof origin === "string" ? { tier: "site", origin } : null;
+}
+
 
 function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort & { store: Map<string, unknown> } {
   const store = new Map(Object.entries(initial));
@@ -39,7 +43,7 @@ function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort &
 }
 
 /** What the background does with an external message: the site dispatcher, then the invite handler. */
-function acceptSiteInvite(message: unknown, origin: string | undefined, storage: StoragePort, redeemer: InviteRedeemer) {
+function acceptSiteInvite(message: unknown, origin: string | undefined, storage: StoragePort, redeemer: InviteRedeemer, dev = true) {
   return dispatchSiteMessage(message, externalCallerContext({ origin }), {
     "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, redeemer),
     "gleam-points:attest": async () => {
@@ -48,7 +52,7 @@ function acceptSiteInvite(message: unknown, origin: string | undefined, storage:
     "gleam-points:attest-status": async () => {
       throw new Error("not an invite");
     },
-  });
+  }, dev);
 }
 
 const INVITE = { type: "gleam-points:invite", code: "FRIEND42" };
@@ -185,14 +189,9 @@ describe("acceptSiteInvite", () => {
   });
 
   it("refuses a local copy of the site in a production build", async () => {
-    vi.stubEnv("DEV", false);
-    try {
-      const { storage, fetchImpl, points } = setup();
-      expect(await acceptSiteInvite(INVITE, "http://localhost:8000", storage, points)).toEqual({ ok: false });
-      expect(fetchImpl).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    const { storage, fetchImpl, points } = setup();
+    expect(await acceptSiteInvite(INVITE, "http://localhost:8000", storage, points, false)).toEqual({ ok: false });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   describe("refuses hostile messages without writing anything", () => {

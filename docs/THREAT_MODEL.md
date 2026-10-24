@@ -105,7 +105,7 @@ default to 1 hour. The vault also locks when the computer's screen locks, unless
 auto-lock is set to "never" (see [By design](#by-design)). Lock and
 unlock run one at a time, so a lock can't race an unlock and leave keys
 behind. See
-`apps/extension/src/handlers/key-session.ts` and
+`packages/runtime/src/handlers/key-session.ts` and
 `apps/extension/entrypoints/keyring/`.
 
 **Passkey unlock.** A passkey's WebAuthn PRF output wraps the vault
@@ -127,7 +127,7 @@ device. Gleam stores only the public key and address.
 - **Gleam Points payloads are refused from sites.** A `signMessage`
   whose data starts with `gleam-points:`, and a `sign` or `dispatch`
   with a `Gleam-Points` tag, are refused before any window opens
-  (`apps/extension/src/dispatch/methods.ts`). The tag refusal adds to
+  (`packages/runtime/src/dispatch/methods.ts`). The tag refusal adds to
   how a hardware proof is built (`core/points/ownership.ts`), which
   already keeps a site's transaction from matching one.
 - **There is no auto-approval.** No setting lets a site sign without the
@@ -152,7 +152,7 @@ device. Gleam stores only the public key and address.
 | Hijacked GitHub account or token | Change the source or CI | 2FA; protected `master`: signed commits, PR with passing CI, no force-push, no admin bypass | An account takeover can change the rules. |
 | Malware on the user's computer | Copy the vault, log keystrokes | Encrypted vault; unlocked keys in memory only, cleared on lock | Malware that can read browser memory or keystrokes wins; no browser wallet can stop it. A stolen vault can be attacked offline: see the password policy under By design. |
 | Someone at an unlocked browser | Send funds, export the key | Export needs the password; sends need confirmation | Auto-lock is 1 hour by default; the user can choose "never", with a warning. |
-| Compromised gleamwallet.app | Message the extension, show announcements | The site can only hand over a points invite code; announcement links are limited to the Gleam site and x.com; a production build accepts site messages only from `https://gleamwallet.app` (`isSiteOrigin` in `apps/extension/src/dispatch/site.ts`) | Misleading announcement text. A development build also accepts them from any `http://localhost` or `http://127.0.0.1` page, so local pages can send a dev build invites and scan attestations. |
+| Compromised gleamwallet.app | Message the extension, show announcements | The site can only hand over a points invite code; announcement links are limited to the Gleam site and x.com; a production build accepts site messages only from `https://gleamwallet.app` (`isSiteOrigin` in `packages/runtime/src/dispatch/site.ts`) | Misleading announcement text. A development build also accepts them from any `http://localhost` or `http://127.0.0.1` page, so local pages can send a dev build invites and scan attestations. |
 | Lying gateway, AO unit or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input | Wrong balances or history on screen; a dishonest gateway can drop a transaction. |
 
 ## Network
@@ -200,10 +200,10 @@ count as a finding.
   even when your computer locks", and the Settings list shows the
   current timeout. Only the extension's own pages can change it
   (`setLockSettings` is extension-tier in
-  `apps/extension/src/dispatch/methods.ts`). On an extension update, a
+  `packages/runtime/src/dispatch/methods.ts`). On an extension update, a
   vault that has wallets but no stored timeout is set to "never", so
   its behavior doesn't change (`keepLockTimeoutOnUpdate` in
-  `apps/extension/src/handlers/wallet-lifecycle.ts`). A vault holding
+  `packages/runtime/src/handlers/wallet-lifecycle.ts`). A vault holding
   only hardware wallets has no password, so it never locks.
   *Still a finding if,* by any path, a web page, content script or
   message from outside the extension's pages changes the timeout; the
@@ -244,7 +244,7 @@ count as a finding.
   Every page method but `disconnect`, reads and `connect` included, is
   refused for a plain-http origin unless its hostname is exactly
   `localhost`, `127.0.0.1` or `[::1]` (`isSecureSigningOrigin` in
-  `apps/extension/src/sender.ts`, checked on every call in
+  `packages/core/src/policy/signing-origin.ts`, checked on every call in
   `apps/extension/entrypoints/background/index.ts`), so a grant made
   before a site lost https reads nothing.
   *Still a finding if,* by any method, a plain-http origin with any

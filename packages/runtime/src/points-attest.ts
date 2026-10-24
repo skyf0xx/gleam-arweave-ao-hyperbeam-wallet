@@ -4,7 +4,7 @@ import type { SiteAttestResponse, SiteAttestStatusResponse } from "@gleam/messag
 import type { SiteMessage } from "./dispatch/methods";
 import { attestFailure } from "./handlers/attest-errors";
 import { ApprovalDeclinedError } from "./handlers/approval";
-import { SITE_ORIGIN } from "./site-pages";
+import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 
 export interface SiteAttestationDeps {
   /** The wallet that would sign: the active one, or null if Gleam has none. */

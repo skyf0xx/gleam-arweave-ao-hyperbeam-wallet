@@ -234,7 +234,7 @@ describe("the repo's security surface", () => {
     const symbols = new Set(functions.map((fn) => `${fn.file}#${fn.symbol}`));
 
     expect(symbols).toContain("packages/core/src/vault/encryption.ts#normalizeEncryptAlgorithm");
-    expect(symbols).toContain("apps/extension/src/handlers/provider-params.ts#readTransaction");
-    expect(symbols).toContain("apps/extension/src/handlers/approval.ts#ApprovalHandler.resolveApproval");
+    expect(symbols).toContain("packages/runtime/src/handlers/provider-params.ts#readTransaction");
+    expect(symbols).toContain("packages/runtime/src/handlers/approval.ts#ApprovalHandler.resolveApproval");
   });
 });

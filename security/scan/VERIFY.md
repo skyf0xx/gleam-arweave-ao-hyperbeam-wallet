@@ -48,8 +48,8 @@ At each step, ask what would stop the attack, and check every layer, not
 only the one the note cites. Gleam's real controls include:
 
 - the origin taken from Chrome's `sender`, never from the message body;
-- the top-frame and secure-origin checks in `src/sender.ts`;
-- each method's caller tier and zod schema in `src/dispatch/methods.ts`;
+- the top-frame and secure-origin checks in `apps/extension/src/sender.ts` and `packages/core/src/policy/signing-origin.ts`;
+- each method's caller tier and zod schema in `packages/runtime/src/dispatch/methods.ts`;
 - the approval window, a separate extension window that a page is meant
   to be unable to draw, frame or answer;
 - non-extractable unlocked keys, and `chrome.storage.session` limited to

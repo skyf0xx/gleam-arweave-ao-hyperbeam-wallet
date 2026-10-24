@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { Keyring } from "@gleam/core/signer";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
-import { GLEAM_SITES_KEY, otherWalletKey } from "@/src/handlers/site-wallet";
-import { SITE_ORIGIN } from "@/src/site-pages";
+import { GLEAM_SITES_KEY, otherWalletKey } from "./handlers/site-wallet";
+import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 import { createRuntime } from "./create-runtime";
 import type { Platform } from "./platform";
 
@@ -52,6 +52,7 @@ function setup() {
       send: vi.fn(async () => {}),
     },
     version: () => "1.0.0",
+    dev: true,
   };
   return { platform, storage, every, runtime: createRuntime(platform) };
 }

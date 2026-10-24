@@ -788,7 +788,7 @@ export class ApprovalHandler {
 
   constructor(
     private readonly storage: StoragePort,
-    private readonly keySession: KeySession,
+    private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod" | "getStoredWallet">,
     private readonly presenter: ApprovalPresenterPort,
     private readonly transfers?: TransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,

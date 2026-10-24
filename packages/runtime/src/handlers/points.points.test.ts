@@ -37,7 +37,6 @@ import {
   type PointsDeviceState,
 } from "./points";
 
-vi.mock("wxt/browser", () => ({ browser: {} }));
 
 function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort & { store: Map<string, unknown> } {
   const store = new Map(Object.entries(initial));

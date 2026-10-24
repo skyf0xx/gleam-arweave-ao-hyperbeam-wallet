@@ -1,5 +1,5 @@
 import type { Announcement, StoragePort } from "@gleam/core";
-import { SITE_URL } from "../site-pages";
+import { SITE_URL } from "@gleam/core/src/models/site-origin.ts";
 
 export const ANNOUNCEMENTS_URL = new URL("announcements.json", SITE_URL).toString();
 /** Ids of announcements the user has dismissed, as `string[]`. */

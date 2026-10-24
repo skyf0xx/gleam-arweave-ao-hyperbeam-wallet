@@ -12,7 +12,6 @@ import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/in
 import { attestationId, parseAttestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import { PointsHandler } from "./points";
 
-vi.mock("wxt/browser", () => ({ browser: {} }));
 
 const API = "https://points.example";
 
@@ -23,8 +22,8 @@ const ATTESTATION = {
   challenge: "q7Xh2mB9kLp4Wz0RtY6uVa",
   answers: [
     { file: "packages/core/src/vault/encryption.ts", symbol: "decrypt", line: 120, check: "Refuses a ciphertext whose tag doesn't verify." },
-    { file: "apps/extension/src/handlers/provider-params.ts", symbol: "readTransaction", line: 212, check: "Rejects a transaction with an unknown format." },
-    { file: "apps/extension/src/handlers/approval.ts", symbol: "ApprovalHandler.resolveApproval", line: 300, check: "Ignores a resolution for an expired request." },
+    { file: "packages/runtime/src/handlers/provider-params.ts", symbol: "readTransaction", line: 212, check: "Rejects a transaction with an unknown format." },
+    { file: "packages/runtime/src/handlers/approval.ts", symbol: "ApprovalHandler.resolveApproval", line: 300, check: "Ignores a resolution for an expired request." },
   ],
   result: "pass",
   report: "# Scan\n\nRead the vault.\n",

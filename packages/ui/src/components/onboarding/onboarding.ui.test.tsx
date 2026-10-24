@@ -11,7 +11,7 @@ import {
 /**
  * Presentational components — lighter tests (render + basic interaction)
  * per the onboarding-unlock packet: the real logic under test lives in
- * `apps/extension/src/handlers/wallet-lifecycle.ts`.
+ * `packages/runtime/src/handlers/wallet-lifecycle.ts`.
  *
  * `KeyfileDropzone`/`ScreenHeader` were retired from this directory by
  * the design-system-pass onboarding-unlock layer (migrated onto the

@@ -9,7 +9,7 @@ import type { UploadTag } from "./upload";
  *
  * Every operation resolves its signer from the unlocked session
  * (`getSigner(walletId)` in
- * `apps/extension/src/handlers/key-session.ts`) — none of these request
+ * `packages/runtime/src/handlers/key-session.ts`) — none of these request
  * shapes carries a password field.
  *
  * Approval routing and the actual cryptographic execution

@@ -18,6 +18,7 @@ import {
 } from "@gleam/core";
 import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gateway.ts";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
+import { isSecureSigningOrigin } from "@gleam/core/src/policy/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
@@ -28,26 +29,26 @@ import {
   type ProviderEventName,
   type WalletSwitchEventPayload,
 } from "@gleam/messaging/src/page-protocol.ts";
-import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
-import { PasskeyHandler } from "@/src/handlers/passkey";
-import { ReadsHandler, registerActivityPromotionAlarm } from "@/src/handlers/reads";
-import { ContactsHandler } from "@/src/handlers/contacts";
-import { TransferHandler } from "@/src/handlers/transfer";
-import { UploadHandler } from "@/src/handlers/upload";
-import { ApprovalHandler } from "@/src/handlers/approval";
-import { AnnouncementsHandler } from "@/src/handlers/announcements";
-import { ReviewPromptHandler } from "@/src/handlers/review-prompt";
-import { ScansHandler } from "@/src/handlers/scans";
-import { SiteWalletHandler } from "@/src/handlers/site-wallet";
-import { SecurityPhraseHandler } from "@/src/handlers/security-phrase";
-import { PointsHandler, registerPointsHeartbeatAlarm } from "@/src/handlers/points";
-import { createKeySession } from "@/src/handlers/key-session";
+import { WalletLifecycleHandler } from "./handlers/wallet-lifecycle";
+import { PasskeyHandler } from "./handlers/passkey";
+import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
+import { ContactsHandler } from "./handlers/contacts";
+import { TransferHandler } from "./handlers/transfer";
+import { UploadHandler } from "./handlers/upload";
+import { ApprovalHandler } from "./handlers/approval";
+import { AnnouncementsHandler } from "./handlers/announcements";
+import { ReviewPromptHandler } from "./handlers/review-prompt";
+import { ScansHandler } from "./handlers/scans";
+import { SiteWalletHandler } from "./handlers/site-wallet";
+import { SecurityPhraseHandler } from "./handlers/security-phrase";
+import { PointsHandler, registerPointsHeartbeatAlarm } from "./handlers/points";
+import { createKeySession } from "./handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
   type ProviderDataItem,
   type ProviderTransaction,
-} from "@/src/handlers/provider-params";
+} from "./handlers/provider-params";
 import {
   BACKGROUND_MESSAGES,
   PAGE_METHODS,
@@ -57,11 +58,10 @@ import {
   type ExtensionMethodSpec,
   type PageMethodSpec,
   type PageParams,
-} from "@/src/dispatch/methods";
-import { dispatchSiteMessage } from "@/src/dispatch/site";
-import { isSecureSigningOrigin } from "@/src/sender";
-import { redeemSiteInvite } from "@/src/points-invite";
-import { signSiteAttestation, siteAttestStatus } from "@/src/points-attest";
+} from "./dispatch/methods";
+import { dispatchSiteMessage } from "./dispatch/site";
+import { redeemSiteInvite } from "./points-invite";
+import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
 
 /**
@@ -942,7 +942,7 @@ export function createRuntime(platform: Platform): Runtime {
           isMember: async (walletId) => (await points.getMemberships())[walletId] !== undefined,
           // The check only labels the page's button; Sign still runs the real one and says what failed.
         }).catch(() => ({ ok: true })),
-    });
+    }, platform.dev);
   }
 
   return {

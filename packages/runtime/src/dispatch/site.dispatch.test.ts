@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SITE_ORIGIN } from "../site-pages";
+import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 import { isSiteOrigin } from "./site";
 
 describe("isSiteOrigin", () => {

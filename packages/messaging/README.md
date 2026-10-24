@@ -34,7 +34,7 @@ turns this interface into typed `sendMessage`/`onMessage` pairs.
 
 This file only pins the wire shape — request/response types. It does
 not enforce who may call what. That's the dispatcher's job in
-`apps/extension`, using the privilege tiers from `permissions.ts`.
+`packages/runtime`, using the privilege tiers from `permissions.ts`.
 
 One method, `providerCall`, is the choke point for every page-originated
 request. The content script forwards a dApp's call here instead of
@@ -80,8 +80,8 @@ and what they get back. `SiteAttestRequest` is `attest.html` handing over
 a community scan attestation; `SiteAttestResponse` is the reply once the
 user has finished in Gleam's window: the points earned, or a
 `SiteAttestErrorCode` with one sentence to show. The site reads these
-shapes; the extension's `src/dispatch/methods.ts` holds the schemas it
-checks them with, and `src/dispatch/site.ts` enforces them.
+shapes; `packages/runtime/src/dispatch/methods.ts` holds the schemas it
+checks them with, and `dispatch/site.ts` enforces them.
 
 ### permissions.ts
 
@@ -104,7 +104,7 @@ can't name its own origin or tier.
 
 - `packages/ui` and `apps/extension`'s popup/side panel/approval code
   import `ProtocolMap` types to call `sendMessage`.
-- The background dispatcher (`apps/extension/src/handlers/`)
+- The background dispatcher (`packages/runtime/src/handlers/`)
   implements each `ProtocolMap` method and enforces the
   `PROVIDER_METHODS`/`APPROVAL_METHODS`/`KEY_METHODS` boundary before a
   handler runs.

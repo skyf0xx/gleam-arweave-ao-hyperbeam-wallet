@@ -7,8 +7,9 @@ import {
 } from "@gleam/core";
 import { hasPointsProofTag, isPointsMessage, isValidInviteCode } from "@gleam/core/src/points/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import type { CallerTier } from "@gleam/messaging/src/caller.ts";
 import { SITE_ATTEST_MESSAGE_TYPE, SITE_ATTEST_STATUS_MESSAGE_TYPE } from "@gleam/messaging/src/site-protocol.ts";
-import { attestFailure } from "@/src/handlers/attest-errors";
+import { attestFailure } from "../handlers/attest-errors";
 import {
   readBytes,
   readDataItem,
@@ -18,13 +19,13 @@ import {
   readProcessId,
   readTransaction,
   type ProviderTransaction,
-} from "@/src/handlers/provider-params";
+} from "../handlers/provider-params";
 
 /**
  * Every method the background answers, with who may call it, whether it
  * can open an approval window, and the schema its caller-supplied
  * params are parsed with before any handler runs. The dispatcher in
- * `src/runtime/create-runtime.ts` reads nothing else to decide whether
+ * `create-runtime.ts` reads nothing else to decide whether
  * a call goes through, so this table is the privilege boundary to audit.
  *
  * - `extension`: this extension's own pages (popup, side panel, approval
@@ -36,7 +37,7 @@ import {
  * - `site`: a message from the Gleam site's own pages over
  *   `externally_connectable` (`SITE_MESSAGES`), never from a dApp.
  */
-export type Tier = "extension" | "contentScript" | "page" | "site";
+export type Tier = CallerTier | "page";
 
 /** `ProtocolMap` methods the background pushes to tabs rather than answers. */
 type PushMessage = "providerEvent" | "siteWalletMode";

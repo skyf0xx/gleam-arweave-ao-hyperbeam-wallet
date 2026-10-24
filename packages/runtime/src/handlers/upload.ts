@@ -49,7 +49,7 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
 export class UploadHandler {
   constructor(
     private readonly storage: StoragePort,
-    private readonly keySession: KeySession,
+    private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod">,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
   ) {}
 

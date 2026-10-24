@@ -22,7 +22,7 @@ const FALLBACK_GATEWAY_VIEW_URL = "https://arweave.net";
  *
  * No password prompt here: same as `SendView`, `submitUpload` reads the
  * signing key from the background's in-memory unlocked-session cache
- * (`apps/extension/src/handlers/key-session.ts`), not from this request —
+ * (`packages/runtime/src/handlers/key-session.ts`), not from this request —
  * see `handlers/upload.ts`'s doc comment.
  *
  * Secret-scan trip uses `RiskNotice`, the one place a scan result
