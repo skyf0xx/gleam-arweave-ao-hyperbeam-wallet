@@ -245,7 +245,7 @@ count as a finding.
   refused for a plain-http origin unless its hostname is exactly
   `localhost`, `127.0.0.1` or `[::1]` (`isSecureSigningOrigin` in
   `packages/core/src/policy/signing-origin.ts`, checked on every call in
-  `apps/extension/entrypoints/background/index.ts`), so a grant made
+  `packages/runtime/src/create-runtime.ts`), so a grant made
   before a site lost https reads nothing.
   *Still a finding if,* by any method, a plain-http origin with any
   other hostname, such as `foo.localhost`, a LAN address or a public
