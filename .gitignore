@@ -16,6 +16,7 @@ POINTS.md
 todo.md
 LEDGER_INSTALLER.md
 LAUNCH.md
+docs/MOBILE.md
 
 .env
 .playwright-mcp
