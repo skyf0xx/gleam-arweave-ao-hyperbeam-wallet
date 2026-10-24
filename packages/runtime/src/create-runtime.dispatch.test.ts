@@ -1,68 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StoragePort } from "@gleam/core";
-import { Keyring } from "@gleam/core/signer";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { GLEAM_SITES_KEY, otherWalletKey } from "./handlers/site-wallet";
 import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 import { createRuntime } from "./create-runtime";
-import type { Platform } from "./platform";
+import { createInMemoryPlatform } from "../testing/index";
 
 const ORIGIN = "https://dapp.example";
 const EXTENSION: CallerContext = { tier: "extension" };
 const CONTENT_SCRIPT: CallerContext = { tier: "contentScript", origin: ORIGIN, tabId: 7 };
 
-function memoryStorage(): StoragePort & { entries: Map<string, unknown> } {
-  const entries = new Map<string, unknown>();
-  return {
-    entries,
-    async get<T>(key: string) {
-      return entries.has(key) ? (entries.get(key) as T) : null;
-    },
-    async set(key, value) {
-      entries.set(key, value);
-    },
-    async remove(key) {
-      entries.delete(key);
-    },
-    watch: () => () => {},
-  };
-}
-
 function setup() {
-  const storage = memoryStorage();
-  const every = vi.fn();
-  const platform: Platform = {
-    storage,
-    sessionKeys: new Keyring(),
-    approvalPresenter: {
-      present: vi.fn(async () => {}),
-      focus: vi.fn(async () => {}),
-      dismiss: vi.fn(async () => {}),
-      onDismissed: vi.fn(() => () => {}),
-    },
-    timer: { every },
-    deviceKey: { loadOrCreate: vi.fn() },
-    badge: { setDot: vi.fn(async () => {}) },
-    lockIndicator: { setLocked: vi.fn(async () => {}) },
-    downloads: { isAllowed: vi.fn(), ensureAllowed: vi.fn(), saveFile: vi.fn() },
-    tabs: {
-      webTabs: vi.fn(async () => []),
-      activeTab: vi.fn(async () => undefined),
-      reload: vi.fn(async () => {}),
-      send: vi.fn(async () => {}),
-    },
-    version: () => "1.0.0",
-    dev: true,
-  };
-  return { platform, storage, every, runtime: createRuntime(platform) };
+  const platform = createInMemoryPlatform();
+  const onDismissed = vi.spyOn(platform.approvalPresenter, "onDismissed");
+  return { platform, storage: platform.storage, onDismissed, runtime: createRuntime(platform) };
 }
 
 describe("createRuntime", () => {
   it("registers its timers and the approval dismissal listener while it runs", () => {
-    const { platform, every } = setup();
+    const { platform, onDismissed } = setup();
 
-    expect(every).toHaveBeenCalledWith("auto-lock", 1, expect.any(Function));
-    expect(platform.approvalPresenter.onDismissed).toHaveBeenCalledTimes(1);
+    expect(platform.timer.schedule("auto-lock")).toMatchObject({ periodMinutes: 1 });
+    expect(onDismissed).toHaveBeenCalledTimes(1);
   });
 
   describe("dispatch", () => {

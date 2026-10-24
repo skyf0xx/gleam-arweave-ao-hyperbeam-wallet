@@ -11,6 +11,9 @@ function memoryStorage(): StoragePort {
     set: async (key, value) => {
       store.set(key, value);
     },
+    setMany: async (entries: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(entries)) store.set(key, value);
+    },
     remove: async (key) => {
       store.delete(key);
     },

@@ -48,6 +48,9 @@ function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort &
     async set<T>(key: string, value: T) {
       store.set(key, value);
     },
+    async setMany(entries: Record<string, unknown>) {
+      for (const [key, value] of Object.entries(entries)) store.set(key, value);
+    },
     async remove(key: string) {
       store.delete(key);
     },

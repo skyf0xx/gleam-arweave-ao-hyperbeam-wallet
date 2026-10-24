@@ -26,6 +26,9 @@ function createSessionStorage(): StoragePort & { store: Map<string, unknown> } {
     async set<T>(key: string, value: T) {
       store.set(key, JSON.parse(JSON.stringify(value)));
     },
+    async setMany(entries: Record<string, unknown>) {
+      for (const [key, value] of Object.entries(entries)) store.set(key, value);
+    },
     async remove(key: string) {
       store.delete(key);
     },

@@ -8,6 +8,9 @@ function memoryStorage(): StoragePort & { data: Map<string, unknown> } {
     data,
     get: async <T>(key: string) => (data.has(key) ? (data.get(key) as T) : null),
     set: async (key, value) => void data.set(key, value),
+    setMany: async (entries: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(entries)) data.set(key, value);
+    },
     remove: async (key) => void data.delete(key),
     watch: () => () => {},
   } as StoragePort & { data: Map<string, unknown> };

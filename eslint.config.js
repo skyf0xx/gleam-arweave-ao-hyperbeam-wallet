@@ -175,6 +175,8 @@ export default tseslint.config(
       "packages/core/src/ports/session-keys.ts",
       "packages/messaging/src/keyring-protocol.ts",
       "apps/extension/src/adapters/offscreen-keyring.ts",
+      // Conformance suites import throwaway keys into a `SessionKeyStorePort`.
+      "packages/runtime/testing/**",
       // Receives the exported keyfile to hand to the user.
       "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
     ],
@@ -199,6 +201,8 @@ export default tseslint.config(
       "apps/points-api/src/test-signers.ts",
       // Gives tests the in-memory `Keyring` in place of the offscreen one.
       "vitest.setup.ts",
+      "packages/runtime/testing/**",
+      "apps/extension/src/adapters/offscreen-keyring.testing.ts",
     ],
     rules: signerFence(SIGNER_IMPORT),
   },
@@ -217,6 +221,7 @@ export default tseslint.config(
     files: ["packages/runtime/**/*.{ts,tsx}"],
     ignores: [
       "**/*.test.{ts,tsx}",
+      "packages/runtime/testing/**",
       "packages/runtime/src/handlers/key-session.ts",
       "packages/runtime/src/handlers/wallet-lifecycle.ts",
     ],

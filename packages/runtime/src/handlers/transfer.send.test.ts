@@ -23,6 +23,9 @@ const keySession = createKeySession({
     async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
+    async setMany(entries: Record<string, unknown>) {
+      for (const [key, value] of Object.entries(entries)) keySessionStore.set(key, value);
+    },
     async remove(key: string) {
       keySessionStore.delete(key);
     },
@@ -41,6 +44,9 @@ function createFakeStorage(): StoragePort {
     },
     async set<T>(key: string, value: T) {
       store.set(key, value);
+    },
+    async setMany(entries: Record<string, unknown>) {
+      for (const [key, value] of Object.entries(entries)) store.set(key, value);
     },
     async remove(key: string) {
       store.delete(key);

@@ -50,6 +50,7 @@ const storage: StoragePort = {
     return null;
   },
   async set() {},
+  async setMany() {},
   async remove() {},
   watch() {
     return () => {};
