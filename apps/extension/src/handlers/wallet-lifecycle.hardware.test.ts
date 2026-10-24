@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addressFromOwner, bytesToBase64Url, type StoragePort, type Wallet } from "@gleam/core";
+import { Keyring } from "@gleam/core/signer";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
-import { getSigner, HardwareWalletSigningError } from "./key-session";
+import { createKeySession, HardwareWalletSigningError } from "./key-session";
 
 /**
  * One store for every key, as the storage adapter routes `local:` and
@@ -10,12 +11,13 @@ import { getSigner, HardwareWalletSigningError } from "./key-session";
  */
 const store = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return store.has(key) ? store.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return store.has(key) ? (store.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       store.set(key, value);
     },
     async remove(key: string) {
@@ -25,7 +27,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { getSigner } = keySession;
 
 const storage: StoragePort = {
   async get<T>(key: string) {
@@ -69,7 +72,7 @@ let handler: WalletLifecycleHandler;
 
 beforeEach(() => {
   store.clear();
-  handler = new WalletLifecycleHandler(storage, TEST_KDF);
+  handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
 });
 
 function addKeystone(fill = 7, name?: string) {
@@ -300,7 +303,7 @@ describe("WalletLifecycleHandler: hardware wallets have no key", () => {
   it("downloadKeyfile refuses a hardware wallet", async () => {
     const keystone = await addKeystone();
     const saveFile = vi.fn();
-    const withDownloads = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: { isAllowed: async () => true, ensureAllowed: async () => true, saveFile } });
+    const withDownloads = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: { isAllowed: async () => true, ensureAllowed: async () => true, saveFile } });
     await expect(withDownloads.downloadKeyfile({ walletId: keystone.id, password: PASSWORD })).rejects.toThrow(
       /stays on its device/,
     );

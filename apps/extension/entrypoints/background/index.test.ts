@@ -110,11 +110,21 @@ const originalFetch = globalThis.fetch;
 
 let sessionJwk: Promise<JWKInterface> | null = null;
 
+/** A key session over the same stores the background's was built on. */
+async function backgroundKeySession() {
+  const [{ createKeySession }, { sessionKeyStore }, { WxtStoragePort }] = await Promise.all([
+    import("@/src/handlers/key-session"),
+    import("@/src/adapters/session-key-store"),
+    import("@/src/adapters/storage"),
+  ]);
+  return createKeySession({ sessionKeys: sessionKeyStore, storage: new WxtStoragePort() });
+}
+
 /** Leaves what unlocking a wallet leaves: its session entry and its non-extractable keys. */
 async function seedSessionKey(walletId: string, address: string): Promise<void> {
   sessionJwk ??= generateJWK();
-  const { cacheKey } = await import("@/src/handlers/key-session");
-  await cacheKey(walletId, await sessionJwk, address);
+  const keySession = await backgroundKeySession();
+  await keySession.cacheKey(walletId, await sessionJwk, address);
 }
 
 describe("background.ts: providerCall privilege-tier choke point", () => {

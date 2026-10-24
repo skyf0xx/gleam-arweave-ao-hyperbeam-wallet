@@ -72,7 +72,7 @@ import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
-import { getSigner, getStoredWallet, getWalletMethod } from "./key-session";
+import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
@@ -789,6 +789,7 @@ export class ApprovalHandler {
 
   constructor(
     private readonly storage: StoragePort,
+    private readonly keySession: KeySession,
     private readonly windows: WindowPort,
     private readonly transfers?: TransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
@@ -1112,7 +1113,7 @@ export class ApprovalHandler {
 
   private async signsOnDevice(entry: PendingApprovalRecord): Promise<boolean> {
     if (!entry.walletId || !DEVICE_SIGNED_KINDS.has(entry.request.kind)) return false;
-    const method = await getWalletMethod(entry.walletId);
+    const method = await this.keySession.getWalletMethod(entry.walletId);
     return method !== null && isHardwareWalletMethod(method);
   }
 
@@ -1158,7 +1159,7 @@ export class ApprovalHandler {
     if (entry.request.kind !== "scanAttestation") {
       throw new Error(`Approval request "${req.requestId}" isn't a scan attestation.`);
     }
-    const wallet = entry.walletId ? await getStoredWallet(entry.walletId) : null;
+    const wallet = entry.walletId ? await this.keySession.getStoredWallet(entry.walletId) : null;
     return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)), wallet?.address);
   }
 
@@ -1253,7 +1254,7 @@ export class ApprovalHandler {
    * verify against, some other owner.
    */
   private async hardwareWallet(walletId: string): Promise<HardwareWalletInfo> {
-    const wallet = await getStoredWallet(walletId);
+    const wallet = await this.keySession.getStoredWallet(walletId);
     if (!wallet || !isHardwareWalletMethod(wallet.method) || wallet.publicKey.length === 0) {
       throw new Error(`Wallet "${walletId}" isn't a hardware wallet with a stored public key.`);
     }
@@ -1576,7 +1577,7 @@ export class ApprovalHandler {
       return encrypt(owner, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
     }
 
-    const signer = await getSigner(walletId);
+    const signer = await this.keySession.getSigner(walletId);
     if (!signer) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
@@ -1594,7 +1595,7 @@ export class ApprovalHandler {
 
       case "dispatch": {
         // A cached key means a keyfile wallet even if its record can't be read.
-        const { dispatchViaBundler: viaBundler } = capabilitiesFor((await getWalletMethod(walletId)) ?? "jwk");
+        const { dispatchViaBundler: viaBundler } = capabilitiesFor((await this.keySession.getWalletMethod(walletId)) ?? "jwk");
         return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, signer, transaction, { viaBundler });
       }
 
@@ -1669,7 +1670,7 @@ export class ApprovalHandler {
    * what a dApp encrypts.
    */
   private async storedOwner(walletId: string): Promise<string> {
-    const wallet = await getStoredWallet(walletId);
+    const wallet = await this.keySession.getStoredWallet(walletId);
     if (!wallet || wallet.publicKey.length === 0) {
       throw new Error(`No public key stored for wallet "${walletId}".`);
     }

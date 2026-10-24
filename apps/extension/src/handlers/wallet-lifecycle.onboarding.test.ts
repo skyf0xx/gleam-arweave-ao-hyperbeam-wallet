@@ -9,10 +9,9 @@ import {
   type VaultEnvelope,
   type Wallet,
 } from "@gleam/core";
-import { VaultKdfError } from "@gleam/core/signer";
+import { VaultKdfError, Keyring } from "@gleam/core/signer";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
-import { getSigner, clearKeyCache } from "./key-session";
-import { sessionKeyStore } from "../adapters/session-key-store";
+import { createKeySession } from "./key-session";
 
 vi.mock("hash-wasm", async (importOriginal) => {
   const actual = await importOriginal<typeof import("hash-wasm")>();
@@ -20,19 +19,20 @@ vi.mock("hash-wasm", async (importOriginal) => {
 });
 
 /**
- * Real key/value store standing in for `adapters/storage.ts`'s
- * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * Real key/value store backing `keySession` below — not an in-process
  * cache, so tests exercise the same "read fresh from storage" behavior
  * `key-session.ts` relies on.
  */
 const keySessionStore = new Map<string, unknown>();
+const sessionKeys = new Keyring();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: sessionKeys,
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -42,11 +42,12 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { getSigner, clearKeyCache } = keySession;
 
 beforeEach(async () => {
   keySessionStore.clear();
-  await sessionKeyStore.clear();
+  await sessionKeys.clear();
 });
 
 /**
@@ -91,7 +92,7 @@ function fakeDownloads(result?: FileDownloadResult, allowed = true) {
 
 async function downloadedJwk(storage: StoragePort, walletId: string, password: string): Promise<JWKInterface> {
   const downloads = fakeDownloads();
-  await new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port }).downloadKeyfile({ walletId, password });
+  await new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port }).downloadKeyfile({ walletId, password });
   return JSON.parse(downloads.saved[0]!.text) as JWKInterface;
 }
 
@@ -149,7 +150,7 @@ describe("WalletLifecycleHandler: createWallet", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   it("rejects a password shorter than 12 characters", async () => {
@@ -216,7 +217,7 @@ describe("WalletLifecycleHandler: importWallet", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   it("rejects a malformed keyfile with a specific reason, not a generic error", async () => {
@@ -301,7 +302,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   it("createWallet rejects a password that doesn't open the vault, and stores nothing", async () => {
@@ -377,7 +378,7 @@ describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
   it("accepts a password that opens any stored wallet, not only the active one", async () => {
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     const otherStorage = createFakeStorage();
-    await new WalletLifecycleHandler(otherStorage, TEST_KDF).importWallet({
+    await new WalletLifecycleHandler(otherStorage, keySession, TEST_KDF).importWallet({
       jwk: validJWK(),
       name: "Legacy",
       password: OTHER_PASSWORD,
@@ -398,7 +399,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   it("unlocks the last-active wallet with its own password", async () => {
@@ -415,11 +416,11 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     await handler.lockWallet();
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
-    expect(await sessionKeyStore.has([wallet.id])).toEqual([wallet.id]);
+    expect(await sessionKeys.has([wallet.id])).toEqual([wallet.id]);
 
     await handler.lockWallet();
 
-    expect(await sessionKeyStore.has([wallet.id])).toEqual([]);
+    expect(await sessionKeys.has([wallet.id])).toEqual([]);
     expect(await getSigner(wallet.id)).toBeNull();
   });
 
@@ -431,7 +432,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     const locking = handler.lockWallet();
     await Promise.all([unlocking, locking]);
 
-    expect(await sessionKeyStore.has([wallet.id])).toEqual([]);
+    expect(await sessionKeys.has([wallet.id])).toEqual([]);
     expect((await handler.getState()).session).toBeNull();
   });
 
@@ -439,14 +440,14 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
     await handler.lockWallet();
-    const importKey = sessionKeyStore.importKey.bind(sessionKeyStore);
-    vi.spyOn(sessionKeyStore, "importKey")
+    const importKey = sessionKeys.importKey.bind(sessionKeys);
+    vi.spyOn(sessionKeys, "importKey")
       .mockImplementationOnce(importKey)
       .mockRejectedValueOnce(new Error("keyring gone"));
 
     await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(/couldn't keep the wallet unlocked/);
 
-    expect(await sessionKeyStore.has([first.id])).toEqual([]);
+    expect(await sessionKeys.has([first.id])).toEqual([]);
     expect((await handler.getState()).session).toBeNull();
     vi.restoreAllMocks();
   });
@@ -459,7 +460,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     it("unlockWallet reports the keyring failure, not a wrong password", async () => {
       await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
       await handler.lockWallet();
-      vi.spyOn(sessionKeyStore, "importKey").mockRejectedValue(new Error("keyring gone"));
+      vi.spyOn(sessionKeys, "importKey").mockRejectedValue(new Error("keyring gone"));
 
       await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(
         /couldn't keep the wallet unlocked/,
@@ -467,7 +468,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     });
 
     it("createWallet reports the keyring failure", async () => {
-      vi.spyOn(sessionKeyStore, "importKey").mockRejectedValue(new Error("keyring gone"));
+      vi.spyOn(sessionKeys, "importKey").mockRejectedValue(new Error("keyring gone"));
 
       await expect(handler.createWallet({ name: "Main", password: GOOD_PASSWORD })).rejects.toThrow(
         /couldn't keep the wallet unlocked/,
@@ -476,7 +477,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
     it("lockWallet surfaces a failed key wipe but still locks every wallet", async () => {
       const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-      vi.spyOn(sessionKeyStore, "clear").mockRejectedValueOnce(new Error("disk error"));
+      vi.spyOn(sessionKeys, "clear").mockRejectedValueOnce(new Error("disk error"));
 
       await expect(handler.lockWallet()).rejects.toThrow("disk error");
 
@@ -486,7 +487,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
     it("resetAllWallets surfaces a failed key wipe but still wipes the vault", async () => {
       await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-      vi.spyOn(sessionKeyStore, "clear").mockRejectedValueOnce(new Error("disk error"));
+      vi.spyOn(sessionKeys, "clear").mockRejectedValueOnce(new Error("disk error"));
 
       await expect(handler.resetAllWallets()).rejects.toThrow("disk error");
 
@@ -497,7 +498,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
     it("deleteWallet surfaces a failed key removal but still removes the wallet", async () => {
       const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-      vi.spyOn(sessionKeyStore, "remove").mockRejectedValueOnce(new Error("disk error"));
+      vi.spyOn(sessionKeys, "remove").mockRejectedValueOnce(new Error("disk error"));
 
       await expect(handler.deleteWallet({ walletId: wallet.id })).rejects.toThrow("disk error");
 
@@ -506,7 +507,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
 
     it("getState reports the wallet locked instead of failing when the keyring can't be reached", async () => {
       await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
-      vi.spyOn(sessionKeyStore, "has").mockRejectedValue(new Error("keyring gone"));
+      vi.spyOn(sessionKeys, "has").mockRejectedValue(new Error("keyring gone"));
       vi.spyOn(console, "error").mockImplementation(() => {});
 
       expect((await handler.getState()).session).toBeNull();
@@ -542,7 +543,7 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     // shared one; seed that case directly since the handler always
     // creates wallets under the shared password.
     const otherStorage = createFakeStorage();
-    await new WalletLifecycleHandler(otherStorage, TEST_KDF).importWallet({
+    await new WalletLifecycleHandler(otherStorage, keySession, TEST_KDF).importWallet({
       jwk: validJWK(),
       name: "Second",
       password: OTHER_PASSWORD,
@@ -663,7 +664,7 @@ describe("WalletLifecycleHandler: Argon2id envelope upgrade on unlock", () => {
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   it("creates wallets with version 2 Argon2id envelopes", async () => {
@@ -831,7 +832,7 @@ describe("WalletLifecycleHandler: Argon2id envelope upgrade on unlock", () => {
     await handler.lockWallet();
     const raised = { memoryKiB: 128, iterations: 2, parallelism: 1 };
 
-    const raisedHandler = new WalletLifecycleHandler(storage, { kdfParams: raised });
+    const raisedHandler = new WalletLifecycleHandler(storage, keySession, { kdfParams: raised });
     await raisedHandler.unlockWallet({ password: GOOD_PASSWORD });
     await raisedHandler.envelopeUpgradeSettled();
 
@@ -847,7 +848,7 @@ describe("WalletLifecycleHandler: key derivation failures", () => {
 
   beforeEach(async () => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.lockWallet();
   });
@@ -905,7 +906,7 @@ describe("WalletLifecycleHandler: key derivation failures", () => {
     const [wallet] = (await storage.get<Wallet[]>("local:wallets"))!;
     vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
 
-    const exported = new WalletLifecycleHandler(storage, { downloads: fakeDownloads().port }).downloadKeyfile({
+    const exported = new WalletLifecycleHandler(storage, keySession, { downloads: fakeDownloads().port }).downloadKeyfile({
       walletId: wallet!.id,
       password: GOOD_PASSWORD,
     });
@@ -918,7 +919,7 @@ describe("WalletLifecycleHandler: key derivation failures", () => {
 describe("WalletLifecycleHandler: lockWallet", () => {
   it("immediately clears unlocked-session state", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.unlockWallet({ password: GOOD_PASSWORD });
 
@@ -933,7 +934,7 @@ describe("WalletLifecycleHandler: lockWallet", () => {
 
   it("getState reports no session once locked", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.unlockWallet({ password: GOOD_PASSWORD });
     await handler.lockWallet();
@@ -945,12 +946,12 @@ describe("WalletLifecycleHandler: lockWallet", () => {
 
 describe("WalletLifecycleHandler: getLockSettings", () => {
   it("defaults to 1 hour when nothing is stored", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "1hr" });
   });
 
   it("reflects a value previously written by setLockSettings", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await handler.setLockSettings({ autoLockTimeout: "5min" });
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "5min" });
   });
@@ -958,7 +959,7 @@ describe("WalletLifecycleHandler: getLockSettings", () => {
   it("drops a malformed stored record back to the default (untrusted storage)", async () => {
     const storage = createFakeStorage();
     await storage.set("local:lockSettings", { autoLockTimeout: "not-a-real-timeout" });
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     expect(await handler.getLockSettings()).toEqual({ autoLockTimeout: "1hr" });
   });
 });
@@ -966,7 +967,7 @@ describe("WalletLifecycleHandler: getLockSettings", () => {
 describe("WalletLifecycleHandler: keepLockTimeoutOnUpdate", () => {
   it("keeps never for a vault that predates the 1-hour default", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await storage.remove("local:lockSettings");
 
@@ -977,7 +978,7 @@ describe("WalletLifecycleHandler: keepLockTimeoutOnUpdate", () => {
 
   it("leaves a timeout the user chose", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.setLockSettings({ autoLockTimeout: "5min" });
 
@@ -987,7 +988,7 @@ describe("WalletLifecycleHandler: keepLockTimeoutOnUpdate", () => {
   });
 
   it("leaves an install with no wallet on the default", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
 
     await handler.keepLockTimeoutOnUpdate();
 
@@ -997,12 +998,12 @@ describe("WalletLifecycleHandler: keepLockTimeoutOnUpdate", () => {
 
 describe("WalletLifecycleHandler: getThemePreference", () => {
   it("defaults to light when nothing is stored", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     expect(await handler.getThemePreference()).toEqual({ theme: "light" });
   });
 
   it("reflects a value previously written by setThemePreference", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await handler.setThemePreference({ theme: "dark" });
     expect(await handler.getThemePreference()).toEqual({ theme: "dark" });
   });
@@ -1010,13 +1011,13 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
   it("drops a malformed stored record back to the default (untrusted storage)", async () => {
     const storage = createFakeStorage();
     await storage.set("local:themeSettings", { theme: "not-a-real-theme" });
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     expect(await handler.getThemePreference()).toEqual({ theme: "light" });
   });
 
   it("defaults to light for a fresh install with no stored preference at all", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     expect(await storage.get("local:themeSettings")).toBeNull();
     expect(await handler.getThemePreference()).toEqual({ theme: "light" });
   });
@@ -1028,7 +1029,7 @@ describe("WalletLifecycleHandler: display settings", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("defaults to the locale's currency with the chart and total value shown", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     vi.spyOn(navigator, "language", "get").mockReturnValue("en-KE");
 
     expect(await handler.getDisplaySettings()).toEqual({
@@ -1040,7 +1041,7 @@ describe("WalletLifecycleHandler: display settings", () => {
   });
 
   it("reflects a value previously written by setDisplaySettings", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await handler.setDisplaySettings(settings);
     expect(await handler.getDisplaySettings()).toEqual(settings);
   });
@@ -1048,12 +1049,12 @@ describe("WalletLifecycleHandler: display settings", () => {
   it("drops a malformed stored record back to the default", async () => {
     const storage = createFakeStorage();
     await storage.set("local:displaySettings", { ...settings, currency: "DOGE" });
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     expect((await handler.getDisplaySettings()).showChart).toBe(true);
   });
 
   it("rejects an unknown currency or headline", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await expect(handler.setDisplaySettings({ ...settings, currency: "XYZ" as never })).rejects.toThrow(/invalid display settings/i);
     await expect(handler.setDisplaySettings({ ...settings, headline: "PI" as never })).rejects.toThrow(/invalid display settings/i);
   });
@@ -1061,7 +1062,7 @@ describe("WalletLifecycleHandler: display settings", () => {
 
 describe("WalletLifecycleHandler: setThemePreference", () => {
   it("rejects a value that isn't exactly light or dark", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), TEST_KDF);
+    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await expect(
       handler.setThemePreference({ theme: "system" as never }),
     ).rejects.toThrow(/invalid theme preference/i);
@@ -1069,10 +1070,10 @@ describe("WalletLifecycleHandler: setThemePreference", () => {
 
   it("persists across a fresh handler instance (popup close/reopen)", async () => {
     const storage = createFakeStorage();
-    const first = new WalletLifecycleHandler(storage, TEST_KDF);
+    const first = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await first.setThemePreference({ theme: "dark" });
 
-    const second = new WalletLifecycleHandler(storage, TEST_KDF);
+    const second = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     expect(await second.getThemePreference()).toEqual({ theme: "dark" });
   });
 });
@@ -1083,7 +1084,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
     await storage.set("local:wallets", [
       { id: "broken", address: 12345 }, // malformed: address must be a string
     ]);
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
 
     const state = await handler.getState();
 
@@ -1093,7 +1094,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
   it("drops an activeWalletId that doesn't reference any stored wallet", async () => {
     const storage = createFakeStorage();
     await storage.set("local:activeWalletId", "does-not-exist");
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
 
     const state = await handler.getState();
 
@@ -1102,7 +1103,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
 
   it("drops an unlockedWalletIds entry that references a since-deleted wallet", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     // Simulate a stale session left over after the wallet was deleted
@@ -1123,7 +1124,7 @@ describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", ()
   it("falls back to the default lock settings when the stored record is malformed", async () => {
     const storage = createFakeStorage();
     await storage.set("local:lockSettings", { autoLockTimeout: "bogus" });
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
 
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
     await handler.lockWallet();
@@ -1140,7 +1141,7 @@ describe("WalletLifecycleHandler: unlocked-session key caching + auto-lock", () 
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   afterEach(async () => {
@@ -1295,7 +1296,7 @@ describe("WalletLifecycleHandler: deleteWallet / renameWallet / switchWallet", (
 
   beforeEach(() => {
     storage = createFakeStorage();
-    handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
   it("renameWallet updates the name and bumps updatedAt", async () => {
@@ -1343,7 +1344,7 @@ describe("WalletLifecycleHandler: deleteWallet / renameWallet / switchWallet", (
 describe("WalletLifecycleHandler: resetAllWallets", () => {
   it("wipes every stored wallet, the active wallet pointer, and the session", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     await handler.importWallet({ jwk: validJWK(), name: "Second", password: GOOD_PASSWORD });
 
@@ -1357,7 +1358,7 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
 
   it("removes each wallet's activity log and watched tokens, and nothing else's", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     const wallet = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     await storage.set(`local:activityLog:${wallet.address}`, [{ id: "tx" }]);
     await storage.set(`local:watchedProcessIds:${wallet.address}`, ["process"]);
@@ -1372,7 +1373,7 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
 
   it("never throws when called with nothing stored", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
 
     await expect(handler.resetAllWallets()).resolves.toBeUndefined();
   });
@@ -1382,7 +1383,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("saves the wallet's standard keyfile JSON and returns only the outcome", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads();
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.importWallet({ jwk: validJWK(), name: "Rose Quartz", password: GOOD_PASSWORD });
 
     const result = await handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1398,7 +1399,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("zeroizes the decrypted bytes once the save settles", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads();
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1408,7 +1409,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
 
   it("records the backup itself once the file is saved", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: fakeDownloads().port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: fakeDownloads().port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1421,7 +1422,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
     "passes a %s download back and leaves the wallet not backed up",
     async (reason) => {
       const storage = createFakeStorage();
-      const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: fakeDownloads({ ok: false, reason }).port });
+      const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: fakeDownloads({ ok: false, reason }).port });
       const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
       await expect(handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD })).resolves.toEqual({
@@ -1435,7 +1436,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("saves nothing when the downloads permission never arrives", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads(undefined, false);
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     const download = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1450,7 +1451,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("saves once the grant arrives", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads(undefined, false);
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.importWallet({ jwk: validJWK(), name: "Main", password: GOOD_PASSWORD });
 
     const download = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1464,7 +1465,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("rejects a wrong password before waiting for the grant", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads(undefined, false);
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await expect(
@@ -1476,7 +1477,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("a retry ends the older call still waiting, so one grant saves one file", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads(undefined, false);
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     const first = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1494,7 +1495,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("cancelKeyfileDownload ends a call waiting for the grant", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads(undefined, false);
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     const download = handler.downloadKeyfile({ walletId: wallet.id, password: GOOD_PASSWORD });
@@ -1509,7 +1510,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
   it("rejects the wrong password and saves nothing", async () => {
     const storage = createFakeStorage();
     const downloads = fakeDownloads();
-    const handler = new WalletLifecycleHandler(storage, { ...TEST_KDF, downloads: downloads.port });
+    const handler = new WalletLifecycleHandler(storage, keySession, { ...TEST_KDF, downloads: downloads.port });
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await expect(
@@ -1522,7 +1523,7 @@ describe("WalletLifecycleHandler: downloadKeyfile", () => {
 describe("WalletLifecycleHandler: confirmWalletBackup", () => {
   it("a new wallet starts with no confirmed backup", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     expect(wallet.backupConfirmedAt).toBeNull();
@@ -1532,7 +1533,7 @@ describe("WalletLifecycleHandler: confirmWalletBackup", () => {
 
   it("records a timestamp once confirmed, surfaced through getState", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     const wallet = await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     const before = Date.now();
@@ -1548,7 +1549,7 @@ describe("WalletLifecycleHandler: confirmWalletBackup", () => {
 
   it("throws for an unknown wallet id rather than silently no-op-ing", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     await handler.createWallet({ name: "Main", password: GOOD_PASSWORD });
 
     await expect(handler.confirmWalletBackup({ walletId: "no-such-wallet" })).rejects.toThrow();
@@ -1556,7 +1557,7 @@ describe("WalletLifecycleHandler: confirmWalletBackup", () => {
 
   it("does not affect other wallets' backup status", async () => {
     const storage = createFakeStorage();
-    const handler = new WalletLifecycleHandler(storage, TEST_KDF);
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
     const second = await handler.importWallet({
       jwk: validJWK(),

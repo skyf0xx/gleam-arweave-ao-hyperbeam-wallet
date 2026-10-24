@@ -10,7 +10,7 @@ import {
   type UploadDraft,
   type UploadReview,
 } from "@gleam/core";
-import { getSigner, getWalletMethod } from "./key-session";
+import type { KeySession } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `reviewUpload`/
@@ -49,6 +49,7 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
 export class UploadHandler {
   constructor(
     private readonly storage: StoragePort,
+    private readonly keySession: KeySession,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
   ) {}
 
@@ -86,7 +87,7 @@ export class UploadHandler {
    * must not be able to bypass the secret scan or tag cap this way.
    */
   async submitUpload(req: SubmitUploadRequest): Promise<{ txId: string }> {
-    const method = await getWalletMethod(req.walletId);
+    const method = await this.keySession.getWalletMethod(req.walletId);
     if (method !== null && !capabilitiesFor(method).upload) {
       throw new Error(unsupportedOperationMessage("upload files"));
     }
@@ -105,7 +106,7 @@ export class UploadHandler {
       );
     }
 
-    const signer = await getSigner(req.walletId);
+    const signer = await this.keySession.getSigner(req.walletId);
     if (!signer) {
       throw new Error(`Wallet "${req.walletId}" is locked. Unlock it to continue.`);
     }

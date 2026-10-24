@@ -10,22 +10,23 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk, generateJWK } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/index.ts";
 import { attestationId, parseAttestation, type Attestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { ApprovalDeclinedError, ApprovalHandler, type ScanAttestationSubmitter } from "./approval";
-import { cacheKey, clearKeyCache } from "./key-session";
+import { createKeySession } from "./key-session";
 import type { OwnershipProof } from "./points";
 
 const keySessionStore = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -35,7 +36,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { cacheKey, clearKeyCache } = keySession;
 
 function createWatchableStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -178,6 +180,7 @@ beforeEach(async () => {
   // keyfile proves the request keeps the wallet it was opened for.
   handler = new ApprovalHandler(
     storage,
+    keySession,
     windows,
     undefined,
     undefined,

@@ -34,7 +34,7 @@ import {
   type Wallet,
   type Winston,
 } from "@gleam/core";
-import { getSigner, getWalletMethod } from "./key-session";
+import type { KeySession } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -114,6 +114,7 @@ export interface TokenRoutes {
 export class TransferHandler {
   constructor(
     private readonly storage: StoragePort,
+    private readonly keySession: KeySession,
     private readonly approvals?: DeviceTransferApprovals,
     private readonly collectibles?: CollectibleCache,
     private readonly tokens?: TokenRoutes,
@@ -156,7 +157,7 @@ export class TransferHandler {
 
   /** The unlocked wallet's signer. Throws if the wallet isn't currently unlocked. */
   private async signerFor(walletId: string): Promise<Signer> {
-    const signer = await getSigner(walletId);
+    const signer = await this.keySession.getSigner(walletId);
     if (!signer) {
       throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
     }
@@ -336,7 +337,7 @@ export class TransferHandler {
    * `core/ao/transfer.ts`'s doc comment for the full distinction.
    */
   async submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }> {
-    const method = await getWalletMethod(req.walletId);
+    const method = await this.keySession.getWalletMethod(req.walletId);
     const transport = await this.transportOf(req);
     // A legacy AO send is a data item, which not every hardware wallet can
     // sign. A collectible or L1 token send is an L1 transaction.

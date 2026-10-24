@@ -39,17 +39,7 @@ import {
   type EncryptOptions,
   generateJWK,
 } from "@gleam/core/signer";
-import {
-  cacheKey,
-  clearKeyCache,
-  isSessionExpired,
-  isKeyStored,
-  isValidSession,
-  removeCachedKey,
-  SESSION_KEY,
-  WALLETS_KEY,
-  withSessionLock,
-} from "./key-session";
+import { isSessionExpired, isValidSession, SESSION_KEY, WALLETS_KEY, type KeySession } from "./key-session";
 
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
@@ -287,6 +277,7 @@ async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySetting
  */
 async function loadSession(
   storage: StoragePort,
+  keySession: KeySession,
   wallets: Wallet[],
 ): Promise<Session | null> {
   const raw = await storage.get<unknown>(SESSION_KEY);
@@ -310,7 +301,7 @@ async function loadSession(
 
   if (!isValidSession(raw)) return null;
   if (isSessionExpired(raw.lastActivityAt, raw.autoLockTimeout)) {
-    await lockSession(storage);
+    await lockSession(storage, keySession);
     return null;
   }
   // Filter unlockedWalletIds against the current wallet set, same
@@ -322,10 +313,10 @@ async function loadSession(
   // session record says. Persist the pruned list so getCachedKey and the
   // UI agree. Hardware wallets alone never keep a password-protected
   // vault unlocked.
-  const keyPresent = await Promise.all(knownIds.map((id) => isKeyStored(id)));
+  const keyPresent = await Promise.all(knownIds.map((id) => keySession.isKeyStored(id)));
   const keyedIds = knownIds.filter((_, index) => keyPresent[index]);
   if (keyedIds.length === 0) {
-    await lockSession(storage);
+    await lockSession(storage, keySession);
     return null;
   }
   const validIds = [...keyedIds, ...hardwareIds];
@@ -340,9 +331,9 @@ async function loadSession(
  * wallet must read as locked, and the caller must still learn the keyring
  * may still hold keys.
  */
-async function lockSession(storage: StoragePort): Promise<void> {
+async function lockSession(storage: StoragePort, keySession: KeySession): Promise<void> {
   try {
-    await clearKeyCache();
+    await keySession.clearKeyCache();
   } finally {
     await saveSession(storage, null);
   }
@@ -390,13 +381,14 @@ function jwkToBytes(jwk: JWKInterface): Uint8Array<ArrayBuffer> {
  */
 async function unlockNewWallet(
   storage: StoragePort,
+  keySession: KeySession,
   wallets: Wallet[],
   walletId: string,
   jwk: JWKInterface,
   address: string,
 ): Promise<void> {
-  const existing = await loadSession(storage, wallets);
-  await cacheKey(walletId, jwk, address);
+  const existing = await loadSession(storage, keySession, wallets);
+  await keySession.cacheKey(walletId, jwk, address);
   const lockSettings = await loadLockSettings(storage);
   const now = Date.now();
 
@@ -433,6 +425,7 @@ export class WalletLifecycleHandler {
 
   constructor(
     private readonly storage: StoragePort,
+    private readonly keySession: KeySession,
     options: WalletLifecycleOptions = {},
   ) {
     this.kdfParams = options.kdfParams ?? DEFAULT_ARGON2ID_PARAMS;
@@ -523,7 +516,7 @@ export class WalletLifecycleHandler {
   }
 
   async createWallet(req: { name: string; password: string }): Promise<WalletSummary> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       const keys = new VaultKeys(req.password);
       const encryptOptions = await this.checkNewWalletPassword(keys, req.password);
 
@@ -553,7 +546,7 @@ export class WalletLifecycleHandler {
       wallets.push(wallet);
       await saveWallets(this.storage, wallets);
       await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      await unlockNewWallet(this.storage, wallets, wallet.id, jwk, address);
+      await unlockNewWallet(this.storage, this.keySession, wallets, wallet.id, jwk, address);
 
       return toSummary(wallet);
     });
@@ -564,7 +557,7 @@ export class WalletLifecycleHandler {
     name: string;
     password: string;
   }): Promise<WalletSummary> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       const keys = new VaultKeys(req.password);
       const encryptOptions = await this.checkNewWalletPassword(keys, req.password);
 
@@ -585,7 +578,7 @@ export class WalletLifecycleHandler {
       }
       if (existing) {
         await this.storage.set(ACTIVE_WALLET_ID_KEY, existing.id);
-        await unlockNewWallet(this.storage, wallets, existing.id, shapeCheck.jwk, address);
+        await unlockNewWallet(this.storage, this.keySession, wallets, existing.id, shapeCheck.jwk, address);
         return toSummary(existing);
       }
 
@@ -617,7 +610,7 @@ export class WalletLifecycleHandler {
       current.push(wallet);
       await saveWallets(this.storage, current);
       await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      await unlockNewWallet(this.storage, current, wallet.id, shapeCheck.jwk, address);
+      await unlockNewWallet(this.storage, this.keySession, current, wallet.id, shapeCheck.jwk, address);
 
       return toSummary(wallet);
     });
@@ -635,7 +628,7 @@ export class WalletLifecycleHandler {
     device: HardwareDevice;
     name?: string;
   }): Promise<WalletSummary> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       if (!isHardwareWalletMethod(req.method)) {
         throw new Error(`"${String(req.method)}" isn't a hardware wallet type.`);
       }
@@ -655,7 +648,7 @@ export class WalletLifecycleHandler {
       }
 
       const wallets = await loadWallets(this.storage);
-      if (hasVaultPassword(wallets) && (await loadSession(this.storage, wallets)) === null) {
+      if (hasVaultPassword(wallets) && (await loadSession(this.storage, this.keySession, wallets)) === null) {
         throw new Error("Unlock Gleam before adding a hardware wallet.");
       }
 
@@ -687,19 +680,19 @@ export class WalletLifecycleHandler {
       await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
       // loadSession lists every hardware wallet, so this adds the new one to
       // an unlocked session, or starts one for a vault without a password.
-      await loadSession(this.storage, wallets);
+      await loadSession(this.storage, this.keySession, wallets);
 
       return toSummary(wallet);
     });
   }
 
   async deleteWallet(req: { walletId: string }): Promise<void> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       const wallets = await loadWallets(this.storage);
       const remaining = wallets.filter((wallet) => wallet.id !== req.walletId);
       await saveWallets(this.storage, remaining);
       try {
-        await removeCachedKey(req.walletId);
+        await this.keySession.removeCachedKey(req.walletId);
       } finally {
         await this.finishDeleteWallet(req.walletId, remaining);
       }
@@ -712,13 +705,13 @@ export class WalletLifecycleHandler {
       await this.storage.set(ACTIVE_WALLET_ID_KEY, remaining[0]?.id ?? null);
     }
 
-    const session = await loadSession(this.storage, remaining);
+    const session = await loadSession(this.storage, this.keySession, remaining);
     if (session !== null && session.unlockedWalletIds.includes(walletId)) {
       const unlockedWalletIds = session.unlockedWalletIds.filter((id) => id !== walletId);
       if (unlockedWalletIds.length > 0) {
         await saveSession(this.storage, { ...session, unlockedWalletIds });
       } else {
-        await lockSession(this.storage);
+        await lockSession(this.storage, this.keySession);
       }
     }
   }
@@ -828,8 +821,8 @@ export class WalletLifecycleHandler {
 
   /** Immediately clears unlocked-session state and every cached signing key, regardless of any auto-lock timeout. */
   async lockWallet(): Promise<void> {
-    return withSessionLock(async () => {
-      await lockSession(this.storage);
+    return this.keySession.withSessionLock(async () => {
+      await lockSession(this.storage, this.keySession);
     });
   }
 
@@ -841,9 +834,9 @@ export class WalletLifecycleHandler {
    * calls both.
    */
   async resetAllWallets(): Promise<void> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       try {
-        await clearKeyCache();
+        await this.keySession.clearKeyCache();
       } finally {
         await this.wipeVault();
       }
@@ -877,7 +870,7 @@ export class WalletLifecycleHandler {
    * it never delays or fails the unlock.
    */
   async unlockWallet(req: { password: string }): Promise<{ unlockedWalletIds: string[] }> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       const wallets = await loadWallets(this.storage);
       const activeWalletId = await loadActiveWalletId(this.storage, wallets);
       const ordered = [
@@ -916,7 +909,7 @@ export class WalletLifecycleHandler {
           // Outside the wrong-password catch: a storage failure here must
           // reach the user as itself.
           importedWalletIds.push(wallet.id);
-          await cacheKey(wallet.id, jwk, wallet.address);
+          await this.keySession.cacheKey(wallet.id, jwk, wallet.address);
           unlockedWalletIds.push(wallet.id);
           opened.push({ wallet, envelope: wallet.encryptedKeyfile });
         }
@@ -948,7 +941,7 @@ export class WalletLifecycleHandler {
         return { unlockedWalletIds };
       } catch (error) {
         // Keys this attempt imported must not outlive it: no session will list them.
-        await Promise.allSettled(importedWalletIds.map((walletId) => removeCachedKey(walletId)));
+        await Promise.allSettled(importedWalletIds.map((walletId) => this.keySession.removeCachedKey(walletId)));
         throw error;
       }
     });
@@ -1032,10 +1025,10 @@ export class WalletLifecycleHandler {
    * Refreshed only for a session `loadSession` didn't just expire.
    */
   async getState({ recordActivity = false }: { recordActivity?: boolean } = {}): Promise<WalletState> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       const wallets = await loadWallets(this.storage);
       const activeWalletId = await loadActiveWalletId(this.storage, wallets);
-      let session = await loadSession(this.storage, wallets);
+      let session = await loadSession(this.storage, this.keySession, wallets);
 
       if (session !== null && recordActivity) {
         session = { ...session, lastActivityAt: Date.now() };
@@ -1067,7 +1060,7 @@ export class WalletLifecycleHandler {
    * starting to lock after the update. Only new installs get the default.
    */
   async keepLockTimeoutOnUpdate(): Promise<void> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       if ((await this.storage.get<unknown>(LOCK_SETTINGS_KEY)) !== null) return;
       if ((await loadWallets(this.storage)).length === 0) return;
       await this.storage.set(LOCK_SETTINGS_KEY, { autoLockTimeout: "never" } satisfies LockSettings);
@@ -1081,14 +1074,14 @@ export class WalletLifecycleHandler {
    * timeout picker and both write the same `Session` record.
    */
   async setLockSettings(req: LockSettings): Promise<void> {
-    return withSessionLock(async () => {
+    return this.keySession.withSessionLock(async () => {
       if (!VALID_AUTO_LOCK_TIMEOUTS.includes(req.autoLockTimeout)) {
         throw new Error(`Invalid auto-lock timeout "${req.autoLockTimeout}".`);
       }
       await this.storage.set(LOCK_SETTINGS_KEY, req);
 
       const wallets = await loadWallets(this.storage);
-      const session = await loadSession(this.storage, wallets);
+      const session = await loadSession(this.storage, this.keySession, wallets);
       if (session !== null) {
         await saveSession(this.storage, { ...session, autoLockTimeout: req.autoLockTimeout });
       }

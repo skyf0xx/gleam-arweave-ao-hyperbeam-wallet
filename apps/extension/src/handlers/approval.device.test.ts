@@ -13,11 +13,12 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk, generateJWK } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { verifyPointsProof } from "@gleam/core/src/points/index.ts";
 import { ApprovalHandler, type SigningRequestInput } from "./approval";
+import { createKeySession } from "./key-session";
 import { TransferHandler } from "./transfer";
 
 const keySessionStore = new Map<string, unknown>();
@@ -38,12 +39,13 @@ vi.mock("@gleam/core", async (importOriginal) => {
   };
 });
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -53,7 +55,7 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
 
 function createWatchableStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -179,8 +181,8 @@ beforeEach(async () => {
   storage = createWatchableStorage();
   await storage.set("local:wallets", [wallet]);
   windows = createFakeWindows();
-  transfer = new TransferHandler(storage, { requestTransfer: (req) => handler.requestWalletTransfer(req) });
-  handler = new ApprovalHandler(storage, windows, transfer, "https://bundler.example");
+  transfer = new TransferHandler(storage, keySession, { requestTransfer: (req) => handler.requestWalletTransfer(req) });
+  handler = new ApprovalHandler(storage, keySession, windows, transfer, "https://bundler.example");
 });
 
 afterEach(() => {

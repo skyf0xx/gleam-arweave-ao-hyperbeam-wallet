@@ -1,50 +1,51 @@
 import { describe, expect, it, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { verifyRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
-import { verifyMessage, signMessage, type JWKInterface } from "@gleam/core";
-import { KeyringLockedError, generateJWK } from "@gleam/core/signer";
-import { sessionKeyStore } from "../adapters/session-key-store";
+import { verifyMessage, signMessage, type JWKInterface, type StoragePort } from "@gleam/core";
+import { Keyring, KeyringLockedError, generateJWK } from "@gleam/core/signer";
+import {
+  createKeySession,
+  HardwareWalletSigningError,
+  isSessionExpired,
+  SessionKeyStorageError,
+} from "./key-session";
 
 /**
- * Real key/value store standing in for `adapters/storage.ts`'s
- * `storagePort`, not an in-process cache layered in front of it.
+ * Real key/value store, not an in-process cache layered in front of it.
  * Cleared in `beforeEach` so every test starts from an empty store, the
  * same way a freshly-restarted MV3 service worker would see whatever
- * session storage still holds and nothing else. The key half goes to
- * the in-memory `Keyring` `vitest.setup.ts` puts behind `sessionKeyStore`.
+ * session storage still holds and nothing else. The key half goes to an
+ * in-memory `Keyring`, the store the keyring offscreen document runs.
  */
 const store = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return store.has(key) ? store.get(key) : null;
-    },
-    async set(key: string, value: unknown) {
-      store.set(key, value);
-    },
-    async remove(key: string) {
-      store.delete(key);
-    },
-    watch() {
-      return () => {};
-    },
+const storage: StoragePort = {
+  async get<T>(key: string) {
+    return store.has(key) ? (store.get(key) as T) : null;
   },
-}));
+  async set<T>(key: string, value: T) {
+    store.set(key, value);
+  },
+  async remove(key: string) {
+    store.delete(key);
+  },
+  watch() {
+    return () => {};
+  },
+};
+
+const sessionKeys = new Keyring();
 
 const {
   cacheKey,
   clearKeyCache,
   enforceAutoLock,
   getSigner,
-  HardwareWalletSigningError,
   hasCachedKey,
   isKeyStored,
-  isSessionExpired,
   reconcileKeyring,
   removeCachedKey,
-  SessionKeyStorageError,
   withSessionLock,
-} = await import("./key-session");
+} = createKeySession({ sessionKeys, storage });
 
 let jwkA: JWKInterface;
 let jwkB: JWKInterface;
@@ -64,11 +65,11 @@ function setSession(autoLockTimeout: string, lastActivityAt = Date.now(), unlock
 
 const bytes = (text: string) => new TextEncoder().encode(text) as Uint8Array<ArrayBuffer>;
 
-const heldKeys = () => sessionKeyStore.has(["wallet-a", "wallet-b"]);
+const heldKeys = () => sessionKeys.has(["wallet-a", "wallet-b"]);
 
 beforeEach(async () => {
   store.clear();
-  await sessionKeyStore.clear();
+  await sessionKeys.clear();
   setSession("never");
 });
 
@@ -130,7 +131,7 @@ describe("key-session", () => {
 
   it("treats a wallet whose keyring key is gone as locked", async () => {
     await cacheKey("wallet-a", jwkA, "address-a");
-    await sessionKeyStore.remove("wallet-a");
+    await sessionKeys.remove("wallet-a");
 
     expect(await getSigner("wallet-a")).toBeNull();
     expect(await isKeyStored("wallet-a")).toBe(false);
@@ -139,7 +140,7 @@ describe("key-session", () => {
   it("treats a session entry holding a whole JWK, as older releases stored, as locked and scrubs it", async () => {
     store.set("session:key:wallet-a", { jwk: jwkA, address: "address-a" });
     store.set("session:cachedWalletIds", ["wallet-a"]);
-    const setSpy = vi.spyOn(await import("../adapters/storage").then((m) => m.storagePort), "set");
+    const setSpy = vi.spyOn(storage, "set");
 
     expect(await getSigner("wallet-a")).toBeNull();
 
@@ -153,7 +154,7 @@ describe("key-session", () => {
   it("treats a session entry carrying d, as an earlier build stored, as locked and scrubs it", async () => {
     await cacheKey("wallet-a", jwkA, "address-a");
     store.set("session:key:wallet-a", { address: "address-a", owner: jwkA.n, d: jwkA.d });
-    const setSpy = vi.spyOn(await import("../adapters/storage").then((m) => m.storagePort), "set");
+    const setSpy = vi.spyOn(storage, "set");
 
     expect(await getSigner("wallet-a")).toBeNull();
 
@@ -206,7 +207,7 @@ describe("key-session", () => {
 
   it("removeCachedKey overwrites the entry's strings with zeros before removing it", async () => {
     await cacheKey("wallet-a", jwkA, "address-a");
-    const setSpy = vi.spyOn(await import("../adapters/storage").then((m) => m.storagePort), "set");
+    const setSpy = vi.spyOn(storage, "set");
 
     await removeCachedKey("wallet-a");
 
@@ -222,7 +223,7 @@ describe("key-session", () => {
   it("clearKeyCache overwrites every cached entry with zeros before removing them", async () => {
     await cacheKey("wallet-a", jwkA, "address-a");
     await cacheKey("wallet-b", jwkB, "address-b");
-    const setSpy = vi.spyOn(await import("../adapters/storage").then((m) => m.storagePort), "set");
+    const setSpy = vi.spyOn(storage, "set");
 
     await clearKeyCache();
 
@@ -288,6 +289,47 @@ describe("key-session", () => {
       await expect(second).resolves.toBe("ok");
       expect(events).toEqual(["first:start", "first:end", "second"]);
     });
+
+    it("auto-lock and reconcile wait for a task already holding the lock", async () => {
+      setSession("immediate", Date.now() - 2 * 60 * 1000);
+      await cacheKey("wallet-a", jwkA, "address-a");
+      let release!: () => void;
+      const held = withSessionLock(() => new Promise<void>((resolve) => (release = resolve)));
+
+      const locking = enforceAutoLock();
+      store.delete("session:unlockedSession");
+      const reconciling = reconcileKeyring();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(await heldKeys()).toEqual(["wallet-a"]);
+      release();
+      await held;
+      await expect(locking).resolves.toBe(false);
+      await reconciling;
+      expect(await heldKeys()).toEqual([]);
+    });
+
+    it("a second key session doesn't wait on this one's lock, so the background builds only one", async () => {
+      const other = createKeySession({ sessionKeys, storage });
+      const events: string[] = [];
+      let release!: () => void;
+      const first = withSessionLock(async () => {
+        await new Promise<void>((resolve) => (release = resolve));
+        events.push("first");
+      });
+      const second = other.withSessionLock(async () => {
+        events.push("other session");
+      });
+      const third = withSessionLock(async () => {
+        events.push("third");
+      });
+
+      await second;
+      release();
+      await Promise.all([first, third]);
+
+      expect(events).toEqual(["other session", "first", "third"]);
+    });
   });
 
   describe("when the keyring fails", () => {
@@ -297,7 +339,6 @@ describe("key-session", () => {
 
     it("clearKeyCache still clears the keyring when a session entry can't be removed", async () => {
       await cacheKey("wallet-a", jwkA, "address-a");
-      const storage = await import("../adapters/storage").then((m) => m.storagePort);
       vi.spyOn(storage, "set").mockRejectedValueOnce(new Error("session storage error"));
 
       await expect(clearKeyCache()).rejects.toThrow("session storage error");
@@ -307,7 +348,7 @@ describe("key-session", () => {
 
     it("clearKeyCache rethrows after removing every session entry", async () => {
       await cacheKey("wallet-a", jwkA, "address-a");
-      vi.spyOn(sessionKeyStore, "clear").mockRejectedValueOnce(new Error("disk error"));
+      vi.spyOn(sessionKeys, "clear").mockRejectedValueOnce(new Error("disk error"));
 
       await expect(clearKeyCache()).rejects.toThrow("disk error");
 
@@ -318,7 +359,7 @@ describe("key-session", () => {
     it("auto-lock rethrows a failed wipe but still ends the session", async () => {
       setSession("immediate", Date.now() - 2 * 60 * 1000);
       await cacheKey("wallet-a", jwkA, "address-a");
-      vi.spyOn(sessionKeyStore, "clear").mockRejectedValueOnce(new Error("disk error"));
+      vi.spyOn(sessionKeys, "clear").mockRejectedValueOnce(new Error("disk error"));
 
       await expect(getSigner("wallet-a")).rejects.toThrow("disk error");
 
@@ -328,7 +369,7 @@ describe("key-session", () => {
 
     it("reports a wallet as locked when its keys can't be read", async () => {
       await cacheKey("wallet-a", jwkA, "address-a");
-      vi.spyOn(sessionKeyStore, "has").mockRejectedValue(new Error("disk error"));
+      vi.spyOn(sessionKeys, "has").mockRejectedValue(new Error("disk error"));
       vi.spyOn(console, "error").mockImplementation(() => {});
 
       expect(await getSigner("wallet-a")).toBeNull();
@@ -336,9 +377,35 @@ describe("key-session", () => {
     });
 
     it("cacheKey throws a storage error a caller can tell from a wrong password", async () => {
-      vi.spyOn(sessionKeyStore, "importKey").mockRejectedValueOnce(new Error("keyring gone"));
+      vi.spyOn(sessionKeys, "importKey").mockRejectedValueOnce(new Error("keyring gone"));
 
       await expect(cacheKey("wallet-a", jwkA, "address-a")).rejects.toBeInstanceOf(SessionKeyStorageError);
+    });
+
+    it("cacheKey writes no session entry when the keyring refuses the key", async () => {
+      vi.spyOn(sessionKeys, "importKey").mockRejectedValueOnce(new Error("keyring gone"));
+
+      await expect(cacheKey("wallet-a", jwkA, "address-a")).rejects.toBeInstanceOf(SessionKeyStorageError);
+
+      expect(store.has("session:key:wallet-a")).toBe(false);
+      expect(store.has("session:cachedWalletIds")).toBe(false);
+    });
+
+    it("cacheKey reports a session entry that can't be written as a storage error", async () => {
+      vi.spyOn(storage, "set").mockRejectedValueOnce(new Error("session storage error"));
+
+      await expect(cacheKey("wallet-a", jwkA, "address-a")).rejects.toBeInstanceOf(SessionKeyStorageError);
+
+      expect(await isKeyStored("wallet-a")).toBe(false);
+    });
+
+    it("removeCachedKey still removes the keyring key when the session entry can't be removed", async () => {
+      await cacheKey("wallet-a", jwkA, "address-a");
+      vi.spyOn(storage, "remove").mockRejectedValueOnce(new Error("session storage error"));
+
+      await expect(removeCachedKey("wallet-a")).rejects.toThrow("session storage error");
+
+      expect(await heldKeys()).toEqual([]);
     });
   });
 

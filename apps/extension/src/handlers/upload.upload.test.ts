@@ -7,24 +7,24 @@ import {
   type UploadTag,
   type Wallet,
 } from "@gleam/core";
-import { generateJWK } from "@gleam/core/signer";
+import { generateJWK, Keyring } from "@gleam/core/signer";
 import { UploadHandler } from "./upload";
-import { cacheKey, clearKeyCache } from "./key-session";
+import { createKeySession } from "./key-session";
 
 /**
- * Real key/value store standing in for `adapters/storage.ts`'s
- * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * Real key/value store backing `keySession` below — not an in-process
  * cache, so tests exercise the same "read fresh from storage" behavior
  * `key-session.ts` relies on.
  */
 const keySessionStore = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -34,7 +34,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { cacheKey, clearKeyCache } = keySession;
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -110,7 +111,7 @@ function mockBundlerFetch(status = 200) {
 
 describe("UploadHandler: reviewUpload", () => {
   it("reports no secret-scan match and the correct tag byte size for ordinary content", () => {
-    const handler = new UploadHandler(createFakeStorage());
+    const handler = new UploadHandler(createFakeStorage(), keySession);
     const review = handler.reviewUpload(
       textDraft("Notes from the field trip.", [{ name: "Content-Type", value: "text/plain" }]),
     );
@@ -120,7 +121,7 @@ describe("UploadHandler: reviewUpload", () => {
   });
 
   it("flags a payload that looks like a PEM private key with the specific match type", () => {
-    const handler = new UploadHandler(createFakeStorage());
+    const handler = new UploadHandler(createFakeStorage(), keySession);
     const pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcw\n-----END PRIVATE KEY-----";
     const review = handler.reviewUpload(textDraft(pem));
 
@@ -128,7 +129,7 @@ describe("UploadHandler: reviewUpload", () => {
   });
 
   it("flags a JWK-shaped JSON payload", () => {
-    const handler = new UploadHandler(createFakeStorage());
+    const handler = new UploadHandler(createFakeStorage(), keySession);
     const jwkJson = JSON.stringify({
       kty: "RSA",
       n: "sXchDaQebHnPiGvyDOAT4saGEUetSyo9MKLOoWFsueri23bOdgWJ",
@@ -150,7 +151,7 @@ describe("UploadHandler: submitUpload", () => {
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
-    const handler = new UploadHandler(storage);
+    const handler = new UploadHandler(storage, keySession);
     const pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0B\n-----END PRIVATE KEY-----";
 
     await expect(handler.submitUpload({ ...textDraft(pem), walletId: WALLET_ID })).rejects.toThrow(/PEM block/i);
@@ -166,7 +167,7 @@ describe("UploadHandler: submitUpload", () => {
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
-    const handler = new UploadHandler(storage);
+    const handler = new UploadHandler(storage, keySession);
     const oversizedTags: UploadTag[] = [{ name: "Description", value: "a".repeat(4097) }];
 
     await expect(
@@ -197,7 +198,7 @@ describe("UploadHandler: submitUpload", () => {
       globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
       vi.advanceTimersByTime(5 * 60 * 1000 + 1);
-      const handler = new UploadHandler(storage);
+      const handler = new UploadHandler(storage, keySession);
 
       await expect(
         handler.submitUpload({ ...textDraft("hello world"), walletId: WALLET_ID }),
@@ -214,7 +215,7 @@ describe("UploadHandler: submitUpload", () => {
     const { wallet } = await createTestWallet();
     await storage.set("local:wallets", [wallet]);
 
-    const handler = new UploadHandler(storage);
+    const handler = new UploadHandler(storage, keySession);
 
     await expect(
       handler.submitUpload({
@@ -242,7 +243,7 @@ describe("UploadHandler: submitUpload", () => {
     ]);
 
     await expect(
-      new UploadHandler(createFakeStorage()).submitUpload({ ...textDraft("hello world"), walletId: WALLET_ID }),
+      new UploadHandler(createFakeStorage(), keySession).submitUpload({ ...textDraft("hello world"), walletId: WALLET_ID }),
     ).rejects.toThrow("This wallet can't upload files. Switch to a keyfile wallet.");
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -254,7 +255,7 @@ describe("UploadHandler: submitUpload", () => {
     await cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(200);
 
-    const handler = new UploadHandler(storage);
+    const handler = new UploadHandler(storage, keySession);
     const result = await handler.submitUpload({
       ...textDraft("hello world", [{ name: "App-Name", value: "Gleam" }]),
       walletId: WALLET_ID,
@@ -271,7 +272,7 @@ describe("UploadHandler: submitUpload", () => {
     await cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(200);
 
-    const handler = new UploadHandler(storage);
+    const handler = new UploadHandler(storage, keySession);
     const result = await handler.submitUpload({
       ...textDraft("hello world", [{ name: "App-Name", value: "Gleam" }]),
       walletId: WALLET_ID,
@@ -297,7 +298,7 @@ describe("UploadHandler: submitUpload", () => {
     await cacheKey(WALLET_ID, jwk, wallet.address);
     mockBundlerFetch(502);
 
-    const handler = new UploadHandler(storage);
+    const handler = new UploadHandler(storage, keySession);
 
     await expect(
       handler.submitUpload({

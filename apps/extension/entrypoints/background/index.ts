@@ -35,7 +35,7 @@ import {
   type WalletSwitchEventPayload,
 } from "@gleam/messaging/src/page-protocol.ts";
 import { WxtStoragePort } from "@/src/adapters/storage";
-import { listenForKeyringConnections } from "@/src/adapters/session-key-store";
+import { listenForKeyringConnections, sessionKeyStore } from "@/src/adapters/session-key-store";
 import { WxtWindowPort } from "@/src/adapters/windows";
 import { restrictSessionStorageToTrustedContexts } from "@/src/adapters/session-access";
 import { WalletLifecycleHandler } from "@/src/handlers/wallet-lifecycle";
@@ -55,15 +55,7 @@ import { loadOrCreateDeviceKey } from "@/src/adapters/device-key";
 import { actionBadge } from "@/src/adapters/badge";
 import { alarmTimer } from "@/src/adapters/timer";
 import { browserDownloads, watchDownloadHistory } from "@/src/adapters/downloads";
-import {
-  clearKeyCache,
-  enforceAutoLock,
-  getSigner,
-  getStoredWallet,
-  getWalletMethod,
-  reconcileKeyring,
-  withSessionLock,
-} from "@/src/handlers/key-session";
+import { createKeySession } from "@/src/handlers/key-session";
 import {
   decodeProviderParams,
   encodeProviderResult,
@@ -105,21 +97,26 @@ void restrictSessionStorageToTrustedContexts();
 
 const storage = new WxtStoragePort();
 const windows = new WxtWindowPort(storage);
+// The one session lock: every handler that touches unlocked keys gets this instance.
+const keySession = createKeySession({ sessionKeys: sessionKeyStore, storage });
+const { clearKeyCache, enforceAutoLock, getSigner, getStoredWallet, getWalletMethod, reconcileKeyring, withSessionLock } =
+  keySession;
 
-const lifecycle = new WalletLifecycleHandler(storage, { downloads: browserDownloads });
+const lifecycle = new WalletLifecycleHandler(storage, keySession, { downloads: browserDownloads });
 const passkey = new PasskeyHandler(storage, lifecycle);
 const reads = new ReadsHandler(storage);
 // `approval` is declared below; hardware sends reach it only at call time.
-const transfer: TransferHandler = new TransferHandler(storage, {
+const transfer: TransferHandler = new TransferHandler(storage, keySession, {
   requestTransfer: async (req): Promise<{ txId: string }> => {
     const metadata = req.token === null ? {} : await resolveTokenDenominationAndTicker(await walletAddress(req.walletId), req.token);
     return approval.requestWalletTransfer({ ...req, ...metadata });
   },
 }, reads, reads);
-const upload = new UploadHandler(storage);
+const upload = new UploadHandler(storage, keySession);
 const contacts = new ContactsHandler(storage);
 const approval: ApprovalHandler = new ApprovalHandler(
   storage,
+  keySession,
   windows,
   transfer,
   DEFAULT_BUNDLER_URL,

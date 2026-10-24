@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveAddress, type StoragePort, type Wallet } from "@gleam/core";
-import { generateJWK } from "@gleam/core/signer";
+import { generateJWK, Keyring } from "@gleam/core/signer";
 import { base64UrlToBytes } from "@gleam/core/src/vault/base64.ts";
 import { TransferHandler } from "./transfer";
-import { cacheKey, clearKeyCache } from "./key-session";
+import { createKeySession } from "./key-session";
 
 const keySessionStore = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -22,7 +23,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { cacheKey, clearKeyCache } = keySession;
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -112,7 +114,7 @@ const muRoutes = { tokenTransport: async () => "mu" as const };
 describe("TransferHandler: arweave-scheduler token sends", () => {
   it("quotes the AR reward of the L1 transaction instead of claiming no fee", async () => {
     stubGateway("1000000000");
-    const estimate = await new TransferHandler(storage, undefined, undefined, l1Routes).estimateTransfer({
+    const estimate = await new TransferHandler(storage, keySession, undefined, undefined, l1Routes).estimateTransfer({
       walletId: WALLET_ID,
       recipient: RECIPIENT,
       token: PID,
@@ -124,7 +126,7 @@ describe("TransferHandler: arweave-scheduler token sends", () => {
 
   it("posts a zero-AR L1 transaction to the token process with the transfer in lowercase tags", async () => {
     const posted = stubGateway("1000000000");
-    const { txId } = await new TransferHandler(storage, undefined, undefined, l1Routes).submitTransfer({
+    const { txId } = await new TransferHandler(storage, keySession, undefined, undefined, l1Routes).submitTransfer({
       walletId: WALLET_ID,
       recipient: RECIPIENT,
       token: PID,
@@ -148,7 +150,7 @@ describe("TransferHandler: arweave-scheduler token sends", () => {
   it("fails before signing when the wallet's AR can't pay the reward", async () => {
     const posted = stubGateway("10");
     await expect(
-      new TransferHandler(storage, undefined, undefined, l1Routes).submitTransfer({
+      new TransferHandler(storage, keySession, undefined, undefined, l1Routes).submitTransfer({
         walletId: WALLET_ID,
         recipient: RECIPIENT,
         token: PID,
@@ -161,7 +163,7 @@ describe("TransferHandler: arweave-scheduler token sends", () => {
 
   it("keeps a legacy token's send on the MU", async () => {
     stubGateway("1000000000");
-    const estimate = await new TransferHandler(storage, undefined, undefined, muRoutes).estimateTransfer({
+    const estimate = await new TransferHandler(storage, keySession, undefined, undefined, muRoutes).estimateTransfer({
       walletId: WALLET_ID,
       recipient: RECIPIENT,
       token: PID,

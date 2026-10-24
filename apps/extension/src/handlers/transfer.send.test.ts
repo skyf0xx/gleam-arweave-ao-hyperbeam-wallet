@@ -1,26 +1,26 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { deriveAddress, type JWKInterface, type StoragePort, type Wallet } from "@gleam/core";
-import { generateJWK } from "@gleam/core/signer";
+import { generateJWK, Keyring } from "@gleam/core/signer";
 import { TransferHandler } from "./transfer";
-import { cacheKey, clearKeyCache } from "./key-session";
+import { createKeySession } from "./key-session";
 
 const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
 vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
 
 /**
- * Real key/value store standing in for `adapters/storage.ts`'s
- * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * Real key/value store backing `keySession` below — not an in-process
  * cache, so tests exercise the same "read fresh from storage" behavior
  * `key-session.ts` relies on.
  */
 const keySessionStore = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -30,7 +30,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { cacheKey, clearKeyCache } = keySession;
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -131,7 +132,7 @@ describe("TransferHandler: estimateTransfer", () => {
 
   it("returns fee: null for an AO token transfer — no sender-side fee quote exists for AO", async () => {
     mockFetchSequence([]);
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
 
     const estimate = await handler.estimateTransfer({
       walletId: WALLET_ID,
@@ -158,7 +159,7 @@ describe("TransferHandler: estimateTransfer", () => {
       },
     ]);
     mockFetchSequence([]);
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
 
     const seen = await handler.estimateTransfer({
       walletId: WALLET_ID,
@@ -181,7 +182,7 @@ describe("TransferHandler: estimateTransfer", () => {
 
   it("returns a fee and firstSeenRecipient=true for a never-seen address", async () => {
     mockFetchSequence([{ status: 200, body: "999" }]);
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
 
     const estimate = await handler.estimateTransfer({
       walletId: WALLET_ID,
@@ -208,7 +209,7 @@ describe("TransferHandler: estimateTransfer", () => {
       },
     ]);
     mockFetchSequence([{ status: 200, body: "999" }]);
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
 
     const estimate = await handler.estimateTransfer({
       walletId: WALLET_ID,
@@ -225,7 +226,7 @@ describe("TransferHandler: estimateTransfer", () => {
 describe("TransferHandler: getArFee", () => {
   it("returns the gateway's fee quote with no recipient target", async () => {
     mockFetchSequence([{ status: 200, body: "777" }]);
-    const handler = new TransferHandler(createFakeStorage());
+    const handler = new TransferHandler(createFakeStorage(), keySession);
 
     const fee = await handler.getArFee();
 
@@ -253,7 +254,7 @@ describe("TransferHandler: submitTransfer", () => {
     });
     aoSubmitMock.mockResolvedValue({ messageId: "ao-msg-id-1" });
 
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
     const result = await handler.submitTransfer({
       walletId: WALLET_ID,
       recipient: "recipientAoAddr",
@@ -278,7 +279,7 @@ describe("TransferHandler: submitTransfer", () => {
   it("refuses a Ledger AO send before opening the approval window", async () => {
     keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", encryptedKeyfile: null }]);
     const requestTransfer = vi.fn();
-    const handler = new TransferHandler(storage, { requestTransfer });
+    const handler = new TransferHandler(storage, keySession, { requestTransfer });
 
     await expect(
       handler.submitTransfer({ walletId: WALLET_ID, recipient: "recipientAoAddr", token: AO_PROCESS_ID, amount: "1", fee: null }),
@@ -296,7 +297,7 @@ describe("TransferHandler: submitTransfer", () => {
     aoSubmitMock.mockResolvedValue({ messageId: "ao-msg-id-2" });
     const huge = "90071992547409930000";
 
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
     await handler.submitTransfer({
       walletId: WALLET_ID,
       recipient: "recipientAoAddr",
@@ -322,7 +323,7 @@ describe("TransferHandler: submitTransfer", () => {
     });
     try {
       vi.advanceTimersByTime(5 * 60 * 1000 + 1);
-      const handler = new TransferHandler(storage);
+      const handler = new TransferHandler(storage, keySession);
       await expect(
         handler.submitTransfer({
           walletId: WALLET_ID,
@@ -340,7 +341,7 @@ describe("TransferHandler: submitTransfer", () => {
 
   it("throws when the wallet isn't unlocked (no cached signing key)", async () => {
     await clearKeyCache();
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
     await expect(
       handler.submitTransfer({
         walletId: WALLET_ID,
@@ -359,7 +360,7 @@ describe("TransferHandler: submitTransfer", () => {
       { status: 200, body: { ok: true } },
     ]);
 
-    const handler = new TransferHandler(storage);
+    const handler = new TransferHandler(storage, keySession);
     const result = await handler.submitTransfer({
       walletId: WALLET_ID,
       recipient: AR_RECIPIENT,
@@ -399,7 +400,7 @@ describe("TransferHandler: lookalike recipients", () => {
       { txId: "t", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 1 },
     ]);
     mockFetchSequence([{ status: 200, body: "999" }]);
-    const estimate = await new TransferHandler(storage).estimateTransfer({
+    const estimate = await new TransferHandler(storage, keySession).estimateTransfer({
       walletId: WALLET_ID,
       recipient: POISON,
       token: null,
@@ -412,14 +413,14 @@ describe("TransferHandler: lookalike recipients", () => {
   it("names a saved contact that the new address imitates, for the approval window", async () => {
     await storage.set("local:contacts", [{ address: SENT_TO, name: "Sam", createdAt: 0 }]);
     mockFetchSequence([]);
-    const assessment = await new TransferHandler(storage).assessRecipient({ walletId: WALLET_ID, recipient: POISON });
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: POISON });
     expect(assessment).toEqual({ firstTime: true, lookalikeOf: SENT_TO });
   });
 
   it("treats a saved contact as known", async () => {
     await storage.set("local:contacts", [{ address: SENT_TO, name: "Sam", createdAt: 0 }]);
     mockFetchSequence([]);
-    const assessment = await new TransferHandler(storage).assessRecipient({ walletId: WALLET_ID, recipient: SENT_TO });
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: SENT_TO });
     expect(assessment).toEqual({ firstTime: false, lookalikeOf: null });
   });
 });

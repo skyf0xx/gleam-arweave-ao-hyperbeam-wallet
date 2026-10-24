@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveAddress, type StoragePort, type Wallet } from "@gleam/core";
-import { generateJWK } from "@gleam/core/signer";
+import { generateJWK, Keyring } from "@gleam/core/signer";
 import { base64UrlToBytes } from "@gleam/core/src/vault/base64.ts";
 import { TransferHandler } from "./transfer";
-import { cacheKey, clearKeyCache } from "./key-session";
+import { createKeySession } from "./key-session";
 
 const keySessionStore = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -22,7 +23,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { cacheKey, clearKeyCache } = keySession;
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -112,7 +114,7 @@ afterEach(async () => {
 describe("TransferHandler: estimateCollectibleSend", () => {
   it("quotes the AR reward for a transaction to the asset process", async () => {
     stubGateway("1000000000");
-    const estimate = await new TransferHandler(storage).estimateCollectibleSend({
+    const estimate = await new TransferHandler(storage, keySession).estimateCollectibleSend({
       walletId: WALLET_ID,
       recipient: RECIPIENT,
       collectible: COLLECTIBLE,
@@ -123,14 +125,14 @@ describe("TransferHandler: estimateCollectibleSend", () => {
   it("fails with the fee in AR when the wallet's AR can't cover it", async () => {
     stubGateway("10");
     await expect(
-      new TransferHandler(storage).estimateCollectibleSend({ walletId: WALLET_ID, recipient: RECIPIENT, collectible: COLLECTIBLE }),
+      new TransferHandler(storage, keySession).estimateCollectibleSend({ walletId: WALLET_ID, recipient: RECIPIENT, collectible: COLLECTIBLE }),
     ).rejects.toThrow("Sending needs about 0.000000654321 AR for the network fee.");
   });
 
   it("refuses to send to the wallet's own address", async () => {
     stubGateway("1000000000");
     await expect(
-      new TransferHandler(storage).estimateCollectibleSend({ walletId: WALLET_ID, recipient: wallet.address, collectible: COLLECTIBLE }),
+      new TransferHandler(storage, keySession).estimateCollectibleSend({ walletId: WALLET_ID, recipient: wallet.address, collectible: COLLECTIBLE }),
     ).rejects.toThrow(/this wallet's own address/);
   });
 });
@@ -145,7 +147,7 @@ describe("TransferHandler: collectible send validation", () => {
   for (const { label, recipient, assetId, error } of cases) {
     it(`refuses ${label} in both estimate and send, before any network call`, async () => {
       const posted = stubGateway("1000000000");
-      const handler = new TransferHandler(storage);
+      const handler = new TransferHandler(storage, keySession);
       const req = { walletId: WALLET_ID, recipient, collectible: { ...COLLECTIBLE, id: assetId } };
 
       await expect(handler.estimateCollectibleSend(req)).rejects.toThrow(error);
@@ -158,7 +160,7 @@ describe("TransferHandler: collectible send validation", () => {
   it("refuses a self-send in the estimate before any network call", async () => {
     stubGateway("1000000000");
     await expect(
-      new TransferHandler(storage).estimateCollectibleSend({ walletId: WALLET_ID, recipient: wallet.address, collectible: COLLECTIBLE }),
+      new TransferHandler(storage, keySession).estimateCollectibleSend({ walletId: WALLET_ID, recipient: wallet.address, collectible: COLLECTIBLE }),
     ).rejects.toThrow(/this wallet's own address/);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -168,7 +170,7 @@ describe("TransferHandler: sendCollectible", () => {
   it("posts an L1 transaction to the asset with zero AR, no data and the transfer tags", async () => {
     const posted = stubGateway("1000000000");
     const forgetCollectible = vi.fn(async () => {});
-    const handler = new TransferHandler(storage, undefined, { forgetCollectible });
+    const handler = new TransferHandler(storage, keySession, undefined, { forgetCollectible });
 
     const { txId } = await handler.sendCollectible({ walletId: WALLET_ID, recipient: RECIPIENT, collectible: COLLECTIBLE });
 
@@ -185,7 +187,7 @@ describe("TransferHandler: sendCollectible", () => {
 
   it("writes a pending activity entry that carries the collectible instead of an amount", async () => {
     stubGateway("1000000000");
-    const { txId } = await new TransferHandler(storage).sendCollectible({
+    const { txId } = await new TransferHandler(storage, keySession).sendCollectible({
       walletId: WALLET_ID,
       recipient: RECIPIENT,
       collectible: COLLECTIBLE,
@@ -206,7 +208,7 @@ describe("TransferHandler: sendCollectible", () => {
   it("signs nothing when the wallet's AR can't pay the reward", async () => {
     const posted = stubGateway("10");
     await expect(
-      new TransferHandler(storage).sendCollectible({ walletId: WALLET_ID, recipient: RECIPIENT, collectible: COLLECTIBLE }),
+      new TransferHandler(storage, keySession).sendCollectible({ walletId: WALLET_ID, recipient: RECIPIENT, collectible: COLLECTIBLE }),
     ).rejects.toThrow(/Sending needs about .* AR for the network fee/);
     expect(posted).toHaveLength(0);
     expect(await storage.get(`local:activityLog:${wallet.address}`)).toBeNull();
@@ -215,7 +217,7 @@ describe("TransferHandler: sendCollectible", () => {
   it("refuses a send to the wallet's own address", async () => {
     const posted = stubGateway("1000000000");
     await expect(
-      new TransferHandler(storage).sendCollectible({ walletId: WALLET_ID, recipient: wallet.address, collectible: COLLECTIBLE }),
+      new TransferHandler(storage, keySession).sendCollectible({ walletId: WALLET_ID, recipient: wallet.address, collectible: COLLECTIBLE }),
     ).rejects.toThrow(/this wallet's own address/);
     expect(posted).toHaveLength(0);
   });
@@ -223,7 +225,7 @@ describe("TransferHandler: sendCollectible", () => {
   it("hands a hardware wallet's send to the approval window with the collectible", async () => {
     keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger" }]);
     const requestTransfer = vi.fn(async () => ({ txId: "device-tx" }));
-    const handler = new TransferHandler(storage, { requestTransfer });
+    const handler = new TransferHandler(storage, keySession, { requestTransfer });
 
     await expect(
       handler.sendCollectible({ walletId: WALLET_ID, recipient: RECIPIENT, collectible: COLLECTIBLE }),
@@ -235,7 +237,7 @@ describe("TransferHandler: sendCollectible", () => {
 
   it("builds the same transaction for a device to sign", async () => {
     stubGateway("1000000000");
-    const payload = await new TransferHandler(storage).prepareDeviceTransfer(
+    const payload = await new TransferHandler(storage, keySession).prepareDeviceTransfer(
       { walletId: WALLET_ID, recipient: RECIPIENT, token: null, amount: "0", fee: null, collectible: COLLECTIBLE },
       ownerB64Url,
     );

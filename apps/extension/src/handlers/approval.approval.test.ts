@@ -7,9 +7,9 @@ import {
   type StoragePort,
   type WindowPort,
 } from "@gleam/core";
-import { signerFromJwk, generateJWK } from "@gleam/core/signer";
+import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
-import { cacheKey, clearKeyCache } from "./key-session";
+import { createKeySession } from "./key-session";
 
 let jwkPromise: Promise<JWKInterface> | null = null;
 
@@ -20,19 +20,19 @@ function sharedJwk(): Promise<JWKInterface> {
 }
 
 /**
- * Real key/value store standing in for `adapters/storage.ts`'s
- * `storagePort`, backing `key-session.ts`'s accessors — not an in-process
+ * Real key/value store backing `keySession` below — not an in-process
  * cache, so tests exercise the same "read fresh from storage" behavior
  * `key-session.ts` relies on.
  */
 const keySessionStore = new Map<string, unknown>();
 
-vi.mock("../adapters/storage", () => ({
-  storagePort: {
-    async get(key: string) {
-      return keySessionStore.has(key) ? keySessionStore.get(key) : null;
+const keySession = createKeySession({
+  sessionKeys: new Keyring(),
+  storage: {
+    async get<T>(key: string) {
+      return keySessionStore.has(key) ? (keySessionStore.get(key) as T) : null;
     },
-    async set(key: string, value: unknown) {
+    async set<T>(key: string, value: T) {
       keySessionStore.set(key, value);
     },
     async remove(key: string) {
@@ -42,7 +42,8 @@ vi.mock("../adapters/storage", () => ({
       return () => {};
     },
   },
-}));
+});
+const { cacheKey, clearKeyCache } = keySession;
 
 beforeEach(() => {
   keySessionStore.clear();
@@ -152,7 +153,7 @@ describe("ApprovalHandler: connect() -> Grant", () => {
   beforeEach(async () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows);
+    handler = new ApprovalHandler(storage, keySession, windows);
     await seedWallet(storage);
   });
 
@@ -334,7 +335,7 @@ describe("ApprovalHandler: connect() before any wallet exists", () => {
     const storage = createWatchableStorage();
     const windows = createFakeWindows();
     let active: string | null = null;
-    const handler = new ApprovalHandler(storage, windows, undefined, undefined, async () => active);
+    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, async () => active);
 
     const pending = handler.requestApproval({
       kind: "connect",
@@ -359,7 +360,7 @@ describe("ApprovalHandler: connect() before any wallet exists", () => {
   it("rejects the dApp and grants nothing if approved while still no wallet exists", async () => {
     const storage = createWatchableStorage();
     const windows = createFakeWindows();
-    const handler = new ApprovalHandler(storage, windows, undefined, undefined, async () => null);
+    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, async () => null);
 
     const pending = handler.requestApproval({
       kind: "connect",
@@ -385,7 +386,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
   beforeEach(async () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows);
+    handler = new ApprovalHandler(storage, keySession, windows);
     await seedWallet(storage);
   });
 
@@ -431,7 +432,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
     };
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows, transfers);
+    handler = new ApprovalHandler(storage, keySession, windows, transfers);
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -462,7 +463,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
     };
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows, transfers);
+    handler = new ApprovalHandler(storage, keySession, windows, transfers);
 
     const pending = handler.requestApproval({
       kind: "transferAoTokens",
@@ -508,7 +509,7 @@ describe("ApprovalHandler: revocation ends access", () => {
   beforeEach(async () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows);
+    handler = new ApprovalHandler(storage, keySession, windows);
     await seedWallet(storage);
     await storage.set("local:grants", [
       {
@@ -586,7 +587,7 @@ describe("ApprovalHandler: removing wallets", () => {
   beforeEach(async () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows);
+    handler = new ApprovalHandler(storage, keySession, windows);
     await seedWallet(storage);
     await storage.set("local:grants", [
       grantFor("https://a.test", WALLET_ID),
@@ -664,7 +665,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
   beforeEach(async () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
-    handler = new ApprovalHandler(storage, windows);
+    handler = new ApprovalHandler(storage, keySession, windows);
     await seedWallet(storage);
   });
 
@@ -943,7 +944,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-      const result = (await dispatchLarge(new ApprovalHandler(storage, windows, undefined, BUNDLER))) as {
+      const result = (await dispatchLarge(new ApprovalHandler(storage, keySession, windows, undefined, BUNDLER))) as {
         id: string;
         type: string;
       };
@@ -958,7 +959,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await cacheKey(WALLET_ID, await generateJWK(), "abc-address");
       vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 500, statusText: "Server Error" }));
 
-      await expect(dispatchLarge(new ApprovalHandler(storage, windows, undefined, BUNDLER))).rejects.toThrow(
+      await expect(dispatchLarge(new ApprovalHandler(storage, keySession, windows, undefined, BUNDLER))).rejects.toThrow(
         /bundler.*HTTP 500/,
       );
     });
@@ -1074,7 +1075,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "ao-message-id-123" });
-    const handler = new ApprovalHandler(storage, windows, { submitTransfer });
+    const handler = new ApprovalHandler(storage, keySession, windows, { submitTransfer });
     await seedWallet(storage);
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
@@ -1116,7 +1117,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "should-not-be-called" });
-    const handler = new ApprovalHandler(storage, windows, { submitTransfer });
+    const handler = new ApprovalHandler(storage, keySession, windows, { submitTransfer });
     await seedWallet(storage);
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
@@ -1143,7 +1144,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
     const submitTransfer = vi.fn();
-    const handler = new ApprovalHandler(storage, windows, { submitTransfer });
+    const handler = new ApprovalHandler(storage, keySession, windows, { submitTransfer });
     await seedWallet(storage);
 
     const pending = handler.requestApproval({
@@ -1169,7 +1170,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
   it("without an injected AoTransferSubmitter, throws a named wiring error rather than silently succeeding", async () => {
     storage = createWatchableStorage();
     windows = createFakeWindows();
-    const handler = new ApprovalHandler(storage, windows);
+    const handler = new ApprovalHandler(storage, keySession, windows);
     await seedWallet(storage);
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
 
@@ -1214,7 +1215,7 @@ describe("ApprovalHandler: addToken approval", () => {
     const storage = createWatchableStorage();
     const windows = createFakeWindows();
     const addWatchedToken = vi.fn().mockResolvedValue(undefined);
-    const handler = new ApprovalHandler(storage, windows, undefined, undefined, undefined, { addWatchedToken });
+    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, undefined, { addWatchedToken });
     keySessionStore.clear();
 
     const pending = requestAddToken(handler);
@@ -1240,7 +1241,7 @@ describe("ApprovalHandler: addToken approval", () => {
     const storage = createWatchableStorage();
     const windows = createFakeWindows();
     const addWatchedToken = vi.fn();
-    const handler = new ApprovalHandler(storage, windows, undefined, undefined, undefined, { addWatchedToken });
+    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, undefined, { addWatchedToken });
 
     const pending = requestAddToken(handler);
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));
@@ -1254,7 +1255,7 @@ describe("ApprovalHandler: addToken approval", () => {
     const storage = createWatchableStorage();
     const windows = createFakeWindows();
     const addWatchedToken = vi.fn().mockRejectedValue(new Error("No HyperBEAM peer configured."));
-    const handler = new ApprovalHandler(storage, windows, undefined, undefined, undefined, { addWatchedToken });
+    const handler = new ApprovalHandler(storage, keySession, windows, undefined, undefined, undefined, { addWatchedToken });
 
     const pending = requestAddToken(handler);
     await vi.waitFor(() => expect(windows.opened.length).toBe(1));

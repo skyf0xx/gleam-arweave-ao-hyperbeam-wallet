@@ -114,6 +114,16 @@ async function approved<T>(call: Promise<unknown>): Promise<{ result: T; request
   return { result: (await call) as T, request };
 }
 
+/** A key session over the same stores the background's was built on. */
+async function backgroundKeySession() {
+  const [{ createKeySession }, { sessionKeyStore }, { WxtStoragePort }] = await Promise.all([
+    import("@/src/handlers/key-session"),
+    import("@/src/adapters/session-key-store"),
+    import("@/src/adapters/storage"),
+  ]);
+  return createKeySession({ sessionKeys: sessionKeyStore, storage: new WxtStoragePort() });
+}
+
 beforeAll(async () => {
   jwk = await generateJWK();
   ADDRESS = await addressFromOwner(jwk.n);
@@ -156,8 +166,8 @@ beforeEach(async () => {
     autoLockTimeout: "never",
     unlockedWalletIds: [WALLET_ID],
   });
-  const { cacheKey } = await import("@/src/handlers/key-session");
-  await cacheKey(WALLET_ID, jwk, ADDRESS);
+  const keySession = await backgroundKeySession();
+  await keySession.cacheKey(WALLET_ID, jwk, ADDRESS);
 });
 
 afterEach(() => {
