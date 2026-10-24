@@ -3,7 +3,6 @@ import {
   addressFromOwner,
   base64UrlToBytes,
   bytesToBase64Url,
-  signature,
   signPayloadWithSigner,
   verifyMessage,
   WALLET_APPROVAL_ORIGIN,
@@ -368,8 +367,8 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
   it("signMessage: a message signed without hashing it first is refused", async () => {
     const message = new TextEncoder().encode("hello");
     const { requestId, device } = await approveOnDevice({ kind: "signMessage", payload: message });
-    // signature() signs RSA-PSS straight over the bytes: one hash short of signMessage.
-    const unhashed = new Uint8Array(await signature(signerFromJwk(deviceKey, ""), message.slice().buffer));
+    // RSA-PSS straight over the bytes is one hash short of signMessage.
+    const unhashed = await signRsaPss(signerFromJwk(deviceKey, ""), message);
 
     await expect(
       handler.submitDeviceSignature({ requestId, signatures: [bytesToBase64Url(unhashed)] }),

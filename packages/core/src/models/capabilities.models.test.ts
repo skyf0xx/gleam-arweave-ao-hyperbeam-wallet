@@ -7,13 +7,12 @@ describe("capabilitiesFor", () => {
     expect(Object.values(capabilitiesFor("jwk")).every(Boolean)).toBe(true);
   });
 
-  it("lets Keystone sign transactions, data items and messages, but not raw signatures or key operations", () => {
+  it("lets Keystone sign transactions, data items and messages, but not key operations", () => {
     expect(capabilitiesFor("keystone")).toEqual({
       signTransaction: true,
       dispatchViaBundler: true,
       signDataItem: true,
       signMessage: true,
-      signature: false,
       decrypt: false,
       exportKey: false,
       encrypt: true,
@@ -28,7 +27,6 @@ describe("capabilitiesFor", () => {
       dispatchViaBundler: false,
       signDataItem: false,
       signMessage: false,
-      signature: false,
       decrypt: false,
       exportKey: false,
       encrypt: true,
@@ -51,17 +49,8 @@ describe("providerMethodRefusal", () => {
     expect(providerMethodRefusal("ledger", "signMessage")).toBe(
       "This wallet can't sign messages. Switch to a keyfile wallet.",
     );
-    expect(providerMethodRefusal("ledger", "signature")).toBe(
-      "This wallet can't sign with the deprecated signature(). Switch to a keyfile wallet.",
-    );
     expect(providerMethodRefusal("keystone", "decrypt")).toBe(
       "This wallet can't decrypt data. Switch to a keyfile wallet.",
-    );
-  });
-
-  it("points a Keystone from signature() to signMessage", () => {
-    expect(providerMethodRefusal("keystone", "signature")).toBe(
-      "This wallet can't sign with the deprecated signature(). Use signMessage instead.",
     );
   });
 

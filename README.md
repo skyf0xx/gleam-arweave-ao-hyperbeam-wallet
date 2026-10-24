@@ -12,7 +12,7 @@ Gleam implements the [ArConnect API](https://docs.arconnect.io/api/intro).
 
 Code written for
 `window.arweaveWallet` **works with Gleam unchanged**, except `privateHash`
-(see below).
+and the deprecated `signature` (see below).
 
 ### Keep a user's data private across devices
 
@@ -37,6 +37,10 @@ const sameKey = await window.arweaveWallet.decrypt(locked, {
 
 Gleam doesn't support `privateHash`, which needs the private key to stay
 readable while the wallet is unlocked.
+
+Gleam doesn't support the deprecated `signature`, which signs whatever
+bytes a site passes, such as a hash it computed. Use `signMessage` or
+`signDataItem` instead.
 
 ### Add a Connect with Gleam button
 

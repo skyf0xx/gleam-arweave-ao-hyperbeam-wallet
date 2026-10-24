@@ -16,8 +16,6 @@ export interface WalletCapabilities {
   signDataItem: boolean;
   /** `signMessage`. A device may support only SHA-256 (see `HARDWARE_MESSAGE_HASH`). */
   signMessage: boolean;
-  /** Wander's deprecated `signature`: RSA-PSS straight over the raw bytes. */
-  signature: boolean;
   decrypt: boolean;
   exportKey: boolean;
   /** Encrypt to the wallet's own public key. */
@@ -37,7 +35,6 @@ const KEYFILE: WalletCapabilities = {
   dispatchViaBundler: true,
   signDataItem: true,
   signMessage: true,
-  signature: true,
   decrypt: true,
   exportKey: true,
   encrypt: true,
@@ -50,7 +47,6 @@ const NONE: WalletCapabilities = {
   dispatchViaBundler: false,
   signDataItem: false,
   signMessage: false,
-  signature: false,
   decrypt: false,
   exportKey: false,
   encrypt: false,
@@ -61,7 +57,7 @@ const NONE: WalletCapabilities = {
 const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
   jwk: KEYFILE,
   // The Keystone hashes a message and signs the hash, which is
-  // `signMessage` with SHA-256. It can't sign raw bytes, so `signature` is off.
+  // `signMessage` with SHA-256.
   keystone: {
     ...NONE,
     signTransaction: true,
@@ -101,7 +97,6 @@ const PROVIDER_REQUIREMENTS: Partial<Record<ProviderMethod, { capability: Provid
   signDataItem: { capability: "signDataItem", action: "sign data items" },
   batchSignDataItem: { capability: "signDataItem", action: "sign data items" },
   transferAoTokens: { capability: "signDataItem", action: "send AO tokens" },
-  signature: { capability: "signature", action: "sign with the deprecated signature()" },
   signMessage: { capability: "signMessage", action: "sign messages" },
   decrypt: { capability: "decrypt", action: "decrypt data" },
   encrypt: { capability: "encrypt", action: "encrypt data" },
@@ -121,9 +116,6 @@ export function capabilityRefusal(
   // A Keystone signs data items, so it's the hardware wallet to point a Ledger user to.
   if (walletMethod === "ledger" && capability === "signDataItem") {
     return `Ledger only supports sending AR for now, so it can't ${action}. Use a Keystone instead.`;
-  }
-  if (capability === "signature" && capabilitiesFor(walletMethod).signMessage) {
-    return `This wallet can't ${action}. Use signMessage instead.`;
   }
   return unsupportedOperationMessage(action);
 }

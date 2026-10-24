@@ -30,7 +30,6 @@ describe("METHOD_PERMISSIONS", () => {
     ["dispatch", ["DISPATCH"]],
     ["encrypt", ["ENCRYPT"]],
     ["decrypt", ["DECRYPT"]],
-    ["signature", ["SIGNATURE"]],
     ["signMessage", ["SIGNATURE"]],
     ["verifyMessage", ["SIGNATURE"]],
     ["signDataItem", ["SIGN_TRANSACTION"]],

@@ -24,7 +24,6 @@ import {
   signDataItem,
   signMessage as vaultSignMessage,
   signTransaction,
-  signature as vaultSignature,
   verifyDeviceSignature,
   PERMISSION_TYPES,
   WALLET_APPROVAL_ORIGIN,
@@ -239,8 +238,6 @@ export interface SigningRequestInput {
   encryptAlgorithm?: EncryptAlgorithm;
   /** `signMessage`'s hash digest selection. */
   hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512";
-  /** `signature`'s RSA-PSS salt length. */
-  saltLength?: number;
   /**
    * `scanAttestation`'s attestation, as `parseAttestation` returned it.
    * `payload` is then the attest message it signs.
@@ -1619,10 +1616,6 @@ export class ApprovalHandler {
           throw new Error("decrypt requires an algorithm.");
         }
         return decrypt(signer, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
-      }
-
-      case "signature": {
-        return new Uint8Array(await vaultSignature(signer, toArrayBuffer(input.payload), { saltLength: input.saltLength }));
       }
 
       case "signMessage": {

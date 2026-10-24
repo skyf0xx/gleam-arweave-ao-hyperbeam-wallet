@@ -87,7 +87,6 @@ export const APPROVAL_GATED_METHODS: readonly ProviderSurfaceMethod[] = [
   "dispatch",
   "encrypt",
   "decrypt",
-  "signature",
   "signMessage",
   "signDataItem",
   "batchSignDataItem",
