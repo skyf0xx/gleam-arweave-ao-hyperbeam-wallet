@@ -56,6 +56,7 @@ async function addMember(db: Db, wallet: TestWallet, device: TestDevice) {
     "INSERT INTO wallets (address, device_id, invite_code, founding_number) VALUES ($1, $2, 'ALICE001', nextval('founding_number_seq'))",
     [wallet.address, device.id],
   );
+  await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2)", [wallet.address, device.id]);
 }
 
 async function redemptions(db: Db) {
@@ -125,6 +126,19 @@ describe("POST /invite/redeem", () => {
     expect((await redeem(newcomer, "NOSUCHCODE")).json).toEqual({ result: "unknown" });
     expect(await redemptions(db)).toEqual([]);
     expect((await db.query("SELECT 1 FROM devices WHERE id = $1", [newcomer.id])).rows).toEqual([]);
+  });
+
+  it("keeps the seats given back when the let-in install's wallet is registered on another install too", async () => {
+    const { db, check, redeem, register } = await setup();
+    await addMember(db, alice, await createTestDevice());
+    const letIn = await createTestDevice();
+    await redeem(letIn, "ALICE001");
+    await register(bob, letIn, "ALICE001");
+    expect((await check("ALICE001")).json.seatsLeft).toBe(4);
+
+    await register(bob, await createTestDevice());
+
+    expect((await check("ALICE001")).json.seatsLeft).toBe(4);
   });
 
   it("gives two seats back when an install it let in registers a wallet", async () => {

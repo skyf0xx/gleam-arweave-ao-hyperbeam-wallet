@@ -31,8 +31,8 @@ export function parseLeaveRequest(body: unknown): LeaveRequest | null {
 
 /**
  * Deletes a wallet and everything stored about it (cascading to its
- * snapshots, points and scan points), plus its device once no other wallet
- * uses it. Its attestations stay: they are signed public records, and
+ * snapshots, points, scan points and installs), plus each of its devices
+ * once no other wallet is registered on it. Its attestations stay: they are signed public records, and
  * keeping them stops a wallet leaving and rejoining to attest again.
  * Leaving an address that isn't registered succeeds, so a retry after a
  * lost response is harmless.
@@ -53,23 +53,22 @@ export async function leave(db: Db, request: LeaveRequest, now: Date): Promise<L
   if (!ownsAddress || !(await verifyPointsProof(request.proof, request.owner, request.message, request.signature))) return { ok: false, status: 401, error: "Wallet signature is invalid." };
 
   await db.transaction(async (tx) => {
-    // Lock the device before the wallet, as register does, so a register
-    // can't add a wallet to the device between our delete and its cleanup.
-    const current = await tx.query<{ device_id: string }>("SELECT device_id FROM wallets WHERE address = $1", [
-      message.address,
-    ]);
-    if (current.rows[0]) {
-      await tx.query("SELECT 1 FROM devices WHERE id = $1 FOR UPDATE", [current.rows[0].device_id]);
-    }
-    const deleted = await tx.query<{ device_id: string }>(
-      "DELETE FROM wallets WHERE address = $1 RETURNING device_id",
+    // Lock the devices before the wallet, as register does, so a register
+    // can't add a wallet to one of them between our delete and its cleanup.
+    // Sorted, so two leaves sharing devices lock them in the same order.
+    const installs = await tx.query<{ device_id: string }>(
+      "SELECT device_id FROM wallet_devices WHERE address = $1 ORDER BY device_id",
       [message.address],
     );
-    const deviceId = deleted.rows[0]?.device_id;
-    if (deviceId) {
+    const deviceIds = installs.rows.map((row) => row.device_id);
+    for (const deviceId of deviceIds) await tx.query("SELECT 1 FROM devices WHERE id = $1 FOR UPDATE", [deviceId]);
+    // Cascades to its `wallet_devices` rows.
+    await tx.query("DELETE FROM wallets WHERE address = $1", [message.address]);
+    if (deviceIds.length > 0) {
       await tx.query(
-        "DELETE FROM devices WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM wallets WHERE device_id = $1)",
-        [deviceId],
+        `DELETE FROM devices d WHERE d.id = ANY($1::text[])
+           AND NOT EXISTS (SELECT 1 FROM wallet_devices wd WHERE wd.device_id = d.id)`,
+        [deviceIds],
       );
     }
   });

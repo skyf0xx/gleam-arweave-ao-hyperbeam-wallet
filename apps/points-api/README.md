@@ -100,12 +100,16 @@ A wallet proves ownership of its Arweave address (`verifyPointsProof`:
 a signed message, or for a hardware wallet, a signed zero-value
 transaction) and binds to this install's device key.
 
-- Re-registering an already-known wallet just moves it to a new device
-  (a reinstall) and keeps its invite code and referrer.
+- A wallet can be registered on several installs (desktop and phone).
+  Each one gets a `wallet_devices` row, and `/me` from any of them lists
+  the wallet. Re-registering an already-known wallet adds the new install
+  and makes it `wallets.device_id`, the newest install, which the whale
+  curve groups by. Its invite code and referrer stay.
 - During Phase 1, a brand-new wallet needs an install that already
   redeemed an invite or holds a wallet. Registering itself also counts
   as a heartbeat.
-- `leave.ts` deletes a wallet and its snapshots/points (cascading), but
+- `leave.ts` deletes a wallet and its snapshots/points/installs
+  (cascading), and each install no other wallet is on, but
   keeps its past attestations. Those are signed public records, and
   deleting them would let a wallet farm scan rewards by leaving and
   rejoining.
@@ -116,8 +120,8 @@ transaction) and binds to this install's device key.
   the stored device public key, shared by `/heartbeat` and `/me`.
 - **`recordHeartbeat`** — stamps `last_heartbeat_at`. This gates both
   snapshot eligibility and scan eligibility. A wallet counts as "live",
-  and can earn points or submit an attestation, only if it has a
-  heartbeat within the last 3 days.
+  and can earn points or submit an attestation, only if one of its
+  installs sent a heartbeat within the last 3 days.
 
 ### invite.ts / drop-codes.ts
 

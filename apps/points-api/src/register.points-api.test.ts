@@ -115,7 +115,7 @@ describe("POST /register", () => {
     expect(json).toMatchObject({ referred: false });
   }, 30_000);
 
-  it("moves a re-registered wallet to its new device and keeps its code and referrer", async () => {
+  it("adds a re-registered wallet's new device, makes it the newest, and keeps its code and referrer", async () => {
     const db = await createTestDb();
     const app = setup(db);
     await post(app, await registerBody(alice, await admittedDevice(db), { issuedAt: NOW_SECONDS }));
@@ -129,6 +129,11 @@ describe("POST /register", () => {
       bob.address,
     ]);
     expect(rows[0]?.device_id).toBe(reinstall.id);
+    const installs = await db.query<{ device_id: string }>("SELECT device_id FROM wallet_devices WHERE address = $1", [
+      bob.address,
+    ]);
+    expect(installs.rows).toHaveLength(2);
+    expect(installs.rows.map((row) => row.device_id)).toContain(reinstall.id);
   });
 
   it("registers a hardware wallet that signed the ownership transaction", async () => {
@@ -233,6 +238,7 @@ describe("POST /register invite requirement", () => {
       alice.address,
       founder.id,
     ]);
+    await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2)", [alice.address, founder.id]);
 
     const { status, json } = await post(app, await registerBody(bob, founder, { issuedAt: NOW_SECONDS }));
 

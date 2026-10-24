@@ -86,7 +86,7 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
        FROM wallets w
        LEFT JOIN ranked r ON r.address = w.address
        LEFT JOIN points p ON p.address = w.address AND p.day = $2::date
-      WHERE w.device_id = $1
+      WHERE EXISTS (SELECT 1 FROM wallet_devices wd WHERE wd.address = w.address AND wd.device_id = $1)
       ORDER BY w.registered_at, w.address`,
     [deviceId, latestDay],
   );

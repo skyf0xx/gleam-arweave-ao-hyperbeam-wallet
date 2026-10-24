@@ -22,7 +22,7 @@ export const SEATS_PER_CONVERSION = 2;
  * redemption are deleted and its extra seat goes with them.
  */
 export const MEMBER_SEAT_BALANCE_SQL = `(${MEMBER_CODE_SEATS} + (SELECT coalesce(sum(
-     CASE WHEN EXISTS (SELECT 1 FROM wallets x WHERE x.device_id = ir.device_id) THEN ${SEATS_PER_CONVERSION - 1} ELSE -1 END
+     CASE WHEN EXISTS (SELECT 1 FROM wallet_devices x WHERE x.device_id = ir.device_id) THEN ${SEATS_PER_CONVERSION - 1} ELSE -1 END
    ), 0) FROM invite_redemptions ir WHERE ir.code = w.invite_code))`;
 
 export function memberSeatsLeft(seatBalance: number, pointsPhase: 1 | 2): number | null {
