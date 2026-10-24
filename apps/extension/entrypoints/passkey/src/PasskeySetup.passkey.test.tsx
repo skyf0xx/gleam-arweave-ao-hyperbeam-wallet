@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { RuntimePort } from "@gleam/core";
-import { PasskeyError } from "@/src/passkey/webauthn";
+import { PasskeyError } from "@gleam/app/src/passkey/webauthn.ts";
 import { PasskeySetup } from "./PasskeySetup";
 
 afterEach(() => {

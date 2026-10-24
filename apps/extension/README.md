@@ -1,11 +1,12 @@
 # @gleam/extension
 
 The Chrome MV3 extension itself: the WXT build that turns `packages/core`,
-`packages/messaging`, `packages/runtime`, and `packages/ui` into the
+`packages/messaging`, `packages/runtime`, `packages/app` and `packages/ui` into the
 installable wallet. It
 owns every browser-specific concern — the manifest, the background
-service worker, the content script and injected page provider, and all
-the popup/sidepanel/approval UI.
+service worker, the content script and injected page provider, and the
+mounts that put `@gleam/app`'s screens in the popup, side panel and
+approval window.
 
 Everything here is a caller or an adapter. Signing, balances, transfers,
 and uploads live in `@gleam/core`; the dispatcher and every handler live
@@ -21,10 +22,10 @@ page.
 - [`entrypoints/approval`](#entrypointsapproval) — the signing/connect approval window
 - [`entrypoints/passkey`](#entrypointspasskey) — the WebAuthn ceremony window
 - [`entrypoints/connect` / `entrypoints/keyring`](#entrypointsconnect--entrypointskeyring) — hardware wallet support
-- [`entrypoints/sidepanel` / `entrypoints/popup/*`](#entrypointssidepanel--entrypointspopup) — the main wallet UI
+- [`entrypoints/sidepanel` / `entrypoints/popup`](#entrypointssidepanel--entrypointspopup) — mounts of the main wallet UI
 - [`src/sender.ts` / `src/site-pages.ts`](#srcsenderts--srcsite-pagests) — sender attestation and site links
 - [`src/adapters/`](#srcadapters) — `@gleam/core` port and `Platform` implementations
-- [`src/App.tsx`](#srcapptsx) — the shared UI shell
+- [`src/hardware/`](#srchardware) — Ledger and Keystone transports and device signing panels
 
 ### `wxt.config.ts`
 
@@ -70,11 +71,12 @@ Gleam for that site.
 
 A standalone popup window opened by `ApprovalHandler`
 (`packages/runtime/src/handlers/approval.ts`) whenever a page's request needs a
-decision: connect, sign, encrypt, decrypt, or add a token. Its screens
+decision: connect, sign, encrypt, decrypt, or add a token. The entrypoint
+only mounts `ApprovalRoot` from `@gleam/app` and hands it the Keystone and
+Ledger panels (`src/hardware/panels/`) through `AppPlatform`; the screens
 (`ConnectionRequestScreen`, `SigningApprovalScreen`, `AddTokenScreen`)
-show a decoded preview of what's being signed. Hardware-wallet flows
-route through `AwaitingDeviceView` and the Keystone/Ledger panels here
-too. Closing the window without acting counts as a rejection.
+show a decoded preview of what's being signed. Closing the window without
+acting counts as a rejection.
 
 ### `entrypoints/passkey`
 
@@ -96,10 +98,11 @@ outside that pair reaches into the offscreen document directly.
 
 ### `entrypoints/sidepanel` / `entrypoints/popup/*`
 
-The main wallet UI. The side panel and every popup screen (onboarding,
-unlock, send, receive, activity, collectibles, connected apps,
-contacts, settings, points, and the rest) mount the same shared shell,
-`src/App.tsx`, which owns top-level view state across all of them.
+The main wallet UI. The side panel and the popup each mount `<App>` from
+`@gleam/app` inside a `PlatformProvider` built by
+`createExtensionAppPlatform`. The screens (onboarding, unlock, send,
+receive, activity, collectibles, connected apps, contacts, settings,
+points, and the rest) live in `packages/app/src/screens/`.
 
 ### `src/sender.ts` / `src/site-pages.ts`
 
@@ -118,14 +121,17 @@ interfaces.
 - **`storage.ts`** → `StoragePort` over WXT storage.
 - **`windows.ts`** (`WindowApprovalPresenter`) → `ApprovalPresenterPort`, opens and tracks one approval window per request id so a restarted service worker can still find them.
 - **`runtime.ts`** → `RuntimePort` over `@webext-core/messaging`.
+- **`app-platform.ts`** → `AppPlatform` for the screens: the runtime client, host permissions, session-backed ephemeral state, the passkey window, downloads permission, and the hardware wallet connect pages and signing panels.
 - **`session-key-store.ts` / `offscreen-keyring.ts`** → bridge to the offscreen keyring document.
 - **`badge.ts`, `downloads.ts`, `device-key.ts`** → the action badge, file downloads, and the Gleam Points device keypair.
 
-### `src/App.tsx`
+### `src/hardware/`
 
-The shared UI shell mounted by the side panel, every popup screen, and
-the approval/passkey windows. It drives top-level view state so each
-surface doesn't reimplement its own routing.
+The Ledger (WebHID) and Keystone (camera QR) transports, the helpers that
+open their connect pages, and `panels/`, the `DeviceSignPanel`s the
+approval window uses to sign on a device. They stay here because they
+touch browser APIs; `@gleam/app` reaches them through
+`AppPlatform.hardwareWallets`.
 
 ## Data flow
 

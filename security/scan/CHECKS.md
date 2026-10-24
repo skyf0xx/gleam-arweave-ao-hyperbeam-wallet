@@ -117,7 +117,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Approval window: what you see is what you sign (tier 4)
 
-`handlers/approval.ts`, `entrypoints/approval/`.
+`handlers/approval.ts`, `entrypoints/approval/`, `packages/app/src/approval/`.
 
 - Is the preview decoded from the same bytes that get signed, or from a
   summary the page supplied?
@@ -135,8 +135,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Hardware wallet signing
 
-`src/hardware/keystone/`, `entrypoints/approval/src/device/`. Not on
-the surface yet.
+`src/hardware/keystone/`, `src/hardware/panels/`.
 
 - Is the signature the device returns checked against the request that
   was sent before Gleam uses it?
@@ -148,7 +147,7 @@ the surface yet.
 
 - `optional_host_permissions` is `https://*/*`. Does every runtime host
   request ask for exactly the host the user typed, show it, and validate
-  it (`popup/network-peers/`)?
+  it (`packages/app/src/screens/network-peers/`)?
 - What does each `web_accessible_resources` entry let a page load or
   learn?
 - `externally_connectable` lets the Gleam site message the extension.

@@ -72,12 +72,9 @@ importers:
 
   apps/extension:
     dependencies:
-      '@dicebear/core':
-        specifier: ^10.6.0
-        version: 10.7.0
-      '@dicebear/styles':
-        specifier: ^10.6.0
-        version: 10.6.0
+      '@gleam/app':
+        specifier: workspace:*
+        version: link:../../packages/app
       '@gleam/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -96,9 +93,6 @@ importers:
       '@ngraveio/bc-ur':
         specifier: ^1.1.13
         version: 1.1.13
-      '@tanstack/react-query':
-        specifier: ^5.104.2
-        version: 5.104.2(react@19.3.0)
       '@webext-core/messaging':
         specifier: ^4.0.0
         version: 4.0.0
@@ -179,6 +173,49 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+
+  packages/app:
+    dependencies:
+      '@dicebear/core':
+        specifier: ^10.6.0
+        version: 10.7.0
+      '@dicebear/styles':
+        specifier: ^10.6.0
+        version: 10.6.0
+      '@gleam/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gleam/messaging':
+        specifier: workspace:*
+        version: link:../messaging
+      '@gleam/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@tanstack/react-query':
+        specifier: ^5.104.2
+        version: 5.104.2(react@19.3.0)
+      react:
+        specifier: ^19.2.4
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.3.0(react@19.3.0)
+      zod:
+        specifier: ^4.6.6
+        version: 4.6.6
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.3.0(@types/react@19.3.0)
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/core:
     dependencies:

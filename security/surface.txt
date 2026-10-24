@@ -26,9 +26,10 @@
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
 1 apps/extension/src/adapters/session-access.ts
-1 apps/extension/entrypoints/popup/onboarding/src/Import.tsx
-1 apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx
-1 apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx
+1 packages/app/src/passkey/
+1 packages/app/src/screens/onboarding/src/Import.tsx
+1 packages/app/src/screens/onboarding/src/OnboardingView.tsx
+1 packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx
 
 2 packages/core/src/ao/transfer.ts
 2 packages/core/src/arweave/data-item.ts
@@ -56,6 +57,8 @@
 
 4 packages/runtime/src/handlers/approval.ts
 4 apps/extension/entrypoints/approval/
+4 apps/extension/src/hardware/panels/
+4 packages/app/src/approval/
 
 5 packages/runtime/src/points-invite.ts
 5 packages/runtime/src/points-attest.ts

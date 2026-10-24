@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import type { PasskeyWindowMode } from "@/src/app-platform/types";
+import type { PasskeyWindowMode } from "@gleam/app/src/app-platform/types.ts";
 
 
 const PASSKEY_WINDOW_WIDTH = 390;

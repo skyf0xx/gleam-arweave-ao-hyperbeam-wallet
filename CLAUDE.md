@@ -35,10 +35,17 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `reads`, `transfer`, `upload`, `approval` and `key-session`. It reaches
   a platform only through `Platform` (`platform.ts`).
 - `packages/ui`: design tokens, primitives and shared components.
+- `packages/app`: every screen (`src/screens/<screen>/`), the router
+  (`src/App.tsx`) and the approval UI (`src/approval/`). It reaches a host
+  only through `AppPlatform` (`src/app-platform/`), so any shell can mount
+  it.
 - `apps/extension`: the WXT shell. `entrypoints/` holds `background`,
   `content`, `provider` (injected into the page), `approval`, `passkey`,
-  `sidepanel`, and `popup/<screen>/`; `src/adapters/` implements the core
-  and runtime ports on `chrome.*`.
+  `sidepanel`, `popup` and `connect`; the popup, side panel and approval
+  entrypoints only mount `@gleam/app`. `src/adapters/` implements the core
+  and runtime ports and `AppPlatform` (`adapters/app-platform.ts`) on
+  `chrome.*`; `src/hardware/` holds the Ledger and Keystone transports and
+  the device signing panels.
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
@@ -51,7 +58,10 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `runtime` is held to the same rule (no `chrome`/`browser`, `wxt/*`,
   `@webext-core/*`, `@capacitor/*` or shell imports; ESLint enforces it).
   The background entrypoint builds a `Platform` from the adapters and
-  hands it to `createRuntime`.
+  hands it to `createRuntime`. `app` follows the same fence: screens
+  reach the host through `AppPlatform` (runtime client, permissions,
+  downloads, hardware wallets, passkey window), and the shell mounts
+  `<PlatformProvider platform={…}>` around `<App>`.
 - **UI never imports background code.** Every cross-context call goes
   through `packages/messaging`. `packages/runtime/src/dispatch/methods.ts` is the one table
   of each method's caller tier, whether it can open an approval, and the
@@ -96,12 +106,12 @@ pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, apps/extension, apps/points-api, scripts/scan
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, apps/extension, apps/points-api, scripts/scan
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-seven projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
+eight projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
 pass. If a change touches signing, network or extension wiring, it also
 needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
 

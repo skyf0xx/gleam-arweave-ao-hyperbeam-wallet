@@ -15,6 +15,8 @@ vi.mock("wxt/browser", () => ({
   },
 }));
 
+vi.mock("./runtime", () => ({ runtimePort: {} }));
+
 const { createExtensionAppPlatform } = await import("./app-platform");
 
 afterEach(() => {

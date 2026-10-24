@@ -1,8 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "@gleam/ui/src/tokens/theme.css";
+import "@gleam/app/src/app.css";
 import { runtimePort } from "@/src/adapters/runtime";
-import { PlatformProvider } from "@/src/app-platform/context";
+import { PlatformProvider } from "@gleam/app/src/app-platform/context.tsx";
 import { createExtensionAppPlatform } from "@/src/adapters/app-platform";
 import { PasskeyRoot } from "./src/PasskeyRoot";
 import { returnToPopup } from "./src/return-to-popup";

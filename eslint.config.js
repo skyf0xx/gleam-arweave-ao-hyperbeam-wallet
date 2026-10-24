@@ -76,6 +76,16 @@ const runtimeFence = (...extraPatterns) => ({
   "no-restricted-globals": ["error", ...RUNTIME_GLOBALS],
 });
 
+// `packages/app` is every screen, and any shell mounts it, so like the
+// runtime it reaches a platform only through `AppPlatform`. The same SDKs,
+// shells, aliases and globals are blocked.
+const APP_IMPORT_MESSAGE =
+  "packages/app is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `AppPlatform`.";
+const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
+}));
+
 // Flat config replaces a rule's options wholesale when a later block sets
 // the same rule, so every block that sets `no-restricted-syntax` spreads
 // in the full list it needs rather than adding to an earlier block's.
@@ -178,7 +188,7 @@ export default tseslint.config(
       // Conformance suites import throwaway keys into a `SessionKeyStorePort`.
       "packages/runtime/testing/**",
       // Receives the exported keyfile to hand to the user.
-      "apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx",
+      "packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx",
     ],
     rules: {
       "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_RAW_KEY],
@@ -231,6 +241,36 @@ export default tseslint.config(
         "error",
         { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
         { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    // The app fence. A later block replaces a rule's options wholesale, so
+    // the second block repeats it with the signer fence for non-test files.
+    files: ["packages/app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }] }],
+      "no-restricted-globals": ["error", ...APP_GLOBALS],
+      "gleam/no-dynamic-import": ["error", { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }],
+    },
+  },
+  {
+    files: ["packages/app/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+            { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
       ],
     },
   },

@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "@/src/App.tsx";
-import { PlatformProvider } from "@/src/app-platform/context";
+import App from "@gleam/app/src/App.tsx";
+import { PlatformProvider } from "@gleam/app/src/app-platform/context.tsx";
 import { createExtensionAppPlatform } from "@/src/adapters/app-platform";
-import "@gleam/ui/src/tokens/theme.css";
+import "@gleam/app/src/app.css";
 
 const platform = createExtensionAppPlatform("sidepanel");
 

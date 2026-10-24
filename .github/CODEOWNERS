@@ -19,9 +19,10 @@
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
 /apps/extension/src/adapters/session-access.ts                             @skyf0xx
-/apps/extension/entrypoints/popup/onboarding/src/Import.tsx                @skyf0xx
-/apps/extension/entrypoints/popup/onboarding/src/OnboardingView.tsx        @skyf0xx
-/apps/extension/entrypoints/popup/wallet-detail/src/WalletDetailView.tsx   @skyf0xx
+/packages/app/src/passkey/                                                 @skyf0xx
+/packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
+/packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx
+/packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx           @skyf0xx
 
 # 2 Signing
 /packages/core/src/ao/transfer.ts                                          @skyf0xx
@@ -52,6 +53,8 @@
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
+/apps/extension/src/hardware/panels/                                       @skyf0xx
+/packages/app/src/approval/                                                @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/runtime/src/points-invite.ts                                     @skyf0xx

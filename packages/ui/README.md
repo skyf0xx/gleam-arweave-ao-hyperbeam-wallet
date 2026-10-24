@@ -3,13 +3,13 @@
 Gleam's shared design system: design tokens, low-level primitives
 (buttons, cards, text fields), and wallet-specific components (token
 rows, balance displays, onboarding screens). Every popup, side panel,
-and approval-window screen in `apps/extension` is built from these
+and approval-window screen in `packages/app` is built from these
 pieces rather than one-off markup. That's what keeps the wallet's UI
 visually consistent.
 
 This package renders UI only. It never imports background code
 (`chrome.*`, `@webext-core/messaging`). Data arrives as props. A
-component that needs wallet state gets it from `apps/extension`'s
+component that needs wallet state gets it from `packages/app`'s
 hooks, which call the background through `@gleam/messaging`.
 
 ## Components
@@ -33,7 +33,7 @@ hooks, which call the background through `@gleam/messaging`.
   id from `@gleam/core` rather than redefining it.
 
 Tailwind 4's source auto-detection only walks from the Vite project root
-(`apps/extension`). The `@source "../../src"` line in `theme.css` makes
+(`apps/extension`). `packages/app/src/app.css` adds its own `@source` for the screens. The `@source "../../src"` line in `theme.css` makes
 this package an explicit scan root. Without it, utility classes used
 only inside `packages/ui/src` are silently never generated.
 
@@ -83,7 +83,7 @@ unlock (see the `SecurityPhrase` model in `@gleam/core`).
 
 ## How it's used
 
-`apps/extension`'s popup/side panel/approval screens compose these
+`packages/app`'s screens compose these
 primitives and wallet components, feeding them data fetched through
 `@gleam/messaging` RPC calls. `@gleam/core` is this package's only
 workspace dependency. It's used for model types (`TokenBalance`,
