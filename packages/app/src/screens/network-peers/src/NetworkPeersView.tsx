@@ -22,9 +22,9 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
  * typo'd, dead, or unrelated host can't strand balance/activity reads with
  * no feedback at edit time.
  *
- * `browser.permissions.request` closes the popup in Chrome the instant it
- * shows its own prompt, which would otherwise discard whatever the user had
- * typed. The in-flight edit (gateway or peer, plus its URL) is saved to
+ * Requesting a host permission (the `hostPermissions` port) closes the
+ * popup in Chrome the instant it shows its own prompt, which would
+ * otherwise discard whatever the user had typed. The in-flight edit (gateway or peer, plus its URL) is saved to
  * `session:pendingNetworkEdit` right before the request, so a remount (the
  * user reopening the popup after answering the prompt) can pick the flow
  * back up: if the origin is now granted, it finishes automatically
