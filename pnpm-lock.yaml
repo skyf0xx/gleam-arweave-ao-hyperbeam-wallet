@@ -184,6 +184,9 @@ importers:
       '@gleam/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gleam/dapp-view':
+        specifier: workspace:*
+        version: link:plugins/dapp-view
       '@gleam/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
@@ -224,6 +227,12 @@ importers:
       vite:
         specifier: ^8.3.3
         version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
+
+  apps/mobile/plugins/dapp-view:
+    dependencies:
+      '@capacitor/core':
+        specifier: 8.5.3
+        version: 8.5.3
 
   apps/points-api:
     dependencies:

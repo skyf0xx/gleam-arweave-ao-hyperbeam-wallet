@@ -24,6 +24,7 @@
     "@capgo/capacitor-native-biometric": "8.9.1",
     "@gleam/app": "workspace:*",
     "@gleam/core": "workspace:*",
+    "@gleam/dapp-view": "workspace:*",
     "@gleam/messaging": "workspace:*",
     "@gleam/runtime": "workspace:*",
     "comlink": "4.4.2",

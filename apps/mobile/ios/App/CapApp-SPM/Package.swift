@@ -19,7 +19,8 @@ let package = Package(
         .package(name: "CapacitorBarcodeScanner", path: "../../../../../node_modules/.pnpm/@capacitor+barcode-scanner@3.1.3_@capacitor+core@8.5.3/node_modules/@capacitor/barcode-scanner"),
         .package(name: "CapacitorFilesystem", path: "../../../../../node_modules/.pnpm/@capacitor+filesystem@8.1.5_@capacitor+core@8.5.3/node_modules/@capacitor/filesystem"),
         .package(name: "CapacitorShare", path: "../../../../../node_modules/.pnpm/@capacitor+share@8.0.3_@capacitor+core@8.5.3/node_modules/@capacitor/share"),
-        .package(name: "CapgoCapacitorNativeBiometric", path: "../../../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.9.1_@capacitor+core@8.5.3/node_modules/@capgo/capacitor-native-biometric")
+        .package(name: "CapgoCapacitorNativeBiometric", path: "../../../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.9.1_@capacitor+core@8.5.3/node_modules/@capgo/capacitor-native-biometric"),
+        .package(name: "GleamDappView", path: "../../../plugins/dapp-view")
     ],
     targets: [
         .target(
@@ -34,7 +35,8 @@ let package = Package(
                 .product(name: "CapacitorBarcodeScanner", package: "CapacitorBarcodeScanner"),
                 .product(name: "CapacitorFilesystem", package: "CapacitorFilesystem"),
                 .product(name: "CapacitorShare", package: "CapacitorShare"),
-                .product(name: "CapgoCapacitorNativeBiometric", package: "CapgoCapacitorNativeBiometric")
+                .product(name: "CapgoCapacitorNativeBiometric", package: "CapgoCapacitorNativeBiometric"),
+                .product(name: "GleamDappView", package: "GleamDappView")
             ]
         )
     ]

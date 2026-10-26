@@ -58,6 +58,7 @@
 /packages/runtime/src/handlers/provider-params.ts                          @skyf0xx
 /apps/extension/src/sender.ts                                              @skyf0xx
 /apps/mobile/src/worker/                                                   @skyf0xx
+/apps/mobile/plugins/dapp-view/                                             @skyf0xx
 /packages/core/src/policy/signing-origin.ts                                @skyf0xx
 /packages/runtime/src/dispatch/methods.ts                                  @skyf0xx
 /packages/messaging/                                                       @skyf0xx

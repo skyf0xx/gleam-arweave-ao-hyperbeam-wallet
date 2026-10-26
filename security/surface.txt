@@ -63,6 +63,7 @@
 3 packages/runtime/src/handlers/provider-params.ts
 3 apps/extension/src/sender.ts
 3 apps/mobile/src/worker/
+3 apps/mobile/plugins/dapp-view/
 3 packages/core/src/policy/signing-origin.ts
 3 packages/runtime/src/dispatch/methods.ts
 3 packages/messaging/

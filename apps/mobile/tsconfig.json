@@ -16,5 +16,5 @@
     "noUncheckedIndexedAccess": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "vite.config.ts", "capacitor.config.ts"]
+  "include": ["src", "plugins/*/src", "vite.config.ts", "capacitor.config.ts"]
 }
