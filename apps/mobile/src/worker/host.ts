@@ -1,9 +1,11 @@
 import type * as Comlink from "comlink";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
+import type { WalletState } from "@gleam/core";
 import type { Runtime } from "@gleam/runtime";
 import { BACKGROUND_MESSAGES, type BackgroundMessage } from "@gleam/runtime/src/dispatch/methods.ts";
 import { exposeMethods } from "../adapters/comlink-guard";
 import { isExactWebOrigin } from "../adapters/dapp-tabs";
+import { createPointsLinks, type PointsLinkOutcome } from "./points-link";
 
 /** What the worker exposes to the wallet WebView over `comlink`. */
 export interface RuntimeHost {
@@ -18,6 +20,8 @@ export interface RuntimeHost {
   tabClosed(tabId: number): Promise<void>;
   /** The app came back from the background. */
   resume(): Promise<void>;
+  /** A link the OS opened the app with, exactly as it arrived (see `createPointsLinks`). */
+  openLink(url: string): Promise<PointsLinkOutcome>;
 }
 
 /** The worker's own events, which the UI thread can only signal. */
@@ -42,13 +46,18 @@ function messageType(type: unknown): BackgroundMessage {
   return type as BackgroundMessage;
 }
 
-export function createRuntimeHost(runtime: Pick<Runtime, "dispatch" | "onTabClosed">, lifecycle: WorkerLifecycle): RuntimeHost {
+type HostedRuntime = Pick<Runtime, "dispatch" | "dispatchSite" | "onTabClosed">;
+
+export function createRuntimeHost(runtime: HostedRuntime, lifecycle: WorkerLifecycle): RuntimeHost {
+  const links = createPointsLinks(runtime);
   return {
     async resume() {
       lifecycle.onResume();
     },
     async dispatch(type, data) {
-      return runtime.dispatch(messageType(type), data, WALLET_UI);
+      const result = await runtime.dispatch(messageType(type), data, WALLET_UI);
+      if (type === "getState") links.stateSeen(result as WalletState);
+      return result;
     },
     // The dApp view's page gets the tier the extension gives a web page's
     // content script, so the dispatcher holds it to the same methods,
@@ -61,14 +70,15 @@ export function createRuntimeHost(runtime: Pick<Runtime, "dispatch" | "onTabClos
     async tabClosed(tabId) {
       if (typeof tabId === "number") runtime.onTabClosed(tabId);
     },
+    openLink: (url) => links.open(url),
   };
 }
 
 /** Serves `runtime` on `endpoint`, the worker's global scope outside tests. */
 export function exposeRuntimeHost(
-  runtime: Pick<Runtime, "dispatch" | "onTabClosed">,
+  runtime: HostedRuntime,
   lifecycle: WorkerLifecycle,
   endpoint: Comlink.Endpoint,
 ): void {
-  exposeMethods(createRuntimeHost(runtime, lifecycle), ["dispatch", "pageCall", "tabClosed", "resume"], endpoint);
+  exposeMethods(createRuntimeHost(runtime, lifecycle), ["dispatch", "pageCall", "tabClosed", "resume", "openLink"], endpoint);
 }

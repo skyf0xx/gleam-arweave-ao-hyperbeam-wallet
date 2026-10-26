@@ -69,6 +69,7 @@
 3 apps/mobile/src/adapters/dapp-bridge.ts
 3 apps/mobile/src/adapters/dapp-tabs.ts
 3 apps/mobile/src/adapters/comlink-guard.ts
+3 apps/mobile/src/adapters/app-links.ts
 3 apps/mobile/src/provider/
 3 packages/core/src/policy/signing-origin.ts
 3 packages/runtime/src/dispatch/methods.ts

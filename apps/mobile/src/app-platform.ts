@@ -5,6 +5,7 @@ import { DappView } from "@gleam/dapp-view";
 import providerScript from "virtual:gleam-provider-script";
 import { version } from "../package.json";
 import { onAppAway } from "./adapters/app-away";
+import { listenForAppLinks } from "./adapters/app-links";
 import { createApprovalSheet, serveApprovalSheet } from "./adapters/approval-sheet";
 import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
@@ -18,11 +19,16 @@ import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from 
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
 
-/**
- * The phone's `AppPlatform`. Capabilities the app gains later (the dApp
- * browser) stay off until their adapters land.
- */
-export async function createMobileAppPlatform(): Promise<AppPlatform> {
+export interface MobileAppPlatformOptions {
+  /**
+   * An invite link changed what the Founding gate shows. The gate reads its
+   * state once, so the shell remounts the app to show the new verdict.
+   */
+  onInviteGateChanged: () => void;
+}
+
+/** The phone's `AppPlatform`. */
+export async function createMobileAppPlatform({ onInviteGateChanged }: MobileAppPlatformOptions): Promise<AppPlatform> {
   // `import.meta.env.DEV` has to stay a bare literal in this condition so the
   // bundler folds it to `false` and drops the preview chunk from production
   // builds; an on-device build then can't reach in-memory storage. The native
@@ -64,6 +70,11 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
   // A request left up while the app is away would still be there on return,
   // so it's rejected instead.
   onAppAway(() => approvalSheet.dismissAll());
+  // Set `VITE_FOUNDING_GATE=false` for the Phase 2 build; it's on otherwise.
+  const foundingGate = import.meta.env.VITE_FOUNDING_GATE !== "false";
+  listenForAppLinks(workerRuntime.openLink, () => {
+    if (foundingGate) onInviteGateChanged();
+  });
   // The worker's intervals stop while the app is in the background; this
   // runs the ones that came due, auto-lock among them.
   void App.addListener("resume", () => {
@@ -71,8 +82,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
   });
   return {
     runtime,
-    // Set `VITE_FOUNDING_GATE=false` for the Phase 2 build; it's on otherwise.
-    buildInfo: { version, foundingGate: import.meta.env.VITE_FOUNDING_GATE !== "false" },
+    buildInfo: { version, foundingGate },
     capabilities: {
       sidePanel: false,
       passkey: false,

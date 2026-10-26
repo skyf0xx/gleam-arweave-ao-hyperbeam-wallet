@@ -64,6 +64,7 @@
 /apps/mobile/src/adapters/dapp-bridge.ts                                   @skyf0xx
 /apps/mobile/src/adapters/dapp-tabs.ts                                     @skyf0xx
 /apps/mobile/src/adapters/comlink-guard.ts                                 @skyf0xx
+/apps/mobile/src/adapters/app-links.ts                                     @skyf0xx
 /apps/mobile/src/provider/                                                 @skyf0xx
 /packages/core/src/policy/signing-origin.ts                                @skyf0xx
 /packages/runtime/src/dispatch/methods.ts                                  @skyf0xx

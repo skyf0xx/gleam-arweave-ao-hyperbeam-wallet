@@ -7,7 +7,7 @@ import type { RuntimeHost } from "../worker/host";
  * are structured clones, and a handler's `Error` arrives as an `Error` with
  * the same message, as it does over extension messaging.
  */
-export function createWorkerRuntimePort(endpoint: Comlink.Endpoint): RuntimePort & Pick<RuntimeHost, "resume" | "pageCall" | "tabClosed"> {
+export function createWorkerRuntimePort(endpoint: Comlink.Endpoint): RuntimePort & Pick<RuntimeHost, "resume" | "pageCall" | "tabClosed" | "openLink"> {
   const host = Comlink.wrap<RuntimeHost>(endpoint);
   // A worker that fails to load never answers, so without this every call
   // would wait forever. Once it has answered, a later uncaught error in it
@@ -33,6 +33,7 @@ export function createWorkerRuntimePort(endpoint: Comlink.Endpoint): RuntimePort
     resume: () => host.resume(),
     pageCall: (type, data, origin, tabId) => answer(host.pageCall(type, data, origin, tabId)),
     tabClosed: (tabId) => answer(host.tabClosed(tabId)),
+    openLink: (url) => answer(host.openLink(url)),
     // The worker sends the UI no runtime messages, so no handler would ever be called.
     onMessage: () => () => {},
   };
