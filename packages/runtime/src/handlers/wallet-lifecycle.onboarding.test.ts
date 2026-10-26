@@ -1391,9 +1391,13 @@ describe("WalletLifecycleHandler: resetAllWallets", () => {
     await storage.set(`local:activityLog:${wallet.address}`, [{ id: "tx" }]);
     await storage.set(`local:watchedProcessIds:${wallet.address}`, ["process"]);
     await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net" });
+    await storage.set("local:browserSavedSites", ["https://a.example"]);
+    await storage.set("local:browserRecentSites", ["https://b.example"]);
 
     await handler.resetAllWallets();
 
+    expect(await storage.get("local:browserSavedSites")).toBeNull();
+    expect(await storage.get("local:browserRecentSites")).toBeNull();
     expect(await storage.get(`local:activityLog:${wallet.address}`)).toBeNull();
     expect(await storage.get(`local:watchedProcessIds:${wallet.address}`)).toBeNull();
     expect(await storage.get("local:networkSettings")).toEqual({ gatewayUrl: "https://arweave.net" });

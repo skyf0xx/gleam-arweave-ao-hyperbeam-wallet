@@ -2,6 +2,7 @@ import { render } from "@testing-library/react";
 import type { RuntimePort } from "@gleam/core";
 import type { ReactElement, ReactNode } from "react";
 import { PlatformProvider } from "./context";
+import { unavailableDappBrowser } from "./dapp-browser";
 import type { AppPlatform } from "./types";
 
 export type FakeAppPlatformOverrides = Partial<Omit<AppPlatform, "buildInfo" | "capabilities">> & {
@@ -67,6 +68,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     downloads: overrides.downloads ?? { requestPermission: async () => true },
     hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, connectViews: {}, signPanels: null },
     storeReview: overrides.storeReview ?? { opensPage: true, request: async () => {} },
+    dappBrowser: overrides.dappBrowser ?? unavailableDappBrowser,
     ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
     ...(overrides.approvalSheet ? { approvalSheet: overrides.approvalSheet } : {}),
   };

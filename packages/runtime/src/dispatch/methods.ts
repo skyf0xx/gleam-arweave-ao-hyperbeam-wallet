@@ -306,6 +306,7 @@ export const BACKGROUND_MESSAGES = {
   getTokenPrices: EXTENSION,
   getConnectedApps: EXTENSION,
   listContacts: EXTENSION,
+  listBrowserSites: EXTENSION,
 
   // actions
   estimateTransfer: EXTENSION,
@@ -341,6 +342,10 @@ export const BACKGROUND_MESSAGES = {
   dismissSiteSuggestion: EXTENSION,
   saveContact: EXTENSION,
   deleteContact: EXTENSION,
+  saveBrowserSite: EXTENSION,
+  removeBrowserSite: EXTENSION,
+  recordRecentSite: EXTENSION,
+  clearRecentSites: EXTENSION,
 
   // Gleam Points
   joinPoints: EXTENSION,

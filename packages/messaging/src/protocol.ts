@@ -184,6 +184,8 @@ export interface ProtocolMap {
   getSecurityPhrase(): SecurityPhrase | null;
   /** One list for the whole vault, most-recently-saved first. */
   listContacts(): Contact[];
+  /** The dApp browser's saved and recent sites, as origins, most recent first. */
+  listBrowserSites(): { saved: string[]; recent: string[] };
 
   // actions
   // `TransferDraft`/`UploadDraft` carry `walletId` directly — signing
@@ -254,6 +256,12 @@ export interface ProtocolMap {
    */
   saveContact(req: { address: string; name: string }): Contact;
   deleteContact(req: { address: string }): void;
+  /** Saves the origin of an http(s) `url`; saving it again moves it to the top. */
+  saveBrowserSite(req: { url: string }): void;
+  removeBrowserSite(req: { origin: string }): void;
+  /** Keeps the 10 most recent origins, one entry per origin. */
+  recordRecentSite(req: { url: string }): void;
+  clearRecentSites(): void;
 
   /**
    * Opts a wallet into Gleam Points (POINTS.md § Identity): the wallet

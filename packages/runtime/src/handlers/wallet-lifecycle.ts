@@ -27,6 +27,7 @@ import {
   type WalletState,
   type WalletSummary,
 } from "@gleam/core";
+import { BROWSER_RECENT_SITES_KEY, BROWSER_SAVED_SITES_KEY } from "./browser-sites";
 import {
   decryptFromEnvelope,
   DEFAULT_ARGON2ID_PARAMS,
@@ -873,6 +874,8 @@ export class WalletLifecycleHandler {
     );
     await saveWallets(this.storage, []);
     await this.storage.remove(ACTIVE_WALLET_ID_KEY);
+    await this.storage.remove(BROWSER_SAVED_SITES_KEY);
+    await this.storage.remove(BROWSER_RECENT_SITES_KEY);
     await saveSession(this.storage, null);
   }
 

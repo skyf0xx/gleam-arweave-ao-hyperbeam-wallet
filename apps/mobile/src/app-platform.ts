@@ -12,6 +12,8 @@ import { KeystoneConnect, KeystonePanel } from "./adapters/keystone";
 import { createQrScanner } from "./adapters/qr-scanner";
 import { createStoreReview } from "./adapters/store-review";
 import { createDappBridge, serveDappTabs } from "./adapters/dapp-bridge";
+import { createDappBrowser } from "./adapters/dapp-browser";
+import { guardLock } from "./adapters/lock-guard";
 import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from "./adapters/file-saver";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
@@ -36,16 +38,29 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
   serveSqliteStore(worker, preview?.store ?? createSqliteStore(openCapacitorDb));
   if (!preview) void sweepCapacitorExports();
   serveFileSaver(worker, preview?.fileSaver ?? createCapacitorFileSaver());
-  const runtime = createWorkerRuntimePort(worker);
-  const dapps = createDappBridge({ plugin: DappView, runtime, providerScript });
+  const workerRuntime = createWorkerRuntimePort(worker);
+  const dapps = createDappBridge({ plugin: DappView, runtime: workerRuntime, providerScript });
+  const dappBrowser = preview?.dappBrowser ?? createDappBrowser({ bridge: dapps, plugin: DappView });
   serveDappTabs(worker, dapps.tabs);
   // The browser preview has no native dApp view to listen to.
   dapps.listening.catch(() => undefined);
   const approvalSheet = createApprovalSheet();
   serveApprovalSheet(worker, approvalSheet);
   approvalSheet.subscribe((requestId) => {
-    dapps.setHidden(requestId !== null).catch(() => undefined);
+    dappBrowser.setSheetUp(requestId !== null).catch(() => undefined);
   });
+  const runtime = guardLock(
+    workerRuntime,
+    () => {
+      approvalSheet.dismissAll();
+      dapps.close().catch(() => undefined);
+    },
+    () => {
+      approvalSheet.dismissAll();
+      // Closes through the bridge first, then wipes cookies and storage.
+      dappBrowser.clearSiteData().catch(() => undefined);
+    },
+  );
   // A request left up while the app is away would still be there on return,
   // so it's rejected instead.
   onAppAway(() => approvalSheet.dismissAll());
@@ -63,7 +78,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
       passkey: false,
       biometrics: preview?.capabilities.biometrics ?? true,
       hardwareWallets: { ledger: false, keystone: true },
-      dappBrowser: false,
+      dappBrowser: true,
       qrScanner: preview?.capabilities.qrScanner ?? true,
       hostPermissions: false,
       lockOnSystemLock: false,
@@ -87,6 +102,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
     biometrics: preview?.biometrics ?? createBiometricUnlock(),
     qrScanner: preview?.qrScanner ?? createQrScanner(),
     storeReview: preview?.storeReview ?? createStoreReview(),
+    dappBrowser,
     backButton: createBackButton(),
     approvalSheet,
     activeSite: { subscribe: () => () => {} },

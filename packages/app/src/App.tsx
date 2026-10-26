@@ -20,6 +20,7 @@ import { WalletDetailView } from "./screens/wallet-detail/index.tsx";
 import { LockSettingsView } from "./screens/lock-settings/index.tsx";
 import { NetworkPeersView } from "./screens/network-peers/index.tsx";
 import { SettingsHomeView } from "./screens/settings-home/index.tsx";
+import { BrowserView } from "./screens/browser/index.tsx";
 import { ConnectedAppsView } from "./screens/connected-apps/index.tsx";
 import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
 import { ContactsView } from "./screens/contacts/index.tsx";
@@ -87,7 +88,9 @@ type MainSubView =
   | { kind: "settings-home" }
   | { kind: "lock-settings" }
   | { kind: "network-peers" }
-  | { kind: "connected-apps" }
+  | { kind: "browser"; url?: string }
+  /** `origin` is the site whose entry to show; `returnToUrl` is the browser page to go back to. */
+  | { kind: "connected-apps"; origin?: string; returnToUrl?: string }
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
   | { kind: "display-currency" }
@@ -131,7 +134,10 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
 
   const refresh = async (runtime: RuntimePort) => {
     const state = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
-    setView(resolveTopView(state));
+    const top = resolveTopView(state);
+    setView(top);
+    // The browser opens on its start screen after a lock, not on the last page.
+    if (top !== "main-screen") setSubView((current) => (current.kind === "browser" ? { kind: "home" } : current));
     setWallet(resolveActiveWallet(state));
     setWallets(state.wallets);
   };
@@ -359,7 +365,24 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else if (subView.kind === "network-peers") {
     content = <NetworkPeersView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "connected-apps") {
-    content = <ConnectedAppsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+    const { origin, returnToUrl } = subView;
+    content = (
+      <ConnectedAppsView
+        runtime={runtime}
+        highlightOrigin={origin}
+        onBack={() => setSubView(returnToUrl ? { kind: "browser", url: returnToUrl } : { kind: "settings-home" })}
+      />
+    );
+  } else if (subView.kind === "browser") {
+    content = (
+      <BrowserView
+        runtime={runtime}
+        initialUrl={subView.url}
+        onBack={() => setSubView({ kind: "home" })}
+        onOpenConnectedApp={(origin, url) => setSubView({ kind: "connected-apps", origin, returnToUrl: url })}
+        onLocked={() => void refresh(runtime)}
+      />
+    );
   } else if (subView.kind === "manage-tokens") {
     content = (
       <ManageTokensView
@@ -405,6 +428,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
             onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
             onOpenSettings={() => setSubView({ kind: "settings-home" })}
             onOpenPoints={() => setSubView({ kind: "points" })}
+            onOpenBrowser={platform.capabilities.dappBrowser ? () => setSubView({ kind: "browser" }) : undefined}
             onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
             onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
             initialTab={homeTab}

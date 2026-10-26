@@ -98,6 +98,8 @@ export interface MainScreenViewProps {
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
   onOpenPoints: () => void;
+  /** Opens the dApp browser. Omitted where the host has none, which hides its button. */
+  onOpenBrowser?: () => void;
   /** Opens the permissions screen for a site that was using another wallet. */
   onUseGleamOnSite: SiteWalletCardProps["onUseGleam"];
   onOpenCollectible: (collectible: Collectible) => void;
@@ -304,6 +306,7 @@ export function MainScreenView({
   onOpenWalletSwitcher,
   onOpenSettings,
   onOpenPoints,
+  onOpenBrowser,
   onUseGleamOnSite,
   onOpenCollectible,
   initialTab = "tokens",
@@ -564,14 +567,26 @@ export function MainScreenView({
           </div>
         )}
 
-        <button
-          type="button"
-          aria-label="Settings"
-          onClick={onOpenSettings}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:-mr-3 phone:h-11 phone:w-11"
-        >
-          <SettingsIcon />
-        </button>
+        <div className="flex flex-shrink-0 items-center phone:-mr-3">
+          {onOpenBrowser ? (
+            <button
+              type="button"
+              aria-label="Browser"
+              onClick={onOpenBrowser}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11"
+            >
+              <GlobeIcon />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            aria-label="Settings"
+            onClick={onOpenSettings}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11"
+          >
+            <SettingsIcon />
+          </button>
+        </div>
       </div>
 
       <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
@@ -978,6 +993,21 @@ function CheckIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

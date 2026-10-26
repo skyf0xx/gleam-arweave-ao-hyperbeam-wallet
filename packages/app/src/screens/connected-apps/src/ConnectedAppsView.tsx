@@ -19,6 +19,8 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 export interface ConnectedAppsViewProps {
   runtime: RuntimePort;
   onBack: () => void;
+  /** The site the user came from in the browser: its entry is listed first and set apart. */
+  highlightOrigin?: string;
 }
 
 function hostnameOf(origin: string): string {
@@ -45,7 +47,7 @@ function expirySummary(grant: Grant): string {
   return `Expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
 }
 
-export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
+export function ConnectedAppsView({ runtime, onBack, highlightOrigin }: ConnectedAppsViewProps) {
   const [grants, setGrants] = useState<Grant[] | null>(null);
   const [error, setError] = useState<string>();
 
@@ -82,8 +84,11 @@ export function ConnectedAppsView({ runtime, onBack }: ConnectedAppsViewProps) {
           <EmptyState message="No apps connected yet. Grants you approve will show up here." />
         ) : (
           <div className="flex flex-col">
-            {grants.map((grant) => (
-              <div key={grant.origin} className="flex items-start gap-3 py-3.5">
+            {[...grants].sort((a, b) => Number(b.origin === highlightOrigin) - Number(a.origin === highlightOrigin)).map((grant) => (
+              <div
+                key={grant.origin}
+                className={`flex items-start gap-3 py-3.5 ${grant.origin === highlightOrigin ? "-mx-3 rounded-xl bg-mist px-3" : ""}`}
+              >
                 <div className="mt-px flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-line bg-mist text-label font-bold text-muted">
                   {hostnameOf(grant.origin).charAt(0).toUpperCase()}
                 </div>

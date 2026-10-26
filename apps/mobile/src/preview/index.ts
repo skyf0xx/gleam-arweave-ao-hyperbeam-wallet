@@ -4,6 +4,8 @@ import type {
   QrScannerPort,
   StoreReviewPort,
 } from "@gleam/app/src/app-platform/types.ts";
+import type { DappBrowserEvent } from "@gleam/app/src/app-platform/types.ts";
+import type { MobileDappBrowser } from "../adapters/dapp-browser";
 import type { FileSaver } from "../adapters/download-channel";
 import type { SqliteStore, StoredRow } from "../adapters/sqlite-channel";
 
@@ -16,6 +18,7 @@ export interface PreviewPorts {
   biometrics: BiometricUnlockPort;
   qrScanner: QrScannerPort;
   storeReview: StoreReviewPort;
+  dappBrowser: MobileDappBrowser;
   capabilities: Pick<AppPlatform["capabilities"], "biometrics" | "qrScanner">;
 }
 
@@ -29,6 +32,32 @@ function createMemoryStore(): SqliteStore {
     async write(puts, deletes) {
       for (const [key, json] of puts) rows.set(key, json);
       for (const key of deletes) rows.delete(key);
+    },
+  };
+}
+
+/**
+ * There is no native page view in a desktop browser, so the screen's
+ * placeholder stands in for it and every page "loads" at once.
+ */
+function createPreviewDappBrowser(): MobileDappBrowser {
+  const listeners = new Set<(event: DappBrowserEvent) => void>();
+  return {
+    async open({ url }) {
+      for (const listener of listeners) listener({ kind: "navigation", url, canGoBack: false, loading: false });
+    },
+    close: async () => {},
+    goBack: async () => {},
+    reload: async () => {},
+    setFrame: async () => {},
+    setHidden: async () => {},
+    clearSiteData: async () => {},
+    setSheetUp: async () => {},
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }
@@ -55,6 +84,7 @@ export function createPreviewPorts(): PreviewPorts {
     },
     qrScanner: { scan: async () => SAMPLE_QR_TEXT },
     storeReview: { opensPage: false, request: async () => {} },
+    dappBrowser: createPreviewDappBrowser(),
     capabilities: { biometrics: false, qrScanner: true },
   };
 }

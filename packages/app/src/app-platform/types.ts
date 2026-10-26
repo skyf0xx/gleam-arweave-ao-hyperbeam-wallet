@@ -152,6 +152,39 @@ export interface ApprovalSheetPort {
   dismissed(requestId: string): void;
 }
 
+/** A rectangle in the app's CSS pixels, as `getBoundingClientRect()` reports it. */
+export interface DappBrowserFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type DappBrowserEvent =
+  | { kind: "navigation"; url: string; canGoBack: boolean; loading: boolean }
+  | { kind: "loadError"; url: string; message: string };
+
+/**
+ * The page view the browser screen draws its chrome around. The host puts
+ * the page at `frame` above the app, so the screen passes the rectangle of
+ * its placeholder again whenever it moves. `open` replaces any page already
+ * open and `close` always ends it, so the runtime hears the tab closed.
+ * Reached only when `capabilities.dappBrowser` is on.
+ */
+export interface DappBrowserPort {
+  open(options: { url: string; frame: DappBrowserFrame }): Promise<void>;
+  close(): Promise<void>;
+  goBack(): Promise<void>;
+  reload(): Promise<void>;
+  setFrame(frame: DappBrowserFrame): Promise<void>;
+  /** Takes the page out of the way of what the screen draws over it, without ending it. */
+  setHidden(hidden: boolean): Promise<void>;
+  /** Wipes the page view's cookies, storage and caches, closing any open page first. */
+  clearSiteData(): Promise<void>;
+  /** Returns the unsubscribe function. */
+  subscribe(listener: (event: DappBrowserEvent) => void): () => void;
+}
+
 export interface AppPlatform {
   /** The wire to the wallet's background. */
   runtime: RuntimePort;
@@ -172,6 +205,8 @@ export interface AppPlatform {
   downloads: DownloadsPort;
   hardwareWallets: HardwareWalletsPort;
   storeReview: StoreReviewPort;
+  /** Reached only when `capabilities.dappBrowser` is on. */
+  dappBrowser: DappBrowserPort;
   /** Omitted where the host has no system back press. */
   backButton?: BackButtonPort;
   /** Omitted where each approval gets its own window. */

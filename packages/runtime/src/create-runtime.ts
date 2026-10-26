@@ -32,6 +32,7 @@ import {
 import { WalletLifecycleHandler } from "./handlers/wallet-lifecycle";
 import { PasskeyHandler } from "./handlers/passkey";
 import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
+import { BrowserSitesHandler } from "./handlers/browser-sites";
 import { ContactsHandler } from "./handlers/contacts";
 import { TransferHandler } from "./handlers/transfer";
 import { UploadHandler } from "./handlers/upload";
@@ -207,6 +208,7 @@ export function createRuntime(platform: Platform): Runtime {
   }, reads, reads);
   const upload = new UploadHandler(storage, keySession);
   const contacts = new ContactsHandler(storage);
+  const browserSites = new BrowserSitesHandler(storage);
   const approval: ApprovalHandler = new ApprovalHandler(
     storage,
     keySession,
@@ -783,6 +785,7 @@ export function createRuntime(platform: Platform): Runtime {
     getTokenPrices: (data) => reads.getTokenPrices(data),
     getConnectedApps: () => approval.getConnectedApps(),
     listContacts: () => contacts.listContacts(),
+    listBrowserSites: () => browserSites.listBrowserSites(),
 
     // actions
     estimateTransfer: (data) => transfer.estimateTransfer(requireWalletId(data)),
@@ -840,6 +843,10 @@ export function createRuntime(platform: Platform): Runtime {
     dismissSiteSuggestion: (data) => siteWallet.dismiss(requireWebOrigin(data.origin)),
     saveContact: (data) => contacts.saveContact(data),
     deleteContact: (data) => contacts.deleteContact(data),
+    saveBrowserSite: (data) => browserSites.saveBrowserSite(data),
+    removeBrowserSite: (data) => browserSites.removeBrowserSite(data),
+    recordRecentSite: (data) => browserSites.recordRecentSite(data),
+    clearRecentSites: () => browserSites.clearRecentSites(),
 
     // Gleam Points
     joinPoints: (data) => points.join(data),

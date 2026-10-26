@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
+import { unavailableDappBrowser } from "@gleam/app/src/app-platform/dapp-browser.ts";
 import type { DeviceSignPanels } from "@gleam/app/src/approval/device-panels.tsx";
 import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
 import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
@@ -86,6 +87,7 @@ export function createExtensionAppPlatform(
       connectViews: {},
       signPanels: options.signPanels ?? null,
     },
+    dappBrowser: unavailableDappBrowser,
     storeReview: {
       opensPage: true,
       request: async () => {
