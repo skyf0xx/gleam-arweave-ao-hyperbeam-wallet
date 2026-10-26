@@ -30,6 +30,10 @@ describe("extension CORS", () => {
     );
   });
 
+  it.each(["https://localhost", "capacitor://localhost"])("lets the mobile app at %s call the wallet endpoints", async (origin) => {
+    expect(await preflight("/invite/redeem", origin)).toBe(origin);
+  });
+
   it("doesn't open the extension endpoints to web pages", async () => {
     expect(await preflight("/register", "https://evil.example")).toBeNull();
   });

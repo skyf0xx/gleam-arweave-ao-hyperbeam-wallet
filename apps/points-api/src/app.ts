@@ -26,6 +26,8 @@ import { issueChallenge } from "./scan-challenge";
 import type { ScanFailure } from "./scan-errors";
 import { scoresForDevice } from "./score";
 
+const MOBILE_ORIGINS = new Set(["https://localhost", "capacitor://localhost"]);
+
 export interface AppDeps {
   db: Db;
   now?: () => Date;
@@ -87,12 +89,15 @@ export function createApp(deps: AppDeps): Hono {
     return bodyLimit({ maxSize: limit })(c, next);
   });
 
-  // The extension calls these without a host permission, so the browser
-  // enforces CORS on them. Any extension id is allowed so unpacked dev
-  // builds work too; every one of these requests is checked on its own
-  // merits, so the origin is never what authorises it.
-  const extensionCors = cors({ origin: (origin) => (origin.startsWith("chrome-extension://") ? origin : null) });
-  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me", "/prices", "/prices/history", "/prices/fx"]) app.use(path, extensionCors);
+  // The extension and the mobile app's WebView (Capacitor's fixed
+  // `https://localhost` on Android, `capacitor://localhost` on iOS) call
+  // these from a browser context, so CORS applies. Any extension id is
+  // allowed so unpacked dev builds work too; every one of these requests is
+  // checked on its own merits, so the origin is never what authorises it.
+  const walletCors = cors({
+    origin: (origin) => (origin.startsWith("chrome-extension://") || MOBILE_ORIGINS.has(origin) ? origin : null),
+  });
+  for (const path of ["/invite/redeem", "/register", "/heartbeat", "/leave", "/me", "/prices", "/prices/history", "/prices/fx"]) app.use(path, walletCors);
 
   // Scan endpoints are open to any origin: the CLI sends no origin, the site
   // reads the list and rewards, and the signature (not the origin) authorises a submission.
