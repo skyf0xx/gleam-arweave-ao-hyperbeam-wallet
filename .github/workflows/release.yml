@@ -28,7 +28,7 @@ jobs:
       zip-name: ${{ steps.zip.outputs.zip-name }}
       zip-sha256: ${{ steps.zip.outputs.zip-sha256 }}
     steps:
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           # Unverified until the first tagged release runs. If a step fails on
           # a blocked call, set egress-policy to audit and read the run's
@@ -140,7 +140,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           # Unverified until the first tagged release runs. If a step fails on
           # a blocked call, set egress-policy to audit and read the run's
