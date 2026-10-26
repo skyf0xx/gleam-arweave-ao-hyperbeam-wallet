@@ -51,14 +51,14 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
       role={critical ? "alert" : undefined}
       className={cn(
         "mx-5 mb-1 flex items-start rounded-xl border",
-        critical ? "border-warning-border bg-warning-surface" : "border-line bg-mist",
+        critical ? "border-warning-border bg-warning-surface" : "border-line bg-mist phone:border-transparent",
       )}
     >
       {body}
       <button
         type="button"
         aria-label="Dismiss"
-        className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center text-muted hover:text-foreground"
+        className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center text-muted hover:text-foreground phone:mt-0 phone:h-11 phone:w-11"
         onClick={dismiss}
       >
         <CloseIcon />

@@ -2,6 +2,7 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
+import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
 import { createQrScanner } from "./adapters/qr-scanner";
 import { createStoreReview } from "./adapters/store-review";
@@ -47,6 +48,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
       dappBrowser: false,
       qrScanner: preview?.capabilities.qrScanner ?? true,
       hostPermissions: false,
+      lockOnSystemLock: false,
     },
     hostPermissions: { contains: async () => true, request: async () => true },
     ephemeralState: {
@@ -67,6 +69,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
     biometrics: preview?.biometrics ?? createBiometricUnlock(),
     qrScanner: preview?.qrScanner ?? createQrScanner(),
     storeReview: preview?.storeReview ?? createStoreReview(),
+    backButton: createBackButton(),
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

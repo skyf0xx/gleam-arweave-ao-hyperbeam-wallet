@@ -14,7 +14,7 @@ export interface OptionSectionProps {
 export function OptionSection({ title, children }: OptionSectionProps) {
   return (
     <section aria-label={title}>
-      <div className="border-b border-line pb-2 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+      <div className="border-b border-line pb-2 text-label font-semibold uppercase tracking-[0.04em] text-muted phone:border-b-0 phone:pb-0">
         {title}
       </div>
       <div className="flex flex-col">{children}</div>
@@ -60,8 +60,8 @@ export function OptionRow({
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       className={cn(
-        "flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50",
-        divided && "border-b border-line last:border-b-0",
+        "flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:enabled:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50",
+        divided && "border-b border-line last:border-b-0 phone:border-b-0",
       )}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">

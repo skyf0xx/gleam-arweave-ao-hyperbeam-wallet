@@ -12,7 +12,7 @@ export interface CardProps {
 }
 
 export function Card({ children, className }: CardProps) {
-  return <div className={cn("border-t border-line bg-background", className)}>{children}</div>;
+  return <div className={cn("border-t border-line bg-background phone:border-t-0", className)}>{children}</div>;
 }
 
 /**
@@ -35,8 +35,8 @@ export function ListRow({ title, subtitle, start, end, onClick, className }: Lis
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0",
-        onClick && "cursor-pointer hover:bg-mist",
+        "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 phone:border-b-0 phone:px-0 phone:py-3.5",
+        onClick && "cursor-pointer hover:bg-mist phone:active:bg-mist",
         className,
       )}
     >

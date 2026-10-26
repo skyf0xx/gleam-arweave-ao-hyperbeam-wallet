@@ -33,6 +33,7 @@ import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/inde
 import { PointsTokenRow } from "../../points/index.tsx";
 import { useCopy } from "../../points/src/useCopy";
 import { readRowVisibility, shownTokenLogo, writeRowVisibility, type RowVisibility } from "../../../token-visibility";
+import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -509,6 +510,10 @@ export function MainScreenView({
     window.scrollTo({ top: 0, behavior });
   };
 
+  useBackHandler(
+    confirmingIgnore !== null ? () => setConfirmingIgnore(null) : headerCollapsed ? returnHome : null,
+  );
+
   return (
     <div className="flex min-h-full flex-col">
       {loadError ? (
@@ -520,26 +525,26 @@ export function MainScreenView({
         />
       ) : null}
 
-      <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4">
+      <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
         {headerCollapsed ? (
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
             type="button"
             aria-label="Back"
             onClick={returnHome}
-            className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
+            className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:-ml-3 phone:h-11 phone:w-11"
           >
             <BackIcon />
           </button>
         ) : (
           // The copy button can't nest inside the pill's button, so the wrapper carries the shared hover background.
-          <div className="group -ml-3 flex min-w-0 items-center rounded-lg pr-1 hover:bg-mist">
+          <div className="group -ml-3 flex min-w-0 items-center rounded-lg pr-1 hover:bg-mist phone:ml-0 phone:pr-0">
             <button
               type="button"
               onClick={onOpenWalletSwitcher}
               aria-haspopup="dialog"
               aria-label={`${wallet.name}, address ${wallet.address}, view account details`}
-              className="flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-1"
+              className="flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-1 phone:min-h-11 phone:gap-2.5"
             >
               <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
               <span className="truncate text-label">{wallet.name}</span>
@@ -552,7 +557,7 @@ export function MainScreenView({
               onClick={copyAddress}
               aria-label={addressCopied ? "Address copied" : "Copy address"}
               title={addressCopied ? "Copied" : "Copy address"}
-              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity focus-visible:opacity-100 group-hover:opacity-100 ${addressCopied ? "text-positive opacity-100" : "text-muted opacity-0 hover:text-foreground"}`}
+              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-muted opacity-0 hover:text-foreground"}`}
             >
               {addressCopied ? <CheckIcon /> : <CopyIcon />}
             </button>
@@ -563,7 +568,7 @@ export function MainScreenView({
           type="button"
           aria-label="Settings"
           onClick={onOpenSettings}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:-mr-3 phone:h-11 phone:w-11"
         >
           <SettingsIcon />
         </button>
@@ -581,7 +586,7 @@ export function MainScreenView({
       */}
       <div className="transition-opacity duration-300 ease-out" style={{ opacity: headerCollapsed ? 0 : 1 }}>
         <div inert={headerCollapsed}>
-          <div className="px-6 pb-1 pt-2.5">
+          <div className="px-6 pb-1 pt-2.5 phone:px-5 phone:pt-1">
             <PortfolioChart
               points={portfolioHistoryQuery.data?.series ?? []}
               currentValue={portfolioHistoryQuery.data?.currentValue ?? 0}
@@ -632,11 +637,11 @@ export function MainScreenView({
             />
           </div>
 
-          <div className="px-6 pb-5 pt-3">
+          <div className="px-6 pb-5 pt-3 phone:px-5 phone:pb-4 phone:pt-2">
             <Beam />
           </div>
 
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 phone:px-5 phone:pb-4">
             <SendReceiveActions onSend={onSend} onReceive={onReceive} />
           </div>
         </div>
@@ -664,24 +669,24 @@ export function MainScreenView({
       {listDocked ? <div style={{ height: listSectionRef.current?.offsetHeight }} /> : null}
       <div
         ref={listSectionRef}
-        className={`px-6 pb-6 ${
+        className={`px-6 pb-6 phone:px-5 phone:pb-4 phone:[@media(max-height:700px)]:pb-2 ${
           listDocked
             ? "gleam-dock-in fixed inset-x-0 bottom-0 top-[calc(4rem+var(--inset-top))] z-20 mx-auto max-w-[var(--content-max)] overflow-y-auto bg-background"
-            : "min-h-[calc(100dvh-4rem)]"
+            : "min-h-[calc(100dvh-4rem)] phone:min-h-0"
         }`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
       >
         <div
           role="tablist"
           aria-label="Tokens, collectibles and activity"
-          className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-2"
+          className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-2 phone:-mx-2.5 phone:pb-1 phone:pt-1"
         >
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "tokens"}
             onClick={() => selectTab("tokens")}
-            className={`rounded-md px-2.5 py-1 text-label ${
+            className={`rounded-md px-2.5 py-1 text-label phone:hit-target ${
               activeTab === "tokens" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
@@ -692,7 +697,7 @@ export function MainScreenView({
             role="tab"
             aria-selected={activeTab === "collectibles"}
             onClick={() => selectTab("collectibles")}
-            className={`rounded-md px-2.5 py-1 text-label ${
+            className={`rounded-md px-2.5 py-1 text-label phone:hit-target ${
               activeTab === "collectibles" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
@@ -703,7 +708,7 @@ export function MainScreenView({
             role="tab"
             aria-selected={activeTab === "activity"}
             onClick={() => selectTab("activity")}
-            className={`rounded-md px-2.5 py-1 text-label ${
+            className={`rounded-md px-2.5 py-1 text-label phone:hit-target ${
               activeTab === "activity" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
@@ -712,7 +717,7 @@ export function MainScreenView({
         </div>
 
         {activeTab === "tokens" ? (
-          <div className="min-h-60 border-t border-line">
+          <div className="min-h-60 border-t border-line phone:min-h-0 phone:border-t-0">
             {loading && !hasLoadedOnce ? (
               <>
                 <SkeletonRow />
@@ -780,7 +785,7 @@ export function MainScreenView({
                   const { processId } = row;
                   if (processId !== undefined && confirmingIgnore === processId) {
                     return (
-                      <div key={row.key} className="flex flex-col gap-2 border-b border-line px-3.5 py-3 last:border-b-0">
+                      <div key={row.key} className="flex flex-col gap-2 border-b border-line px-3.5 py-3 last:border-b-0 phone:border-b-0 phone:px-0">
                         <p className="text-caption leading-relaxed text-muted">
                           Ignore {row.label}? It won&apos;t show anywhere in Gleam. To bring it back, add
                           its process id in Manage tokens.
@@ -811,12 +816,12 @@ export function MainScreenView({
                     );
                   }
                   const actionClassName =
-                    "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground";
+                    "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
                   return (
-                    <div key={row.key} className="group relative border-b border-line last:border-b-0">
+                    <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative border-b border-line last:border-b-0 phone:border-b-0">
                       {row.node}
                       {hiddenExpanded ? (
-                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
+                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100">
                           {hidden && processId !== undefined ? (
                             <button
                               type="button"
@@ -852,7 +857,7 @@ export function MainScreenView({
                           type="button"
                           aria-expanded={hiddenExpanded}
                           onClick={toggleHiddenExpanded}
-                          className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground"
+                          className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground phone:min-h-11 phone:px-0"
                         >
                           <span>Hidden ({hiddenRows.length})</span>
                           <ChevronIcon open={hiddenExpanded} />
@@ -864,7 +869,7 @@ export function MainScreenView({
                       <button
                         type="button"
                         onClick={() => setHiddenExpanded((prev) => !prev)}
-                        className="px-3.5 py-3 text-caption text-faint hover:text-foreground"
+                        className="px-3.5 py-3 text-caption text-faint hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
                       >
                         {hiddenExpanded ? "Done" : "Edit list"}
                       </button>
@@ -875,9 +880,9 @@ export function MainScreenView({
             )}
           </div>
         ) : activeTab === "collectibles" ? (
-          <div className="min-h-60 border-t border-line pt-3.5">
+          <div className="min-h-60 border-t border-line pt-3.5 phone:min-h-0 phone:border-t-0 phone:pt-1">
             {collectiblesQuery.error && !collectiblesQuery.data ? (
-              <NetworkErrorBanner onRetry={() => void collectiblesQuery.refetch()} />
+              <NetworkErrorBanner onRetry={() => void collectiblesQuery.refetch()} className="phone:mx-0 phone:mt-0" />
             ) : (
               <CollectiblesGrid
                 items={collectiblesQuery.data}
@@ -888,7 +893,7 @@ export function MainScreenView({
           </div>
         ) : (
           <>
-            <div className="min-h-60 border-t border-line">
+            <div className="min-h-60 border-t border-line phone:min-h-0 phone:border-t-0">
               {loading && !hasLoadedOnce ? (
                 <>
                   <SkeletonRow />
@@ -936,11 +941,11 @@ export function MainScreenView({
                 ))
               )}
             </div>
-            <div className="pt-2.5 text-center">
+            <div className="pt-2.5 text-center phone:pt-1">
               <button
                 type="button"
                 onClick={() => openInExplorer(wallet.address)}
-                className="text-label font-medium text-muted hover:text-foreground hover:underline"
+                className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
               >
                 View all
               </button>

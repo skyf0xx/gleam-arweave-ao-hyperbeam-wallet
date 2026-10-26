@@ -20,7 +20,7 @@ export function FoundingReveal({ seatsLeft, inviteCode, onDone }: FoundingReveal
   const { copied, copy } = useCopy(inviteCode ? inviteLinkFor(inviteCode) : "");
 
   return (
-    <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
+    <div className="flex min-h-full flex-col items-center px-8 phone:px-5 pb-6 pt-7 phone:pt-4">
       <div className="mt-12 flex flex-col items-center gap-1 text-center">
         <h1 className="text-h2 font-semibold tracking-tight text-foreground">You&apos;re in</h1>
         <p className="text-body text-muted">You&apos;re now earning Gleam Points.</p>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 /**
  * Explicit, plainly-worded destructive reset, never a silent delete.
@@ -25,7 +26,7 @@ export function ForgotPassword({
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <div className="flex min-h-full flex-col items-center gap-4 px-8 pb-6 pt-10 text-center">
+    <div className="flex min-h-full flex-col items-center gap-4 px-8 phone:px-5 pb-6 phone:pb-0 pt-10 phone:pt-6 text-center">
       <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-mist text-muted">
         <LockGlyph />
       </div>
@@ -48,23 +49,24 @@ export function ForgotPassword({
         </p>
       ) : null}
 
-      <Button
-        type="button"
-        variant="destructive"
-        onClick={() => (confirming ? onReset() : setConfirming(true))}
-        disabled={resetting}
-        className="mt-8"
-      >
-        {resetting ? "Resetting…" : confirming ? "Yes, reset wallet" : "Reset wallet"}
-      </Button>
-      <button
-        type="button"
-        onClick={confirming ? () => setConfirming(false) : onCancel}
-        disabled={resetting}
-        className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
-      >
-        Cancel
-      </button>
+      <ScreenFooter className="mt-8 items-center gap-4" pinned={false}>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => (confirming ? onReset() : setConfirming(true))}
+          disabled={resetting}
+        >
+          {resetting ? "Resetting…" : confirming ? "Yes, reset wallet" : "Reset wallet"}
+        </Button>
+        <button
+          type="button"
+          onClick={confirming ? () => setConfirming(false) : onCancel}
+          disabled={resetting}
+          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-4"
+        >
+          Cancel
+        </button>
+      </ScreenFooter>
     </div>
   );
 }

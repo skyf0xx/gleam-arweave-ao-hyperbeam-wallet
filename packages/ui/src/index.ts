@@ -2,6 +2,8 @@ export { cn } from "./primitives/cn";
 export { Button, type ButtonProps } from "./primitives/button";
 export { Beam, BeamMark, type BeamProps } from "./primitives/beam";
 export { ScreenHeader, type ScreenHeaderProps } from "./primitives/screen-header";
+export { BackStackContext, createBackStack, useBackHandler, type BackStack } from "./primitives/back-stack";
+export { ScreenFooter, type ScreenFooterProps } from "./primitives/screen-footer";
 export { Card, ListRow, type CardProps, type ListRowProps } from "./primitives/card";
 export { OptionSection, OptionRow, type OptionSectionProps, type OptionRowProps } from "./primitives/option-list";
 export { TextField, type TextFieldProps } from "./primitives/text-field";

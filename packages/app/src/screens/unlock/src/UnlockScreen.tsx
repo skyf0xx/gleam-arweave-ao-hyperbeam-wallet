@@ -3,6 +3,7 @@ import type { SecurityPhrase } from "@gleam/core";
 import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 
 /**
@@ -95,14 +96,38 @@ export function UnlockScreen({
     setPassword("");
   }
 
+  const links = (
+    <div className="mt-3.5 flex justify-center gap-4">
+      {quick && usePassword ? (
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => setUsePassword(false)}
+          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
+        >
+          {quick.switchBack}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        disabled={locked}
+        onClick={onForgotPassword}
+        className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
+      >
+        Forgot password?
+      </button>
+    </div>
+  );
+
   return (
-    <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
+    <div className="flex min-h-full flex-col items-center px-8 phone:px-5 pb-6 phone:pb-0 pt-7 phone:pt-4">
       <div className="h-2 w-full" aria-hidden="true" />
-      <div className="mt-16 mb-2">
+      {/* With the keyboard up there is no room for the wordmark; the security phrase below it stays. */}
+      <div className="mt-16 mb-2 phone:mt-6 phone:[@media(max-height:560px)]:hidden">
         <BeamMark tagline={tagline} />
       </div>
       {securityPhrase && phraseIcon ? (
-        <SecurityPhraseMark phrase={securityPhrase} iconSvg={phraseIcon} layout="stacked" className="mt-6" />
+        <SecurityPhraseMark phrase={securityPhrase} iconSvg={phraseIcon} layout="stacked" className="mt-6 phone:mt-4" />
       ) : null}
 
       {quick && !usePassword ? (
@@ -110,10 +135,11 @@ export function UnlockScreen({
           {...quick}
           disabled={locked}
           onUsePassword={() => setUsePassword(true)}
+          links={links}
         />
       ) : (
         <form
-          className="mt-12 flex w-full flex-col gap-2.5"
+          className="mt-12 flex w-full flex-col gap-2.5 phone:mt-8 phone:flex-1"
           onSubmit={(event) => {
             event.preventDefault();
             if (!locked && password.length > 0) onUnlock(password);
@@ -132,44 +158,22 @@ export function UnlockScreen({
             errorMessage={errorMessage}
           />
 
-          <Button
-            type="submit"
-            disabled={locked || password.length === 0}
-            aria-busy={unlocking}
-            className="mt-1.5"
-          >
-            {unlocking ? (
-              <>
-                <Spinner />
-                <span>Unlocking&hellip;</span>
-              </>
-            ) : (
-              "Unlock"
-            )}
-          </Button>
+          <ScreenFooter className="mt-1.5 gap-0">
+            <Button type="submit" disabled={locked || password.length === 0} aria-busy={unlocking}>
+              {unlocking ? (
+                <>
+                  <Spinner />
+                  <span>Unlocking&hellip;</span>
+                </>
+              ) : (
+                "Unlock"
+              )}
+            </Button>
+            {links}
+          </ScreenFooter>
         </form>
       )}
 
-      <div className="mt-3.5 flex justify-center gap-4">
-        {quick && usePassword ? (
-          <button
-            type="button"
-            disabled={locked}
-            onClick={() => setUsePassword(false)}
-            className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
-          >
-            {quick.switchBack}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          disabled={locked}
-          onClick={onForgotPassword}
-          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
-        >
-          Forgot password?
-        </button>
-      </div>
     </div>
   );
 }
@@ -183,9 +187,10 @@ function QuickUnlockButtons({
   waiting,
   disabled,
   onUsePassword,
-}: QuickUnlock & { disabled: boolean; onUsePassword: () => void }) {
+  links,
+}: QuickUnlock & { disabled: boolean; onUsePassword: () => void; links: ReactNode }) {
   return (
-    <div className="mt-12 flex w-full flex-col gap-2.5">
+    <ScreenFooter className="mt-12 gap-0">
       <Button type="button" autoFocus disabled={busy || disabled} aria-busy={busy} onClick={onUnlock}>
         {busy ? (
           <>
@@ -202,15 +207,16 @@ function QuickUnlockButtons({
       {notice ? (
         <p
           role={notice.tone === "error" ? "alert" : "status"}
-          className={notice.tone === "error" ? "text-center text-caption text-warning" : "text-center text-caption text-muted"}
+          className={notice.tone === "error" ? "mt-2.5 text-center text-caption text-warning" : "mt-2.5 text-center text-caption text-muted"}
         >
           {notice.text}
         </p>
       ) : null}
-      <Button type="button" variant="secondary" disabled={busy || disabled} onClick={onUsePassword}>
+      <Button type="button" variant="secondary" disabled={busy || disabled} onClick={onUsePassword} className="mt-2.5">
         Use password instead
       </Button>
-    </div>
+      {links}
+    </ScreenFooter>
   );
 }
 

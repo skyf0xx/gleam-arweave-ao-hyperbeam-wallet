@@ -27,7 +27,7 @@ export function SecurityPhrasePicker({ value, onChange, iconSvg, disabled = fals
             type="button"
             disabled={disabled}
             onClick={() => onChange(suggestSecurityPhrase(Math.random, value.word))}
-            className="rounded-md px-1.5 py-0.5 text-caption font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60"
+            className="rounded-md px-1.5 py-0.5 text-caption font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60 phone:flex phone:min-h-11 phone:items-center phone:px-2.5"
           >
             Suggest another
           </button>

@@ -14,7 +14,7 @@ export interface EmptyStateProps {
 
 export function EmptyState({ message, action, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-12 text-center", className)}>
+    <div className={cn("flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-12 text-center phone:px-0 phone:py-6", className)}>
       <p className="m-0 max-w-[260px] text-label text-muted">{message}</p>
       {action}
     </div>

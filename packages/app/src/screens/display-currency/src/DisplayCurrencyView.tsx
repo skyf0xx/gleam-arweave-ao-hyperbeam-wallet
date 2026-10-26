@@ -55,7 +55,7 @@ export function DisplayCurrencyView({ runtime, onBack }: DisplayCurrencyViewProp
         role="radio"
         aria-checked={selected}
         onClick={() => void choose(option.code)}
-        className="flex w-full items-center gap-3 py-3 text-left hover:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+        className="flex w-full items-center gap-3 py-3 text-left phone:py-3.5 hover:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
       >
         <span className="w-10 flex-shrink-0 text-label font-semibold text-foreground">{option.code}</span>
         <span className="min-w-0 flex-1 truncate text-label text-muted">{option.name}</span>
@@ -71,7 +71,7 @@ export function DisplayCurrencyView({ runtime, onBack }: DisplayCurrencyViewProp
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Currency" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-5">
+      <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-5">
         <TextField
           type="search"
           aria-label="Search currencies"

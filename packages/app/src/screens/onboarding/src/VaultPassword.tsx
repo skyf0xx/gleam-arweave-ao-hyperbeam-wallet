@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 /**
  * Asks for the existing vault password when adding a wallet. Every wallet
@@ -38,9 +39,9 @@ export function VaultPassword({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title={title} onBack={onBack} />
+      <ScreenHeader title={title} onBack={onBack} busy={submitting} />
       <form
-        className="flex flex-1 flex-col gap-5 px-6 py-6"
+        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
           event.preventDefault();
           if (!submitting && password.length > 0) onSubmit(password);
@@ -66,9 +67,11 @@ export function VaultPassword({
           errorMessage={serverError}
         />
 
-        <Button type="submit" disabled={submitting || password.length === 0} className="mt-8">
-          {submitting ? "Adding…" : "Continue"}
-        </Button>
+        <ScreenFooter className="mt-8">
+          <Button type="submit" disabled={submitting || password.length === 0}>
+            {submitting ? "Adding…" : "Continue"}
+          </Button>
+        </ScreenFooter>
       </form>
     </div>
   );

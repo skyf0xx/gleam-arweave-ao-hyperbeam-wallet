@@ -51,8 +51,8 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0",
-        onClick && "cursor-pointer hover:bg-mist",
+        "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 phone:gap-3 phone:border-b-0 phone:px-0 phone:py-3.5 phone:[@media(max-height:700px)]:py-3",
+        onClick && "cursor-pointer hover:bg-mist phone:active:bg-mist",
         className,
       )}
     >
@@ -62,8 +62,11 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
         <div className="text-caption tabular-nums text-muted" title={amountFull}>
           {amountFull ? (
             <>
-              <span aria-hidden="true">{amount}</span>
-              <span className="sr-only">{amountFull}</span>
+              <span aria-hidden="true" className="phone:hidden">
+                {amount}
+              </span>
+              {/* A touch screen has no hover to reveal the full figure, so the phone has room to show it outright. */}
+              <span className="sr-only phone:not-sr-only phone:block phone:truncate">{amountFull}</span>
             </>
           ) : (
             amount
@@ -71,7 +74,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
         </div>
       </div>
       {value ? (
-        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", loading && "opacity-50 transition-opacity")}>
+        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", loading && "opacity-50 transition-opacity", "phone:group-data-editing:invisible")}>
           {value}
         </div>
       ) : null}

@@ -20,7 +20,7 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Receive" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col items-center gap-5 px-6 pb-6 pt-7">
+      <div className="flex flex-1 flex-col items-center gap-5 px-6 phone:px-5 pb-6 pt-7 phone:pt-4">
         <div className="flex items-center gap-2">
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="text-label">{wallet.name}</span>

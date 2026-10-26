@@ -50,6 +50,7 @@ export function createExtensionAppPlatform(
       dappBrowser: false,
       qrScanner: false,
       hostPermissions: true,
+      lockOnSystemLock: true,
     },
     hostPermissions: {
       contains: (origins) => browser.permissions.contains({ origins: [...origins] }),

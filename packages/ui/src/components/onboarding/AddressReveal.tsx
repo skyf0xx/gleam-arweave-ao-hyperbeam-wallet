@@ -44,10 +44,10 @@ export function AddressReveal({
           </div>
           <button
             type="button"
-            aria-label="Download keyfile"
+            aria-label="Save keyfile"
             onClick={onDownload}
             disabled={downloading || !canDownload}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground disabled:opacity-50"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground disabled:opacity-50 phone:hit-target"
           >
             <DownloadIcon />
           </button>
@@ -67,7 +67,7 @@ export function AddressReveal({
           <button
             type="button"
             onClick={onSkip}
-            className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
+            className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-4"
           >
             I&apos;ll back this up later
           </button>

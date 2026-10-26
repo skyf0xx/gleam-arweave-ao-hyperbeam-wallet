@@ -4,6 +4,7 @@ import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 export interface CollectibleDetailViewProps {
   collectible: Collectible;
@@ -28,7 +29,7 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Collectible" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-6">
+      <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 pb-6 phone:pb-0 pt-6">
         <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="mx-auto max-w-[280px]" />
 
         <div className="flex flex-col gap-0.5 text-center">
@@ -36,7 +37,7 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
           {collectible.collectionName ? <p className="text-label text-muted">{collectible.collectionName}</p> : null}
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-line pt-3.5">
+        <div className="flex items-center justify-between gap-2 border-t border-line pt-3.5 phone:border-t-0 phone:pt-0">
           <span className="text-label text-muted">Process ID</span>
           <span className="flex items-center gap-1.5">
             <span className="font-mono text-label" title={collectible.id}>
@@ -63,9 +64,9 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
         </a>
 
         {onSend ? (
-          <div className="mt-auto pt-2">
+          <ScreenFooter className="gap-0 pt-2">
             <Button onClick={() => onSend(collectible)}>Send</Button>
-          </div>
+          </ScreenFooter>
         ) : null}
       </div>
     </div>

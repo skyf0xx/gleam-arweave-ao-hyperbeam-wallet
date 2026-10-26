@@ -101,8 +101,8 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
   const busy = state.kind === "ready" && state.phase !== "idle";
 
   return (
-    <div className="pb-10">
-      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+    <div className="pb-10 phone:pb-8">
+      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
         {title}
       </div>
       {state.kind === "loading" ? (

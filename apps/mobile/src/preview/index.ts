@@ -34,6 +34,7 @@ function createMemoryStore(): SqliteStore {
 }
 
 export function createPreviewPorts(): PreviewPorts {
+  applyPreviewInsets();
   return {
     store: createMemoryStore(),
     fileSaver: {
@@ -56,4 +57,21 @@ export function createPreviewPorts(): PreviewPorts {
     storeReview: { opensPage: false, request: async () => {} },
     capabilities: { biometrics: false, qrScanner: true },
   };
+}
+
+/** iPhone 15's portrait insets, for `?insets=notch`. */
+const NOTCH_INSETS = { top: "59px", right: "0px", bottom: "34px", left: "0px" };
+
+/**
+ * A desktop browser reports no safe-area insets, so `?insets=notch` stands
+ * in a notched phone's by overriding the custom properties the phone layout
+ * reads (`--safe-*` in packages/ui's theme.css).
+ */
+export function applyPreviewInsets(search: string = window.location.search): void {
+  if (new URLSearchParams(search).get("insets") !== "notch") return;
+  const style = document.documentElement.style;
+  style.setProperty("--safe-top", NOTCH_INSETS.top);
+  style.setProperty("--safe-right", NOTCH_INSETS.right);
+  style.setProperty("--safe-bottom", NOTCH_INSETS.bottom);
+  style.setProperty("--safe-left", NOTCH_INSETS.left);
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useBackHandler } from "./back-stack";
 import { cn } from "./cn";
 
 /**
@@ -12,34 +13,42 @@ export interface ScreenHeaderProps {
   /** Takes the title's place, e.g. a row of tabs. */
   center?: ReactNode;
   onBack?: () => void;
+  /**
+   * While true the system back press (Android) is consumed without leaving, for a screen whose
+   * action is in flight. The arrow on screen is the caller's own business and is unchanged.
+   */
+  busy?: boolean;
   end?: ReactNode;
   subtitle?: ReactNode;
   className?: string;
 }
 
-export function ScreenHeader({ title, center, onBack, end, subtitle, className }: ScreenHeaderProps) {
+export function ScreenHeader({ title, center, onBack, busy = false, end, subtitle, className }: ScreenHeaderProps) {
+  useBackHandler(onBack ? (busy ? ignoreBack : onBack) : null);
   return (
-    <div className={cn("flex items-center gap-2.5 border-b border-line px-4 py-3.5", className)}>
+    <div className={cn("flex items-center gap-2.5 border-b border-line px-4 py-3.5 phone:sticky phone:top-[var(--safe-top)] phone:z-30 phone:gap-1 phone:border-b-0 phone:bg-background phone:px-2 phone:py-1", className)}>
       {onBack ? (
         <button
           type="button"
           aria-label="Back"
           onClick={onBack}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11 phone:active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
         >
           <BackIcon />
         </button>
       ) : (
-        <div className="h-8 w-8 flex-shrink-0" aria-hidden="true" />
+        <div className="h-8 w-8 flex-shrink-0 phone:h-11 phone:w-11" aria-hidden="true" />
       )}
       <div className="flex flex-1 flex-col items-center gap-px">
-        {center ?? <span className="text-body font-semibold text-foreground">{title}</span>}
+        {center ?? <span className="text-body font-semibold text-foreground phone:text-[1rem]">{title}</span>}
         {subtitle}
       </div>
-      {end ?? <div className="h-8 w-8 flex-shrink-0" aria-hidden="true" />}
+      {end ?? <div className="h-8 w-8 flex-shrink-0 phone:h-11 phone:w-11" aria-hidden="true" />}
     </div>
   );
 }
+
+function ignoreBack() {}
 
 function BackIcon() {
   return (

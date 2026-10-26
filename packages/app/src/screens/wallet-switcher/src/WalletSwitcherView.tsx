@@ -97,7 +97,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
 
       <ScreenHeader title="Wallets" onBack={onBack} />
 
-      <div className="px-6 pb-3 pt-9">
+      <div className="px-6 phone:px-5 pb-3 pt-9 phone:pt-4">
         <div>
           {state.loading ? (
             <>
@@ -159,7 +159,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
     // floats beside the chevron instead of taking a column, so the address
     // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-mist" : "border-b border-line last:border-b-0 hover:bg-mist"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-mist" : "border-b border-line last:border-b-0 hover:bg-mist phone:border-b-0"}`}
     >
       <button
         type="button"
@@ -178,7 +178,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
             {active ? (
               <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-muted">Active</span>
             ) : (
-              <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+              <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:opacity-100">
                 Make active
               </span>
             )}
@@ -191,7 +191,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         onClick={copy}
         aria-label={copied ? `${wallet.name} address copied` : `Copy ${wallet.name} address`}
         title={copied ? "Copied" : "Copy address"}
-        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
       </button>
@@ -199,7 +199,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         type="button"
         aria-label={`Manage ${wallet.name}`}
         onClick={onManage}
-        className="flex h-7 w-5 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground"
+        className="flex h-7 w-5 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11"
       >
         <ChevronRightIcon />
       </button>

@@ -30,6 +30,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
       biometrics: false,
       dappBrowser: false,
       qrScanner: false,
+      lockOnSystemLock: true,
       hostPermissions: true,
       ...overrides.capabilities,
       hardwareWallets: { ledger: true, keystone: true, ...overrides.capabilities?.hardwareWallets },
@@ -66,6 +67,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     downloads: overrides.downloads ?? { requestPermission: async () => true },
     hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },
     storeReview: overrides.storeReview ?? { opensPage: true, request: async () => {} },
+    ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
   };
 }
 

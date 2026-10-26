@@ -60,7 +60,7 @@ describe("OnboardingView: create flow", () => {
     });
     expect(send).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
     await waitFor(() => expect(screen.getByText("Saved as wallet-1-arweave-keyfile.json")).toBeTruthy());
     expect(requestDownloadPermission).toHaveBeenCalledOnce();
     expect(send).toHaveBeenNthCalledWith(2, {
@@ -132,11 +132,11 @@ describe("OnboardingView: create flow", () => {
   }
 
   function downloadButton() {
-    return screen.getByRole("button", { name: "Download keyfile" }) as HTMLButtonElement;
+    return screen.getByRole("button", { name: "Save keyfile" }) as HTMLButtonElement;
   }
 
   it.each([
-    ["cancelled", "The download was cancelled."],
+    ["cancelled", "Saving the keyfile was cancelled."],
     ["failed", "The keyfile couldn't be saved."],
   ])("after a %s download, offers a retry and points to wallet settings", async (reason, message) => {
     const send = vi

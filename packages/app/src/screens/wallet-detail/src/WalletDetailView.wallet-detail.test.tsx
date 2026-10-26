@@ -32,7 +32,7 @@ const PASSWORD = "correct horse battery staple";
 function startBackup() {
   fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: PASSWORD } });
-  fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
 }
 
 describe("WalletDetailView", () => {
@@ -150,7 +150,7 @@ describe("WalletDetailView", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     await waitFor(() => expect(screen.getByText("Enter your password")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: PASSWORD } });
-    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
 
     await waitFor(() => expect(screen.getByText("Saved as wallet-one-arweave-keyfile.json")).toBeTruthy());
     expect(requestDownloadPermission).toHaveBeenCalledOnce();
@@ -180,7 +180,7 @@ describe("WalletDetailView", () => {
 
     startBackup();
 
-    await waitFor(() => expect(screen.getByText("The download was cancelled.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Saving the keyfile was cancelled.")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => expect(screen.getByText("Not backed up yet")).toBeTruthy());
   });

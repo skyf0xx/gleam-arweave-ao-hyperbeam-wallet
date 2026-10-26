@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "./screens/onboarding/index.tsx";
@@ -118,6 +119,13 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [initError, setInitError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
   const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
+  const [backStack] = useState(createBackStack);
+
+  // Every back arrow on screen and every overlay registers with the stack, so
+  // the system back press undoes what a tap on Back would. Unhandled, the
+  // shell minimises, which is the right thing to do from the home screen.
+  const subscribeBack = platform.backButton?.subscribe;
+  useEffect(() => subscribeBack?.(() => backStack.handle()), [subscribeBack, backStack]);
 
   const refresh = async (runtime: RuntimePort) => {
     const state = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
@@ -340,8 +348,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
-        onSetUpPasskey={() => platform.unlock.openPasskeyWindow("setup")}
+        onSetUpPasskey={platform.capabilities.passkey ? () => platform.unlock.openPasskeyWindow("setup") : undefined}
         biometrics={platform.capabilities.biometrics ? platform.biometrics : undefined}
+        lockOnSystemLock={platform.capabilities.lockOnSystemLock}
       />
     );
   } else if (subView.kind === "network-peers") {
@@ -405,6 +414,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <BackStackContext.Provider value={backStack}>
       <AddressIdentityProvider value={addressIdentity}>
         <div
           data-layout={layout}
@@ -414,6 +424,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
           {content}
         </div>
       </AddressIdentityProvider>
+      </BackStackContext.Provider>
     </QueryClientProvider>
   );
 }

@@ -12,6 +12,7 @@ import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useNetworkSettings } from "../../main-screen/src/useNetworkSettings";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 const TAG_BYTES_LIMIT = 4096;
 const FALLBACK_GATEWAY_VIEW_URL = "https://arweave.net";
@@ -287,7 +288,7 @@ function ComposeStep({
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Upload" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-5 px-5 py-5">
+      <div className="flex flex-1 flex-col gap-5 px-5 py-5 phone:pb-0">
         <div className="flex rounded-md bg-mist p-[3px]">
           {(["file", "text", "json"] as SourceKind[]).map((source) => (
             <button
@@ -408,9 +409,11 @@ function ComposeStep({
           </div>
         ) : null}
 
-        <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
-          {continueLabel}
-        </Button>
+        <ScreenFooter>
+          <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue}>
+            {continueLabel}
+          </Button>
+        </ScreenFooter>
       </div>
     </div>
   );
@@ -459,8 +462,8 @@ function ReviewStep({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Review upload" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-5 px-5 py-5">
+      <ScreenHeader title="Review upload" onBack={onBack} busy={step.submitting} />
+      <div className="flex flex-1 flex-col gap-5 px-5 py-5 phone:pb-0">
         {step.fileName ? <FileRow name={step.fileName} size={base64ByteLength(step.dataBase64)} onRemove={onBack} /> : null}
 
         {tripped ? (
@@ -501,20 +504,21 @@ function ReviewStep({
           </div>
         ) : null}
 
-        <Button
-          type="button"
-          variant={tripped ? "destructive" : "primary"}
-          disabled={tripped || step.submitting}
-          aria-busy={step.submitting}
-          onClick={onSign}
-          className="mt-auto"
-        >
-          {step.submitting
-            ? "Uploading…"
-            : tripped
-              ? "Can't upload this"
-              : `Upload ${formatFileSize(base64ByteLength(step.dataBase64))}`}
-        </Button>
+        <ScreenFooter pinned={false}>
+          <Button
+            type="button"
+            variant={tripped ? "destructive" : "primary"}
+            disabled={tripped || step.submitting}
+            aria-busy={step.submitting}
+            onClick={onSign}
+          >
+            {step.submitting
+              ? "Uploading…"
+              : tripped
+                ? "Can't upload this"
+                : `Upload ${formatFileSize(base64ByteLength(step.dataBase64))}`}
+          </Button>
+        </ScreenFooter>
       </div>
       <span className="sr-only">{wallet.name}</span>
     </div>
@@ -523,7 +527,7 @@ function ReviewStep({
 
 function ReviewRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-body last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-body last:border-b-0 phone:border-b-0 phone:py-3">
       <span className="flex-shrink-0 text-muted">{label}</span>
       <span className="text-right font-semibold text-foreground">{value}</span>
     </div>
@@ -543,7 +547,7 @@ function SuccessStep({
   const explorerUrl = explorerUrlFor(step.txId);
 
   return (
-    <div className="flex min-h-full flex-col items-center gap-4 px-6 pb-6 pt-12 text-center">
+    <div className="flex min-h-full flex-col items-center gap-4 px-6 phone:px-5 pb-6 pt-12 text-center">
       <div className="mb-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-mist text-foreground">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -552,7 +556,7 @@ function SuccessStep({
       <h2 className="text-body text-foreground">Signed and uploaded.</h2>
       {step.fileName ? <p className="-mt-2 text-label text-muted">{step.fileName}</p> : null}
 
-      <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted">
+      <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted phone:border-b-0">
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
         <span>Pending confirmation</span>
       </div>
@@ -576,9 +580,11 @@ function SuccessStep({
         </a>
       </div>
 
-      <Button type="button" onClick={onDone} className="mt-auto">
-        Done
-      </Button>
+      <ScreenFooter>
+        <Button type="button" onClick={onDone}>
+          Done
+        </Button>
+      </ScreenFooter>
     </div>
   );
 }

@@ -34,7 +34,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             ref={ref}
             id={inputId}
             type={revealed ? "text" : "password"}
-            className="pr-10"
+            className="pr-10 phone:pr-12"
             {...props}
           />
           <button
@@ -42,7 +42,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             aria-label={revealed ? "Hide password" : "Show password"}
             aria-pressed={revealed}
             onClick={() => setRevealed((value) => !value)}
-            className="absolute right-2 top-0 flex h-11 w-7 flex-shrink-0 items-center justify-center text-faint hover:text-muted"
+            className="absolute right-2 top-0 flex h-11 w-7 flex-shrink-0 phone:right-0 phone:w-11 items-center justify-center text-faint hover:text-muted"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-xs hover:bg-mist">
               <EyeIcon />

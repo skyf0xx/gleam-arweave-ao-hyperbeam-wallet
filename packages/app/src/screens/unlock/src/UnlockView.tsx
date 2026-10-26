@@ -12,6 +12,7 @@ import { usePlatform } from "../../../app-platform/context";
 import { ForgotPassword } from "./ForgotPassword";
 import { PasskeyError } from "../../../passkey/webauthn";
 import { unlockWithPasskey } from "./passkey-unlock";
+import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 
 /**
  * Unlock view module (`screens/unlock/`) — same "folder, not a
@@ -152,6 +153,14 @@ export function UnlockView({
       setUnlocking(false);
     }
   };
+
+  useBackHandler(
+    step.kind === "forgot-password"
+      ? () => {
+          if (!resetting) setStep({ kind: "unlock" });
+        }
+      : null,
+  );
 
   if (step.kind === "forgot-password") {
     const handleReset = async () => {

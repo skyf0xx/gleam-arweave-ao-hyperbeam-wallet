@@ -14,6 +14,7 @@ import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -162,7 +163,7 @@ export function WalletDetailView({
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Wallet" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-7">
+      <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-7 phone:pt-4">
         <div className="group flex items-center gap-3.5">
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -177,7 +178,7 @@ export function WalletDetailView({
                 onClick={copyAddress}
                 aria-label={addressCopied ? "Address copied" : "Copy address"}
                 title={addressCopied ? "Copied" : "Copy address"}
-                className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+                className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
               >
                 {addressCopied ? <CheckIcon /> : <CopyIcon />}
               </button>
@@ -268,8 +269,8 @@ function RemoveConfirmStep({
 }) {
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Remove wallet" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-5 px-6 py-6">
+      <ScreenHeader title="Remove wallet" onBack={onBack} busy={removing} />
+      <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0">
         <p className="text-body leading-relaxed text-muted">
           This removes <span className="font-semibold text-foreground">{walletName}</span> from
           this browser.
@@ -296,9 +297,11 @@ function RemoveConfirmStep({
           </p>
         ) : null}
 
-        <Button type="button" variant="destructive" disabled={removing} onClick={onConfirm} className="mt-8">
-          {removing ? "Removing…" : "Yes, remove wallet"}
-        </Button>
+        <ScreenFooter className="mt-8" pinned={false}>
+          <Button type="button" variant="destructive" disabled={removing} onClick={onConfirm}>
+            {removing ? "Removing…" : "Yes, remove wallet"}
+          </Button>
+        </ScreenFooter>
       </div>
     </div>
   );
@@ -327,9 +330,9 @@ function ExportPasswordStep({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Back up keyfile" onBack={onBack} />
+      <ScreenHeader title="Back up keyfile" onBack={onBack} busy={submitting} />
       <form
-        className="flex flex-1 flex-col gap-5 px-6 py-6"
+        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
           event.preventDefault();
           if (!submitting && password.length > 0) onSubmit(password);
@@ -338,7 +341,7 @@ function ExportPasswordStep({
         <div className="flex flex-col gap-1.5">
           <h1 className="text-h3 font-semibold tracking-tight text-foreground">Enter your password</h1>
           <p className="text-body leading-relaxed text-muted">
-            Confirms it's you, then saves this wallet's keyfile to your downloads.
+            Confirms it's you, then saves this wallet's keyfile so you can keep a copy.
           </p>
         </div>
 
@@ -360,9 +363,11 @@ function ExportPasswordStep({
           errorMessage={serverError}
         />
 
-        <Button type="submit" disabled={submitting || password.length === 0} className="mt-8">
-          {submitting ? "Saving…" : "Download keyfile"}
-        </Button>
+        <ScreenFooter className="mt-8">
+          <Button type="submit" disabled={submitting || password.length === 0}>
+            {submitting ? "Saving…" : "Save keyfile"}
+          </Button>
+        </ScreenFooter>
       </form>
     </div>
   );

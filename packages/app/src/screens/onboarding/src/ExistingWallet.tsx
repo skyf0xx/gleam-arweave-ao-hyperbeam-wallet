@@ -42,7 +42,7 @@ export function ExistingWallet({ onBack, ...options }: ExistingWalletProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Use an existing wallet" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-6 px-6 py-6">
+      <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 py-6">
         <ExistingWalletOptions {...options} />
       </div>
     </div>

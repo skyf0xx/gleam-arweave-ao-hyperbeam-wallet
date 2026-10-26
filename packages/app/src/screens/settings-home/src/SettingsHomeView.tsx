@@ -133,7 +133,7 @@ export function SettingsHomeView({
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Settings" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-8 px-6 pb-6 pt-9">
+      <div className="flex flex-1 flex-col gap-8 phone:gap-6 px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <OptionSection title="Wallet">
           {onOpenLockSettings ? (
             <OptionRow
@@ -347,7 +347,7 @@ function SourceLink() {
       href={REPO_URL}
       target="_blank"
       rel="noreferrer"
-      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-mist"
+      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-mist phone:px-0"
     >
       <span aria-hidden="true" className="shrink-0 text-foreground">
         <GitHubIcon />

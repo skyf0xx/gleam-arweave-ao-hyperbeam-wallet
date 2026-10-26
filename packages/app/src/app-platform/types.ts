@@ -19,6 +19,8 @@ export interface AppCapabilities {
   qrScanner: boolean;
   /** Origins are granted at runtime, so a network URL needs a grant before it is used. */
   hostPermissions: boolean;
+  /** The wallet locks when the OS session does (the extension listens for the computer locking). */
+  lockOnSystemLock: boolean;
 }
 
 export interface HostPermissionsPort {
@@ -112,6 +114,17 @@ export interface StoreReviewPort {
   request(): Promise<void>;
 }
 
+/**
+ * The system back press (Android's back button or gesture). `handler`
+ * returns whether the app used the press; when it didn't, the shell does
+ * what the OS would do (the phone minimises). The press is never swallowed
+ * silently, so a shell without one omits the port.
+ */
+export interface BackButtonPort {
+  /** Returns the unsubscribe function. */
+  subscribe(handler: () => boolean): () => void;
+}
+
 export interface AppPlatform {
   /** The wire to the wallet's background. */
   runtime: RuntimePort;
@@ -132,4 +145,6 @@ export interface AppPlatform {
   downloads: DownloadsPort;
   hardwareWallets: HardwareWalletsPort;
   storeReview: StoreReviewPort;
+  /** Omitted where the host has no system back press. */
+  backButton?: BackButtonPort;
 }
