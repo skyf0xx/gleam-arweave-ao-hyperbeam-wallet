@@ -317,6 +317,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <OnboardingView
         runtime={runtime}
         mode="add-wallet"
+        vaultHasPassword={vaultHasPassword(wallets)}
         claim={platform.buildInfo.foundingGate ? "founding" : "open"}
         onCancel={() => setSubView({ kind: "wallet-switcher" })}
         onComplete={() => {

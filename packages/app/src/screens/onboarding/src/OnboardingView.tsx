@@ -48,6 +48,11 @@ export interface OnboardingViewProps {
    * vault password instead of setting one.
    */
   mode?: "first-run" | "add-wallet";
+  /**
+   * Add-wallet only: false when every wallet so far is a hardware wallet.
+   * The vault has no password yet, so the new keyfile wallet sets one.
+   */
+  vaultHasPassword?: boolean;
   /** Leaves the add-wallet flow from its first screen. */
   onCancel?: () => void;
   /**
@@ -107,12 +112,13 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultHasPassword = true, onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
   const { hardwareWallets, downloads } = usePlatform();
   const connectKeystone = onConnectKeystone ?? (() => void hardwareWallets.openConnectPage("keystone"));
   const connectLedger = onConnectLedger ?? (() => void hardwareWallets.openConnectPage("ledger"));
   const requestPermission = requestDownloadPermission ?? downloads.requestPermission;
   const addingWallet = mode === "add-wallet";
+  const askVaultPassword = addingWallet && vaultHasPassword;
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string>();
@@ -127,11 +133,11 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     else onComplete();
   };
 
-  // A first wallet also picks the security phrase, unless one survives
+  // The wallet that sets the password also picks the security phrase, unless one survives
   // from before a reset. If the phrase can't be read, onboarding still
   // finishes; it can be set later in Lock & unlock.
   const finish = (wallet: WalletSummary) => {
-    if (addingWallet) return proceed(wallet);
+    if (askVaultPassword) return proceed(wallet);
     runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined }).then(
       (phrase) => (phrase ? proceed(wallet) : setStep({ kind: "security-phrase", wallet })),
       () => proceed(wallet),
@@ -240,7 +246,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
       );
 
     case "create-password":
-      if (addingWallet) {
+      if (askVaultPassword) {
         return (
           <VaultPassword
             title="Create a wallet"
@@ -289,7 +295,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
       );
 
     case "import-password":
-      if (addingWallet) {
+      if (askVaultPassword) {
         return (
           <VaultPassword
             title="Import a wallet"

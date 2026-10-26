@@ -341,6 +341,39 @@ describe("OnboardingView: add-wallet mode", () => {
       payload: { jwk: VALID_JWK, name: expect.any(String), password: GOOD_PASSWORD },
     });
   });
+
+  it("sets a new password when every wallet so far is a hardware wallet", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-2", name: "Jade" }) // importWallet
+      .mockResolvedValueOnce({ word: "harbor" }); // getSecurityPhrase
+    const onComplete = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" vaultHasPassword={false} onComplete={onComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+    fireEvent.change(screen.getByPlaceholderText(/kty/), {
+      target: { value: JSON.stringify(VALID_JWK) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByText("Set a password")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenCalledWith({
+      type: "importWallet",
+      payload: { jwk: VALID_JWK, name: expect.any(String), password: GOOD_PASSWORD },
+    });
+    expect(send).toHaveBeenCalledWith({ type: "getSecurityPhrase", payload: undefined });
+  });
 });
 
 describe("OnboardingView: start screens", () => {
