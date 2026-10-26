@@ -19,6 +19,18 @@ export const SITE_MODE_REQUEST = "GLEAM_SITE_MODE_REQUEST";
 export const OTHER_WALLET = "GLEAM_OTHER_WALLET";
 
 /**
+ * The mobile dApp view's page → native channel: the provider sends each
+ * envelope as JSON text through `webkit.messageHandlers[name].postMessage`
+ * on iOS and `window[name].postMessage` on Android.
+ */
+export const NATIVE_BRIDGE_HANDLER = "gleamDappView";
+/**
+ * The window `CustomEvent` type the mobile dApp view delivers the wallet's
+ * envelopes with, as JSON text in `detail`.
+ */
+export const NATIVE_BRIDGE_EVENT = "gleamdappview";
+
+/**
  * The ArConnect-compatible method surface injected as
  * `window.arweaveWallet`: core's `PROVIDER_METHODS` plus
  * `REFUSED_PROVIDER_METHODS`, which stay defined so a dApp gets a clear

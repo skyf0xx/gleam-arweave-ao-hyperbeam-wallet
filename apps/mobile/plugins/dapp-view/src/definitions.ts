@@ -1,20 +1,18 @@
 import type { PluginListenerHandle } from "@capacitor/core";
 
 /**
- * The one channel a page in the dApp view has to native. The injected
- * script sends text with
- * `window.webkit.messageHandlers.gleamDappView.postMessage(text)` on iOS
- * and `window.gleamDappView.postMessage(text)` on Android. Every frame can
- * reach it; each message carries the frame's origin as the platform
- * reports it, and the transport decides what to accept.
+ * The one channel a page in the dApp view has to native
+ * (`DAPP_VIEW_HANDLER`), and the event native answers on the main frame's
+ * `window` (`DAPP_VIEW_EVENT`, the text as its `detail`). Every frame can
+ * reach the channel; each message carries the frame's origin as the
+ * platform reports it, and the transport decides what to accept. The
+ * names live with the page protocol so the injected provider uses the
+ * same ones.
  */
-export const DAPP_VIEW_HANDLER = "gleamDappView";
-
-/**
- * `postMessage` dispatches a `CustomEvent` with this type on the main
- * frame's `window`, with the text as its `detail`.
- */
-export const DAPP_VIEW_EVENT = "gleamdappview";
+export {
+  NATIVE_BRIDGE_EVENT as DAPP_VIEW_EVENT,
+  NATIVE_BRIDGE_HANDLER as DAPP_VIEW_HANDLER,
+} from "@gleam/messaging/src/page-protocol.ts";
 
 /**
  * A rectangle in the wallet WebView's CSS pixels, as

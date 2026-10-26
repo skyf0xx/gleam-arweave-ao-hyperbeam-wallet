@@ -1,11 +1,14 @@
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
+import { DappView } from "@gleam/dapp-view";
+import providerScript from "virtual:gleam-provider-script";
 import { version } from "../package.json";
 import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
 import { createQrScanner } from "./adapters/qr-scanner";
 import { createStoreReview } from "./adapters/store-review";
+import { createDappBridge, serveDappTabs } from "./adapters/dapp-bridge";
 import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from "./adapters/file-saver";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
@@ -31,6 +34,10 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
   if (!preview) void sweepCapacitorExports();
   serveFileSaver(worker, preview?.fileSaver ?? createCapacitorFileSaver());
   const runtime = createWorkerRuntimePort(worker);
+  const dapps = createDappBridge({ plugin: DappView, runtime, providerScript });
+  serveDappTabs(worker, dapps.tabs);
+  // The browser preview has no native dApp view to listen to.
+  dapps.listening.catch(() => undefined);
   // The worker's intervals stop while the app is in the background; this
   // runs the ones that came due, auto-lock among them.
   void App.addListener("resume", () => {

@@ -1,11 +1,21 @@
-import * as Comlink from "comlink";
+import type * as Comlink from "comlink";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import type { Runtime } from "@gleam/runtime";
 import { BACKGROUND_MESSAGES, type BackgroundMessage } from "@gleam/runtime/src/dispatch/methods.ts";
+import { exposeMethods } from "../adapters/comlink-guard";
+import { isExactWebOrigin } from "../adapters/dapp-tabs";
 
 /** What the worker exposes to the wallet WebView over `comlink`. */
 export interface RuntimeHost {
   dispatch(type: string, data: unknown): Promise<unknown>;
+  /**
+   * A message from the top frame of the page in the dApp view, on `origin`
+   * as native attested it. `tabId` names that page's load (see
+   * `createDappBridge`).
+   */
+  pageCall(type: string, data: unknown, origin: string, tabId: number | undefined): Promise<unknown>;
+  /** The dApp view's page with this tab id is gone. */
+  tabClosed(tabId: number): Promise<void>;
   /** The app came back from the background. */
   resume(): Promise<void>;
 }
@@ -23,54 +33,42 @@ export interface WorkerLifecycle {
  */
 const WALLET_UI: CallerContext = { tier: "extension" };
 
-export function createRuntimeHost(runtime: Pick<Runtime, "dispatch">, lifecycle: WorkerLifecycle): RuntimeHost {
+function messageType(type: unknown): BackgroundMessage {
+  // `type` crossed a structured clone untyped; `hasOwn` also refuses
+  // inherited names such as `constructor`.
+  if (typeof type !== "string" || !Object.hasOwn(BACKGROUND_MESSAGES, type)) {
+    throw new Error(`Gleam has no "${String(type)}" message.`);
+  }
+  return type as BackgroundMessage;
+}
+
+export function createRuntimeHost(runtime: Pick<Runtime, "dispatch" | "onTabClosed">, lifecycle: WorkerLifecycle): RuntimeHost {
   return {
     async resume() {
       lifecycle.onResume();
     },
     async dispatch(type, data) {
-      // `type` crossed a structured clone untyped; `hasOwn` also refuses
-      // inherited names such as `constructor`.
-      if (typeof type !== "string" || !Object.hasOwn(BACKGROUND_MESSAGES, type)) {
-        throw new Error(`Gleam has no "${String(type)}" message.`);
-      }
-      return runtime.dispatch(type as BackgroundMessage, data, WALLET_UI);
+      return runtime.dispatch(messageType(type), data, WALLET_UI);
+    },
+    // The dApp view's page gets the tier the extension gives a web page's
+    // content script, so the dispatcher holds it to the same methods,
+    // grants and secure-origin check.
+    async pageCall(type, data, origin, tabId) {
+      if (!isExactWebOrigin(origin)) throw new Error("A page call needs the page's http(s) origin.");
+      const caller: CallerContext = { tier: "contentScript", origin, tabId: typeof tabId === "number" ? tabId : undefined };
+      return runtime.dispatch(messageType(type), data, caller);
+    },
+    async tabClosed(tabId) {
+      if (typeof tabId === "number") runtime.onTabClosed(tabId);
     },
   };
 }
 
-/**
- * Comlink's `expose` follows any property path and can get, set, call or
- * construct whatever it reaches, so `["dispatch", "constructor"]` would hand
- * the UI `Function` and code execution in the worker that holds the keys.
- * Only a call to one of the host's own methods, with plain cloned
- * arguments, gets through. A comlink proxy or transfer handler as an
- * argument doesn't.
- */
-const HOST_METHODS: ReadonlySet<unknown> = new Set<keyof RuntimeHost>(["dispatch", "resume"]);
-
-function isHostCall(data: unknown): boolean {
-  if (typeof data !== "object" || data === null) return false;
-  const { type, path, argumentList } = data as Record<string, unknown>;
-  return (
-    type === "APPLY" &&
-    Array.isArray(path) &&
-    path.length === 1 &&
-    HOST_METHODS.has(path[0]) &&
-    Array.isArray(argumentList) &&
-    argumentList.every((arg) => typeof arg === "object" && arg !== null && (arg as { type?: unknown }).type === "RAW")
-  );
-}
-
 /** Serves `runtime` on `endpoint`, the worker's global scope outside tests. */
 export function exposeRuntimeHost(
-  runtime: Pick<Runtime, "dispatch">,
+  runtime: Pick<Runtime, "dispatch" | "onTabClosed">,
   lifecycle: WorkerLifecycle,
   endpoint: Comlink.Endpoint,
 ): void {
-  // Registered before comlink's own listener, so it runs first and can stop it.
-  endpoint.addEventListener("message", (event) => {
-    if (!isHostCall((event as MessageEvent).data)) event.stopImmediatePropagation();
-  });
-  Comlink.expose(createRuntimeHost(runtime, lifecycle), endpoint);
+  exposeMethods(createRuntimeHost(runtime, lifecycle), ["dispatch", "pageCall", "tabClosed", "resume"], endpoint);
 }

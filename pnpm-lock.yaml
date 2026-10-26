@@ -190,6 +190,9 @@ importers:
       '@gleam/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@gleam/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       '@gleam/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -233,6 +236,9 @@ importers:
       '@capacitor/core':
         specifier: 8.5.3
         version: 8.5.3
+      '@gleam/messaging':
+        specifier: workspace:*
+        version: link:../../../../packages/messaging
 
   apps/points-api:
     dependencies:

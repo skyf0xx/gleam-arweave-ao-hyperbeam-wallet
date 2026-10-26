@@ -64,6 +64,10 @@
 3 apps/extension/src/sender.ts
 3 apps/mobile/src/worker/
 3 apps/mobile/plugins/dapp-view/
+3 apps/mobile/src/adapters/dapp-bridge.ts
+3 apps/mobile/src/adapters/dapp-tabs.ts
+3 apps/mobile/src/adapters/comlink-guard.ts
+3 apps/mobile/src/provider/
 3 packages/core/src/policy/signing-origin.ts
 3 packages/runtime/src/dispatch/methods.ts
 3 packages/messaging/
@@ -78,6 +82,7 @@
 5 packages/runtime/src/handlers/attest-errors.ts
 5 apps/extension/wxt.config.ts
 5 apps/mobile/capacitor.config.ts
+5 apps/mobile/vite.config.ts
 5 apps/mobile/index.html
 5 apps/mobile/ios/App/App/Info.plist
 5 apps/mobile/android/app/src/main/AndroidManifest.xml

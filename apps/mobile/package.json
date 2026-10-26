@@ -26,6 +26,7 @@
     "@gleam/core": "workspace:*",
     "@gleam/dapp-view": "workspace:*",
     "@gleam/messaging": "workspace:*",
+    "@gleam/provider": "workspace:*",
     "@gleam/runtime": "workspace:*",
     "comlink": "4.4.2",
     "react": "19.3.0",

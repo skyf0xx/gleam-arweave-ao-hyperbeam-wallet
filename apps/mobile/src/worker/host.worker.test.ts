@@ -103,4 +103,34 @@ describe("worker runtime host", () => {
     await expect(port.send({ type: "getState", payload: undefined })).resolves.toBeDefined();
     expect([...sender.answered]).toEqual([]);
   });
+
+  it("answers a page call as a web page's content script on the origin it was given", async () => {
+    const { port } = connect();
+    await expect(port.pageCall("getSiteWalletMode", undefined, "https://dapp.example", 1)).resolves.toEqual({
+      useGleam: false,
+    });
+    await expect(
+      port.pageCall("providerCall", { method: "getActiveAddress" }, "https://dapp.example", undefined),
+    ).rejects.toThrow('"https://dapp.example" is not connected');
+  });
+
+  it("refuses the wallet's own messages from a page", async () => {
+    const { port } = connect();
+    await expect(port.pageCall("getState", undefined, "https://dapp.example", 1)).rejects.toThrow(
+      /can only be called from the Gleam extension/,
+    );
+  });
+
+  it.each(["noSuchMessage", "constructor"])("refuses a page call to %s, which isn't a message", async (type) => {
+    const { port } = connect();
+    await expect(port.pageCall(type, undefined, "https://dapp.example", 1)).rejects.toThrow(/has no/);
+  });
+
+  it.each(["null", "file://", "https://dapp.example/", "https://dapp.example/path", "about:blank"])(
+    "refuses a page call on %j, which isn't an exact http(s) origin",
+    async (origin) => {
+      const { port } = connect();
+      await expect(port.pageCall("getSiteWalletMode", undefined, origin, 1)).rejects.toThrow(/http\(s\) origin/);
+    },
+  );
 });

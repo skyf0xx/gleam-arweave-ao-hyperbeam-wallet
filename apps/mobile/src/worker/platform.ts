@@ -1,6 +1,7 @@
 import type { ApprovalPresenterPort } from "@gleam/core";
 import { deviceKeyPort } from "@gleam/core/src/points/device-key-store.ts";
-import type { Platform, TabsPort } from "@gleam/runtime";
+import type { Platform } from "@gleam/runtime";
+import { createWorkerTabs } from "../adapters/dapp-tabs";
 import { createWorkerDownloads } from "../adapters/downloads";
 import { createWorkerSessionKeys } from "../adapters/session-key-store";
 import { connectSqliteStore, MobileStoragePort } from "../adapters/storage";
@@ -18,18 +19,11 @@ const noApprovals: ApprovalPresenterPort = {
   onDismissed: () => () => {},
 };
 
-// The app has no browser tabs: dApps open in its own dApp view.
-const noTabs: TabsPort = {
-  webTabs: async () => [],
-  activeTab: async () => undefined,
-  reload: async () => {},
-  send: async () => {
-    throw new Error("The app has no browser tabs.");
-  },
-};
-
 /** The worker's `Platform`, with `scope` the worker's global scope. */
-export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore>[0] & Parameters<typeof createWorkerDownloads>[0], timer: WorkerTimer): Platform {
+export function createWorkerPlatform(
+  scope: Parameters<typeof connectSqliteStore>[0] & Parameters<typeof createWorkerDownloads>[0] & Parameters<typeof createWorkerTabs>[0],
+  timer: WorkerTimer,
+): Platform {
   return {
     storage: new MobileStoragePort(connectSqliteStore(scope)),
     sessionKeys: createWorkerSessionKeys(),
@@ -40,7 +34,7 @@ export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore
     badge: { setDot: async () => {} },
     lockIndicator: { setLocked: async () => {} },
     downloads: createWorkerDownloads(scope),
-    tabs: noTabs,
+    tabs: createWorkerTabs(scope),
     version: () => version,
     dev: import.meta.env.DEV,
   };
