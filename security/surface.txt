@@ -31,6 +31,9 @@
 1 apps/mobile/src/adapters/sqlite-channel.ts
 1 apps/mobile/src/adapters/session-key-store.ts
 1 apps/mobile/src/adapters/biometric-unlock.ts
+1 apps/mobile/src/adapters/download-channel.ts
+1 apps/mobile/src/adapters/downloads.ts
+1 apps/mobile/src/adapters/file-saver.ts
 1 packages/app/src/passkey/
 1 packages/app/src/biometrics/
 1 packages/app/src/screens/lock-settings/src/BiometricSection.tsx

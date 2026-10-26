@@ -8,5 +8,11 @@ project(':capacitor-community-sqlite').projectDir = new File('../../../node_modu
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../../../node_modules/.pnpm/@capacitor+app@8.1.2_@capacitor+core@8.5.3/node_modules/@capacitor/app/android')
 
+include ':capacitor-filesystem'
+project(':capacitor-filesystem').projectDir = new File('../../../node_modules/.pnpm/@capacitor+filesystem@8.1.5_@capacitor+core@8.5.3/node_modules/@capacitor/filesystem/android')
+
+include ':capacitor-share'
+project(':capacitor-share').projectDir = new File('../../../node_modules/.pnpm/@capacitor+share@8.0.3_@capacitor+core@8.5.3/node_modules/@capacitor/share/android')
+
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.9.1_@capacitor+core@8.5.3/node_modules/@capgo/capacitor-native-biometric/android')

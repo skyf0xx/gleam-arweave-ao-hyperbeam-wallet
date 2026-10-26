@@ -2,6 +2,7 @@ import { App } from "@capacitor/app";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
+import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from "./adapters/file-saver";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
 
@@ -15,6 +16,8 @@ export function createMobileAppPlatform(): AppPlatform {
   const ephemeral = new Map<string, unknown>();
   const worker = new Worker(new URL("./worker/index.ts", import.meta.url), { type: "module" });
   serveSqliteStore(worker, createSqliteStore(openCapacitorDb));
+  void sweepCapacitorExports();
+  serveFileSaver(worker, createCapacitorFileSaver());
   const runtime = createWorkerRuntimePort(worker);
   // The worker's intervals stop while the app is in the background; this
   // runs the ones that came due, auto-lock among them.
