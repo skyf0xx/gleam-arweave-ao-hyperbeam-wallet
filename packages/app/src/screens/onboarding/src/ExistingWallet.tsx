@@ -1,5 +1,7 @@
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
+import { usePlatform } from "../../../app-platform/context";
+import { hasHardwareWallet } from "../../../app-platform/hardware";
 
 /**
  * The ways to bring in a wallet the user already has, grouped by what
@@ -13,15 +15,21 @@ export interface ExistingWalletOptionsProps {
 }
 
 export function ExistingWalletOptions({ onImport, onConnectKeystone, onConnectLedger }: ExistingWalletOptionsProps) {
+  const { capabilities } = usePlatform();
+  const { ledger, keystone } = capabilities.hardwareWallets;
   return (
     <>
       <OptionSection title="From a file">
         <OptionRow title="Import a keyfile" description="A .json keyfile from another Arweave wallet" onClick={onImport} />
       </OptionSection>
-      <OptionSection title="Hardware wallet">
-        <OptionRow title="Ledger" description="Connect over USB" onClick={onConnectLedger} />
-        <OptionRow title="Keystone" description="Scan its QR code with your camera" onClick={onConnectKeystone} />
-      </OptionSection>
+      {hasHardwareWallet(capabilities) ? (
+        <OptionSection title="Hardware wallet">
+          {ledger ? <OptionRow title="Ledger" description="Connect over USB" onClick={onConnectLedger} /> : null}
+          {keystone ? (
+            <OptionRow title="Keystone" description="Scan its QR code with your camera" onClick={onConnectKeystone} />
+          ) : null}
+        </OptionSection>
+      ) : null}
     </>
   );
 }

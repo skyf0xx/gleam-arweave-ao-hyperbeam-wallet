@@ -45,7 +45,7 @@ export function createExtensionAppPlatform(
       sidePanel: true,
       passkey: true,
       biometrics: false,
-      hardwareWallets: true,
+      hardwareWallets: { ledger: true, keystone: true },
       dappBrowser: false,
       qrScanner: false,
       hostPermissions: true,

@@ -6,11 +6,14 @@ import type { DeviceSignPanels } from "../approval/device-panels";
  * `capabilities`, never on which shell mounted them, and reach the host
  * only through these ports.
  */
+export type HardwareWalletCapabilities = Record<HardwareWalletMethod, boolean>;
+
 export interface AppCapabilities {
   sidePanel: boolean;
   passkey: boolean;
   biometrics: boolean;
-  hardwareWallets: boolean;
+  /** Which hardware wallets the shell can reach. Use `hasHardwareWallet` for "any". */
+  hardwareWallets: HardwareWalletCapabilities;
   dappBrowser: boolean;
   /** The camera can read a QR code into a field. */
   qrScanner: boolean;

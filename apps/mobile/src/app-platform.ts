@@ -33,7 +33,7 @@ export function createMobileAppPlatform(): AppPlatform {
       sidePanel: false,
       passkey: false,
       biometrics: true,
-      hardwareWallets: false,
+      hardwareWallets: { ledger: false, keystone: false },
       dappBrowser: false,
       qrScanner: true,
       hostPermissions: false,

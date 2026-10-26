@@ -6,7 +6,9 @@ import type { AppPlatform } from "./types";
 
 export type FakeAppPlatformOverrides = Partial<Omit<AppPlatform, "buildInfo" | "capabilities">> & {
   buildInfo?: Partial<AppPlatform["buildInfo"]>;
-  capabilities?: Partial<AppPlatform["capabilities"]>;
+  capabilities?: Partial<Omit<AppPlatform["capabilities"], "hardwareWallets">> & {
+    hardwareWallets?: Partial<AppPlatform["capabilities"]["hardwareWallets"]>;
+  };
 };
 
 /** Tests that reach the background pass a `runtime` prop or override this. */
@@ -26,11 +28,11 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
       sidePanel: true,
       passkey: true,
       biometrics: false,
-      hardwareWallets: true,
       dappBrowser: false,
       qrScanner: false,
       hostPermissions: true,
       ...overrides.capabilities,
+      hardwareWallets: { ledger: true, keystone: true, ...overrides.capabilities?.hardwareWallets },
     },
     hostPermissions: overrides.hostPermissions ?? {
       contains: async () => true,
