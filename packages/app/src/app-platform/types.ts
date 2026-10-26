@@ -12,6 +12,8 @@ export interface AppCapabilities {
   biometrics: boolean;
   hardwareWallets: boolean;
   dappBrowser: boolean;
+  /** The camera can read a QR code into a field. */
+  qrScanner: boolean;
   /** Origins are granted at runtime, so a network URL needs a grant before it is used. */
   hostPermissions: boolean;
 }
@@ -64,6 +66,16 @@ export interface BiometricUnlockPort {
   remove(): Promise<void>;
 }
 
+/**
+ * Opens the device's scanner and resolves the text of the first QR code it
+ * reads, or `null` when the user backs out. Failures reject with a
+ * `QrScanError`. The text is untrusted input: callers validate it as if the
+ * user had typed it.
+ */
+export interface QrScannerPort {
+  scan(): Promise<string | null>;
+}
+
 export interface ActiveSitePort {
   /** Calls `onChange` whenever the site in view, or what is known about it, may have changed. */
   subscribe(onChange: () => void): () => void;
@@ -98,6 +110,8 @@ export interface AppPlatform {
   unlock: UnlockPort;
   /** Reached only when `capabilities.biometrics` is on. */
   biometrics: BiometricUnlockPort;
+  /** Reached only when `capabilities.qrScanner` is on. */
+  qrScanner: QrScannerPort;
   activeSite: ActiveSitePort;
   downloads: DownloadsPort;
   hardwareWallets: HardwareWalletsPort;

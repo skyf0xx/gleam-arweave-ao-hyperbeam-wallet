@@ -28,6 +28,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
       biometrics: false,
       hardwareWallets: true,
       dappBrowser: false,
+      qrScanner: false,
       hostPermissions: true,
       ...overrides.capabilities,
     },
@@ -53,6 +54,11 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
         throw new Error("fakeAppPlatform has no stored password");
       },
       remove: async () => {},
+    },
+    qrScanner: overrides.qrScanner ?? {
+      scan: async () => {
+        throw new Error("fakeAppPlatform has no scanner");
+      },
     },
     activeSite: overrides.activeSite ?? { subscribe: () => () => {} },
     downloads: overrides.downloads ?? { requestPermission: async () => true },

@@ -47,6 +47,7 @@ export function createExtensionAppPlatform(
       biometrics: false,
       hardwareWallets: true,
       dappBrowser: false,
+      qrScanner: false,
       hostPermissions: true,
     },
     hostPermissions: {
@@ -68,6 +69,11 @@ export function createExtensionAppPlatform(
       enrol: biometricsUnavailable,
       readPassword: biometricsUnavailable,
       remove: async () => {},
+    },
+    qrScanner: {
+      scan: async () => {
+        throw new Error("QR scanning isn't available in the extension.");
+      },
     },
     downloads: {
       requestPermission: () => browser.permissions.request({ permissions: ["downloads"] }).catch(() => false),

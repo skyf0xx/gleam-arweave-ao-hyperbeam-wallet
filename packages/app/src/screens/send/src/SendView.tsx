@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -6,6 +6,8 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "../../../address-identity";
+import { usePlatform } from "../../../app-platform/context";
+import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { useDisplaySettings } from "../../../display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
@@ -785,7 +787,17 @@ export function RecipientField({
   onConfirmSaveAddress: () => void;
   savingAddress: boolean;
 }) {
+  const { capabilities, qrScanner } = usePlatform();
   const [editing, setEditing] = useState<"no" | "focused" | "refocus">("no");
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | undefined>();
+  // A scan fills the field without focusing it, so no blur will validate it.
+  const [validateScan, setValidateScan] = useState(false);
+  useEffect(() => {
+    if (!validateScan) return;
+    setValidateScan(false);
+    onBlurRecipient();
+  }, [validateScan, onBlurRecipient]);
   const address = recipientSchema.safeParse(recipient).data;
   const identity = useAddressIdentity();
   const avatarSvg = address ? identity.avatarSvg(address) : undefined;
@@ -805,9 +817,42 @@ export function RecipientField({
         .slice(0, SUGGESTION_LIMIT)
     : [];
 
+  async function scan() {
+    setScanning(true);
+    setScanError(undefined);
+    try {
+      const payload = await qrScanner.scan();
+      if (payload === null) return;
+      onChangeRecipient(addressFromQr(payload));
+      setValidateScan(true);
+    } catch (error) {
+      setScanError(
+        error instanceof QrScanError && error.reason === "permission-denied"
+          ? "Camera access is off for Gleam. Turn it on in Settings to scan."
+          : "Couldn't scan. Try again or paste the address.",
+      );
+    } finally {
+      setScanning(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-label font-semibold text-muted">To</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-label font-semibold text-muted">To</span>
+        {capabilities.qrScanner ? (
+          <button
+            type="button"
+            aria-label="Scan QR code"
+            disabled={scanning}
+            onClick={() => void scan()}
+            // 44px target without growing the label row.
+            className="-my-3 -mr-3 flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:opacity-50"
+          >
+            <QrScanIcon />
+          </button>
+        ) : null}
+      </div>
       {showCard ? (
         <RecipientCard
           address={address}
@@ -877,6 +922,11 @@ export function RecipientField({
           {recipientError}
         </div>
       ) : null}
+      {scanError ? (
+        <div role="alert" className="text-label leading-snug text-warning">
+          {scanError}
+        </div>
+      ) : null}
       {lookalikeOf ? (
         <RecipientWarning
           firstTime={false}
@@ -897,6 +947,16 @@ export function RecipientField({
         />
       ) : null}
     </div>
+  );
+}
+
+function QrScanIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <rect x="8" y="8" width="3" height="3" />
+      <rect x="13" y="13" width="3" height="3" />
+    </svg>
   );
 }
 

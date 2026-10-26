@@ -2,6 +2,7 @@ import { App } from "@capacitor/app";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
+import { createQrScanner } from "./adapters/qr-scanner";
 import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from "./adapters/file-saver";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
@@ -34,6 +35,7 @@ export function createMobileAppPlatform(): AppPlatform {
       biometrics: true,
       hardwareWallets: false,
       dappBrowser: false,
+      qrScanner: true,
       hostPermissions: false,
     },
     hostPermissions: { contains: async () => true, request: async () => true },
@@ -53,6 +55,7 @@ export function createMobileAppPlatform(): AppPlatform {
       },
     },
     biometrics: createBiometricUnlock(),
+    qrScanner: createQrScanner(),
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

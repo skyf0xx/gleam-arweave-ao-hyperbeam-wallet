@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Collectible, FeeEstimate, RuntimePort, WalletSummary } from "@gleam/core";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
+import { PlatformProvider } from "../../../app-platform/context";
+import { fakeAppPlatform } from "../../../app-platform/testing";
 import { SendCollectibleView } from "./SendCollectibleView";
 
 afterEach(cleanup);
@@ -54,9 +56,11 @@ function setup(
   queryClient.setQueryData(walletQueryKeys.collectibles(wallet.address), [COLLECTIBLE]);
   const onDone = vi.fn();
   render(
-    <QueryClientProvider client={queryClient}>
-      <SendCollectibleView runtime={runtime} wallet={wallet} collectible={COLLECTIBLE} onBack={vi.fn()} onDone={onDone} />
-    </QueryClientProvider>,
+    <PlatformProvider platform={fakeAppPlatform()}>
+      <QueryClientProvider client={queryClient}>
+        <SendCollectibleView runtime={runtime} wallet={wallet} collectible={COLLECTIBLE} onBack={vi.fn()} onDone={onDone} />
+      </QueryClientProvider>
+    </PlatformProvider>,
   );
   return { send, queryClient, onDone };
 }
