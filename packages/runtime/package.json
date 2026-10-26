@@ -11,7 +11,7 @@
   "dependencies": {
     "@gleam/core": "workspace:*",
     "@gleam/messaging": "workspace:*",
-    "zod": "^4.6.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "hash-wasm": "4.12.0",
