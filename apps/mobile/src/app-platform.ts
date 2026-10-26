@@ -1,4 +1,5 @@
 import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
@@ -12,14 +13,22 @@ import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters
  * The phone's `AppPlatform`. Capabilities the app gains later (the dApp
  * browser) stay off until their adapters land.
  */
-export function createMobileAppPlatform(): AppPlatform {
+export async function createMobileAppPlatform(): Promise<AppPlatform> {
+  // `import.meta.env.DEV` has to stay a bare literal in this condition so the
+  // bundler folds it to `false` and drops the preview chunk from production
+  // builds; an on-device build then can't reach in-memory storage. The native
+  // check keeps `vite dev` inside a Capacitor shell on the real adapters.
+  const preview =
+    import.meta.env.DEV && !Capacitor.isNativePlatform()
+      ? (await import("./preview")).createPreviewPorts()
+      : undefined;
   // The app has one long-lived surface, so state that must outlive a
   // closed popup in the extension only needs to outlive a re-render here.
   const ephemeral = new Map<string, unknown>();
   const worker = new Worker(new URL("./worker/index.ts", import.meta.url), { type: "module" });
-  serveSqliteStore(worker, createSqliteStore(openCapacitorDb));
-  void sweepCapacitorExports();
-  serveFileSaver(worker, createCapacitorFileSaver());
+  serveSqliteStore(worker, preview?.store ?? createSqliteStore(openCapacitorDb));
+  if (!preview) void sweepCapacitorExports();
+  serveFileSaver(worker, preview?.fileSaver ?? createCapacitorFileSaver());
   const runtime = createWorkerRuntimePort(worker);
   // The worker's intervals stop while the app is in the background; this
   // runs the ones that came due, auto-lock among them.
@@ -33,10 +42,10 @@ export function createMobileAppPlatform(): AppPlatform {
     capabilities: {
       sidePanel: false,
       passkey: false,
-      biometrics: true,
+      biometrics: preview?.capabilities.biometrics ?? true,
       hardwareWallets: { ledger: false, keystone: false },
       dappBrowser: false,
-      qrScanner: true,
+      qrScanner: preview?.capabilities.qrScanner ?? true,
       hostPermissions: false,
     },
     hostPermissions: { contains: async () => true, request: async () => true },
@@ -55,9 +64,9 @@ export function createMobileAppPlatform(): AppPlatform {
         throw new Error("Passkeys aren't available in the app.");
       },
     },
-    biometrics: createBiometricUnlock(),
-    qrScanner: createQrScanner(),
-    storeReview: createStoreReview(),
+    biometrics: preview?.biometrics ?? createBiometricUnlock(),
+    qrScanner: preview?.qrScanner ?? createQrScanner(),
+    storeReview: preview?.storeReview ?? createStoreReview(),
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

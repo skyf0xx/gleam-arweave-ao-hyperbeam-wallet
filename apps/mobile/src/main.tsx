@@ -5,7 +5,7 @@ import { PlatformProvider } from "@gleam/app/src/app-platform/context.tsx";
 import { createMobileAppPlatform } from "./app-platform";
 import "@gleam/app/src/app.css";
 
-const platform = createMobileAppPlatform();
+const platform = await createMobileAppPlatform();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

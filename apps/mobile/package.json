@@ -5,6 +5,7 @@
   "version": "1.30.0",
   "type": "module",
   "scripts": {
+    "dev": "vite",
     "build": "vite build",
     "ios": "vite build && cap sync ios && cap open ios",
     "android": "vite build && cap sync android && cap open android"
