@@ -65,7 +65,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     },
     activeSite: overrides.activeSite ?? { subscribe: () => () => {} },
     downloads: overrides.downloads ?? { requestPermission: async () => true },
-    hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },
+    hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, connectViews: {}, signPanels: null },
     storeReview: overrides.storeReview ?? { opensPage: true, request: async () => {} },
     ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
     ...(overrides.approvalSheet ? { approvalSheet: overrides.approvalSheet } : {}),

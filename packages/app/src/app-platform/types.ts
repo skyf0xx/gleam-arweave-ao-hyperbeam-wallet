@@ -1,4 +1,5 @@
-import type { HardwareWalletMethod, RuntimePort } from "@gleam/core";
+import type { ReactElement } from "react";
+import type { HardwareWalletMethod, RuntimePort, WalletSummary } from "@gleam/core";
 import type { DeviceSignPanels } from "../approval/device-panels";
 
 /**
@@ -91,9 +92,23 @@ export interface DownloadsPort {
   requestPermission(): Promise<boolean>;
 }
 
+export interface HardwareConnectViewProps {
+  runtime: RuntimePort;
+  /** The device's account was added as a wallet. */
+  onConnected(wallet: WalletSummary): void;
+}
+
+/** Pairs a device and adds its account, drawn inside one of the app's own screens. */
+export type HardwareConnectView = (props: HardwareConnectViewProps) => ReactElement;
+
 export interface HardwareWalletsPort {
   /** Opens the page where the user connects a device, in a surface that can reach it. */
   openConnectPage(device: HardwareWalletMethod): Promise<void>;
+  /**
+   * Devices the app's own surface can reach, connected from a screen in the
+   * app instead of through `openConnectPage`.
+   */
+  connectViews: Partial<Record<HardwareWalletMethod, HardwareConnectView>>;
   /**
    * The panels that talk to a device while a request awaits it, or `null`
    * where the surface can't reach the camera or WebHID.

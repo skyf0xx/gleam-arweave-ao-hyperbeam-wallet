@@ -4,9 +4,11 @@ import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { DappView } from "@gleam/dapp-view";
 import providerScript from "virtual:gleam-provider-script";
 import { version } from "../package.json";
+import { onAppAway } from "./adapters/app-away";
 import { createApprovalSheet, serveApprovalSheet } from "./adapters/approval-sheet";
 import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
+import { KeystoneConnect, KeystonePanel } from "./adapters/keystone";
 import { createQrScanner } from "./adapters/qr-scanner";
 import { createStoreReview } from "./adapters/store-review";
 import { createDappBridge, serveDappTabs } from "./adapters/dapp-bridge";
@@ -46,7 +48,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
   });
   // A request left up while the app is away would still be there on return,
   // so it's rejected instead.
-  void App.addListener("pause", () => approvalSheet.dismissAll());
+  onAppAway(() => approvalSheet.dismissAll());
   // The worker's intervals stop while the app is in the background; this
   // runs the ones that came due, auto-lock among them.
   void App.addListener("resume", () => {
@@ -60,7 +62,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
       sidePanel: false,
       passkey: false,
       biometrics: preview?.capabilities.biometrics ?? true,
-      hardwareWallets: { ledger: false, keystone: false },
+      hardwareWallets: { ledger: false, keystone: true },
       dappBrowser: false,
       qrScanner: preview?.capabilities.qrScanner ?? true,
       hostPermissions: false,
@@ -91,9 +93,10 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
     downloads: { requestPermission: async () => true },
     hardwareWallets: {
       openConnectPage: async () => {
-        throw new Error("Hardware wallets aren't available in the app.");
+        throw new Error("Ledger isn't available in the app.");
       },
-      signPanels: null,
+      connectViews: { keystone: KeystoneConnect },
+      signPanels: { keystone: KeystonePanel },
     },
   };
 }

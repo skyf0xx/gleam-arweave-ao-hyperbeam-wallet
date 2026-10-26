@@ -11,3 +11,5 @@ export {
   KeystoneSignatureError,
   type KeystoneSignRequest,
 } from "./sign-request";
+export { createKeystonePanel, type KeystonePanelOptions } from "./KeystonePanel";
+export { KeystoneConnectView, type KeystoneConnectViewProps } from "./KeystoneConnectView";

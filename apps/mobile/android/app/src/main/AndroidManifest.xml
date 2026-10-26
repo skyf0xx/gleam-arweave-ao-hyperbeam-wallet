@@ -41,4 +41,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Not left to the barcode plugin's merge: the Keystone scanner reaches the camera from the WebView. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

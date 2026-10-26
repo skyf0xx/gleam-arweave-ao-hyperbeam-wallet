@@ -23,6 +23,7 @@ import { OnboardingView } from "../screens/onboarding/index.tsx";
 import { UnlockView } from "../screens/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
 import { AwaitingDeviceView } from "./AwaitingDeviceView";
+import { DEVICE_NAMES } from "./device-panels";
 import { usePlatform } from "../app-platform/context";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
@@ -283,7 +284,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
         }
       />
     ) : (
-      <CenteredMessage text="This window can't reach a hardware wallet." tone="warning" />
+      <CenteredMessage text={`Gleam can't reach a ${DEVICE_NAMES[device.method]} from here.`} tone="warning" />
     );
   } else {
     const { runtime, request, assessment } = state;

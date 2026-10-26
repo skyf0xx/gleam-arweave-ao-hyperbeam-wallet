@@ -44,13 +44,18 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `window.permawebConnect` shim). It reaches the wallet only through
   `ProviderTransport` (`src/transport.ts`); `createWindowMessageTransport`
   is the extension's `postMessage` half of the content-script relay.
+- `packages/keystone`: Keystone over QR for both shells: UR assembly,
+  account decode, sign request, the camera `QrScanner`, `AnimatedQr`,
+  `KeystoneConnectView` and `createKeystonePanel`. A shell hands the view
+  and panel to `@gleam/app` through `AppPlatform.hardwareWallets`, because
+  `app` may not import `@keystonehq` or `@ngraveio`.
 - `apps/extension`: the WXT shell. `entrypoints/` holds `background`,
   `content`, `provider` (builds `provider.js` from `@gleam/provider`),
   `approval`, `passkey`, `sidepanel`, `popup` and `connect`; the popup,
   side panel and approval entrypoints only mount `@gleam/app`.
   `src/adapters/` implements the core and runtime ports and `AppPlatform`
   (`adapters/app-platform.ts`) on `chrome.*`; `src/hardware/` holds the
-  Ledger and Keystone transports and the device signing panels.
+  Ledger transport and panel and opens the connect page in a tab.
 - `apps/mobile`: the Capacitor shell for iOS and Android (Vite + React,
   `ios/` and `android/` native projects). `src/main.tsx` mounts
   `@gleam/app` with `layout="phone"` and the shell's `AppPlatform`
@@ -120,12 +125,12 @@ pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
 pnpm mobile:build                          # app web bundle → apps/mobile/dist (mobile:ios / mobile:android sync and open the native project)
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, apps/extension, apps/mobile, apps/points-api, scripts/scan
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-ten projects. A change is done when tests, tsc, eslint, `pnpm wxt:build`
+eleven projects. A change is done when tests, tsc, eslint, `pnpm wxt:build`
 and `pnpm mobile:build` pass. If a change touches signing, network or
 extension wiring, it also needs a manual check in Chrome (load
 `.output/chrome-mv3` unpacked).

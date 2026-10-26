@@ -1,0 +1,26 @@
+{
+  "name": "@gleam/keystone",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gleam/app": "workspace:*",
+    "@gleam/core": "workspace:*",
+    "@gleam/ui": "workspace:*",
+    "@keystonehq/bc-ur-registry-arweave": "0.5.3",
+    "@ngraveio/bc-ur": "1.1.13",
+    "jsqr": "1.4.0",
+    "qrcode-generator": "2.0.4",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "typescript": "^5.9.3",
+    "vite-plugin-node-polyfills": "0.28.0"
+  }
+}

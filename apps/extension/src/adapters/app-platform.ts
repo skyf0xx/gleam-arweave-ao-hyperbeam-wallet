@@ -82,6 +82,8 @@ export function createExtensionAppPlatform(
     },
     hardwareWallets: {
       openConnectPage: (device) => (device === "keystone" ? openKeystoneConnect() : openLedgerConnect()),
+      // The action popup closes when it loses focus, so both devices connect in a tab (`openConnectPage`).
+      connectViews: {},
       signPanels: options.signPanels ?? null,
     },
     storeReview: {

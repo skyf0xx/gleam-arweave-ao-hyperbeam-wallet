@@ -17,20 +17,18 @@
   "dependencies": {
     "@gleam/app": "workspace:*",
     "@gleam/core": "workspace:*",
+    "@gleam/keystone": "workspace:*",
     "@gleam/messaging": "workspace:*",
     "@gleam/provider": "workspace:*",
     "@gleam/runtime": "workspace:*",
     "@gleam/ui": "workspace:*",
-    "@keystonehq/bc-ur-registry-arweave": "0.5.3",
-    "@ngraveio/bc-ur": "^1.1.13",
     "@webext-core/messaging": "^4.0.0",
-    "jsqr": "^1.4.0",
-    "qrcode-generator": "^2.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "vite-plugin-node-polyfills": "^0.28.0"
   },
   "devDependencies": {
+    "@keystonehq/bc-ur-registry-arweave": "0.5.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

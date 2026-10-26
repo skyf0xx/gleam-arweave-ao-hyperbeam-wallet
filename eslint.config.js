@@ -91,6 +91,12 @@ const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
 }));
+const KEYSTONE_IMPORT_MESSAGE =
+  "packages/keystone is shared by both shells: no wxt, Capacitor plugins, @webext-core or apps/*. Take shell-specific copy or behaviour as props.";
+const KEYSTONE_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/keystone never touches extension globals. Take what differs per shell as props.",
+}));
 
 // `packages/provider` runs in the page's own world, where anything it
 // loads is reachable by the page, and any shell injects it. Beyond the
@@ -309,6 +315,29 @@ export default tseslint.config(
         { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
         { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
         { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    // `packages/keystone` is shared by both shells, so it gets the app's
+    // shell fence, signer fence included. It is where the Keystone
+    // libraries the app refuses live, so those stay allowed.
+    files: ["packages/keystone/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+            { regex: RUNTIME_IMPORT, message: KEYSTONE_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+      "no-restricted-globals": ["error", ...KEYSTONE_GLOBALS],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: KEYSTONE_IMPORT_MESSAGE },
       ],
     },
   },

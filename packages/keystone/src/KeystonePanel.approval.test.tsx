@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { ArweaveSignature } from "@keystonehq/bc-ur-registry-arweave";
 import { UR } from "@ngraveio/bc-ur";
 import type { DeviceSigningPayload } from "@gleam/core";
-import type { QrScannerProps } from "../keystone";
+import type { QrScannerProps } from "./QrScanner";
 import type { DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
 import { createKeystonePanel } from "./KeystonePanel";
 
@@ -30,7 +30,7 @@ function FakeScanner(props: QrScannerProps) {
   scannerMounts += 1;
   return <p>fake-scanner</p>;
 }
-const Panel = createKeystonePanel(FakeScanner);
+const Panel = createKeystonePanel({ Scanner: FakeScanner, cameraDeniedHelp: "Turn the camera on for Gleam." });
 
 const dataItem = (byte: number): DeviceSigningPayload => ({
   kind: "dataItem",
@@ -109,7 +109,7 @@ describe("KeystonePanel", () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: "Scan Keystone's signature" }));
     act(() => lastScanner!.onError("camera-denied"));
-    expect(screen.getByRole("alert").textContent).toMatch(/set Camera to Allow/);
+    expect(screen.getByRole("alert").textContent).toContain("Turn the camera on for Gleam.");
     fireEvent.click(screen.getByRole("button", { name: "Show the QR again" }));
     expect(screen.getByText("Scan this with your Keystone")).toBeTruthy();
   });

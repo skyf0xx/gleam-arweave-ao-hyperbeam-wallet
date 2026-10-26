@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { renderWithPlatform as render } from "../app-platform/testing";
+import { fakeAppPlatform, renderWithPlatform as render } from "../app-platform/testing";
 import type { ApprovalRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
 import { ApprovalRoot } from "./ApprovalRoot";
 
@@ -339,5 +339,35 @@ describe("ApprovalRoot security phrase", () => {
 
     await waitFor(() => expect(screen.getByPlaceholderText("Enter your password")).toBeTruthy());
     await waitFor(() => expect(screen.getAllByLabelText("Your security phrase: willow")).toHaveLength(1));
+  });
+});
+
+describe("ApprovalRoot: a device request the surface can't reach", () => {
+  it("names the device instead of offering a panel", async () => {
+    const request: ApprovalRequest = {
+      ...CONNECT_REQUEST,
+      device: {
+        method: "ledger",
+        device: null,
+        address: "addr-1",
+        publicKey: "pub",
+        payloads: [],
+        summaries: [],
+        deadline: Date.now() + 60_000,
+      },
+    };
+    const send = vi.fn(async (message: { type: string }) => {
+      if (message.type === "getApproval") return request;
+      if (message.type === "getState") return UNLOCKED_STATE;
+      return null;
+    });
+    const keystoneOnly = fakeAppPlatform({
+      hardwareWallets: { openConnectPage: vi.fn(), connectViews: {}, signPanels: { keystone: () => <p>keystone-panel</p> } },
+    });
+
+    render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />, keystoneOnly);
+
+    expect(await screen.findByText("Gleam can't reach a Ledger from here.")).toBeTruthy();
+    expect(screen.queryByText("keystone-panel")).toBeNull();
   });
 });

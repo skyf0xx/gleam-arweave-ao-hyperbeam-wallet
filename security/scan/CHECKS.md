@@ -135,7 +135,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Hardware wallet signing
 
-`src/hardware/keystone/`, `src/hardware/panels/`.
+`packages/keystone/src/`, `apps/extension/src/hardware/panels/`.
 
 - Is the signature the device returns checked against the request that
   was sent before Gleam uses it?

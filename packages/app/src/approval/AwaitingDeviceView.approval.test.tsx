@@ -222,7 +222,7 @@ describe("ApprovalRoot with a hardware wallet", () => {
   function renderRoot(ui: ReactElement, panel: DeviceSignPanel = IdlePanel) {
     const signPanels = { keystone: panel, ledger: panel };
     return render(ui, {
-      wrapper: platformWrapper(fakeAppPlatform({ hardwareWallets: { openConnectPage: async () => {}, signPanels } })),
+      wrapper: platformWrapper(fakeAppPlatform({ hardwareWallets: { openConnectPage: async () => {}, connectViews: {}, signPanels } })),
     });
   }
 

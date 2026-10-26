@@ -6,3 +6,5 @@
  * are never generated.
  */
 @source ".";
+/* The Keystone views, which a shell hands these screens through `AppPlatform`. */
+@source "../../keystone/src";

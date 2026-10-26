@@ -50,6 +50,8 @@
 2 packages/runtime/src/handlers/transfer.ts
 2 packages/runtime/src/handlers/upload.ts
 2 packages/core/src/hardware/
+2 packages/keystone/src/sign-request.ts
+2 packages/keystone/src/decode-account.ts
 2 packages/core/src/points/ownership.ts
 2 packages/runtime/src/handlers/points.ts
 
@@ -75,6 +77,7 @@
 4 packages/runtime/src/handlers/approval.ts
 4 apps/extension/entrypoints/approval/
 4 apps/extension/src/hardware/panels/
+4 packages/keystone/src/KeystonePanel.tsx
 4 packages/app/src/approval/
 4 apps/mobile/src/adapters/approval-presenter.ts
 4 apps/mobile/src/adapters/approval-sheet.ts

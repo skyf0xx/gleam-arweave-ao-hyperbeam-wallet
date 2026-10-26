@@ -44,6 +44,8 @@
 /packages/runtime/src/handlers/transfer.ts                                 @skyf0xx
 /packages/runtime/src/handlers/upload.ts                                   @skyf0xx
 /packages/core/src/hardware/                                               @skyf0xx
+/packages/keystone/src/sign-request.ts                                     @skyf0xx
+/packages/keystone/src/decode-account.ts                                   @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
 /packages/runtime/src/handlers/points.ts                                   @skyf0xx
 
@@ -71,6 +73,7 @@
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 /apps/extension/src/hardware/panels/                                       @skyf0xx
+/packages/keystone/src/KeystonePanel.tsx                                   @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
 /apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
 /apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx

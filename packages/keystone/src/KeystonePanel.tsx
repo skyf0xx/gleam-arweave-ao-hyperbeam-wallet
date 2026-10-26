@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import type { UREncoder } from "@ngraveio/bc-ur";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { AnimatedQr } from "./AnimatedQr";
+import { CAMERA_UNAVAILABLE_MESSAGE, CameraDeniedNotice } from "./CameraDeniedNotice";
+import { QrScanner, type QrScannerProps, type ScannerError } from "./QrScanner";
 import {
-  AnimatedQr,
   buildKeystoneSignRequest,
-  CAMERA_UNAVAILABLE_MESSAGE,
-  CameraDeniedNotice,
   decodeKeystoneSignature,
   keystoneQrEncoder,
   KEYSTONE_SIGNATURE_UR_TYPE,
   KeystoneSignatureError,
-  QrScanner,
-  type QrScannerProps,
-  type ScannerError,
-} from "../keystone";
+} from "./sign-request";
 import type { DeviceSignPanel, DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
 
 interface PreparedRequest {
@@ -63,8 +60,14 @@ function prepare({ payloads, wallet }: Pick<DeviceSignPanelProps, "payloads" | "
   }
 }
 
-/** `Scanner` is swapped in tests, which have no camera. */
-export function createKeystonePanel(Scanner: ComponentType<QrScannerProps> = QrScanner): DeviceSignPanel {
+export interface KeystonePanelOptions {
+  /** Where this shell lets the user turn the camera back on. */
+  cameraDeniedHelp: string;
+  /** Swapped in tests, which have no camera. */
+  Scanner?: ComponentType<QrScannerProps>;
+}
+
+export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: KeystonePanelOptions): DeviceSignPanel {
   return function KeystonePanel({ payloads, wallet, onSignatures, onActivity, onError }: DeviceSignPanelProps) {
     const [prepared] = useState(() => prepare({ payloads, wallet }));
     const [index, setIndex] = useState(0);
@@ -170,7 +173,7 @@ export function createKeystonePanel(Scanner: ComponentType<QrScannerProps> = QrS
         {step.kind === "scan-error" ? (
           <>
             {step.error === "camera-denied" ? (
-              <CameraDeniedNotice />
+              <CameraDeniedNotice help={cameraDeniedHelp} />
             ) : (
               <p role="alert" className="text-caption leading-snug text-warning">
                 {SCAN_ERROR[step.error]}
@@ -188,5 +191,3 @@ export function createKeystonePanel(Scanner: ComponentType<QrScannerProps> = QrS
     );
   };
 }
-
-export const KeystonePanel = createKeystonePanel();

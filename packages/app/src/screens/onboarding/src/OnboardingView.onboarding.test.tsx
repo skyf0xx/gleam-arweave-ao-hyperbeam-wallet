@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
-import { renderWithPlatform as render } from "../../../app-platform/testing";
-import type { RuntimePort } from "@gleam/core";
+import { fakeAppPlatform, renderWithPlatform as render } from "../../../app-platform/testing";
+import type { HardwareConnectViewProps } from "../../../app-platform/types";
+import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
 
 afterEach(() => {
@@ -418,6 +419,47 @@ describe("OnboardingView: Connect Keystone", () => {
     openHardwareStart(mode);
     fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
     expect(onConnectKeystone).toHaveBeenCalledOnce();
+  });
+});
+
+describe("OnboardingView: a device the app connects itself", () => {
+  let connectedWith: HardwareConnectViewProps | undefined;
+  function FakeConnectView(props: HardwareConnectViewProps) {
+    connectedWith = props;
+    return <p>fake-connect</p>;
+  }
+  const platform = (openConnectPage = vi.fn()) =>
+    fakeAppPlatform({ hardwareWallets: { openConnectPage, connectViews: { keystone: FakeConnectView }, signPanels: null } });
+
+  it.each(["first-run", "add-wallet"] as const)(
+    "shows its connect view as a screen from the %s start, then back returns there",
+    (mode) => {
+      const openConnectPage = vi.fn();
+      render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode={mode} />, platform(openConnectPage));
+      openHardwareStart(mode);
+      fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
+      expect(screen.getByText("Connect Keystone")).toBeTruthy();
+      expect(screen.getByText("fake-connect")).toBeTruthy();
+      expect(openConnectPage).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(screen.getByRole("button", { name: "Keystone" })).toBeTruthy();
+    },
+  );
+
+  it("completes onboarding once the device's wallet is added", () => {
+    const onComplete = vi.fn();
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={onComplete} mode="add-wallet" />, platform());
+    fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
+    connectedWith!.onConnected({ id: "w1" } as WalletSummary);
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("opens the connect page for a device without a view", () => {
+    const openConnectPage = vi.fn();
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode="add-wallet" />, platform(openConnectPage));
+    fireEvent.click(screen.getByRole("button", { name: "Ledger" }));
+    expect(openConnectPage).toHaveBeenCalledWith("ledger");
   });
 });
 

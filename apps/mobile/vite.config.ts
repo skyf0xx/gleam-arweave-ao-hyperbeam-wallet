@@ -2,6 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { build, defineConfig, type Plugin } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // The page's CSP blocks Vite's HMR websocket, which the browser preview
 // (`pnpm --filter @gleam/mobile dev`) needs. Dev server only: builds keep it.
@@ -48,7 +49,16 @@ const providerScript: Plugin = {
 };
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), devCsp, providerScript],
+  plugins: [
+    react(),
+    tailwindcss(),
+    devCsp,
+    providerScript,
+    // The Keystone UR registry subclasses `stream.Transform` at import time
+    // and, like `@gleam/keystone`, uses `Buffer`, which the plugin's default
+    // globals supply.
+    nodePolyfills({ include: ["stream", "events"] }),
+  ],
   // Capacitor serves `dist/` from its own origin root on iOS and Android,
   // but relative URLs keep the bundle loadable from any path.
   base: "./",

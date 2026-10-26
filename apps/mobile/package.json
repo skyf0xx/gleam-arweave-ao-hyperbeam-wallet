@@ -25,6 +25,7 @@
     "@gleam/app": "workspace:*",
     "@gleam/core": "workspace:*",
     "@gleam/dapp-view": "workspace:*",
+    "@gleam/keystone": "workspace:*",
     "@gleam/messaging": "workspace:*",
     "@gleam/provider": "workspace:*",
     "@gleam/runtime": "workspace:*",
@@ -40,6 +41,7 @@
     "@vitejs/plugin-react": "6.1.2",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
-    "vite": "8.3.4"
+    "vite": "8.3.4",
+    "vite-plugin-node-polyfills": "0.28.0"
   }
 }
