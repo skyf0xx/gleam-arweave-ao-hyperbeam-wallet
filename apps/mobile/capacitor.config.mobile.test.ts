@@ -39,4 +39,14 @@ describe("capacitor.config", () => {
       }
     }
   });
+
+  // Android FLAG_SECURE blocks screenshots and blanks the recents card; iOS
+  // covers the window in the app switcher. Both come from native config, so
+  // no JS path can leave them off. iOS's layer-reparenting screenshot block
+  // stays off.
+  it("keeps the privacy screen on from startup", () => {
+    expect(config.plugins?.PrivacyScreen?.enable).toBe(true);
+    expect(config.plugins?.PrivacyScreen?.preventScreenshots).toBe(false);
+    expect(packageJson.dependencies["@capacitor-community/privacy-screen"]).toMatch(/^\d+\.\d+\.\d+$/);
+  });
 });
