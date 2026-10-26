@@ -15,7 +15,8 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
 
 /**
  * The sheet opened from the main screen's account pill. Lists every stored
- * wallet from `getState()`, marks the active one with a checkmark, and
+ * wallet from `getState()` in saved order, marks the active one with a
+ * green checkmark, and
  * switches on tap via `switchWallet`.
  *
  * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
@@ -105,19 +106,17 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
               <SkeletonRow />
             </>
           ) : (
-            // The active wallet leads; the rest keep their saved order.
-            [...state.wallets]
-              .sort((a, b) => Number(b.id === state.activeWalletId) - Number(a.id === state.activeWalletId))
-              .map((wallet) => (
-                <WalletSwitcherRow
-                  key={wallet.id}
-                  wallet={wallet}
-                  active={wallet.id === state.activeWalletId}
-                  switching={switchingId === wallet.id}
-                  onSwitch={() => void handleSwitch(wallet.id)}
-                  onManage={() => onManage(wallet.id)}
-                />
-              ))
+            // Saved order, never active-first: a list that reshuffles on every switch loses people.
+            state.wallets.map((wallet) => (
+              <WalletSwitcherRow
+                key={wallet.id}
+                wallet={wallet}
+                active={wallet.id === state.activeWalletId}
+                switching={switchingId === wallet.id}
+                onSwitch={() => void handleSwitch(wallet.id)}
+                onManage={() => onManage(wallet.id)}
+              />
+            ))
           )}
         </div>
 
@@ -154,12 +153,13 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   const { copied, copy } = useCopy(wallet.address);
 
   return (
-    // The row bleeds 8px past the list edge so the active fill has room
-    // around its content while text stays aligned with the header. Copy
+    // The row bleeds 8px past the list edge so the hover fill has room
+    // around its content while text stays aligned with the header. Only
+    // the checkmark marks the active row: a fill would read as hover. Copy
     // floats beside the chevron instead of taking a column, so the address
     // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-mist" : "border-b border-line last:border-b-0 hover:bg-mist phone:border-b-0"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "" : "hover:bg-mist"}`}
     >
       <button
         type="button"
@@ -176,9 +176,12 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
             {active ? (
-              <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-muted">Active</span>
+              <span className="flex flex-shrink-0 items-center gap-1 text-caption font-medium text-positive">
+                <CheckIcon size={12} />
+                Active
+              </span>
             ) : (
-              <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:opacity-100">
+              <span className="flex-shrink-0 text-caption font-medium text-muted opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:opacity-100">
                 Make active
               </span>
             )}
@@ -207,9 +210,9 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   );
 }
 
-function CheckIcon() {
+function CheckIcon({ size = 15 }: { size?: number }) {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

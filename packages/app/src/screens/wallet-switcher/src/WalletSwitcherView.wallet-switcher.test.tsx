@@ -52,6 +52,16 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
     expect(send).toHaveBeenCalledWith({ type: "getState", payload: undefined });
   });
 
+  it("keeps the saved order when the active wallet isn't first", async () => {
+    const send = vi.fn().mockResolvedValue({ ...STATE, activeWalletId: "wallet-2" });
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} onManage={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    const position = screen.getByText("Wallet One").compareDocumentPosition(screen.getByText("Trading"));
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Trading").closest("button")?.getAttribute("aria-current")).toBe("true");
+  });
+
   it("calls switchWallet with the tapped row's walletId, then onSwitched", async () => {
     const send = vi.fn().mockResolvedValueOnce(STATE).mockResolvedValueOnce(undefined);
     const onSwitched = vi.fn();
