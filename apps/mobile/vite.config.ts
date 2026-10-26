@@ -8,4 +8,6 @@ export default defineConfig({
   // but relative URLs keep the bundle loadable from any path.
   base: "./",
   build: { outDir: "dist", emptyOutDir: true },
+  // Matches the `type: "module"` the runtime worker is constructed with.
+  worker: { format: "es" },
 });

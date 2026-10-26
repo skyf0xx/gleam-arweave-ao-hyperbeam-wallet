@@ -15,6 +15,9 @@
     "@capacitor/ios": "8.5.3",
     "@gleam/app": "workspace:*",
     "@gleam/core": "workspace:*",
+    "@gleam/messaging": "workspace:*",
+    "@gleam/runtime": "workspace:*",
+    "comlink": "4.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
