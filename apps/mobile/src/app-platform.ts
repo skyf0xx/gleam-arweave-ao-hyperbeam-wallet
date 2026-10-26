@@ -1,3 +1,4 @@
+import { App } from "@capacitor/app";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
@@ -13,8 +14,14 @@ export function createMobileAppPlatform(): AppPlatform {
   const ephemeral = new Map<string, unknown>();
   const worker = new Worker(new URL("./worker/index.ts", import.meta.url), { type: "module" });
   serveSqliteStore(worker, createSqliteStore(openCapacitorDb));
+  const runtime = createWorkerRuntimePort(worker);
+  // The worker's intervals stop while the app is in the background; this
+  // runs the ones that came due, auto-lock among them.
+  void App.addListener("resume", () => {
+    runtime.resume().catch((error: unknown) => console.error("Couldn't resume the runtime.", error));
+  });
   return {
-    runtime: createWorkerRuntimePort(worker),
+    runtime,
     buildInfo: { version },
     capabilities: {
       sidePanel: false,

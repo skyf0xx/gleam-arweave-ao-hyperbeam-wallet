@@ -1,8 +1,8 @@
 import type { ApprovalPresenterPort, DeviceKeyPort, DownloadPort } from "@gleam/core";
 import type { Platform, TabsPort } from "@gleam/runtime";
-import { InMemoryTimer } from "@gleam/runtime/testing/index.ts";
 import { createWorkerSessionKeys } from "../adapters/session-key-store";
 import { connectSqliteStore, MobileStoragePort } from "../adapters/storage";
+import type { WorkerTimer } from "../adapters/timer";
 import { version } from "../../package.json";
 
 // dApp approvals arrive with the dApp browser; until then nothing in the
@@ -38,16 +38,13 @@ const noTabs: TabsPort = {
   },
 };
 
-/**
- * The worker's `Platform`, with `scope` the worker's global scope. The
- * timer is in memory until the worker timer (M19) replaces it.
- */
-export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore>[0]): Platform {
+/** The worker's `Platform`, with `scope` the worker's global scope. */
+export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore>[0], timer: WorkerTimer): Platform {
   return {
     storage: new MobileStoragePort(connectSqliteStore(scope)),
     sessionKeys: createWorkerSessionKeys(),
     approvalPresenter: noApprovals,
-    timer: new InMemoryTimer(),
+    timer,
     deviceKey: noDeviceKey,
     // The app has no toolbar icon to badge.
     badge: { setDot: async () => {} },

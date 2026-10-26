@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WalletState } from "@gleam/core";
 import { createRuntime } from "@gleam/runtime/src/create-runtime.ts";
 import { createInMemoryPlatform } from "@gleam/runtime/testing/index.ts";
@@ -13,8 +13,9 @@ function connect() {
   const runtime = createRuntime(createInMemoryPlatform());
   const channel = new MessageChannel();
   channels.push(channel);
-  exposeRuntimeHost(runtime, channel.port1);
-  return { port: createWorkerRuntimePort(channel.port2), ui: channel.port2 };
+  const lifecycle = { onResume: vi.fn() };
+  exposeRuntimeHost(runtime, lifecycle, channel.port1);
+  return { port: createWorkerRuntimePort(channel.port2), ui: channel.port2, lifecycle };
 }
 
 /** Posts a hand-built comlink message and records the ids that get an answer. */
@@ -63,6 +64,12 @@ describe("worker runtime host", () => {
   it.each(["noSuchMessage", "constructor", "__proto__", "toString"])("refuses %s, which isn't a message", async (type) => {
     const { port } = connect();
     await expect(port.send({ type, payload: undefined })).rejects.toThrow(/has no/);
+  });
+
+  it("passes a resume on to the worker's lifecycle", async () => {
+    const { port, lifecycle } = connect();
+    await port.resume();
+    expect(lifecycle.onResume).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a payload that can't be cloned rather than dropping part of it", async () => {
