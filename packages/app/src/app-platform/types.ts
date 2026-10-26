@@ -99,6 +99,19 @@ export interface HardwareWalletsPort {
   signPanels: DeviceSignPanels | null;
 }
 
+/**
+ * Asks for a store review. The extension opens its store's reviews page;
+ * the phone asks the OS for its in-app prompt, which the store may decline
+ * to show and which reports nothing back. A caller never assumes a review
+ * happened.
+ */
+export interface StoreReviewPort {
+  /** Whether `request` opens a page outside the app, for copy that marks the link. */
+  opensPage: boolean;
+  /** Must be called from a click: the extension opens a tab. Failures are the caller's to ignore. */
+  request(): Promise<void>;
+}
+
 export interface AppPlatform {
   /** The wire to the wallet's background. */
   runtime: RuntimePort;
@@ -118,4 +131,5 @@ export interface AppPlatform {
   activeSite: ActiveSitePort;
   downloads: DownloadsPort;
   hardwareWallets: HardwareWalletsPort;
+  storeReview: StoreReviewPort;
 }

@@ -3,6 +3,7 @@ import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
 import { createQrScanner } from "./adapters/qr-scanner";
+import { createStoreReview } from "./adapters/store-review";
 import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from "./adapters/file-saver";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
@@ -56,6 +57,7 @@ export function createMobileAppPlatform(): AppPlatform {
     },
     biometrics: createBiometricUnlock(),
     qrScanner: createQrScanner(),
+    storeReview: createStoreReview(),
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

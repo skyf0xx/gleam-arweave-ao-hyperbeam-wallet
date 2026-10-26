@@ -145,6 +145,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@capacitor-community/in-app-review':
+        specifier: 8.0.0
+        version: 8.0.0(@capacitor/core@8.5.3)
       '@capacitor-community/privacy-screen':
         specifier: 8.0.0
         version: 8.0.0(@capacitor/core@8.5.3)
@@ -510,6 +513,11 @@ packages:
   '@bramus/specificity@2.4.2':
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
+
+  '@capacitor-community/in-app-review@8.0.0':
+    resolution: {integrity: sha512-AYpEkIjdv27WGS3hnlc7xAQ1BhaBvD2svgQBfHF4P2Olw1N6a7MSCOQC6O4SuxmdBdJ2fM6uFeo1jyNjKLtIPw==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
 
   '@capacitor-community/privacy-screen@8.0.0':
     resolution: {integrity: sha512-XcBTgQ13BdH8xB7arJ2io5rP3aEXcndgDVl/GdFRNwc8TatnV+1U6rGROLtepYLA4Rl0GP7k4zAeykcG+a//3w==}
@@ -5061,6 +5069,10 @@ snapshots:
   '@bramus/specificity@2.4.2':
     dependencies:
       css-tree: 3.2.1
+
+  '@capacitor-community/in-app-review@8.0.0(@capacitor/core@8.5.3)':
+    dependencies:
+      '@capacitor/core': 8.5.3
 
   '@capacitor-community/privacy-screen@8.0.0(@capacitor/core@8.5.3)':
     dependencies:

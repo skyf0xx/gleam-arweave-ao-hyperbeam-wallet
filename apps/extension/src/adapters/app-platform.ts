@@ -4,6 +4,7 @@ import type { DeviceSignPanels } from "@gleam/app/src/approval/device-panels.tsx
 import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
 import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
 import { openPasskeyWindow } from "@/src/passkey/open-window";
+import { STORE_REVIEWS_URL } from "@gleam/core";
 import { runtimePort } from "./runtime";
 
 /**
@@ -81,6 +82,12 @@ export function createExtensionAppPlatform(
     hardwareWallets: {
       openConnectPage: (device) => (device === "keystone" ? openKeystoneConnect() : openLedgerConnect()),
       signPanels: options.signPanels ?? null,
+    },
+    storeReview: {
+      opensPage: true,
+      request: async () => {
+        window.open(STORE_REVIEWS_URL, "_blank", "noreferrer");
+      },
     },
     activeSite: {
       subscribe(onChange) {

@@ -65,6 +65,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     activeSite: overrides.activeSite ?? { subscribe: () => () => {} },
     downloads: overrides.downloads ?? { requestPermission: async () => true },
     hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },
+    storeReview: overrides.storeReview ?? { opensPage: true, request: async () => {} },
   };
 }
 

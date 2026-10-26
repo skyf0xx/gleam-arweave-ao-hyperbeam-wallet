@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { renderWithPlatform as render } from "../../../app-platform/testing";
+import { fakeAppPlatform, renderWithPlatform as render, type FakeAppPlatformOverrides } from "../../../app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Announcement, ReviewMoment, RuntimePort, WalletSummary } from "@gleam/core";
 import { MainScreenNotice } from "./MainScreenNotice";
@@ -27,7 +27,7 @@ interface Setup {
   review?: ReviewMoment | null;
 }
 
-function setup(options: Setup = {}) {
+function setup(options: Setup = {}, platformOverrides: FakeAppPlatformOverrides = {}) {
   const dismissed = [...(options.dismissed ?? [])];
   const send = vi.fn(async ({ type, payload }: { type: string; payload?: { id?: string } }) => {
     switch (type) {
@@ -62,6 +62,7 @@ function setup(options: Setup = {}) {
     <QueryClientProvider client={queryClient}>
       <MainScreenNotice runtime={runtime} wallet={WALLET} onOpenPoints={onOpenPoints} />
     </QueryClientProvider>,
+    fakeAppPlatform(platformOverrides),
   );
   return { send, onOpenPoints, view };
 }
@@ -138,22 +139,36 @@ describe("MainScreenNotice", () => {
   });
 
   it("asks for a review after a good moment, with feedback beside it", async () => {
-    const { send } = setup({ review: { kind: "hardware", device: "Ledger" }, announcements: [INFO] });
+    const request = vi.fn(async () => {});
+    const { send } = setup(
+      { review: { kind: "hardware", device: "Ledger" }, announcements: [INFO] },
+      { storeReview: { opensPage: true, request } },
+    );
 
     expect(await screen.findByText("Enjoying Gleam?")).toBeTruthy();
     expect(screen.getByText("Leave a review to help others discover us.")).toBeTruthy();
     expect(screen.queryByText(INFO.text)).toBeNull();
     const feedback = screen.getByRole("link", { name: "Send us feedback" });
     expect(feedback.getAttribute("href")).toBe("https://gleamwallet.app/feedback.html?v=1.2.3");
-    const review = screen.getByRole("link", { name: /Leave a review/ });
-    expect(review.getAttribute("href")).toBe(
-      "https://chromewebstore.google.com/detail/einabcphdmlicabnjllaaallnebfkmki/reviews",
-    );
-    expect(review.getAttribute("target")).toBe("_blank");
+    const review = screen.getByRole("button", { name: /Leave a review/ });
+    expect(review.textContent).toContain("↗");
 
     fireEvent.click(review);
+    expect(request).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "finishReviewPrompt", payload: undefined }));
     expect(await screen.findByText(INFO.text)).toBeTruthy();
+  });
+
+  it("answers the ask even when the review request fails, and marks no page on the phone", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("no prompt"));
+    const { send } = setup({ review: { kind: "send" } }, { storeReview: { opensPage: false, request } });
+    const review = await screen.findByRole("button", { name: /Leave a review/ });
+    expect(review.textContent).not.toContain("↗");
+
+    fireEvent.click(review);
+    expect(request).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "finishReviewPrompt", payload: undefined }));
+    await waitFor(() => expect(screen.queryByText("Enjoying Gleam?")).toBeNull());
   });
 
   it("retires the review prompt on dismiss", async () => {
