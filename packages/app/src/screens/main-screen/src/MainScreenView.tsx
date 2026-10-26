@@ -586,7 +586,7 @@ export function MainScreenView({
       */}
       <div className="transition-opacity duration-300 ease-out" style={{ opacity: headerCollapsed ? 0 : 1 }}>
         <div inert={headerCollapsed}>
-          <div className="px-6 pb-1 pt-2.5 phone:px-5 phone:pt-1">
+          <div className="px-6 pb-1 pt-1.5 phone:px-5 phone:pt-1">
             <PortfolioChart
               points={portfolioHistoryQuery.data?.series ?? []}
               currentValue={portfolioHistoryQuery.data?.currentValue ?? 0}
@@ -637,11 +637,11 @@ export function MainScreenView({
             />
           </div>
 
-          <div className="px-6 pb-5 pt-3 phone:px-5 phone:pb-4 phone:pt-2">
+          <div className="px-6 pb-4 pt-3 phone:px-5 phone:pb-4 phone:pt-2">
             <Beam />
           </div>
 
-          <div className="px-6 pb-6 phone:px-5 phone:pb-4">
+          <div className="px-6 pb-5 phone:px-5 phone:pb-4">
             <SendReceiveActions onSend={onSend} onReceive={onReceive} />
           </div>
         </div>
@@ -679,7 +679,7 @@ export function MainScreenView({
         <div
           role="tablist"
           aria-label="Tokens, collectibles and activity"
-          className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-2 phone:-mx-2.5 phone:pb-1 phone:pt-1"
+          className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-1 phone:-mx-2.5 phone:pb-1 phone:pt-1"
         >
           <button
             type="button"
