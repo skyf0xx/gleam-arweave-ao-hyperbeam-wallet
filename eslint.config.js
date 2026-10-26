@@ -81,6 +81,12 @@ const runtimeFence = (...extraPatterns) => ({
 // shells, aliases and globals are blocked.
 const APP_IMPORT_MESSAGE =
   "packages/app is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `AppPlatform`.";
+// The hardware-wallet libraries belong to a shell's signing panels, which
+// it hands the app through `AppPlatform.hardwareWallets`. Imported from
+// `packages/app`, they would land in the popup and the phone bundle.
+const HARDWARE_IMPORT = "^@(keystonehq|ngraveio|ledgerhq)(/|$)";
+const HARDWARE_IMPORT_MESSAGE =
+  "packages/app doesn't import hardware-wallet libraries. The shell provides its signing panels through `AppPlatform.hardwareWallets`.";
 const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
@@ -267,9 +273,21 @@ export default tseslint.config(
     // the second block repeats it with the signer fence for non-test files.
     files: ["packages/app/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+            { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
+          ],
+        },
+      ],
       "no-restricted-globals": ["error", ...APP_GLOBALS],
-      "gleam/no-dynamic-import": ["error", { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+        { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
+      ],
     },
   },
   {
@@ -282,6 +300,7 @@ export default tseslint.config(
           patterns: [
             { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
             { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+            { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
           ],
         },
       ],
@@ -289,6 +308,7 @@ export default tseslint.config(
         "error",
         { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
         { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+        { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
       ],
     },
   },
