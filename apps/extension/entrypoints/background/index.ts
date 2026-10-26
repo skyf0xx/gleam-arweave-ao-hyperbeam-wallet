@@ -6,7 +6,7 @@ import { WxtStoragePort } from "@/src/adapters/storage";
 import { listenForKeyringConnections, sessionKeyStore } from "@/src/adapters/session-key-store";
 import { WindowApprovalPresenter } from "@/src/adapters/windows";
 import { restrictSessionStorageToTrustedContexts } from "@/src/adapters/session-access";
-import { deviceKeyPort } from "@/src/adapters/device-key";
+import { deviceKeyPort } from "@gleam/core/src/points/device-key-store.ts";
 import { actionBadge, actionLockIcon } from "@/src/adapters/badge";
 import { alarmTimer } from "@/src/adapters/timer";
 import { browserDownloads, watchDownloadHistory } from "@/src/adapters/downloads";

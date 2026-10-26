@@ -1,4 +1,5 @@
-import type { ApprovalPresenterPort, DeviceKeyPort, DownloadPort } from "@gleam/core";
+import type { ApprovalPresenterPort, DownloadPort } from "@gleam/core";
+import { deviceKeyPort } from "@gleam/core/src/points/device-key-store.ts";
 import type { Platform, TabsPort } from "@gleam/runtime";
 import { createWorkerSessionKeys } from "../adapters/session-key-store";
 import { connectSqliteStore, MobileStoragePort } from "../adapters/storage";
@@ -14,12 +15,6 @@ const noApprovals: ApprovalPresenterPort = {
   focus: async () => {},
   dismiss: async () => {},
   onDismissed: () => () => {},
-};
-
-const noDeviceKey: DeviceKeyPort = {
-  loadOrCreate: async () => {
-    throw new Error("Gleam Points isn't available in the app yet.");
-  },
 };
 
 const noDownloads: DownloadPort = {
@@ -45,7 +40,7 @@ export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore
     sessionKeys: createWorkerSessionKeys(),
     approvalPresenter: noApprovals,
     timer,
-    deviceKey: noDeviceKey,
+    deviceKey: deviceKeyPort,
     // The app has no toolbar icon to badge.
     badge: { setDot: async () => {} },
     lockIndicator: { setLocked: async () => {} },

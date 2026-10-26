@@ -1,5 +1,5 @@
-import type { DeviceKey, DeviceKeyPort } from "@gleam/core";
-import { deviceKeyThumbprint, type DevicePublicJwk } from "@gleam/core/src/points/index.ts";
+import type { DeviceKey, DeviceKeyPort } from "../ports/device-key";
+import { deviceKeyThumbprint, type DevicePublicJwk } from "./identity";
 
 const DB_NAME = "gleam-points";
 const STORE = "device";
@@ -10,11 +10,11 @@ let pending: Promise<DeviceKey> | null = null;
 /**
  * The install's Gleam Points device key, created on first use.
  *
- * It lives in IndexedDB rather than `chrome.storage`, because IndexedDB
- * can hold a `CryptoKey` object itself. The private key is generated
- * non-extractable, so its bytes can never be read back out, not even by
- * extension code. Calls share one promise so two concurrent first uses
- * can't create two keys.
+ * It lives in IndexedDB rather than `StoragePort`, because IndexedDB can
+ * hold a `CryptoKey` object itself, and every shell (extension background,
+ * app worker) has it. The private key is generated non-extractable, so its
+ * bytes can never be read back out, not even by wallet code. Calls share
+ * one promise so two concurrent first uses can't create two keys.
  */
 export function loadOrCreateDeviceKey(): Promise<DeviceKey> {
   pending ??= loadOrCreate().catch((error: unknown) => {
@@ -35,7 +35,7 @@ async function loadOrCreate(): Promise<DeviceKey> {
     const publicKey: DevicePublicJwk = { kty: "EC", crv: "P-256", x: exported.x!, y: exported.y! };
     const created: DeviceKey = { id: await deviceKeyThumbprint(publicKey), publicKey, privateKey: pair.privateKey };
 
-    // `add` fails if another context (popup vs. background) won the race,
+    // `add` fails if another context (e.g. popup vs. background) won the race,
     // in which case the stored key is the one to use.
     try {
       await request(db.transaction(STORE, "readwrite").objectStore(STORE).add(created, RECORD_KEY));

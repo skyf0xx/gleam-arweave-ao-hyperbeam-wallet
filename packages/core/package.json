@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@dha-team/arbundles": "^1.0.3",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.9.3"
   }
 }
