@@ -1,24 +1,9 @@
-import type { ApprovalPresenterPort, DeviceKeyPort, DownloadPort, SessionKeyStorePort } from "@gleam/core";
+import type { ApprovalPresenterPort, DeviceKeyPort, DownloadPort } from "@gleam/core";
 import type { Platform, TabsPort } from "@gleam/runtime";
 import { InMemoryTimer } from "@gleam/runtime/testing/index.ts";
+import { createWorkerSessionKeys } from "../adapters/session-key-store";
 import { connectSqliteStore, MobileStoragePort } from "../adapters/storage";
 import { version } from "../../package.json";
-
-// Holds no key, so every wallet stays locked until the worker's key store (M18).
-const noSessionKeys: SessionKeyStorePort = {
-  importKey: async () => {
-    throw new Error("Unlocking isn't available in the app yet.");
-  },
-  sign: async () => {
-    throw new Error("This wallet is locked.");
-  },
-  decrypt: async () => {
-    throw new Error("This wallet is locked.");
-  },
-  has: async () => [],
-  remove: async () => {},
-  clear: async () => {},
-};
 
 // dApp approvals arrive with the dApp browser; until then nothing in the
 // app opens one.
@@ -60,7 +45,7 @@ const noTabs: TabsPort = {
 export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore>[0]): Platform {
   return {
     storage: new MobileStoragePort(connectSqliteStore(scope)),
-    sessionKeys: noSessionKeys,
+    sessionKeys: createWorkerSessionKeys(),
     approvalPresenter: noApprovals,
     timer: new InMemoryTimer(),
     deviceKey: noDeviceKey,

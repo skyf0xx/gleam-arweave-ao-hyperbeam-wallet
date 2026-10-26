@@ -22,6 +22,7 @@
 /apps/mobile/src/adapters/storage.ts                                       @skyf0xx
 /apps/mobile/src/adapters/sqlite-store.ts                                  @skyf0xx
 /apps/mobile/src/adapters/sqlite-channel.ts                                @skyf0xx
+/apps/mobile/src/adapters/session-key-store.ts                             @skyf0xx
 /packages/app/src/passkey/                                                 @skyf0xx
 /packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
 /packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx

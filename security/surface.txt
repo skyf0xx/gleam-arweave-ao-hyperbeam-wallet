@@ -29,6 +29,7 @@
 1 apps/mobile/src/adapters/storage.ts
 1 apps/mobile/src/adapters/sqlite-store.ts
 1 apps/mobile/src/adapters/sqlite-channel.ts
+1 apps/mobile/src/adapters/session-key-store.ts
 1 packages/app/src/passkey/
 1 packages/app/src/screens/onboarding/src/Import.tsx
 1 packages/app/src/screens/onboarding/src/OnboardingView.tsx
