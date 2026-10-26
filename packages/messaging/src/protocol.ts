@@ -108,6 +108,12 @@ export interface ProtocolMap {
    */
   checkVaultPassword(req: { password: string }): void;
   /**
+   * Whether `password` opens the vault. Rejects when the check couldn't
+   * run (storage, Argon2id), which is never a wrong password. Asked before
+   * dropping a stored biometric password that failed to unlock.
+   */
+  probeVaultPassword(req: { password: string }): { opens: boolean };
+  /**
    * Stores the vault password wrapped under the passkey's PRF output.
    * `prfSalt` and `prfOutput` are base64url. Replaces any earlier passkey.
    */

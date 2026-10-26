@@ -285,6 +285,7 @@ export const BACKGROUND_MESSAGES = {
   unlockWallet: EXTENSION,
   getPasskeyStatus: EXTENSION,
   checkVaultPassword: EXTENSION,
+  probeVaultPassword: EXTENSION,
   enrollPasskey: EXTENSION,
   unlockWithPasskey: EXTENSION,
   removePasskey: EXTENSION,

@@ -22,6 +22,10 @@ export interface ExtensionAppPlatformOptions {
   signPanels?: DeviceSignPanels;
 }
 
+async function biometricsUnavailable(): Promise<never> {
+  throw new Error("Biometric unlock isn't available in the extension.");
+}
+
 /**
  * The action popup closes when the browser's passkey prompt takes focus,
  * so only it hands the ceremony to its own window.
@@ -57,6 +61,13 @@ export function createExtensionAppPlatform(
     unlock: {
       passkeyMode: surface === "popup" ? "window" : "inline",
       openPasskeyWindow,
+    },
+    biometrics: {
+      availability: async () => ({ available: false, reason: "unavailable" }),
+      isEnrolled: async () => false,
+      enrol: biometricsUnavailable,
+      readPassword: biometricsUnavailable,
+      remove: async () => {},
     },
     downloads: {
       requestPermission: () => browser.permissions.request({ permissions: ["downloads"] }).catch(() => false),

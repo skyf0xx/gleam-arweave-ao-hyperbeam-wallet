@@ -61,9 +61,9 @@ const signerFence = (regex) => ({
 // mobile app), so it reaches a platform only through `Platform`. Block the
 // shells' SDKs, both shells, their `@/` and `~/` aliases, and the extension
 // globals. `(^|/)apps/` also catches a relative climb into `apps/`.
-const RUNTIME_IMPORT = "^(wxt|@capacitor|@webext-core)(/|$)|(^|/)apps/(extension|mobile)(/|$)|^[@~]/";
+const RUNTIME_IMPORT = "^(wxt|@capacitor|@capacitor-community|@capgo|@webext-core)(/|$)|(^|/)apps/(extension|mobile)(/|$)|^[@~]/";
 const RUNTIME_IMPORT_MESSAGE =
-  "packages/runtime is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `Platform`.";
+  "packages/runtime is shell-free: no wxt, Capacitor plugins, @webext-core or apps/*. Take what you need through `Platform`.";
 const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
@@ -80,7 +80,7 @@ const runtimeFence = (...extraPatterns) => ({
 // runtime it reaches a platform only through `AppPlatform`. The same SDKs,
 // shells, aliases and globals are blocked.
 const APP_IMPORT_MESSAGE =
-  "packages/app is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `AppPlatform`.";
+  "packages/app is shell-free: no wxt, Capacitor plugins, @webext-core or apps/*. Take what you need through `AppPlatform`.";
 // The hardware-wallet libraries belong to a shell's signing panels, which
 // it hands the app through `AppPlatform.hardwareWallets`. Imported from
 // `packages/app`, they would land in the popup and the phone bundle.
@@ -100,7 +100,7 @@ const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
 const PROVIDER_IMPORT =
   "^@gleam/(core|runtime|app|ui)(/|$)|(^|/)packages/(core|runtime|app|ui|messaging)(/|$)|^(\\.\\./){2,}(core|runtime|app|ui|messaging)(/|$)|^@gleam/messaging(?!/src/page-protocol(\\.ts)?$)";
 const PROVIDER_IMPORT_MESSAGE =
-  "packages/provider is page-world code: no wxt, @capacitor, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
+  "packages/provider is page-world code: no wxt, Capacitor plugins, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
 const PROVIDER_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/provider never touches extension globals. Reach the wallet through `ProviderTransport`.",

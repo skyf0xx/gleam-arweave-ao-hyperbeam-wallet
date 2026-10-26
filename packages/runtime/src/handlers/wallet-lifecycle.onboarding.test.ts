@@ -900,6 +900,19 @@ describe("WalletLifecycleHandler: key derivation failures", () => {
     await expect(handler.checkVaultPassword({ password: GOOD_PASSWORD })).rejects.toBeInstanceOf(VaultKdfError);
   });
 
+  it("probes the vault password as opens, doesn't open, or couldn't check", async () => {
+    await expect(handler.probeVaultPassword({ password: GOOD_PASSWORD })).resolves.toEqual({ opens: true });
+    await expect(handler.probeVaultPassword({ password: OTHER_PASSWORD })).resolves.toEqual({ opens: false });
+
+    vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
+    await expect(handler.probeVaultPassword({ password: GOOD_PASSWORD })).rejects.toBeInstanceOf(VaultKdfError);
+  });
+
+  it("probes a vault with no password as not opening", async () => {
+    const empty = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
+    await expect(empty.probeVaultPassword({ password: GOOD_PASSWORD })).resolves.toEqual({ opens: false });
+  });
+
   it("reports an Argon2id failure when adding a wallet", async () => {
     vi.mocked(hashWasm.argon2id).mockRejectedValueOnce(wasmFailure());
 

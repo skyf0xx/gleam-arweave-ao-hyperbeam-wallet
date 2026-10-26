@@ -45,6 +45,15 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
       },
     },
     unlock: overrides.unlock ?? { passkeyMode: "inline", openPasskeyWindow: async () => {} },
+    biometrics: overrides.biometrics ?? {
+      availability: async () => ({ available: false, reason: "unavailable" }),
+      isEnrolled: async () => false,
+      enrol: async () => {},
+      readPassword: async () => {
+        throw new Error("fakeAppPlatform has no stored password");
+      },
+      remove: async () => {},
+    },
     activeSite: overrides.activeSite ?? { subscribe: () => () => {} },
     downloads: overrides.downloads ?? { requestPermission: async () => true },
     hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },

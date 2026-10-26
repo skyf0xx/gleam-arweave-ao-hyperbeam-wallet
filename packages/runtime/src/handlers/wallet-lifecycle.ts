@@ -520,6 +520,17 @@ export class WalletLifecycleHandler {
     }
   }
 
+  /**
+   * `opens: false` only when the password definitely opens nothing,
+   * including a vault with no password. A check that couldn't run
+   * rejects instead, so a caller never mistakes it for a wrong password.
+   */
+  async probeVaultPassword(req: { password: string }): Promise<{ opens: boolean }> {
+    const wallets = await loadWallets(this.storage);
+    if (!hasVaultPassword(wallets)) return { opens: false };
+    return { opens: (await this.opensVault(wallets, new VaultKeys(req.password))) !== null };
+  }
+
   async hasVaultPassword(): Promise<boolean> {
     return hasVaultPassword(await loadWallets(this.storage));
   }

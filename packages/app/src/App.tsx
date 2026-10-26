@@ -199,6 +199,15 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A stored biometric password outlives the vault it opened once the last
+  // keyfile wallet is removed (and, on iOS, an uninstall), so it is
+  // dropped rather than kept.
+  const vaultWithoutPassword = view !== "loading" && initError === null && !vaultHasPassword(wallets);
+  useEffect(() => {
+    if (!vaultWithoutPassword || !platform.capabilities.biometrics) return;
+    platform.biometrics.remove().catch((error: unknown) => console.error("Couldn't remove the biometric unlock.", error));
+  }, [vaultWithoutPassword, platform]);
+
   const addressIdentity = useMemo(
     () => makeAddressIdentity(identityKey, () => void loadAddressIdentityKey(runtime).then(setIdentityKey)),
     [identityKey, runtime],
@@ -332,6 +341,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
         onSetUpPasskey={() => platform.unlock.openPasskeyWindow("setup")}
+        biometrics={platform.capabilities.biometrics ? platform.biometrics : undefined}
       />
     );
   } else if (subView.kind === "network-peers") {

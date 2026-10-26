@@ -40,6 +40,30 @@ export interface UnlockPort {
   openPasskeyWindow(mode: PasskeyWindowMode): Promise<void>;
 }
 
+/** What the device calls its biometric check, for the copy that names it. */
+export type BiometryKind = "faceId" | "touchId" | "fingerprint" | "face" | "iris" | "biometrics";
+
+export type BiometricAvailability =
+  | { available: true; kind: BiometryKind }
+  | { available: false; reason: "not-enrolled" | "no-passcode" | "unavailable" };
+
+/**
+ * Biometric unlock keeps the vault password in the device's secure
+ * storage, released only by the OS after a biometric check. The app then
+ * unlocks with that password exactly as if it were typed. Calls that fail
+ * reject with a `BiometricError`.
+ */
+export interface BiometricUnlockPort {
+  availability(): Promise<BiometricAvailability>;
+  /** Whether a password is stored. Asks the OS without a prompt. */
+  isEnrolled(): Promise<boolean>;
+  /** Stores `password` behind the biometrics enrolled now. Replaces any earlier one. */
+  enrol(password: string): Promise<void>;
+  /** Shows the OS prompt and resolves the password it released. */
+  readPassword(): Promise<string>;
+  remove(): Promise<void>;
+}
+
 export interface ActiveSitePort {
   /** Calls `onChange` whenever the site in view, or what is known about it, may have changed. */
   subscribe(onChange: () => void): () => void;
@@ -72,6 +96,8 @@ export interface AppPlatform {
   hostPermissions: HostPermissionsPort;
   ephemeralState: EphemeralStatePort;
   unlock: UnlockPort;
+  /** Reached only when `capabilities.biometrics` is on. */
+  biometrics: BiometricUnlockPort;
   activeSite: ActiveSitePort;
   downloads: DownloadsPort;
   hardwareWallets: HardwareWalletsPort;

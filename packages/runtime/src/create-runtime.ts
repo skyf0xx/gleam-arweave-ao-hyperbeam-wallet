@@ -750,6 +750,7 @@ export function createRuntime(platform: Platform): Runtime {
     },
     getPasskeyStatus: () => passkey.getPasskeyStatus(),
     checkVaultPassword: (data) => lifecycle.checkVaultPassword(data),
+    probeVaultPassword: (data) => lifecycle.probeVaultPassword(data),
     enrollPasskey: (data) => passkey.enrollPasskey(data),
     unlockWithPasskey: async (data) => {
       const result = await passkey.unlockWithPasskey(data);

@@ -30,7 +30,10 @@
 1 apps/mobile/src/adapters/sqlite-store.ts
 1 apps/mobile/src/adapters/sqlite-channel.ts
 1 apps/mobile/src/adapters/session-key-store.ts
+1 apps/mobile/src/adapters/biometric-unlock.ts
 1 packages/app/src/passkey/
+1 packages/app/src/biometrics/
+1 packages/app/src/screens/lock-settings/src/BiometricSection.tsx
 1 packages/app/src/screens/onboarding/src/Import.tsx
 1 packages/app/src/screens/onboarding/src/OnboardingView.tsx
 1 packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx

@@ -23,7 +23,10 @@
 /apps/mobile/src/adapters/sqlite-store.ts                                  @skyf0xx
 /apps/mobile/src/adapters/sqlite-channel.ts                                @skyf0xx
 /apps/mobile/src/adapters/session-key-store.ts                             @skyf0xx
+/apps/mobile/src/adapters/biometric-unlock.ts                              @skyf0xx
 /packages/app/src/passkey/                                                 @skyf0xx
+/packages/app/src/biometrics/                                              @skyf0xx
+/packages/app/src/screens/lock-settings/src/BiometricSection.tsx           @skyf0xx
 /packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
 /packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx
 /packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx           @skyf0xx

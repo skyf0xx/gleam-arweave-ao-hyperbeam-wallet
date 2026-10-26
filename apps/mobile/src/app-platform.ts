@@ -1,12 +1,13 @@
 import { App } from "@capacitor/app";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
+import { createBiometricUnlock } from "./adapters/biometric-unlock";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
 
 /**
- * The phone's `AppPlatform`. Capabilities the app gains later (biometrics,
- * the dApp browser) stay off until their adapters land.
+ * The phone's `AppPlatform`. Capabilities the app gains later (the dApp
+ * browser) stay off until their adapters land.
  */
 export function createMobileAppPlatform(): AppPlatform {
   // The app has one long-lived surface, so state that must outlive a
@@ -27,7 +28,7 @@ export function createMobileAppPlatform(): AppPlatform {
     capabilities: {
       sidePanel: false,
       passkey: false,
-      biometrics: false,
+      biometrics: true,
       hardwareWallets: false,
       dappBrowser: false,
       hostPermissions: false,
@@ -48,6 +49,7 @@ export function createMobileAppPlatform(): AppPlatform {
         throw new Error("Passkeys aren't available in the app.");
       },
     },
+    biometrics: createBiometricUnlock(),
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

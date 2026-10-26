@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { SecurityPhrase } from "@gleam/core";
 import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
@@ -19,6 +19,8 @@ export interface UnlockScreenProps {
   tagline?: string;
   /** Present when a passkey is set up. It becomes the primary way in, with the password one tap away. */
   passkey?: PasskeyUnlockProps;
+  /** Present when biometric unlock is set up. It takes the passkey's place. */
+  biometrics?: BiometricUnlockProps;
   /** The user's anti-phishing phrase, when one is set. */
   securityPhrase?: SecurityPhrase | null;
 }
@@ -30,6 +32,40 @@ export interface PasskeyUnlockProps {
   notice?: { text: string; tone: "muted" | "error" };
 }
 
+export interface BiometricUnlockProps extends PasskeyUnlockProps {
+  /** What the device calls it, mid-sentence: "Face ID", "fingerprint". */
+  label: string;
+}
+
+interface QuickUnlock extends PasskeyUnlockProps {
+  icon: ReactNode;
+  action: string;
+  waiting: string;
+  switchBack: string;
+}
+
+function quickUnlockFor(passkey?: PasskeyUnlockProps, biometrics?: BiometricUnlockProps): QuickUnlock | undefined {
+  if (biometrics) {
+    return {
+      ...biometrics,
+      icon: <BiometricIcon />,
+      action: `Unlock with ${biometrics.label}`,
+      waiting: `Waiting for ${biometrics.label}…`,
+      switchBack: `Use ${biometrics.label}`,
+    };
+  }
+  if (passkey) {
+    return {
+      ...passkey,
+      icon: <PasskeyIcon />,
+      action: "Unlock with passkey",
+      waiting: "Waiting for passkey…",
+      switchBack: "Use passkey",
+    };
+  }
+  return undefined;
+}
+
 export function UnlockScreen({
   onUnlock,
   unlocking = false,
@@ -37,8 +73,12 @@ export function UnlockScreen({
   onForgotPassword,
   tagline = "Simple. Fast. Easy.",
   passkey,
+  biometrics,
   securityPhrase,
 }: UnlockScreenProps) {
+  const quick = quickUnlockFor(passkey, biometrics);
+  // The form and the links stay disabled while the other way in is running.
+  const locked = unlocking || (quick?.busy ?? false);
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -65,10 +105,10 @@ export function UnlockScreen({
         <SecurityPhraseMark phrase={securityPhrase} iconSvg={phraseIcon} layout="stacked" className="mt-6" />
       ) : null}
 
-      {passkey && !usePassword ? (
-        <PasskeyUnlock
-          {...passkey}
-          disabled={unlocking}
+      {quick && !usePassword ? (
+        <QuickUnlockButtons
+          {...quick}
+          disabled={locked}
           onUsePassword={() => setUsePassword(true)}
         />
       ) : (
@@ -76,7 +116,7 @@ export function UnlockScreen({
           className="mt-12 flex w-full flex-col gap-2.5"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!unlocking && password.length > 0) onUnlock(password);
+            if (!locked && password.length > 0) onUnlock(password);
           }}
         >
           <PasswordField
@@ -85,7 +125,7 @@ export function UnlockScreen({
             autoFocus
             autoComplete="current-password"
             value={password}
-            disabled={unlocking}
+            disabled={locked}
             onChange={(event) => setPassword(event.target.value)}
             onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
             capsLockOn={capsLockOn}
@@ -94,7 +134,7 @@ export function UnlockScreen({
 
           <Button
             type="submit"
-            disabled={unlocking || password.length === 0}
+            disabled={locked || password.length === 0}
             aria-busy={unlocking}
             className="mt-1.5"
           >
@@ -111,19 +151,19 @@ export function UnlockScreen({
       )}
 
       <div className="mt-3.5 flex justify-center gap-4">
-        {passkey && usePassword ? (
+        {quick && usePassword ? (
           <button
             type="button"
-            disabled={unlocking}
+            disabled={locked}
             onClick={() => setUsePassword(false)}
             className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
           >
-            Use passkey
+            {quick.switchBack}
           </button>
         ) : null}
         <button
           type="button"
-          disabled={unlocking}
+          disabled={locked}
           onClick={onForgotPassword}
           className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline"
         >
@@ -134,25 +174,28 @@ export function UnlockScreen({
   );
 }
 
-function PasskeyUnlock({
+function QuickUnlockButtons({
   onUnlock,
   busy,
   notice,
+  icon,
+  action,
+  waiting,
   disabled,
   onUsePassword,
-}: PasskeyUnlockProps & { disabled: boolean; onUsePassword: () => void }) {
+}: QuickUnlock & { disabled: boolean; onUsePassword: () => void }) {
   return (
     <div className="mt-12 flex w-full flex-col gap-2.5">
       <Button type="button" autoFocus disabled={busy || disabled} aria-busy={busy} onClick={onUnlock}>
         {busy ? (
           <>
             <Spinner />
-            <span>Waiting for passkey&hellip;</span>
+            <span>{waiting}</span>
           </>
         ) : (
           <>
-            <PasskeyIcon />
-            <span>Unlock with passkey</span>
+            {icon}
+            <span>{action}</span>
           </>
         )}
       </Button>
@@ -187,6 +230,15 @@ export function PasskeyIcon({ size = 16 }: { size?: number }) {
       <path d="M3 20a6 6 0 0 1 9.5-4.9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
       <circle cx="17.5" cy="14.5" r="2.5" stroke="currentColor" strokeWidth="1.75" />
       <path d="M17.5 17v4m0-2h1.75" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function BiometricIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1M9.5 16a3.5 3.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -13,6 +13,8 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
+import { BiometricSection } from "./BiometricSection";
+import type { BiometricUnlockPort } from "../../../app-platform/types";
 
 const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
   { value: "never", label: "Never" },
@@ -36,6 +38,8 @@ export interface LockSettingsViewProps {
   onSetUpPasskey?: () => Promise<void>;
   /** Injected for tests; defaults to feature-detecting WebAuthn. */
   passkeysSupported?: boolean;
+  /** Omitted, the biometric section is hidden. */
+  biometrics?: BiometricUnlockPort;
 }
 
 interface LoadState {
@@ -50,6 +54,7 @@ export function LockSettingsView({
   onLocked,
   onSetUpPasskey,
   passkeysSupported = passkeysAvailable(),
+  biometrics,
 }: LockSettingsViewProps) {
   const [state, setState] = useState<LoadState>({
     settings: null,
@@ -144,6 +149,8 @@ export function LockSettingsView({
             </span>
           </button>
         </div>
+
+        {biometrics ? <BiometricSection runtime={runtime} biometrics={biometrics} /> : null}
 
         {onSetUpPasskey ? (
           <PasskeySection
