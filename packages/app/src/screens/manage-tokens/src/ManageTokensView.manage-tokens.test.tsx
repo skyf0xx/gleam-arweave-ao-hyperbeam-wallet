@@ -147,7 +147,7 @@ describe("ManageTokensView", () => {
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "previewWatchedToken" }));
   });
 
-  it("lets a token whose balance can't be read still be added, saying why", async () => {
+  it("lets a token whose balance can't be read still be added, in plain words", async () => {
     const unreadable: TokenBalance = { ...BALANCE_1, available: false, unavailableReason: "Couldn't read your wUSDC balance." };
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getWatchedTokens") return [];
@@ -161,8 +161,28 @@ describe("ManageTokensView", () => {
     await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
     fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
 
-    await waitFor(() => expect(screen.getByText(/Couldn't read your wUSDC balance\. You can still add it/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/can't read this token right now/)).toBeTruthy());
+    expect(screen.getByText(/You can still add it/)).toBeTruthy();
+    expect(screen.getByText(/can't read this token right now/).parentElement?.getAttribute("title")).toBe("Couldn't read your wUSDC balance.");
     expect((screen.getByText("Add wUSDC").closest("button") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shortens the process id of a token whose details can't be read", async () => {
+    const unknown: TokenBalance = { ...BALANCE_1, ticker: PROC_1, name: null, available: false };
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getWatchedTokens") return [];
+      if (type === "getTokenBalances") return [];
+      if (type === "previewWatchedToken") return unknown;
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+
+    renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+
+    await waitFor(() => expect(screen.getByText("Add token")).toBeTruthy());
+    expect(screen.queryByText(PROC_1)).toBeNull();
   });
 
   it("lists discovered tokens separately, and hiding one calls removeWatchedToken", async () => {

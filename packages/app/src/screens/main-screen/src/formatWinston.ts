@@ -1,3 +1,5 @@
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
+
 /**
  * Formats a Winston atomic-integer string as an AR display string
  * (1 AR = 10^12 Winston), using `BigInt` arithmetic throughout so no
@@ -54,9 +56,9 @@ function isValidArweaveAddress(address: string): boolean {
 /**
  * A `ticker` that is really an Arweave/AO process id (unregistered
  * tokens have no other source for a symbol — see `ao/balance.ts`)
- * shortens to a `abcd…wxyz` display form rather than showing the full
- * 43-char address as if it were the token's name.
+ * shortens like a wallet address (`abcdef…wxyz`) rather than showing the
+ * full 43-char address as if it were the token's name.
  */
 export function displayTicker(ticker: string): string {
-  return isValidArweaveAddress(ticker) ? `${ticker.slice(0, 4)}…${ticker.slice(-4)}` : ticker;
+  return isValidArweaveAddress(ticker) ? truncateAddress(ticker, 6) : ticker;
 }

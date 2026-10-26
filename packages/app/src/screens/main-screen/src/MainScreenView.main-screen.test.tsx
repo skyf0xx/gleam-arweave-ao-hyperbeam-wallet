@@ -1077,7 +1077,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
-    await waitFor(() => expect(screen.getByText("-42 unkn…0000")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("-42 unknow…0000")).toBeTruthy());
   });
 
   it("shows a collectible send as its name and thumbnail, not an amount", async () => {

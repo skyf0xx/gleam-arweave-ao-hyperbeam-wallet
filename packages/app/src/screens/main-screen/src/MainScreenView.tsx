@@ -752,7 +752,7 @@ export function MainScreenView({
                     const discovered = token.source === "discovered";
                     return {
                       key: token.processId,
-                      label: token.ticker,
+                      label: displayTicker(token.ticker),
                       processId: token.processId,
                       // Anyone can send a token, so one the user didn't add starts hidden.
                       defaultHidden: discovered,
@@ -763,7 +763,7 @@ export function MainScreenView({
                             tone: 2,
                             logoUrl: shownTokenLogo(token, rowVisibility, showTokenLogos),
                           }}
-                          name={token.ticker}
+                          name={displayTicker(token.ticker)}
                           amount={
                             token.available === false
                               ? UNAVAILABLE_BALANCE_LABEL
