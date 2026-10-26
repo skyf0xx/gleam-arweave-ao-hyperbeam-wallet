@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@gleam/core": "workspace:*",
-    "@hono/node-server": "^2.1.4",
+    "@hono/node-server": "^2.1.5",
     "hono": "^4.13.13",
     "pg": "^8.23.1",
     "tsx": "^4.23.15"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "^0.5.10",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1"
   }
