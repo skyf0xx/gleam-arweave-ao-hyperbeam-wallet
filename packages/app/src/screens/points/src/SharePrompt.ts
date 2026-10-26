@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointsSharePrompt, PointsWalletScore, RuntimePort, WalletSummary } from "@gleam/core";
-import { FOUNDING_GATE } from "../../../founding-gate";
+import { usePlatform } from "../../../app-platform/context";
 import {
   useMarkSeatsSeen,
   useMarkShareSeen,
@@ -29,7 +29,7 @@ export interface SharePromptState {
  */
 export function pickSharePrompt({ score, shareSeen, seatsSeen, revealSeen }: SharePromptState): SharePromptKind | null {
   const seats = score.seatsLeft;
-  if (!FOUNDING_GATE || seats === null) return null;
+  if (seats === null) return null;
   if (seatsSeen !== undefined && seats > seatsSeen) return "gainedSeat";
   if (seats === 1 && !shareSeen.includes("lastSeat")) return "lastSeat";
   if (score.foundingNumber !== null && !revealSeen && !shareSeen.includes("joined")) return "joined";
@@ -72,7 +72,7 @@ export interface ActiveSharePrompt extends PromptContent {
  */
 export function useSharePrompt({ runtime, wallet, score }: SharePromptArgs): ActiveSharePrompt | null {
   const seats = score?.seatsLeft ?? null;
-  const ready = FOUNDING_GATE && seats !== null;
+  const ready = usePlatform().buildInfo.foundingGate && seats !== null;
   const shareSeen = usePointsShareSeen(runtime, ready);
   const seatsSeen = usePointsSeatsSeen(runtime, ready);
   const revealSeen = usePointsRevealSeen(runtime, ready);

@@ -21,7 +21,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
   const state = new Map<string, unknown>();
   return {
     runtime: overrides.runtime ?? UNWIRED_RUNTIME,
-    buildInfo: { version: "1.2.3", ...overrides.buildInfo },
+    buildInfo: { version: "1.2.3", foundingGate: true, ...overrides.buildInfo },
     capabilities: {
       sidePanel: true,
       passkey: true,

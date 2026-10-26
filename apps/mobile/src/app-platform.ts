@@ -22,7 +22,8 @@ export function createMobileAppPlatform(): AppPlatform {
   });
   return {
     runtime,
-    buildInfo: { version },
+    // Set `VITE_FOUNDING_GATE=false` for the Phase 2 build; it's on otherwise.
+    buildInfo: { version, foundingGate: import.meta.env.VITE_FOUNDING_GATE !== "false" },
     capabilities: {
       sidePanel: false,
       passkey: false,

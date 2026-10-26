@@ -32,7 +32,11 @@ export function createExtensionAppPlatform(
 ): AppPlatform {
   return {
     runtime: runtimePort,
-    buildInfo: { version: browser.runtime.getManifest().version },
+    buildInfo: {
+      version: browser.runtime.getManifest().version,
+      // Set `WXT_FOUNDING_GATE=false` for the Phase 2 build; it's on otherwise.
+      foundingGate: import.meta.env.WXT_FOUNDING_GATE !== "false",
+    },
     capabilities: {
       sidePanel: true,
       passkey: true,

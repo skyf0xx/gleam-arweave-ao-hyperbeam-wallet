@@ -63,7 +63,11 @@ export interface HardwareWalletsPort {
 export interface AppPlatform {
   /** The wire to the wallet's background. */
   runtime: RuntimePort;
-  buildInfo: { version: string };
+  buildInfo: {
+    version: string;
+    /** Phase 1 of Gleam Points: onboarding goes through the Founding gate. Each shell sets it at build time. */
+    foundingGate: boolean;
+  };
   capabilities: AppCapabilities;
   hostPermissions: HostPermissionsPort;
   ephemeralState: EphemeralStatePort;

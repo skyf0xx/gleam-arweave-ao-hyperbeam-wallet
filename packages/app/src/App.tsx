@@ -27,7 +27,6 @@ import { PointsView } from "./screens/points/index.tsx";
 import { UploadView } from "./screens/upload/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
-import { FOUNDING_GATE } from "./founding-gate";
 import { sitePageUrl } from "@gleam/core";
 
 /**
@@ -212,7 +211,11 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else if (view === "loading") {
     content = <div className="p-4 text-body text-muted">Loading&hellip;</div>;
   } else if (view === "onboarding") {
-    content = <GatedOnboarding runtime={runtime} onComplete={() => void refresh(runtime)} />;
+    content = <GatedOnboarding
+        runtime={runtime}
+        onComplete={() => void refresh(runtime)}
+        gateEnabled={platform.buildInfo.foundingGate}
+      />;
   } else if (view === "unlock") {
     content = (
       <UnlockView
@@ -297,7 +300,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <OnboardingView
         runtime={runtime}
         mode="add-wallet"
-        claim={FOUNDING_GATE ? "founding" : "open"}
+        claim={platform.buildInfo.foundingGate ? "founding" : "open"}
         onCancel={() => setSubView({ kind: "wallet-switcher" })}
         onComplete={() => {
           setSubView({ kind: "home" });
@@ -370,7 +373,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else {
     content = (
       <PendingClaim runtime={runtime} wallet={wallet}>
-        <ExistingMemberReveal runtime={runtime} wallet={wallet}>
+        <ExistingMemberReveal runtime={runtime} wallet={wallet} enabled={platform.buildInfo.foundingGate}>
           <MainScreenView
             runtime={runtime}
             wallet={wallet}

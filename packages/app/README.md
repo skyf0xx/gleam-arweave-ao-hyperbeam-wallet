@@ -63,9 +63,9 @@ classes are never generated.
 ### Shared modules
 
 `address-identity.tsx` and `account-avatar.ts` (avatars seeded from the
-security phrase), `display-settings.ts`, `founding-gate.ts`,
-`points-share.ts`, `security-phrase-icon.ts`, `passkey/webauthn.ts` (the
-WebAuthn calls) and `keyfile/download.ts`.
+security phrase), `display-settings.ts`, `points-share.ts`,
+`security-phrase-icon.ts`, `passkey/webauthn.ts` (the WebAuthn calls) and
+`keyfile/download.ts`.
 
 ## Tests
 
