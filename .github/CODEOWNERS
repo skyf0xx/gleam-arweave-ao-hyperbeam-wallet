@@ -72,6 +72,8 @@
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 /apps/extension/src/hardware/panels/                                       @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
+/apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
+/apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/runtime/src/points-invite.ts                                     @skyf0xx

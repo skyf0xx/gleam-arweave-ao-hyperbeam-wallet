@@ -23,12 +23,17 @@ export interface PageRuntime {
   tabClosed(tabId: number): Promise<void>;
 }
 
-export type DappViewBridgePlugin = Pick<DappViewPlugin, "open" | "close" | "postMessage" | "reload" | "addListener">;
+export type DappViewBridgePlugin = Pick<DappViewPlugin, "open" | "close" | "postMessage" | "reload" | "setHidden" | "addListener">;
 
 export interface DappBridge {
   /** Opens `url` in the dApp view with Gleam's provider in every page. */
   open(options: { url: string; frame: DappViewRect }): Promise<void>;
   close(): Promise<void>;
+  /**
+   * The native view sits above the wallet WebView, so anything the wallet
+   * draws over it (the approval sheet) has to hide it first.
+   */
+  setHidden(hidden: boolean): Promise<void>;
   /** The dApp view as the runtime's one browser tab, served to the worker by `serveDappTabs`. */
   tabs: TabsPort;
 }
@@ -212,6 +217,7 @@ export function createDappBridge({
       await plugin.close();
       replaceTab(null);
     },
+    setHidden: (hidden) => plugin.setHidden({ hidden }),
     tabs,
     listening,
   };

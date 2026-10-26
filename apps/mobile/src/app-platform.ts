@@ -4,6 +4,7 @@ import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { DappView } from "@gleam/dapp-view";
 import providerScript from "virtual:gleam-provider-script";
 import { version } from "../package.json";
+import { createApprovalSheet, serveApprovalSheet } from "./adapters/approval-sheet";
 import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
 import { createQrScanner } from "./adapters/qr-scanner";
@@ -38,6 +39,14 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
   serveDappTabs(worker, dapps.tabs);
   // The browser preview has no native dApp view to listen to.
   dapps.listening.catch(() => undefined);
+  const approvalSheet = createApprovalSheet();
+  serveApprovalSheet(worker, approvalSheet);
+  approvalSheet.subscribe((requestId) => {
+    dapps.setHidden(requestId !== null).catch(() => undefined);
+  });
+  // A request left up while the app is away would still be there on return,
+  // so it's rejected instead.
+  void App.addListener("pause", () => approvalSheet.dismissAll());
   // The worker's intervals stop while the app is in the background; this
   // runs the ones that came due, auto-lock among them.
   void App.addListener("resume", () => {
@@ -77,6 +86,7 @@ export async function createMobileAppPlatform(): Promise<AppPlatform> {
     qrScanner: preview?.qrScanner ?? createQrScanner(),
     storeReview: preview?.storeReview ?? createStoreReview(),
     backButton: createBackButton(),
+    approvalSheet,
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

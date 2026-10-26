@@ -20,3 +20,4 @@ export {
   type DefaultTokenId,
   type DefaultTokenIdentity,
 } from "./tokens/default-tokens";
+export { Sheet, type SheetProps } from "./primitives/sheet";

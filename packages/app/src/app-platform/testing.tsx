@@ -68,6 +68,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },
     storeReview: overrides.storeReview ?? { opensPage: true, request: async () => {} },
     ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
+    ...(overrides.approvalSheet ? { approvalSheet: overrides.approvalSheet } : {}),
   };
 }
 

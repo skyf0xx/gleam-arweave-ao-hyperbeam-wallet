@@ -452,7 +452,7 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
 
     presenter.userDismisses(requestId);
 
-    await expect(pending).rejects.toThrow(/approval window was closed/);
+    await expect(pending).rejects.toThrow(/approval was dismissed/);
   });
 
   it("submitDeviceSignature is refused for a request still in review", async () => {

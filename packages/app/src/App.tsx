@@ -28,6 +28,7 @@ import { PointsView } from "./screens/points/index.tsx";
 import { UploadView } from "./screens/upload/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
+import { ApprovalSheet } from "./approval/ApprovalSheet";
 import { sitePageUrl } from "@gleam/core";
 
 /**
@@ -120,6 +121,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
   const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
   const [backStack] = useState(createBackStack);
+  const [layoutRoot, setLayoutRoot] = useState<HTMLDivElement | null>(null);
 
   // Every back arrow on screen and every overlay registers with the stack, so
   // the system back press undoes what a tap on Back would. Unhandled, the
@@ -418,11 +420,13 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <BackStackContext.Provider value={backStack}>
       <AddressIdentityProvider value={addressIdentity}>
         <div
+          ref={setLayoutRoot}
           data-layout={layout}
           data-theme={theme === "dark" ? "dark" : undefined}
           className="min-h-full bg-background text-foreground"
         >
           {content}
+          {platform.approvalSheet ? <ApprovalSheet port={platform.approvalSheet} container={layoutRoot} /> : null}
         </div>
       </AddressIdentityProvider>
       </BackStackContext.Provider>

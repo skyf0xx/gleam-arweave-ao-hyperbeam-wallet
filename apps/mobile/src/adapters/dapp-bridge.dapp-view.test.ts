@@ -27,6 +27,7 @@ function fakeDappView(pageOrigin = DAPP) {
     open: vi.fn(async () => {}),
     close: vi.fn(async () => {}),
     reload: vi.fn(async () => {}),
+    setHidden: vi.fn(async () => {}),
     postMessage: vi.fn(async ({ data, targetOrigin }: { data: string; targetOrigin: string }) => {
       const delivered = targetOrigin === page.origin;
       posted.push({ envelope: JSON.parse(data) as Record<string, unknown>, targetOrigin, delivered });
@@ -89,6 +90,16 @@ describe("attestedOrigin", () => {
 });
 
 describe("createDappBridge", () => {
+  it("hides and shows the native view on request", async () => {
+    const { view, dapps } = bridge();
+
+    await dapps.setHidden(true);
+    await dapps.setHidden(false);
+
+    expect(view.plugin.setHidden).toHaveBeenNthCalledWith(1, { hidden: true });
+    expect(view.plugin.setHidden).toHaveBeenNthCalledWith(2, { hidden: false });
+  });
+
   it("answers a main-frame request with the runtime's result, addressed to the reporting origin", async () => {
     const { view, runtime } = bridge();
     view.message({ data: request() });

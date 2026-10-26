@@ -125,6 +125,18 @@ export interface BackButtonPort {
   subscribe(handler: () => boolean): () => void;
 }
 
+/**
+ * Where the shell shows an approval request: a sheet over the current
+ * screen, for a host with one surface instead of an approval window per
+ * request. The shell decides which request is up next; the app draws it.
+ */
+export interface ApprovalSheetPort {
+  /** Calls `onChange` with the request to show, or `null` when none. Returns the unsubscribe function. */
+  subscribe(onChange: (requestId: string | null) => void): () => void;
+  /** The user closed the sheet for `requestId` themselves, which rejects it. */
+  dismissed(requestId: string): void;
+}
+
 export interface AppPlatform {
   /** The wire to the wallet's background. */
   runtime: RuntimePort;
@@ -147,4 +159,6 @@ export interface AppPlatform {
   storeReview: StoreReviewPort;
   /** Omitted where the host has no system back press. */
   backButton?: BackButtonPort;
+  /** Omitted where each approval gets its own window. */
+  approvalSheet?: ApprovalSheetPort;
 }
