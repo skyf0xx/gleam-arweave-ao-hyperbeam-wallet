@@ -26,6 +26,9 @@
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
 1 apps/extension/src/adapters/session-access.ts
+1 apps/mobile/src/adapters/storage.ts
+1 apps/mobile/src/adapters/sqlite-store.ts
+1 apps/mobile/src/adapters/sqlite-channel.ts
 1 packages/app/src/passkey/
 1 packages/app/src/screens/onboarding/src/Import.tsx
 1 packages/app/src/screens/onboarding/src/OnboardingView.tsx
@@ -70,6 +73,7 @@
 5 apps/mobile/index.html
 5 apps/mobile/ios/App/App/Info.plist
 5 apps/mobile/android/app/src/main/AndroidManifest.xml
+5 apps/mobile/android/app/src/main/res/xml/data_extraction_rules.xml
 5 .github/
 5 pnpm-workspace.yaml
 5 pnpm-lock.yaml

@@ -8,9 +8,10 @@ import { createWorkerPlatform } from "./platform";
  * this worker, off the UI thread. The UI reaches it only through
  * `createWorkerRuntimePort`.
  */
-const runtime = createRuntime(createWorkerPlatform());
 // The app compiles against DOM types; here `self` is the worker's global scope.
-exposeRuntimeHost(runtime, self as unknown as Endpoint);
+const scope = self as unknown as Endpoint;
+const runtime = createRuntime(createWorkerPlatform(scope));
+exposeRuntimeHost(runtime, scope);
 runtime.start();
 // The worker starts only when the app does.
 runtime.onBrowserStartup();

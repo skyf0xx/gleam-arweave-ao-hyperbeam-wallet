@@ -19,6 +19,9 @@
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
 /apps/extension/src/adapters/session-access.ts                             @skyf0xx
+/apps/mobile/src/adapters/storage.ts                                       @skyf0xx
+/apps/mobile/src/adapters/sqlite-store.ts                                  @skyf0xx
+/apps/mobile/src/adapters/sqlite-channel.ts                                @skyf0xx
 /packages/app/src/passkey/                                                 @skyf0xx
 /packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
 /packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx
@@ -67,6 +70,7 @@
 /apps/mobile/index.html                                                    @skyf0xx
 /apps/mobile/ios/App/App/Info.plist                                        @skyf0xx
 /apps/mobile/android/app/src/main/AndroidManifest.xml                      @skyf0xx
+/apps/mobile/android/app/src/main/res/xml/data_extraction_rules.xml        @skyf0xx
 /.github/                                                                  @skyf0xx
 /pnpm-workspace.yaml                                                       @skyf0xx
 /pnpm-lock.yaml                                                            @skyf0xx

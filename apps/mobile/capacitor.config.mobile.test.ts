@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import config from "./capacitor.config";
 import packageJson from "./package.json";
@@ -17,5 +18,25 @@ describe("capacitor.config", () => {
     const installed = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
     expect(installed.filter((name) => LIVE_UPDATE_PACKAGE.test(name))).toEqual([]);
     expect(Object.keys(config.plugins ?? {}).filter((name) => LIVE_UPDATE_PACKAGE.test(name))).toEqual([]);
+  });
+
+  // The database holds the sealed vault; a backup would expose it to
+  // offline password guessing.
+  it("keeps the wallet database out of backups", () => {
+    expect(config.plugins?.CapacitorSQLite?.iosDatabaseLocation).toBe("Library/CapacitorDatabase");
+
+    const res = new URL("./android/app/src/main/", import.meta.url);
+    const manifest = readFileSync(new URL("AndroidManifest.xml", res), "utf8");
+    expect(manifest).toContain('android:allowBackup="false"');
+    expect(manifest).toContain('android:dataExtractionRules="@xml/data_extraction_rules"');
+
+    const rules = readFileSync(new URL("res/xml/data_extraction_rules.xml", res), "utf8");
+    for (const section of ["cloud-backup", "device-transfer"]) {
+      const body = rules.match(new RegExp(`<${section}>([\\s\\S]*?)</${section}>`))?.[1] ?? "";
+      expect(body).not.toContain("<include");
+      for (const domain of ["root", "file", "database", "sharedpref", "external"]) {
+        expect(body).toContain(`<exclude domain="${domain}" path="." />`);
+      }
+    }
   });
 });

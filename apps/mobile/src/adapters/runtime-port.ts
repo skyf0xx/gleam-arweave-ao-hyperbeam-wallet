@@ -26,7 +26,7 @@ export function createWorkerRuntimePort(endpoint: Comlink.Endpoint): RuntimePort
       });
       return (await Promise.race([reply, loadFailure])) as TResponse;
     },
-    // The worker never messages the UI, so no handler would ever be called.
+    // The worker sends the UI no runtime messages, so no handler would ever be called.
     onMessage: () => () => {},
   };
 }

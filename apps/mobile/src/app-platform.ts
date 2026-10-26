@@ -1,6 +1,7 @@
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { version } from "../package.json";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
+import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
 
 /**
  * The phone's `AppPlatform`. Capabilities the app gains later (biometrics,
@@ -11,6 +12,7 @@ export function createMobileAppPlatform(): AppPlatform {
   // closed popup in the extension only needs to outlive a re-render here.
   const ephemeral = new Map<string, unknown>();
   const worker = new Worker(new URL("./worker/index.ts", import.meta.url), { type: "module" });
+  serveSqliteStore(worker, createSqliteStore(openCapacitorDb));
   return {
     runtime: createWorkerRuntimePort(worker),
     buildInfo: { version },

@@ -1,6 +1,7 @@
 import type { ApprovalPresenterPort, DeviceKeyPort, DownloadPort, SessionKeyStorePort } from "@gleam/core";
 import type { Platform, TabsPort } from "@gleam/runtime";
-import { InMemoryStorage, InMemoryTimer } from "@gleam/runtime/testing/index.ts";
+import { InMemoryTimer } from "@gleam/runtime/testing/index.ts";
+import { connectSqliteStore, MobileStoragePort } from "../adapters/storage";
 import { version } from "../../package.json";
 
 // Holds no key, so every wallet stays locked until the worker's key store (M18).
@@ -53,12 +54,12 @@ const noTabs: TabsPort = {
 };
 
 /**
- * The worker's `Platform`. Storage and the timer are in memory until the
- * SQLite storage adapter (M17) and the worker timer (M19) replace them.
+ * The worker's `Platform`, with `scope` the worker's global scope. The
+ * timer is in memory until the worker timer (M19) replaces it.
  */
-export function createWorkerPlatform(): Platform {
+export function createWorkerPlatform(scope: Parameters<typeof connectSqliteStore>[0]): Platform {
   return {
-    storage: new InMemoryStorage(),
+    storage: new MobileStoragePort(connectSqliteStore(scope)),
     sessionKeys: noSessionKeys,
     approvalPresenter: noApprovals,
     timer: new InMemoryTimer(),
