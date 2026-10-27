@@ -27,15 +27,15 @@ export interface NetworkSettings {
 export const DEFAULT_HYPERBEAM_PEER_URLS: readonly string[] = ["https://state.forward.computer"];
 
 /**
- * ANS-104 bundler that uploads and bundled `dispatch` items are posted to.
+ * ANS-104 bundler that bundled `dispatch` items are posted to.
  * Also listed in apps/extension/wxt.config.ts's `host_permissions`.
  */
 export const DEFAULT_BUNDLER_URL = "https://up.arweave.net";
 
 /**
  * lunar.arweave.net's block explorer, used everywhere a tx id or address
- * needs an external link: activity rows, send success, upload success.
- * Centralized so all three build the same URL.
+ * needs an external link: activity rows and send success.
+ * Centralized so both build the same URL.
  */
 const EXPLORER_BASE_URL = "https://lunar.arweave.net/#/explorer";
 

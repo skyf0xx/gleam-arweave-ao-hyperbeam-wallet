@@ -57,7 +57,7 @@ export type {
   AoTokenTransferRequest,
   AoTokenTransferResult,
 } from "./transfer";
-export type { UploadTag, UploadDraft, UploadReview } from "./upload";
+export type { Tag } from "./tag";
 export type {
   AddTokenApprovalPreview,
   ApprovalKind,

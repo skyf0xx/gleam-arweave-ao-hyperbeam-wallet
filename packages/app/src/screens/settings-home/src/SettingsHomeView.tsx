@@ -40,11 +40,9 @@ function gatewayHostname(gatewayUrl: string): string {
 
 /**
  * The dedicated settings screen the gear icon opens: grouped
- * WALLET/NETWORK/TOOLS/DISPLAY sections of navigable rows, each showing
+ * WALLET/NETWORK/DISPLAY sections of navigable rows, each showing
  * its current value on the right, with a Help & About section (feedback
  * card and source link) pinned below them.
- * "Upload to Arweave" is disabled, with a "Coming soon" label, until
- * bundler uploads work reliably.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
@@ -56,8 +54,6 @@ export interface SettingsHomeViewProps {
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
   onOpenDisplayCurrency: () => void;
-  /** Omitted for a wallet that can't upload, which hides the Tools section. */
-  onOpenUpload?: () => void;
   onOpenFeedback: () => void;
 }
 
@@ -76,12 +72,8 @@ export function SettingsHomeView({
   onOpenManageTokens,
   onOpenContacts,
   onOpenDisplayCurrency,
-  onOpenUpload,
   onOpenFeedback,
 }: SettingsHomeViewProps) {
-  // Upload row is disabled below; onOpenUpload stays in the prop contract
-  // so re-enabling it is a one-line change.
-  void onOpenUpload;
   const platform = usePlatform();
   const { version } = platform.buildInfo;
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
@@ -200,14 +192,6 @@ export function SettingsHomeView({
             onToggle={() => void handleToggleTheme()}
           />
         </OptionSection>
-
-        {onOpenUpload ? (
-          <OptionSection title="Tools">
-            {/* Bundler uploads don't yet work reliably with current AO wallets;
-                re-enable by restoring onClick={onOpenUpload} below. */}
-            <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
-          </OptionSection>
-        ) : null}
 
         {platform.capabilities.dappBrowser ? (
           <OptionSection title="Browser">

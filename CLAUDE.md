@@ -2,7 +2,7 @@
 
 A Chrome MV3 browser-extension wallet for Arweave and AO. It has a
 password-protected key vault, AR and AO token balances, send/receive, a
-merged activity feed, tagged Arweave uploads, and an ArConnect-compatible
+merged activity feed, and an ArConnect-compatible
 `window.arweaveWallet` provider. Every dApp signing request opens its own
 approval window with a decoded preview.
 
@@ -24,7 +24,7 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 - `packages/core`: pure domain logic. `signer/` (vault envelope, key
   import and signing, keyring; reached only through `@gleam/core/signer`
   and allowed no npm imports but `hash-wasm`), `vault/` and `keys/`
-  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, upload), `ao/` (AO
+  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, bundler), `ao/` (AO
   balance, transfer, result), `activity/`, `pricing/`, `policy/`, and
   `models/`. `ports/` holds the interfaces for storage, runtime and
   windows.
@@ -32,7 +32,7 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   popup, background, content script and page.
 - `packages/runtime`: `createRuntime(platform)`, the dispatcher
   (`dispatch/`) and every handler (`handlers/`) such as `wallet-lifecycle`,
-  `reads`, `transfer`, `upload`, `approval` and `key-session`. It reaches
+  `reads`, `transfer`, `approval` and `key-session`. It reaches
   a platform only through `Platform` (`platform.ts`).
 - `packages/ui`: design tokens, primitives and shared components.
 - `packages/app`: every screen (`src/screens/<screen>/`), the router

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { capabilitiesFor, vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
+import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "./screens/onboarding/index.tsx";
 import { UnlockView } from "./screens/unlock/index.tsx";
 import {
@@ -27,7 +27,6 @@ import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
 import { ContactsView } from "./screens/contacts/index.tsx";
 import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
 import { PointsView } from "./screens/points/index.tsx";
-import { UploadView } from "./screens/upload/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
 import { ApprovalSheet } from "./approval/ApprovalSheet";
@@ -100,7 +99,6 @@ type MainSubView =
   | { kind: "collectible"; collectible: Collectible }
   | { kind: "send-collectible"; collectible: Collectible }
   | { kind: "points" }
-  | { kind: "upload" }
   | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null; requestedPermissions: PermissionType[] };
 
 function resolveTopView(state: WalletState): TopView {
@@ -357,7 +355,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
         onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
-        onOpenUpload={wallet && capabilitiesFor(wallet.method).upload ? () => setSubView({ kind: "upload" }) : undefined}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }
@@ -407,15 +404,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "display-currency") {
     content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
-  } else if (subView.kind === "upload") {
-    content = (
-      <UploadView
-        runtime={runtime}
-        wallet={wallet}
-        onBack={() => setSubView({ kind: "settings-home" })}
-        onDone={() => setSubView({ kind: "settings-home" })}
-      />
-    );
   } else if (subView.kind === "use-gleam-on-site") {
     content = (
       <UseGleamOnSiteView

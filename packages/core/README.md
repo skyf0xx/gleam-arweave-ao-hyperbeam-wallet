@@ -25,7 +25,7 @@ wallet apps, the points server and the scan CLI.
 
 ### Networks
 
-- **`arweave/`**: AR balances and transfers, uploads, and reads from
+- **`arweave/`**: AR balances and transfers, and reads from
   Arweave gateways.
 - **`ao/`**: AO token balances and transfers, discovery of the tokens and
   collectibles an address holds, and checking whether a transfer actually
@@ -39,8 +39,7 @@ wallet apps, the points server and the scan CLI.
   like an address the user already knows, which defends against address
   poisoning.
 - **`pricing/`**: USD prices and exchange rates for display.
-- **`policy/`**: last-minute checks on what is about to be sent, such as
-  spotting a private key accidentally included in an upload.
+- **`policy/`**: which page origins may connect or ask for a signature.
 - **`points/`**: the Gleam Points rules, shared with the points server
   (see `POINTS.md`).
 - **`scan/`**: the community security-scan protocol, shared with the

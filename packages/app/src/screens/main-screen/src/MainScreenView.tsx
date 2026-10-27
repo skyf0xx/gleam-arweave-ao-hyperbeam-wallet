@@ -920,7 +920,7 @@ export function MainScreenView({
                   <SkeletonRow />
                 </>
               ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
-                <EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />
+                <EmptyState message="No activity yet. Once you send or receive, it'll show up here." />
               ) : (
                 activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => (
                   <ActivityRow

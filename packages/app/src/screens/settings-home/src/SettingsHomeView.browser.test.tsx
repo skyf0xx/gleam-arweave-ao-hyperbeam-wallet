@@ -44,7 +44,6 @@ function mount(dappBrowser: boolean) {
         onOpenManageTokens={vi.fn()}
         onOpenContacts={vi.fn()}
         onOpenDisplayCurrency={vi.fn()}
-        onOpenUpload={vi.fn()}
         onOpenFeedback={vi.fn()}
       />
     </QueryClientProvider>,

@@ -5,7 +5,7 @@ import type {
   DataItemInput,
   DispatchResult,
 } from "../models/signing";
-import { postDataItemToBundler } from "../arweave/upload";
+import { postDataItemToBundler } from "../arweave/bundler";
 import {
   applyTransactionSignature,
   buildUnsignedTransaction,

@@ -1,8 +1,8 @@
-import type { UploadTag } from "./upload";
+import type { Tag } from "./tag";
 
 /**
  * The signing/crypto provider-surface methods' request/response shapes.
- * Modeled here, in `core/models`, following `transfer.ts`/`upload.ts`'s
+ * Modeled here, in `core/models`, following `transfer.ts`'s
  * precedent: the request/response pairing lives in `core` so both
  * `messaging` and the layers that actually execute these operations can
  * share one definition.
@@ -27,7 +27,7 @@ export interface SignTransactionInput {
   data?: string;
   target?: string;
   quantity?: string;
-  tags?: UploadTag[];
+  tags?: Tag[];
   reward?: string;
   last_tx?: string;
 }
@@ -49,7 +49,7 @@ export interface SignedTransaction {
   id: string;
   last_tx: string;
   owner: string;
-  tags: UploadTag[];
+  tags: Tag[];
   target: string;
   quantity: string;
   data: string;
@@ -81,7 +81,7 @@ export interface DispatchResult {
 /** An ANS-104 data item to sign. `data` is standard base64; tags are plain text. */
 export interface DataItemInput {
   data: string;
-  tags?: UploadTag[];
+  tags?: Tag[];
   target?: string;
   anchor?: string;
 }

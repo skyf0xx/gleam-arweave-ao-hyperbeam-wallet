@@ -11,7 +11,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
  *
  * Not yet wired into `App.tsx`'s view-switch — this view module is
  * complete and independently mountable, following the same shape
- * `OnboardingView`/`SendView`/`UploadView` use for the same reason.
+ * `OnboardingView`/`SendView` use for the same reason.
  *
  * Uses the shared `SkeletonRow`/`NetworkErrorBanner` (already used by
  * main-screen/activity) instead of an ad hoc loading/error primitive.

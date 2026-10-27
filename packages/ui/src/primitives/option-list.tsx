@@ -25,8 +25,7 @@ export function OptionSection({ title, children }: OptionSectionProps) {
 /**
  * One choice in an `OptionSection`: a title, a line saying what it takes
  * or does, an optional current value, and a chevron that marks it as a
- * step forward. A disabled row drops the chevron; `comingSoon` also
- * labels it as not available yet.
+ * step forward. A disabled row drops the chevron.
  */
 export interface OptionRowProps {
   title: string;
@@ -35,7 +34,6 @@ export interface OptionRowProps {
   value?: string;
   onClick?: () => void;
   disabled?: boolean;
-  comingSoon?: boolean;
   /** Draws a line between rows. Turn off for plain lists of settings. */
   divided?: boolean;
 }
@@ -46,7 +44,6 @@ export function OptionRow({
   value,
   onClick,
   disabled = false,
-  comingSoon = false,
   divided = true,
 }: OptionRowProps) {
   const titleId = useId();
@@ -73,8 +70,7 @@ export function OptionRow({
         </span>
       </span>
       {value ? <span className="flex-shrink-0 text-label text-muted">{value}</span> : null}
-      {comingSoon ? <span className="flex-shrink-0 text-caption text-faint">Coming soon</span> : null}
-      {disabled || comingSoon ? null : (
+      {disabled ? null : (
         <span aria-hidden="true" className="flex-shrink-0 text-faint">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

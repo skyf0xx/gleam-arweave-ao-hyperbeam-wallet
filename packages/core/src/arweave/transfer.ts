@@ -8,7 +8,7 @@ import {
 } from "./transaction";
 import type { Signer } from "../vault/signer";
 import type { Winston } from "../models/balance";
-import type { UploadTag } from "../models/upload";
+import type { Tag } from "../models/tag";
 
 /**
  * This module's public functions accept an unlocked wallet's `Signer`
@@ -64,7 +64,7 @@ export async function prepareTransfer(
   ownerB64Url: string,
   recipient: string,
   amount: Winston,
-  tags: UploadTag[] = [],
+  tags: Tag[] = [],
 ): Promise<ArweaveTransactionJson> {
   // arweave-js decodes `target` with strict base64 and would otherwise
   // throw a bare "Invalid character" DOMException.

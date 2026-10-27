@@ -16,7 +16,6 @@ describe("capabilitiesFor", () => {
       decrypt: false,
       exportKey: false,
       encrypt: true,
-      upload: false,
       points: true,
     });
   });
@@ -30,7 +29,6 @@ describe("capabilitiesFor", () => {
       decrypt: false,
       exportKey: false,
       encrypt: true,
-      upload: false,
       points: true,
     });
   });
@@ -97,8 +95,8 @@ describe("capabilityRefusal", () => {
     expect(capabilityRefusal("ledger", "signDataItem", "send AO")).toBe(
       "Ledger only supports sending AR for now, so it can't send AO. Use a Keystone instead.",
     );
-    expect(capabilityRefusal("ledger", "upload", "upload files")).toBe(
-      "This wallet can't upload files. Switch to a keyfile wallet.",
+    expect(capabilityRefusal("ledger", "exportKey", "export its key")).toBe(
+      "This wallet can't export its key. Switch to a keyfile wallet.",
     );
   });
 });

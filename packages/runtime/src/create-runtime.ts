@@ -37,7 +37,6 @@ import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
 import { BrowserSitesHandler } from "./handlers/browser-sites";
 import { ContactsHandler } from "./handlers/contacts";
 import { TransferHandler } from "./handlers/transfer";
-import { UploadHandler } from "./handlers/upload";
 import { ApprovalHandler } from "./handlers/approval";
 import { AnnouncementsHandler } from "./handlers/announcements";
 import { ReviewPromptHandler } from "./handlers/review-prompt";
@@ -154,8 +153,8 @@ type ProviderHandlers = {
 const INSECURE_ORIGIN_ERROR = "Gleam only works with secure (https) sites.";
 
 /**
- * `TransferDraft`/`UploadDraft` type `walletId` as optional. Every real
- * caller (`SendView`/`UploadView`) always supplies it, but the wire type
+ * `TransferDraft` types `walletId` as optional. Every real
+ * caller (`SendView`) always supplies it, but the wire type
  * itself can't promise that — this guard turns a missing field into a
  * named rejection rather than `undefined` silently reaching the
  * key-session lookup as a wallet id. The request carries no signing
@@ -208,7 +207,6 @@ export function createRuntime(platform: Platform): Runtime {
       return approval.requestWalletTransfer({ ...req, ...metadata });
     },
   }, reads, reads);
-  const upload = new UploadHandler(storage, keySession);
   const contacts = new ContactsHandler(storage);
   const browserSites = new BrowserSitesHandler(storage);
   const approval: ApprovalHandler = new ApprovalHandler(
@@ -801,8 +799,6 @@ export function createRuntime(platform: Platform): Runtime {
     submitTransfer: (data) => transfer.submitTransfer(requireWalletId(data)),
     estimateCollectibleSend: (data) => transfer.estimateCollectibleSend(requireWalletId(data)),
     sendCollectible: (data) => transfer.sendCollectible(requireWalletId(data)),
-    reviewUpload: (data) => upload.reviewUpload(data),
-    submitUpload: (data) => upload.submitUpload(requireWalletId(data)),
 
     // approvals
     getApproval: (data) => approval.getApproval(data),

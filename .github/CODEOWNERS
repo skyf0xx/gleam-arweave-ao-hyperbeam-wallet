@@ -40,9 +40,7 @@
 /packages/core/src/arweave/rsa-pss.ts                                      @skyf0xx
 /packages/core/src/arweave/transaction.ts                                  @skyf0xx
 /packages/core/src/arweave/transfer.ts                                     @skyf0xx
-/packages/core/src/arweave/upload.ts                                       @skyf0xx
 /packages/runtime/src/handlers/transfer.ts                                 @skyf0xx
-/packages/runtime/src/handlers/upload.ts                                   @skyf0xx
 /packages/core/src/hardware/                                               @skyf0xx
 /packages/keystone/src/sign-request.ts                                     @skyf0xx
 /packages/keystone/src/decode-account.ts                                   @skyf0xx

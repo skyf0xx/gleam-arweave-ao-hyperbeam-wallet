@@ -67,8 +67,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Signing pipelines (tier 2)
 
-`core/arweave/`, `core/ao/transfer.ts`, `handlers/transfer.ts`,
-`handlers/upload.ts`.
+`core/arweave/`, `core/ao/transfer.ts`, `handlers/transfer.ts`.
 
 - Is what gets signed exactly what was approved? Look for any
   re-serialization, default filled in, or field rewritten between the

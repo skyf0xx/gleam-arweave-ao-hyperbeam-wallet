@@ -61,16 +61,10 @@ describe("ReviewPromptHandler", () => {
     expect(await prompt.get({ since: OPENED })).toBeNull();
   });
 
-  it("asks after a confirmed send or upload", async () => {
+  it("asks after a confirmed send", async () => {
     expect(
       await handler({ "local:wallets": [wallet()], "local:activityLog:addr-1": [entry()] }).prompt.get({ since: OPENED }),
     ).toEqual({ kind: "send" });
-    expect(
-      await handler({
-        "local:wallets": [wallet()],
-        "local:activityLog:addr-1": [entry({ timestamp: OPENED - 20_000 }), entry({ type: "upload" })],
-      }).prompt.get({ since: OPENED }),
-    ).toEqual({ kind: "upload" });
   });
 
   it("waits for the next visit when the send was made in this one", async () => {

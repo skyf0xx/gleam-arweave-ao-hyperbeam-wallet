@@ -1,5 +1,5 @@
 import type { Signer } from "../vault/signer";
-import type { UploadTag } from "../models/upload";
+import type { Tag } from "../models/tag";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { clientForGateway } from "./client";
 import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
@@ -21,7 +21,7 @@ export interface ArweaveTransactionJson {
   id: string;
   last_tx: string;
   owner: string;
-  tags: UploadTag[];
+  tags: Tag[];
   target: string;
   quantity: string;
   data: string;
@@ -88,7 +88,7 @@ export async function buildUnsignedTransaction(
   gatewayUrl: string,
   ownerB64Url: string,
   attributes: TransactionAttributes,
-  tags: UploadTag[] = [],
+  tags: Tag[] = [],
 ): Promise<ArweaveTransactionJson> {
   const client = clientForGateway(gatewayUrl);
   const transaction = await client.createTransaction({ ...attributes, owner: ownerB64Url });

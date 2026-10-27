@@ -78,7 +78,7 @@ import { isSessionExpired, isValidSession, SESSION_KEY, WALLETS_KEY, type KeySes
  * `unlockWallet`, `createWallet`, and `importWallet` all import the
  * wallet's JWK as non-extractable session keys there (the latter two
  * already have the plaintext JWK in hand before encrypting it, so no extra
- * decrypt is needed), so `TransferHandler`/`UploadHandler`/`ApprovalHandler` can sign
+ * decrypt is needed), so `TransferHandler`/`ApprovalHandler` can sign
  * without asking for the password again. `lockWallet` and an expired
  * auto-lock timeout both clear that cache. Expiry is checked by
  * `loadSession` here, by `getSigner` on every key read, since signing
@@ -938,7 +938,7 @@ export class WalletLifecycleHandler {
    * the same password against every other stored wallet — each mismatch
    * fails silently (never surfaced as a per-wallet prompt). Every wallet that unlocks
    * successfully has its key imported as non-extractable session keys
-   * (`key-session.ts`) so later signing calls (transfer/upload/approval)
+   * (`key-session.ts`) so later signing calls (transfer/approval)
    * don't need the password again for the rest of this unlocked session.
    *
    * Envelopes below the current KDF cost (every PBKDF2 one) are then

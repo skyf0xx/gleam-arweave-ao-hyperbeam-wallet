@@ -5,7 +5,7 @@ import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
 /**
  * ANS-104 data items with signature type 1 (Arweave RSA-PSS 4096), built
  * from plain `Uint8Array`s and WebCrypto. Every item Gleam signs (AO
- * sends, dApp `signDataItem`, bundled `dispatch`, uploads) goes through
+ * sends, dApp `signDataItem`, bundled `dispatch`) goes through
  * here: build the unsigned bytes from the owner alone, sign the deep
  * hash wherever the key lives (keyfile in memory, or a hardware device),
  * then write the signature in.

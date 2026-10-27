@@ -23,7 +23,7 @@ the runtime never has to know which one it is running in.
 - **`handlers/`**: one file per feature. For example,
   `wallet-lifecycle.ts` creates, unlocks and switches wallets, and
   `key-session.ts` looks after the unlocked key. Others include
-  `transfer.ts`, `upload.ts`, `approval.ts` and `points.ts`.
+  `transfer.ts`, `approval.ts` and `points.ts`.
 
 ## Where it sits
 

@@ -1,6 +1,6 @@
 import { prepareTransfer } from "../arweave/transfer";
 import type { ArweaveTransactionJson } from "../arweave/transaction";
-import type { UploadTag } from "../models/upload";
+import type { Tag } from "../models/tag";
 
 /**
  * Tokens on `arweave-scheduler@1.0` (fungible tokens and collectibles
@@ -13,7 +13,7 @@ import type { UploadTag } from "../models/upload";
 const ADDRESS = /^[A-Za-z0-9_-]{43}$/;
 const ATOMIC = /^[1-9]\d*$/;
 
-export function l1TransferTags(recipient: string, quantity: string): UploadTag[] {
+export function l1TransferTags(recipient: string, quantity: string): Tag[] {
   return [
     { name: "action", value: "transfer" },
     { name: "recipient", value: recipient },
@@ -49,7 +49,7 @@ export function readL1TokenTransfer(transaction: {
   target: string;
   quantity: string;
   data_size: string;
-  tags: UploadTag[];
+  tags: Tag[];
 }): { processId: string; recipient: string; quantity: string } | null {
   const [action, recipient, quantity, ...rest] = transaction.tags;
   if (

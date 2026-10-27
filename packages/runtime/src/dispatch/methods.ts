@@ -315,8 +315,6 @@ export const BACKGROUND_MESSAGES = {
   submitTransfer: EXTENSION,
   estimateCollectibleSend: EXTENSION,
   sendCollectible: EXTENSION,
-  reviewUpload: EXTENSION,
-  submitUpload: EXTENSION,
 
   // approvals
   getApproval: EXTENSION,

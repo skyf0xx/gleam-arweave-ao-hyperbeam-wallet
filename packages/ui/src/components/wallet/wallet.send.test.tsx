@@ -109,9 +109,9 @@ describe("ActivityRow", () => {
 
 describe("EmptyState", () => {
   it("renders the given message", () => {
-    render(<EmptyState message="No activity yet. Once you send, receive, or upload, it'll show up here." />);
+    render(<EmptyState message="No activity yet. Once you send or receive, it'll show up here." />);
     expect(
-      screen.getByText("No activity yet. Once you send, receive, or upload, it'll show up here."),
+      screen.getByText("No activity yet. Once you send or receive, it'll show up here."),
     ).toBeTruthy();
   });
 });

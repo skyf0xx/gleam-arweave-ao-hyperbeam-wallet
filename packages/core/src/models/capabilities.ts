@@ -20,8 +20,6 @@ export interface WalletCapabilities {
   exportKey: boolean;
   /** Encrypt to the wallet's own public key. */
   encrypt: boolean;
-  /** Tagged Arweave uploads from the Upload screen. */
-  upload: boolean;
   /**
    * Join or leave Gleam Points. A keyfile proves ownership with
    * `signMessage`, a hardware wallet by signing a 0-AR transaction that is
@@ -38,7 +36,6 @@ const KEYFILE: WalletCapabilities = {
   decrypt: true,
   exportKey: true,
   encrypt: true,
-  upload: true,
   points: true,
 };
 
@@ -50,7 +47,6 @@ const NONE: WalletCapabilities = {
   decrypt: false,
   exportKey: false,
   encrypt: false,
-  upload: false,
   points: false,
 };
 
@@ -90,7 +86,7 @@ export function capabilitiesFor(method: WalletMethod): WalletCapabilities {
   return CAPABILITIES[method];
 }
 
-type ProviderCapability = Exclude<keyof WalletCapabilities, "dispatchViaBundler" | "exportKey" | "upload" | "points">;
+type ProviderCapability = Exclude<keyof WalletCapabilities, "dispatchViaBundler" | "exportKey" | "points">;
 
 /** The capability each signing provider method needs, and how to name it to the user. */
 const PROVIDER_REQUIREMENTS: Partial<Record<ProviderMethod, { capability: ProviderCapability; action: string }>> = {

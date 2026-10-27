@@ -33,8 +33,6 @@ import type {
   TokenBalance,
   TokenPrice,
   TransferDraft,
-  UploadDraft,
-  UploadReview,
   WalletState,
   WalletSummary,
   Winston,
@@ -194,7 +192,7 @@ export interface ProtocolMap {
   listBrowserSites(): { saved: string[]; recent: string[] };
 
   // actions
-  // `TransferDraft`/`UploadDraft` carry `walletId` directly — signing
+  // `TransferDraft` carries `walletId` directly — signing
   // reads the decrypted JWK from the background's in-memory
   // unlocked-session cache (`packages/runtime/src/handlers/key-session.ts`),
   // not a password on the request: once unlocked, no further call needs
@@ -207,14 +205,12 @@ export interface ProtocolMap {
   estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;
   /** Sends one collectible as an L1 transaction to its process (`core/ao/collectible-transfer.ts`). */
   sendCollectible(req: CollectibleSendDraft): { txId: string };
-  reviewUpload(req: UploadDraft): UploadReview; // runs the secret scan
-  submitUpload(req: UploadDraft): { txId: string };
 
   // approvals
   getApproval(req: { requestId: string }): ApprovalRequest;
   /**
    * A signing approval reads its signing key the same way
-   * `submitTransfer`/`submitUpload` do — from the unlocked-session cache,
+   * `submitTransfer` does — from the unlocked-session cache,
    * keyed by the request's own `walletId` — so `resolveApproval` alone is
    * enough to finalize either a `connect` or a signing approval; no
    * separate password hand-off call precedes it any more.
