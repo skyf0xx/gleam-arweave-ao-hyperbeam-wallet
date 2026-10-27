@@ -100,3 +100,7 @@
 /scripts/verify-release.sh                                                 @skyf0xx
 /security/surface.mjs                                                      @skyf0xx
 /security/surface.txt                                                      @skyf0xx
+/apps/mobile/ios/App/App/App.entitlements                           @skyf0xx
+/apps/site-open/.well-known/apple-app-site-association              @skyf0xx
+/apps/site-open/.well-known/assetlinks.json                         @skyf0xx
+/apps/site-open/vercel.json                                         @skyf0xx

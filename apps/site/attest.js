@@ -80,6 +80,12 @@ if (!decoded.ok) {
     list.appendChild(row);
   }
   $("[data-review]").hidden = false;
+  // The app claims this subdomain; it opens the link there, or falls back to this page.
+  const openApp = $("[data-open-app]");
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    openApp.href = `https://open.gleamwallet.app/attest${location.hash}`;
+    openApp.hidden = false;
+  }
   $("[data-footnote]").hidden = false;
 
   let busy = false;

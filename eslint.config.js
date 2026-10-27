@@ -406,7 +406,7 @@ export default tseslint.config(
   {
     // The static site's vanilla script runs in the browser; `globals` isn't
     // resolvable from the root, so the handful it uses are listed here.
-    files: ["apps/site/**/*.js"],
+    files: ["apps/site/**/*.js", "apps/site-open/**/*.js"],
     languageOptions: {
       sourceType: "script",
       globals: {

@@ -103,3 +103,7 @@
 5 scripts/verify-release.sh
 5 security/surface.mjs
 5 security/surface.txt
+5 apps/mobile/ios/App/App/App.entitlements
+5 apps/site-open/.well-known/apple-app-site-association
+5 apps/site-open/.well-known/assetlinks.json
+5 apps/site-open/vercel.json
