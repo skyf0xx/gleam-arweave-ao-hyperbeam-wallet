@@ -86,11 +86,15 @@ jobs:
           -name '*.swift' -not -name Package.swift
           -not -path '*/node_modules/*' -not -path '*/.build/*'
           -exec touch {} +
+      # Packages resolved in the untraced build; resolving again under the
+      # tracer took 7+ minutes.
       - run: >-
           xcodebuild
           -project apps/mobile/ios/App/App.xcodeproj
           -scheme App
           -destination 'generic/platform=iOS Simulator'
+          -disableAutomaticPackageResolution
+          -skipPackageUpdates
           ARCHS=arm64
           CODE_SIGNING_ALLOWED=NO
           build
