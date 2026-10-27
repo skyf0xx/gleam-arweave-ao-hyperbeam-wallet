@@ -56,7 +56,8 @@ export interface SettingsHomeViewProps {
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
   onOpenDisplayCurrency: () => void;
-  onOpenUpload: () => void;
+  /** Omitted for a wallet that can't upload, which hides the Tools section. */
+  onOpenUpload?: () => void;
   onOpenFeedback: () => void;
 }
 
@@ -200,11 +201,13 @@ export function SettingsHomeView({
           />
         </OptionSection>
 
-        <OptionSection title="Tools">
-          {/* Bundler uploads don't yet work reliably with current AO wallets;
-              re-enable by restoring onClick={onOpenUpload} below. */}
-          <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
-        </OptionSection>
+        {onOpenUpload ? (
+          <OptionSection title="Tools">
+            {/* Bundler uploads don't yet work reliably with current AO wallets;
+                re-enable by restoring onClick={onOpenUpload} below. */}
+            <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
+          </OptionSection>
+        ) : null}
 
         {platform.capabilities.dappBrowser ? (
           <OptionSection title="Browser">

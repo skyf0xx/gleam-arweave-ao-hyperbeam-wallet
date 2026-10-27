@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
+import { capabilitiesFor, vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "./screens/onboarding/index.tsx";
 import { UnlockView } from "./screens/unlock/index.tsx";
 import {
@@ -357,7 +357,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
         onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
-        onOpenUpload={() => setSubView({ kind: "upload" })}
+        onOpenUpload={wallet && capabilitiesFor(wallet.method).upload ? () => setSubView({ kind: "upload" }) : undefined}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }

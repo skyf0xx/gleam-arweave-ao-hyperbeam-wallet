@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
-import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow, WatchOnlyBadge } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
@@ -177,6 +177,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               {wallet.name}
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
+            {wallet.method === "watch" ? <WatchOnlyBadge /> : null}
             {active ? (
               <span className="flex flex-shrink-0 items-center gap-1 text-caption font-medium text-positive">
                 <CheckIcon size={12} />

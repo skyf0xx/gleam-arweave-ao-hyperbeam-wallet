@@ -1,5 +1,5 @@
-import type { WalletSummary } from "@gleam/core";
-import { AccountAvatar, AddressDisplay, QrCode } from "@gleam/ui/src/components/wallet/index.ts";
+import { isWatchWalletMethod, type WalletSummary } from "@gleam/core";
+import { AccountAvatar, AddressDisplay, QrCode, WatchOnlyBadge } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 
@@ -16,6 +16,7 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
   const identity = useAddressIdentity();
   const { emphasisPick } = identity;
   const avatarSvg = identity.avatarSvg(wallet.address);
+  const watchOnly = isWatchWalletMethod(wallet.method);
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Receive" onBack={onBack} />
@@ -24,12 +25,13 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
         <div className="flex items-center gap-2">
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
           <span className="text-label">{wallet.name}</span>
+          {watchOnly ? <WatchOnlyBadge /> : null}
         </div>
 
         <QrCode value={wallet.address} />
 
         <div className="flex w-full flex-col gap-2">
-          <span className="text-center text-label font-semibold text-muted">Your address</span>
+          <span className="text-center text-label font-semibold text-muted">{watchOnly ? "Watched address" : "Your address"}</span>
           <AddressDisplay
             address={wallet.address}
             emphasisPick={emphasisPick}

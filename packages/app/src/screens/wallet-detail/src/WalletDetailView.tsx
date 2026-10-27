@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
-import { isHardwareWalletMethod, type RuntimePort, type WalletSummary } from "@gleam/core";
+import { capabilitiesFor, isHardwareWalletMethod, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
   keyfileDownloadError,
@@ -22,8 +22,7 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
   ethereum: "Ethereum",
   ledger: "Ledger",
   keystone: "Keystone",
-  // Marked with the watch-only badge instead.
-  watch: null,
+  watch: "Watch only",
 };
 
 function formatBackupDate(timestamp: number): string {
@@ -134,6 +133,7 @@ export function WalletDetailView({
   };
 
   const hardware = isHardwareWalletMethod(wallet.method);
+  const watchOnly = wallet.method === "watch";
   const methodLabel = WALLET_METHOD_LABEL[wallet.method];
 
   if (step.kind === "remove-confirm") {
@@ -141,6 +141,7 @@ export function WalletDetailView({
       <RemoveConfirmStep
         walletName={wallet.name}
         hardware={hardware}
+        watchOnly={watchOnly}
         backedUp={backupConfirmedAt !== null}
         onBack={() => setStep({ kind: "detail" })}
         onConfirm={() => void handleRemove()}
@@ -206,7 +207,7 @@ export function WalletDetailView({
           errorMessage={nameError ?? undefined}
         />
 
-        {hardware ? null : (
+        {capabilitiesFor(wallet.method).exportKey ? (
           <button
             type="button"
             onClick={() => setStep({ kind: "export-password", submitting: false })}
@@ -228,7 +229,7 @@ export function WalletDetailView({
             </span>
             <ChevronIcon />
           </button>
-        )}
+        ) : null}
 
         {/* The solid destructive button is for the confirm step; this only opens it. */}
         <Button
@@ -255,6 +256,7 @@ function ChevronIcon() {
 function RemoveConfirmStep({
   walletName,
   hardware,
+  watchOnly,
   backedUp,
   onBack,
   onConfirm,
@@ -263,6 +265,7 @@ function RemoveConfirmStep({
 }: {
   walletName: string;
   hardware: boolean;
+  watchOnly: boolean;
   backedUp: boolean;
   onBack: () => void;
   onConfirm: () => void;
@@ -278,7 +281,11 @@ function RemoveConfirmStep({
           this browser.
         </p>
 
-        {hardware ? (
+        {watchOnly ? (
+          <p className="text-body leading-relaxed text-muted">
+            Gleam only watches this address, so you can add it again later.
+          </p>
+        ) : hardware ? (
           <p className="text-body leading-relaxed text-muted">
             The key stays on your device, so you can add this wallet again later.
           </p>

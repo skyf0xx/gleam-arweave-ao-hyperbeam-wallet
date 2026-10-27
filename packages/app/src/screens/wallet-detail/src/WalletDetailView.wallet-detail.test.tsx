@@ -57,6 +57,18 @@ describe("WalletDetailView", () => {
     expect(screen.queryByText("Back up keyfile")).toBeNull();
   });
 
+  it("hides keyfile backup for a watch wallet, labels it, and says removing it loses nothing", () => {
+    const watched: WalletSummary = { ...WALLET, method: "watch", publicKey: "" };
+    render(
+      <WalletDetailView runtime={fakeRuntime()} wallet={watched} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+    );
+
+    expect(screen.getByText(/Watch only/)).toBeTruthy();
+    expect(screen.queryByText("Back up keyfile")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+    expect(screen.getByText(/only watches this address/)).toBeTruthy();
+  });
+
   it("shows 'Not backed up yet' when backupConfirmedAt is null", () => {
     const send = vi.fn();
     render(

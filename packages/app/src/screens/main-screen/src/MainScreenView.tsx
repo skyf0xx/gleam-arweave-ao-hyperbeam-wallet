@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { explorerUrlFor, type Collectible, type CollectibleRef, type DisplayCurrency, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, isWatchWalletMethod, type Collectible, type CollectibleRef, type DisplayCurrency, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import {
   AccountAvatar,
@@ -367,6 +367,7 @@ export function MainScreenView({
   const showChart = displaySettings?.showChart ?? true;
   const showTokenLogos = displaySettings?.showTokenLogos ?? false;
   const masked = displaySettings?.balancesHidden ?? false;
+  const watchOnly = isWatchWalletMethod(wallet.method);
   const toggleMasked = () => void updateDisplaySettings({ balancesHidden: !masked });
   const tokenPricesQuery = useTokenPrices(runtime, currency);
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
@@ -657,7 +658,11 @@ export function MainScreenView({
           </div>
 
           <div className="px-6 pb-5 phone:px-5 phone:pb-4">
-            <SendReceiveActions onSend={onSend} onReceive={onReceive} />
+            <SendReceiveActions
+              onSend={onSend}
+              onReceive={onReceive}
+              sendDisabledReason={watchOnly ? "This wallet is watch-only, so it can't send." : undefined}
+            />
           </div>
         </div>
       </div>
@@ -752,7 +757,7 @@ export function MainScreenView({
                         amount={masked ? HIDDEN_AMOUNT : row.amount}
                         value={masked && row.value !== undefined ? HIDDEN_AMOUNT : row.value}
                         loading={loading}
-                        onClick={send === null ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
+                        onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                         className="border-b-0"
                       />
                     ),
@@ -787,7 +792,7 @@ export function MainScreenView({
                                 : formatAtomicAsDisplay(token.quantity, token.denomination)
                           }
                           loading={loading}
-                          onClick={token.available === false ? undefined : () => onSendToken(token)}
+                          onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
                           className="border-b-0"
                         />
                       ),
