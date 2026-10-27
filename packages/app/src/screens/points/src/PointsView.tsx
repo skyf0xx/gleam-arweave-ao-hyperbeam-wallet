@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
 import {
   capabilitiesFor,
+  capabilityRefusal,
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
-  unsupportedOperationMessage,
   type RuntimePort,
   type WalletSummary,
 } from "@gleam/core";
@@ -145,7 +145,7 @@ function JoinView({
         {canJoin ? (
           <JoinNote withLink={false} />
         ) : (
-          <p className="text-center text-caption text-faint">{unsupportedOperationMessage("join Gleam Points")}</p>
+          <p className="text-center text-caption text-faint">{capabilityRefusal(wallet.method, "points", "join Gleam Points")}</p>
         )}
       </ScreenFooter>
 

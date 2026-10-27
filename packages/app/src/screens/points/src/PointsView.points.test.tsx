@@ -257,6 +257,20 @@ describe("PointsView", () => {
     );
   });
 
+  it("says a watch wallet can't join because it is watch-only", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({}),
+      getPointsPendingInvite: () => null,
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={{ ...WALLET, method: "watch", publicKey: "" }} onBack={vi.fn()} />);
+
+    const button = await screen.findByRole("button", { name: "Join Gleam Points" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("This wallet is watch-only, so it can't join Gleam Points.")).toBeTruthy();
+  });
+
   it("disables joining for a wallet that can't join and says why", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,

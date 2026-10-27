@@ -252,6 +252,13 @@ describe("PointsHandler.join", () => {
     expect(locked.fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("says a watch wallet is watch-only, without calling the server", async () => {
+    const { handler, fetchImpl } = await setup(null, 200, { walletMethod: "watch" });
+
+    await expect(handler.join({ walletId: "w1" })).rejects.toThrow("This wallet is watch-only, so it can't join Gleam Points.");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("refuses a wallet with no Arweave key without calling the server", async () => {
     const { handler, fetchImpl } = await setup(null, 200, { walletMethod: "ethereum" });
 

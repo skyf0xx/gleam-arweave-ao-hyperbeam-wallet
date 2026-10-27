@@ -1,7 +1,7 @@
 import {
   bytesToBase64Url,
   INVITE_REQUIRED_MESSAGE,
-  capabilitiesFor,
+  capabilityRefusal,
   isHardwareWalletMethod,
   unsupportedOperationMessage,
   type BadgePort,
@@ -195,9 +195,8 @@ export class PointsHandler {
 
   private async requirePointsCapability(walletId: string, action: string): Promise<void> {
     const method = await this.deps.walletMethod(walletId);
-    if (method !== null && !capabilitiesFor(method).points) {
-      throw new Error(unsupportedOperationMessage(action));
-    }
+    const refusal = method === null ? null : capabilityRefusal(method, "points", action);
+    if (refusal) throw new Error(refusal);
   }
 
   /**
