@@ -5,8 +5,7 @@ import { cn } from "./cn";
  * File drop target. Presentational and content-agnostic: hands the
  * dropped/selected `File` up via `onFile` and lets the caller own the
  * read (text parse, size validation, etc.) — this primitive never
- * assumes the file is JSON/a keyfile specifically, so both the
- * onboarding import flow and the upload-compose flow can compose it.
+ * assumes the file is JSON/a keyfile specifically.
  */
 export interface FileDropzoneProps {
   label?: string;

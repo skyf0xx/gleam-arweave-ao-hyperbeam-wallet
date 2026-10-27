@@ -7,6 +7,7 @@ import {
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validatePassword } from "@gleam/core/src/vault/password-policy.ts";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 /**
  * Create wallet — password, reused for both the create and import flows.
@@ -55,10 +56,11 @@ export function CreatePassword({
       <ScreenHeader
         title={title}
         onBack={onBack}
+        busy={submitting}
         subtitle={<StepDots total={2} current={1} />}
       />
       <form
-        className="flex flex-1 flex-col gap-5 px-6 py-6"
+        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
           event.preventDefault();
           setTouched(true);
@@ -99,9 +101,11 @@ export function CreatePassword({
           errorMessage={confirmError}
         />
 
-        <Button type="submit" disabled={!canSubmit} className="mt-8">
-          {submitting ? "Creating…" : "Continue"}
-        </Button>
+        <ScreenFooter className="mt-8">
+          <Button type="submit" disabled={!canSubmit}>
+            {submitting ? "Creating…" : "Continue"}
+          </Button>
+        </ScreenFooter>
       </form>
     </div>
   );

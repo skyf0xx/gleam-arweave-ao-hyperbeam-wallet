@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PasskeyStatus, RuntimePort, SecurityPhrase } from "@gleam/core";
 import { UnlockScreen, type PasskeyUnlockProps } from "./UnlockScreen";
+import type { BiometricUnlockPort, BiometryKind } from "../../../app-platform/types";
+import {
+  biometricNotice,
+  biometricsGone,
+  biometryLabel,
+  unlockWithBiometrics,
+} from "../../../biometrics/biometrics";
 import { usePlatform } from "../../../app-platform/context";
 import { ForgotPassword } from "./ForgotPassword";
 import { PasskeyError } from "../../../passkey/webauthn";
 import { unlockWithPasskey } from "./passkey-unlock";
+import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 
 /**
  * Unlock view module (`screens/unlock/`) — same "folder, not a
@@ -32,7 +40,7 @@ export function UnlockView({
   tagline,
   autoStartPasskey = false,
 }: UnlockViewProps) {
-  const { unlock } = usePlatform();
+  const { unlock, capabilities, biometrics } = usePlatform();
   const [step, setStep] = useState<Step>({ kind: "unlock" });
   const [unlocking, setUnlocking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -42,6 +50,35 @@ export function UnlockView({
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyNotice, setPasskeyNotice] = useState<PasskeyUnlockProps["notice"]>();
   const [securityPhrase, setSecurityPhrase] = useState<SecurityPhrase | null>(null);
+  const [biometry, setBiometry] = useState<BiometryKind | null>(null);
+  const [biometricBusy, setBiometricBusy] = useState(false);
+  const [biometricNoticeState, setBiometricNotice] = useState<PasskeyUnlockProps["notice"]>();
+
+  // Password and biometric unlock never run together: a password submitted
+  // before the auto-prompt starts would otherwise unlock twice.
+  const unlockInFlight = useRef(false);
+
+  const handleBiometricUnlock = async (kind: BiometryKind) => {
+    if (unlockInFlight.current) return;
+    unlockInFlight.current = true;
+    setBiometricBusy(true);
+    setBiometricNotice(undefined);
+    try {
+      await unlockWithBiometrics(runtime, biometrics, kind);
+      onUnlocked();
+    } catch (error) {
+      const notice = biometricNotice(error, kind);
+      if (biometricsGone(error)) {
+        setBiometry(null);
+        setErrorMessage(notice.text);
+      } else {
+        setBiometricNotice(notice);
+      }
+    } finally {
+      unlockInFlight.current = false;
+      setBiometricBusy(false);
+    }
+  };
 
   const handlePasskeyUnlock = async (status: Enrolled) => {
     setPasskeyBusy(true);
@@ -68,6 +105,19 @@ export function UnlockView({
     void readSecurityPhrase(runtime).then((phrase) => {
       if (!cancelled) setSecurityPhrase(phrase);
     });
+    if (capabilities.biometrics) {
+      void (async () => {
+        const kind = await readBiometry(biometrics);
+        if (cancelled || !kind) return;
+        setBiometry(kind);
+        // The app opens straight to the OS prompt, as phone apps do. Not
+        // while hidden: the OS would refuse the prompt and show an error.
+        if (document.visibilityState === "visible") void handleBiometricUnlock(kind);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
     void (async () => {
       const status = await readPasskeyStatus(runtime);
       if (cancelled || !status?.enrolled) return;
@@ -82,6 +132,8 @@ export function UnlockView({
   }, [runtime]);
 
   const handleUnlock = async (password: string) => {
+    if (unlockInFlight.current) return;
+    unlockInFlight.current = true;
     setUnlocking(true);
     setErrorMessage(undefined);
     try {
@@ -97,9 +149,18 @@ export function UnlockView({
           : "That password didn't work. Try again, or use your recovery method.",
       );
     } finally {
+      unlockInFlight.current = false;
       setUnlocking(false);
     }
   };
+
+  useBackHandler(
+    step.kind === "forgot-password"
+      ? () => {
+          if (!resetting) setStep({ kind: "unlock" });
+        }
+      : null,
+  );
 
   if (step.kind === "forgot-password") {
     const handleReset = async () => {
@@ -135,6 +196,16 @@ export function UnlockView({
       onForgotPassword={() => setStep({ kind: "forgot-password" })}
       tagline={tagline}
       securityPhrase={securityPhrase}
+      biometrics={
+        biometry
+          ? {
+              label: biometryLabel(biometry),
+              onUnlock: () => void handleBiometricUnlock(biometry),
+              busy: biometricBusy,
+              notice: biometricNoticeState,
+            }
+          : undefined
+      }
       passkey={
         passkey
           ? { onUnlock: () => void handlePasskeyUnlock(passkey), busy: passkeyBusy, notice: passkeyNotice }
@@ -148,6 +219,16 @@ export function UnlockView({
 async function readSecurityPhrase(runtime: RuntimePort): Promise<SecurityPhrase | null> {
   try {
     return (await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined })) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Null unless a password is stored and the device can release it now. */
+async function readBiometry(biometrics: BiometricUnlockPort): Promise<BiometryKind | null> {
+  try {
+    const [availability, enrolled] = await Promise.all([biometrics.availability(), biometrics.isEnrolled()]);
+    return availability.available && enrolled ? availability.kind : null;
   } catch {
     return null;
   }

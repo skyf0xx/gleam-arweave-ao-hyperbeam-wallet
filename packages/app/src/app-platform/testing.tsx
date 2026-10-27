@@ -2,11 +2,14 @@ import { render } from "@testing-library/react";
 import type { RuntimePort } from "@gleam/core";
 import type { ReactElement, ReactNode } from "react";
 import { PlatformProvider } from "./context";
+import { unavailableDappBrowser } from "./dapp-browser";
 import type { AppPlatform } from "./types";
 
 export type FakeAppPlatformOverrides = Partial<Omit<AppPlatform, "buildInfo" | "capabilities">> & {
   buildInfo?: Partial<AppPlatform["buildInfo"]>;
-  capabilities?: Partial<AppPlatform["capabilities"]>;
+  capabilities?: Partial<Omit<AppPlatform["capabilities"], "hardwareWallets">> & {
+    hardwareWallets?: Partial<AppPlatform["capabilities"]["hardwareWallets"]>;
+  };
 };
 
 /** Tests that reach the background pass a `runtime` prop or override this. */
@@ -21,15 +24,17 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
   const state = new Map<string, unknown>();
   return {
     runtime: overrides.runtime ?? UNWIRED_RUNTIME,
-    buildInfo: { version: "1.2.3", ...overrides.buildInfo },
+    buildInfo: { version: "1.2.3", foundingGate: true, ...overrides.buildInfo },
     capabilities: {
       sidePanel: true,
       passkey: true,
       biometrics: false,
-      hardwareWallets: true,
       dappBrowser: false,
+      qrScanner: false,
+      lockOnSystemLock: true,
       hostPermissions: true,
       ...overrides.capabilities,
+      hardwareWallets: { ledger: true, keystone: true, ...overrides.capabilities?.hardwareWallets },
     },
     hostPermissions: overrides.hostPermissions ?? {
       contains: async () => true,
@@ -45,9 +50,28 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
       },
     },
     unlock: overrides.unlock ?? { passkeyMode: "inline", openPasskeyWindow: async () => {} },
+    biometrics: overrides.biometrics ?? {
+      availability: async () => ({ available: false, reason: "unavailable" }),
+      isEnrolled: async () => false,
+      enrol: async () => {},
+      readPassword: async () => {
+        throw new Error("fakeAppPlatform has no stored password");
+      },
+      remove: async () => {},
+    },
+    qrScanner: overrides.qrScanner ?? {
+      scan: async () => {
+        throw new Error("fakeAppPlatform has no scanner");
+      },
+    },
     activeSite: overrides.activeSite ?? { subscribe: () => () => {} },
     downloads: overrides.downloads ?? { requestPermission: async () => true },
-    hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, signPanels: null },
+    hardwareWallets: overrides.hardwareWallets ?? { openConnectPage: async () => {}, connectViews: {}, signPanels: null },
+    storeReview: overrides.storeReview ?? { opensPage: true, request: async () => {} },
+    dappBrowser: overrides.dappBrowser ?? unavailableDappBrowser,
+    ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
+    ...(overrides.approvalSheet ? { approvalSheet: overrides.approvalSheet } : {}),
+    ...(overrides.notices ? { notices: overrides.notices } : {}),
   };
 }
 

@@ -39,8 +39,9 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
 
   const { rows: wallets } = await db.query<{ address: string; device_id: string; referred_by: string | null; original_founder: boolean; live: boolean }>(
     `SELECT w.address, w.device_id, w.referred_by, w.original_founder,
-            coalesce(d.last_heartbeat_at >= $1, false) AS live
-       FROM wallets w JOIN devices d ON d.id = w.device_id`,
+            EXISTS (SELECT 1 FROM wallet_devices wd JOIN devices d ON d.id = wd.device_id
+                    WHERE wd.address = w.address AND d.last_heartbeat_at >= $1) AS live
+       FROM wallets w`,
     [new Date(now.getTime() - LIVENESS_WINDOW_MS)],
   );
 

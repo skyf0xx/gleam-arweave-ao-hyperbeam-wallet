@@ -43,6 +43,16 @@ const STATE: WalletState = {
 };
 
 describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
+  it("badges only a watch-only wallet", async () => {
+    const [first, second] = STATE.wallets;
+    const send = vi.fn().mockResolvedValue({ ...STATE, wallets: [first, { ...second!, method: "watch", publicKey: "" }] });
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} onManage={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Trading")).toBeTruthy());
+    expect(screen.getAllByText("Watch only")).toHaveLength(1);
+    expect(screen.getByText("Trading").closest("button")?.textContent).toContain("Watch only");
+  });
+
   it("lists every wallet from getState and marks the active one", async () => {
     const send = vi.fn().mockResolvedValue(STATE);
     render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} onManage={vi.fn()} />);
@@ -50,6 +60,16 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     expect(screen.getByText("Trading")).toBeTruthy();
     expect(send).toHaveBeenCalledWith({ type: "getState", payload: undefined });
+  });
+
+  it("keeps the saved order when the active wallet isn't first", async () => {
+    const send = vi.fn().mockResolvedValue({ ...STATE, activeWalletId: "wallet-2" });
+    render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} onManage={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    const position = screen.getByText("Wallet One").compareDocumentPosition(screen.getByText("Trading"));
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Trading").closest("button")?.getAttribute("aria-current")).toBe("true");
   });
 
   it("calls switchWallet with the tapped row's walletId, then onSwitched", async () => {

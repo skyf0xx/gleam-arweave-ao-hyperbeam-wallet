@@ -1,15 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
-import { FOUNDING_GATE } from "../../../founding-gate";
 import { usePointsMemberships, usePointsScores } from "../../points/src/usePoints";
 import { FoundingRevealScreen, REVEAL_SEEN_QUERY_KEY } from "./FoundingReveal";
 
 export interface ExistingMemberRevealProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
-  /** Defaults to the build-time `FOUNDING_GATE` flag: only Phase 1 has founding numbers. */
-  enabled?: boolean;
+  /** The build's `buildInfo.foundingGate`: only Phase 1 has founding numbers. */
+  enabled: boolean;
   children: ReactNode;
 }
 
@@ -20,7 +19,7 @@ export interface ExistingMemberRevealProps {
  * decided (a failed read, no number yet) shows `children` instead:
  * the reveal is a courtesy, never a gate.
  */
-export function ExistingMemberReveal({ runtime, wallet, enabled = FOUNDING_GATE, children }: ExistingMemberRevealProps) {
+export function ExistingMemberReveal({ runtime, wallet, enabled, children }: ExistingMemberRevealProps) {
   const [dismissed, setDismissed] = useState(false);
   const memberships = usePointsMemberships(runtime, { enabled, retry: false });
   const membership = memberships.data?.[wallet.id] ?? null;

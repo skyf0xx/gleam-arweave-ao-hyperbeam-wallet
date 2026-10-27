@@ -44,7 +44,7 @@ function counts(redemptions: number, claims: number): CodeKindCounts {
   return { redemptions, claims, claimRate: redemptions === 0 ? null : claims / redemptions };
 }
 
-const CLAIMED_SQL = "EXISTS (SELECT 1 FROM wallets w WHERE w.device_id = ir.device_id)";
+const CLAIMED_SQL = "EXISTS (SELECT 1 FROM wallet_devices w WHERE w.device_id = ir.device_id)";
 
 /**
  * Leaving deletes the device and, by cascade, its redemption, so installs

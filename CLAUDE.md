@@ -2,7 +2,7 @@
 
 A Chrome MV3 browser-extension wallet for Arweave and AO. It has a
 password-protected key vault, AR and AO token balances, send/receive, a
-merged activity feed, tagged Arweave uploads, and an ArConnect-compatible
+merged activity feed, and an ArConnect-compatible
 `window.arweaveWallet` provider. Every dApp signing request opens its own
 approval window with a decoded preview.
 
@@ -24,7 +24,7 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 - `packages/core`: pure domain logic. `signer/` (vault envelope, key
   import and signing, keyring; reached only through `@gleam/core/signer`
   and allowed no npm imports but `hash-wasm`), `vault/` and `keys/`
-  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, upload), `ao/` (AO
+  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, bundler), `ao/` (AO
   balance, transfer, result), `activity/`, `pricing/`, `policy/`, and
   `models/`. `ports/` holds the interfaces for storage, runtime and
   windows.
@@ -32,7 +32,7 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   popup, background, content script and page.
 - `packages/runtime`: `createRuntime(platform)`, the dispatcher
   (`dispatch/`) and every handler (`handlers/`) such as `wallet-lifecycle`,
-  `reads`, `transfer`, `upload`, `approval` and `key-session`. It reaches
+  `reads`, `transfer`, `approval` and `key-session`. It reaches
   a platform only through `Platform` (`platform.ts`).
 - `packages/ui`: design tokens, primitives and shared components.
 - `packages/app`: every screen (`src/screens/<screen>/`), the router
@@ -44,13 +44,23 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `window.permawebConnect` shim). It reaches the wallet only through
   `ProviderTransport` (`src/transport.ts`); `createWindowMessageTransport`
   is the extension's `postMessage` half of the content-script relay.
+- `packages/keystone`: Keystone over QR for both shells: UR assembly,
+  account decode, sign request, the camera `QrScanner`, `AnimatedQr`,
+  `KeystoneConnectView` and `createKeystonePanel`. A shell hands the view
+  and panel to `@gleam/app` through `AppPlatform.hardwareWallets`, because
+  `app` may not import `@keystonehq` or `@ngraveio`.
 - `apps/extension`: the WXT shell. `entrypoints/` holds `background`,
   `content`, `provider` (builds `provider.js` from `@gleam/provider`),
   `approval`, `passkey`, `sidepanel`, `popup` and `connect`; the popup,
   side panel and approval entrypoints only mount `@gleam/app`.
   `src/adapters/` implements the core and runtime ports and `AppPlatform`
   (`adapters/app-platform.ts`) on `chrome.*`; `src/hardware/` holds the
-  Ledger and Keystone transports and the device signing panels.
+  Ledger transport and panel and opens the connect page in a tab.
+- `apps/mobile`: the Capacitor shell for iOS and Android (Vite + React,
+  `ios/` and `android/` native projects). `src/main.tsx` mounts
+  `@gleam/app` with `layout="phone"` and the shell's `AppPlatform`
+  (`src/app-platform.ts`). It loads only its bundled `dist/`: no
+  `server.url` and no live-update plugin (`capacitor.config.mobile.test.ts`).
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
@@ -113,15 +123,17 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
+pnpm mobile:build                          # app web bundle → apps/mobile/dist (mobile:ios / mobile:android sync and open the native project)
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, apps/extension, apps/points-api, scripts/scan
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan
 pnpm eslint --max-warnings=0 <files>
 ```
 
 The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-nine projects. A change is done when tests, tsc, eslint and `pnpm wxt:build`
-pass. If a change touches signing, network or extension wiring, it also
-needs a manual check in Chrome (load `.output/chrome-mv3` unpacked).
+eleven projects. A change is done when tests, tsc, eslint, `pnpm wxt:build`
+and `pnpm mobile:build` pass. If a change touches signing, network or
+extension wiring, it also needs a manual check in Chrome (load
+`.output/chrome-mv3` unpacked).
 
 ## Workflow
 

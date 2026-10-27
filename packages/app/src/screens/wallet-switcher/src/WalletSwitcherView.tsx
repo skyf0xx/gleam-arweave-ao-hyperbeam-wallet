@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
-import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow, WatchOnlyBadge } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
@@ -11,11 +11,14 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
   ethereum: "Ethereum",
   ledger: "Ledger",
   keystone: "Keystone",
+  // Marked with the watch-only badge instead.
+  watch: null,
 };
 
 /**
  * The sheet opened from the main screen's account pill. Lists every stored
- * wallet from `getState()`, marks the active one with a checkmark, and
+ * wallet from `getState()` in saved order, marks the active one with a
+ * green checkmark, and
  * switches on tap via `switchWallet`.
  *
  * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
@@ -97,7 +100,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
 
       <ScreenHeader title="Wallets" onBack={onBack} />
 
-      <div className="px-6 pb-3 pt-9">
+      <div className="px-6 phone:px-5 pb-3 pt-9 phone:pt-4">
         <div>
           {state.loading ? (
             <>
@@ -105,19 +108,17 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
               <SkeletonRow />
             </>
           ) : (
-            // The active wallet leads; the rest keep their saved order.
-            [...state.wallets]
-              .sort((a, b) => Number(b.id === state.activeWalletId) - Number(a.id === state.activeWalletId))
-              .map((wallet) => (
-                <WalletSwitcherRow
-                  key={wallet.id}
-                  wallet={wallet}
-                  active={wallet.id === state.activeWalletId}
-                  switching={switchingId === wallet.id}
-                  onSwitch={() => void handleSwitch(wallet.id)}
-                  onManage={() => onManage(wallet.id)}
-                />
-              ))
+            // Saved order, never active-first: a list that reshuffles on every switch loses people.
+            state.wallets.map((wallet) => (
+              <WalletSwitcherRow
+                key={wallet.id}
+                wallet={wallet}
+                active={wallet.id === state.activeWalletId}
+                switching={switchingId === wallet.id}
+                onSwitch={() => void handleSwitch(wallet.id)}
+                onManage={() => onManage(wallet.id)}
+              />
+            ))
           )}
         </div>
 
@@ -154,12 +155,13 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   const { copied, copy } = useCopy(wallet.address);
 
   return (
-    // The row bleeds 8px past the list edge so the active fill has room
-    // around its content while text stays aligned with the header. Copy
+    // The row bleeds 8px past the list edge so the hover fill has room
+    // around its content while text stays aligned with the header. Only
+    // the checkmark marks the active row: a fill would read as hover. Copy
     // floats beside the chevron instead of taking a column, so the address
     // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-mist" : "border-b border-line last:border-b-0 hover:bg-mist"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "" : "hover:bg-mist"}`}
     >
       <button
         type="button"
@@ -175,10 +177,14 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               {wallet.name}
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
+            {wallet.method === "watch" ? <WatchOnlyBadge /> : null}
             {active ? (
-              <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-muted">Active</span>
+              <span className="flex flex-shrink-0 items-center gap-1 text-caption font-medium text-positive">
+                <CheckIcon size={12} />
+                Active
+              </span>
             ) : (
-              <span className="flex-shrink-0 rounded-full bg-background px-2 py-px text-caption font-medium text-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+              <span className="flex-shrink-0 text-caption font-medium text-muted opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:opacity-100">
                 Make active
               </span>
             )}
@@ -191,7 +197,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         onClick={copy}
         aria-label={copied ? `${wallet.name} address copied` : `Copy ${wallet.name} address`}
         title={copied ? "Copied" : "Copy address"}
-        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
       </button>
@@ -199,7 +205,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         type="button"
         aria-label={`Manage ${wallet.name}`}
         onClick={onManage}
-        className="flex h-7 w-5 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground"
+        className="flex h-7 w-5 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11"
       >
         <ChevronRightIcon />
       </button>
@@ -207,9 +213,9 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   );
 }
 
-function CheckIcon() {
+function CheckIcon({ size = 15 }: { size?: number }) {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

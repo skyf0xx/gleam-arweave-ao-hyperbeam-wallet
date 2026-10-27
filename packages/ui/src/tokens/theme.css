@@ -231,6 +231,7 @@ body:has([data-layout="popup"]) {
 [data-layout="phone"] {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   min-height: 100dvh;
 }
 
@@ -243,22 +244,138 @@ body:has([data-layout="popup"]) {
 }
 
 /*
+ * `phone:` styles a utility only inside the phone layout, so a screen
+ * shared with the popup and side panel can tighten or loosen itself for a
+ * touch screen without a second component. Zero specificity, like every
+ * utility, and generated after the plain ones so it wins.
+ */
+@custom-variant phone (&:where([data-layout="phone"], [data-layout="phone"] *));
+
+/*
  * The shell must set `viewport-fit=cover` for `env(safe-area-inset-*)` to
  * be non-zero, and `interactive-widget=resizes-content` so the keyboard
  * shrinks the layout viewport: `dvh` then follows it, which keeps
  * `mt-auto` footers above the keyboard. `scroll-padding-bottom` leaves
  * room under a focused input when it scrolls into view.
+ *
+ * The insets are read through `--safe-*` so a browser preview, which
+ * can't emulate `env()`, can stand in iPhone values. Nothing sets them in
+ * a shipped build, so they are the device's own.
+ *
+ * `--gutter` is the one horizontal inset every phone screen shares, and
+ * the type scale steps up a notch: the sizes above are tuned for a 400px
+ * popup read at arm's length, and look small on a phone held closer.
  */
-[data-layout="phone"] {
-  --inset-top: env(safe-area-inset-top, 0px);
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 
+[data-layout="phone"] {
+  --inset-top: var(--safe-top);
+  --gutter: 1.25rem;
+  --text-caption: 0.75rem; /* 12px */
+  --text-label: 0.8125rem; /* 13px */
+  --text-body: 0.9375rem; /* 15px */
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * A native-feeling shell: no pinch zoom (the viewport meta says so too,
+ * but Android's WebView only honours the touch-action), no rubber band
+ * that reveals a different colour behind the page, and no text selection
+ * handles popping up on a control that was only tapped. Inputs and
+ * anything marked selectable keep selection so addresses can still be
+ * copied by hand.
+ */
 html:has([data-layout="phone"]) {
-  scroll-padding-bottom: 6rem;
+  scroll-padding-bottom: calc(6.5rem + var(--safe-bottom));
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
+  background: var(--color-background);
+}
+
+[data-layout="phone"] :is(button, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="menuitemcheckbox"], a, label, summary) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/*
+ * iOS zooms the page on focusing a field set under 16px. The headline
+ * amount field is already larger, so the `text-h*` sizes are left alone.
+ */
+[data-layout="phone"] :is(input, select, textarea):not([class*="text-h"]) {
+  font-size: 16px;
+}
+
+/*
+ * `phone:hit-target` grows a small control's tap area to 44px (the smallest
+ * iOS and Android guidelines allow) without changing how it looks: a
+ * transparent box centred on the control, never smaller than the control.
+ * It is opt-in, for icon-sized controls: on a text link inside a sentence
+ * it would steal taps from the words around it.
+ */
+@utility hit-target {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Fields are sized for real rather than padded out: a short one is hard to hit. */
+[data-layout="phone"] :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="hidden"]), select) {
+  min-height: 2.75rem;
+}
+
+/*
+ * A screen's primary action, pinned above the bottom inset (and above the
+ * keyboard, which shrinks the viewport) while the content scrolls behind
+ * it. Where the content is short the footer simply sits at the bottom of
+ * the screen. It bleeds out to the gutters so content never shows beside
+ * it, and the negative bottom margin cancels the layout's own inset
+ * padding so it sits in the same place pinned or not. The screen column
+ * it sits in must have no bottom padding of its own.
+ *
+ * `gleam-footer-flow` is for an irreversible action: the footer follows
+ * the content instead of pinning, so the warning above it can never be
+ * scrolled out of view while the button is on screen.
+ *
+ * In the components layer so a utility on the footer (`mt-8`, `pt-6`)
+ * still wins, unlike the unlayered rules above that deliberately don't.
+ */
+@layer components {
+  [data-layout="phone"] .gleam-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    align-self: stretch;
+    width: auto;
+    margin-top: auto;
+    margin-inline: calc(var(--gutter) * -1);
+    margin-bottom: calc(var(--safe-bottom) * -1);
+    padding: 0.75rem var(--gutter) calc(0.75rem + var(--safe-bottom));
+    background: var(--color-background);
+  }
+
+  [data-layout="phone"] .gleam-footer.gleam-footer-flow {
+    position: static;
+    margin-inline: 0;
+    margin-bottom: 0;
+    padding: 0.75rem 0;
+  }
 }
 
 /*
@@ -269,7 +386,7 @@ html:has([data-layout="phone"]) {
   content: "";
   position: fixed;
   inset: 0 0 auto 0;
-  height: env(safe-area-inset-top, 0px);
+  height: var(--safe-top);
   background: var(--color-background);
   z-index: 40;
 }

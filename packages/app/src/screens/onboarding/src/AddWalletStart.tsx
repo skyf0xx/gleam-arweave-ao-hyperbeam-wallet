@@ -14,13 +14,14 @@ export interface AddWalletStartProps {
   onImport: () => void;
   onConnectKeystone: () => void;
   onConnectLedger: () => void;
+  onWatch: () => void;
 }
 
 export function AddWalletStart({ onBack, onCreate, ...existing }: AddWalletStartProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Add wallet" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-6 px-6 py-6">
+      <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 py-6">
         <h1 className="text-h3 font-semibold tracking-tight text-foreground">Add a wallet</h1>
         <OptionSection title="New">
           <OptionRow

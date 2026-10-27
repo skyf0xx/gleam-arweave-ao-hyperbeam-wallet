@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
 import {
   capabilitiesFor,
+  capabilityRefusal,
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
-  unsupportedOperationMessage,
   type RuntimePort,
   type WalletSummary,
 } from "@gleam/core";
@@ -28,6 +28,8 @@ import {
   usePendingInvite,
   usePointsStanding,
 } from "./usePoints";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -102,7 +104,7 @@ function JoinView({
 
   return (
     <form
-      className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-5"
+      className="flex flex-1 flex-col gap-5 px-6 phone:px-5 pb-6 phone:pb-0 pt-5"
       onSubmit={(event) => {
         event.preventDefault();
         join.mutate({
@@ -135,7 +137,7 @@ function JoinView({
         }
       />
 
-      <div className="mt-auto flex flex-col gap-3">
+      <ScreenFooter className="phone:order-last">
         <Button type="submit" disabled={!canJoin || join.isPending}>
           {join.isPending ? "Joining…" : "Join Gleam Points"}
         </Button>
@@ -143,9 +145,9 @@ function JoinView({
         {canJoin ? (
           <JoinNote withLink={false} />
         ) : (
-          <p className="text-center text-caption text-faint">{unsupportedOperationMessage("join Gleam Points")}</p>
+          <p className="text-center text-caption text-faint">{capabilityRefusal(wallet.method, "points", "join Gleam Points")}</p>
         )}
-      </div>
+      </ScreenFooter>
 
       <AboutPoints />
     </form>
@@ -240,7 +242,7 @@ function JoinedView({
   const topPercent = score?.topPercent ?? null;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-5">
+    <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-5">
       <InkCard label="Standing">
         <div className="flex flex-col gap-2">
           <PointsTotal value={formatPoints(total.shown)} highlighted={total.highlighted} />
@@ -273,6 +275,12 @@ function JoinedView({
           </InkStat>
           <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
         </dl>
+        {score && score.rank !== 1 && topPercent === null ? (
+          // The explanation behind "Unranked" is a hover tooltip, which a touch screen can't show.
+          <p className="hidden text-caption text-on-ink-muted phone:block">
+            You're ranked once a daily snapshot credits your points. Snapshots run just after midnight UTC.
+          </p>
+        ) : null}
         {score?.rank != null && score.pointsToNextRankAtomic !== null ? (
           <p className="text-label text-on-ink-muted">
             You're #{score.rank}. {formatPoints(score.pointsToNextRankAtomic)} points to pass #{score.rank - 1}.
@@ -377,7 +385,7 @@ function EarnItem({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={label} className="flex flex-col gap-3 border-t border-line pt-4">
+    <section aria-label={label} className="flex flex-col gap-3 border-t border-line pt-4 phone:border-t-0 phone:pt-0">
       <h3 className="text-body font-semibold text-foreground">{title}</h3>
       {children}
     </section>
@@ -456,7 +464,7 @@ function AboutPoints({
         aria-expanded={open}
         aria-controls="points-about"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1 text-caption text-muted hover:text-foreground"
+        className="flex items-center gap-1 text-caption text-muted hover:text-foreground phone:min-h-11"
       >
         About Gleam Points
         <ChevronIcon open={open} />
@@ -499,7 +507,7 @@ function AboutLink({
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-mist"
+        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-mist phone:px-0"
       >
         <span className="flex flex-col gap-0.5">
           <span className="text-label font-semibold text-foreground">
@@ -526,6 +534,7 @@ function LeaveControl({
 }) {
   const leave = useLeavePoints(runtime);
   const [confirming, setConfirming] = useState(false);
+  useBackHandler(confirming ? () => setConfirming(false) : null);
 
   if (!confirming) {
     return (

@@ -23,6 +23,7 @@ import { useSendCollectible } from "../../activity/src/useSendCollectible";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { namedSuggestions, RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
@@ -131,7 +132,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
     return (
       <div className="flex min-h-full flex-col">
         <ScreenHeader title="Send collectible" onBack={onBack} />
-        <div className="flex flex-1 flex-col gap-6 px-5 py-5">
+        <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
           <div className="flex items-center gap-3">
             <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-12 flex-shrink-0 rounded-md" />
             <div className="flex min-w-0 flex-col">
@@ -186,9 +187,11 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             </div>
           ) : null}
 
-          <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={() => void handleContinue()} className="mt-auto">
-            {step.submitting ? "Estimating fee…" : parsed.success ? "Review and Send" : "Enter an address"}
-          </Button>
+          <ScreenFooter>
+            <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={() => void handleContinue()}>
+              {step.submitting ? "Estimating fee…" : parsed.success ? "Review and Send" : "Enter an address"}
+            </Button>
+          </ScreenFooter>
         </div>
       </div>
     );
@@ -231,8 +234,8 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
     return (
       <div className="flex min-h-full flex-col">
-        <ScreenHeader title="Review send" onBack={() => setStep(composeStep(step.recipient))} />
-        <div className="flex flex-1 flex-col gap-6 px-5 py-5">
+        <ScreenHeader title="Review send" onBack={() => setStep(composeStep(step.recipient))} busy={step.submitting} />
+        <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
           <div className="flex flex-col items-center gap-2 pt-2 text-center">
             <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-28" />
             <span className="break-words text-body font-semibold text-foreground">{collectible.name}</span>
@@ -281,16 +284,17 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             </p>
           ) : null}
 
-          <Button
-            type="button"
-            variant={irreversible ? "destructive" : "primary"}
-            disabled={step.submitting}
-            aria-busy={step.submitting}
-            onClick={() => void handleSign()}
-            className="mt-auto"
-          >
-            {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Sending…") : "Send collectible"}
-          </Button>
+          <ScreenFooter pinned={false}>
+            <Button
+              type="button"
+              variant={irreversible ? "destructive" : "primary"}
+              disabled={step.submitting}
+              aria-busy={step.submitting}
+              onClick={() => void handleSign()}
+            >
+              {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Sending…") : "Send collectible"}
+            </Button>
+          </ScreenFooter>
         </div>
       </div>
     );

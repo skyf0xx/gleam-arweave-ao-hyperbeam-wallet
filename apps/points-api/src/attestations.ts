@@ -252,8 +252,9 @@ export async function submitAttestation(
   const address = await addressFromOwner(request.owner);
 
   const wallet = await db.query<{ live: boolean }>(
-    `SELECT coalesce(d.last_heartbeat_at >= $2, false) AS live
-       FROM wallets w JOIN devices d ON d.id = w.device_id WHERE w.address = $1`,
+    `SELECT EXISTS (SELECT 1 FROM wallet_devices wd JOIN devices d ON d.id = wd.device_id
+                    WHERE wd.address = w.address AND d.last_heartbeat_at >= $2) AS live
+       FROM wallets w WHERE w.address = $1`,
     [address, new Date(now.getTime() - LIVENESS_WINDOW_MS)],
   );
   if (!wallet.rows[0]) return notRegistered();

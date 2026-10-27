@@ -154,6 +154,18 @@ describe("POST /me", () => {
     expect((await me(devices.bob)).json.wallets[0].originalFounder).toBe(false);
   });
 
+  it("lists a wallet on every install it is registered on", async () => {
+    const { db, devices, me } = await setup();
+    const phone = await createTestDevice();
+    await db.query("INSERT INTO devices (id, public_key_jwk) VALUES ($1, $2)", [phone.id, JSON.stringify(phone.publicKey)]);
+    await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2)", [alice.address, phone.id]);
+
+    const [desktop, mobile] = await Promise.all([me(devices.alice), me(phone)]);
+
+    expect(desktop.json.wallets.map((wallet: { address: string }) => wallet.address)).toEqual([alice.address]);
+    expect(mobile.json.wallets.map((wallet: { address: string }) => wallet.address)).toEqual([alice.address]);
+  });
+
   it("refuses a heartbeat payload and another device's signature", async () => {
     const { devices, postMe } = await setup();
     const impostor = await createTestDevice();

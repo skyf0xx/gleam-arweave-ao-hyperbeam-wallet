@@ -2,10 +2,12 @@ import * as React from "react";
 import { cn } from "../../primitives/cn";
 import { MemorableAddress } from "./MemorableAddress";
 
+const HOLD_MS = 500;
+
 /**
  * A full, untruncated address in `MemorableAddress`'s chunked form; the
- * whole box copies on tap. Used on Receive, where the user learns how
- * their own address reads.
+ * whole box copies on tap or press-and-hold. Used on Receive, where the
+ * user learns how their own address reads.
  *
  * `onCopy` is the caller's responsibility (clipboard write + any
  * telemetry); this component only renders the "Copied" affordance for
@@ -36,6 +38,15 @@ export function AddressDisplay({
     };
   }, []);
 
+  const holdRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heldRef = React.useRef(false);
+
+  React.useEffect(() => {
+    return () => {
+      if (holdRef.current) clearTimeout(holdRef.current);
+    };
+  }, []);
+
   const handleCopy = () => {
     onCopy();
     setCopied(true);
@@ -43,14 +54,40 @@ export function AddressDisplay({
     timeoutRef.current = setTimeout(() => setCopied(false), copiedDurationMs);
   };
 
+  const stopHold = () => {
+    if (holdRef.current) clearTimeout(holdRef.current);
+    holdRef.current = null;
+  };
+  const startHold = () => {
+    heldRef.current = false;
+    stopHold();
+    holdRef.current = setTimeout(() => {
+      heldRef.current = true;
+      handleCopy();
+    }, HOLD_MS);
+  };
+
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <button
         type="button"
-        onClick={handleCopy}
+        onClick={() => {
+          // The release that ends a long press also clicks.
+          if (heldRef.current) {
+            heldRef.current = false;
+            return;
+          }
+          handleCopy();
+        }}
+        onPointerDown={startHold}
+        onPointerUp={stopHold}
+        onPointerLeave={stopHold}
+        onPointerCancel={stopHold}
+        // Holding would otherwise select the text or open the OS menu.
+        onContextMenu={(event) => event.preventDefault()}
         aria-label={copied ? "Address copied" : `Copy address ${address}`}
         className={cn(
-          "flex w-full justify-center rounded-lg border bg-mist px-4 py-3 transition-colors",
+          "flex w-full select-none justify-center rounded-lg border bg-mist px-4 py-3 transition-colors [-webkit-touch-callout:none]",
           copied ? "border-positive" : "border-line hover:border-faint",
         )}
       >
@@ -58,9 +95,12 @@ export function AddressDisplay({
       </button>
       <span
         aria-live="polite"
-        className="h-[14px] text-center text-caption font-semibold text-positive"
+        className={cn(
+          "h-[14px] text-center text-caption",
+          copied ? "font-semibold text-positive" : "text-faint",
+        )}
       >
-        {copied ? "Copied to clipboard" : ""}
+        {copied ? "Copied to clipboard" : "Tap or hold to copy"}
       </span>
     </div>
   );

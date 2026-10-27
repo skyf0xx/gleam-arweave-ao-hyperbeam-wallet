@@ -3,6 +3,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validateJWKShape } from "@gleam/core/src/keys/jwk.ts";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 /**
  * Import wallet — file drop + paste-JSON fallback, validates JWK shape
@@ -59,7 +60,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Import a wallet" onBack={onBack} />
       <form
-        className="flex flex-1 flex-col gap-5 px-6 py-6"
+        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
           event.preventDefault();
           if (pendingJWK) onValidJWK(pendingJWK);
@@ -99,9 +100,11 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
           className="min-h-[84px] resize-none rounded-md border border-line bg-background p-3 font-mono text-caption leading-relaxed text-foreground placeholder:font-sans placeholder:text-faint focus:border-foreground focus:outline-none"
         />
 
-        <Button type="submit" disabled={!pendingJWK} className="mt-8">
-          Continue
-        </Button>
+        <ScreenFooter className="mt-8">
+          <Button type="submit" disabled={!pendingJWK}>
+            Continue
+          </Button>
+        </ScreenFooter>
       </form>
     </div>
   );

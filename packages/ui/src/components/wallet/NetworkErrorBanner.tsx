@@ -1,3 +1,5 @@
+import { cn } from "../../primitives/cn";
+
 /**
  * The shared network-unreachable banner — direct, specific,
  * next-step-first copy, no apology theater. Caller supplies `onRetry`;
@@ -5,11 +7,13 @@
  */
 export interface NetworkErrorBannerProps {
   onRetry: () => void;
+  /** On the phone the banner insets itself to the gutter; `phone:mx-0` where the parent already does. */
+  className?: string;
 }
 
-export function NetworkErrorBanner({ onRetry }: NetworkErrorBannerProps) {
+export function NetworkErrorBanner({ onRetry, className }: NetworkErrorBannerProps) {
   return (
-    <div className="flex items-center gap-2.5 border-b border-line bg-mist px-4 py-3">
+    <div className={cn("flex items-center gap-2.5 border-b border-line bg-mist px-4 py-3 phone:mx-5 phone:mt-2 phone:rounded-xl phone:border-b-0 phone:py-1.5 phone:pl-3.5 phone:pr-1", className)}>
       <svg
         width="16"
         height="16"
@@ -27,7 +31,7 @@ export function NetworkErrorBanner({ onRetry }: NetworkErrorBannerProps) {
       <button
         type="button"
         onClick={onRetry}
-        className="flex-shrink-0 p-1 text-caption font-semibold text-foreground underline decoration-faint underline-offset-2"
+        className="flex-shrink-0 p-1 text-caption font-semibold text-foreground underline decoration-faint underline-offset-2 phone:flex phone:min-h-11 phone:items-center phone:px-3"
       >
         Retry
       </button>

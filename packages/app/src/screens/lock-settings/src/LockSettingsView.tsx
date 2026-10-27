@@ -13,6 +13,8 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
+import { BiometricSection } from "./BiometricSection";
+import type { BiometricUnlockPort } from "../../../app-platform/types";
 
 const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
   { value: "never", label: "Never" },
@@ -36,6 +38,10 @@ export interface LockSettingsViewProps {
   onSetUpPasskey?: () => Promise<void>;
   /** Injected for tests; defaults to feature-detecting WebAuthn. */
   passkeysSupported?: boolean;
+  /** Omitted, the biometric section is hidden. */
+  biometrics?: BiometricUnlockPort;
+  /** Whether the shell locks the wallet when the OS locks. Off, the copy stops promising it. */
+  lockOnSystemLock?: boolean;
 }
 
 interface LoadState {
@@ -50,6 +56,8 @@ export function LockSettingsView({
   onLocked,
   onSetUpPasskey,
   passkeysSupported = passkeysAvailable(),
+  biometrics,
+  lockOnSystemLock = true,
 }: LockSettingsViewProps) {
   const [state, setState] = useState<LoadState>({
     settings: null,
@@ -123,8 +131,8 @@ export function LockSettingsView({
       <ScreenHeader title="Lock & unlock" onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
-      <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
-        <div className="pb-10">
+      <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
+        <div className="pb-10 phone:pb-8">
           <button
             type="button"
             disabled={locking}
@@ -145,6 +153,8 @@ export function LockSettingsView({
           </button>
         </div>
 
+        {biometrics ? <BiometricSection runtime={runtime} biometrics={biometrics} /> : null}
+
         {onSetUpPasskey ? (
           <PasskeySection
             runtime={runtime}
@@ -156,7 +166,7 @@ export function LockSettingsView({
         <SecurityPhraseSection runtime={runtime} />
 
         <div>
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
             Auto-lock
           </div>
           <div>
@@ -198,12 +208,13 @@ export function LockSettingsView({
               role="note"
               className="pt-2.5 text-caption leading-relaxed text-warning"
             >
-              Gleam stays unlocked always, even when your computer locks.
+              {lockOnSystemLock ? "Gleam stays unlocked always, even when your computer locks." : "Gleam stays unlocked always."}
             </p>
           ) : (
             <p className="pt-2.5 text-caption leading-relaxed text-faint">
-              Gleam locks after this long without use, and whenever your
-              computer locks.
+              {lockOnSystemLock
+                ? "Gleam locks after this long without use, and whenever your computer locks."
+                : "Gleam locks after this long without use."}
             </p>
           )}
         </div>
@@ -305,8 +316,8 @@ function PasskeySection({
   };
 
   return (
-    <div className="pb-10">
-      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+    <div className="pb-10 phone:pb-8">
+      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
         Passkey
       </div>
       {passkey.kind === "loading" ? (

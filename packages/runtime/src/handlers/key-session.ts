@@ -1,5 +1,6 @@
 import {
   isHardwareWalletMethod,
+  isWatchWalletMethod,
   vaultHasPassword,
   type AutoLockTimeout,
   type HardwareDevice,
@@ -53,6 +54,14 @@ export class HardwareWalletSigningError extends Error {
   constructor() {
     super("This wallet signs on its device. Signing with a hardware wallet isn't supported yet.");
     this.name = "HardwareWalletSigningError";
+  }
+}
+
+/** Thrown for a watch wallet, which has no key anywhere, so nothing can sign for it. */
+export class WatchWalletSigningError extends Error {
+  constructor() {
+    super("This wallet is watch-only, so it can't sign.");
+    this.name = "WatchWalletSigningError";
   }
 }
 
@@ -243,11 +252,6 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     return (await getStoredWallet(walletId))?.method ?? null;
   }
 
-  async function isHardwareWallet(walletId: string): Promise<boolean> {
-    const method = await getWalletMethod(walletId);
-    return method !== null && isHardwareWalletMethod(method);
-  }
-
   async function zeroizeAndRemoveEntry(walletId: string): Promise<void> {
     const key = entryKey(walletId);
     const entry = await storage.get<unknown>(key);
@@ -317,7 +321,7 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
   }
 
   /**
-   * A vault of only hardware wallets has no password to unlock with, so
+   * A vault of only hardware and watch wallets has no password to unlock with, so
    * `wallet-lifecycle.ts`'s `loadSession` keeps its session open and never
    * auto-locks it. Matched here so the alarm doesn't end a session that
    * `loadSession` would only start again.
@@ -358,11 +362,14 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
    * Handlers read keys without going through `getState`, so the auto-lock
    * timeout is enforced here too: an expired session wipes every key and
    * the session record before anything can sign. Throws
-   * `HardwareWalletSigningError` for a hardware wallet, which never has a
-   * key here.
+   * `HardwareWalletSigningError` for a hardware wallet and
+   * `WatchWalletSigningError` for a watch wallet, which never have a key
+   * here.
    */
   async function getUnlockedKey(walletId: string): Promise<SessionKeyEntry | null> {
-    if (await isHardwareWallet(walletId)) throw new HardwareWalletSigningError();
+    const method = await getWalletMethod(walletId);
+    if (method !== null && isHardwareWalletMethod(method)) throw new HardwareWalletSigningError();
+    if (method !== null && isWatchWalletMethod(method)) throw new WatchWalletSigningError();
     const session = await storage.get<unknown>(SESSION_KEY);
     if (!isValidSession(session)) return null;
     if (isSessionExpired(session.lastActivityAt, session.autoLockTimeout)) {

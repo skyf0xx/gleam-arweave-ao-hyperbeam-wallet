@@ -5,6 +5,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { useAddressIdentity } from "../../../address-identity";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 export interface SecurityPhraseStepProps {
   runtime: RuntimePort;
@@ -26,7 +27,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Security phrase" />
       <form
-        className="flex flex-1 flex-col gap-5 px-6 py-6"
+        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
           event.preventDefault();
           if (!valid || saving) return;
@@ -59,9 +60,11 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
           errorMessage={error ?? (valid ? undefined : "Use up to 24 letters or numbers.")}
         />
 
-        <Button type="submit" disabled={!valid || saving} className="mt-auto">
-          {saving ? "Saving…" : "Continue"}
-        </Button>
+        <ScreenFooter>
+          <Button type="submit" disabled={!valid || saving}>
+            {saving ? "Saving…" : "Continue"}
+          </Button>
+        </ScreenFooter>
       </form>
     </div>
   );

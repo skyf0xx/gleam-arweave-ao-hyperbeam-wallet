@@ -24,6 +24,10 @@ async function seed(
       `CODE${i}`,
       wallet.referredBy ?? null,
     ]);
+    await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2)", [
+      wallet.address,
+      `device-${wallet.address}`,
+    ]);
   }
 }
 
@@ -102,6 +106,20 @@ describe("runSnapshot", () => {
     expect(await pointsByAddress(db)).toEqual({});
     const { rows } = await db.query<{ live: boolean }>("SELECT live FROM snapshots WHERE address = 'gone'");
     expect(rows[0]?.live).toBe(false);
+  });
+
+  it("counts a wallet live while any of its installs checks in, and reads its balance once", async () => {
+    const db = await createTestDb();
+    await seed(db, [{ address: "phone", heartbeat: DAYS_AGO }]);
+    await db.query("INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ('desktop', '{}', $1)", [HOURS_AGO]);
+    await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ('phone', 'desktop')");
+    const readBalances = reader({ phone: { arAtomic: "100", aoAtomic: "0" } });
+
+    const summary = await runSnapshot(db, NOW, { readBalances });
+
+    expect(readBalances).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ liveCount: 1 });
+    expect(await pointsByAddress(db)).toEqual({ phone: { holding: "100", referee: "0", referrer: "0" } });
   });
 
   it("retries a failing read, then leaves the wallet out of the day", async () => {

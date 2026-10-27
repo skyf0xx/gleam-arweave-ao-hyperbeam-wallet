@@ -12,6 +12,7 @@ async function device(db: Db, id: string, lastHeartbeat: Date | null = null) {
 }
 async function wallet(db: Db, address: string, deviceId: string, code: string) {
   await db.query("INSERT INTO wallets (address, device_id, invite_code) VALUES ($1, $2, $3)", [address, deviceId, code]);
+  await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2)", [address, deviceId]);
 }
 async function redeem(db: Db, deviceId: string, code: string, at: Date) {
   await db.query("INSERT INTO invite_redemptions (device_id, code, redeemed_at) VALUES ($1, $2, $3)", [deviceId, code, at]);

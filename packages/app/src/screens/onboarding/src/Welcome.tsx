@@ -14,7 +14,7 @@ export interface WelcomeProps {
 
 export function Welcome({ onCreate, onExisting }: WelcomeProps) {
   return (
-    <div className="flex min-h-full flex-col items-center px-8 pb-8 pt-7">
+    <div className="flex min-h-full flex-col items-center px-8 phone:px-5 pb-8 pt-7 phone:pt-4">
       <div className="my-auto">
         <BeamMark tagline="crypto, without the clutter." />
       </div>

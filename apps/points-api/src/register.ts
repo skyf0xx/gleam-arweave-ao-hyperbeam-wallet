@@ -54,8 +54,9 @@ export function parseRegisterRequest(body: unknown): RegisterRequest | null {
  * Binds a wallet to the install's device key. Registering also counts as
  * a heartbeat, so the wallet is live from its first snapshot.
  *
- * Registering an already-known wallet moves it to the new device (a
- * reinstall) and keeps its invite code and referrer. An invite code
+ * Registering an already-known wallet adds the new device to its installs
+ * and makes it the wallet's newest install, keeping its invite code and
+ * referrer, so a second install or a reinstall both work. An invite code
  * counts only for the first wallet an install registers; an unknown code
  * is ignored rather than failing the registration.
  *
@@ -109,6 +110,7 @@ export async function register(
 
     if (existing.rows[0]) {
       await tx.query("UPDATE wallets SET device_id = $1 WHERE address = $2", [deviceId, address]);
+      await addInstall(tx, address, deviceId);
       const { invite_code, referred_by } = existing.rows[0];
       return { ok: true, result: { address, inviteCode: invite_code, referred: referred_by !== null } };
     }
@@ -118,14 +120,22 @@ export async function register(
     if (inviteCode === null) {
       return { ok: false, status: 409, error: "This wallet is being registered elsewhere. Try again." };
     }
+    await addInstall(tx, address, deviceId);
     return { ok: true, result: { address, inviteCode, referred: referredBy !== null } };
   });
+}
+
+async function addInstall(tx: Queryable, address: string, deviceId: string): Promise<void> {
+  await tx.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [
+    address,
+    deviceId,
+  ]);
 }
 
 async function installMayAddWallet(tx: Queryable, deviceId: string): Promise<boolean> {
   const { rows } = await tx.query<{ allowed: boolean }>(
     `SELECT EXISTS (SELECT 1 FROM invite_redemptions WHERE device_id = $1)
-         OR EXISTS (SELECT 1 FROM wallets WHERE device_id = $1) AS allowed`,
+         OR EXISTS (SELECT 1 FROM wallet_devices WHERE device_id = $1) AS allowed`,
     [deviceId],
   );
   return rows[0]?.allowed === true;
@@ -133,7 +143,7 @@ async function installMayAddWallet(tx: Queryable, deviceId: string): Promise<boo
 
 async function referrerFor(tx: Queryable, deviceId: string, inviteCode: string, address: string): Promise<string | null> {
   const deviceWallets = await tx.query<{ count: string }>(
-    "SELECT count(*)::text AS count FROM wallets WHERE device_id = $1",
+    "SELECT count(*)::text AS count FROM wallet_devices WHERE device_id = $1",
     [deviceId],
   );
   if (deviceWallets.rows[0]?.count !== "0") return null;

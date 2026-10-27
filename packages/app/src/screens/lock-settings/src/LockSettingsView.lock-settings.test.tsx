@@ -77,6 +77,18 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     expect(screen.getByText(/whenever your computer locks/)).toBeTruthy();
   });
 
+  it("stops promising a lock on OS lock where the shell has none", async () => {
+    const send = sendFor();
+    render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} lockOnSystemLock={false} />);
+
+    await waitFor(() => expect(screen.getByRole("note").textContent).toBe("Gleam stays unlocked always."));
+    fireEvent.click(screen.getByText("1 hour"));
+
+    await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
+    expect(screen.getByText("Gleam locks after this long without use.")).toBeTruthy();
+    expect(screen.queryByText(/computer locks/)).toBeNull();
+  });
+
   it("does not re-save when the already-selected timeout is tapped again", async () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);

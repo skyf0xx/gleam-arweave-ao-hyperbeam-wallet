@@ -276,6 +276,7 @@ export const BACKGROUND_MESSAGES = {
   createWallet: EXTENSION,
   importWallet: EXTENSION,
   addHardwareWallet: EXTENSION,
+  addWatchWallet: EXTENSION,
   deleteWallet: EXTENSION,
   renameWallet: EXTENSION,
   switchWallet: EXTENSION,
@@ -285,6 +286,7 @@ export const BACKGROUND_MESSAGES = {
   unlockWallet: EXTENSION,
   getPasskeyStatus: EXTENSION,
   checkVaultPassword: EXTENSION,
+  probeVaultPassword: EXTENSION,
   enrollPasskey: EXTENSION,
   unlockWithPasskey: EXTENSION,
   removePasskey: EXTENSION,
@@ -305,6 +307,7 @@ export const BACKGROUND_MESSAGES = {
   getTokenPrices: EXTENSION,
   getConnectedApps: EXTENSION,
   listContacts: EXTENSION,
+  listBrowserSites: EXTENSION,
 
   // actions
   estimateTransfer: EXTENSION,
@@ -312,8 +315,6 @@ export const BACKGROUND_MESSAGES = {
   submitTransfer: EXTENSION,
   estimateCollectibleSend: EXTENSION,
   sendCollectible: EXTENSION,
-  reviewUpload: EXTENSION,
-  submitUpload: EXTENSION,
 
   // approvals
   getApproval: EXTENSION,
@@ -340,6 +341,10 @@ export const BACKGROUND_MESSAGES = {
   dismissSiteSuggestion: EXTENSION,
   saveContact: EXTENSION,
   deleteContact: EXTENSION,
+  saveBrowserSite: EXTENSION,
+  removeBrowserSite: EXTENSION,
+  recordRecentSite: EXTENSION,
+  clearRecentSites: EXTENSION,
 
   // Gleam Points
   joinPoints: EXTENSION,

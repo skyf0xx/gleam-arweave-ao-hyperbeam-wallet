@@ -33,8 +33,6 @@ import type {
   TokenBalance,
   TokenPrice,
   TransferDraft,
-  UploadDraft,
-  UploadReview,
   WalletState,
   WalletSummary,
   Winston,
@@ -78,6 +76,12 @@ export interface ProtocolMap {
     device: HardwareDevice;
     name?: string;
   }): WalletSummary;
+  /**
+   * Adds a watch-only wallet: just an address, with no key, so it can't
+   * sign or connect to sites. Needs Gleam unlocked when the vault has a
+   * password.
+   */
+  addWatchWallet(req: { address: string; name?: string }): WalletSummary;
   deleteWallet(req: { walletId: string }): void;
   renameWallet(req: { walletId: string; name: string }): void;
   switchWallet(req: { walletId: string }): void;
@@ -107,6 +111,12 @@ export interface ProtocolMap {
    * the user's password manager.
    */
   checkVaultPassword(req: { password: string }): void;
+  /**
+   * Whether `password` opens the vault. Rejects when the check couldn't
+   * run (storage, Argon2id), which is never a wrong password. Asked before
+   * dropping a stored biometric password that failed to unlock.
+   */
+  probeVaultPassword(req: { password: string }): { opens: boolean };
   /**
    * Stores the vault password wrapped under the passkey's PRF output.
    * `prfSalt` and `prfOutput` are base64url. Replaces any earlier passkey.
@@ -178,9 +188,11 @@ export interface ProtocolMap {
   getSecurityPhrase(): SecurityPhrase | null;
   /** One list for the whole vault, most-recently-saved first. */
   listContacts(): Contact[];
+  /** The dApp browser's saved and recent sites, as origins, most recent first. */
+  listBrowserSites(): { saved: string[]; recent: string[] };
 
   // actions
-  // `TransferDraft`/`UploadDraft` carry `walletId` directly — signing
+  // `TransferDraft` carries `walletId` directly — signing
   // reads the decrypted JWK from the background's in-memory
   // unlocked-session cache (`packages/runtime/src/handlers/key-session.ts`),
   // not a password on the request: once unlocked, no further call needs
@@ -193,14 +205,12 @@ export interface ProtocolMap {
   estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;
   /** Sends one collectible as an L1 transaction to its process (`core/ao/collectible-transfer.ts`). */
   sendCollectible(req: CollectibleSendDraft): { txId: string };
-  reviewUpload(req: UploadDraft): UploadReview; // runs the secret scan
-  submitUpload(req: UploadDraft): { txId: string };
 
   // approvals
   getApproval(req: { requestId: string }): ApprovalRequest;
   /**
    * A signing approval reads its signing key the same way
-   * `submitTransfer`/`submitUpload` do — from the unlocked-session cache,
+   * `submitTransfer` does — from the unlocked-session cache,
    * keyed by the request's own `walletId` — so `resolveApproval` alone is
    * enough to finalize either a `connect` or a signing approval; no
    * separate password hand-off call precedes it any more.
@@ -248,6 +258,12 @@ export interface ProtocolMap {
    */
   saveContact(req: { address: string; name: string }): Contact;
   deleteContact(req: { address: string }): void;
+  /** Saves the origin of an http(s) `url`; saving it again moves it to the top. */
+  saveBrowserSite(req: { url: string }): void;
+  removeBrowserSite(req: { origin: string }): void;
+  /** Keeps the 10 most recent origins, one entry per origin. */
+  recordRecentSite(req: { url: string }): void;
+  clearRecentSites(): void;
 
   /**
    * Opts a wallet into Gleam Points (POINTS.md § Identity): the wallet

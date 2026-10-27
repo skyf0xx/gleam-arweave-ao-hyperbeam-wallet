@@ -1,9 +1,11 @@
 import { browser } from "wxt/browser";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
+import { unavailableDappBrowser } from "@gleam/app/src/app-platform/dapp-browser.ts";
 import type { DeviceSignPanels } from "@gleam/app/src/approval/device-panels.tsx";
 import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
 import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
 import { openPasskeyWindow } from "@/src/passkey/open-window";
+import { STORE_REVIEWS_URL } from "@gleam/core";
 import { runtimePort } from "./runtime";
 
 /**
@@ -22,6 +24,10 @@ export interface ExtensionAppPlatformOptions {
   signPanels?: DeviceSignPanels;
 }
 
+async function biometricsUnavailable(): Promise<never> {
+  throw new Error("Biometric unlock isn't available in the extension.");
+}
+
 /**
  * The action popup closes when the browser's passkey prompt takes focus,
  * so only it hands the ceremony to its own window.
@@ -32,14 +38,20 @@ export function createExtensionAppPlatform(
 ): AppPlatform {
   return {
     runtime: runtimePort,
-    buildInfo: { version: browser.runtime.getManifest().version },
+    buildInfo: {
+      version: browser.runtime.getManifest().version,
+      // Set `WXT_FOUNDING_GATE=false` for the Phase 2 build; it's on otherwise.
+      foundingGate: import.meta.env.WXT_FOUNDING_GATE !== "false",
+    },
     capabilities: {
       sidePanel: true,
       passkey: true,
       biometrics: false,
-      hardwareWallets: true,
+      hardwareWallets: { ledger: true, keystone: true },
       dappBrowser: false,
+      qrScanner: false,
       hostPermissions: true,
+      lockOnSystemLock: true,
     },
     hostPermissions: {
       contains: (origins) => browser.permissions.contains({ origins: [...origins] }),
@@ -54,12 +66,33 @@ export function createExtensionAppPlatform(
       passkeyMode: surface === "popup" ? "window" : "inline",
       openPasskeyWindow,
     },
+    biometrics: {
+      availability: async () => ({ available: false, reason: "unavailable" }),
+      isEnrolled: async () => false,
+      enrol: biometricsUnavailable,
+      readPassword: biometricsUnavailable,
+      remove: async () => {},
+    },
+    qrScanner: {
+      scan: async () => {
+        throw new Error("QR scanning isn't available in the extension.");
+      },
+    },
     downloads: {
       requestPermission: () => browser.permissions.request({ permissions: ["downloads"] }).catch(() => false),
     },
     hardwareWallets: {
       openConnectPage: (device) => (device === "keystone" ? openKeystoneConnect() : openLedgerConnect()),
+      // The action popup closes when it loses focus, so both devices connect in a tab (`openConnectPage`).
+      connectViews: {},
       signPanels: options.signPanels ?? null,
+    },
+    dappBrowser: unavailableDappBrowser,
+    storeReview: {
+      opensPage: true,
+      request: async () => {
+        window.open(STORE_REVIEWS_URL, "_blank", "noreferrer");
+      },
     },
     activeSite: {
       subscribe(onChange) {

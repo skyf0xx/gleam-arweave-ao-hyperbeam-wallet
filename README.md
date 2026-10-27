@@ -9,10 +9,8 @@ A Chrome browser-extension wallet for Arweave and AO.
 ### Works with `window.arweaveWallet`
 
 Gleam implements the [ArConnect API](https://docs.arconnect.io/api/intro).
-
-Code written for
-`window.arweaveWallet` **works with Gleam unchanged**, except `privateHash`
-and the deprecated `signature` (see below).
+Code written for `window.arweaveWallet` **works with Gleam unchanged**,
+except for `privateHash` and the deprecated `signature` (see below).
 
 ### Keep a user's data private across devices
 
@@ -35,18 +33,18 @@ const sameKey = await window.arweaveWallet.decrypt(locked, {
 
 </details>
 
-Gleam doesn't support `privateHash`, which needs the private key to stay
-readable while the wallet is unlocked.
+Gleam does not support `privateHash`, because it needs the private key to
+stay readable while the wallet is unlocked.
 
-Gleam doesn't support the deprecated `signature`, which signs whatever
-bytes a site passes, such as a hash it computed. Use `signMessage` or
+Gleam does not support the deprecated `signature`, because it signs
+whatever bytes a site passes, such as a hash the site computed. Use `signMessage` or
 `signDataItem` instead.
 
 ### Add a Connect with Gleam button
 
-use `window.gleam` instead of `window.arweaveWallet`
+Use `window.gleam` instead of `window.arweaveWallet`.
 
-If `window.gleam` is `undefined` the wallet isn't installed and you can link to the
+If `window.gleam` is `undefined`, Gleam is not installed. Link to the
 [Chrome Web Store](https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki)
 instead.
 
@@ -82,6 +80,42 @@ button.addEventListener("click", async () => {
 
 ## Development
 
+### Repository layout
+
+The wallet is split into shared packages that both apps are built from.
+Each folder has a README with more detail.
+
+```text
+apps/extension, apps/mobile          (each app mounts both halves)
+   │                    │
+   ▼                    ▼
+packages/app ──messaging──▶ packages/runtime ──▶ packages/core
+(screens, built                (backend)           (domain logic)
+ from packages/ui)
+```
+
+- [`packages/core`](packages/core): the domain logic: keys, signing, Arweave
+  and AO, and the rules behind each feature.
+- [`packages/runtime`](packages/runtime): the background that checks and
+  handles every request.
+- [`packages/app`](packages/app): every screen the user sees.
+- [`packages/ui`](packages/ui): the design system the screens are built
+  from.
+- [`packages/messaging`](packages/messaging): the messages the wallet's
+  parts send each other.
+- [`packages/provider`](packages/provider): the `window.arweaveWallet`
+  script that runs in dApp pages.
+- [`packages/keystone`](packages/keystone): Keystone hardware wallet
+  support over QR codes.
+- [`apps/extension`](apps/extension): the Chrome extension.
+- [`apps/mobile`](apps/mobile): the iOS and Android app.
+- [`apps/points-api`](apps/points-api): the Gleam Points server.
+- [`apps/site`](apps/site): the gleamwallet.app website.
+- [`apps/site-open`](apps/site-open): the site that opens links in the
+  mobile app.
+- [`scripts/scan`](scripts/scan): the `pnpm scan` CLI for community
+  security scans.
+
 <details>
 <summary>Build and test</summary>
 
@@ -98,7 +132,8 @@ Load `apps/extension/.output/chrome-mv3` unpacked in Chrome to try it.
 
 <details>
 <summary>Verify a release</summary>
-The script will build the tag from source and check that your zip has the
+
+The script builds the tag from source and checks that your zip has the
 same hash as the
 [release](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases).
 
@@ -147,7 +182,8 @@ Chrome's extension folder:
 - Windows: `%LOCALAPPDATA%\Google\Chrome\User Data\Default\Extensions\`
 - Linux: `~/.config/google-chrome/Default/Extensions/`
 
-The Web Store adds `_metadata/`, `key` and `update_url`. The script ignores them.
+The Web Store adds `_metadata/`, `key` and `update_url`, and the script
+ignores them.
 
 </details>
 

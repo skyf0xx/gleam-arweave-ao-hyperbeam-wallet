@@ -200,7 +200,7 @@ export function PortfolioChart({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {onRetry ? (
-        <NetworkErrorBanner onRetry={onRetry} />
+        <NetworkErrorBanner onRetry={onRetry} className="phone:mx-0 phone:mt-0" />
       ) : (
         <>
           <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
@@ -311,7 +311,7 @@ export function PortfolioChart({
       )}
 
       {showChart ? (
-        <div role="tablist" aria-label="Chart range" className="flex items-center gap-1">
+        <div role="tablist" aria-label="Chart range" className="flex items-center gap-1 phone:-mx-2.5">
           {RANGE_TABS.map((range) => (
             <button
               key={range}
@@ -320,7 +320,7 @@ export function PortfolioChart({
               aria-selected={range === activeRange}
               onClick={() => onRangeChange(range)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-caption font-semibold",
+                "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
                 range === activeRange
                   ? "bg-foreground text-background"
                   : "text-muted hover:bg-mist hover:text-foreground",
@@ -374,7 +374,7 @@ interface ChartAreaProps {
 
 /** The 80px chart slot: a plain box, or a button over it when the scope toggle is enabled. */
 function ChartArea({ onToggle, scope, children }: ChartAreaProps) {
-  if (!onToggle) return <div className="h-[80px] w-full">{children}</div>;
+  if (!onToggle) return <div className="h-[80px] w-full phone:[@media(max-height:700px)]:h-14">{children}</div>;
 
   return (
     <button
@@ -382,7 +382,7 @@ function ChartArea({ onToggle, scope, children }: ChartAreaProps) {
       onClick={onToggle}
       aria-pressed={scope === "all"}
       aria-label={SCOPE_ACTION_LABEL[scope]}
-      className="block h-[80px] w-full cursor-pointer rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+      className="block h-[80px] w-full cursor-pointer rounded-md text-left phone:[@media(max-height:700px)]:h-14 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
     >
       {children}
     </button>

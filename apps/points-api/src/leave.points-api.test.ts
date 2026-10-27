@@ -77,6 +77,19 @@ describe("POST /leave", () => {
     expect(await count(db, "devices WHERE id = $1", [devices.bob.id])).toBe(1);
   });
 
+  it("removes every install of a wallet on several, keeping one another wallet uses", async () => {
+    const { db, devices, post } = await setup();
+    const phone = await createTestDevice();
+    await post("/register", await registerBody(alice, phone, { issuedAt: NOW_SECONDS }));
+    await post("/register", await registerBody(bob, phone, { issuedAt: NOW_SECONDS }));
+
+    expect((await post("/leave", await leaveBody(alice, NOW_SECONDS))).status).toBe(200);
+
+    expect(await count(db, "wallet_devices WHERE address = $1", [alice.address])).toBe(0);
+    expect(await count(db, "devices WHERE id = $1", [devices.alice.id])).toBe(0);
+    expect(await count(db, "devices WHERE id = $1", [phone.id])).toBe(1);
+  });
+
   it("stops the invite link: an invitee keeps its points but is no longer credited as invited", async () => {
     const { db, post } = await setup();
     await runSnapshot(db, NOW, { readBalances: balances });

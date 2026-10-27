@@ -61,9 +61,9 @@ const signerFence = (regex) => ({
 // mobile app), so it reaches a platform only through `Platform`. Block the
 // shells' SDKs, both shells, their `@/` and `~/` aliases, and the extension
 // globals. `(^|/)apps/` also catches a relative climb into `apps/`.
-const RUNTIME_IMPORT = "^(wxt|@capacitor|@webext-core)(/|$)|(^|/)apps/(extension|mobile)(/|$)|^[@~]/";
+const RUNTIME_IMPORT = "^(wxt|@capacitor|@capacitor-community|@capgo|@webext-core)(/|$)|(^|/)apps/(extension|mobile)(/|$)|^[@~]/";
 const RUNTIME_IMPORT_MESSAGE =
-  "packages/runtime is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `Platform`.";
+  "packages/runtime is shell-free: no wxt, Capacitor plugins, @webext-core or apps/*. Take what you need through `Platform`.";
 const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
@@ -80,10 +80,22 @@ const runtimeFence = (...extraPatterns) => ({
 // runtime it reaches a platform only through `AppPlatform`. The same SDKs,
 // shells, aliases and globals are blocked.
 const APP_IMPORT_MESSAGE =
-  "packages/app is shell-free: no wxt, @capacitor, @webext-core or apps/*. Take what you need through `AppPlatform`.";
+  "packages/app is shell-free: no wxt, Capacitor plugins, @webext-core or apps/*. Take what you need through `AppPlatform`.";
+// The hardware-wallet libraries belong to a shell's signing panels, which
+// it hands the app through `AppPlatform.hardwareWallets`. Imported from
+// `packages/app`, they would land in the popup and the phone bundle.
+const HARDWARE_IMPORT = "^@(keystonehq|ngraveio|ledgerhq)(/|$)";
+const HARDWARE_IMPORT_MESSAGE =
+  "packages/app doesn't import hardware-wallet libraries. The shell provides its signing panels through `AppPlatform.hardwareWallets`.";
 const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
+}));
+const KEYSTONE_IMPORT_MESSAGE =
+  "packages/keystone is shared by both shells: no wxt, Capacitor plugins, @webext-core or apps/*. Take shell-specific copy or behaviour as props.";
+const KEYSTONE_GLOBALS = ["chrome", "browser"].map((name) => ({
+  name,
+  message: "packages/keystone never touches extension globals. Take what differs per shell as props.",
 }));
 
 // `packages/provider` runs in the page's own world, where anything it
@@ -94,7 +106,7 @@ const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
 const PROVIDER_IMPORT =
   "^@gleam/(core|runtime|app|ui)(/|$)|(^|/)packages/(core|runtime|app|ui|messaging)(/|$)|^(\\.\\./){2,}(core|runtime|app|ui|messaging)(/|$)|^@gleam/messaging(?!/src/page-protocol(\\.ts)?$)";
 const PROVIDER_IMPORT_MESSAGE =
-  "packages/provider is page-world code: no wxt, @capacitor, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
+  "packages/provider is page-world code: no wxt, Capacitor plugins, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
 const PROVIDER_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/provider never touches extension globals. Reach the wallet through `ProviderTransport`.",
@@ -147,6 +159,9 @@ export default tseslint.config(
       "**/.wxt/**",
       "**/node_modules/**",
       "**/.claude/worktrees/**",
+      // Generated native projects; `cap sync` copies the built bundle into them.
+      "apps/mobile/ios/**",
+      "apps/mobile/android/**",
     ],
   },
   js.configs.recommended,
@@ -221,6 +236,7 @@ export default tseslint.config(
       "apps/extension/src/keyring/server.ts",
       "apps/extension/src/adapters/offscreen-keyring.ts",
       "apps/extension/entrypoints/keyring/main.ts",
+      "apps/mobile/src/adapters/session-key-store.ts",
       // Points API test fixtures sign with throwaway keys.
       "apps/points-api/src/test-signers.ts",
       // Gives tests the in-memory `Keyring` in place of the offscreen one.
@@ -263,9 +279,21 @@ export default tseslint.config(
     // the second block repeats it with the signer fence for non-test files.
     files: ["packages/app/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [{ regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+            { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
+          ],
+        },
+      ],
       "no-restricted-globals": ["error", ...APP_GLOBALS],
-      "gleam/no-dynamic-import": ["error", { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE }],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+        { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
+      ],
     },
   },
   {
@@ -278,6 +306,7 @@ export default tseslint.config(
           patterns: [
             { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
             { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+            { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
           ],
         },
       ],
@@ -285,6 +314,30 @@ export default tseslint.config(
         "error",
         { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
         { regex: RUNTIME_IMPORT, message: APP_IMPORT_MESSAGE },
+        { regex: HARDWARE_IMPORT, message: HARDWARE_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    // `packages/keystone` is shared by both shells, so it gets the app's
+    // shell fence, signer fence included. It is where the Keystone
+    // libraries the app refuses live, so those stay allowed.
+    files: ["packages/keystone/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+            { regex: RUNTIME_IMPORT, message: KEYSTONE_IMPORT_MESSAGE },
+          ],
+        },
+      ],
+      "no-restricted-globals": ["error", ...KEYSTONE_GLOBALS],
+      "gleam/no-dynamic-import": [
+        "error",
+        { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
+        { regex: RUNTIME_IMPORT, message: KEYSTONE_IMPORT_MESSAGE },
       ],
     },
   },
@@ -353,7 +406,7 @@ export default tseslint.config(
   {
     // The static site's vanilla script runs in the browser; `globals` isn't
     // resolvable from the root, so the handful it uses are listed here.
-    files: ["apps/site/**/*.js"],
+    files: ["apps/site/**/*.js", "apps/site-open/**/*.js"],
     languageOptions: {
       sourceType: "script",
       globals: {

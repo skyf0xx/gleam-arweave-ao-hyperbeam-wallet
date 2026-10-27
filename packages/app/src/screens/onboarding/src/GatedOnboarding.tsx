@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { InviteUnlock, RuntimePort } from "@gleam/core";
-import { FOUNDING_GATE } from "../../../founding-gate";
 import { FoundingGate } from "./FoundingGate";
 import { OnboardingView } from "./OnboardingView";
 
 export interface GatedOnboardingProps {
   runtime: RuntimePort;
   onComplete: () => void;
-  /** Defaults to the build-time `FOUNDING_GATE` flag. */
-  gateEnabled?: boolean;
+  /** The build's `buildInfo.foundingGate`. */
+  gateEnabled: boolean;
 }
 
 /**
@@ -18,7 +17,7 @@ export interface GatedOnboardingProps {
  * rather than blocking: it focuses the launch and isn't a security
  * boundary.
  */
-export function GatedOnboarding({ runtime, onComplete, gateEnabled = FOUNDING_GATE }: GatedOnboardingProps) {
+export function GatedOnboarding({ runtime, onComplete, gateEnabled }: GatedOnboardingProps) {
   const [passed, setPassed] = useState(false);
   const claim = gateEnabled ? "founding" : "open";
   const stored = useQuery({

@@ -55,8 +55,8 @@ export default defineConfig({
     // background service worker fetches, unless that origin answers with
     // CORS headers (the Gleam API does, price proxy included; see POINTS_API_URL). The
     // hosts fetched
-    // unconditionally (Arweave gateway, the up.arweave.net bundler used
-    // for uploads — a distinct host from arweave.net under MV3's exact
+    // unconditionally (Arweave gateway, the up.arweave.net bundler that
+    // bundled `dispatch` posts to — a distinct host from arweave.net under MV3's exact
     // match-pattern rules, not covered by 'https://arweave.net/*' —
     // and the default
     // HyperBEAM peers AO balance reads use out of the box, from

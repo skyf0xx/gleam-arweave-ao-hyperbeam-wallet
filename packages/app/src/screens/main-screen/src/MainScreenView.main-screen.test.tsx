@@ -137,6 +137,30 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
   });
 });
 
+describe("MainScreenView: a watch-only wallet", () => {
+  const WATCHED: WalletSummary = { ...WALLET, method: "watch", publicKey: "" };
+
+  it("keeps Send visible but disabled, says why, and leaves Receive working", async () => {
+    const onSend = vi.fn();
+    const onReceive = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send: successfulSend({ wallets: [WATCHED] }) }), wallet: WATCHED, onSend, onReceive });
+
+    const sendButton = await screen.findByRole("button", { name: "Send" });
+    expect((sendButton as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("This wallet is watch-only, so it can't send tokens.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Receive" }));
+    expect(onReceive).toHaveBeenCalledOnce();
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("enables Send for a keyfile wallet", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: successfulSend() }) });
+
+    expect(((await screen.findByRole("button", { name: "Send" })) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText(/watch-only/)).toBeNull();
+  });
+});
+
 describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => {
   it("renders a locally-generated SVG avatar in the account pill, with no network fetch to any dicebear host", async () => {
     const send = successfulSend();
@@ -1077,7 +1101,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
-    await waitFor(() => expect(screen.getByText("-42 unkn…0000")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("-42 unknow…0000")).toBeTruthy());
   });
 
   it("shows a collectible send as its name and thumbnail, not an amount", async () => {

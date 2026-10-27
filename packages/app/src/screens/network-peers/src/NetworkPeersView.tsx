@@ -22,9 +22,9 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
  * typo'd, dead, or unrelated host can't strand balance/activity reads with
  * no feedback at edit time.
  *
- * `browser.permissions.request` closes the popup in Chrome the instant it
- * shows its own prompt, which would otherwise discard whatever the user had
- * typed. The in-flight edit (gateway or peer, plus its URL) is saved to
+ * Requesting a host permission (the `hostPermissions` port) closes the
+ * popup in Chrome the instant it shows its own prompt, which would
+ * otherwise discard whatever the user had typed. The in-flight edit (gateway or peer, plus its URL) is saved to
  * `session:pendingNetworkEdit` right before the request, so a remount (the
  * user reopening the popup after answering the prompt) can pick the flow
  * back up: if the origin is now granted, it finishes automatically
@@ -362,9 +362,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       <ScreenHeader title="Network & peers" onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
-      <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
+      <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10">
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
             Gateway
           </div>
           <div>
@@ -432,7 +432,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         </div>
 
         <div>
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
             AO peers
           </div>
           <div>
@@ -451,7 +451,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         type="button"
                         disabled={saving || !peer.enabled}
                         onClick={() => handleSelectActive(peer)}
-                        className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default"
+                        className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default phone:hit-target"
                       >
                         <span
                           className={`truncate font-mono text-label font-semibold ${
@@ -472,7 +472,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                           aria-label={`Enable ${peerHostname(peer.url)}`}
                           disabled={saving}
                           onClick={() => handleToggleEnabled(peer.url)}
-                          className={`relative flex h-5 w-[34px] flex-shrink-0 items-center rounded-full border px-0.5 transition-colors disabled:opacity-60 ${
+                          className={`relative flex h-5 w-[34px] flex-shrink-0 items-center rounded-full border px-0.5 transition-colors disabled:opacity-60 phone:hit-target ${
                             peer.enabled ? "border-foreground bg-foreground" : "border-line bg-mist"
                           }`}
                         >

@@ -223,6 +223,13 @@
       .trim()
       .toUpperCase();
     if (!INVITE_CODE.test(inviteCode)) inviteCode = "";
+    // Phones hand this link to the app when it's installed. The subdomain is
+    // the one the app claims; the main site's own links stay in the browser.
+    var openApp = document.querySelector("[data-open-app]");
+    if (inviteCode && openApp && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      openApp.href = "https://open.gleamwallet.app/invite?code=" + encodeURIComponent(inviteCode);
+      document.querySelector("[data-open-app-wrap]").hidden = false;
+    }
     var states = {};
     document.querySelectorAll("[data-state]").forEach(function (el) {
       states[el.getAttribute("data-state")] = el;

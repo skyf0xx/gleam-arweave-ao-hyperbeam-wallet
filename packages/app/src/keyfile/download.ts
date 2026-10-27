@@ -39,7 +39,7 @@ export function keyfileDownloadError(result: FileDownloadResult): string | null 
   if (result.ok) return null;
   switch (result.reason) {
     case "cancelled":
-      return "The download was cancelled.";
+      return "Saving the keyfile was cancelled.";
     case "failed":
       return "The keyfile couldn't be saved.";
     case "permission":

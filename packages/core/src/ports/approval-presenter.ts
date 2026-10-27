@@ -8,7 +8,9 @@
  * popup closes on focus loss and would silently drop the request.
  *
  * Implemented by `apps/extension/src/adapters/windows.ts` over
- * `browser.windows`. `core` and the handlers only see this interface.
+ * `browser.windows`, and in the phone app by a sheet over the dApp view
+ * (`apps/mobile/src/adapters/approval-presenter.ts`), which shows one
+ * request at a time. `core` and the handlers only see this interface.
  */
 export interface ApprovalPresenterPort {
   /**

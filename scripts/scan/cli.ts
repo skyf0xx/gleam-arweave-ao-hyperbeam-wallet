@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { POINTS_API_URL } from "../../packages/core/src/models/network.ts";
-import { SITE_URL } from "../../apps/extension/src/site-pages.ts";
+import { SITE_URL } from "../../packages/core/src/models/site-origin.ts";
 import { runFinish } from "./finish.ts";
 import { runStart } from "./start.ts";
 import type { Deps, Outcome } from "./shared.ts";

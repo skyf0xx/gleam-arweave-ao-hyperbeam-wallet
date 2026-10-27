@@ -87,7 +87,7 @@ describe("ui/onboarding: AddressReveal", () => {
     const onDownload = vi.fn();
     const onSkip = vi.fn();
     render(<AddressReveal onDownload={onDownload} onSkip={onSkip} onContinue={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
     expect(onDownload).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByText("I'll back this up later"));
     expect(onSkip).toHaveBeenCalledOnce();
@@ -111,7 +111,7 @@ describe("ui/onboarding: AddressReveal", () => {
         onContinue={vi.fn()}
       />,
     );
-    expect((screen.getByRole("button", { name: "Download keyfile" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Save keyfile" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("alert").textContent).toBe("The download failed.");
   });
 });

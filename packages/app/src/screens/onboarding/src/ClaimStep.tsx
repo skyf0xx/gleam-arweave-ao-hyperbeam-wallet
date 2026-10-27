@@ -5,6 +5,7 @@ import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { FoundingGate } from "./FoundingGate";
 import { JoinNote } from "../../points/src/JoinNote";
 import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 export const CLAIM_PENDING_QUERY_KEY = ["points", "claimPending"] as const;
 
@@ -51,7 +52,7 @@ export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepPro
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center px-8 pb-6 pt-7">
+    <div className="flex min-h-full flex-col items-center px-8 phone:px-5 pb-6 pt-7 phone:pt-4">
       <div className="mt-6">
         <BeamMark />
       </div>
@@ -70,7 +71,7 @@ export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepPro
         ) : null}
       </div>
 
-      <div className="mt-auto flex w-full flex-col gap-3 pt-6">
+      <ScreenFooter className="pt-6">
         {join.error instanceof Error ? <p className="text-center text-caption text-warning">{join.error.message}</p> : null}
         <Button
           disabled={join.isPending}
@@ -82,7 +83,7 @@ export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepPro
           Not now
         </Button>
         <JoinNote />
-      </div>
+      </ScreenFooter>
     </div>
   );
 }

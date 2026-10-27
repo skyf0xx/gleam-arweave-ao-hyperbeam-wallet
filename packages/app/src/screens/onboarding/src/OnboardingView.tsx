@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RuntimePort, SecurityPhrase, WalletSummary } from "@gleam/core";
+import type { HardwareWalletMethod, RuntimePort, SecurityPhrase, WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
   keyfileDownloadError,
@@ -11,6 +11,8 @@ import { Backup } from "./Backup";
 import { Import } from "./Import";
 import { AddWalletStart } from "./AddWalletStart";
 import { ExistingWallet } from "./ExistingWallet";
+import { ConnectDevice } from "./ConnectDevice";
+import { WatchAddress } from "./WatchAddress";
 import { usePlatform } from "../../../app-platform/context";
 import { VaultPassword } from "./VaultPassword";
 import { ClaimStep, type ClaimPhase } from "./ClaimStep";
@@ -35,6 +37,8 @@ type Step =
   | { kind: "backup"; password: string | null; wallet: WalletSummary }
   | { kind: "import" }
   | { kind: "import-password"; jwk: unknown }
+  | { kind: "connect-device"; device: HardwareWalletMethod }
+  | { kind: "watch" }
   | { kind: "security-phrase"; wallet: WalletSummary }
   | { kind: "claim"; wallet: WalletSummary }
   | { kind: "reveal"; wallet: WalletSummary; inviteCode: string };
@@ -48,6 +52,11 @@ export interface OnboardingViewProps {
    * vault password instead of setting one.
    */
   mode?: "first-run" | "add-wallet";
+  /**
+   * Add-wallet only: false when every wallet so far is a hardware or watch wallet.
+   * The vault has no password yet, so the new keyfile wallet sets one.
+   */
+  vaultHasPassword?: boolean;
   /** Leaves the add-wallet flow from its first screen. */
   onCancel?: () => void;
   /**
@@ -56,9 +65,9 @@ export interface OnboardingViewProps {
    * backup or import.
    */
   claim?: ClaimPhase;
-  /** Opens the Keystone connect page. Defaults to the platform's connect page. */
+  /** Opens the Keystone connect page. Defaults to the platform's connect view or page. */
   onConnectKeystone?: () => void;
-  /** Opens the Ledger connect page. Defaults to the platform's connect page. */
+  /** Opens the Ledger connect page. Defaults to the platform's connect view or page. */
   onConnectLedger?: () => void;
   /** Asks for the optional `downloads` permission from the Download click. */
   requestDownloadPermission?: RequestDownloadsPermission;
@@ -107,13 +116,18 @@ function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
-export function OnboardingView({ runtime, onComplete, mode = "first-run", onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
+export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultHasPassword = true, onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
   const { hardwareWallets, downloads } = usePlatform();
-  const connectKeystone = onConnectKeystone ?? (() => void hardwareWallets.openConnectPage("keystone"));
-  const connectLedger = onConnectLedger ?? (() => void hardwareWallets.openConnectPage("ledger"));
+  const [step, setStep] = useState<Step>({ kind: "welcome" });
+  const connectDevice = (device: HardwareWalletMethod) => {
+    if (hardwareWallets.connectViews[device]) setStep({ kind: "connect-device", device });
+    else void hardwareWallets.openConnectPage(device);
+  };
+  const connectKeystone = onConnectKeystone ?? (() => connectDevice("keystone"));
+  const connectLedger = onConnectLedger ?? (() => connectDevice("ledger"));
   const requestPermission = requestDownloadPermission ?? downloads.requestPermission;
   const addingWallet = mode === "add-wallet";
-  const [step, setStep] = useState<Step>({ kind: "welcome" });
+  const askVaultPassword = addingWallet && vaultHasPassword;
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string>();
   const [backup, setBackup] = useState<{ downloading: boolean; savedAs: string | null; error: string | null }>({
@@ -127,11 +141,11 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
     else onComplete();
   };
 
-  // A first wallet also picks the security phrase, unless one survives
+  // The wallet that sets the password also picks the security phrase, unless one survives
   // from before a reset. If the phrase can't be read, onboarding still
   // finishes; it can be set later in Lock & unlock.
   const finish = (wallet: WalletSummary) => {
-    if (addingWallet) return proceed(wallet);
+    if (askVaultPassword) return proceed(wallet);
     runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined }).then(
       (phrase) => (phrase ? proceed(wallet) : setStep({ kind: "security-phrase", wallet })),
       () => proceed(wallet),
@@ -219,6 +233,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
             onImport={() => setStep({ kind: "import" })}
             onConnectKeystone={connectKeystone}
             onConnectLedger={connectLedger}
+            onWatch={() => setStep({ kind: "watch" })}
           />
         );
       }
@@ -236,11 +251,22 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
           onImport={() => setStep({ kind: "import" })}
           onConnectKeystone={connectKeystone}
           onConnectLedger={connectLedger}
+          onWatch={() => setStep({ kind: "watch" })}
+        />
+      );
+
+    case "watch":
+      return (
+        <WatchAddress
+          runtime={runtime}
+          onBack={() => setStep({ kind: addingWallet ? "welcome" : "existing" })}
+          // A watch wallet can't sign, so it skips the Points claim, which needs a signature.
+          onAdded={onComplete}
         />
       );
 
     case "create-password":
-      if (addingWallet) {
+      if (askVaultPassword) {
         return (
           <VaultPassword
             title="Create a wallet"
@@ -288,8 +314,20 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", onCanc
         />
       );
 
+    case "connect-device":
+      return (
+        <ConnectDevice
+          device={step.device}
+          runtime={runtime}
+          // Both ways in list the devices: the add-wallet start, or first
+          // run's "I already have a wallet".
+          onBack={() => setStep({ kind: addingWallet ? "welcome" : "existing" })}
+          onConnected={onComplete}
+        />
+      );
+
     case "import-password":
-      if (addingWallet) {
+      if (askVaultPassword) {
         return (
           <VaultPassword
             title="Import a wallet"

@@ -7,6 +7,7 @@ import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { EmptyState, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useContacts, useDeleteContact, useSaveContact } from "../../activity/src/useContacts";
+import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 
 /**
  * Settings' Contacts screen — "Address book, part 2" per `todo.md`. A flat
@@ -31,6 +32,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
   const deleteContactMutation = useDeleteContact(runtime);
 
   const [adding, setAdding] = useState(false);
+  useBackHandler(adding ? () => setAdding(false) : null);
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -126,7 +128,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
               setAdding((prev) => !prev);
               setAddError(null);
             }}
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-foreground hover:bg-mist"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-foreground hover:bg-mist phone:hit-target"
           >
             <PlusIcon />
           </button>
@@ -134,7 +136,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
       />
 
       {adding ? (
-        <div className="flex flex-col gap-2 border-b border-line px-3.5 py-3">
+        <div className="flex flex-col gap-2 border-b border-line px-3.5 py-3 phone:border-b-0 phone:px-5">
           <input
             type="text"
             autoFocus
@@ -167,18 +169,18 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                 setNewName("");
                 setNewAddress("");
               }}
-              className="text-label font-medium text-muted hover:text-foreground"
+              className="text-label font-medium text-muted hover:text-foreground phone:hit-target"
             >
               Cancel
             </button>
-            <Button type="button" size="sm" disabled={saveContactMutation.isPending} onClick={handleAdd}>
+            <Button type="button" size="sm" disabled={saveContactMutation.isPending} onClick={handleAdd} className="phone:hit-target">
               {saveContactMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </div>
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col px-1 py-2">
+      <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {contactsQuery.isLoading ? (
           <>
             <SkeletonRow />
@@ -189,7 +191,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
         ) : (
           contacts.map((contact) =>
             editingAddress === contact.address ? (
-              <div key={contact.address} className="flex items-center gap-2 border-b border-line px-3.5 py-3 last:border-b-0">
+              <div key={contact.address} className="flex items-center gap-2 border-b border-line px-3.5 py-3 last:border-b-0 phone:border-b-0 phone:px-0">
                 <input
                   type="text"
                   autoFocus
@@ -204,7 +206,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                 />
               </div>
             ) : (
-              <div key={contact.address} className="flex items-center border-b border-line last:border-b-0">
+              <div key={contact.address} className="flex items-center border-b border-line last:border-b-0 phone:border-b-0">
                 <div className="min-w-0 flex-1">
                   <AddressRow address={contact.address} name={contact.name} onSelect={() => startEdit(contact)} />
                 </div>

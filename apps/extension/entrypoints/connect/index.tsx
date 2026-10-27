@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "@gleam/ui/src/tokens/theme.css";
+import "@gleam/app/src/app.css";
 import { runtimePort } from "@/src/adapters/runtime";
 import { ConnectView } from "./src/ConnectView";
 import { LedgerConnectView } from "./src/LedgerConnectView";

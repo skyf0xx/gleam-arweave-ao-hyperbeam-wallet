@@ -17,7 +17,7 @@ export interface ReviewPromptHandlerDeps {
 /**
  * Asks for a store review once, after a good moment. The moments are read
  * from what's already stored rather than recorded as they happen: the
- * local activity log holds only this wallet's own sends and uploads, so a
+ * local activity log holds only this wallet's own sends, so a
  * confirmed entry there is one the user made and saw land.
  */
 export class ReviewPromptHandler {
@@ -41,9 +41,9 @@ export class ReviewPromptHandler {
     );
     const landed = logs
       .flat()
-      .filter((entry) => entry.status === "confirmed" && entry.timestamp < since && entry.type !== "receive")
+      .filter((entry) => entry.status === "confirmed" && entry.timestamp < since && entry.type === "send")
       .sort((a, b) => b.timestamp - a.timestamp)[0];
-    if (landed) return { kind: landed.type === "upload" ? "upload" : "send" };
+    if (landed) return { kind: "send" };
 
     const hardware = wallets.find((wallet) => wallet.createdAt < since && (wallet.method === "ledger" || wallet.method === "keystone"));
     if (hardware) return { kind: "hardware", device: hardware.method === "ledger" ? "Ledger" : "Keystone" };

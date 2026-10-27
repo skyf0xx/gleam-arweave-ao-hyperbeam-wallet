@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
-import { renderWithPlatform as render } from "../../../app-platform/testing";
-import type { RuntimePort } from "@gleam/core";
+import { fakeAppPlatform, renderWithPlatform as render } from "../../../app-platform/testing";
+import type { HardwareConnectViewProps } from "../../../app-platform/types";
+import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { OnboardingView } from "./OnboardingView";
 
 afterEach(() => {
@@ -60,7 +61,7 @@ describe("OnboardingView: create flow", () => {
     });
     expect(send).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
     await waitFor(() => expect(screen.getByText("Saved as wallet-1-arweave-keyfile.json")).toBeTruthy());
     expect(requestDownloadPermission).toHaveBeenCalledOnce();
     expect(send).toHaveBeenNthCalledWith(2, {
@@ -132,11 +133,11 @@ describe("OnboardingView: create flow", () => {
   }
 
   function downloadButton() {
-    return screen.getByRole("button", { name: "Download keyfile" }) as HTMLButtonElement;
+    return screen.getByRole("button", { name: "Save keyfile" }) as HTMLButtonElement;
   }
 
   it.each([
-    ["cancelled", "The download was cancelled."],
+    ["cancelled", "Saving the keyfile was cancelled."],
     ["failed", "The keyfile couldn't be saved."],
   ])("after a %s download, offers a retry and points to wallet settings", async (reason, message) => {
     const send = vi
@@ -341,6 +342,39 @@ describe("OnboardingView: add-wallet mode", () => {
       payload: { jwk: VALID_JWK, name: expect.any(String), password: GOOD_PASSWORD },
     });
   });
+
+  it("sets a new password when every wallet so far is a hardware wallet", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "wallet-2", name: "Jade" }) // importWallet
+      .mockResolvedValueOnce({ word: "harbor" }); // getSecurityPhrase
+    const onComplete = vi.fn();
+    render(
+      <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" vaultHasPassword={false} onComplete={onComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+    fireEvent.change(screen.getByPlaceholderText(/kty/), {
+      target: { value: JSON.stringify(VALID_JWK) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByText("Set a password")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter your password"), {
+      target: { value: GOOD_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenCalledWith({
+      type: "importWallet",
+      payload: { jwk: VALID_JWK, name: expect.any(String), password: GOOD_PASSWORD },
+    });
+    expect(send).toHaveBeenCalledWith({ type: "getSecurityPhrase", payload: undefined });
+  });
 });
 
 describe("OnboardingView: start screens", () => {
@@ -385,6 +419,47 @@ describe("OnboardingView: Connect Keystone", () => {
     openHardwareStart(mode);
     fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
     expect(onConnectKeystone).toHaveBeenCalledOnce();
+  });
+});
+
+describe("OnboardingView: a device the app connects itself", () => {
+  let connectedWith: HardwareConnectViewProps | undefined;
+  function FakeConnectView(props: HardwareConnectViewProps) {
+    connectedWith = props;
+    return <p>fake-connect</p>;
+  }
+  const platform = (openConnectPage = vi.fn()) =>
+    fakeAppPlatform({ hardwareWallets: { openConnectPage, connectViews: { keystone: FakeConnectView }, signPanels: null } });
+
+  it.each(["first-run", "add-wallet"] as const)(
+    "shows its connect view as a screen from the %s start, then back returns there",
+    (mode) => {
+      const openConnectPage = vi.fn();
+      render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode={mode} />, platform(openConnectPage));
+      openHardwareStart(mode);
+      fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
+      expect(screen.getByText("Connect Keystone")).toBeTruthy();
+      expect(screen.getByText("fake-connect")).toBeTruthy();
+      expect(openConnectPage).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(screen.getByRole("button", { name: "Keystone" })).toBeTruthy();
+    },
+  );
+
+  it("completes onboarding once the device's wallet is added", () => {
+    const onComplete = vi.fn();
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={onComplete} mode="add-wallet" />, platform());
+    fireEvent.click(screen.getByRole("button", { name: "Keystone" }));
+    connectedWith!.onConnected({ id: "w1" } as WalletSummary);
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("opens the connect page for a device without a view", () => {
+    const openConnectPage = vi.fn();
+    render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode="add-wallet" />, platform(openConnectPage));
+    fireEvent.click(screen.getByRole("button", { name: "Ledger" }));
+    expect(openConnectPage).toHaveBeenCalledWith("ledger");
   });
 });
 

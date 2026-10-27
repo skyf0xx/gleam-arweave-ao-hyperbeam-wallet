@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
+import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
 import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "./screens/onboarding/index.tsx";
@@ -19,15 +21,15 @@ import { WalletDetailView } from "./screens/wallet-detail/index.tsx";
 import { LockSettingsView } from "./screens/lock-settings/index.tsx";
 import { NetworkPeersView } from "./screens/network-peers/index.tsx";
 import { SettingsHomeView } from "./screens/settings-home/index.tsx";
+import { BrowserView } from "./screens/browser/index.tsx";
 import { ConnectedAppsView } from "./screens/connected-apps/index.tsx";
 import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
 import { ContactsView } from "./screens/contacts/index.tsx";
 import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
 import { PointsView } from "./screens/points/index.tsx";
-import { UploadView } from "./screens/upload/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
-import { FOUNDING_GATE } from "./founding-gate";
+import { ApprovalSheet } from "./approval/ApprovalSheet";
 import { sitePageUrl } from "@gleam/core";
 
 /**
@@ -74,6 +76,8 @@ export interface AppProps {
  */
 const queryClient = new QueryClient();
 
+const NOTICE_MS = 6000;
+
 type TopView = "loading" | "onboarding" | "unlock" | "main-screen";
 type MainSubView =
   | { kind: "home" }
@@ -86,14 +90,15 @@ type MainSubView =
   | { kind: "settings-home" }
   | { kind: "lock-settings" }
   | { kind: "network-peers" }
-  | { kind: "connected-apps" }
+  | { kind: "browser"; url?: string }
+  /** `origin` is the site whose entry to show; `returnToUrl` is the browser page to go back to. */
+  | { kind: "connected-apps"; origin?: string; returnToUrl?: string }
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
   | { kind: "display-currency" }
   | { kind: "collectible"; collectible: Collectible }
   | { kind: "send-collectible"; collectible: Collectible }
   | { kind: "points" }
-  | { kind: "upload" }
   | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null; requestedPermissions: PermissionType[] };
 
 function resolveTopView(state: WalletState): TopView {
@@ -119,10 +124,30 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [initError, setInitError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
   const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
+  const [backStack] = useState(createBackStack);
+  const [layoutRoot, setLayoutRoot] = useState<HTMLDivElement | null>(null);
+
+  const [notice, setNotice] = useState<string | null>(null);
+  const subscribeNotices = platform.notices?.subscribe;
+  useEffect(() => subscribeNotices?.(setNotice), [subscribeNotices]);
+  useEffect(() => {
+    if (notice === null) return;
+    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  // Every back arrow on screen and every overlay registers with the stack, so
+  // the system back press undoes what a tap on Back would. Unhandled, the
+  // shell minimises, which is the right thing to do from the home screen.
+  const subscribeBack = platform.backButton?.subscribe;
+  useEffect(() => subscribeBack?.(() => backStack.handle()), [subscribeBack, backStack]);
 
   const refresh = async (runtime: RuntimePort) => {
     const state = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
-    setView(resolveTopView(state));
+    const top = resolveTopView(state);
+    setView(top);
+    // The browser opens on its start screen after a lock, not on the last page.
+    if (top !== "main-screen") setSubView((current) => (current.kind === "browser" ? { kind: "home" } : current));
     setWallet(resolveActiveWallet(state));
     setWallets(state.wallets);
   };
@@ -200,6 +225,15 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A stored biometric password outlives the vault it opened once the last
+  // keyfile wallet is removed (and, on iOS, an uninstall), so it is
+  // dropped rather than kept.
+  const vaultWithoutPassword = view !== "loading" && initError === null && !vaultHasPassword(wallets);
+  useEffect(() => {
+    if (!vaultWithoutPassword || !platform.capabilities.biometrics) return;
+    platform.biometrics.remove().catch((error: unknown) => console.error("Couldn't remove the biometric unlock.", error));
+  }, [vaultWithoutPassword, platform]);
+
   const addressIdentity = useMemo(
     () => makeAddressIdentity(identityKey, () => void loadAddressIdentityKey(runtime).then(setIdentityKey)),
     [identityKey, runtime],
@@ -212,7 +246,11 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else if (view === "loading") {
     content = <div className="p-4 text-body text-muted">Loading&hellip;</div>;
   } else if (view === "onboarding") {
-    content = <GatedOnboarding runtime={runtime} onComplete={() => void refresh(runtime)} />;
+    content = <GatedOnboarding
+        runtime={runtime}
+        onComplete={() => void refresh(runtime)}
+        gateEnabled={platform.buildInfo.foundingGate}
+      />;
   } else if (view === "unlock") {
     content = (
       <UnlockView
@@ -297,7 +335,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <OnboardingView
         runtime={runtime}
         mode="add-wallet"
-        claim={FOUNDING_GATE ? "founding" : "open"}
+        vaultHasPassword={vaultHasPassword(wallets)}
+        claim={platform.buildInfo.foundingGate ? "founding" : "open"}
         onCancel={() => setSubView({ kind: "wallet-switcher" })}
         onComplete={() => {
           setSubView({ kind: "home" });
@@ -316,7 +355,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
         onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
-        onOpenUpload={() => setSubView({ kind: "upload" })}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }
@@ -328,13 +366,32 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "settings-home" })}
         onLocked={() => void refresh(runtime)}
-        onSetUpPasskey={() => platform.unlock.openPasskeyWindow("setup")}
+        onSetUpPasskey={platform.capabilities.passkey ? () => platform.unlock.openPasskeyWindow("setup") : undefined}
+        biometrics={platform.capabilities.biometrics ? platform.biometrics : undefined}
+        lockOnSystemLock={platform.capabilities.lockOnSystemLock}
       />
     );
   } else if (subView.kind === "network-peers") {
     content = <NetworkPeersView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "connected-apps") {
-    content = <ConnectedAppsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+    const { origin, returnToUrl } = subView;
+    content = (
+      <ConnectedAppsView
+        runtime={runtime}
+        highlightOrigin={origin}
+        onBack={() => setSubView(returnToUrl ? { kind: "browser", url: returnToUrl } : { kind: "settings-home" })}
+      />
+    );
+  } else if (subView.kind === "browser") {
+    content = (
+      <BrowserView
+        runtime={runtime}
+        initialUrl={subView.url}
+        onBack={() => setSubView({ kind: "home" })}
+        onOpenConnectedApp={(origin, url) => setSubView({ kind: "connected-apps", origin, returnToUrl: url })}
+        onLocked={() => void refresh(runtime)}
+      />
+    );
   } else if (subView.kind === "manage-tokens") {
     content = (
       <ManageTokensView
@@ -347,15 +404,6 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "display-currency") {
     content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
-  } else if (subView.kind === "upload") {
-    content = (
-      <UploadView
-        runtime={runtime}
-        wallet={wallet}
-        onBack={() => setSubView({ kind: "settings-home" })}
-        onDone={() => setSubView({ kind: "settings-home" })}
-      />
-    );
   } else if (subView.kind === "use-gleam-on-site") {
     content = (
       <UseGleamOnSiteView
@@ -370,7 +418,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   } else {
     content = (
       <PendingClaim runtime={runtime} wallet={wallet}>
-        <ExistingMemberReveal runtime={runtime} wallet={wallet}>
+        <ExistingMemberReveal runtime={runtime} wallet={wallet} enabled={platform.buildInfo.foundingGate}>
           <MainScreenView
             runtime={runtime}
             wallet={wallet}
@@ -380,6 +428,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
             onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
             onOpenSettings={() => setSubView({ kind: "settings-home" })}
             onOpenPoints={() => setSubView({ kind: "points" })}
+            onOpenBrowser={platform.capabilities.dappBrowser ? () => setSubView({ kind: "browser" }) : undefined}
             onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
             onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
             initialTab={homeTab}
@@ -392,15 +441,20 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <BackStackContext.Provider value={backStack}>
       <AddressIdentityProvider value={addressIdentity}>
         <div
+          ref={setLayoutRoot}
           data-layout={layout}
           data-theme={theme === "dark" ? "dark" : undefined}
           className="min-h-full bg-background text-foreground"
         >
           {content}
+          {notice !== null ? <Toast message={notice} multiline className="fixed bottom-[calc(0.875rem+var(--safe-bottom))] z-40" /> : null}
+          {platform.approvalSheet ? <ApprovalSheet port={platform.approvalSheet} container={layoutRoot} /> : null}
         </div>
       </AddressIdentityProvider>
+      </BackStackContext.Provider>
     </QueryClientProvider>
   );
 }

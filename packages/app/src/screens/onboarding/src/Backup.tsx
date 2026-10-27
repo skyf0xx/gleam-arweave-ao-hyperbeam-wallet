@@ -25,7 +25,7 @@ export function Backup({ onBack, onDownload, canDownload, downloading, savedAs, 
         onBack={onBack}
         subtitle={<StepDots total={2} current={2} />}
       />
-      <div className="flex flex-1 flex-col gap-5 px-6 py-6">
+      <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6">
         <div className="flex justify-center pb-1 pt-2">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-mist text-foreground">
             <BackupGlyph />

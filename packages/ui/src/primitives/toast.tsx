@@ -13,10 +13,12 @@ export interface ToastProps {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Wraps a sentence that doesn't fit on one line instead of cutting it off. */
+  multiline?: boolean;
   className?: string;
 }
 
-export function Toast({ message, actionLabel, onAction, className }: ToastProps) {
+export function Toast({ message, actionLabel, onAction, multiline, className }: ToastProps) {
   return (
     <div
       role="status"
@@ -25,7 +27,7 @@ export function Toast({ message, actionLabel, onAction, className }: ToastProps)
         className,
       )}
     >
-      <span className="min-w-0 flex-1 truncate">{message}</span>
+      <span className={cn("min-w-0 flex-1", multiline ? "break-words" : "truncate")}>{message}</span>
       {actionLabel && onAction ? (
         <button type="button" onClick={onAction} className="flex-shrink-0 font-semibold underline-offset-2 hover:underline">
           {actionLabel}

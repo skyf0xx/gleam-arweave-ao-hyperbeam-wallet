@@ -3,6 +3,8 @@ import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ActivityPage, Contact, FeeEstimate, RuntimePort, TokenBalance, TokenPrice, WalletState, WalletSummary } from "@gleam/core";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
+import { PlatformProvider } from "../../../app-platform/context";
+import { fakeAppPlatform } from "../../../app-platform/testing";
 import { SendView, type SendViewProps } from "./SendView";
 
 afterEach(() => {
@@ -22,9 +24,11 @@ afterEach(() => {
 function renderSendView(props: SendViewProps) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <SendView {...props} />
-    </QueryClientProvider>,
+    <PlatformProvider platform={fakeAppPlatform()}>
+      <QueryClientProvider client={queryClient}>
+        <SendView {...props} />
+      </QueryClientProvider>
+    </PlatformProvider>,
   );
 }
 

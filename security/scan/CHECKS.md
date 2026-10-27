@@ -67,8 +67,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Signing pipelines (tier 2)
 
-`core/arweave/`, `core/ao/transfer.ts`, `handlers/transfer.ts`,
-`handlers/upload.ts`.
+`core/arweave/`, `core/ao/transfer.ts`, `handlers/transfer.ts`.
 
 - Is what gets signed exactly what was approved? Look for any
   re-serialization, default filled in, or field rewritten between the
@@ -135,7 +134,7 @@ Some of the classes here are adapted from Cloudflare's
 
 ### Hardware wallet signing
 
-`src/hardware/keystone/`, `src/hardware/panels/`.
+`packages/keystone/src/`, `apps/extension/src/hardware/panels/`.
 
 - Is the signature the device returns checked against the request that
   was sent before Gleam uses it?

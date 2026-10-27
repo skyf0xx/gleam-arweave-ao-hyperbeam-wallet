@@ -10,7 +10,7 @@ export interface DeviceKey {
 
 /**
  * The install's Gleam Points device key. Implemented by
- * `apps/extension/src/adapters/device-key.ts` over IndexedDB.
+ * `points/device-key-store.ts` over IndexedDB.
  */
 export interface DeviceKeyPort {
   /**

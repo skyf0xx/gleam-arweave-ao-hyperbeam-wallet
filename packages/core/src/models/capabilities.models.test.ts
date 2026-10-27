@@ -16,7 +16,6 @@ describe("capabilitiesFor", () => {
       decrypt: false,
       exportKey: false,
       encrypt: true,
-      upload: false,
       points: true,
     });
   });
@@ -30,13 +29,16 @@ describe("capabilitiesFor", () => {
       decrypt: false,
       exportKey: false,
       encrypt: true,
-      upload: false,
       points: true,
     });
   });
 
   it("gives an ethereum wallet no Arweave capability", () => {
     expect(Object.values(capabilitiesFor("ethereum")).some(Boolean)).toBe(false);
+  });
+
+  it("gives a watch wallet no capability at all", () => {
+    expect(Object.values(capabilitiesFor("watch")).some(Boolean)).toBe(false);
   });
 });
 
@@ -72,6 +74,11 @@ describe("providerMethodRefusal", () => {
     );
   });
 
+  it("says a watch wallet is watch-only", () => {
+    expect(providerMethodRefusal("watch", "sign")).toBe("This wallet is watch-only, so it can't sign transactions.");
+    expect(capabilityRefusal("watch", "signTransaction", "send AR")).toBe("This wallet is watch-only, so it can't send AR.");
+  });
+
   it("never refuses a method that signs nothing", () => {
     for (const method of ["connect", "getActiveAddress", "verifyMessage", "tokenBalance"] as const) {
       expect(providerMethodRefusal("ethereum", method)).toBeNull();
@@ -88,8 +95,8 @@ describe("capabilityRefusal", () => {
     expect(capabilityRefusal("ledger", "signDataItem", "send AO")).toBe(
       "Ledger only supports sending AR for now, so it can't send AO. Use a Keystone instead.",
     );
-    expect(capabilityRefusal("ledger", "upload", "upload files")).toBe(
-      "This wallet can't upload files. Switch to a keyfile wallet.",
+    expect(capabilityRefusal("ledger", "exportKey", "export its key")).toBe(
+      "This wallet can't export its key. Switch to a keyfile wallet.",
     );
   });
 });

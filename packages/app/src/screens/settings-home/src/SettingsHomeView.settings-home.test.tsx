@@ -47,7 +47,6 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenManageTokens={vi.fn()}
       onOpenContacts={vi.fn()}
       onOpenDisplayCurrency={vi.fn()}
-      onOpenUpload={vi.fn()}
       onOpenFeedback={vi.fn()}
       {...overrides}
     />
@@ -137,21 +136,6 @@ describe("SettingsHomeView", () => {
     fireEvent.click(screen.getByText("Contacts"));
 
     expect(onOpenContacts).toHaveBeenCalled();
-  });
-
-  it("shows the Upload to Arweave row as disabled with a Coming soon label and never calls onOpenUpload", async () => {
-    const onOpenUpload = vi.fn();
-    renderSettingsHome({ onOpenUpload });
-
-    await waitFor(() => expect(screen.getByText("Upload to Arweave")).toBeTruthy());
-    expect(screen.getByText("Coming soon")).toBeTruthy();
-
-    const row = screen.getByText("Upload to Arweave").closest("button") as HTMLButtonElement;
-    expect(row.disabled).toBe(true);
-
-    fireEvent.click(row);
-
-    expect(onOpenUpload).not.toHaveBeenCalled();
   });
 
   it("calls onBack when the header back button is pressed", async () => {

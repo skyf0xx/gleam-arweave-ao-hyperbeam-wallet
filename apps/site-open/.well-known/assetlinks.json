@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.gleamwallet",
+      "sha256_cert_fingerprints": ["REPLACE:WITH:PLAY:APP:SIGNING:SHA256", "REPLACE:WITH:UPLOAD:KEY:SHA256"]
+    }
+  }
+]

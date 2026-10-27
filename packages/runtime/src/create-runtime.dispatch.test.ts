@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { WATCH_ONLY_CONNECT_REFUSAL, type WalletSummary } from "@gleam/core";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { GLEAM_SITES_KEY, otherWalletKey } from "./handlers/site-wallet";
 import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
@@ -82,6 +83,53 @@ describe("createRuntime", () => {
       expect(() =>
         runtime.dispatch("reportOtherWallet", { walletName: "Wander", used: false }, { ...CONTENT_SCRIPT, tabId: undefined }),
       ).toThrow("reportOtherWallet is only accepted from a web page's content script.");
+    });
+  });
+
+  describe("a watch-only active wallet", () => {
+    const WATCHED = "w".repeat(43);
+
+    async function setupWatching() {
+      const context = setup();
+      const watched = (await context.runtime.dispatch("addWatchWallet", { address: WATCHED }, EXTENSION)) as WalletSummary;
+      return { ...context, watched };
+    }
+
+    it("refuses a site's connect before any window opens", async () => {
+      const { runtime } = await setupWatching();
+
+      await expect(
+        runtime.dispatch("providerCall", { method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } }, CONTENT_SCRIPT),
+      ).rejects.toThrow(WATCH_ONLY_CONNECT_REFUSAL);
+    });
+
+    it("refuses a site that was granted earlier, for reads and signing alike", async () => {
+      const { runtime, storage, watched } = await setupWatching();
+      await storage.set("local:grants", [
+        {
+          origin: ORIGIN,
+          walletId: watched.id,
+          permissions: ["ACCESS_ADDRESS", "SIGNATURE"],
+          createdAt: Date.now(),
+          expiresAt: null,
+          budget: null,
+        },
+      ]);
+
+      for (const method of ["getActiveAddress", "signMessage"]) {
+        await expect(
+          runtime.dispatch("providerCall", { method, params: method === "signMessage" ? { data: [1] } : undefined }, CONTENT_SCRIPT),
+        ).rejects.toThrow(WATCH_ONLY_CONNECT_REFUSAL);
+      }
+    });
+
+    it("refuses \"Use Gleam here\" from the popup", async () => {
+      const { runtime, storage } = await setupWatching();
+
+      await expect(
+        runtime.dispatch("useGleamOnSite", { origin: ORIGIN, permissions: ["ACCESS_ADDRESS"] }, EXTENSION),
+      ).rejects.toThrow(WATCH_ONLY_CONNECT_REFUSAL);
+      expect(await storage.get("local:grants")).toBeNull();
     });
   });
 

@@ -12,16 +12,16 @@ export function AboutBuild({ runtime, version }: AboutBuildProps) {
   const scanStats = useScanStats(runtime);
   const count = scanStats.data?.total;
   return (
-    <div className="flex flex-col gap-1 px-4 pt-3 text-caption text-muted">
+    <div className="flex flex-col gap-1 px-4 pt-3 text-caption text-muted phone:px-0">
       <div className="flex items-center justify-between gap-3">
         <span>Version {version}</span>
-        <a href={releaseUrl(version)} target="_blank" rel="noreferrer" className="text-foreground underline">
+        <a href={releaseUrl(version)} target="_blank" rel="noreferrer" className="text-foreground underline phone:flex phone:min-h-11 phone:items-center">
           View release
         </a>
       </div>
       <div className="flex items-center justify-between gap-3">
         <span>Security reviews</span>
-        <a href={sitePageUrl("review-results", version)} target="_blank" rel="noreferrer" className="text-foreground underline">
+        <a href={sitePageUrl("review-results", version)} target="_blank" rel="noreferrer" className="text-foreground underline phone:flex phone:min-h-11 phone:items-center">
           {typeof count === "number" ? `${count} ${count === 1 ? "review" : "reviews"} →` : "View reviews →"}
         </a>
       </div>

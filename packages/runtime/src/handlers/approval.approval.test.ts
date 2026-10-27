@@ -413,7 +413,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
 
   it("closing the window rejects the request at once and drops it", async () => {
     const pending = requestConnect();
-    const assertion = expect(pending).rejects.toThrow(/approval window was closed/i);
+    const assertion = expect(pending).rejects.toThrow(/approval was dismissed/i);
     await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
     const requestId = presenter.presented[0]!;
 

@@ -15,6 +15,7 @@ import {
   finishDispatch,
   finishSignTransaction,
   isHardwareWalletMethod,
+  WATCH_ONLY_CONNECT_REFUSAL,
   prepareDataItem,
   prepareDataItems,
   prepareDispatch,
@@ -81,9 +82,9 @@ import type { SubmitTransferRequest } from "./transfer";
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
  * `resolveApproval`, plus the internal (non-`ProtocolMap`) API the
  * `background.ts` dispatcher uses to actually create an `ApprovalRequest`,
- * open its window, and await the user's decision before letting a
+ * show its approval UI, and await the user's decision before letting a
  * page-originated provider call resume. `connect()` requests show the
- * origin and requested permission scopes and open in their own window; a
+ * origin and requested permission scopes and open in their own approval UI (a window, or a sheet on a phone); a
  * signing approval shows recipient, amount, fee, a decoded-data preview,
  * tags, and a SHA-256 hash.
  *
@@ -100,13 +101,13 @@ import type { SubmitTransferRequest } from "./transfer";
  *   in-flight connection/signing request has no reason to survive a full
  *   browser restart — if the browser closes mid-approval, the dApp's
  *   original call is gone too. Session-scoped storage still survives an
- *   MV3 service-worker idle-kill/restart while the approval window stays
+ *   MV3 service-worker idle-kill/restart while the approval UI stays
  *   open, which is the restart this needs to survive.
  *
  * Waiting for resolution: the dispatcher's `requestApproval()` call
  * resolves only once `resolveApproval` is called for that `requestId`.
  * Rather than a service-worker-local `Map<requestId, deferred>` result
- * store (which cannot survive an SW restart while the approval window is
+ * store (which cannot survive an SW restart while the approval UI is
  * still open), `resolveApproval` writes its outcome (`approved`/`result`/
  * `error`) directly onto the pending record in `session:pendingApprovals`
  * *before* removing it, and `requestApproval`'s `StoragePort.watch`
@@ -117,16 +118,16 @@ import type { SubmitTransferRequest } from "./transfer";
  * originating dispatcher call context dying either), but it does mean the
  * resolution data itself is never only-in-memory.
  *
- * Closing the approval window with its own close button counts as a
- * rejection: `ApprovalPresenterPort.onDismissed` writes a rejected outcome
+ * Closing the approval UI (a window's close button, a sheet swiped away)
+ * counts as a rejection: `ApprovalPresenterPort.onDismissed` writes a rejected outcome
  * the same way `resolveApproval` does, so the dApp hears back at once
  * instead of after the review timeout (`reviewTimeoutMs`).
  *
  * Hardware wallets: the service worker can't reach the camera or WebHID,
- * so every hardware signature is made in the approval window. Approving
+ * so every hardware signature is made in the approval UI. Approving
  * a hardware wallet's request builds the unsigned payloads from the
  * wallet's stored public key and moves the record to "awaiting device"
- * (`PendingApprovalRecord.device`) instead of finishing it. The window
+ * (`PendingApprovalRecord.device`) instead of finishing it. The UI
  * then sends `submitDeviceSignature`, which verifies each signature
  * against that key before anything is returned or posted. A signature
  * that fails verification leaves the request waiting so the user can
@@ -410,7 +411,7 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "signMessage",
 ]);
 
-const TIMED_OUT = "Approval request timed out — the approval window was not resolved in time.";
+const TIMED_OUT = "Approval request timed out — the approval was not resolved in time.";
 
 /** How soon a timeout looks again at a request that was being resolved when it fired. */
 const RESOLVING_RECHECK_MS = 5_000;
@@ -771,7 +772,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
 
 export class ApprovalHandler {
   /**
-   * Requests `resolveApproval` is finishing. Closing the window while an
+   * Requests `resolveApproval` is finishing. Dismissing the approval UI while an
    * approved request signs or posts must not also report it as rejected.
    */
   private readonly resolving = new Set<string>();
@@ -872,10 +873,10 @@ export class ApprovalHandler {
   }
 
   /**
-   * Creates a pending `ApprovalRequest`, opens its own approval window
+   * Creates a pending `ApprovalRequest`, shows its own approval UI
    * (never inline in the popup), and resolves once `resolveApproval` has
    * been called for it. Rejects on
-   * explicit rejection or on timeout (a hung/abandoned approval window
+   * explicit rejection or on timeout (a hung/abandoned approval UI
    * must not hang the calling dApp forever).
    */
   async requestApproval(input: CreateApprovalInput): Promise<unknown> {
@@ -962,10 +963,10 @@ export class ApprovalHandler {
 
   /**
    * Also drops a record left behind by a service worker that restarted
-   * while its window was open, even though nothing is awaiting it.
+   * while its approval UI was up, even though nothing is awaiting it.
    */
   private async rejectDismissed(requestId: string): Promise<void> {
-    const outcome: ApprovalOutcome = { approved: false, error: "The approval window was closed." };
+    const outcome: ApprovalOutcome = { approved: false, error: "The approval was dismissed." };
     let rejected = false;
     await this.updatePending((pending) => {
       if (this.resolving.has(requestId)) return null;
@@ -1017,12 +1018,12 @@ export class ApprovalHandler {
     throw new Error(TIMED_OUT);
   }
 
-  /** `ProtocolMap.getApproval` — read-only, called by the approval window on mount. */
+  /** `ProtocolMap.getApproval` — read-only, called by the approval UI on mount. */
   async getApproval(req: { requestId: string }): Promise<ApprovalRequest> {
     return this.requestView(await this.findPending(req.requestId));
   }
 
-  /** The request as the window sees it: with the device's payloads once it waits on one. */
+  /** The request as the approval UI sees it: with the device's payloads once it waits on one. */
   private async requestView(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
     if (!entry.device || !entry.walletId) return entry.request;
     const wallet = await this.hardwareWallet(entry.walletId);
@@ -1039,7 +1040,7 @@ export class ApprovalHandler {
   }
 
   /**
-   * `ProtocolMap.resolveApproval` — called only from the approval window
+   * `ProtocolMap.resolveApproval` — called only from the approval UI
    * (`APPROVAL_METHODS`, enforced by the dispatcher choke point, not by
    * this handler). On a `connect` approval, creates and persists a real
    * `Grant`. On a signing approval, performs the actual signing operation
@@ -1047,7 +1048,7 @@ export class ApprovalHandler {
    * staging step needed any more — see this class's doc comment on why
    * `unlockApprovalWallet` existed and `wallet-lifecycle.ts`'s doc comment
    * for the superseding session-cache decision) and returns the result to
-   * the original caller, then closes the approval window.
+   * the original caller, then takes the approval UI down.
    *
    * If an approved request fails (locked wallet, network error), the dApp
    * is rejected with that error and this call throws it too. The window
@@ -1506,6 +1507,9 @@ export class ApprovalHandler {
     const grantWalletId = walletId ?? (await this.activeWalletId());
     if (!grantWalletId) {
       throw new Error("There is no wallet to connect. Create or import one first.");
+    }
+    if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
+      throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
     }
     const grants = await this.loadGrants();
     const withoutExisting = grants.filter((grant) => grant.origin !== origin);

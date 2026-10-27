@@ -53,8 +53,8 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
   };
 
   return (
-    <div className="pb-10">
-      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+    <div className="pb-10 phone:pb-8">
+      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
         Security phrase
       </div>
       {state.kind === "loading" ? (
@@ -96,7 +96,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           <button
             type="button"
             onClick={() => setState({ kind: "editing", phrase: state.phrase, draft: state.phrase!, saving: false })}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground"
+            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3"
           >
             Change
           </button>

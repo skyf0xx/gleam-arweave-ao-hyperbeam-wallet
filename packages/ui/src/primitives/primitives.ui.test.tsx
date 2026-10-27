@@ -149,21 +149,20 @@ describe("ui: OptionSection and OptionRow", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it("shows a value, and a disabled coming-soon row is inert and has no chevron", () => {
+  it("shows a value, and a disabled row is inert and has no chevron", () => {
     const onClick = vi.fn();
     render(
       <OptionSection title="Tools">
         <OptionRow title="Auto-lock" description="When it locks" value="Never" onClick={onClick} />
-        <OptionRow title="Upload" description="Store a file" disabled comingSoon onClick={onClick} />
+        <OptionRow title="Rename" description="Change its name" disabled onClick={onClick} />
       </OptionSection>,
     );
 
     expect(screen.getByText("Never")).toBeTruthy();
-    expect(screen.getByText("Coming soon")).toBeTruthy();
-    const upload = screen.getByRole("button", { name: "Upload" }) as HTMLButtonElement;
-    expect(upload.disabled).toBe(true);
-    expect(upload.querySelector("svg")).toBeNull();
-    fireEvent.click(upload);
+    const rename = screen.getByRole("button", { name: "Rename" }) as HTMLButtonElement;
+    expect(rename.disabled).toBe(true);
+    expect(rename.querySelector("svg")).toBeNull();
+    fireEvent.click(rename);
     expect(onClick).not.toHaveBeenCalled();
   });
 });

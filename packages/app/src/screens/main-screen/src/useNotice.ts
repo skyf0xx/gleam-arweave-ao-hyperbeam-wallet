@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Announcement, ReviewMoment, RuntimePort, WalletSummary } from "@gleam/core";
-import { FOUNDING_GATE } from "../../../founding-gate";
+import { usePlatform } from "../../../app-platform/context";
 import {
   useMarkSeatsSeen,
   usePointsMemberships,
@@ -32,10 +32,11 @@ export interface UseNotice {
 /** The main-screen notice for `wallet`, or null when there is nothing to show. */
 export function useNotice(runtime: RuntimePort, wallet: WalletSummary): UseNotice {
   const queryClient = useQueryClient();
+  const { foundingGate } = usePlatform().buildInfo;
   const memberships = usePointsMemberships(runtime, { retry: false });
   const isMember = memberships.data?.[wallet.id] !== undefined;
-  const scores = usePointsScores(runtime, isMember && FOUNDING_GATE);
-  const seatsSeen = usePointsSeatsSeen(runtime, isMember && FOUNDING_GATE);
+  const scores = usePointsScores(runtime, isMember && foundingGate);
+  const seatsSeen = usePointsSeatsSeen(runtime, isMember && foundingGate);
   const markSeats = useMarkSeatsSeen(runtime);
 
   const announcements = useQuery({

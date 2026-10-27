@@ -32,7 +32,7 @@ const PASSWORD = "correct horse battery staple";
 function startBackup() {
   fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: PASSWORD } });
-  fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
 }
 
 describe("WalletDetailView", () => {
@@ -55,6 +55,18 @@ describe("WalletDetailView", () => {
 
     expect(screen.getByText(/Keystone/)).toBeTruthy();
     expect(screen.queryByText("Back up keyfile")).toBeNull();
+  });
+
+  it("hides keyfile backup for a watch wallet, labels it, and says removing it loses nothing", () => {
+    const watched: WalletSummary = { ...WALLET, method: "watch", publicKey: "" };
+    render(
+      <WalletDetailView runtime={fakeRuntime()} wallet={watched} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+    );
+
+    expect(screen.getByText(/Watch only/)).toBeTruthy();
+    expect(screen.queryByText("Back up keyfile")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+    expect(screen.getByText(/only watches this address/)).toBeTruthy();
   });
 
   it("shows 'Not backed up yet' when backupConfirmedAt is null", () => {
@@ -150,7 +162,7 @@ describe("WalletDetailView", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Back up keyfile/ }));
     await waitFor(() => expect(screen.getByText("Enter your password")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: PASSWORD } });
-    fireEvent.click(screen.getByRole("button", { name: "Download keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save keyfile" }));
 
     await waitFor(() => expect(screen.getByText("Saved as wallet-one-arweave-keyfile.json")).toBeTruthy());
     expect(requestDownloadPermission).toHaveBeenCalledOnce();
@@ -180,7 +192,7 @@ describe("WalletDetailView", () => {
 
     startBackup();
 
-    await waitFor(() => expect(screen.getByText("The download was cancelled.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Saving the keyfile was cancelled.")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => expect(screen.getByText("Not backed up yet")).toBeTruthy());
   });

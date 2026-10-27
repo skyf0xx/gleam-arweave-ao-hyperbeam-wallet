@@ -19,7 +19,17 @@
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
 /apps/extension/src/adapters/session-access.ts                             @skyf0xx
+/apps/mobile/src/adapters/storage.ts                                       @skyf0xx
+/apps/mobile/src/adapters/sqlite-store.ts                                  @skyf0xx
+/apps/mobile/src/adapters/sqlite-channel.ts                                @skyf0xx
+/apps/mobile/src/adapters/session-key-store.ts                             @skyf0xx
+/apps/mobile/src/adapters/biometric-unlock.ts                              @skyf0xx
+/apps/mobile/src/adapters/download-channel.ts                         @skyf0xx
+/apps/mobile/src/adapters/downloads.ts                                @skyf0xx
+/apps/mobile/src/adapters/file-saver.ts                               @skyf0xx
 /packages/app/src/passkey/                                                 @skyf0xx
+/packages/app/src/biometrics/                                              @skyf0xx
+/packages/app/src/screens/lock-settings/src/BiometricSection.tsx           @skyf0xx
 /packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
 /packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx
 /packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx           @skyf0xx
@@ -30,10 +40,10 @@
 /packages/core/src/arweave/rsa-pss.ts                                      @skyf0xx
 /packages/core/src/arweave/transaction.ts                                  @skyf0xx
 /packages/core/src/arweave/transfer.ts                                     @skyf0xx
-/packages/core/src/arweave/upload.ts                                       @skyf0xx
 /packages/runtime/src/handlers/transfer.ts                                 @skyf0xx
-/packages/runtime/src/handlers/upload.ts                                   @skyf0xx
 /packages/core/src/hardware/                                               @skyf0xx
+/packages/keystone/src/sign-request.ts                                     @skyf0xx
+/packages/keystone/src/decode-account.ts                                   @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
 /packages/runtime/src/handlers/points.ts                                   @skyf0xx
 
@@ -47,6 +57,13 @@
 /packages/provider/                                                        @skyf0xx
 /packages/runtime/src/handlers/provider-params.ts                          @skyf0xx
 /apps/extension/src/sender.ts                                              @skyf0xx
+/apps/mobile/src/worker/                                                   @skyf0xx
+/apps/mobile/plugins/dapp-view/                                             @skyf0xx
+/apps/mobile/src/adapters/dapp-bridge.ts                                   @skyf0xx
+/apps/mobile/src/adapters/dapp-tabs.ts                                     @skyf0xx
+/apps/mobile/src/adapters/comlink-guard.ts                                 @skyf0xx
+/apps/mobile/src/adapters/app-links.ts                                     @skyf0xx
+/apps/mobile/src/provider/                                                 @skyf0xx
 /packages/core/src/policy/signing-origin.ts                                @skyf0xx
 /packages/runtime/src/dispatch/methods.ts                                  @skyf0xx
 /packages/messaging/                                                       @skyf0xx
@@ -55,13 +72,22 @@
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 /apps/extension/src/hardware/panels/                                       @skyf0xx
+/packages/keystone/src/KeystonePanel.tsx                                   @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
+/apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
+/apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/runtime/src/points-invite.ts                                     @skyf0xx
 /packages/runtime/src/points-attest.ts                                     @skyf0xx
 /packages/runtime/src/handlers/attest-errors.ts                            @skyf0xx
 /apps/extension/wxt.config.ts                                              @skyf0xx
+/apps/mobile/capacitor.config.ts                                           @skyf0xx
+/apps/mobile/vite.config.ts                                                @skyf0xx
+/apps/mobile/index.html                                                    @skyf0xx
+/apps/mobile/ios/App/App/Info.plist                                        @skyf0xx
+/apps/mobile/android/app/src/main/AndroidManifest.xml                      @skyf0xx
+/apps/mobile/android/app/src/main/res/xml/data_extraction_rules.xml        @skyf0xx
 /.github/                                                                  @skyf0xx
 /pnpm-workspace.yaml                                                       @skyf0xx
 /pnpm-lock.yaml                                                            @skyf0xx
@@ -72,3 +98,16 @@
 /scripts/verify-release.sh                                                 @skyf0xx
 /security/surface.mjs                                                      @skyf0xx
 /security/surface.txt                                                      @skyf0xx
+/apps/mobile/ios/App/App/App.entitlements                           @skyf0xx
+/apps/mobile/android/app/src/main/res/xml/file_paths.xml                 @skyf0xx
+/apps/mobile/ios/App/CapApp-SPM/Package.swift                            @skyf0xx
+/apps/mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved @skyf0xx
+/apps/mobile/android/app/build.gradle                                    @skyf0xx
+/apps/mobile/android/build.gradle                                        @skyf0xx
+/apps/mobile/android/variables.gradle                                    @skyf0xx
+/apps/mobile/android/capacitor.settings.gradle                           @skyf0xx
+/apps/mobile/android/app/capacitor.build.gradle                          @skyf0xx
+/apps/mobile/plugins/dapp-view/android/build.gradle                      @skyf0xx
+/apps/site-open/.well-known/apple-app-site-association              @skyf0xx
+/apps/site-open/.well-known/assetlinks.json                         @skyf0xx
+/apps/site-open/vercel.json                                         @skyf0xx

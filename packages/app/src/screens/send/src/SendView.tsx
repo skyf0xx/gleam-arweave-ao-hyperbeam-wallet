@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -6,6 +6,8 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "../../../address-identity";
+import { usePlatform } from "../../../app-platform/context";
+import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { useDisplaySettings } from "../../../display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
@@ -23,6 +25,7 @@ import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSche
 import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { readRowVisibility, shownTokenLogo } from "../../../token-visibility";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -612,7 +615,7 @@ function ComposeStep({
                 type="button"
                 role="tab"
                 aria-selected={action.id === "send"}
-                className={`rounded-md px-2.5 py-1 text-body ${action.id === "send" ? "font-semibold text-foreground" : "text-muted hover:text-foreground"}`}
+                className={`rounded-md px-2.5 py-1 text-body phone:hit-target ${action.id === "send" ? "font-semibold text-foreground" : "text-muted hover:text-foreground"}`}
               >
                 {action.label}
               </button>
@@ -624,7 +627,7 @@ function ComposeStep({
             type="button"
             aria-label="Token details"
             onClick={() => onShowInfo(true)}
-            className="flex max-w-[104px] flex-shrink-0 items-center gap-1 rounded-md px-1 py-1 text-label font-normal text-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+            className="flex max-w-[104px] flex-shrink-0 items-center gap-1 rounded-md px-1 py-1 text-label font-normal text-muted hover:text-foreground phone:hit-target focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
           >
             <span aria-hidden="true">[</span>
             <span className="truncate">{ticker}</span>
@@ -632,7 +635,7 @@ function ComposeStep({
           </button>
         }
       />
-      <div className="flex flex-1 flex-col gap-6 px-5 py-5">
+      <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
         <div className="flex items-center justify-between gap-3 text-label">
           <span className="font-semibold text-muted">From</span>
           <span className="flex min-w-0 items-center gap-2">
@@ -675,7 +678,7 @@ function ComposeStep({
                   type="button"
                   aria-label={`Max: ${maxDisplay}`}
                   onClick={() => onChange({ amountDisplay: maxDisplay })}
-                  className="rounded-full px-2 py-1 text-caption font-semibold uppercase tracking-wide text-foreground hover:bg-mist"
+                  className="rounded-full px-2 py-1 text-caption font-semibold uppercase tracking-wide text-foreground hover:bg-mist phone:hit-target"
                 >
                   Max
                 </button>
@@ -706,7 +709,7 @@ function ComposeStep({
                 type="button"
                 onClick={onOpenTokenPicker}
                 aria-haspopup="dialog"
-                className="flex flex-shrink-0 items-center gap-1 rounded-[7px] border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line"
+                className="flex flex-shrink-0 items-center gap-1 rounded-[7px] border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line phone:hit-target"
               >
                 {ticker}
                 <ChevronDownIcon />
@@ -729,9 +732,11 @@ function ComposeStep({
           </p>
         ) : null}
 
-        <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue} className="mt-auto">
-          {continueLabel}
-        </Button>
+        <ScreenFooter>
+          <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={onContinue}>
+            {continueLabel}
+          </Button>
+        </ScreenFooter>
       </div>
     </div>
   );
@@ -785,7 +790,17 @@ export function RecipientField({
   onConfirmSaveAddress: () => void;
   savingAddress: boolean;
 }) {
+  const { capabilities, qrScanner } = usePlatform();
   const [editing, setEditing] = useState<"no" | "focused" | "refocus">("no");
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | undefined>();
+  // A scan fills the field without focusing it, so no blur will validate it.
+  const [validateScan, setValidateScan] = useState(false);
+  useEffect(() => {
+    if (!validateScan) return;
+    setValidateScan(false);
+    onBlurRecipient();
+  }, [validateScan, onBlurRecipient]);
   const address = recipientSchema.safeParse(recipient).data;
   const identity = useAddressIdentity();
   const avatarSvg = address ? identity.avatarSvg(address) : undefined;
@@ -805,9 +820,42 @@ export function RecipientField({
         .slice(0, SUGGESTION_LIMIT)
     : [];
 
+  async function scan() {
+    setScanning(true);
+    setScanError(undefined);
+    try {
+      const payload = await qrScanner.scan();
+      if (payload === null) return;
+      onChangeRecipient(addressFromQr(payload));
+      setValidateScan(true);
+    } catch (error) {
+      setScanError(
+        error instanceof QrScanError && error.reason === "permission-denied"
+          ? "Camera access is off for Gleam. Turn it on in Settings to scan."
+          : "Couldn't scan. Try again or paste the address.",
+      );
+    } finally {
+      setScanning(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-label font-semibold text-muted">To</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-label font-semibold text-muted">To</span>
+        {capabilities.qrScanner ? (
+          <button
+            type="button"
+            aria-label="Scan QR code"
+            disabled={scanning}
+            onClick={() => void scan()}
+            // 44px target without growing the label row.
+            className="-my-3 -mr-3 flex h-11 w-11 items-center justify-center rounded-md text-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:opacity-50"
+          >
+            <QrScanIcon />
+          </button>
+        ) : null}
+      </div>
       {showCard ? (
         <RecipientCard
           address={address}
@@ -877,6 +925,11 @@ export function RecipientField({
           {recipientError}
         </div>
       ) : null}
+      {scanError ? (
+        <div role="alert" className="text-label leading-snug text-warning">
+          {scanError}
+        </div>
+      ) : null}
       {lookalikeOf ? (
         <RecipientWarning
           firstTime={false}
@@ -897,6 +950,16 @@ export function RecipientField({
         />
       ) : null}
     </div>
+  );
+}
+
+export function QrScanIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <rect x="8" y="8" width="3" height="3" />
+      <rect x="13" y="13" width="3" height="3" />
+    </svg>
   );
 }
 
@@ -933,8 +996,8 @@ function SaveAddressInline({
   return (
     <div className="flex flex-col gap-2">
       {/* Keeps focus in the recipient input: its blur swaps in the shorter card, which moves this checkbox out from under the click. */}
-      <label onMouseDown={(event) => event.preventDefault()} className="flex w-fit items-center gap-2 text-label text-muted">
-        <input type="checkbox" checked={expanded} onChange={onToggle} className="h-3.5 w-3.5 accent-foreground" />
+      <label onMouseDown={(event) => event.preventDefault()} className="flex w-fit items-center gap-2 text-label text-muted phone:min-h-11 phone:gap-2.5">
+        <input type="checkbox" checked={expanded} onChange={onToggle} className="h-3.5 w-3.5 accent-foreground phone:h-5 phone:w-5" />
         Save this address
       </label>
       {expanded ? (
@@ -1009,8 +1072,8 @@ function ReviewStep({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Review send" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-6 px-5 py-5">
+      <ScreenHeader title="Review send" onBack={onBack} busy={step.submitting} />
+      <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
         <div className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
           <span className="text-[30px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
             {formatAmount(step.amountAtomic, token)} {ticker}
@@ -1057,7 +1120,7 @@ function ReviewStep({
           </p>
         ) : null}
 
-        <div className="mt-auto flex flex-col gap-3">
+        <ScreenFooter pinned={false}>
           {irreversible ? null : <p className="text-center text-label text-muted">This cannot be undone.</p>}
           <Button
             type="button"
@@ -1072,7 +1135,7 @@ function ReviewStep({
                 : "Sending…"
               : `Send ${formatAmount(step.amountAtomic, token)} ${ticker}`}
           </Button>
-        </div>
+        </ScreenFooter>
       </div>
     </div>
   );
@@ -1080,7 +1143,7 @@ function ReviewStep({
 
 export function ReviewRow({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 phone:border-b-0 phone:py-3">
       <span className="text-muted">{label}</span>
       <span
         className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-[11px] font-medium" : ""}`}
@@ -1157,9 +1220,9 @@ function TokenPickerStep({
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label="Select token">
       <ScreenHeader title="Select token" onBack={onBack} />
-      <div className="flex flex-1 flex-col px-1 py-2">
+      <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {errorMessage ? (
-          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning">
+          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
             {errorMessage}
           </div>
         ) : null}
@@ -1220,7 +1283,7 @@ function TokenPickerStep({
 
 function SkeletonPickerRow() {
   return (
-    <div className="flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 last:border-b-0">
+    <div className="flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 last:border-b-0 phone:border-b-0 phone:px-0">
       <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-full bg-mist" aria-hidden="true" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="h-3 w-20 animate-pulse rounded bg-mist" />
@@ -1283,7 +1346,7 @@ export function SavedAddressesStep({
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label="Saved contacts">
       <ScreenHeader title="Saved contacts" onBack={onBack} />
-      <div className="px-3.5 pb-2 pt-3">
+      <div className="px-3.5 pb-2 pt-3 phone:px-5">
         <input
           type="text"
           value={filter}
@@ -1292,9 +1355,9 @@ export function SavedAddressesStep({
           className="w-full rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
         />
       </div>
-      <div className="flex flex-1 flex-col px-1 py-2">
+      <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {activityQuery.isError ? (
-          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning">
+          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
             {activityQuery.error instanceof Error ? activityQuery.error.message : String(activityQuery.error)}
           </div>
         ) : loading ? (
@@ -1343,7 +1406,7 @@ export function SavedAddressesStep({
 function PickerSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section aria-label={label}>
-      <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-faint">{label}</div>
+      <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-faint phone:px-0">{label}</div>
       {children}
     </section>
   );
@@ -1430,7 +1493,7 @@ export function SuccessStep({
   const [saved, setSaved] = useState(false);
 
   return (
-    <div className="flex min-h-full flex-col items-center gap-4 px-6 pb-6 pt-12 text-center">
+    <div className="flex min-h-full flex-col items-center gap-4 px-6 phone:px-5 pb-6 pt-12 text-center">
       <div className="mb-1 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-mist text-foreground">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1438,7 +1501,7 @@ export function SuccessStep({
       </div>
       <h2 className="text-body text-foreground">Signed and sent.</h2>
       <p className="-mt-2 break-words text-label text-muted">{summary}</p>
-      <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted">
+      <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted phone:border-b-0">
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
         <span>Pending confirmation</span>
       </div>
@@ -1492,9 +1555,11 @@ export function SuccessStep({
         </div>
       ) : null}
 
-      <Button type="button" onClick={onDone} className="mt-auto">
-        Done
-      </Button>
+      <ScreenFooter>
+        <Button type="button" onClick={onDone}>
+          Done
+        </Button>
+      </ScreenFooter>
     </div>
   );
 }

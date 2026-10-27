@@ -15,3 +15,4 @@ export { SkeletonTile } from "./SkeletonTile";
 export { CollectibleThumbnail, type CollectibleThumbnailProps } from "./CollectibleThumbnail";
 export { MemorableAddress, type MemorableAddressProps } from "./MemorableAddress";
 export { RecipientCard, type RecipientCardProps } from "./RecipientCard";
+export { WatchOnlyBadge } from "./WatchOnlyBadge";

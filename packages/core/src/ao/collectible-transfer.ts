@@ -1,6 +1,6 @@
 import type { ArweaveTransactionJson } from "../arweave/transaction";
 import type { Winston } from "../models/balance";
-import type { UploadTag } from "../models/upload";
+import type { Tag } from "../models/tag";
 import { l1TransferTags, prepareL1TokenTransfer, readL1TokenTransfer } from "./l1-transfer";
 
 /**
@@ -11,7 +11,7 @@ export const COLLECTIBLE_TRANSFER_QUANTITY = "1";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
-export function collectibleTransferTags(recipient: string): UploadTag[] {
+export function collectibleTransferTags(recipient: string): Tag[] {
   return l1TransferTags(recipient, COLLECTIBLE_TRANSFER_QUANTITY);
 }
 
@@ -33,7 +33,7 @@ export function readCollectibleTransfer(transaction: {
   target: string;
   quantity: string;
   data_size: string;
-  tags: UploadTag[];
+  tags: Tag[];
 }): { assetId: string; recipient: string } | null {
   const transfer = readL1TokenTransfer(transaction);
   if (!transfer || transfer.quantity !== COLLECTIBLE_TRANSFER_QUANTITY) return null;

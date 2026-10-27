@@ -40,11 +40,9 @@ function gatewayHostname(gatewayUrl: string): string {
 
 /**
  * The dedicated settings screen the gear icon opens: grouped
- * WALLET/NETWORK/TOOLS/DISPLAY sections of navigable rows, each showing
+ * WALLET/NETWORK/DISPLAY sections of navigable rows, each showing
  * its current value on the right, with a Help & About section (feedback
  * card and source link) pinned below them.
- * "Upload to Arweave" is disabled, with a "Coming soon" label, until
- * bundler uploads work reliably.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
@@ -56,7 +54,6 @@ export interface SettingsHomeViewProps {
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
   onOpenDisplayCurrency: () => void;
-  onOpenUpload: () => void;
   onOpenFeedback: () => void;
 }
 
@@ -75,13 +72,10 @@ export function SettingsHomeView({
   onOpenManageTokens,
   onOpenContacts,
   onOpenDisplayCurrency,
-  onOpenUpload,
   onOpenFeedback,
 }: SettingsHomeViewProps) {
-  // Upload row is disabled below; onOpenUpload stays in the prop contract
-  // so re-enabling it is a one-line change.
-  void onOpenUpload;
-  const { version } = usePlatform().buildInfo;
+  const platform = usePlatform();
+  const { version } = platform.buildInfo;
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
@@ -133,7 +127,7 @@ export function SettingsHomeView({
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Settings" onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-8 px-6 pb-6 pt-9">
+      <div className="flex flex-1 flex-col gap-8 phone:gap-6 px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <OptionSection title="Wallet">
           {onOpenLockSettings ? (
             <OptionRow
@@ -199,11 +193,20 @@ export function SettingsHomeView({
           />
         </OptionSection>
 
-        <OptionSection title="Tools">
-          {/* Bundler uploads don't yet work reliably with current AO wallets;
-              re-enable by restoring onClick={onOpenUpload} below. */}
-          <OptionRow divided={false} title="Upload to Arweave" description="Store a file permanently" disabled comingSoon />
-        </OptionSection>
+        {platform.capabilities.dappBrowser ? (
+          <OptionSection title="Browser">
+            <ClearRow
+              title="Clear recent sites"
+              description="Forget the sites you opened lately"
+              clear={() => runtime.send({ type: "clearRecentSites", payload: undefined })}
+            />
+            <ClearRow
+              title="Clear site data"
+              description="Sign out of sites and delete what they stored"
+              clear={() => platform.dappBrowser.clearSiteData()}
+            />
+          </OptionSection>
+        ) : null}
 
         <OptionSection title="Network">
           <OptionRow
@@ -229,6 +232,20 @@ export function SettingsHomeView({
       </div>
     </div>
   );
+}
+
+/** An action that wipes something and says so; it has nothing to undo, so it asks nothing first. */
+function ClearRow({ title, description, clear }: { title: string; description: string; clear: () => Promise<unknown> }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "failed">("idle");
+  const run = () => {
+    setState("busy");
+    clear().then(
+      () => setState("done"),
+      () => setState("failed"),
+    );
+  };
+  const value = state === "done" ? "Cleared" : state === "failed" ? "Couldn't clear" : undefined;
+  return <OptionRow divided={false} title={title} description={description} value={value} disabled={state === "busy"} onClick={run} />;
 }
 
 function SelectRow<T extends string>({
@@ -347,7 +364,7 @@ function SourceLink() {
       href={REPO_URL}
       target="_blank"
       rel="noreferrer"
-      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-mist"
+      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-mist phone:px-0"
     >
       <span aria-hidden="true" className="shrink-0 text-foreground">
         <GitHubIcon />

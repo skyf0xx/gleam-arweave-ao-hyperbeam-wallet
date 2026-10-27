@@ -23,13 +23,14 @@ import { OnboardingView } from "../screens/onboarding/index.tsx";
 import { UnlockView } from "../screens/unlock/index.tsx";
 import { AddTokenScreen } from "./AddTokenScreen";
 import { AwaitingDeviceView } from "./AwaitingDeviceView";
+import { DEVICE_NAMES } from "./device-panels";
 import { usePlatform } from "../app-platform/context";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 
 /**
- * The approval window's top-level state machine: loads the pending
+ * The approval UI's top-level state machine, in a window or a sheet: loads the pending
  * `ApprovalRequest` for `requestId` via `getApproval`, then renders
  * `ConnectionRequestScreen`, `AddTokenScreen` or `SigningApprovalScreen`
  * depending on `request.kind`. The dApp keeps waiting while the window first runs
@@ -58,6 +59,8 @@ import { SigningApprovalScreen } from "./SigningApprovalScreen";
 export interface ApprovalRootProps {
   requestId: string | null;
   runtime?: RuntimePort;
+  /** Closes the surface the request shows in, once the user is finished with it. Defaults to closing the window. */
+  onClose?: () => void;
 }
 
 type LoadState =
@@ -116,7 +119,7 @@ function hostnameOf(origin: string): string {
   }
 }
 
-export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootProps) {
+export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => window.close() }: ApprovalRootProps) {
   const platform = usePlatform();
   const devicePanels = platform.hardwareWallets.signPanels;
   const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -225,7 +228,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
   } else if (state.kind === "done") {
     content = <CenteredMessage text={state.message} />;
   } else if (state.kind === "attested") {
-    content = <ScanAttestationResult result={state.result} onClose={() => window.close()} />;
+    content = <ScanAttestationResult result={state.result} onClose={onClose} />;
   } else if (state.kind === "failed") {
     content = <CenteredMessage text={state.message} tone="warning" />;
   } else if (state.kind === "no-wallet") {
@@ -281,7 +284,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp }: ApprovalRootPr
         }
       />
     ) : (
-      <CenteredMessage text="This window can't reach a hardware wallet." tone="warning" />
+      <CenteredMessage text={`Gleam can't reach a ${DEVICE_NAMES[device.method]} from here.`} tone="warning" />
     );
   } else {
     const { runtime, request, assessment } = state;

@@ -3,7 +3,7 @@ import { usePlatform } from "../../../app-platform/context";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
-import { sitePageUrl, STORE_REVIEWS_URL } from "@gleam/core";
+import { sitePageUrl } from "@gleam/core";
 import { useNotice } from "./useNotice";
 
 export interface MainScreenNoticeProps {
@@ -51,14 +51,14 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
       role={critical ? "alert" : undefined}
       className={cn(
         "mx-5 mb-1 flex items-start rounded-xl border",
-        critical ? "border-warning-border bg-warning-surface" : "border-line bg-mist",
+        critical ? "border-warning-border bg-warning-surface" : "border-line bg-mist phone:border-transparent",
       )}
     >
       {body}
       <button
         type="button"
         aria-label="Dismiss"
-        className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center text-muted hover:text-foreground"
+        className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center text-muted hover:text-foreground phone:mt-0 phone:h-11 phone:w-11"
         onClick={dismiss}
       >
         <CloseIcon />
@@ -69,23 +69,31 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
 
 /**
  * The one-time store review ask, shown after a good moment. Every user
- * gets the same two links whatever they'd answer, and nothing is offered
- * for a review: the store's policy forbids filtering and incentives. Feedback sits beside it for anyone with a
+ * gets the same two actions whatever they'd answer, and nothing is offered
+ * for a review: the stores' policies forbid filtering and incentives. Feedback sits beside it for anyone with a
  * complaint rather than praise.
  */
 function ReviewPrompt({ onAnswer, className }: { onAnswer: () => void; className: string }) {
-  const { version } = usePlatform().buildInfo;
+  const { buildInfo, storeReview } = usePlatform();
+  const { version } = buildInfo;
   return (
     <div className={cn(className, "gap-3 pb-3.5")}>
       <span className="flex flex-col gap-0.5">
         <NoticeContent title="Enjoying Gleam?" text="Leave a review to help others discover us." />
       </span>
       <span className="flex items-center gap-4">
-        <Button asChild variant="secondary" size="sm">
-          <a href={STORE_REVIEWS_URL} target="_blank" rel="noreferrer" onClick={onAnswer}>
-            Leave a review
-            <span aria-hidden="true">↗</span>
-          </a>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            // Called before anything awaits, so the click's user gesture still opens the tab.
+            // The OS prompt may show nothing and never reports back, so the ask is answered either way.
+            storeReview.request().catch(() => {});
+            onAnswer();
+          }}
+        >
+          Leave a review
+          {storeReview.opensPage ? <span aria-hidden="true">↗</span> : null}
         </Button>
         <a
           href={sitePageUrl("feedback", version)}

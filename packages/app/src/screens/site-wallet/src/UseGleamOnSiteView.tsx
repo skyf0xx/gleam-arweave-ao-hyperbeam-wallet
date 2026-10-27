@@ -5,6 +5,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SiteIcon } from "./SiteWalletCard";
 import { PERMISSION_GROUPS, hostnameOf, initialGroupIds, permissionsFor } from "./site-card";
 import { useUseGleamOnSite } from "./useActiveSite";
+import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 
 export interface UseGleamOnSiteViewProps {
   runtime: RuntimePort;
@@ -46,18 +47,18 @@ export function UseGleamOnSiteView({
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title="Use Gleam here" onBack={onBack} />
-      <div className="flex flex-1 flex-col gap-5 px-5 py-5">
+      <div className="flex flex-1 flex-col gap-5 px-5 py-5 phone:pb-0">
         <div className="flex flex-col items-center gap-2 text-center">
           <SiteIcon origin={origin} favIconUrl={favIconUrl} size="lg" />
           <div className="font-mono text-label text-foreground">{host}</div>
         </div>
 
         <section aria-label="Permissions" className="flex flex-col">
-          <div className="border-b border-line pb-2 text-label font-semibold text-muted">With Gleam, this site can:</div>
+          <div className="border-b border-line pb-2 text-label font-semibold text-muted phone:border-b-0">With Gleam, this site can:</div>
           {PERMISSION_GROUPS.map((group) => {
             const on = group.required === true || enabled.has(group.id);
             return (
-              <div key={group.id} className="flex items-center gap-3 border-b border-line py-3 last:border-b-0">
+              <div key={group.id} className="flex items-center gap-3 border-b border-line py-3 last:border-b-0 phone:border-b-0">
                 <div className="flex min-w-0 flex-1 flex-col gap-px">
                   <span className="text-label font-semibold text-foreground">{group.title}</span>
                   <span className="text-caption text-muted">{group.detail}</span>
@@ -88,7 +89,7 @@ export function UseGleamOnSiteView({
           })}
         </section>
 
-        <div className="mt-auto flex flex-col gap-3">
+        <ScreenFooter>
           <p className="text-center text-caption leading-relaxed text-muted">
             The page reloads with Gleam. You can switch back from the main screen or Connected apps.
           </p>
@@ -100,7 +101,7 @@ export function UseGleamOnSiteView({
           <Button type="button" disabled={useGleam.isPending} onClick={submit}>
             {useGleam.isPending ? "Switching…" : "Use Gleam here"}
           </Button>
-        </div>
+        </ScreenFooter>
       </div>
     </div>
   );

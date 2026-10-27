@@ -1,0 +1,21 @@
+{
+  "name": "@gleam/dapp-view",
+  "description": "The native WebView that Gleam's mobile app opens dApps in",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@gleam/messaging": "workspace:*"
+  }
+}

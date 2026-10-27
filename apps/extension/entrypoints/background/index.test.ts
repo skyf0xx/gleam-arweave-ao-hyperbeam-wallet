@@ -163,6 +163,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       "resetAllWallets",
       "getPasskeyStatus",
       "checkVaultPassword",
+      "probeVaultPassword",
       "enrollPasskey",
       "unlockWithPasskey",
       "removePasskey",

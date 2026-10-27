@@ -5,7 +5,7 @@ import type { RuntimePort, TokenBalance } from "@gleam/core";
 import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
+import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 
 /**
@@ -152,9 +152,9 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       <ScreenHeader title="Manage tokens" onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
-      <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
+      <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div>
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
             Watched AO tokens
           </div>
           <div>
@@ -174,7 +174,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                     ) : null}
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-label font-semibold text-foreground">
-                        {balance?.ticker ?? "Unavailable"}
+                        {balance ? displayTicker(balance.ticker) : "Unavailable"}
                       </span>
                       <span className="truncate font-mono text-caption text-muted">{truncateAddress(processId, 6)}</span>
                     </span>
@@ -204,7 +204,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
 
         {state.discovered.length > 0 ? (
           <div className="pt-10">
-            <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+            <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
               Found in your wallet
             </div>
             {state.discovered.map((token) => (
@@ -231,7 +231,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
         ) : null}
 
         <div className="pt-10">
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
             Add a token
           </div>
           <div className="flex flex-col gap-2 py-3.5">
@@ -263,33 +263,36 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
             {previewing ? <TokenSkeletonRow className="py-1" /> : null}
             {preview ? (
               <div className="flex flex-col gap-1 py-1">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2.5 text-label font-semibold text-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-2.5 text-label font-semibold text-foreground">
                     {preview.logoUrl ? (
                       <TokenGlyph label={preview.ticker.slice(0, 2).toUpperCase()} tone={2} logoUrl={preview.logoUrl} />
                     ) : null}
-                    <span>
-                      {preview.ticker}
+                    <span className="truncate">
+                      {displayTicker(preview.ticker)}
                       {preview.name && preview.name !== preview.ticker ? (
                         <span className="font-normal text-muted"> · {preview.name}</span>
                       ) : null}
                     </span>
                   </span>
-                  <span className="font-mono text-label text-muted">
+                  <span className="flex-shrink-0 font-mono text-label text-muted">
                     {preview.available === false ? "Unavailable" : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
                   </span>
                 </div>
                 {preview.available === false ? (
-                  <span className="text-caption leading-snug text-muted">
-                    {preview.unavailableReason ?? "Its balance can't be read right now."} You can still add it; the
-                    balance shows once it can be read.
-                  </span>
+                  <div className="flex flex-col gap-2 text-caption leading-snug text-muted" title={preview.unavailableReason}>
+                    <p>
+                      Gleam can't read this token right now. Its node may be busy, or it may be an older token Gleam
+                      doesn't support.
+                    </p>
+                    <p>You can still add it - the balance shows once it can be read.</p>
+                  </div>
                 ) : null}
               </div>
             ) : null}
             {preview ? (
               <Button className="mt-1" disabled={adding} onClick={() => void handleConfirmAdd()}>
-                {adding ? "Adding…" : `Add ${preview.ticker}`}
+                {adding ? "Adding…" : preview.ticker === preview.processId ? "Add token" : `Add ${preview.ticker}`}
               </Button>
             ) : null}
           </div>
