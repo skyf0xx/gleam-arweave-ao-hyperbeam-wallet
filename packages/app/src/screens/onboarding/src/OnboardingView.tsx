@@ -12,6 +12,7 @@ import { Import } from "./Import";
 import { AddWalletStart } from "./AddWalletStart";
 import { ExistingWallet } from "./ExistingWallet";
 import { ConnectDevice } from "./ConnectDevice";
+import { WatchAddress } from "./WatchAddress";
 import { usePlatform } from "../../../app-platform/context";
 import { VaultPassword } from "./VaultPassword";
 import { ClaimStep, type ClaimPhase } from "./ClaimStep";
@@ -37,6 +38,7 @@ type Step =
   | { kind: "import" }
   | { kind: "import-password"; jwk: unknown }
   | { kind: "connect-device"; device: HardwareWalletMethod }
+  | { kind: "watch" }
   | { kind: "security-phrase"; wallet: WalletSummary }
   | { kind: "claim"; wallet: WalletSummary }
   | { kind: "reveal"; wallet: WalletSummary; inviteCode: string };
@@ -51,7 +53,7 @@ export interface OnboardingViewProps {
    */
   mode?: "first-run" | "add-wallet";
   /**
-   * Add-wallet only: false when every wallet so far is a hardware wallet.
+   * Add-wallet only: false when every wallet so far is a hardware or watch wallet.
    * The vault has no password yet, so the new keyfile wallet sets one.
    */
   vaultHasPassword?: boolean;
@@ -231,6 +233,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
             onImport={() => setStep({ kind: "import" })}
             onConnectKeystone={connectKeystone}
             onConnectLedger={connectLedger}
+            onWatch={() => setStep({ kind: "watch" })}
           />
         );
       }
@@ -248,6 +251,17 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
           onImport={() => setStep({ kind: "import" })}
           onConnectKeystone={connectKeystone}
           onConnectLedger={connectLedger}
+          onWatch={() => setStep({ kind: "watch" })}
+        />
+      );
+
+    case "watch":
+      return (
+        <WatchAddress
+          runtime={runtime}
+          onBack={() => setStep({ kind: addingWallet ? "welcome" : "existing" })}
+          // A watch wallet can't sign, so it skips the Points claim, which needs a signature.
+          onAdded={onComplete}
         />
       );
 

@@ -12,9 +12,10 @@ export interface ExistingWalletOptionsProps {
   onImport: () => void;
   onConnectKeystone: () => void;
   onConnectLedger: () => void;
+  onWatch: () => void;
 }
 
-export function ExistingWalletOptions({ onImport, onConnectKeystone, onConnectLedger }: ExistingWalletOptionsProps) {
+export function ExistingWalletOptions({ onImport, onConnectKeystone, onConnectLedger, onWatch }: ExistingWalletOptionsProps) {
   const { capabilities } = usePlatform();
   const { ledger, keystone } = capabilities.hardwareWallets;
   return (
@@ -30,6 +31,9 @@ export function ExistingWalletOptions({ onImport, onConnectKeystone, onConnectLe
           ) : null}
         </OptionSection>
       ) : null}
+      <OptionSection title="Address only">
+        <OptionRow title="Watch an address" description="See balances and activity, without sending or signing" onClick={onWatch} />
+      </OptionSection>
     </>
   );
 }

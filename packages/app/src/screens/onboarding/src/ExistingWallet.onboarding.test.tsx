@@ -6,7 +6,7 @@ import { ExistingWallet } from "./ExistingWallet";
 
 afterEach(cleanup);
 
-const handlers = { onImport: vi.fn(), onConnectKeystone: vi.fn(), onConnectLedger: vi.fn() };
+const handlers = { onImport: vi.fn(), onConnectKeystone: vi.fn(), onConnectLedger: vi.fn(), onWatch: vi.fn() };
 
 const screens = {
   ExistingWallet: () => <ExistingWallet onBack={vi.fn()} {...handlers} />,

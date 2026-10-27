@@ -14,6 +14,7 @@ export interface AddWalletStartProps {
   onImport: () => void;
   onConnectKeystone: () => void;
   onConnectLedger: () => void;
+  onWatch: () => void;
 }
 
 export function AddWalletStart({ onBack, onCreate, ...existing }: AddWalletStartProps) {
