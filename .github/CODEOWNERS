@@ -101,6 +101,15 @@
 /security/surface.mjs                                                      @skyf0xx
 /security/surface.txt                                                      @skyf0xx
 /apps/mobile/ios/App/App/App.entitlements                           @skyf0xx
+/apps/mobile/android/app/src/main/res/xml/file_paths.xml                 @skyf0xx
+/apps/mobile/ios/App/CapApp-SPM/Package.swift                            @skyf0xx
+/apps/mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved @skyf0xx
+/apps/mobile/android/app/build.gradle                                    @skyf0xx
+/apps/mobile/android/build.gradle                                        @skyf0xx
+/apps/mobile/android/variables.gradle                                    @skyf0xx
+/apps/mobile/android/capacitor.settings.gradle                           @skyf0xx
+/apps/mobile/android/app/capacitor.build.gradle                          @skyf0xx
+/apps/mobile/plugins/dapp-view/android/build.gradle                      @skyf0xx
 /apps/site-open/.well-known/apple-app-site-association              @skyf0xx
 /apps/site-open/.well-known/assetlinks.json                         @skyf0xx
 /apps/site-open/vercel.json                                         @skyf0xx

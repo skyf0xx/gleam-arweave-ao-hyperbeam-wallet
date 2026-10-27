@@ -104,6 +104,15 @@
 5 security/surface.mjs
 5 security/surface.txt
 5 apps/mobile/ios/App/App/App.entitlements
+5 apps/mobile/android/app/src/main/res/xml/file_paths.xml
+5 apps/mobile/ios/App/CapApp-SPM/Package.swift
+5 apps/mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+5 apps/mobile/android/app/build.gradle
+5 apps/mobile/android/build.gradle
+5 apps/mobile/android/variables.gradle
+5 apps/mobile/android/capacitor.settings.gradle
+5 apps/mobile/android/app/capacitor.build.gradle
+5 apps/mobile/plugins/dapp-view/android/build.gradle
 5 apps/site-open/.well-known/apple-app-site-association
 5 apps/site-open/.well-known/assetlinks.json
 5 apps/site-open/vercel.json
