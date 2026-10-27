@@ -282,15 +282,14 @@ describe("TransferHandler: submitTransfer", () => {
     expect(entry?.token).toBe(AO_PROCESS_ID);
   });
 
-  it("refuses a Ledger AO send before opening the approval window", async () => {
+  it("hands a Ledger AO send to the approval window, where the device signs it", async () => {
     keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", encryptedKeyfile: null }]);
-    const requestTransfer = vi.fn();
+    const requestTransfer = vi.fn().mockResolvedValue({ txId: "ao-msg-id-ledger" });
     const handler = new TransferHandler(storage, keySession, { requestTransfer });
+    const req = { walletId: WALLET_ID, recipient: "recipientAoAddr", token: AO_PROCESS_ID, amount: "1", fee: null };
 
-    await expect(
-      handler.submitTransfer({ walletId: WALLET_ID, recipient: "recipientAoAddr", token: AO_PROCESS_ID, amount: "1", fee: null }),
-    ).rejects.toThrow("Ledger only supports sending AR for now, so it can't send AO tokens. Use a Keystone instead.");
-    expect(requestTransfer).not.toHaveBeenCalled();
+    await expect(handler.submitTransfer(req)).resolves.toEqual({ txId: "ao-msg-id-ledger" });
+    expect(requestTransfer).toHaveBeenCalledWith(req);
     expect(aoSubmitMock).not.toHaveBeenCalled();
   });
 

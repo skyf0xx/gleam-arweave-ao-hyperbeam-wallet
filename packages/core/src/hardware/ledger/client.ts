@@ -314,8 +314,12 @@ function checkPermawebTags(tags: DataItemTag[]): void {
   }
 }
 
+/** The permawebOS wallet, which installs the beta Permaweb app on a Ledger; Gleam doesn't ship the app. */
+export const LEDGER_PERMAWEB_INSTALLER_URL = "https://arweave.net/DkgYUWIl593qN_2OVeGxgK5ZHtv6ERIb_llTzzAQ594";
+
 export const LEDGER_PERMAWEB_REQUIRED_MESSAGE =
-  "Ledger only supports sending AR for now. To send AO tokens or sign data items, use a Keystone.";
+  "Your Ledger can't send AO tokens or sign data items with the Arweave app. Install the beta Permaweb app on it " +
+  `with the permawebOS wallet (${LEDGER_PERMAWEB_INSTALLER_URL}), then open the Permaweb app and try again.`;
 
 export const LEDGER_TARGET_REQUIRED_MESSAGE =
   "The Ledger Arweave app only signs transactions sent to an address. Use a Keystone or a keyfile wallet for this one.";
