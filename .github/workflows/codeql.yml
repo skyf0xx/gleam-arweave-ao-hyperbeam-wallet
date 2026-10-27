@@ -45,6 +45,9 @@ jobs:
   # The dApp view plugin is a trust boundary, but it only compiles inside the
   # app: on its own, SwiftPM can't resolve Capacitor's Cordova module. So this
   # builds the whole app, which needs the web bundle and `cap sync` first.
+  # Tracing the full build (every Capacitor plugin, SQLCipher's C) took ~20
+  # minutes, so dependencies build untraced and only our own Swift is rebuilt
+  # under CodeQL.
   analyze-swift:
     name: Analyze (swift)
     runs-on: macos-15
@@ -63,16 +66,30 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm mobile:build
       - run: pnpm --filter @gleam/mobile exec cap sync ios
+      - run: >-
+          xcodebuild
+          -project apps/mobile/ios/App/App.xcodeproj
+          -scheme App
+          -destination 'generic/platform=iOS Simulator'
+          ARCHS=arm64
+          CODE_SIGNING_ALLOWED=NO
+          build
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: swift
           build-mode: manual
           queries: security-extended
       - run: >-
+          find apps/mobile/ios/App/App apps/mobile/plugins
+          -name '*.swift' -not -name Package.swift
+          -not -path '*/node_modules/*' -not -path '*/.build/*'
+          -exec touch {} +
+      - run: >-
           xcodebuild
           -project apps/mobile/ios/App/App.xcodeproj
           -scheme App
           -destination 'generic/platform=iOS Simulator'
+          ARCHS=arm64
           CODE_SIGNING_ALLOWED=NO
           build
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
