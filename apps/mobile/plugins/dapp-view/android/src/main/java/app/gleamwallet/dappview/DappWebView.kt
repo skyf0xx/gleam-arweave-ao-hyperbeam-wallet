@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
+import android.webkit.ValueCallback
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -44,6 +45,8 @@ internal class DappWebView(
     private var layout: FrameLayout.LayoutParams,
     private val providerScript: String,
     private val events: Events,
+    /** Starts the system picker; its result comes back through [fileChooserResult]. */
+    private val launchPicker: (Intent) -> Unit,
 ) {
     class Events(
         val message: (JSObject) -> Unit,
@@ -73,6 +76,7 @@ internal class DappWebView(
      */
     private var crashedThisLoad = false
     private val deliveries = mutableListOf<Delivery>()
+    private var fileChooser: ValueCallback<Array<Uri>>? = null
 
     init {
         webView = create()
@@ -131,6 +135,7 @@ internal class DappWebView(
         webView?.let { destroy(it) }
         webView = null
         finishDeliveries()
+        endFileChooser(null)
     }
 
     /**
@@ -170,6 +175,17 @@ internal class DappWebView(
             deliveries.remove(this)
             completion(delivered)
         }
+    }
+
+    /** WebView needs its callback answered exactly once, even with nothing chosen. */
+    private fun endFileChooser(files: Array<Uri>?) {
+        val callback = fileChooser ?: return
+        fileChooser = null
+        callback.onReceiveValue(files)
+    }
+
+    fun fileChooserResult(resultCode: Int, data: Intent?) {
+        endFileChooser(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
     }
 
     private fun create(): WebView {
@@ -309,6 +325,7 @@ internal class DappWebView(
             destroy(view)
             webView = null
             finishDeliveries()
+            endFileChooser(null)
             if (closed) return true
             if (crashedThisLoad) {
                 events.loadError(JSObject().put("url", lastUrl ?: "").put("message", "The page stopped working."))
@@ -330,6 +347,27 @@ internal class DappWebView(
      * destroyed before anything loads.
      */
     private inner class ChromeClient : WebChromeClient() {
+        override fun onShowFileChooser(
+            view: WebView,
+            filePathCallback: ValueCallback<Array<Uri>>,
+            params: FileChooserParams,
+        ): Boolean {
+            if (closed || view !== webView) {
+                filePathCallback.onReceiveValue(null)
+                return true
+            }
+            endFileChooser(null)
+            fileChooser = filePathCallback
+            try {
+                launchPicker(params.createIntent())
+            } catch (_: ActivityNotFoundException) {
+                endFileChooser(null)
+            } catch (_: SecurityException) {
+                endFileChooser(null)
+            }
+            return true
+        }
+
         override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
             if (closed || view !== webView) return false
             val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false

@@ -1,10 +1,14 @@
 package app.gleamwallet.dappview
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.view.Gravity
 import android.view.View
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import android.widget.FrameLayout
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -21,7 +25,17 @@ import kotlin.math.roundToInt
 class DappViewPlugin : Plugin() {
     private var dappView: DappWebView? = null
 
+    /**
+     * A file input has no PluginCall, so this can't use `startActivityForResult`
+     * with `@ActivityCallback`. Registered in `load`, before the activity
+     * starts, as the Activity Result API requires.
+     */
+    private var filePicker: ActivityResultLauncher<Intent>? = null
+
     override fun load() {
+        filePicker = bridge.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            dappView?.fileChooserResult(it.resultCode, it.data)
+        }
         // A reload or crash of the wallet WebView loses the JS that owns the
         // dApp view, so either closes it. The listener stays registered for
         // the plugin's life: the bridge iterates its listener list while
@@ -85,6 +99,7 @@ class DappViewPlugin : Plugin() {
                     navigation = { notifyListeners("navigation", it) },
                     loadError = { notifyListeners("loadError", it) },
                 ),
+                launchPicker = { filePicker?.launch(it) ?: throw ActivityNotFoundException() },
             )
             dappView = view
             view.load(url)
