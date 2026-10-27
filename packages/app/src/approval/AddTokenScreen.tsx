@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { AddTokenApprovalPreview } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
+import { useAddressIdentity } from "../address-identity";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -28,6 +30,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const host = hostnameOf(origin);
+  const identity = useAddressIdentity();
 
   const handleAdd = async () => {
     setSubmitting(true);
@@ -61,12 +64,20 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
 
         <div className="flex flex-col gap-1.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">Process id</span>
-          <span className="break-all font-mono text-caption leading-relaxed text-foreground">{preview.processId}</span>
+          <MemorableAddress
+            address={preview.processId}
+            emphasisPick={identity.emphasisPick}
+            avatarSvg={identity.avatarSvg(preview.processId)}
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">To wallet</span>
-          <span className="break-all font-mono text-caption leading-relaxed text-foreground">{preview.address}</span>
+          <MemorableAddress
+            address={preview.address}
+            emphasisPick={identity.emphasisPick}
+            avatarSvg={identity.avatarSvg(preview.address)}
+          />
         </div>
 
         <p className="text-caption leading-snug text-muted">

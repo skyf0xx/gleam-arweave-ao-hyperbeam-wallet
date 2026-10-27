@@ -1,6 +1,7 @@
 import { useEffect, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import {
   WALLET_APPROVAL_ORIGIN,
   type ApprovalRequest,
@@ -62,7 +63,7 @@ describe("AwaitingDeviceView", () => {
   it("names the device and the signing address, and hands the panel the payloads and wallet", () => {
     const { panel } = renderView();
     expect(screen.getByText("Confirm on your Ledger")).toBeTruthy();
-    expect(screen.getByText(DEVICE.address)).toBeTruthy();
+    expect(screen.getByText(addressText(DEVICE.address))).toBeTruthy();
     expect(screen.getByText("Test panel")).toBeTruthy();
     expect(panel.last().payloads).toEqual(DEVICE.payloads);
     expect(panel.last().wallet).toEqual({ method: "ledger", device: { kind: "ledger" }, address: DEVICE.address, publicKey: "pub" });
@@ -84,10 +85,10 @@ describe("AwaitingDeviceView", () => {
       token: { processId: "p".repeat(43), denomination: 6, ticker: "ARDRIVE" },
     });
     expect(screen.getByText("Item 1")).toBeTruthy();
-    expect(screen.getByText("r".repeat(43))).toBeTruthy();
+    expect(screen.getByText(addressText("r".repeat(43)))).toBeTruthy();
     expect(screen.getByText("1 AR")).toBeTruthy();
     expect(screen.getByText("0.002 AR")).toBeTruthy();
-    expect(screen.getByText("p".repeat(43))).toBeTruthy();
+    expect(screen.getByText(addressText("p".repeat(43)))).toBeTruthy();
     expect(screen.getByText("2.5 ARDRIVE")).toBeTruthy();
   });
 
