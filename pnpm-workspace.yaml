@@ -18,6 +18,7 @@ overrides:
   shell-quote: ^1.11.0
   pbkdf2: ^3.1.7
   "@keystonehq/bc-ur-registry-arweave>uuid": ^11.1.1
+  xcode>uuid: ^11.1.1
   vite: ^8.3.3
 # Hijacked npm releases are usually caught and pulled within a day or two;
 # refusing anything younger than 3 days keeps them out of the lockfile.
