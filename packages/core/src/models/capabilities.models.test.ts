@@ -38,6 +38,10 @@ describe("capabilitiesFor", () => {
   it("gives an ethereum wallet no Arweave capability", () => {
     expect(Object.values(capabilitiesFor("ethereum")).some(Boolean)).toBe(false);
   });
+
+  it("gives a watch wallet no capability at all", () => {
+    expect(Object.values(capabilitiesFor("watch")).some(Boolean)).toBe(false);
+  });
 });
 
 describe("providerMethodRefusal", () => {
@@ -70,6 +74,11 @@ describe("providerMethodRefusal", () => {
     expect(providerMethodRefusal("ledger", "signDataItem")).toBe(
       "Ledger only supports sending AR for now, so it can't sign data items. Use a Keystone instead.",
     );
+  });
+
+  it("says a watch wallet is watch-only", () => {
+    expect(providerMethodRefusal("watch", "sign")).toBe("This wallet is watch-only, so it can't sign transactions.");
+    expect(capabilityRefusal("watch", "signTransaction", "send AR")).toBe("This wallet is watch-only, so it can't send AR.");
   });
 
   it("never refuses a method that signs nothing", () => {

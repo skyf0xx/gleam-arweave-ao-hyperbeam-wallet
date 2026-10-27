@@ -15,6 +15,7 @@ import {
   finishDispatch,
   finishSignTransaction,
   isHardwareWalletMethod,
+  WATCH_ONLY_CONNECT_REFUSAL,
   prepareDataItem,
   prepareDataItems,
   prepareDispatch,
@@ -1506,6 +1507,9 @@ export class ApprovalHandler {
     const grantWalletId = walletId ?? (await this.activeWalletId());
     if (!grantWalletId) {
       throw new Error("There is no wallet to connect. Create or import one first.");
+    }
+    if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
+      throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
     }
     const grants = await this.loadGrants();
     const withoutExisting = grants.filter((grant) => grant.origin !== origin);

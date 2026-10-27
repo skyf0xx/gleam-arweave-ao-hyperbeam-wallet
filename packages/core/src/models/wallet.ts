@@ -3,10 +3,11 @@ export type { JWKInterface } from "arweave/web/lib/wallet";
 /**
  * A stored key record. `jwk` wallets hold an encrypted keyfile.
  * `keystone`/`ledger` are hardware wallets: Gleam stores only the public
- * key and signing happens on the device. `ethereum` is modeled but not
- * produced yet.
+ * key and signing happens on the device. `watch` is only an address the
+ * user follows, with no key anywhere, so it can't sign at all. `ethereum`
+ * is modeled but not produced yet.
  */
-export type WalletMethod = "jwk" | "ethereum" | "ledger" | "keystone";
+export type WalletMethod = "jwk" | "ethereum" | "ledger" | "keystone" | "watch";
 
 export type HardwareWalletMethod = "keystone" | "ledger";
 
@@ -29,12 +30,22 @@ export function isHardwareWalletMethod(method: WalletMethod): method is Hardware
   return method === "keystone" || method === "ledger";
 }
 
+export function isWatchWalletMethod(method: WalletMethod): boolean {
+  return method === "watch";
+}
+
+/** Hardware and watch wallets: Gleam holds no key for them, so there is nothing to unlock. */
+export function isKeylessWalletMethod(method: WalletMethod): boolean {
+  return isHardwareWalletMethod(method) || isWatchWalletMethod(method);
+}
+
 /**
  * Whether Gleam has a password to lock behind. Only keyfile wallets are
- * encrypted under one; a vault of hardware wallets has nothing to lock.
+ * encrypted under one; a vault of hardware and watch wallets has nothing
+ * to lock.
  */
 export function vaultHasPassword(wallets: readonly { method: WalletMethod }[]): boolean {
-  return wallets.some((wallet) => !isHardwareWalletMethod(wallet.method));
+  return wallets.some((wallet) => !isKeylessWalletMethod(wallet.method));
 }
 
 export interface Wallet {
@@ -47,7 +58,7 @@ export interface Wallet {
   updatedAt: number;
   /**
    * The encrypted Vault envelope wrapping this Wallet's key material.
-   * `null` for hardware wallets, which store no key material at all.
+   * `null` for hardware and watch wallets, which store no key material at all.
    */
   encryptedKeyfile: VaultEnvelope | null;
   /**

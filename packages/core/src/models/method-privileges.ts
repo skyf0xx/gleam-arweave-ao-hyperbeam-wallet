@@ -59,6 +59,7 @@ export const KEY_METHODS = [
   "downloadKeyfile",
   "cancelKeyfileDownload",
   "addHardwareWallet",
+  "addWatchWallet",
   "resetAllWallets",
   "enrollPasskey",
 ] as const;

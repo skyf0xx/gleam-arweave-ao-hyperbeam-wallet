@@ -10,9 +10,9 @@ export type {
   HardwareWalletMethod,
   HardwareDevice,
 } from "./wallet";
-export { isHardwareWalletMethod, vaultHasPassword } from "./wallet";
+export { isHardwareWalletMethod, isKeylessWalletMethod, isWatchWalletMethod, vaultHasPassword } from "./wallet";
 export type { WalletCapabilities } from "./capabilities";
-export { HARDWARE_MESSAGE_HASH, capabilitiesFor, capabilityRefusal, providerMethodRefusal, unsupportedOperationMessage } from "./capabilities";
+export { HARDWARE_MESSAGE_HASH, WATCH_ONLY_CONNECT_REFUSAL, capabilitiesFor, capabilityRefusal, providerMethodRefusal, unsupportedOperationMessage } from "./capabilities";
 export type {
   Session,
   AutoLockTimeout,

@@ -79,6 +79,8 @@ const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
   },
   // Modeled but never produced: no Arweave operation applies.
   ethereum: NONE,
+  // No key anywhere: Gleam only reads this address.
+  watch: NONE,
 };
 
 /** The only `signMessage` hash a hardware wallet signs with. */
@@ -106,6 +108,10 @@ export function unsupportedOperationMessage(action: string): string {
   return `This wallet can't ${action}. Switch to a keyfile wallet.`;
 }
 
+/** Why a site can't connect while a watch wallet is active. */
+export const WATCH_ONLY_CONNECT_REFUSAL =
+  "The active Gleam wallet is watch-only, so it can't connect to sites. Switch to a wallet that can sign.";
+
 /** Why a wallet of `walletMethod` can't `action`, or null when it has `capability`. */
 export function capabilityRefusal(
   walletMethod: WalletMethod,
@@ -113,6 +119,7 @@ export function capabilityRefusal(
   action: string,
 ): string | null {
   if (capabilitiesFor(walletMethod)[capability]) return null;
+  if (walletMethod === "watch") return `This wallet is watch-only, so it can't ${action}.`;
   // A Keystone signs data items, so it's the hardware wallet to point a Ledger user to.
   if (walletMethod === "ledger" && capability === "signDataItem") {
     return `Ledger only supports sending AR for now, so it can't ${action}. Use a Keystone instead.`;

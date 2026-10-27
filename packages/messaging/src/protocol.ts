@@ -78,6 +78,12 @@ export interface ProtocolMap {
     device: HardwareDevice;
     name?: string;
   }): WalletSummary;
+  /**
+   * Adds a watch-only wallet: just an address, with no key, so it can't
+   * sign or connect to sites. Needs Gleam unlocked when the vault has a
+   * password.
+   */
+  addWatchWallet(req: { address: string; name?: string }): WalletSummary;
   deleteWallet(req: { walletId: string }): void;
   renameWallet(req: { walletId: string; name: string }): void;
   switchWallet(req: { walletId: string }): void;

@@ -22,6 +22,8 @@ const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
   ethereum: "Ethereum",
   ledger: "Ledger",
   keystone: "Keystone",
+  // Marked with the watch-only badge instead.
+  watch: null,
 };
 
 function formatBackupDate(timestamp: number): string {

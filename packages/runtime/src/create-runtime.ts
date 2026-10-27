@@ -7,6 +7,7 @@ import {
   missingPermissions,
   HARDWARE_MESSAGE_HASH,
   isHardwareWalletMethod,
+  isWatchWalletMethod,
   providerMethodRefusal,
   verifyMessage,
   type Grant,
@@ -15,6 +16,7 @@ import {
   type WalletState,
   type WalletSummary,
   vaultHasPassword,
+  WATCH_ONLY_CONNECT_REFUSAL,
 } from "@gleam/core";
 import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gateway.ts";
 import { estimateFee } from "@gleam/core/src/arweave/transfer.ts";
@@ -397,6 +399,8 @@ export function createRuntime(platform: Platform): Runtime {
   const PROVIDER_HANDLERS: ProviderHandlers = {
     async connect({ permissions: wanted, appInfo }, { origin }) {
       const state = await lifecycle.getState();
+      const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
+      if (active && isWatchWalletMethod(active.method)) throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
 
       // Many dApps call connect() on every page load. An origin whose grant
       // already covers the request resolves without a prompt; otherwise only
@@ -656,6 +660,9 @@ export function createRuntime(platform: Platform): Runtime {
 
     const state = await lifecycle.getState();
     const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId) ?? null;
+    // Grants follow the active wallet, so a site connected earlier must not
+    // reach a watch wallet's address or sign requests through its grant.
+    if (wallet && isWatchWalletMethod(wallet.method)) throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
     // Refuse what the active wallet can't do before any approval window
     // opens, rather than after the user has approved it.
     const refusal = wallet ? providerMethodRefusal(wallet.method, method) : null;
@@ -708,6 +715,7 @@ export function createRuntime(platform: Platform): Runtime {
     createWallet: (data) => addWallet(() => lifecycle.createWallet(data)),
     importWallet: (data) => addWallet(() => lifecycle.importWallet(data)),
     addHardwareWallet: (data) => addWallet(() => lifecycle.addHardwareWallet(data)),
+    addWatchWallet: (data) => addWallet(() => lifecycle.addWatchWallet(data)),
     deleteWallet: async (data) => {
       const { walletId } = data;
       const before = await lifecycle.getState();

@@ -276,6 +276,7 @@ export const BACKGROUND_MESSAGES = {
   createWallet: EXTENSION,
   importWallet: EXTENSION,
   addHardwareWallet: EXTENSION,
+  addWatchWallet: EXTENSION,
   deleteWallet: EXTENSION,
   renameWallet: EXTENSION,
   switchWallet: EXTENSION,
