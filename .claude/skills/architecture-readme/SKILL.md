@@ -1,117 +1,135 @@
 ---
 name: architecture-readme
-description: Use when asked to document a directory or package, or when a code change alters component responsibilities, dependencies, or architectural relationships described in an existing README. Creates or updates a concise README.md that explains a directory's role, its important components, and how they work together, for a new contributor or auditor.
+description: Use when asked to document a directory or package, or when a code change alters a package's purpose, its main parts, or how it connects to the rest of the repo. Creates or updates a short README.md that lets an engineer exploring the repo understand what a folder is for, what is in it, and where it sits in the system.
 ---
 
 # Architecture README
 
-README files are living documentation, not one-off deliverables. Keep them
-accurate as the codebase changes.
+A README helps an engineer who is exploring the repo build a mental
+model of one folder: what it is for, what is in it, and where it sits.
+It is a map, not a reference manual, and it does not need to cover
+every detail. A loose but helpful description beats an exhaustive one.
 
-## 1. Explore before documenting
+## 1. Which folders get one
 
-Inspect the target directory and trace the code where necessary. Do not
-infer behavior from filenames alone — follow imports, exports, call sites,
-and interfaces.
+- Each package and app: `packages/*`, `apps/*`.
+- Each top-level tool folder with its own purpose, such as
+  `scripts/scan`.
+- Not subfolders inside a package's `src/`, and not generated folders
+  (for example Capacitor's `CapApp-SPM`).
 
-Understand:
+The root `README.md` has a **Repository layout** section with a small
+diagram of how the apps and packages connect, and a one-line linked entry
+for each folder that has a README. Add or update an entry whenever a
+folder's README is added, removed or changes its one-line summary.
 
-- What the directory is responsible for.
-- Which files and subdirectories matter most.
-- How its components relate to one another.
-- What depends on it, and what it depends on.
-- Where important operations begin, flow through the system, and end.
-- Where state, configuration, persistence, or security boundaries live.
+If a folder is deployed as-is (a static site), keep its README out of
+the deploy, for example with a `.vercelignore` that lists `README.md`.
 
-## 2. Document the architecture
+## 2. Explore before writing
 
-Only document directories that contain a nested `src/` (packages and
-apps). Don't create READMEs for arbitrary subdirectories inside `src/`.
+Read the folder's entry points, exports and main callers before writing
+anything. Do not describe a file from its name alone. Check every claim
+against the code, such as which apps use a package or what a script
+does. Earlier READMEs in this repo had drifted, and checking was what
+found the errors.
 
-Create or update a single `README.md` at the same level as `src/` (the
-package or app root), not inside it.
+## 3. Layout
 
-- **Directory overview** — a brief explanation of what the directory does
-  and how it fits into the wider system.
-- **Component index** — the important files and directories, grouped by
-  responsibility, each linked to its explanation via a Markdown anchor.
-  Explain a directory as a whole when that's sufficient; list individual
-  files only when their specific responsibilities matter.
-- **Component explanations** — for each important component, cover what
-  responsibility it has, why it exists, and when/how it's used. Prefer a
-  short titled list (bolded name, then a one- or two-sentence
-  explanation) over a dense paragraph that chains several components
-  together with commas and dashes. Give each component its own line so
-  a reader can scan instead of parse.
-- **Relationships and data flow** — who calls or depends on whom, how
-  data/control flows, where responsibilities begin and end, and who owns
-  state or persistence. Prioritize relationships that build a reader's
-  mental model; isolated component descriptions aren't enough on their
-  own. Use a short sequence or Mermaid diagram only when it clarifies a
-  non-obvious relationship.
+Every README uses the same layout:
 
-## 3. Writing standards
+~~~markdown
+# <package name or folder title>
 
-Write for a technically capable reader unfamiliar with this part of the
-codebase. Target Flesch–Kincaid grade 6–8 where practical: familiar
-words, short sentences, concrete explanations. One idea per sentence —
-split any sentence that chains two or more claims with commas,
-semicolons, parentheticals, or "and"/"but" into separate sentences or
-list items. This applies as much to a relationship explanation (layering,
-dependency direction, an exception, an analogy) as it does to a list of
-files — a paragraph that packs "what depends on what, with one
-exception, summarized by an analogy" into three long sentences is still
-too dense, even with zero files named. If a paragraph's sentences each
-need re-reading to parse, break it into shorter sentences or a short
-list before moving on. Keep necessary technical terms, explained briefly
-where context doesn't already make them clear. Avoid restating what the
-code already makes obvious, generic introductions, filler, and
-boilerplate. Document the architecture, not every implementation
-detail.
+<Paragraph 1: what this folder is and what it does for the wallet,
+starting with "This package is…" or "This is…".>
 
-Default to titled lists over dense paragraphs. When explaining a set of
-files, components, or steps, use a bulleted or numbered list with a
-bolded title per item rather than a paragraph that packs them all
-together. Reserve paragraphs for the directory overview and for
-relationships/data flow that genuinely need connected prose; even there,
-keep sentences short and break up any sentence doing too much work.
+<Paragraph 2: the one idea that explains how it is built, usually the
+pattern it follows and the main rule it keeps.>
 
-## 4. Keep documentation up to date
+## Structure
 
-Whenever code changes affect a documented directory:
+- **`file-or-folder`**: what it does, in one or two lines.
 
-1. Check whether its README remains accurate.
-2. Update the index and explanations for added, removed, renamed, or
-   materially changed components.
-3. Update relationship descriptions when dependencies or data/control
-   flow change.
-4. Remove references to deleted or obsolete components.
-5. Verify internal links and file paths.
+## Where it sits
 
-Skip the update for trivial changes that don't affect what a reader
-needs to understand about the architecture. When a change spans multiple
-directories, update each affected README — don't assume the nearest one
-covers everything.
+```text
+caller → this folder → what it calls
+```
+~~~
 
-## 5. Constraints
+- **Intro**: two short paragraphs. Don't start with a sentence fragment
+  such as "Every screen of the wallet, and…".
+- **Structure**: one bulleted line per important file or folder, with the
+  name in bold. Group related items under `###` subheadings when there
+  are more than about ten (see `packages/core`). Mention a few examples
+  rather than listing every file.
+- **Where it sits**: a small `text` diagram showing what calls this
+  folder and what it calls. Add a short numbered list only when a
+  request passes through several steps (see `apps/extension`).
 
-- Touch only the README files relevant to the requested directory or
-  affected architecture, unless told otherwise.
-- Never modify application code as part of a documentation-only task.
-- Never invent behavior, dependencies, or architectural intent — if a
-  claim can't be verified, investigate further or omit it.
-- Keep documentation proportional to the directory's complexity.
+## 4. What to leave out
 
-## 6. Completion criteria
+Leave out anything that doesn't help someone understand the structure:
 
-Before finishing, verify the README lets a new contributor or auditor
-quickly answer:
+- How rules are enforced (ESLint rules, `exports` maps, import fences).
+  State the rule itself if it explains the design, such as "core uses no
+  browser API", but not how it is enforced.
+- Exact numbers and settings: rate limits, cache times, body sizes,
+  reward fractions, CORS origins, manifest fields, lock types.
+- Test setup and where tests live (CLAUDE.md covers that).
+- Detail that belongs in code comments or in `docs/THREAT_MODEL.md`.
 
-1. What lives here, and why?
-2. How do the important parts work together?
-3. Where should I look to understand or investigate a particular
-   responsibility?
+## 5. Analogies
 
-And that: explanations match the actual code, internal links and paths
-resolve, the README is concise and readable, and no unrelated files were
-modified.
+An analogy is welcome when it maps the folder onto something the reader
+already knows. The reader is a TypeScript engineer, so use engineering
+patterns, not everyday objects. Everyday analogies (an engine, a bank
+teller, a receptionist, a phrasebook) come across as condescending.
+
+Good examples from this repo:
+
+- `core`: a domain layer using ports and adapters.
+- `runtime`: a small server whose dispatcher acts as authorization
+  middleware in front of the handlers.
+- `app`: screens that receive an `AppPlatform` through React context,
+  like an API client passed down by a provider.
+- `ui`: a shadcn/ui-style library of presentational components.
+- `messaging`: a typed contract between contexts, like a shared tRPC
+  router type or an OpenAPI schema.
+- `provider`: a thin RPC client stub over a transport.
+- `extension`, `mobile`: composition roots that wire adapters into the
+  packages.
+
+## 6. Writing style
+
+- **Reading level**: aim for about Flesch–Kincaid grade 7. Use plain
+  words, but link related ideas with "so", "which" and "because". A
+  string of very short sentences scores around grade 5 and reads as
+  choppy. Measure if unsure, and don't pad or chop sentences only to hit
+  the number.
+- **Current state only**: no history or temporary wording such as
+  "today", "still", "for now", "originally" or "(new)". Follow the
+  `no-history-in-output` skill.
+- **Direct statements**: say what something is or does. Avoid double
+  negatives and "holds no X and no Y" constructions. Write "Wallet logic
+  lives in the background, and the screens live here."
+- **No filler**: no generic introductions, no "This README describes…",
+  and no restating what a file name already makes obvious.
+
+## 7. Keep it current
+
+When a change affects a documented folder, check its README: update the
+Structure list for added, removed or renamed parts, update the diagram
+if the connections changed, and update the root README's entry if the
+folder's purpose changed. Skip changes that don't affect what a reader
+needs to understand the structure.
+
+## 8. Done when
+
+- Someone new can answer three questions from the README: what lives
+  here and why, what the main parts are, and where it sits.
+- Every claim matches the code, and every path exists.
+- The README follows the layout, scores about grade 7, and has no
+  history wording.
+- Only README files (and a deploy ignore, where needed) were changed.

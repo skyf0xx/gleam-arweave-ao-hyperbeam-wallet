@@ -1,73 +1,34 @@
 # @gleam/app
 
-Every screen of the wallet, the router that connects them, and the
-approval UI. A shell (today the Chrome extension) wraps `<App>` or
-`<ApprovalRoot>` in a `PlatformProvider` and supplies an `AppPlatform`;
-it holds no wallet logic and no screens of its own.
+This package is everything the user sees: every screen, including the
+approval screens that dApp requests open, and the router that moves
+between them. The Chrome extension and the mobile app both display these
+same screens.
 
-Nothing here imports `chrome.*`, WXT, `@webext-core/*`, Capacitor, or a
-shell's code; ESLint fails the build if it does. A screen that needs the
-host asks `usePlatform()` and branches on `capabilities`, never on which
-shell mounted it. Data comes from the background through the
-`RuntimePort` on `AppPlatform`, over the `@gleam/messaging` contracts.
+The screens never know which app they are running in. The host app
+injects an `AppPlatform` through React context, and the screens reach
+the background and host features such as permissions, downloads and
+hardware wallets only through it, much as a component receives an API
+client from a provider.
 
-## Components
+## Structure
 
-- [`App.tsx`](#apptsx) — the router for the popup and side panel
-- [`app-platform/`](#app-platform) — what a shell must supply
-- [`screens/`](#screens) — one folder per screen
-- [`approval/`](#approval) — the approval window's UI
-- [`app.css`](#appcss) — the stylesheet entry shells import
-- [shared modules](#shared-modules)
+- **`App.tsx`**: the router, which decides whether to show onboarding,
+  unlock or the main screen, and arranges it for the popup, side panel or
+  phone.
+- **`app-platform/`**: the `AppPlatform` an app provides, and the
+  `usePlatform()` hook that screens use to reach it.
+- **`screens/`**: one folder per screen, such as `send`, `receive`,
+  `activity`, `settings-home` and `onboarding`.
+- **`approval/`**: the screens a dApp's request opens, covering connect,
+  sign, add token and scan attestation.
+- **`app.css`**: the stylesheet an app imports to get the theme together
+  with the screens' styles.
+- Shared helpers for avatars, display settings, passkeys, biometrics and
+  keyfile downloads.
 
-### App.tsx
+## Where it sits
 
-`<App layout="popup" | "sidepanel">` reads `getState` and picks onboarding,
-unlock or the main screen, with a nested view switch under the main
-screen. It owns one `QueryClient` per document and applies the stored
-theme.
-
-### app-platform/
-
-- **`types.ts`** — `AppPlatform`: the runtime client, build info,
-  `capabilities`, host permissions, ephemeral state, the passkey window,
-  the active-site feed, the downloads permission and `hardwareWallets`
-  (connect pages and device signing panels).
-- **`context.tsx`** — `PlatformProvider` and `usePlatform`.
-- **`testing.tsx`** — `fakeAppPlatform` and `renderWithPlatform` for tests.
-
-### screens/
-
-`activity`, `collectibles`, `connected-apps`, `contacts`,
-`display-currency`, `lock-settings`, `main-screen`, `manage-tokens`,
-`network-peers`, `onboarding`, `points`, `receive`, `send`,
-`settings-home`, `site-wallet`, `unlock`, `upload`, `wallet-detail` and
-`wallet-switcher`. Each has an `index.tsx` that exports its views and a
-`src/` with the views, hooks and tests.
-
-### approval/
-
-`ApprovalRoot` loads one pending request and renders the connection,
-add-token, signing or scan-attestation screen, with onboarding and unlock
-in place when the wallet needs them. A hardware wallet's request goes on
-to `AwaitingDeviceView`, which drives the `DeviceSignPanel` the shell
-supplies through `AppPlatform.hardwareWallets.signPanels`.
-
-### app.css
-
-Imports `@gleam/ui`'s theme and adds this package as a Tailwind source.
-Tailwind 4 scans only the importing app and the paths named in `@source`,
-so a shell must import this file, not `theme.css`, or the screens' utility
-classes are never generated.
-
-### Shared modules
-
-`address-identity.tsx` and `account-avatar.ts` (avatars seeded from the
-security phrase), `display-settings.ts`, `points-share.ts`,
-`security-phrase-icon.ts`, `passkey/webauthn.ts` (the WebAuthn calls) and
-`keyfile/download.ts`.
-
-## Tests
-
-Tests sit next to the file they test and run in jsdom. Screens render
-under `renderWithPlatform`; the background is a stubbed `RuntimePort`.
+```text
+app → AppPlatform → screens (built from @gleam/ui) → background
+```
