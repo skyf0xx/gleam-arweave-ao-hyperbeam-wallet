@@ -661,7 +661,7 @@ export function MainScreenView({
             <SendReceiveActions
               onSend={onSend}
               onReceive={onReceive}
-              sendDisabledReason={watchOnly ? "This wallet is watch-only, so it can't send." : undefined}
+              sendDisabledReason={watchOnly ? "This wallet is watch-only, so it can't send tokens." : undefined}
             />
           </div>
         </div>

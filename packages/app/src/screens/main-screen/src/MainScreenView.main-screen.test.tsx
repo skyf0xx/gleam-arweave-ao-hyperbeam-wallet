@@ -147,7 +147,7 @@ describe("MainScreenView: a watch-only wallet", () => {
 
     const sendButton = await screen.findByRole("button", { name: "Send" });
     expect((sendButton as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("This wallet is watch-only, so it can't send.")).toBeTruthy();
+    expect(screen.getByText("This wallet is watch-only, so it can't send tokens.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Receive" }));
     expect(onReceive).toHaveBeenCalledOnce();
     expect(onSend).not.toHaveBeenCalled();
