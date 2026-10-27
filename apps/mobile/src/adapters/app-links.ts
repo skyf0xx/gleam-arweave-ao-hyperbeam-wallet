@@ -1,4 +1,6 @@
 import { App } from "@capacitor/app";
+import type { NoticePort } from "@gleam/app/src/app-platform/types.ts";
+import { LINK_NOTICE } from "../worker/link-notice";
 import type { PointsLinkOutcome } from "../worker/points-link";
 
 /**
@@ -17,4 +19,24 @@ export function listenForAppLinks(openLink: (url: string) => Promise<PointsLinkO
       })
       .catch((error: unknown) => console.error("Couldn't open the link.", error));
   });
+}
+
+/**
+ * The runtime worker's explanation for a link that did nothing, as the
+ * app's notice. The worker only ever sends this one message besides
+ * comlink's, and only a string is shown.
+ */
+export function createLinkNotices(worker: Pick<Worker, "addEventListener">): NoticePort {
+  const listeners = new Set<(message: string) => void>();
+  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
+    const data = event.data as { type?: unknown; message?: unknown } | null;
+    if (data?.type !== LINK_NOTICE || typeof data.message !== "string") return;
+    for (const listener of listeners) listener(data.message);
+  });
+  return {
+    subscribe(onNotice) {
+      listeners.add(onNotice);
+      return () => listeners.delete(onNotice);
+    },
+  };
 }

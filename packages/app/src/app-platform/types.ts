@@ -152,6 +152,15 @@ export interface ApprovalSheetPort {
   dismissed(requestId: string): void;
 }
 
+/**
+ * Sentences the host wants shown for something that happened outside the
+ * app's own screens, such as a link that was opened and did nothing.
+ */
+export interface NoticePort {
+  /** Calls `onNotice` with each sentence to show. Returns the unsubscribe function. */
+  subscribe(onNotice: (message: string) => void): () => void;
+}
+
 /** A rectangle in the app's CSS pixels, as `getBoundingClientRect()` reports it. */
 export interface DappBrowserFrame {
   x: number;
@@ -211,4 +220,6 @@ export interface AppPlatform {
   backButton?: BackButtonPort;
   /** Omitted where each approval gets its own window. */
   approvalSheet?: ApprovalSheetPort;
+  /** Omitted where the host has nothing to say outside the app's screens. */
+  notices?: NoticePort;
 }

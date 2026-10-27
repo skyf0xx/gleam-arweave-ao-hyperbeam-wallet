@@ -71,6 +71,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     dappBrowser: overrides.dappBrowser ?? unavailableDappBrowser,
     ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
     ...(overrides.approvalSheet ? { approvalSheet: overrides.approvalSheet } : {}),
+    ...(overrides.notices ? { notices: overrides.notices } : {}),
   };
 }
 

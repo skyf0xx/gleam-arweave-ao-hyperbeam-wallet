@@ -4,7 +4,7 @@ import { isValidInviteCode } from "@gleam/core/src/points/index.ts";
 import type { ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import { decodeAttestationPayload } from "@gleam/core/src/scan/payload.ts";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
-import { SITE_ATTEST_MESSAGE_TYPE } from "@gleam/messaging/src/site-protocol.ts";
+import { SITE_ATTEST_MESSAGE_TYPE, type SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { Runtime } from "@gleam/runtime";
 
 /**
@@ -76,6 +76,24 @@ function isUnlocked(state: WalletState): boolean {
   return state.session !== null && state.session.unlockedWalletIds.length > 0;
 }
 
+/**
+ * The refusals that come before the approval sheet opens, so nothing on
+ * screen says why the link did nothing. Every other failure (a rejection,
+ * a timeout, the points API's verdict) is shown by the sheet itself.
+ * Desktop words them on `attest.html`; `busy` names the sheet, not a window.
+ */
+const SILENT_REFUSALS: Readonly<Record<string, string | null>> = {
+  no_wallet: null,
+  unsupported_wallet: null,
+  busy: "Gleam is already showing an attestation to sign. Finish or close it, then open the link again.",
+};
+
+function noticeFor(reply: unknown): string | null {
+  const failure = reply as Partial<Extract<SiteAttestResponse, { ok: false }>> | null;
+  if (failure?.ok !== false || typeof failure.code !== "string" || !Object.hasOwn(SILENT_REFUSALS, failure.code)) return null;
+  return SILENT_REFUSALS[failure.code] ?? (typeof failure.error === "string" && failure.error !== "" ? failure.error : null);
+}
+
 export interface PointsLinks {
   open(url: unknown): Promise<PointsLinkOutcome>;
   /** Every `getState` the wallet UI reads, so a held attestation starts once it shows the wallet unlocked. */
@@ -89,14 +107,22 @@ export interface PointsLinks {
  * any wallet exists. An attestation needs an unlocked wallet, and the app
  * dismisses any sheet while the lock screen is up, so one that arrives
  * while locked waits for the unlock. Only the latest waits, and only in
- * memory: if the app is killed, the link is tapped again.
+ * memory: if the app is killed, the link is tapped again. `notify` gets a
+ * sentence for an attestation that was refused before the sheet opened,
+ * including one that was held; the link was opened from outside the app, so
+ * nothing else would say why nothing happened.
  */
-export function createPointsLinks(runtime: Pick<Runtime, "dispatch" | "dispatchSite">): PointsLinks {
+export function createPointsLinks(runtime: Pick<Runtime, "dispatch" | "dispatchSite">, notify: (notice: string) => void = () => {}): PointsLinks {
   let held: ParsedAttestation | null = null;
 
   const attest = (attestation: ParsedAttestation) => {
-    // The reply is the sheet's verdict, which the sheet has already shown.
-    void runtime.dispatchSite({ type: SITE_ATTEST_MESSAGE_TYPE, attestation }, POINTS_SITE);
+    runtime
+      .dispatchSite({ type: SITE_ATTEST_MESSAGE_TYPE, attestation }, POINTS_SITE)
+      .then((reply) => {
+        const notice = noticeFor(reply);
+        if (notice !== null) notify(notice);
+      })
+      .catch((error: unknown) => console.error("Couldn't handle the attestation link.", error));
   };
 
   return {

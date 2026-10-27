@@ -27,6 +27,8 @@ export interface RuntimeHost {
 /** The worker's own events, which the UI thread can only signal. */
 export interface WorkerLifecycle {
   onResume(): void;
+  /** A link did nothing the screen shows; `message` says why. */
+  onLinkNotice?(message: string): void;
 }
 
 /**
@@ -49,7 +51,7 @@ function messageType(type: unknown): BackgroundMessage {
 type HostedRuntime = Pick<Runtime, "dispatch" | "dispatchSite" | "onTabClosed">;
 
 export function createRuntimeHost(runtime: HostedRuntime, lifecycle: WorkerLifecycle): RuntimeHost {
-  const links = createPointsLinks(runtime);
+  const links = createPointsLinks(runtime, (message) => lifecycle.onLinkNotice?.(message));
   return {
     async resume() {
       lifecycle.onResume();

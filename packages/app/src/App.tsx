@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
@@ -76,6 +77,8 @@ export interface AppProps {
  */
 const queryClient = new QueryClient();
 
+const NOTICE_MS = 6000;
+
 type TopView = "loading" | "onboarding" | "unlock" | "main-screen";
 type MainSubView =
   | { kind: "home" }
@@ -125,6 +128,15 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
   const [backStack] = useState(createBackStack);
   const [layoutRoot, setLayoutRoot] = useState<HTMLDivElement | null>(null);
+
+  const [notice, setNotice] = useState<string | null>(null);
+  const subscribeNotices = platform.notices?.subscribe;
+  useEffect(() => subscribeNotices?.(setNotice), [subscribeNotices]);
+  useEffect(() => {
+    if (notice === null) return;
+    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   // Every back arrow on screen and every overlay registers with the stack, so
   // the system back press undoes what a tap on Back would. Unhandled, the
@@ -450,6 +462,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
           className="min-h-full bg-background text-foreground"
         >
           {content}
+          {notice !== null ? <Toast message={notice} multiline className="fixed bottom-[calc(0.875rem+var(--safe-bottom))] z-40" /> : null}
           {platform.approvalSheet ? <ApprovalSheet port={platform.approvalSheet} container={layoutRoot} /> : null}
         </div>
       </AddressIdentityProvider>

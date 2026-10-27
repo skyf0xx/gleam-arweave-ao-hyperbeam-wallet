@@ -5,7 +5,7 @@ import { DappView } from "@gleam/dapp-view";
 import providerScript from "virtual:gleam-provider-script";
 import { version } from "../package.json";
 import { onAppAway } from "./adapters/app-away";
-import { listenForAppLinks } from "./adapters/app-links";
+import { createLinkNotices, listenForAppLinks } from "./adapters/app-links";
 import { createApprovalSheet, serveApprovalSheet } from "./adapters/approval-sheet";
 import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
@@ -115,6 +115,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
     dappBrowser,
     backButton: createBackButton(),
     approvalSheet,
+    notices: createLinkNotices(worker),
     activeSite: { subscribe: () => () => {} },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {

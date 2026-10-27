@@ -2,6 +2,7 @@ import type { Endpoint } from "comlink";
 import { createRuntime } from "@gleam/runtime/src/create-runtime.ts";
 import { WorkerTimer } from "../adapters/timer";
 import { exposeRuntimeHost } from "./host";
+import { LINK_NOTICE } from "./link-notice";
 import { createWorkerPlatform } from "./platform";
 
 /**
@@ -13,7 +14,11 @@ import { createWorkerPlatform } from "./platform";
 const scope = self as unknown as Endpoint;
 const timer = new WorkerTimer();
 const runtime = createRuntime(createWorkerPlatform(scope, timer));
-exposeRuntimeHost(runtime, { onResume: () => timer.catchUp() }, scope);
+exposeRuntimeHost(
+  runtime,
+  { onResume: () => timer.catchUp(), onLinkNotice: (message) => scope.postMessage({ type: LINK_NOTICE, message }) },
+  scope,
+);
 runtime.start();
 // The worker starts only when the app does.
 runtime.onBrowserStartup();
