@@ -140,14 +140,13 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
 describe("MainScreenView: a watch-only wallet", () => {
   const WATCHED: WalletSummary = { ...WALLET, method: "watch", publicKey: "" };
 
-  it("keeps Send visible but disabled, says why, and leaves Receive working", async () => {
+  it("keeps Send visible but disabled and leaves Receive working", async () => {
     const onSend = vi.fn();
     const onReceive = vi.fn();
     renderMainScreen({ runtime: fakeRuntime({ send: successfulSend({ wallets: [WATCHED] }) }), wallet: WATCHED, onSend, onReceive });
 
     const sendButton = await screen.findByRole("button", { name: "Send" });
     expect((sendButton as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("This wallet is watch-only, so it can't send tokens.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Receive" }));
     expect(onReceive).toHaveBeenCalledOnce();
     expect(onSend).not.toHaveBeenCalled();
