@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Directory } from "@capacitor/filesystem";
-import { createFileSaver, sweepExports, type SaverPlugins } from "./file-saver";
+import { createWorkerDownloads } from "./downloads";
+import { createFileSaver, serveFileSaver, sweepExports, type SaverPlugins } from "./file-saver";
 
 vi.mock("@capacitor/filesystem", () => ({ Directory: { Cache: "CACHE" }, Filesystem: {} }));
 vi.mock("@capacitor/share", () => ({ Share: {} }));
@@ -108,5 +109,23 @@ describe("sweepExports", () => {
     expect(vi.mocked(plugins.rmdir).mock.calls.map(([o]) => o.path)).toEqual(["gleam-export-old"]);
     release();
     await saving;
+  });
+});
+
+describe("serveFileSaver", () => {
+  it("passes the worker's transferred save call through its guard", async () => {
+    const { plugins, calls } = setup();
+    const worker = new EventTarget();
+    serveFileSaver(worker as Worker, createFileSaver(plugins));
+    const ports: MessagePort[] = [];
+    const downloads = createWorkerDownloads({
+      postMessage: (message, transfer) => {
+        ports.push(...(transfer as MessagePort[]));
+        worker.dispatchEvent(new MessageEvent("message", { data: message }));
+      },
+    });
+    await expect(downloads.saveFile(file())).resolves.toEqual({ ok: true, filename: "wallet.json" });
+    expect(calls).toEqual(["write", "share", "delete"]);
+    ports.forEach((port) => port.close());
   });
 });
