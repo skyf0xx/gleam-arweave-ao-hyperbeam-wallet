@@ -1,0 +1,6 @@
+# Tests never ship, and their fixtures (unanchored regexes in assertions,
+# hand-posted messages) trip security queries. CodeQL gates merges, so a
+# false positive here would block a PR.
+paths-ignore:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
