@@ -205,7 +205,7 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
 describe("MainScreenView display settings", () => {
   function sendWithDisplay(settings: Partial<DisplaySettings>, prices: TokenPrice[] = []) {
     const base = successfulSend();
-    const display: DisplaySettings = { currency: "USD", showChart: true, showTokenLogos: false, headline: "total", balancesHidden: false, ...settings };
+    const display: DisplaySettings = { currency: "USD", compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: false, ...settings };
     return vi.fn(async (message: { type: string; payload: unknown }) => {
       if (message.type === "getDisplaySettings") return display;
       if (message.type === "setDisplaySettings") return undefined;
@@ -234,21 +234,12 @@ describe("MainScreenView display settings", () => {
     expect(screen.getByText("$12.00")).toBeTruthy();
   });
 
-  it("drops the chart and range tabs but keeps the total when the chart is off", async () => {
-    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ showChart: false }) }) });
+  it("keeps the chart, %-change and range tabs with the compact header on", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ compactHeader: true }) }) });
 
-    await waitFor(() => expect(screen.getByText("$12.00")).toBeTruthy());
-    expect(screen.queryByRole("tab", { name: "7D" })).toBeNull();
-    expect(screen.queryByRole("img", { name: /Portfolio value/ })).toBeNull();
-  });
-
-  it("moves the %-change beside the period label when the chart is off", async () => {
-    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ showChart: false }) }) });
-
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
-    const periodRow = screen.getByText("Last 7 days").parentElement!.parentElement!;
-    expect(within(periodRow).getByText("+20.00%")).toBeTruthy();
-    expect(within(screen.getByRole("button", { name: "Hide balances" }).parentElement!).queryByText("+20.00%")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("img", { name: /Portfolio value/ })).toBeTruthy());
+    expect(within(screen.getByRole("button", { name: "Hide balances" }).parentElement!).getByText("+20.00%")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "7D" })).toBeTruthy();
   });
 
   it("hides every balance when the total is tapped, and saves the choice", async () => {
@@ -264,21 +255,21 @@ describe("MainScreenView display settings", () => {
     expect(screen.queryByText("1")).toBeNull();
     expect(send).toHaveBeenCalledWith({
       type: "setDisplaySettings",
-      payload: { currency: "USD", showChart: true, showTokenLogos: false, headline: "total", balancesHidden: true },
+      payload: { currency: "USD", compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: true },
     });
   });
 });
 
 describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () => {
-  it("fetches getPortfolioHistory for the default 7D range and renders value/%-change/period label together", async () => {
+  it("fetches getPortfolioHistory for the default 7D range and renders value and %-change together", async () => {
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } }),
     );
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
-    expect(screen.getByText("+20.00%")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
+    expect(screen.queryByText("Last 7 days")).toBeNull();
     expect(screen.getByText("$12.00")).toBeTruthy();
 
     // Gain color must reference the real `--color-positive` token, the
@@ -290,14 +281,14 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     for (const label of ["24H", "7D", "1M", "1Y", "ALL"]) {
       expect(screen.getByRole("tab", { name: label })).toBeTruthy();
     }
     expect(screen.getByRole("tab", { name: "7D" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("clicking a range tab re-fetches that range and updates chart/%-change/period label together", async () => {
+  it("clicking a range tab re-fetches that range and updates chart and %-change together", async () => {
     const oneMonthHistory: PortfolioHistory = {
       range: "1M",
       series: [
@@ -322,10 +313,10 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     }) as RuntimePort["send"];
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: "1M" }));
 
-    await waitFor(() => expect(screen.getByText("Last 30 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("-20.00%")).toBeTruthy());
     expect(screen.getByText("-20.00%")).toBeTruthy();
     expect(screen.getByText("$80.00")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "1M" }).getAttribute("aria-selected")).toBe("true");
@@ -363,7 +354,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Show all wallets" })).toBeNull();
   });
 
@@ -496,7 +487,7 @@ describe("MainScreenView hidden token rows", () => {
     return vi.fn(async (message: { type: string }) => {
       if (message.type === "getTokenBalances") return tokens;
       if (message.type === "getDisplaySettings" && display) {
-        return { currency: "USD", showChart: true, showTokenLogos: false, headline: "total", balancesHidden: false, ...display };
+        return { currency: "USD", compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: false, ...display };
       }
       return base(message as never);
     }) as RuntimePort["send"];
@@ -646,7 +637,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
   }): RuntimePort["send"] {
     return vi.fn(async ({ type }: { type: string }) => {
       if (type === "getDisplaySettings" && overrides.showTokenLogos !== undefined) {
-        return { currency: "USD", showChart: true, showTokenLogos: overrides.showTokenLogos, headline: "total", balancesHidden: false };
+        return { currency: "USD", compactHeader: false, showTokenLogos: overrides.showTokenLogos, headline: "total", balancesHidden: false };
       }
       if (type === "getBalance") return overrides.arBalance ?? BALANCE;
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;
@@ -766,7 +757,7 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     setScrollY(200);
 
     await waitFor(() =>
@@ -799,7 +790,7 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
     const onTabChange = vi.fn();
     renderMainScreen({ runtime: fakeRuntime({ send: successfulSend() }), initialTab: "activity", onTabChange });
 
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     // Mounting on a restored tab doesn't reset it; only a collapse-then-expand does.
     expect(screen.getByRole("tab", { name: "Activity" }).getAttribute("aria-selected")).toBe("true");
 
@@ -818,7 +809,7 @@ describe("MainScreenView scroll-fading header (main-screen-chart)", () => {
     const send = successfulSend();
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getByText("Last 7 days")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     setScrollY(200);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Send" }).closest("[inert]")).toBeTruthy(),

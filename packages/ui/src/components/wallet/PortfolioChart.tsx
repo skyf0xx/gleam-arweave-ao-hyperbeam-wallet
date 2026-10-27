@@ -26,16 +26,17 @@ import { NetworkErrorBanner } from "./NetworkErrorBanner";
  * Scope toggle: when the caller passes `onToggleScope` (only worth it with
  * more than one wallet), the chart area itself is the switch between the
  * active wallet's total and every wallet's. Nothing marks it at rest
- * beyond a pointer cursor. A click briefly crossfades the period caption
- * to the view now showing, so the label sits under the figure it
- * describes rather than floating over the chart like a tooltip.
+ * beyond a pointer cursor. A click briefly crossfades the %-change to the
+ * view now showing, so the note sits beside the figure it describes
+ * rather than floating over the chart like a tooltip.
  *
  * Headline: the large figure is the total value unless the caller passes
  * `headline` (a token balance), which demotes the total to a smaller line
  * beside the %-change. `onToggleMasked` makes that figure a button that
  * hides or shows balances; `masked` swaps both figures for dots.
- * `showChart: false` drops the chart and range tabs and keeps the figures,
- * moving the %-change down beside the period it covers.
+ *
+ * `compact` moves the chart beside the figures as a small sparkline, which
+ * leaves more of the popup for the token list.
  *
  * Color rule: reuses `--color-positive` for gains and `--color-negative`
  * for losses — both real `@theme` tokens, never `--color-beam-red`/
@@ -75,19 +76,20 @@ export interface PortfolioChartProps {
   headline?: CurrencyValueParts;
   masked?: boolean;
   onToggleMasked?: () => void;
-  showChart?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
 const CHART_WIDTH = 100;
 const CHART_HEIGHT = 40;
+/** Keeps the highest and lowest points off the box's edges, where half the stroke would be clipped flat. */
+const CHART_INSET_Y = 3;
 
 /**
- * Fed through the same `buildLinePath` used for real data, so the
- * zero-balance empty state renders via the identical polyline/area code
- * path as a priced series — a gentle hand-authored wave rather than a
- * flat line, so the shimmer treatment below has a line worth traveling
- * along. Never shown alongside real values.
+ * Fed through the same `buildLinePath` used for real data — a gentle
+ * hand-authored wave rather than a flat line, so the shimmer has a line
+ * worth traveling along. Only for a zero-balance wallet; never alongside
+ * real values.
  */
 const EMPTY_STATE_POINTS: PortfolioChartPoint[] = [
   { timestamp: 0, value: 0.3 },
@@ -142,10 +144,34 @@ function buildLinePath(points: PortfolioChartPoint[]): string {
   return points
     .map((point) => {
       const x = ((point.timestamp - minTimestamp) / timeRange) * CHART_WIDTH;
-      const y = CHART_HEIGHT - ((point.value - minValue) / valueRange) * CHART_HEIGHT;
+      const y = CHART_HEIGHT - CHART_INSET_Y - ((point.value - minValue) / valueRange) * (CHART_HEIGHT - 2 * CHART_INSET_Y);
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
+}
+
+/** Enough to keep the trend's shape without packing several points into each pixel, which reads as a thick, jagged line. */
+const SPARKLINE_POINTS = 32;
+const CHART_POINTS = 90;
+
+/**
+ * Averages a series into `maxPoints` equal buckets, keeping the last
+ * point exact so the line still ends on the current value.
+ */
+function downsample(points: PortfolioChartPoint[], maxPoints: number): PortfolioChartPoint[] {
+  if (points.length <= maxPoints) return points;
+  const bucketSize = points.length / (maxPoints - 1);
+  const result: PortfolioChartPoint[] = [];
+  for (let bucket = 0; bucket < maxPoints - 1; bucket++) {
+    const slice = points.slice(Math.floor(bucket * bucketSize), Math.floor((bucket + 1) * bucketSize));
+    if (slice.length === 0) continue;
+    result.push({
+      timestamp: slice[0]!.timestamp,
+      value: slice.reduce((sum, point) => sum + point.value, 0) / slice.length,
+    });
+  }
+  result.push(points[points.length - 1]!);
+  return result;
 }
 
 export function PortfolioChart({
@@ -163,7 +189,7 @@ export function PortfolioChart({
   headline,
   masked = false,
   onToggleMasked,
-  showChart = true,
+  compact = false,
   className,
 }: PortfolioChartProps) {
   const [flash, setFlash] = useState<string | null>(null);
@@ -186,151 +212,116 @@ export function PortfolioChart({
   if (flash) lastFlashRef.current = flash;
   const isPositive = change >= 0;
   const isEmpty = currentValue === 0 && points.every((point) => point.value === 0);
-  const linePoints = buildLinePath(isEmpty ? EMPTY_STATE_POINTS : points);
+  const linePoints = buildLinePath(downsample(points, compact ? SPARKLINE_POINTS : CHART_POINTS));
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
   const totalLabel = masked ? HIDDEN_AMOUNT : formatCurrencyValue(currentValue, currency);
   const headlineParts: CurrencyValueParts = masked ? { amount: HIDDEN_AMOUNT } : (headline ?? formatCurrencyParts(currentValue, currency));
+  // The range tabs already name the period, so the scope note briefly takes the %-change's place instead.
   const changeBadge = (
-    <span className="text-label font-semibold tabular-nums" style={{ color: lineColorVar }}>
-      {formatPercent(change)}
+    <span className="grid text-label font-semibold tabular-nums">
+      <span
+        aria-hidden={flash ? true : undefined}
+        className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
+        style={{ color: lineColorVar }}
+      >
+        {formatPercent(change)}
+      </span>
+      <span
+        aria-live="polite"
+        className={cn("col-start-1 row-start-1 whitespace-nowrap text-muted transition-opacity duration-300", !flash && "opacity-0")}
+      >
+        {flash ?? lastFlashRef.current}
+      </span>
     </span>
+  );
+
+  const figures = (
+    <div className={cn("flex min-w-0 flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
+      <div className="flex items-baseline gap-2.5">
+        <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
+        {headline === undefined ? changeBadge : null}
+      </div>
+      {headline !== undefined ? (
+        <div className="flex items-baseline gap-2.5">
+          <span className="text-label tabular-nums text-muted">{totalLabel}</span>
+          {changeBadge}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const chart = (
+    <ChartArea onToggle={onToggleScope ? toggleScope : undefined} scope={scope} compact={compact}>
+      {loading ? (
+        // Faded: a chart is mostly white, so a full-strength block is heavier than what replaces it.
+        <div className="h-full w-full gleam-shimmer rounded-md opacity-60" />
+      ) : points.length === 0 ? (
+        <div className="flex h-full w-full items-center justify-center text-caption text-faint">
+          No chart data
+        </div>
+      ) : isEmpty ? (
+        <EmptyLine />
+      ) : (
+        <svg
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          preserveAspectRatio="none"
+          width="100%"
+          height="100%"
+          role="img"
+          aria-label={`Portfolio value ${totalLabel}, ${formatPercent(change)} for ${periodLabel}`}
+        >
+          {compact ? null : <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />}
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke={lineColorVar}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      )}
+    </ChartArea>
   );
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {onRetry ? (
         <NetworkErrorBanner onRetry={onRetry} className="phone:mx-0 phone:mt-0" />
+      ) : compact ? (
+        <div className="flex items-center gap-4">
+          <div className="min-w-0 flex-1">{figures}</div>
+          {chart}
+        </div>
       ) : (
         <>
-          <div className={cn("flex flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
-            <div className="flex items-baseline gap-2.5">
-              <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
-              {headline === undefined && showChart ? changeBadge : null}
-            </div>
-            {headline !== undefined ? (
-              <div className="flex items-baseline gap-2.5">
-                <span className="text-label tabular-nums text-muted">{totalLabel}</span>
-                {showChart ? changeBadge : null}
-              </div>
-            ) : null}
-            <div className="flex items-baseline gap-2">
-              {showChart ? null : changeBadge}
-              <div className="grid text-caption text-muted">
-                <span
-                  aria-hidden={flash ? true : undefined}
-                  className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
-                >
-                  {periodLabel || " "}
-                </span>
-                <span
-                  aria-live="polite"
-                  className={cn("col-start-1 row-start-1 transition-opacity duration-300", !flash && "opacity-0")}
-                >
-                  {flash ?? lastFlashRef.current}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {showChart ? (
-            <ChartArea
-              onToggle={onToggleScope ? toggleScope : undefined}
-              scope={scope}
-            >
-              {loading ? (
-                <div className="h-full w-full gleam-shimmer rounded-md" />
-              ) : points.length === 0 ? (
-                <div className="flex h-full w-full items-center justify-center text-caption text-faint">
-                  No chart data
-                </div>
-              ) : isEmpty ? (
-                <svg
-                  viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-                  preserveAspectRatio="none"
-                  width="100%"
-                  height="100%"
-                  role="img"
-                  aria-label="No portfolio history yet"
-                >
-                  <defs>
-                    <linearGradient id="portfolio-chart-empty-gradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={CHART_WIDTH} y2="0">
-                      <stop offset="0%" stopColor="var(--color-beam-purple)" />
-                      <stop offset="35%" stopColor="var(--color-beam-sky)" />
-                      <stop offset="70%" stopColor="var(--color-beam-yellow)" />
-                      <stop offset="100%" stopColor="var(--color-beam-green)" />
-                    </linearGradient>
-                  </defs>
-                  <polyline
-                    points={linePoints}
-                    fill="none"
-                    stroke="url(#portfolio-chart-empty-gradient)"
-                    strokeWidth={1.5}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    vectorEffect="non-scaling-stroke"
-                    opacity={0.13}
-                  />
-                  <polyline
-                    className="gleam-chart-empty-shimmer"
-                    points={linePoints}
-                    fill="none"
-                    stroke="url(#portfolio-chart-empty-gradient)"
-                    strokeWidth={2}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    vectorEffect="non-scaling-stroke"
-                    pathLength={100}
-                  />
-                </svg>
-              ) : (
-                <svg
-                  viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-                  preserveAspectRatio="none"
-                  width="100%"
-                  height="100%"
-                  role="img"
-                  aria-label={`Portfolio value ${totalLabel}, ${formatPercent(change)} for ${periodLabel}`}
-                >
-                  <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />
-                  <polyline
-                    points={linePoints}
-                    fill="none"
-                    stroke={lineColorVar}
-                    strokeWidth={1.5}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-              )}
-            </ChartArea>
-          ) : null}
-          {showChart && isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
+          {figures}
+          {chart}
+          {isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
         </>
       )}
 
-      {showChart ? (
-        <div role="tablist" aria-label="Chart range" className="flex items-center gap-1 phone:-mx-2.5">
-          {RANGE_TABS.map((range) => (
-            <button
-              key={range}
-              type="button"
-              role="tab"
-              aria-selected={range === activeRange}
-              onClick={() => onRangeChange(range)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
-                range === activeRange
-                  ? "bg-foreground text-background"
-                  : "text-muted hover:bg-mist hover:text-foreground",
-              )}
-            >
-              {range}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <div role="tablist" aria-label="Chart range" className="flex items-center gap-1 phone:-mx-2.5">
+        {RANGE_TABS.map((range) => (
+          <button
+            key={range}
+            type="button"
+            role="tab"
+            aria-selected={range === activeRange}
+            onClick={() => onRangeChange(range)}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
+              range === activeRange
+                ? "bg-mist text-foreground"
+                : "text-muted hover:text-foreground",
+            )}
+          >
+            {range}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -366,15 +357,63 @@ function Headline({ parts, masked, onToggle }: { parts: CurrencyValueParts; mask
   );
 }
 
+const EMPTY_LINE = buildLinePath(EMPTY_STATE_POINTS);
+
+/** The empty chart: a faint beam-tinted wave with a light traveling along it. */
+function EmptyLine() {
+  return (
+    <svg
+      viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+      preserveAspectRatio="none"
+      width="100%"
+      height="100%"
+      role="img"
+      aria-label="No portfolio history yet"
+    >
+      <defs>
+        <linearGradient id="portfolio-chart-empty-gradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={CHART_WIDTH} y2="0">
+          <stop offset="0%" stopColor="var(--color-beam-purple)" />
+          <stop offset="35%" stopColor="var(--color-beam-sky)" />
+          <stop offset="70%" stopColor="var(--color-beam-yellow)" />
+          <stop offset="100%" stopColor="var(--color-beam-green)" />
+        </linearGradient>
+      </defs>
+      <polyline
+        points={EMPTY_LINE}
+        fill="none"
+        stroke="url(#portfolio-chart-empty-gradient)"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+        opacity={0.13}
+      />
+      <polyline
+        className="gleam-chart-empty-shimmer"
+        points={EMPTY_LINE}
+        fill="none"
+        stroke="url(#portfolio-chart-empty-gradient)"
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+        pathLength={100}
+      />
+    </svg>
+  );
+}
+
 interface ChartAreaProps {
   onToggle?: () => void;
   scope: PortfolioScope;
+  compact: boolean;
   children: ReactNode;
 }
 
-/** The 80px chart slot: a plain box, or a button over it when the scope toggle is enabled. */
-function ChartArea({ onToggle, scope, children }: ChartAreaProps) {
-  if (!onToggle) return <div className="h-[80px] w-full phone:[@media(max-height:700px)]:h-14">{children}</div>;
+/** The chart slot, full width or a sparkline beside the figures: a plain box, or a button over it when the scope toggle is enabled. */
+function ChartArea({ onToggle, scope, compact, children }: ChartAreaProps) {
+  const size = compact ? "h-8 w-32 flex-shrink-0" : "h-16 w-full phone:[@media(max-height:700px)]:h-12";
+  if (!onToggle) return <div className={size}>{children}</div>;
 
   return (
     <button
@@ -382,7 +421,10 @@ function ChartArea({ onToggle, scope, children }: ChartAreaProps) {
       onClick={onToggle}
       aria-pressed={scope === "all"}
       aria-label={SCOPE_ACTION_LABEL[scope]}
-      className="block h-[80px] w-full cursor-pointer rounded-md text-left phone:[@media(max-height:700px)]:h-14 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+      className={cn(
+        size,
+        "block cursor-pointer rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground",
+      )}
     >
       {children}
     </button>

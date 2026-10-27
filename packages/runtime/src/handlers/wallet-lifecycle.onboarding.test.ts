@@ -1043,17 +1043,17 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
 });
 
 describe("WalletLifecycleHandler: display settings", () => {
-  const settings = { currency: "EUR", showChart: false, showTokenLogos: true, headline: "AO", balancesHidden: true } as const;
+  const settings = { currency: "EUR", compactHeader: true, showTokenLogos: true, headline: "AO", balancesHidden: true } as const;
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("defaults to the locale's currency with the chart and total value shown and token logos off", async () => {
+  it("defaults to the locale's currency, the full chart, the total value and token logos off", async () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     vi.spyOn(navigator, "language", "get").mockReturnValue("en-KE");
 
     expect(await handler.getDisplaySettings()).toEqual({
       currency: "KES",
-      showChart: true,
+      compactHeader: false,
       showTokenLogos: false,
       headline: "total",
       balancesHidden: false,
@@ -1068,17 +1068,33 @@ describe("WalletLifecycleHandler: display settings", () => {
 
   it("keeps a record stored before the token logo toggle, with logos off", async () => {
     const storage = createFakeStorage();
-    const older = { currency: settings.currency, showChart: settings.showChart, headline: settings.headline, balancesHidden: settings.balancesHidden };
+    const older = { currency: settings.currency, compactHeader: settings.compactHeader, headline: settings.headline, balancesHidden: settings.balancesHidden };
     await storage.set("local:displaySettings", older);
     const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
     expect(await handler.getDisplaySettings()).toEqual({ ...older, showTokenLogos: false });
+  });
+
+  it("turns a stored record with the chart off into the compact header", async () => {
+    const storage = createFakeStorage();
+    const { currency, showTokenLogos, headline, balancesHidden } = settings;
+    await storage.set("local:displaySettings", { currency, showChart: false, showTokenLogos, headline, balancesHidden });
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
+    expect(await handler.getDisplaySettings()).toEqual(settings);
+  });
+
+  it("keeps the full chart for a stored record with the chart on", async () => {
+    const storage = createFakeStorage();
+    const { currency, showTokenLogos, headline, balancesHidden } = settings;
+    await storage.set("local:displaySettings", { currency, showChart: true, showTokenLogos, headline, balancesHidden });
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
+    expect((await handler.getDisplaySettings()).compactHeader).toBe(false);
   });
 
   it("drops a malformed stored record back to the default", async () => {
     const storage = createFakeStorage();
     await storage.set("local:displaySettings", { ...settings, currency: "DOGE" });
     const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
-    expect((await handler.getDisplaySettings()).showChart).toBe(true);
+    expect((await handler.getDisplaySettings()).compactHeader).toBe(false);
   });
 
   it("rejects an unknown currency or headline", async () => {

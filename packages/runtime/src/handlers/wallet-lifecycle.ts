@@ -252,7 +252,7 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
   const record = value as Record<string, unknown>;
   return (
     isDisplayCurrency(record.currency) &&
-    typeof record.showChart === "boolean" &&
+    typeof record.compactHeader === "boolean" &&
     typeof record.showTokenLogos === "boolean" &&
     isHeadlineBalance(record.headline) &&
     typeof record.balancesHidden === "boolean"
@@ -261,15 +261,19 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
   const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
-  // Settings saved before the logo toggle existed lack `showTokenLogos`; keep the rest of them.
-  const withLogos = raw !== null && typeof raw === "object" ? { showTokenLogos: false, ...raw } : raw;
-  if (isDisplaySettings(withLogos)) {
+  // Older records lack `showTokenLogos`, or carry `showChart` in place of `compactHeader`. Someone who
+  // had turned the chart off gets the compact header, the closest thing to it; the rest is kept.
+  const record = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  const upgraded = record
+    ? { showTokenLogos: false, compactHeader: record.showChart === false, ...record }
+    : raw;
+  if (isDisplaySettings(upgraded)) {
     return {
-      currency: withLogos.currency,
-      showChart: withLogos.showChart,
-      showTokenLogos: withLogos.showTokenLogos,
-      headline: withLogos.headline,
-      balancesHidden: withLogos.balancesHidden,
+      currency: upgraded.currency,
+      compactHeader: upgraded.compactHeader,
+      showTokenLogos: upgraded.showTokenLogos,
+      headline: upgraded.headline,
+      balancesHidden: upgraded.balancesHidden,
     };
   }
   return defaultDisplaySettings(globalThis.navigator?.language);
@@ -1196,7 +1200,7 @@ export class WalletLifecycleHandler {
     if (!isDisplaySettings(req)) throw new Error("Invalid display settings.");
     await this.storage.set(DISPLAY_SETTINGS_KEY, {
       currency: req.currency,
-      showChart: req.showChart,
+      compactHeader: req.compactHeader,
       showTokenLogos: req.showTokenLogos,
       headline: req.headline,
       balancesHidden: req.balancesHidden,

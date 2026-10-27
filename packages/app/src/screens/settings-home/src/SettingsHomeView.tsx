@@ -174,10 +174,10 @@ export function SettingsHomeView({
             onChange={(headline) => void updateDisplay({ headline })}
           />
           <ToggleRow
-            title="Portfolio chart"
-            checked={display?.showChart ?? true}
+            title="Compact header"
+            checked={display?.compactHeader ?? false}
             disabled={!display}
-            onToggle={() => void updateDisplay({ showChart: !(display?.showChart ?? true) })}
+            onToggle={() => void updateDisplay({ compactHeader: !(display?.compactHeader ?? false) })}
           />
           <ToggleRow
             title="Token logos"

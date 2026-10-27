@@ -14,7 +14,7 @@ function mount(dappBrowser: boolean) {
     if (type === "getLockSettings") return { autoLockTimeout: "never" };
     if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
     if (type === "getThemePreference") return { theme: "light" };
-    if (type === "getDisplaySettings") return { currency: "USD", showChart: true, showTokenLogos: false, headline: "total", balancesHidden: false };
+    if (type === "getDisplaySettings") return { currency: "USD", compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: false };
     if (type === "getScanStats") return null;
     return undefined;
   });
