@@ -4,7 +4,8 @@ import {
   addressFromOwner,
   base64UrlToBytes,
   bytesToBase64Url,
-  LEDGER_PERMAWEB_REQUIRED_MESSAGE,
+  LEDGER_PERMAWEB_INSTALLER_URL,
+  LEDGER_PERMAWEB_REQUIRED_REASON,
   verifyDeviceSignature,
   type DeviceSigningPayload,
   type JWKInterface,
@@ -202,15 +203,23 @@ describe("LedgerPanel", () => {
     expect(device.signIns).toEqual([0x03]);
   });
 
+  it("asks for the Permaweb app when signing a data item", async () => {
+    const { view } = await setup([dataItem("hello AO")]);
+    view();
+    expect(screen.getByText("Plug in your Ledger, unlock it and open the Permaweb app.")).toBeTruthy();
+  });
+
   it("refuses a data item on the stock Arweave app before sending it to the device", async () => {
     const { device, props, view } = await setup([dataItem("hello AO")]);
     view();
     start();
 
-    await waitFor(() => expect(props.onError).toHaveBeenCalledWith(LEDGER_PERMAWEB_REQUIRED_MESSAGE));
-    expect(LEDGER_PERMAWEB_REQUIRED_MESSAGE).toBe(
-      "Ledger only supports sending AR for now. To send AO tokens or sign data items, use a Keystone.",
-    );
+    await waitFor(() => expect(props.onError).toHaveBeenCalledTimes(1));
+    cleanup();
+    render(<>{props.onError.mock.calls[0]![0]}</>);
+    expect(screen.getByText(LEDGER_PERMAWEB_REQUIRED_REASON)).toBeTruthy();
+    const link = screen.getByRole("link", { name: "permawebOS extension" });
+    expect(link.getAttribute("href")).toBe(LEDGER_PERMAWEB_INSTALLER_URL);
     expect(device.signIns).toEqual([]);
     expect(device.close).toHaveBeenCalled();
     expect(props.onSignatures).not.toHaveBeenCalled();

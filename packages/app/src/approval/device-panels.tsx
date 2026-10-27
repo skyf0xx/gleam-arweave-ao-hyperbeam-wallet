@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { DeviceSigningPayload, DeviceSigningRequest, HardwareWalletMethod } from "@gleam/core";
 
 export type DeviceSigningWallet = Pick<DeviceSigningRequest, "method" | "device" | "address" | "publicKey">;
@@ -17,7 +17,8 @@ export interface DeviceSignPanelProps {
   wallet: DeviceSigningWallet;
   onSignatures(signatures: string[]): void;
   onActivity(): void;
-  onError(message: string): void;
+  /** A string, or a node when the message needs a link. */
+  onError(message: ReactNode): void;
   onCancel(): void;
 }
 

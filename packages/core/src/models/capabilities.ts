@@ -63,13 +63,15 @@ const CAPABILITIES: Record<WalletMethod, WalletCapabilities> = {
     encrypt: true,
     points: true,
   },
-  // The Ledger Arweave app has no data-item command, so AO sends and
-  // `signDataItem` are off and `dispatch` stays on L1. The client can still
-  // sign data items on the experimental Permaweb app; turn this on once
-  // Gleam can install it.
+  // Data items need the beta Permaweb app; the stock Arweave app has no
+  // data-item command. Which app is installed isn't known until signing, so
+  // data items stay on and the signer refuses them on the Arweave app with
+  // copy pointing to the installer. `dispatch` stays on L1 so it works with
+  // either app.
   ledger: {
     ...NONE,
     signTransaction: true,
+    signDataItem: true,
     encrypt: true,
     points: true,
   },
@@ -116,10 +118,6 @@ export function capabilityRefusal(
 ): string | null {
   if (capabilitiesFor(walletMethod)[capability]) return null;
   if (walletMethod === "watch") return `This wallet is watch-only, so it can't ${action}.`;
-  // A Keystone signs data items, so it's the hardware wallet to point a Ledger user to.
-  if (walletMethod === "ledger" && capability === "signDataItem") {
-    return `Ledger only supports sending AR for now, so it can't ${action}. Use a Keystone instead.`;
-  }
   return unsupportedOperationMessage(action);
 }
 

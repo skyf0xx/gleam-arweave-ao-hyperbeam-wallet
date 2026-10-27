@@ -29,8 +29,8 @@ async function biometricsUnavailable(): Promise<never> {
 }
 
 /**
- * The action popup closes when the browser's passkey prompt takes focus,
- * so only it hands the ceremony to its own window.
+ * Every surface runs the passkey unlock prompt in place: the action popup
+ * stays open under the browser's passkey sheet.
  */
 export function createExtensionAppPlatform(
   surface: "popup" | "sidepanel" | "window",
@@ -63,7 +63,7 @@ export function createExtensionAppPlatform(
       remove: (key) => browser.storage.session.remove(key),
     },
     unlock: {
-      passkeyMode: surface === "popup" ? "window" : "inline",
+      passkeyMode: "inline",
       openPasskeyWindow,
     },
     biometrics: {

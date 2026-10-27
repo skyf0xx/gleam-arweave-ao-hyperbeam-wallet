@@ -20,11 +20,11 @@ describe("capabilitiesFor", () => {
     });
   });
 
-  it("lets Ledger sign AR transactions only, with dispatch on L1", () => {
+  it("lets Ledger sign transactions and data items, with dispatch on L1", () => {
     expect(capabilitiesFor("ledger")).toEqual({
       signTransaction: true,
       dispatchViaBundler: false,
-      signDataItem: false,
+      signDataItem: true,
       signMessage: false,
       decrypt: false,
       exportKey: false,
@@ -60,18 +60,9 @@ describe("providerMethodRefusal", () => {
     for (const method of ["sign", "dispatch", "signDataItem", "batchSignDataItem", "transferAoTokens", "signMessage", "encrypt"] as const) {
       expect(providerMethodRefusal("keystone", method)).toBeNull();
     }
-    for (const method of ["sign", "dispatch", "encrypt"] as const) {
+    for (const method of ["sign", "dispatch", "signDataItem", "batchSignDataItem", "transferAoTokens", "encrypt"] as const) {
       expect(providerMethodRefusal("ledger", method)).toBeNull();
     }
-  });
-
-  it("points a Ledger to a Keystone for data items", () => {
-    expect(providerMethodRefusal("ledger", "transferAoTokens")).toBe(
-      "Ledger only supports sending AR for now, so it can't send AO tokens. Use a Keystone instead.",
-    );
-    expect(providerMethodRefusal("ledger", "signDataItem")).toBe(
-      "Ledger only supports sending AR for now, so it can't sign data items. Use a Keystone instead.",
-    );
   });
 
   it("says a watch wallet is watch-only", () => {
@@ -92,9 +83,6 @@ describe("capabilityRefusal", () => {
   });
 
   it("names the action for a wallet without it", () => {
-    expect(capabilityRefusal("ledger", "signDataItem", "send AO")).toBe(
-      "Ledger only supports sending AR for now, so it can't send AO. Use a Keystone instead.",
-    );
     expect(capabilityRefusal("ledger", "exportKey", "export its key")).toBe(
       "This wallet can't export its key. Switch to a keyfile wallet.",
     );

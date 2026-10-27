@@ -6,10 +6,8 @@ const PASSKEY_WINDOW_WIDTH = 390;
 const PASSKEY_WINDOW_HEIGHT = 640;
 
 /**
- * Opens the passkey page in its own window. The action popup closes as
- * soon as the browser's passkey prompt takes focus, which would abort the
- * ceremony. The page reopens the popup on the window it came from once
- * it's done.
+ * Opens the passkey page in its own window, where passkey setup runs. The
+ * page reopens the popup on the window it came from once it's done.
  */
 export async function openPasskeyWindow(mode: PasskeyWindowMode): Promise<void> {
   const params = new URLSearchParams({ mode });

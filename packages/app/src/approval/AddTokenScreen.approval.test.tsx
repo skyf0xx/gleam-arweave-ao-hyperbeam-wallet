@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import type { AddTokenApprovalPreview } from "@gleam/core";
 import { AddTokenScreen } from "./AddTokenScreen";
 
@@ -24,8 +25,8 @@ describe("AddTokenScreen", () => {
     expect(screen.getByText("bazar.arweave.net")).toBeTruthy();
     expect(screen.getByText("TKN")).toBeTruthy();
     expect(screen.getByText("Token Name")).toBeTruthy();
-    expect(screen.getByText(PROCESS_ID)).toBeTruthy();
-    expect(screen.getByText("a".repeat(43))).toBeTruthy();
+    expect(screen.getByText(addressText(PROCESS_ID))).toBeTruthy();
+    expect(screen.getByText(addressText("a".repeat(43)))).toBeTruthy();
     expect(screen.getByText(/set by whoever created the token/)).toBeTruthy();
   });
 
@@ -40,7 +41,7 @@ describe("AddTokenScreen", () => {
     );
 
     expect(screen.getByText("Unknown token")).toBeTruthy();
-    expect(screen.getByText(PROCESS_ID)).toBeTruthy();
+    expect(screen.getByText(addressText(PROCESS_ID))).toBeTruthy();
   });
 
   it("calls onAdd and onReject from their buttons", () => {

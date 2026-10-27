@@ -51,8 +51,8 @@ describe("extension AppPlatform activeSite", () => {
     expect(storageListeners.size).toBe(0);
   });
 
-  it("hands the passkey ceremony to a window only from the popup", () => {
-    expect(createExtensionAppPlatform("popup").unlock.passkeyMode).toBe("window");
+  it("runs the passkey unlock in place on every surface, the popup included", () => {
+    expect(createExtensionAppPlatform("popup").unlock.passkeyMode).toBe("inline");
     expect(createExtensionAppPlatform("sidepanel").unlock.passkeyMode).toBe("inline");
     expect(createExtensionAppPlatform("window").unlock.passkeyMode).toBe("inline");
   });

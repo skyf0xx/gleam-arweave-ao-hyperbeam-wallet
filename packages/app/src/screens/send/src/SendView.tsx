@@ -540,7 +540,7 @@ function ComposeStep({
 }) {
   const denomination = token === null ? 12 : token.denomination;
   const ticker = tickerFor(token);
-  // Every non-AR send is an AO data item, which a Ledger can't sign yet.
+  // Every non-AR send is an AO data item, which not every wallet kind can sign.
   const unsupported = token === null ? null : capabilityRefusal(wallet.method, "signDataItem", `send ${ticker}`);
   const recipientValid = recipientSchema.safeParse(step.recipient).success;
   const amountValid = amountSchema(denomination).safeParse(step.amountDisplay).success;

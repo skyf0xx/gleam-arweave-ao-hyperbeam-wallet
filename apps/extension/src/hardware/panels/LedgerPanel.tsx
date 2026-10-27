@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   base64UrlToBytes,
   bytesToBase64Url,
   LedgerArweaveClient,
   LedgerError,
   ledgerMaxPayloadBytes,
+  LEDGER_PERMAWEB_INSTALLER_URL,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
+  LEDGER_PERMAWEB_REQUIRED_REASON,
   LEDGER_MESSAGE_UNSUPPORTED,
   type LedgerTransport,
 } from "@gleam/core";
@@ -31,6 +33,22 @@ type Step =
 
 export const WRONG_LEDGER_MESSAGE = "This is a different Ledger than the one connected to this wallet.";
 
+/** Gleam doesn't ship the Permaweb app, so the refusal links to the wallet that installs it. */
+function PermawebRequiredError() {
+  return (
+    <span className="flex flex-col gap-2">
+      <span>{LEDGER_PERMAWEB_REQUIRED_REASON}</span>
+      <span>
+        To send AO on Gleam, install the beta Permaweb app using the{" "}
+        <a href={LEDGER_PERMAWEB_INSTALLER_URL} target="_blank" rel="noreferrer" className="underline">
+          permawebOS extension
+        </a>
+        .
+      </span>
+    </span>
+  );
+}
+
 /**
  * Signs every payload over WebHID, in order. WebHID's device chooser
  * needs a user gesture, so nothing touches the device until the button
@@ -54,6 +72,7 @@ export function createLedgerPanel({
     useEffect(() => () => abortRef.current?.abort(), []);
 
     const needsPermaweb = payloads.some((payload) => payload.kind === "dataItem");
+    const appName = needsPermaweb ? "Permaweb" : "Arweave";
     const total = payloads.length;
 
     const run = async () => {
@@ -63,7 +82,7 @@ export function createLedgerPanel({
       const activity = setInterval(() => callbacks.current.onActivity(), activityMs);
       let transport: LedgerTransport | null = null;
       let signatures: string[] | null = null;
-      let failure: string | null = null;
+      let failure: ReactNode = null;
       setStep({ kind: "connecting" });
       try {
         const opened = await openTransport();
@@ -78,7 +97,7 @@ export function createLedgerPanel({
           appTimeoutMs,
           keyTimeoutMs,
           onWaiting: (reason) => setStep({ kind: "waiting", reason }),
-          appTimeoutMessage: "Gleam couldn't find the Arweave app. Unlock your Ledger, open the Arweave app and try again.",
+          appTimeoutMessage: `Gleam couldn't find the ${appName} app. Unlock your Ledger, open the ${appName} app and try again.`,
         });
 
         if (needsPermaweb) {
@@ -111,7 +130,10 @@ export function createLedgerPanel({
         signatures = signed;
       } catch (error) {
         if (!(error instanceof LedgerCancelled) && !signal.aborted) {
-          failure = ledgerErrorText(error);
+          failure =
+            error instanceof LedgerError && error.code === "permaweb-app-required"
+              ? <PermawebRequiredError />
+              : ledgerErrorText(error);
         }
       } finally {
         clearInterval(activity);
@@ -127,7 +149,7 @@ export function createLedgerPanel({
       return (
         <div className="flex flex-col gap-4">
           <p className="text-center text-label leading-snug text-muted">
-            Plug in your Ledger, unlock it and open the Arweave app.
+            Plug in your Ledger, unlock it and open the {appName} app.
           </p>
           <Button type="button" onClick={() => void run()} disabled={busy}>
             {busy ? "Connecting…" : "Sign on Ledger"}
@@ -141,7 +163,7 @@ export function createLedgerPanel({
         <p role="status" className="text-center text-label leading-snug text-muted">
           {step.reason === "key"
             ? "Your Ledger is generating its Arweave key. This happens once per recovery phrase and can take several minutes. Keep it plugged in and the app open."
-            : "Waiting for the Arweave app. Unlock your Ledger and open the Arweave app."}
+            : `Waiting for the ${appName} app. Unlock your Ledger and open the ${appName} app.`}
         </p>
       );
     }

@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { WALLET_APPROVAL_ORIGIN, type DeviceSigningRequest, type DeviceSigningSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
+import { useAddressIdentity } from "../address-identity";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { DEVICE_NAMES, type DeviceSignPanel } from "./device-panels";
 
@@ -43,7 +45,7 @@ function hostnameOf(origin: string): string {
 export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, onActivity, token }: AwaitingDeviceViewProps) {
   const [attempt, setAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<ReactNode>();
   const activity = useRef(onActivity);
   activity.current = onActivity;
   const name = DEVICE_NAMES[device.method];
@@ -85,7 +87,7 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
 
         <div className="flex flex-col gap-1.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">Signing as</span>
-          <span className="break-all font-mono text-caption leading-relaxed text-foreground">{device.address}</span>
+          <AddressValue address={device.address} />
         </div>
 
         <div className="flex flex-col gap-3">
@@ -138,8 +140,8 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   if (summary.kind === "transaction") {
     return (
       <>
-        {summary.recipient !== null ? <Row label="Recipient" value={summary.recipient} mono /> : null}
         {summary.recipient !== null ? <Row label="Amount" value={`${formatWinstonAsAr(summary.quantity)} AR`} /> : null}
+        {summary.recipient !== null ? <AddressRow label="Recipient" address={summary.recipient} /> : null}
         <Row label="Fee" value={`${formatWinstonAsAr(summary.fee)} AR`} />
         {summary.dataSize !== "0" ? <Row label="Data" value={`${summary.dataSize} bytes`} /> : null}
       </>
@@ -155,10 +157,11 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
         : `${summary.quantity} smallest units`;
     return (
       <>
-        <Row label="Token" value={scale?.ticker ?? "Unknown token"} />
-        <Row label="Token process" value={summary.process} mono />
-        <Row label="Recipient" value={summary.recipient} mono />
+        {/* A resolved ticker already names the token in the amount. */}
+        {scale === undefined ? <Row label="Token" value="Unknown token" /> : null}
         <Row label="Amount" value={quantity} />
+        <AddressRow label="Recipient" address={summary.recipient} />
+        <AddressRow label="Token process" address={summary.process} />
         {summary.kind === "l1TokenTransfer" ? <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} /> : null}
       </>
     );
@@ -166,8 +169,8 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   if (summary.kind === "collectibleTransfer") {
     return (
       <>
-        <Row label="Collectible" value={summary.asset} mono />
-        <Row label="Recipient" value={summary.recipient} mono />
+        <AddressRow label="Collectible" address={summary.asset} />
+        <AddressRow label="Recipient" address={summary.recipient} />
         <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
       </>
     );
@@ -181,19 +184,36 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   }
   return (
     <>
-      {summary.target !== null ? <Row label="Target" value={summary.target} mono /> : null}
+      {summary.target !== null ? <AddressRow label="Target" address={summary.target} /> : null}
       <Row label="Data" value={`${summary.dataSize} bytes`} />
     </>
   );
 }
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-line py-2 text-caption last:border-b-0">
       <span className="flex-shrink-0 text-muted">{label}</span>
-      <span className={`min-w-0 break-all text-right font-semibold text-foreground ${mono ? "font-mono" : "tabular-nums"}`}>
-        {value}
-      </span>
+      <span className="min-w-0 text-right font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );
+}
+
+/**
+ * An address or id on its own line in `MemorableAddress`'s chunked form,
+ * so it never wraps mid-chunk. Every one, process ids included, gets its
+ * derived avatar: unlike a token logo it can't be claimed by a lookalike.
+ */
+function AddressRow({ label, address }: { label: string; address: string }) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-line py-2 text-caption last:border-b-0">
+      <span className="text-muted">{label}</span>
+      <AddressValue address={address} />
+    </div>
+  );
+}
+
+function AddressValue({ address }: { address: string }) {
+  const identity = useAddressIdentity();
+  return <MemorableAddress address={address} emphasisPick={identity.emphasisPick} avatarSvg={identity.avatarSvg(address)} />;
 }
