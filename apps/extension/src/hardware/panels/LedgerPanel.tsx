@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   base64UrlToBytes,
   bytesToBase64Url,
   LedgerArweaveClient,
   LedgerError,
   ledgerMaxPayloadBytes,
+  LEDGER_PERMAWEB_INSTALLER_URL,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
+  LEDGER_PERMAWEB_REQUIRED_REASON,
   LEDGER_MESSAGE_UNSUPPORTED,
   type LedgerTransport,
 } from "@gleam/core";
@@ -30,6 +32,22 @@ type Step =
   | { kind: "signing"; index: number };
 
 export const WRONG_LEDGER_MESSAGE = "This is a different Ledger than the one connected to this wallet.";
+
+/** Gleam doesn't ship the Permaweb app, so the refusal links to the wallet that installs it. */
+function PermawebRequiredError() {
+  return (
+    <span className="flex flex-col gap-2">
+      <span>{LEDGER_PERMAWEB_REQUIRED_REASON}</span>
+      <span>
+        To send AO on Gleam, install the beta Permaweb app using the{" "}
+        <a href={LEDGER_PERMAWEB_INSTALLER_URL} target="_blank" rel="noreferrer" className="underline">
+          permawebOS extension
+        </a>
+        .
+      </span>
+    </span>
+  );
+}
 
 /**
  * Signs every payload over WebHID, in order. WebHID's device chooser
@@ -64,7 +82,7 @@ export function createLedgerPanel({
       const activity = setInterval(() => callbacks.current.onActivity(), activityMs);
       let transport: LedgerTransport | null = null;
       let signatures: string[] | null = null;
-      let failure: string | null = null;
+      let failure: ReactNode = null;
       setStep({ kind: "connecting" });
       try {
         const opened = await openTransport();
@@ -112,7 +130,10 @@ export function createLedgerPanel({
         signatures = signed;
       } catch (error) {
         if (!(error instanceof LedgerCancelled) && !signal.aborted) {
-          failure = ledgerErrorText(error);
+          failure =
+            error instanceof LedgerError && error.code === "permaweb-app-required"
+              ? <PermawebRequiredError />
+              : ledgerErrorText(error);
         }
       } finally {
         clearInterval(activity);

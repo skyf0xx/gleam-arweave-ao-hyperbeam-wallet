@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { WALLET_APPROVAL_ORIGIN, type DeviceSigningRequest, type DeviceSigningSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
@@ -43,7 +43,7 @@ function hostnameOf(origin: string): string {
 export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, onActivity, token }: AwaitingDeviceViewProps) {
   const [attempt, setAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<ReactNode>();
   const activity = useRef(onActivity);
   activity.current = onActivity;
   const name = DEVICE_NAMES[device.method];

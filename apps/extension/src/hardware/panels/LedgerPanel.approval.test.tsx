@@ -5,7 +5,7 @@ import {
   base64UrlToBytes,
   bytesToBase64Url,
   LEDGER_PERMAWEB_INSTALLER_URL,
-  LEDGER_PERMAWEB_REQUIRED_MESSAGE,
+  LEDGER_PERMAWEB_REQUIRED_REASON,
   verifyDeviceSignature,
   type DeviceSigningPayload,
   type JWKInterface,
@@ -214,8 +214,12 @@ describe("LedgerPanel", () => {
     view();
     start();
 
-    await waitFor(() => expect(props.onError).toHaveBeenCalledWith(LEDGER_PERMAWEB_REQUIRED_MESSAGE));
-    expect(LEDGER_PERMAWEB_REQUIRED_MESSAGE).toContain(LEDGER_PERMAWEB_INSTALLER_URL);
+    await waitFor(() => expect(props.onError).toHaveBeenCalledTimes(1));
+    cleanup();
+    render(<>{props.onError.mock.calls[0]![0]}</>);
+    expect(screen.getByText(LEDGER_PERMAWEB_REQUIRED_REASON)).toBeTruthy();
+    const link = screen.getByRole("link", { name: "permawebOS extension" });
+    expect(link.getAttribute("href")).toBe(LEDGER_PERMAWEB_INSTALLER_URL);
     expect(device.signIns).toEqual([]);
     expect(device.close).toHaveBeenCalled();
     expect(props.onSignatures).not.toHaveBeenCalled();
