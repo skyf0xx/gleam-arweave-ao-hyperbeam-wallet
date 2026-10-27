@@ -27,7 +27,7 @@ export interface UnlockViewProps {
   /** Called once the real `resetAllWallets` RPC call has resolved successfully. */
   onResetComplete: () => void;
   tagline?: string;
-  /** Starts the passkey prompt as soon as the passkey is known, for the passkey window the user just asked for. */
+  /** Starts the passkey prompt as soon as the passkey is known, even from a surface that would otherwise wait for a click. */
   autoStartPasskey?: boolean;
 }
 
@@ -122,7 +122,12 @@ export function UnlockView({
       const status = await readPasskeyStatus(runtime);
       if (cancelled || !status?.enrolled) return;
       setPasskey(status);
-      if (autoStartPasskey) void handlePasskeyUnlock(status);
+      // Where the prompt runs in place, start it straight away as phone apps
+      // do; cancelling leaves this screen. Without focus the browser would
+      // reject the prompt, so the button waits for a click instead.
+      if (autoStartPasskey || (unlock.passkeyMode === "inline" && document.hasFocus())) {
+        void handlePasskeyUnlock(status);
+      }
     })();
     return () => {
       cancelled = true;

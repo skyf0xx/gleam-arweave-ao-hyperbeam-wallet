@@ -25,6 +25,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function runtimeWith(handlers: Record<string, (payload: unknown) => unknown>): RuntimePort & { send: ReturnType<typeof vi.fn> } {
@@ -107,5 +108,38 @@ describe("UnlockView with a passkey", () => {
 
     await waitFor(() => expect(onUnlocked).toHaveBeenCalledOnce());
     expect(get).toHaveBeenCalledOnce();
+  });
+
+  it("starts the prompt on its own where it runs inline and the page has focus", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    get.mockRejectedValue(new DOMException("not allowed", "NotAllowedError"));
+    const runtime = runtimeWith({ getPasskeyStatus: () => ENROLLED });
+    render(<UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/cancelled/i));
+    expect(get).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: /unlock with passkey/i })).toBeTruthy();
+  });
+
+  it("waits for a click when the page has no focus", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    const runtime = runtimeWith({ getPasskeyStatus: () => ENROLLED });
+    render(<UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
+
+    await screen.findByRole("button", { name: /unlock with passkey/i });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("never opens the passkey window on its own from the action popup", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const openPasskeyWindow = vi.fn<(mode: "setup" | "unlock") => Promise<void>>(async () => undefined);
+    const runtime = runtimeWith({ getPasskeyStatus: () => ENROLLED });
+    render(
+      <UnlockView runtime={runtime} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />,
+      fakeAppPlatform({ unlock: { passkeyMode: "window", openPasskeyWindow } }),
+    );
+
+    await screen.findByRole("button", { name: /unlock with passkey/i });
+    expect(openPasskeyWindow).not.toHaveBeenCalled();
   });
 });
