@@ -92,10 +92,9 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 - **Passkey unlock** wraps the vault password under the passkey's
   WebAuthn PRF output (`core/vault/passkey.ts`, `handlers/passkey.ts`),
   so it unlocks exactly like the password. The RP id is the extension
-  id. The action popup closes when the browser's passkey prompt takes
-  focus, so from the popup every ceremony runs in the `passkey.html`
-  window (`src/passkey/open-window.ts`); the side panel and approval
-  window run it inline.
+  id. Unlock runs the prompt in place on every surface, the action popup
+  included, and starts it on its own when the page has focus. Setup runs
+  in the `passkey.html` window (`src/passkey/open-window.ts`).
 - **AO sends** are ANS-104 items built and signed with plain WebCrypto in
   `core/ao/transfer.ts`, then POSTed to `mu.ao-testnet.xyz`. Don't use
   `@permaweb/aoconnect`: its browser build's signature check breaks raw-JWK
