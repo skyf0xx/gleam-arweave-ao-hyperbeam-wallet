@@ -115,6 +115,10 @@ exactly as typing it would. The relying party is the extension's own id.
 **Hardware wallets.** Keystone and Ledger wallets keep the key on the
 device. Gleam stores only the public key and address.
 
+**Watch wallets.** A watch wallet is only an address, with no key. A
+site can't connect while one is active, and every signing call for it
+is refused before any approval opens.
+
 ## Signing and approvals
 
 - **Every signing, decryption and transfer request from a site opens a
@@ -162,7 +166,7 @@ The extension talks to:
 - **Arweave gateways:** `arweave.net` by default, a few fallbacks, or one
   the user sets. Used for balances, history (GraphQL) and posting
   transactions.
-- **`up.arweave.net`:** the bundler, for uploads.
+- **`up.arweave.net`:** the bundler that a site's `dispatch` posts to.
 - **AO:** `mu.ao-testnet.xyz` (sending messages), `cu.ao-testnet.xyz`
   (reading results), `state.forward.computer` and HyperBEAM peers (token
   balances).
@@ -283,10 +287,10 @@ count as a finding.
   receives data over a non-https connection (for example through a
   production `connect-src` that permits a non-https scheme, or a
   `script-src` that permits a remote source).
-- **Dependency advisories that touch only development tools.** Neither
-  package below has a patched release. `osv-scanner.toml` ignores each
-  advisory until 2027-04-16, so the scan fails again and the entry is
-  re-checked. Every Gleam signature is RSA-PSS through WebCrypto
+- **Dependency advisories that touch only development tools.** None of the
+  packages below has a patched release. `osv-scanner.toml` ignores each
+  advisory until 2027-04-16 unless noted, so the scan fails again and the
+  entry is re-checked. Every Gleam signature is RSA-PSS through WebCrypto
   (`core/signer/keys.ts`, `core/arweave/rsa-pss.ts`).
   - `elliptic` ≤ 6.6.1 (GHSA-848j-6mx2-7j84): faulty ECDSA nonces can
     leak the signing key. It enters the lockfile through
@@ -300,9 +304,12 @@ count as a finding.
   - `node-forge` ≤ 1.4.0 (GHSA-86w9-cpqp-85rv): forged RSA PKCS#1 v1.5
     signatures. It comes only through `wxt` → `web-ext` → `adbkit`, a
     development tool, and isn't in the build.
+  - `deepmerge` 4.3.1 (GHSA-gcqx-w48m-w2h4): it comes only through
+    `wxt` → `web-ext` → `addons-linter`, a development tool, and isn't in
+    the build. Its ignore runs until 2027-04-28.
 
   *Still a finding if,* by any path, `.output/chrome-mv3` contains code
-  from either package, or shipped code signs or verifies with ECDSA or
+  from any of these packages, or shipped code signs or verifies with ECDSA or
   PKCS#1 v1.5, so the advisory's harm reaches users; or a patched
   version of either package exists, which ends the ignore.
 
@@ -311,8 +318,10 @@ count as a finding.
 These are true of the current release.
 
 - **Hardware wallets sign only part of the API.** Ledger signs AR
-  transactions only: the Ledger Arweave app has no data-item command, so
-  AO sends and `signDataItem` are off. Keystone signs transactions, data
+  transactions, and data items (AO sends, `signDataItem`) only on the
+  beta Permaweb app: the stock Arweave app has no data-item command, and
+  the Ledger panel refuses a data item on it. `dispatch` stays on L1 for
+  Ledger, and it signs no messages. Keystone signs transactions, data
   items and messages. Neither decrypts or exports, since the key stays on the device
   (`core/models/capabilities.ts`).
 - **No independent audit has been completed.**

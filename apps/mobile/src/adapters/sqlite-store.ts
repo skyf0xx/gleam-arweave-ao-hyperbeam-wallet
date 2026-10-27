@@ -1,5 +1,5 @@
-import * as Comlink from "comlink";
 import { CapacitorSQLite, SQLiteConnection, type capSQLiteSet } from "@capacitor-community/sqlite";
+import { exposeMethods } from "./comlink-guard";
 import { STORE_REQUEST, type SqliteStore } from "./sqlite-channel";
 
 /** The part of the plugin's `SQLiteDBConnection` this store uses. */
@@ -68,6 +68,6 @@ export function serveSqliteStore(worker: Worker, store: SqliteStore): void {
     const data = event.data as { type?: unknown; port?: unknown } | null;
     if (served || data?.type !== STORE_REQUEST || !(data.port instanceof MessagePort)) return;
     served = true;
-    Comlink.expose(store, data.port);
+    exposeMethods(store, ["load", "write"], data.port);
   });
 }

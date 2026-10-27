@@ -95,6 +95,11 @@ describe("buildKeystoneSignRequest", () => {
     );
   });
 
+  it("refuses a transaction whose data size isn't a number", () => {
+    const odd = { ...transaction, transaction: { ...transaction.transaction, data_size: "lots" } };
+    expect(() => buildKeystoneSignRequest(odd, xfp)).toThrow(KeystoneRequestError);
+  });
+
   it("accepts a transaction with data right at the limit, and it still fits the frame cap", () => {
     const data = Buffer.alloc(KEYSTONE_MAX_TRANSACTION_DATA, 9).toString("base64url");
     const full = {

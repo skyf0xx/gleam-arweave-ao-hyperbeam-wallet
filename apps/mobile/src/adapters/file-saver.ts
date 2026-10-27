@@ -1,7 +1,7 @@
-import * as Comlink from "comlink";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import type { FileDownloadResult } from "@gleam/core";
+import { exposeMethods } from "./comlink-guard";
 import { SAVER_REQUEST, type FileSaver } from "./download-channel";
 
 /** The parts of the two plugins this saver uses. */
@@ -105,6 +105,6 @@ export function serveFileSaver(worker: Worker, saver: FileSaver): void {
     const data = event.data as { type?: unknown; port?: unknown } | null;
     if (served || data?.type !== SAVER_REQUEST || !(data.port instanceof MessagePort)) return;
     served = true;
-    Comlink.expose(saver, data.port);
+    exposeMethods(saver, ["save"], data.port);
   });
 }

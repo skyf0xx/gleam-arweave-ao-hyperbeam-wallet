@@ -165,3 +165,26 @@ describe("serveSqliteStore", () => {
     ports.forEach((port) => port.close());
   });
 });
+
+describe("serveSqliteStore's guard", () => {
+  it("answers load and write but not a comlink path that reaches past them", async () => {
+    const worker = new EventTarget();
+    serveSqliteStore(worker as Worker, createSqliteStore(async () => nodeSqliteDb()));
+    const channel = new MessageChannel();
+    worker.dispatchEvent(new MessageEvent("message", { data: { type: STORE_REQUEST, port: channel.port2 } }));
+    const answered: unknown[] = [];
+    channel.port1.addEventListener("message", (event) => answered.push((event as MessageEvent<{ id: string }>).data.id));
+    channel.port1.start();
+    const raw = (value: unknown) => ({ type: "RAW", value });
+    const post = (data: object) => channel.port1.postMessage(data);
+
+    post({ id: "construct", type: "APPLY", path: ["load", "constructor"], argumentList: [raw("return 1")] });
+    post({ id: "get", type: "GET", path: ["load", "constructor", "name"] });
+    post({ id: "load", type: "APPLY", path: ["load"], argumentList: [] });
+
+    await vi.waitFor(() => expect(answered).toContain("load"));
+    expect(answered).toEqual(["load"]);
+    channel.port1.close();
+    channel.port2.close();
+  });
+});

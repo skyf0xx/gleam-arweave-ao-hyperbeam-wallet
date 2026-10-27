@@ -220,6 +220,19 @@ final class DappWebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptM
         return nil
     }
 
+    /// The app holds camera access for its QR scanner, so without this a
+    /// dApp's `getUserMedia` would get the system prompt under Gleam's name.
+    /// Android's view denies the same requests.
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        decisionHandler(.deny)
+    }
+
     // MARK: Private
 
     private func emitNavigation() {
