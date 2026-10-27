@@ -55,7 +55,8 @@ function payloadBytes(payload: DeviceSigningPayload): { bytes: Buffer; signType:
     return { bytes: Buffer.from(base64UrlToBytes(payload.raw)), signType: SignType.DataItem };
   }
   const { transaction } = payload;
-  if (Number(transaction.data_size) > KEYSTONE_MAX_TRANSACTION_DATA) {
+  // Written so a missing or non-numeric size (NaN) is refused too.
+  if (!(Number(transaction.data_size) <= KEYSTONE_MAX_TRANSACTION_DATA)) {
     throw new KeystoneRequestError(
       `This transaction carries more than ${Math.floor(KEYSTONE_MAX_TRANSACTION_DATA / 1000)} KB of data, which is too much to show as a QR for Keystone to sign. Try a smaller request.`,
     );
