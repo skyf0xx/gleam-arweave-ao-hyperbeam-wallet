@@ -60,8 +60,9 @@ import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
  *
  * Display settings (`useDisplaySettings`): values are priced in the
  * chosen currency, the large figure is the total or the AR/AO balance,
- * the chart and its range tabs can be turned off, and tapping the large
- * figure hides every balance on this screen until it's tapped again.
+ * the compact header swaps the full-width chart for a sparkline, and
+ * tapping the large figure hides every balance on this screen until it's
+ * tapped again.
  *
  * Tokens/Activity: a single tab control (local `activeTab` state, no
  * routing) switches between the two sections. The tab-button
@@ -364,7 +365,7 @@ export function MainScreenView({
   const activityQuery = useActivity(runtime, wallet.address);
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
-  const showChart = displaySettings?.showChart ?? true;
+  const compactHeader = displaySettings?.compactHeader ?? false;
   const showTokenLogos = displaySettings?.showTokenLogos ?? false;
   const masked = displaySettings?.balancesHidden ?? false;
   const watchOnly = isWatchWalletMethod(wallet.method);
@@ -378,8 +379,7 @@ export function MainScreenView({
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
   // With a single wallet "all" equals "wallet"; resolving it here keeps one cache entry and no toggle.
-  // The toggle lives on the chart, so without it the figure stays on this wallet.
-  const portfolioScope: PortfolioScope = hasOtherWallets && showChart ? preferredScope : "wallet";
+  const portfolioScope: PortfolioScope = hasOtherWallets ? preferredScope : "wallet";
   const togglePortfolioScope = () => {
     const next: PortfolioScope = portfolioScope === "all" ? "wallet" : "all";
     setPreferredScope(next);
@@ -622,7 +622,7 @@ export function MainScreenView({
               }
               masked={masked}
               onToggleMasked={displaySettings ? toggleMasked : undefined}
-              showChart={showChart}
+              compact={compactHeader}
               loading={portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
               /**
                * `series: []` on a *resolved* response (no thrown query
@@ -661,7 +661,8 @@ export function MainScreenView({
             <SendReceiveActions
               onSend={onSend}
               onReceive={onReceive}
-              sendDisabledReason={watchOnly ? "This wallet is watch-only, so it can't send tokens." : undefined}
+              sendDisabled={watchOnly}
+              compact={compactHeader}
             />
           </div>
         </div>
