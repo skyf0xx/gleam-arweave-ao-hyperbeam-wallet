@@ -32,10 +32,8 @@ import { checkWellKnown } from "./well-known.mjs";
 
 const REMOTE = "origin";
 const BRANCH = "master";
-// The invite-link site goes live in M45 (docs/MOBILE.md); until then its
-// .well-known files are missing and a failed check only warns. M45 sets this
-// to true so a release can't ship apps whose links cannot verify.
-const WELL_KNOWN_REQUIRED = false;
+// A release must not ship apps whose invite and attest links cannot verify.
+const WELL_KNOWN_REQUIRED = true;
 
 /** @param {string} reason */
 function refuse(reason) {
