@@ -17,4 +17,11 @@ describe("open.gleamwallet.app association files", () => {
     expect(entry.relation).toEqual(["delegate_permission/common.handle_all_urls"]);
     expect(entry.target.package_name).toBe("app.gleamwallet");
   });
+
+  it("lists the Play app signing key and the upload key", () => {
+    const [entry] = read("assetlinks.json");
+    const fingerprints: string[] = entry.target.sha256_cert_fingerprints;
+    expect(fingerprints).toHaveLength(2);
+    for (const f of fingerprints) expect(f).toMatch(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
+  });
 });

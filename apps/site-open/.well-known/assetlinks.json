@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "app.gleamwallet",
-      "sha256_cert_fingerprints": ["REPLACE:WITH:PLAY:APP:SIGNING:SHA256", "REPLACE:WITH:UPLOAD:KEY:SHA256"]
+      "sha256_cert_fingerprints": ["41:D5:EB:65:7F:98:77:17:07:B6:73:56:4F:56:C9:24:FB:0B:62:B0:B7:0A:C0:37:DC:35:B1:89:CF:23:D7:24", "80:5E:D0:05:03:3F:B8:99:64:29:5D:0F:35:3F:1E:EB:48:3A:9D:B0:7D:98:B4:35:B8:0C:08:EE:4B:23:B2:29"]
     }
   }
 ]
