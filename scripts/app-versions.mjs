@@ -6,9 +6,11 @@
 //
 // apps/extension/package.json is the source of truth. The iOS marketing
 // version lives in project.pbxproj (Info.plist only holds build-setting
-// references) and the Android one in app/build.gradle. Both stores reject a
-// build number they have already seen, so the build numbers count up by one
-// per release rather than following the version.
+// references) and the Android one in app/version.properties, which
+// build.gradle reads: build.gradle is on the security surface, so bumping it
+// at release time would invalidate the audit. Both stores reject a build
+// number they have already seen, so the build numbers count up by one per
+// release rather than following the version.
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -17,12 +19,12 @@ import { fileURLToPath } from "node:url";
 const EXTENSION = "apps/extension/package.json";
 const MOBILE = "apps/mobile/package.json";
 const PBXPROJ = "apps/mobile/ios/App/App.xcodeproj/project.pbxproj";
-const GRADLE = "apps/mobile/android/app/build.gradle";
+const PROPERTIES = "apps/mobile/android/app/version.properties";
 
 const MARKETING = /^(\s*MARKETING_VERSION = )([^;\s]+)(;\s*)$/gm;
 const BUILD = /^(\s*CURRENT_PROJECT_VERSION = )([^;\s]+)(;\s*)$/gm;
-const GRADLE_CODE = /^(\s*versionCode )(\d+)(\s*)$/gm;
-const GRADLE_NAME = /^(\s*versionName ")([^"]*)("\s*)$/gm;
+const PROP_CODE = /^(versionCode=)(.*?)(\s*)$/gm;
+const PROP_NAME = /^(versionName=)(.*?)(\s*)$/gm;
 
 /** @param {string} root @param {string} rel */
 const read = (root, rel) => readFileSync(join(root, rel), "utf8");
@@ -42,16 +44,17 @@ function uniform(text, re, count, label) {
 /** @param {string} root */
 export function readVersions(root) {
   const pbx = read(root, PBXPROJ);
-  const gradle = read(root, GRADLE);
+  const props = read(root, PROPERTIES);
   const iosBuild = uniform(pbx, BUILD, 2, "CURRENT_PROJECT_VERSION in project.pbxproj");
-  const androidCode = uniform(gradle, GRADLE_CODE, 1, "versionCode in build.gradle");
+  const androidCode = uniform(props, PROP_CODE, 1, "versionCode in version.properties");
+  if (!/^\d+$/.test(androidCode)) throw new Error(`versionCode is not an integer: ${androidCode}`);
   if (!/^\d+$/.test(iosBuild)) throw new Error(`CURRENT_PROJECT_VERSION is not an integer: ${iosBuild}`);
   return {
     extension: JSON.parse(read(root, EXTENSION)).version,
     mobile: JSON.parse(read(root, MOBILE)).version,
     iosMarketing: uniform(pbx, MARKETING, 2, "MARKETING_VERSION in project.pbxproj"),
     iosBuild: Number(iosBuild),
-    androidName: uniform(gradle, GRADLE_NAME, 1, "versionName in build.gradle"),
+    androidName: uniform(props, PROP_NAME, 1, "versionName in version.properties"),
     androidCode: Number(androidCode),
   };
 }
@@ -78,12 +81,12 @@ export function writeVersions(root, next) {
   pbx = replaceValue(pbx, BUILD, String(current.iosBuild + 1));
   writeFileSync(join(root, PBXPROJ), pbx);
 
-  let gradle = read(root, GRADLE);
-  gradle = replaceValue(gradle, GRADLE_NAME, next);
-  gradle = replaceValue(gradle, GRADLE_CODE, String(current.androidCode + 1));
-  writeFileSync(join(root, GRADLE), gradle);
+  let props = read(root, PROPERTIES);
+  props = replaceValue(props, PROP_NAME, next);
+  props = replaceValue(props, PROP_CODE, String(current.androidCode + 1));
+  writeFileSync(join(root, PROPERTIES), props);
 
-  return [EXTENSION, MOBILE, PBXPROJ, GRADLE];
+  return [EXTENSION, MOBILE, PBXPROJ, PROPERTIES];
 }
 
 /** @param {string} root @param {string} version */

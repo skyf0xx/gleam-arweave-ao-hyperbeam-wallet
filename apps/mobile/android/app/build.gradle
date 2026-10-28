@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// The version lives outside this file because build.gradle is on the security
+// surface: a release-time bump here would need a new audit.
+def versionProps = new Properties()
+file("version.properties").withInputStream { versionProps.load(it) }
+["versionCode", "versionName"].each { key ->
+    if (!versionProps.getProperty(key)) throw new GradleException("version.properties is missing ${key}")
+}
+
 android {
     namespace = "app.gleamwallet"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +15,8 @@ android {
         applicationId "app.gleamwallet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode Integer.parseInt(versionProps.getProperty("versionCode"))
+        versionName versionProps.getProperty("versionName")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
