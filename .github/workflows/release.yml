@@ -1,8 +1,9 @@
 name: Release
 
 # pnpm release --yes pushes a signed tag v<version>; this builds that commit,
-# attests the zip and publishes it as a GitHub Release. The Chrome Web Store
-# upload stays manual, so no store credentials live in CI.
+# attests the extension zip, hashes the mobile apps' web bundle into the
+# manifest and publishes it all as a GitHub Release. The Chrome Web Store
+# and app store uploads stay manual, so no store credentials live in CI.
 on:
   push:
     tags: ["v*"]
@@ -27,6 +28,7 @@ jobs:
       built-at: ${{ steps.verify.outputs.built-at }}
       zip-name: ${{ steps.zip.outputs.zip-name }}
       zip-sha256: ${{ steps.zip.outputs.zip-sha256 }}
+      mobile-bundle-sha256: ${{ steps.mobile.outputs.bundle-sha256 }}
     steps:
       - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
@@ -86,6 +88,9 @@ jobs:
           version="$(node -p 'require("./apps/extension/package.json").version')"
           [ "v$version" = "$TAG" ] || fail "tag $TAG does not match apps/extension/package.json version $version"
 
+          node scripts/app-versions.mjs --check "$version" \
+            || fail "extension, mobile, iOS and Android versions do not all match $version"
+
           # The same gate pnpm release runs, so tagging by hand doesn't skip it.
           node scripts/release-gate.mjs || fail "release gate failed for $TAG (see output above)"
 
@@ -108,6 +113,7 @@ jobs:
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @gleam/extension exec wxt zip
+      - run: pnpm mobile:build
 
       - name: Hash the zip
         id: zip
@@ -123,6 +129,16 @@ jobs:
             echo "zip-name=$name"
             echo "zip-sha256=$sha"
           } >> "$GITHUB_OUTPUT"
+
+      # The hash scripts/verify-bundle.mjs recomputes before the apps are signed.
+      - name: Hash the mobile web bundle
+        id: mobile
+        run: |
+          set -euo pipefail
+          sha="$(node apps/mobile/scripts/bundle-hash.mjs apps/mobile/dist)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::bundle hash is not 64 hex characters: $sha"; exit 1; }
+          echo "mobile bundle $sha"
+          echo "bundle-sha256=$sha" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -190,6 +206,7 @@ jobs:
           BUILT_AT: ${{ needs.build.outputs.built-at }}
           ZIP_NAME: ${{ needs.build.outputs.zip-name }}
           ZIP_SHA256: ${{ needs.build.outputs.zip-sha256 }}
+          MOBILE_BUNDLE_SHA256: ${{ needs.build.outputs.mobile-bundle-sha256 }}
           ATTESTATION: ${{ steps.attest.outputs.attestation-url }}
           REPO: ${{ github.repository }}
         run: |
@@ -201,9 +218,10 @@ jobs:
             --arg zipName "$ZIP_NAME" \
             --arg zipSha256 "$ZIP_SHA256" \
             --arg workflowRun "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg mobileBundleSha256 "$MOBILE_BUNDLE_SHA256" \
             --arg builtAt "$BUILT_AT" \
             --arg attestation "$ATTESTATION" \
-            '{version: $version, tag: $tag, commit: $commit, zipName: $zipName, zipSha256: $zipSha256, workflowRun: $workflowRun, builtAt: $builtAt, attestation: $attestation}' \
+            '{version: $version, tag: $tag, commit: $commit, zipName: $zipName, zipSha256: $zipSha256, mobileBundleSha256: $mobileBundleSha256, workflowRun: $workflowRun, builtAt: $builtAt, attestation: $attestation}' \
             > dist/release-manifest.json
           cat dist/release-manifest.json
 
@@ -228,6 +246,18 @@ jobs:
           \`\`\`
 
           Build provenance: $ATTESTATION
+
+          ## Mobile apps
+
+          SHA-256 of the apps' web bundle: \`$MOBILE_BUNDLE_SHA256\`
+
+          To compare it with an Android APK, unzip the APK and run this from a checkout of \`$TAG\`:
+
+          \`\`\`bash
+          node apps/mobile/scripts/bundle-hash.mjs <unzipped-apk>/assets/public --exclude cordova.js --exclude cordova_plugins.js
+          \`\`\`
+
+          The native shell is not reproducible, because the stores re-sign it. The apps can reach the stores a day or two after the extension, since store review takes time.
           EOF
 
       - name: Publish the release
