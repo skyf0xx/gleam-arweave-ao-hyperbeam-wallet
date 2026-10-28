@@ -4,16 +4,22 @@ fastlane builds, signs and uploads the app from a release tag, on your own
 machine. CI builds unsigned artifacts only; signing keys and store
 credentials stay in the KeePassXC database and never reach CI.
 
-Run the lanes through `scripts/release-app.sh`. It checks the tag, builds
+Run the lanes through `scripts/release-app.sh`. It checks the tag (on
+`origin/master`, signed by a key in `origin/master`'s `.github/allowed_signers`), builds
 and verifies the web bundle with no credentials in the environment, then
 unlocks the database, exports the credentials into a private temp dir
 (deleted on exit) and runs the lane.
 
 ```bash
 apps/mobile/scripts/release-app.sh v1.31.0 ios            --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
+apps/mobile/scripts/release-app.sh v1.31.0 ios-ipa        --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
 apps/mobile/scripts/release-app.sh v1.31.0 android        --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
 apps/mobile/scripts/release-app.sh v1.31.0 android-bundle --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
 ```
+
+`ios` signs and uploads to TestFlight, `ios-ipa` stops at the signed IPA,
+`android` uploads to the Play internal track and `android-bundle` stops at
+the signed AAB.
 
 `GLEAM_CWS_KDBX` replaces `--kdbx`; `GLEAM_CWS_KDBX_YUBIKEY=<slot[:serial]>`
 adds a YubiKey.
@@ -25,16 +31,19 @@ adds a YubiKey.
   `gh` or network access to the GitHub Release.
 - A modern Ruby with Bundler. macOS's `/usr/bin/ruby` is too old:
   `brew install ruby`, then put `$(brew --prefix ruby)/bin` first on
-  `PATH`. `bundle install` runs from `apps/mobile`.
+  `PATH`. `bundle install` runs from `apps/mobile`. The script checks for
+  Ruby 3 or newer before it unlocks anything.
 - iOS: macOS with Xcode.
-- Android: JDK 21 and the Android SDK.
+- Android: JDK 21 (checked by the script; `JAVA_HOME` is used when set)
+  and the Android SDK.
 
 ## Lanes
 
 | Lane | What it does |
 | --- | --- |
 | `ios prepare` / `android prepare` | `pnpm mobile:build`, `cap sync`, then the bundle check. No credentials. |
-| `ios beta` | Bundle check, signed build with cloud-managed signing, upload to TestFlight without waiting for processing. |
+| `ios signed_ipa` | Bundle check, then a signed `Gleam.ipa` with cloud-managed signing; prints its path. |
+| `ios beta` | `ios signed_ipa`, then upload to TestFlight without waiting for processing. |
 | `android signed_bundle` | Bundle check, then a signed `app-release.aab`; prints its path. |
 | `android internal` | `android signed_bundle`, then upload to the Play internal track. |
 
@@ -68,12 +77,12 @@ header of `release-app.sh`.
 
 | Entry | Attachment | Other fields |
 | --- | --- | --- |
-| `Apple settings` | `AuthKey_XLM98V7M34.p8` | attributes `KEY_ID`, `ISSUER_ID` (or `ASC_KEY_ID`, `ASC_ISSUER_ID` in the environment) |
+| `App Store Connect API` | the single `AuthKey_*.p8` it holds (`GLEAM_ASC_KEY_ATTACHMENT` names it explicitly) | attributes `KEY_ID`, `ISSUER_ID` (or `ASC_KEY_ID`, `ASC_ISSUER_ID` in the environment) |
 | `Play service account` | `play-service-account.json` | none |
 | `gleam-upload-keystore` | `upload-keystore.jks` | password = keystore password; attributes `KeyAlias`, `KeyPassword` |
 
-The App Store Connect key needs the Admin or App Manager role so Xcode can
-create the distribution certificate and profile.
+The App Store Connect key needs the Admin role: cloud-managed signing
+creates the distribution certificate and profile.
 
 ## Apple team id
 
