@@ -25,7 +25,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Gleam uses the camera to scan QR codes: a recipient's address, or a Keystone's account and signatures.</string>
+	<string>Gleam uses the camera to scan QR codes for recipient addresses or Keystone account and signatures.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Gleam uses Face ID to unlock your wallet.</string>
 	<key>UIApplicationSceneManifest</key>
