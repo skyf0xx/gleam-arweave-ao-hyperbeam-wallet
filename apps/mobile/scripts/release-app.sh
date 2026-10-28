@@ -18,15 +18,15 @@
 # is deleted on exit. CI never sees them.
 #
 # Entries in the database, each name overridable by the variable shown:
-#   App Store Connect API   GLEAM_ASC_ENTRY       attachment AuthKey.p8 (GLEAM_ASC_KEY_ATTACHMENT),
-#                                                 attributes KeyID and IssuerID
+#   Apple settings           GLEAM_ASC_ENTRY       attachment AuthKey_XLM98V7M34.p8 (GLEAM_ASC_KEY_ATTACHMENT),
+#                                                 attributes KEY_ID and ISSUER_ID
 #   Play service account    GLEAM_PLAY_ENTRY      attachment play-service-account.json
 #                                                 (GLEAM_PLAY_KEY_ATTACHMENT)
 #   gleam-upload-keystore   GLEAM_KEYSTORE_ENTRY  attachment upload-keystore.jks
 #                                                 (GLEAM_KEYSTORE_ATTACHMENT), password = store
 #                                                 password, attributes KeyAlias and KeyPassword
-# ASC_KEY_ID and ASC_ISSUER_ID in the environment replace the KeyID and
-# IssuerID attributes. GLEAM_APPLE_TEAM_ID overrides the Apple team id.
+# ASC_KEY_ID and ASC_ISSUER_ID in the environment replace the KEY_ID and
+# ISSUER_ID attributes. GLEAM_APPLE_TEAM_ID overrides the Apple team id.
 set -uo pipefail
 
 # Only the --allow-unverified-bundle flag may turn the bypass on.
@@ -154,12 +154,12 @@ attribute() { # entry attribute
 # A failed attribute read inside $(...) cannot exit the script, so the value
 # is read first, checked, then exported.
 if [ "$platform" = ios ]; then
-  asc_entry="${GLEAM_ASC_ENTRY:-App Store Connect API}"
-  export_attachment "$asc_entry" "${GLEAM_ASC_KEY_ATTACHMENT:-AuthKey.p8}" "$work/AuthKey.p8"
+  asc_entry="${GLEAM_ASC_ENTRY:-Apple settings}"
+  export_attachment "$asc_entry" "${GLEAM_ASC_KEY_ATTACHMENT:-AuthKey_XLM98V7M34.p8}" "$work/AuthKey.p8"
   key_id="${ASC_KEY_ID:-}"
-  [ -n "$key_id" ] || key_id="$(attribute "$asc_entry" KeyID)" || exit 1
+  [ -n "$key_id" ] || key_id="$(attribute "$asc_entry" KEY_ID)" || exit 1
   issuer_id="${ASC_ISSUER_ID:-}"
-  [ -n "$issuer_id" ] || issuer_id="$(attribute "$asc_entry" IssuerID)" || exit 1
+  [ -n "$issuer_id" ] || issuer_id="$(attribute "$asc_entry" ISSUER_ID)" || exit 1
   export GLEAM_ASC_KEY_PATH="$work/AuthKey.p8" ASC_KEY_ID="$key_id" ASC_ISSUER_ID="$issuer_id"
 else
   keystore_entry="${GLEAM_KEYSTORE_ENTRY:-gleam-upload-keystore}"

@@ -68,7 +68,7 @@ header of `release-app.sh`.
 
 | Entry | Attachment | Other fields |
 | --- | --- | --- |
-| `App Store Connect API` | `AuthKey.p8` | attributes `KeyID`, `IssuerID` (or `ASC_KEY_ID`, `ASC_ISSUER_ID` in the environment) |
+| `Apple settings` | `AuthKey_XLM98V7M34.p8` | attributes `KEY_ID`, `ISSUER_ID` (or `ASC_KEY_ID`, `ASC_ISSUER_ID` in the environment) |
 | `Play service account` | `play-service-account.json` | none |
 | `gleam-upload-keystore` | `upload-keystore.jks` | password = keystore password; attributes `KeyAlias`, `KeyPassword` |
 
