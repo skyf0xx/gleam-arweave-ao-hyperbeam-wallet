@@ -3,12 +3,17 @@
 # KeePassXC; nothing here reads a secret from the repo.
 #
 #   fastlane ios prepare tag:v1.2.3       build the web bundle, sync, verify (no secrets)
+#   fastlane ios signed_ipa tag:v1.2.3    verify, sign, print the IPA path
 #   fastlane ios beta tag:v1.2.3          verify, sign, upload to TestFlight
 #   fastlane android prepare tag:v1.2.3
 #   fastlane android signed_bundle tag:v1.2.3  verify, sign, print the AAB path
 #   fastlane android internal tag:v1.2.3  verify, sign, upload to the Play internal track
 
 default_platform(:ios)
+
+# fastlane rewrites fastlane/README.md after every lane, which dirties the
+# tree and fails the next lane's clean-tree check.
+skip_docs
 
 # This runs on the machine that holds the signing credentials.
 opt_out_usage
@@ -19,6 +24,7 @@ NATIVE_PUBLIC = {
   ios: File.join(MOBILE_DIR, "ios/App/App/public"),
   android: File.join(MOBILE_DIR, "android/app/src/main/assets/public"),
 }.freeze
+IPA_PATH = File.join(MOBILE_DIR, "ios/App/output/Gleam.ipa")
 AAB_PATH = File.join(MOBILE_DIR, "android/app/build/outputs/bundle/release/app-release.aab")
 
 def tag_option(options)
@@ -57,7 +63,7 @@ platform :ios do
     prepare_bundle(:ios, tag_option(options))
   end
 
-  lane :beta do |options|
+  lane :signed_ipa do |options|
     tag = tag_option(options)
     verify_bundle(:ios, tag)
 
@@ -66,18 +72,14 @@ platform :ios do
     key_path = required_env("GLEAM_ASC_KEY_PATH")
     team_id = CredentialsManager::AppfileConfig.try_fetch_value(:team_id)
 
-    api_key = app_store_connect_api_key(
-      key_id: key_id,
-      issuer_id: issuer_id,
-      key_filepath: key_path,
-      in_house: false,
-    )
-
     # Cloud-managed signing: Xcode asks App Store Connect for the
     # distribution certificate and profile with the API key, so the account
     # type does not matter and no certificate sits on this machine.
     auth = ["-allowProvisioningUpdates", "-authenticationKeyPath", key_path,
             "-authenticationKeyID", key_id, "-authenticationKeyIssuerID", issuer_id]
+    # No export_xcargs: gym appends both export_xcargs and xcargs to
+    # `xcodebuild -exportArchive`, and xcodebuild rejects an authentication
+    # option given twice (exit 64). xcargs reaches archive and export.
     build_app(
       project: File.join(MOBILE_DIR, "ios/App/App.xcodeproj"),
       scheme: "App",
@@ -85,12 +87,22 @@ platform :ios do
       export_method: "app-store",
       export_team_id: team_id,
       xcargs: (auth + ["DEVELOPMENT_TEAM=#{team_id}", "CODE_SIGN_STYLE=Automatic"]).join(" "),
-      export_xcargs: auth.join(" "),
       output_directory: File.join(MOBILE_DIR, "ios/App/output"),
       output_name: "Gleam.ipa",
       clean: true,
     )
+    UI.success("Signed IPA: #{IPA_PATH}")
+  end
 
+  lane :beta do |options|
+    signed_ipa(options)
+
+    api_key = app_store_connect_api_key(
+      key_id: required_env("ASC_KEY_ID"),
+      issuer_id: required_env("ASC_ISSUER_ID"),
+      key_filepath: required_env("GLEAM_ASC_KEY_PATH"),
+      in_house: false,
+    )
     upload_to_testflight(
       api_key: api_key,
       skip_waiting_for_build_processing: true,
