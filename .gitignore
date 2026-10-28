@@ -23,3 +23,15 @@ docs/MOBILE.md
 .gleam-scan/
 CLAUDE.local.md
 *.crx
+
+# fastlane
+apps/mobile/fastlane/report.xml
+apps/mobile/fastlane/test_output/
+apps/mobile/ios/App/output/
+apps/mobile/ios/App/*.ipa
+apps/mobile/ios/App/*.dSYM.zip
+apps/mobile/fastlane/*.p8
+apps/mobile/fastlane/*.json
+apps/mobile/fastlane/*.jks
+apps/mobile/fastlane/*.keystore
+apps/mobile/.bundle/

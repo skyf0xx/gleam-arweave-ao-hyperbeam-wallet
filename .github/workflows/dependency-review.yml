@@ -30,6 +30,10 @@ jobs:
             GPL-2.0, GPL-2.0-only, GPL-2.0-or-later,
             GPL-3.0, GPL-3.0-only, GPL-3.0-or-later,
             AGPL-3.0, AGPL-3.0-only, AGPL-3.0-or-later
+          # fastlane's highline and rdoc are "GPL-2.0-only OR Ruby", used under
+          # Ruby. They run only on the machine that uploads the app and ship in
+          # no bundle.
+          allow-dependencies-licenses: pkg:gem/highline, pkg:gem/rdoc
           # elliptic (GHSA-848j-6mx2-7j84) and node-forge (GHSA-86w9-cpqp-85rv)
           # have no patched release, so a PR touching them would fail
           # forever. Drop each ID once its package has a fix.

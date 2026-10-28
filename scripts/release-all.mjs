@@ -7,11 +7,13 @@
 //   pnpm release:all <major|minor|patch> --key <path-to-private-key>
 //
 // Stages:
-//   1. Bump apps/extension/package.json, commit, push a branch, open a PR.
+//   1. Bump the extension and both mobile apps (scripts/app-versions.mjs),
+//      commit, push a branch, open a PR.
 //      Stops here: merge it yourself (release-gate.mjs also requires
 //      security/audits/v<version>.md to exist with no open critical/high
 //      findings — write that first if it's missing).
-//   2. Pull master, run scripts/release.mjs --yes (signed tag + push).
+//   2. Pull master, check the app versions and the invite-link host's
+//      .well-known files, run scripts/release.mjs --yes (signed tag + push).
 //      Confirms before tagging, since a tag CI has already built on is not
 //      something to casually re-push.
 //   3. Wait for you to confirm the GitHub Release (with its zip and
@@ -23,13 +25,17 @@
 //   5. Remind you to upload the .crx by hand; that step stays manual.
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import process from "node:process";
+import { checkVersions, readVersions, writeVersions } from "./app-versions.mjs";
 import { git, runGate } from "./release-gate.mjs";
+import { checkWellKnown } from "./well-known.mjs";
 
 const REMOTE = "origin";
 const BRANCH = "master";
+// The invite-link site goes live in M45 (docs/MOBILE.md); until then its
+// .well-known files are missing and a failed check only warns. M45 sets this
+// to true so a release can't ship apps whose links cannot verify.
+const WELL_KNOWN_REQUIRED = false;
 
 /** @param {string} reason */
 function refuse(reason) {
@@ -73,19 +79,17 @@ if (dirty !== "") refuse("working tree has uncommitted changes");
 
 // --- stage 1: bump, commit, PR -------------------------------------------
 
-const pkgPath = join(root, "apps/extension/package.json");
-const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-const [maj, min, patch] = pkg.version.split(".").map(Number);
+const current = readVersions(root).extension;
+const [maj, min, patch] = current.split(".").map(Number);
 const next =
   bump === "major" ? `${maj + 1}.0.0` : bump === "minor" ? `${maj}.${min + 1}.0` : `${maj}.${min}.${patch + 1}`;
 
-process.stdout.write(`== Stage 1: bump ${pkg.version} -> ${next} ==\n`);
-pkg.version = next;
-writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+process.stdout.write(`== Stage 1: bump ${current} -> ${next} ==\n`);
+const changed = writeVersions(root, next);
 
 const bumpBranch = `release/v${next}`;
 run("git", ["checkout", "-b", bumpBranch], root);
-run("git", ["add", "apps/extension/package.json"], root);
+run("git", ["add", "--", ...changed], root);
 run("git", ["commit", "-m", `chore: bump version to ${next}`], root);
 run("git", ["push", "-u", REMOTE, bumpBranch], root);
 run(
@@ -110,6 +114,19 @@ run("git", ["pull", "--ff-only", REMOTE, BRANCH], root);
 const gate = runGate({ cwd: root });
 if (!gate.ok) refuse(`release gate still failing after merge: ${gate.reason}`);
 if (gate.version !== next) refuse(`master's version is ${gate.version}, expected ${next}`);
+
+try {
+  checkVersions(root, next);
+} catch (e) {
+  refuse(/** @type {Error} */ (e).message);
+}
+
+const wellKnown = await checkWellKnown();
+if (wellKnown.length > 0) {
+  const detail = wellKnown.map((p) => `  ${p}`).join("\n");
+  if (WELL_KNOWN_REQUIRED) refuse(`invite-link .well-known files are not served correctly:\n${detail}`);
+  process.stdout.write(`WARNING: invite-link .well-known files are not served correctly:\n${detail}\n`);
+}
 
 process.stdout.write(`about to create signed tag v${next} and push it to ${REMOTE}\n`);
 await pause(`Confirm you want to tag and push v${next},`);

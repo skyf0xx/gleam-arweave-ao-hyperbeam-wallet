@@ -324,6 +324,12 @@ These are true of the current release.
   Ledger, and it signs no messages. Keystone signs transactions, data
   items and messages. Neither decrypts or exports, since the key stays on the device
   (`core/models/capabilities.ts`).
+- **On Android, a dApp page and the wallet share one renderer process.**
+  Android WebViews in an app run in a single renderer process, across
+  WebView instances and profiles. A renderer exploit in a page loaded in
+  the dApp view could therefore reach the memory of the wallet WebView.
+  Isolating them would need the dApp view in its own process, for example
+  a separate Activity with `android:process`. Accepted for now.
 - **No independent audit has been completed.**
 
 ## Out of scope
