@@ -102,6 +102,13 @@
 5 security/surface.mjs
 5 security/surface.txt
 5 apps/mobile/ios/App/App/App.entitlements
+5 apps/mobile/fastlane/Fastfile
+5 apps/mobile/fastlane/Appfile
+5 apps/mobile/Gemfile
+5 apps/mobile/Gemfile.lock
+5 apps/mobile/scripts/bundle-hash.mjs
+5 apps/mobile/scripts/verify-bundle.mjs
+5 apps/mobile/scripts/release-app.sh
 5 apps/mobile/android/app/src/main/res/xml/file_paths.xml
 5 apps/mobile/ios/App/CapApp-SPM/Package.swift
 5 apps/mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved

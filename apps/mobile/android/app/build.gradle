@@ -16,8 +16,25 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // The upload key comes from the environment (scripts/release-app.sh), so
+    // nothing secret is in the repo. Without it the release build is unsigned,
+    // which is what CI produces.
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv("GLEAM_UPLOAD_KEYSTORE")
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv("GLEAM_UPLOAD_STORE_PASSWORD")
+                keyAlias System.getenv("GLEAM_UPLOAD_KEY_ALIAS")
+                keyPassword System.getenv("GLEAM_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
+            if (System.getenv("GLEAM_UPLOAD_KEYSTORE")) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

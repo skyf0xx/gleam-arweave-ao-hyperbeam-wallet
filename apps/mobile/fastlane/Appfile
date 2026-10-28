@@ -1,0 +1,7 @@
+app_identifier("app.gleamwallet")
+package_name("app.gleamwallet")
+
+# The Apple team id is the only account-specific value. An Individual
+# account that becomes an Organization gets a new one: set
+# GLEAM_APPLE_TEAM_ID instead of editing this file.
+team_id(ENV.fetch("GLEAM_APPLE_TEAM_ID", "2GYJRK444L"))

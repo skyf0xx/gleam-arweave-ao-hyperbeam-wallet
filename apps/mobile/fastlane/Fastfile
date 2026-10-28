@@ -1,0 +1,131 @@
+# Build, check, sign and upload the Gleam app. Run through
+# apps/mobile/scripts/release-app.sh, which supplies the credentials from
+# KeePassXC; nothing here reads a secret from the repo.
+#
+#   fastlane ios prepare tag:v1.2.3       build the web bundle, sync, verify (no secrets)
+#   fastlane ios beta tag:v1.2.3          verify, sign, upload to TestFlight
+#   fastlane android prepare tag:v1.2.3
+#   fastlane android signed_bundle tag:v1.2.3  verify, sign, print the AAB path
+#   fastlane android internal tag:v1.2.3  verify, sign, upload to the Play internal track
+
+default_platform(:ios)
+
+# This runs on the machine that holds the signing credentials.
+opt_out_usage
+
+MOBILE_DIR = File.expand_path("..", __dir__)
+REPO_DIR = File.expand_path("../..", MOBILE_DIR)
+NATIVE_PUBLIC = {
+  ios: File.join(MOBILE_DIR, "ios/App/App/public"),
+  android: File.join(MOBILE_DIR, "android/app/src/main/assets/public"),
+}.freeze
+AAB_PATH = File.join(MOBILE_DIR, "android/app/build/outputs/bundle/release/app-release.aab")
+
+def tag_option(options)
+  tag = options[:tag].to_s
+  UI.user_error!("pass tag:v<major>.<minor>.<patch>") unless tag.match?(/\Av\d+\.\d+\.\d+\z/)
+  head = sh("git", "-C", REPO_DIR, "rev-parse", "HEAD", log: false).strip
+  at_tag = sh("git", "-C", REPO_DIR, "rev-parse", "--verify", "#{tag}^{commit}", log: false).strip
+  UI.user_error!("checkout is at #{head}, not #{tag}") unless head == at_tag
+  UI.user_error!("working tree is not clean") unless sh("git", "-C", REPO_DIR, "status", "--porcelain", log: false).strip.empty?
+  tag
+end
+
+def required_env(name)
+  value = ENV[name].to_s
+  UI.user_error!("#{name} is not set; run through scripts/release-app.sh") if value.empty?
+  value
+end
+
+# Runs before any signing step. The bundle hash is read from the Release
+# CI published, so a bundle built from anything else stops here.
+def verify_bundle(platform, tag)
+  sh("node", File.join(MOBILE_DIR, "scripts/verify-bundle.mjs"), tag, NATIVE_PUBLIC.fetch(platform))
+end
+
+def prepare_bundle(platform, tag)
+  Dir.chdir(REPO_DIR) do
+    sh("pnpm", "install", "--frozen-lockfile")
+    sh("pnpm", "mobile:build")
+  end
+  Dir.chdir(MOBILE_DIR) { sh("pnpm", "exec", "cap", "sync", platform.to_s) }
+  verify_bundle(platform, tag)
+end
+
+platform :ios do
+  lane :prepare do |options|
+    prepare_bundle(:ios, tag_option(options))
+  end
+
+  lane :beta do |options|
+    tag = tag_option(options)
+    verify_bundle(:ios, tag)
+
+    key_id = required_env("ASC_KEY_ID")
+    issuer_id = required_env("ASC_ISSUER_ID")
+    key_path = required_env("GLEAM_ASC_KEY_PATH")
+    team_id = CredentialsManager::AppfileConfig.try_fetch_value(:team_id)
+
+    api_key = app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: issuer_id,
+      key_filepath: key_path,
+      in_house: false,
+    )
+
+    # Cloud-managed signing: Xcode asks App Store Connect for the
+    # distribution certificate and profile with the API key, so the account
+    # type does not matter and no certificate sits on this machine.
+    auth = ["-allowProvisioningUpdates", "-authenticationKeyPath", key_path,
+            "-authenticationKeyID", key_id, "-authenticationKeyIssuerID", issuer_id]
+    build_app(
+      project: File.join(MOBILE_DIR, "ios/App/App.xcodeproj"),
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: team_id,
+      xcargs: (auth + ["DEVELOPMENT_TEAM=#{team_id}", "CODE_SIGN_STYLE=Automatic"]).join(" "),
+      export_xcargs: auth.join(" "),
+      output_directory: File.join(MOBILE_DIR, "ios/App/output"),
+      output_name: "Gleam.ipa",
+      clean: true,
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end
+
+platform :android do
+  lane :prepare do |options|
+    prepare_bundle(:android, tag_option(options))
+  end
+
+  lane :signed_bundle do |options|
+    tag = tag_option(options)
+    verify_bundle(:android, tag)
+
+    %w[GLEAM_UPLOAD_KEYSTORE GLEAM_UPLOAD_KEY_ALIAS GLEAM_UPLOAD_STORE_PASSWORD GLEAM_UPLOAD_KEY_PASSWORD].each { |name| required_env(name) }
+    gradle(project_dir: File.join(MOBILE_DIR, "android"), tasks: ["clean", "bundleRelease"], flags: "--no-daemon")
+    UI.user_error!("no AAB at #{AAB_PATH}") unless File.exist?(AAB_PATH)
+    UI.success("Signed AAB: #{AAB_PATH}")
+  end
+
+  lane :internal do |options|
+    signed_bundle(options)
+
+    upload_to_play_store(
+      package_name: CredentialsManager::AppfileConfig.try_fetch_value(:package_name),
+      json_key: required_env("GLEAM_PLAY_JSON_KEY_PATH"),
+      track: "internal",
+      aab: AAB_PATH,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end
