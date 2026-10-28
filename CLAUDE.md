@@ -142,3 +142,28 @@ for the branch, and merge it once CI is green. `master` accepts only
 signed commits through a PR with passing CI, and admins get no bypass.
 This repo signs commits with an SSH key (`git config --local
 commit.gpgsign true`), so the key has to be loaded in `ssh-agent`.
+
+## Releasing
+
+One signed tag `v<version>` releases the extension and both apps.
+
+1. Write `security/audits/v<version>.md` (`security/audits/TEMPLATE.md`).
+   The gate refuses to tag while any security-surface file changed after
+   the audited commit or a critical/high finding is open.
+2. `pnpm release:all <major|minor|patch>` sets one version in the
+   extension, the mobile package, iOS and Android
+   (`scripts/app-versions.mjs`), adds 1 to both build numbers, and opens
+   the bump PR. After the merge it tags, and `release.yml` publishes the
+   zip and `release-manifest.json` (with `mobileBundleSha256`) as a GitHub
+   Release. `pack-release.sh` then rebuilds and signs the `.crx` locally.
+3. Apps, from a clean checkout of the tag:
+   `apps/mobile/scripts/release-app.sh v<version> ios|ios-ipa|android|android-bundle`.
+   It checks the tag against `origin/master`, rebuilds the web bundle and
+   compares it with the manifest before unlocking any credential
+   (`apps/mobile/fastlane/README.md`).
+4. Store steps stay manual: the Chrome Web Store upload, App Store review,
+   and promoting the Android build. CI holds no signing key or store
+   credential.
+
+Signing keys and store credentials live in a local KeePassXC database, so
+steps 2 and 3 need the maintainer at the terminal.
