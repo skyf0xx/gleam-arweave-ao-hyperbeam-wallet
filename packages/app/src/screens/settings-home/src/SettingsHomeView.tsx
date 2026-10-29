@@ -192,21 +192,6 @@ export function SettingsHomeView({
           />
         </OptionSection>
 
-        {platform.capabilities.dappBrowser ? (
-          <OptionSection title="Browser">
-            <ClearRow
-              title="Clear recent sites"
-              description="Forget the sites you opened lately"
-              clear={() => runtime.send({ type: "clearRecentSites", payload: undefined })}
-            />
-            <ClearRow
-              title="Clear site data"
-              description="Sign out of sites and delete what they stored"
-              clear={() => platform.dappBrowser.clearSiteData()}
-            />
-          </OptionSection>
-        ) : null}
-
         <OptionSection title="Network">
           <OptionRow
             divided={false}
@@ -229,20 +214,6 @@ export function SettingsHomeView({
       </div>
     </div>
   );
-}
-
-/** An action that wipes something and says so; it has nothing to undo, so it asks nothing first. */
-function ClearRow({ title, description, clear }: { title: string; description: string; clear: () => Promise<unknown> }) {
-  const [state, setState] = useState<"idle" | "busy" | "done" | "failed">("idle");
-  const run = () => {
-    setState("busy");
-    clear().then(
-      () => setState("done"),
-      () => setState("failed"),
-    );
-  };
-  const value = state === "done" ? "Cleared" : state === "failed" ? "Couldn't clear" : undefined;
-  return <OptionRow divided={false} title={title} description={description} value={value} disabled={state === "busy"} onClick={run} />;
 }
 
 function SelectRow<T extends string>({

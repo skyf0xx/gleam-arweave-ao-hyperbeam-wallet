@@ -234,6 +234,9 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
       .catch(() => undefined);
   };
 
+  const clearRecent = () =>
+    runtime.send({ type: "clearRecentSites", payload: undefined }).then(() => sites.reload());
+
   const retry = () => {
     setFailedUrl(null);
     browser.reload().catch(() => undefined);
@@ -296,7 +299,15 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
         {page ? <div ref={placeholder} data-testid="page-placeholder" className="absolute inset-0 bg-mist" /> : null}
         {showingStart ? (
           <div className="absolute inset-0 overflow-y-auto bg-background">
-            <StartScreen query={text} saved={sites.saved} recent={sites.recent} onOpen={open} onRemoveSaved={removeSaved} />
+            <StartScreen
+              query={text}
+              saved={sites.saved}
+              recent={sites.recent}
+              onOpen={open}
+              onRemoveSaved={removeSaved}
+              onClearSiteData={platform.capabilities.dappBrowser ? () => browser.clearSiteData() : undefined}
+              onClearRecent={platform.capabilities.dappBrowser ? clearRecent : undefined}
+            />
           </div>
         ) : null}
         {failedUrl !== null && !showingStart ? (

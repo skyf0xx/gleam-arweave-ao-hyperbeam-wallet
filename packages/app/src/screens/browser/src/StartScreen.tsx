@@ -9,6 +9,9 @@ export interface StartScreenProps {
   recent: readonly string[];
   onOpen: (url: string) => void;
   onRemoveSaved: (origin: string) => void;
+  /** Present only where the host can clear what sites stored. */
+  onClearSiteData?: () => Promise<unknown>;
+  onClearRecent?: () => Promise<unknown>;
 }
 
 function sitesOf(urls: readonly string[]): KnownSite[] {
@@ -20,7 +23,7 @@ function sitesOf(urls: readonly string[]): KnownSite[] {
  * ones. Typing narrows the same lists. Rows carry a letter, never a
  * fetched icon, so showing this screen makes no network request.
  */
-export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved }: StartScreenProps) {
+export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved, onClearSiteData, onClearRecent }: StartScreenProps) {
   const savedSites = sitesOf(saved);
   const builtIn = sitesOf(BUILT_IN_SITES);
   const shown = new Set([...savedSites, ...builtIn].map((site) => site.host));
@@ -65,20 +68,107 @@ export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved }: Sta
         ))}
       </Section>
       {recentSites.length > 0 ? (
-        <Section title="Recent">
+        <Section
+          title="Recent"
+          action={onClearRecent ? <ClearButton label="Clear" ariaLabel="Clear recent sites" clear={onClearRecent} /> : undefined}
+        >
           {recentSites.map((site) => (
             <SiteRow key={site.url} host={site.host} onOpen={() => onOpen(site.url)} />
           ))}
         </Section>
       ) : null}
+      {onClearSiteData ? (
+        <ClearSiteData clear={onClearSiteData} />
+      ) : null}
     </div>
   );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+type ClearState = "idle" | "busy" | "done" | "failed";
+
+function useClear(clear: () => Promise<unknown>) {
+  const [state, setState] = useState<ClearState>("idle");
+  const run = () => {
+    setState("busy");
+    clear().then(
+      () => setState("done"),
+      () => setState("failed"),
+    );
+  };
+  return { state, run };
+}
+
+const clearLabel = (state: ClearState, idle: string) =>
+  state === "done" ? "Cleared" : state === "failed" ? "Couldn't clear" : idle;
+
+const CLEAR_BUTTON =
+  "-mx-3 min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
+
+/** Wipes something and says so; recents hold nothing worth a second tap. */
+function ClearButton({ label, ariaLabel, clear }: { label: string; ariaLabel?: string; clear: () => Promise<unknown> }) {
+  const { state, run } = useClear(clear);
+  return (
+    <button
+      type="button"
+      aria-label={state === "idle" ? ariaLabel : undefined}
+      disabled={state === "busy"}
+      onClick={run}
+      className={CLEAR_BUTTON}
+    >
+      {clearLabel(state, label)}
+    </button>
+  );
+}
+
+/**
+ * Signs the user out of every site, so the tap asks first, in place, with
+ * the same Cancel / confirm pair a held saved site uses before it is removed.
+ */
+function ClearSiteData({ clear }: { clear: () => Promise<unknown> }) {
+  const { state, run } = useClear(clear);
+  const [asking, setAsking] = useState(false);
+  if (asking && state === "idle") {
+    return (
+      <div role="group" aria-label="Clear site data" className="flex flex-col items-start gap-1">
+        <p className="text-label text-foreground">Sign out of all sites and delete what they stored?</p>
+        <div className="-mx-3 flex items-center">
+          <button type="button" onClick={() => setAsking(false)} className="min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist">
+            Cancel
+          </button>
+          <button type="button" onClick={run} className="min-h-11 rounded-lg px-3 text-label font-semibold text-warning active:bg-mist">
+            Clear
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <button type="button" disabled={state === "busy"} onClick={() => setAsking(true)} className={CLEAR_BUTTON}>
+        {clearLabel(state, "Clear site data")}
+      </button>
+      <p className="text-caption text-faint">Signs you out of sites and deletes what they stored.</p>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  hint,
+  action,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section aria-label={title} className="flex flex-col">
-      <h2 className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{title}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{title}</h2>
+        {action}
+      </div>
       <div className="flex flex-col">{children}</div>
       {hint ? <p className="pt-1 text-caption text-faint">{hint}</p> : null}
     </section>
