@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { explorerUrlFor, isWatchWalletMethod, type Collectible, type CollectibleRef, type DisplayCurrency, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
-import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
+import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN, PullToRefreshIndicator, usePullToRefresh } from "@gleam/ui";
 import {
   AccountAvatar,
   ActivityRow,
@@ -390,6 +390,19 @@ export function MainScreenView({
     enabled: !otherWalletsQuery.isPending,
   });
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pullState = usePullToRefresh({
+    target: rootRef,
+    onRefresh: () =>
+      Promise.allSettled([
+        balancesQuery.refetch(),
+        activityQuery.refetch(),
+        tokenPricesQuery.refetch(),
+        portfolioHistoryQuery.refetch(),
+        ...(collectiblesOpened ? [collectiblesQuery.refetch()] : []),
+      ]),
+  });
+
   const defaultTokenRows = buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data, currency);
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
@@ -519,7 +532,7 @@ export function MainScreenView({
   );
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div ref={rootRef} className="flex min-h-full flex-col">
       {loadError ? (
         <NetworkErrorBanner
           onRetry={() => {
@@ -589,6 +602,8 @@ export function MainScreenView({
           </button>
         </div>
       </div>
+
+      <PullToRefreshIndicator {...pullState} />
 
       <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
       <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
