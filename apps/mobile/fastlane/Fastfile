@@ -7,6 +7,7 @@
 #   fastlane ios beta tag:v1.2.3          verify, sign, upload to TestFlight
 #   fastlane android prepare tag:v1.2.3
 #   fastlane android signed_bundle tag:v1.2.3  verify, sign, print the AAB path
+#   fastlane android signed_apk tag:v1.2.3     verify, sign, print the APK path
 #   fastlane android internal tag:v1.2.3  verify, sign, upload to the Play internal track
 
 default_platform(:ios)
@@ -26,6 +27,7 @@ NATIVE_PUBLIC = {
 }.freeze
 IPA_PATH = File.join(MOBILE_DIR, "ios/App/output/Gleam.ipa")
 AAB_PATH = File.join(MOBILE_DIR, "android/app/build/outputs/bundle/release/app-release.aab")
+APK_PATH = File.join(MOBILE_DIR, "android/app/build/outputs/apk/release/app-release.apk")
 
 def tag_option(options)
   tag = options[:tag].to_s
@@ -123,6 +125,19 @@ platform :android do
     gradle(project_dir: File.join(MOBILE_DIR, "android"), tasks: ["clean", "bundleRelease"], flags: "--no-daemon")
     UI.user_error!("no AAB at #{AAB_PATH}") unless File.exist?(AAB_PATH)
     UI.success("Signed AAB: #{AAB_PATH}")
+  end
+
+  # Sideloaded builds, while Play is unavailable. Gradle names the output
+  # app-release-unsigned.apk when no signing config applies, so the path
+  # check also catches a missing key.
+  lane :signed_apk do |options|
+    tag = tag_option(options)
+    verify_bundle(:android, tag)
+
+    %w[GLEAM_UPLOAD_KEYSTORE GLEAM_UPLOAD_KEY_ALIAS GLEAM_UPLOAD_STORE_PASSWORD GLEAM_UPLOAD_KEY_PASSWORD].each { |name| required_env(name) }
+    gradle(project_dir: File.join(MOBILE_DIR, "android"), tasks: ["clean", "assembleRelease"], flags: "--no-daemon")
+    UI.user_error!("no signed APK at #{APK_PATH}") unless File.exist?(APK_PATH)
+    UI.success("Signed APK: #{APK_PATH}")
   end
 
   lane :internal do |options|
