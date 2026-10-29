@@ -5,6 +5,8 @@
 #   apps/mobile/scripts/release-app.sh v1.31.0 ios-ipa        --kdbx <path>   signed IPA only
 #   apps/mobile/scripts/release-app.sh v1.31.0 android        --kdbx <path>   Play internal track
 #   apps/mobile/scripts/release-app.sh v1.31.0 android-bundle --kdbx <path>   signed AAB only
+#   apps/mobile/scripts/release-app.sh v1.31.0 android-apk    --kdbx <path>   signed APK, attached to
+#                                                                            the GitHub Release as gleam.apk
 #
 # Add --allow-unverified-bundle to skip the comparison with the manifest's
 # mobileBundleSha256 (a tag whose manifest has none). It asks for a typed
@@ -42,7 +44,7 @@ mobile="$(cd "$here/.." && pwd)"
 repo_root="$(cd "$mobile/../.." && pwd)"
 
 usage() {
-  echo "usage: $0 v<major>.<minor>.<patch> ios|ios-ipa|android|android-bundle --kdbx <path-to-keepassxc-db> [--allow-unverified-bundle]" >&2
+  echo "usage: $0 v<major>.<minor>.<patch> ios|ios-ipa|android|android-bundle|android-apk --kdbx <path-to-keepassxc-db> [--allow-unverified-bundle]" >&2
   exit 2
 }
 
@@ -74,12 +76,19 @@ case "$target" in
   ios-ipa) platform=ios; lane=signed_ipa ;;
   android) platform=android; lane=internal ;;
   android-bundle) platform=android; lane=signed_bundle ;;
+  android-apk) platform=android; lane=signed_apk ;;
   *) usage ;;
 esac
 [ -n "$kdbx" ] || { echo "no KeePassXC database: pass --kdbx or set GLEAM_CWS_KDBX" >&2; exit 2; }
 [ -f "$kdbx" ] || { echo "KeePassXC database not found: $kdbx" >&2; exit 2; }
 command -v keepassxc-cli > /dev/null || { echo "keepassxc-cli not found; brew install --cask keepassxc" >&2; exit 2; }
 command -v bundle > /dev/null || { echo "bundler not found; see apps/mobile/fastlane/README.md" >&2; exit 2; }
+if [ "$target" = android-apk ]; then
+  command -v gh > /dev/null || { echo "gh not found; it uploads the APK to the GitHub Release" >&2; exit 2; }
+  gh release view "$tag" > /dev/null 2>&1 || { echo "no GitHub Release for $tag yet; wait for release.yml" >&2; exit 2; }
+  gh release view "$tag" --json assets -q '.assets[].name' | grep -qx gleam.apk \
+    && { echo "$tag already has gleam.apk; delete that asset first to replace it" >&2; exit 2; }
+fi
 
 # Fastlane and Gradle need newer tools than macOS ships; fail now, not after
 # the credentials are unlocked.
@@ -239,4 +248,20 @@ fi
 unset db_password store_password key_password
 
 echo "== Running $platform $lane =="
-bundle exec fastlane "$platform" "$lane" "tag:$tag"
+bundle exec fastlane "$platform" "$lane" "tag:$tag" || exit 1
+
+if [ "$target" = android-apk ]; then
+  # gh needs none of the signing credentials.
+  unset GLEAM_UPLOAD_KEYSTORE GLEAM_UPLOAD_STORE_PASSWORD GLEAM_UPLOAD_KEY_ALIAS GLEAM_UPLOAD_KEY_PASSWORD
+  # Always the same asset name, so releases/latest/download/gleam.apk stays a
+  # stable link.
+  apk="$work/gleam.apk"
+  cp "$mobile/android/app/build/outputs/apk/release/app-release.apk" "$apk" || exit 1
+  apk_sha="$(shasum -a 256 "$apk" | awk '{ print $1 }')"
+  echo "== Uploading gleam.apk (SHA-256 $apk_sha) to the $tag release =="
+  gh release upload "$tag" "$apk" || exit 1
+  notes="$(gh release view "$tag" --json body -q .body)" || exit 1
+  gh release edit "$tag" --notes "$notes
+
+Android APK \`gleam.apk\` SHA-256: \`$apk_sha\`" > /dev/null || exit 1
+fi

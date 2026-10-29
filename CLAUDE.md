@@ -157,7 +157,7 @@ One signed tag `v<version>` releases the extension and both apps.
    zip and `release-manifest.json` (with `mobileBundleSha256`) as a GitHub
    Release. `pack-release.sh` then rebuilds and signs the `.crx` locally.
 3. Apps, from a clean checkout of the tag:
-   `apps/mobile/scripts/release-app.sh v<version> ios|ios-ipa|android|android-bundle`.
+   `apps/mobile/scripts/release-app.sh v<version> ios|ios-ipa|android|android-bundle|android-apk`.
    It checks the tag against `origin/master`, rebuilds the web bundle and
    compares it with the manifest before unlocking any credential
    (`apps/mobile/fastlane/README.md`).

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
-import { formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
-import { useAnimatedNumber } from "../../primitives/animated-number";
+import { currencyStep, formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
+import { animatedNumberTintStyle, useAnimatedNumber, type AnimatedNumberTrend } from "../../primitives/animated-number";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
@@ -85,6 +85,8 @@ export interface PortfolioChartProps {
    * `NetworkErrorBanner`; the range tabs below stay rendered regardless.
    */
   onRetry?: () => void;
+  /** With `onRetry`: the retry is in flight, so the banner shows it's working. */
+  retrying?: boolean;
   scope?: PortfolioScope;
   /** Makes the chart area toggle `scope`. Leave unset when there's only one wallet. */
   onToggleScope?: () => void;
@@ -207,6 +209,7 @@ export function PortfolioChart({
   cachedFetching = false,
   walletKey = "",
   onRetry,
+  retrying,
   scope = "wallet",
   onToggleScope,
   headline,
@@ -243,26 +246,28 @@ export function PortfolioChart({
   const totalParts = formatCurrencyParts(currentValue, currency);
   // While loading, `currentValue` is a stand-in, so the first real figure swaps in rather than ticking up from it.
   const figureIdentity = `${walletKey}|${activeRange}|${scope}|${currency}`;
-  const totalAmount = useAnimatedNumber({
+  const total = useAnimatedNumber({
     value: loading ? Number.NaN : currentValue,
     text: totalParts.amount,
     format: (value) => formatCurrencyParts(value, currency).amount,
+    step: currencyStep(currentValue, currency),
     identity: figureIdentity,
     cached,
   });
-  const headlineAmount = useAnimatedNumber({
+  const headlineFigure = useAnimatedNumber({
     value: headline?.value ?? Number.NaN,
     text: headline?.amount ?? "",
     identity: `${figureIdentity}|${headline?.unit ?? ""}`,
     cached,
   });
   const faded = cached && !loading;
-  const totalLabel = masked ? HIDDEN_AMOUNT : totalParts.unit ? `${totalAmount} ${totalParts.unit}` : totalAmount;
+  const totalLabel = masked ? HIDDEN_AMOUNT : totalParts.unit ? `${total.text} ${totalParts.unit}` : total.text;
   const headlineParts: CurrencyValueParts = masked
     ? { amount: HIDDEN_AMOUNT }
     : headline
-      ? { amount: headlineAmount, unit: headline.unit }
-      : { amount: totalAmount, unit: totalParts.unit };
+      ? { amount: headlineFigure.text, unit: headline.unit }
+      : { amount: total.text, unit: totalParts.unit };
+  const headlineTrend = masked ? null : headline ? headlineFigure.trend : total.trend;
   // The range tabs already name the period, so the scope note briefly takes the %-change's place instead.
   const changeBadge = (
     <span className="grid text-label font-semibold tabular-nums">
@@ -285,12 +290,14 @@ export function PortfolioChart({
   const figures = (
     <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", faded && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))}>
       <div className="flex items-baseline gap-2.5">
-        <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
+        <Headline parts={headlineParts} trend={headlineTrend} masked={masked} onToggle={onToggleMasked} />
         {headline === undefined ? changeBadge : null}
       </div>
       {headline !== undefined ? (
         <div className="flex items-baseline gap-2.5">
-          <span className="text-label tabular-nums text-muted">{totalLabel}</span>
+          <span className="text-label tabular-nums text-muted" style={animatedNumberTintStyle(masked ? null : total.trend)}>
+            {totalLabel}
+          </span>
           {changeBadge}
         </div>
       ) : null}
@@ -335,7 +342,7 @@ export function PortfolioChart({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {onRetry ? (
-        <NetworkErrorBanner onRetry={onRetry} className="phone:mx-0 phone:mt-0" />
+        <NetworkErrorBanner onRetry={onRetry} retrying={retrying} className="phone:mx-0 phone:mt-0" />
       ) : compact ? (
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">{figures}</div>
@@ -375,10 +382,10 @@ export function PortfolioChart({
 const HEADLINE_CLASS = "text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground";
 
 /** The large figure; a button that hides or shows balances when `onToggle` is set. */
-function Headline({ parts, masked, onToggle }: { parts: CurrencyValueParts; masked: boolean; onToggle?: () => void }) {
+function Headline({ parts, trend, masked, onToggle }: { parts: CurrencyValueParts; trend: AnimatedNumberTrend | null; masked: boolean; onToggle?: () => void }) {
   const label = (
     <>
-      {parts.amount}
+      <span style={animatedNumberTintStyle(trend)}>{parts.amount}</span>
       {parts.unit ? (
         <>
           {" "}

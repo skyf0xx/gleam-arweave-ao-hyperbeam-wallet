@@ -3,6 +3,9 @@ import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
 
+/** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
+const COMPUTE_TIMEOUT_MS = 8_000;
+
 /**
  * Reads an AO token balance via the HyperBEAM `process@1.0` compute path:
  * `GET /{processId}~process@1.0/compute/balances/{address}`.
@@ -18,7 +21,7 @@ export async function getTokenBalance(
   fetchImpl: typeof fetch = fetch,
 ): Promise<TokenBalance> {
   const url = `${trimTrailingSlash(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
-  const response = await fetchImpl(url);
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(COMPUTE_TIMEOUT_MS) });
 
   if (response.status === 404) {
     return parseBalanceResponse("0", processId, address);

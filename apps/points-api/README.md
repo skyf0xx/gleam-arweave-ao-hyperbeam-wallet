@@ -29,10 +29,15 @@ shares its points and scan rules with the wallet through `@gleam/core`.
 - **`prices.ts`**: a price service the wallet uses to show token prices.
 - **`bounty.ts`, `funnel.ts`**: command-line scripts for the operator.
 
-## Where it sits
+## Location
 
 ```text
-wallet ─────────────┐
-Gleam website ──────┼→ points-api → Postgres
-scan CLI (agents) ──┘
+  wallet     website     scan CLI
+    │           │           │
+    └───────────┼───────────┘
+                ▼
+            points-api
+                │
+                ▼
+             Postgres
 ```

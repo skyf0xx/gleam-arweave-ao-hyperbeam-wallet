@@ -23,8 +23,15 @@ without needing to know how QR codes work.
   and scanning QR codes. Large data is split across several codes that
   play one after another, like a short animation.
 
-## Where it sits
+## Location
 
 ```text
-@gleam/app ← app → @gleam/keystone ⇄ QR codes ⇄ Keystone device
+        @gleam/app      the screens
+            │
+            ▼
+     @gleam/keystone    QR in and out
+            ▲
+            │ QR codes
+            ▼
+     Keystone device
 ```

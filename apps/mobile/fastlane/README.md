@@ -15,11 +15,15 @@ apps/mobile/scripts/release-app.sh v1.31.0 ios            --kdbx ~/.secrets/glea
 apps/mobile/scripts/release-app.sh v1.31.0 ios-ipa        --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
 apps/mobile/scripts/release-app.sh v1.31.0 android        --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
 apps/mobile/scripts/release-app.sh v1.31.0 android-bundle --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
+apps/mobile/scripts/release-app.sh v1.31.0 android-apk    --kdbx ~/.secrets/gleam-cws/gleam-cws.kdbx
 ```
 
 `ios` signs and uploads to TestFlight, `ios-ipa` stops at the signed IPA,
-`android` uploads to the Play internal track and `android-bundle` stops at
-the signed AAB.
+`android` uploads to the Play internal track, `android-bundle` stops at
+the signed AAB, and `android-apk` signs an APK with the upload key and
+attaches it to the tag's GitHub Release as `gleam.apk`, with its SHA-256 in
+the release notes. Sideloaded installs can't later update from Play, which
+signs with its own key.
 
 `GLEAM_CWS_KDBX` replaces `--kdbx`; `GLEAM_CWS_KDBX_YUBIKEY=<slot[:serial]>`
 adds a YubiKey.

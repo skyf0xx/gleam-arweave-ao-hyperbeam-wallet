@@ -10,7 +10,7 @@ describe("getUsdFxRate", () => {
     const fetchImpl = respond(200, { currency: "EUR", rate: 0.92 });
 
     expect(await getUsdFxRate("EUR", "https://api.example", fetchImpl)).toBe(0.92);
-    expect(fetchImpl).toHaveBeenCalledWith("https://api.example/prices/fx?currency=EUR");
+    expect(fetchImpl).toHaveBeenCalledWith("https://api.example/prices/fx?currency=EUR", { signal: expect.any(AbortSignal) });
   });
 
   it("answers 1 for USD without a request", async () => {

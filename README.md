@@ -86,12 +86,16 @@ The wallet is split into shared packages that both apps are built from.
 Each folder has a README with more detail.
 
 ```text
-apps/extension, apps/mobile          (each app mounts both halves)
-   │                    │
-   ▼                    ▼
-packages/app ──messaging──▶ packages/runtime ──▶ packages/core
-(screens, built                (backend)           (domain logic)
- from packages/ui)
+Extension        Mobile
+    └──────┬───────┘
+           ▼
+         /app       screens and UI
+           │ messages
+           ▼
+       /runtime     request handler
+           │
+           ▼
+         /core      keys, signing, AO
 ```
 
 - [`packages/core`](packages/core): the domain logic: keys, signing, Arweave

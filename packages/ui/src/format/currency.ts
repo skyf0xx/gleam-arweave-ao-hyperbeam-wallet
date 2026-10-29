@@ -40,6 +40,15 @@ export function formatCurrencyParts(value: number, currency: DisplayCurrency): C
   return { amount: new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value), unit: currency };
 }
 
+/** One step of the last digit `formatCurrencyParts` shows for `value`, such as 0.01 for cents. */
+export function currencyStep(value: number, currency: DisplayCurrency): number {
+  if (isFiatCurrency(currency)) {
+    const { maximumFractionDigits = 2 } = new Intl.NumberFormat(undefined, { style: "currency", currency }).resolvedOptions();
+    return 10 ** -maximumFractionDigits;
+  }
+  return Math.abs(value) >= 1 || value === 0 ? 0.01 : 0.000001;
+}
+
 export function formatCurrencyValue(value: number, currency: DisplayCurrency): string {
   const { amount, unit } = formatCurrencyParts(value, currency);
   return unit ? `${amount} ${unit}` : amount;

@@ -7,11 +7,17 @@ const MAX_PULL_PX = 96;
 const DIRECTION_SLOP_PX = 6;
 
 export const PULL_TO_REFRESH_THRESHOLD_PX = 64;
+/**
+ * The longest the spinner holds. A refresh can chain several slow reads;
+ * past this the screen's own fetching cues carry on and the page is free
+ * to pull again.
+ */
+export const PULL_TO_REFRESH_MAX_HOLD_MS = 8_000;
 
 export interface UsePullToRefreshOptions {
   /** Element that receives the touches; the gesture only runs while the window is scrolled to the top. */
   target: RefObject<HTMLElement | null>;
-  /** Resolves when the refresh is done. A pull released while one is pending does nothing. */
+  /** Resolves when the refresh is done. A pull released while one is pending does nothing, up to `PULL_TO_REFRESH_MAX_HOLD_MS`. */
   onRefresh: () => Promise<unknown>;
   threshold?: number;
 }
@@ -102,10 +108,15 @@ export function usePullToRefresh({
       }
       refreshingRef.current = true;
       setState({ pull: threshold, refreshing: true, dragging: false });
+      let settled = false;
       const settle = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(holdTimer);
         refreshingRef.current = false;
         setState({ pull: 0, refreshing: false, dragging: false });
       };
+      const holdTimer = window.setTimeout(settle, PULL_TO_REFRESH_MAX_HOLD_MS);
       try {
         refreshRef.current().then(settle, settle);
       } catch {

@@ -51,12 +51,16 @@ wallet apps, the points server and the scan CLI.
 - **`ports/`**: the interfaces for host services, such as storage and
   approval windows, which each app implements as adapters.
 
-## Where it sits
+## Location
 
 ```text
-@gleam/runtime → @gleam/core → Arweave / AO networks
-                     ↑
-       ports (implemented by each app)
+      @gleam/runtime
+            │
+            ▼
+       @gleam/core      keys, signing, AO
+            │
+            ▼
+      Arweave and AO
 ```
 
 When the user sends tokens, the runtime takes the unlocked key from

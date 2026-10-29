@@ -17,10 +17,14 @@ installed, the page redirects the visitor to the main website instead.
   still contains placeholder values.
 - **`vercel.json`**: hosting settings.
 
-## Where it sits
+## Location
 
 ```text
-link on a phone → app installed? → Gleam app
-                       ↓ no
-                 gleamwallet.app
+     link on a phone
+            │
+            ▼
+      app installed?
+    ┌───────┴───────┐
+yes ▼               ▼ no
+Gleam app    gleamwallet.app
 ```

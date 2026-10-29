@@ -28,4 +28,4 @@ export {
 } from "./primitives/use-pull-to-refresh";
 export { PullToRefreshIndicator } from "./primitives/pull-to-refresh-indicator";
 export { Sheet, type SheetProps } from "./primitives/sheet";
-export { AnimatedNumber, useAnimatedNumber, ANIMATED_NUMBER_DURATION_MS, type AnimatedNumberProps } from "./primitives/animated-number";
+export { AnimatedNumber, useAnimatedNumber, animatedNumberTintStyle, ANIMATED_NUMBER_DURATION_MS, ANIMATED_NUMBER_TINT_MS, type AnimatedNumberProps, type AnimatedFigure, type AnimatedNumberTrend } from "./primitives/animated-number";

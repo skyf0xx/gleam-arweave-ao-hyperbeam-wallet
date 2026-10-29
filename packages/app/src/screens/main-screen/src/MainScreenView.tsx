@@ -409,6 +409,17 @@ export function MainScreenView({
   const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, currency, {
     enabled: !otherWalletsQuery.isPending,
   });
+  // A refetch of a query that never had data resets it to pending and drops the error, which would take the banner
+  // down mid-retry; this keeps it up until that retry settles. Keyed so switching range doesn't carry it over.
+  const portfolioKey = `${wallet.address}|${selectedRange}|${portfolioScope}|${currency}`;
+  const [portfolioRetryKey, setPortfolioRetryKey] = useState<string | null>(null);
+  const portfolioRetrying = portfolioRetryKey === portfolioKey;
+  const portfolioFailed =
+    portfolioRetrying || portfolioHistoryQuery.isError || (portfolioHistoryQuery.isSuccess && portfolioHistoryQuery.data.series.length === 0);
+  const retryPortfolio = () => {
+    setPortfolioRetryKey(portfolioKey);
+    void portfolioHistoryQuery.refetch().finally(() => setPortfolioRetryKey((key) => (key === portfolioKey ? null : key)));
+  };
 
   const rootRef = useRef<HTMLDivElement>(null);
   const pullState = usePullToRefresh({
@@ -567,6 +578,7 @@ export function MainScreenView({
             void balancesQuery.refetch();
             void activityQuery.refetch();
           }}
+          retrying={balancesQuery.isFetching || activityQuery.isFetching}
         />
       ) : null}
 
@@ -683,20 +695,14 @@ export function MainScreenView({
                * tabs (rendered inside `PortfolioChart`) stay visible and
                * clickable even while the active range is failed — a
                * failed "ALL" no longer strands the user without a way
-               * back to a previously-cached "7D". Gated on `!isFetching`
-               * so clicking Retry hides the banner immediately instead
-               * of leaving it on screen, inert, for the duration of the
-               * refetch. `isFetching` rather than `isLoading` for
-               * `loading`: a Retry re-runs an already-errored query,
-               * which `isLoading` never reflects. A series already on
-               * screen stays through a refetch, marked by `cached`.
+               * back to a previously-cached "7D". The banner stays up
+               * through a retry with `retrying` set, so the tap visibly
+               * does something even when the retry fails again at once.
+               * A series already on screen stays through a refetch,
+               * marked by `cached`.
                */
-              onRetry={
-                !portfolioHistoryQuery.isFetching &&
-                (portfolioHistoryQuery.error || (portfolioHistoryQuery.isSuccess && portfolioHistoryQuery.data.series.length === 0))
-                  ? () => void portfolioHistoryQuery.refetch()
-                  : undefined
-              }
+              onRetry={portfolioFailed ? retryPortfolio : undefined}
+              retrying={portfolioFailed && portfolioHistoryQuery.isFetching}
             />
           </div>
 

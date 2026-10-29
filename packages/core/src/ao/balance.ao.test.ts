@@ -20,6 +20,7 @@ describe("getTokenBalance", () => {
 
     expect(fetchImpl).toHaveBeenCalledWith(
       `${PEER}/${PROCESS_ID}~process@1.0/compute/balances/${ADDRESS}`,
+      { signal: expect.any(AbortSignal) },
     );
   });
 

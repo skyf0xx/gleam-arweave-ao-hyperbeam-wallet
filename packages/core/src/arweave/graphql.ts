@@ -37,6 +37,9 @@ interface GraphQLTransactionsResponse {
  */
 export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://arweave-search.goldsky.com"];
 
+/** Per gateway, so one that never answers falls through to the next candidate. */
+const GRAPHQL_TIMEOUT_MS = 10_000;
+
 function gatewayCandidates(primaryGatewayUrl: string): string[] {
   const primary = trimTrailingSlash(primaryGatewayUrl);
   const candidates = [primary, ...FALLBACK_GATEWAYS.map(trimTrailingSlash)];
@@ -66,6 +69,7 @@ export async function postGraphQLWithFailover<T>(
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query, variables }),
+        signal: AbortSignal.timeout(GRAPHQL_TIMEOUT_MS),
       });
 
       if (!response.ok) {

@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
-import { usePullToRefresh } from "./use-pull-to-refresh";
+import { PULL_TO_REFRESH_MAX_HOLD_MS, usePullToRefresh } from "./use-pull-to-refresh";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 function touch(el: Element, type: string, x: number, y: number) {
   const event = new Event(type, { bubbles: true, cancelable: true });
@@ -87,6 +90,21 @@ describe("usePullToRefresh", () => {
     drag(getByTestId("root"), 0, 140);
     expect(onRefresh).toHaveBeenCalledTimes(1);
     await act(async () => finish());
+    drag(getByTestId("root"), 0, 140);
+    expect(onRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets go of a refresh that never settles after the hold limit", () => {
+    vi.useFakeTimers();
+    const onRefresh = vi.fn(() => new Promise<void>(() => {}));
+    const { getByTestId } = render(<Harness onRefresh={onRefresh} />);
+    drag(getByTestId("root"), 0, 140);
+    expect(getByTestId("root").dataset.refreshing).toBe("true");
+    act(() => {
+      vi.advanceTimersByTime(PULL_TO_REFRESH_MAX_HOLD_MS);
+    });
+    expect(getByTestId("root").dataset.refreshing).toBe("false");
+    expect(getByTestId("root").dataset.pull).toBe("0");
     drag(getByTestId("root"), 0, 140);
     expect(onRefresh).toHaveBeenCalledTimes(2);
   });

@@ -27,10 +27,22 @@ the wallet's screens.
   packages rely on, such as storage, windows and messaging.
 - **`src/hardware/`**: the connections to Ledger and Keystone devices.
 
-## Where it sits
+## Location
 
 ```text
-dApp page → content script → background → handler → @gleam/core
+  @gleam/app         dApp page
+       │                 │
+       │          content script
+       │                 │
+       └────────┬────────┘
+                ▼
+           background        checks the site
+                │
+                ▼
+             handler         runs the request
+                │
+                ▼
+           @gleam/core
 ```
 
 1. The dApp calls `window.arweaveWallet`, which passes the request to

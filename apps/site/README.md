@@ -13,6 +13,8 @@ finished scan to the wallet so the user can sign it.
 
 - **`index.html`, `privacy.html`, `terms.html`, `security.html`**: the
   main pages of the site.
+- **`android.html`, `ios.html`**: how to install the Android (APK) and
+  iPhone (TestFlight) betas, behind the `/android` and `/ios` redirects.
 - **`welcome.html`, `goodbye.html`, `feedback.html`**: the pages people
   see around installing and uninstalling the extension.
 - **`points.html`, `invite.html`, `program.*`**: Gleam Points and
@@ -23,9 +25,12 @@ finished scan to the wallet so the user can sign it.
   screen.
 - **`img/`, `fonts/`, `*.css`**: images, fonts and styles.
 
-## Where it sits
+## Location
 
 ```text
-website pages ⇄ wallet (invites, scan attestations)
-website pages → points-api (stats, scan rewards)
+            website
+       ┌───────┴───────┐
+       ▼               ▼
+     wallet        points-api
+ invites, scans  stats, rewards
 ```

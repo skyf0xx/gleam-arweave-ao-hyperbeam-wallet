@@ -12,7 +12,7 @@ describe("getUsdPrice", () => {
   it("reads the price from the server's proxy, not from a price provider", async () => {
     const fetchImpl = fakeFetch({ prices: { arweave: 11.23 } });
     expect(await getUsdPrice(AR, API, fetchImpl)).toBe(11.23);
-    expect(fetchImpl).toHaveBeenCalledWith(`${API}/prices?ids=arweave`);
+    expect(fetchImpl).toHaveBeenCalledWith(`${API}/prices?ids=arweave`, { signal: expect.any(AbortSignal) });
   });
 
   it("returns null when the id is null or absent in the response", async () => {

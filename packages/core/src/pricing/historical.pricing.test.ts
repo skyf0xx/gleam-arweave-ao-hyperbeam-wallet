@@ -26,7 +26,7 @@ describe("getHistoricalUsdPrices", () => {
       { timestamp: 1000, usd: 10 },
       { timestamp: 2000, usd: 12.5 },
     ]);
-    expect(fetchImpl).toHaveBeenCalledWith(`${API}/prices/history?id=arweave&range=7D`);
+    expect(fetchImpl).toHaveBeenCalledWith(`${API}/prices/history?id=arweave&range=7D`, { signal: expect.any(AbortSignal) });
   });
 
   it("drops malformed points", async () => {
