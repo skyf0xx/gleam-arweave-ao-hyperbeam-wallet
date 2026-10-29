@@ -1,5 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/android",
+      "destination": "https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest/download/gleam.apk",
+      "permanent": false
+    },
+    { "source": "/ios", "destination": "https://testflight.apple.com/join/y2t2HeCH", "permanent": false },
+    {
+      "source": "/chrome",
+      "destination": "https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
