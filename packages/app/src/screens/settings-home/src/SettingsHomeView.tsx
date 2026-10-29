@@ -11,7 +11,6 @@ import type {
 } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
-import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { useDisplaySettings } from "../../../display-settings";
 import { REPO_URL } from "@gleam/core";
 import { AboutBuild } from "./AboutBuild";
@@ -222,10 +221,8 @@ export function SettingsHomeView({
 
         <div className="mt-auto">
           <OptionSection title="Help & About">
-            <div className="flex flex-col gap-3 pt-3">
-              <FeedbackCard onClick={onOpenFeedback} />
-              <SourceLink />
-            </div>
+            <FeedbackCard onClick={onOpenFeedback} />
+            <SourceLink />
             <AboutBuild runtime={runtime} version={version} />
           </OptionSection>
         </div>
@@ -334,23 +331,30 @@ function ToggleRow({
   );
 }
 
-/**
- * Sits apart from the setting rows: it leaves the wallet for the website's
- * feedback form, so it reads as an invitation rather than another setting.
- */
+/** The geometry every Help & About row shares with `OptionRow`: no horizontal inset, a 20px leading icon box, the trailing icon on the right edge. */
+const HELP_ROW =
+  "flex w-full items-center gap-2.5 py-3.5 text-left hover:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground";
+
+function LeadingIcon({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span aria-hidden="true" className={`flex h-5 w-5 shrink-0 items-center justify-center ${className ?? "text-foreground"}`}>
+      {children}
+    </span>
+  );
+}
+
+/** It leaves the wallet for the website's feedback form, so the trailing icon marks it as a link out. */
 function FeedbackCard({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl bg-mist px-4 py-4 text-left transition-colors hover:bg-line"
-    >
-      <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <Beam className="w-8" />
+    <button type="button" onClick={onClick} className={HELP_ROW}>
+      <LeadingIcon>
+        <FeedbackIcon />
+      </LeadingIcon>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-label font-semibold text-foreground">Got an issue or suggestion?</span>
         <span className="text-caption text-muted">Send us a message</span>
       </span>
-      <span aria-hidden="true" className="shrink-0 text-muted">
+      <span aria-hidden="true" className="shrink-0 text-faint">
         <ExternalIcon />
       </span>
     </button>
@@ -360,23 +364,31 @@ function FeedbackCard({ onClick }: { onClick: () => void }) {
 /** A wallet asks for trust, so the source sits one click away. */
 function SourceLink() {
   return (
-    <a
-      href={REPO_URL}
-      target="_blank"
-      rel="noreferrer"
-      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-mist phone:px-0"
-    >
-      <span aria-hidden="true" className="shrink-0 text-foreground">
+    <a href={REPO_URL} target="_blank" rel="noreferrer" className={HELP_ROW}>
+      <LeadingIcon>
         <GitHubIcon />
-      </span>
+      </LeadingIcon>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-label font-semibold text-foreground">Gleam is open source</span>
         <span className="text-caption text-muted">MIT licensed. Read the code on GitHub</span>
       </span>
-      <span aria-hidden="true" className="shrink-0 text-muted">
+      <span aria-hidden="true" className="shrink-0 text-faint">
         <ExternalIcon />
       </span>
     </a>
+  );
+}
+
+function FeedbackIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -390,7 +402,7 @@ function GitHubIcon() {
 
 function ExternalIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
         stroke="currentColor"
