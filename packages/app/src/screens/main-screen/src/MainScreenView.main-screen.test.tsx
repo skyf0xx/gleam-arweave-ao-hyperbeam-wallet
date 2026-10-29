@@ -343,6 +343,30 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
 
     await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
   });
+
+  it("keeps the portfolio banner up and shows Retrying until the retry lands", async () => {
+    let portfolioCalls = 0;
+    let finishRetry!: () => void;
+    const base = successfulSend();
+    const send = vi.fn(async (message: Parameters<RuntimePort["send"]>[0]) => {
+      if (message.type !== "getPortfolioHistory") return base(message);
+      portfolioCalls += 1;
+      // The first fetch and its one automatic retry fail; the user's Retry then waits on `finishRetry`.
+      if (portfolioCalls <= 2) throw new Error("unreachable");
+      await new Promise<void>((resolve) => (finishRetry = resolve));
+      return PORTFOLIO_HISTORY_7D;
+    }) as RuntimePort["send"];
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    expect(screen.getByRole("button", { name: "Retrying" })).toBeTruthy();
+    await waitFor(() => expect(portfolioCalls).toBe(3));
+    expect(screen.getByRole("button", { name: "Retrying" })).toBeTruthy();
+
+    finishRetry();
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
+    expect(screen.queryByText(/couldn't reach the network/i)).toBeNull();
+  });
   it("formats a large %-change with thousands separators", async () => {
     const send = successfulSend({ portfolioHistory: { ...PORTFOLIO_HISTORY_7D, change: 27.6866 } });
     renderMainScreen({ runtime: fakeRuntime({ send }) });

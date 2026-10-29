@@ -85,6 +85,8 @@ export interface PortfolioChartProps {
    * `NetworkErrorBanner`; the range tabs below stay rendered regardless.
    */
   onRetry?: () => void;
+  /** With `onRetry`: the retry is in flight, so the banner shows it's working. */
+  retrying?: boolean;
   scope?: PortfolioScope;
   /** Makes the chart area toggle `scope`. Leave unset when there's only one wallet. */
   onToggleScope?: () => void;
@@ -207,6 +209,7 @@ export function PortfolioChart({
   cachedFetching = false,
   walletKey = "",
   onRetry,
+  retrying,
   scope = "wallet",
   onToggleScope,
   headline,
@@ -339,7 +342,7 @@ export function PortfolioChart({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {onRetry ? (
-        <NetworkErrorBanner onRetry={onRetry} className="phone:mx-0 phone:mt-0" />
+        <NetworkErrorBanner onRetry={onRetry} retrying={retrying} className="phone:mx-0 phone:mt-0" />
       ) : compact ? (
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">{figures}</div>

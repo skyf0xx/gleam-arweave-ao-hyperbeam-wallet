@@ -1,4 +1,8 @@
+import { useEffect, useState } from "react";
 import { cn } from "../../primitives/cn";
+
+/** A retry that fails faster than this would bring the banner straight back, as if the tap did nothing. */
+export const NETWORK_RETRY_MIN_MS = 700;
 
 /**
  * The shared network-unreachable banner — direct, specific,
@@ -7,11 +11,21 @@ import { cn } from "../../primitives/cn";
  */
 export interface NetworkErrorBannerProps {
   onRetry: () => void;
+  /** True while the caller's retry is in flight; the button shows it's working instead of going quiet. */
+  retrying?: boolean;
   /** On the phone the banner insets itself to the gutter; `phone:mx-0` where the parent already does. */
   className?: string;
 }
 
-export function NetworkErrorBanner({ onRetry, className }: NetworkErrorBannerProps) {
+export function NetworkErrorBanner({ onRetry, retrying = false, className }: NetworkErrorBannerProps) {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!held) return;
+    const timer = window.setTimeout(() => setHeld(false), NETWORK_RETRY_MIN_MS);
+    return () => window.clearTimeout(timer);
+  }, [held]);
+  const busy = retrying || held;
+
   return (
     <div className={cn("flex items-center gap-2.5 border-b border-line bg-mist px-4 py-3 phone:mx-5 phone:mt-2 phone:rounded-xl phone:border-b-0 phone:py-1.5 phone:pl-3.5 phone:pr-1", className)}>
       <svg
@@ -30,10 +44,22 @@ export function NetworkErrorBanner({ onRetry, className }: NetworkErrorBannerPro
       </p>
       <button
         type="button"
-        onClick={onRetry}
-        className="flex-shrink-0 p-1 text-caption font-semibold text-foreground underline decoration-faint underline-offset-2 phone:flex phone:min-h-11 phone:items-center phone:px-3"
+        onClick={() => {
+          setHeld(true);
+          onRetry();
+        }}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        className="flex flex-shrink-0 items-center gap-1.5 p-1 text-caption font-semibold text-foreground underline decoration-faint underline-offset-2 disabled:text-muted disabled:no-underline phone:min-h-11 phone:px-3"
       >
-        Retry
+        {busy ? (
+          <>
+            <span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-muted/30 border-t-muted animate-spin motion-reduce:animate-none" />
+            Retrying
+          </>
+        ) : (
+          "Retry"
+        )}
       </button>
     </div>
   );
