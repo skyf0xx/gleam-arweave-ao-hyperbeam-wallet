@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { RuntimePort } from "@gleam/core";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { fakeAppPlatform } from "../../../app-platform/testing";
@@ -50,13 +50,13 @@ function fakeRuntime(sites = { saved: [] as string[], recent: [] as string[] }, 
   return { runtime: { send, onMessage: () => () => {} } as unknown as RuntimePort, send };
 }
 
-function mount(options: { browser?: DappBrowserPort; runtime?: RuntimePort; initialUrl?: string; onBack?: () => void } = {}) {
+function mount(options: { dappBrowser?: boolean; browser?: DappBrowserPort; runtime?: RuntimePort; initialUrl?: string; onBack?: () => void } = {}) {
   const browser = options.browser ?? fakeBrowser().port;
   const runtime = options.runtime ?? fakeRuntime().runtime;
   const stack = createBackStack();
   const props = { onBack: options.onBack ?? vi.fn(), onOpenConnectedApp: vi.fn(), onLocked: vi.fn() };
   render(
-    <PlatformProvider platform={fakeAppPlatform({ dappBrowser: browser, runtime })}>
+    <PlatformProvider platform={fakeAppPlatform({ dappBrowser: browser, runtime, capabilities: { dappBrowser: options.dappBrowser ?? true } })}>
       <BackStackContext.Provider value={stack}>
         <BrowserView runtime={runtime} initialUrl={options.initialUrl} {...props} />
       </BackStackContext.Provider>
@@ -66,6 +66,47 @@ function mount(options: { browser?: DappBrowserPort; runtime?: RuntimePort; init
 }
 
 describe("BrowserView start screen", () => {
+  it("clears site data and recent sites from the start screen", async () => {
+    const browser = fakeBrowser();
+    const { runtime, send } = fakeRuntime({ saved: [], recent: ["https://recent.example"] });
+    mount({ browser: browser.port, runtime });
+
+    await screen.findByText("recent.example");
+    fireEvent.click(screen.getByRole("button", { name: "Clear recent sites" }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "clearRecentSites", payload: undefined }));
+
+    fireEvent.click(screen.getByText("Clear site data"));
+    fireEvent.click(within(screen.getByRole("group", { name: "Clear site data" })).getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(browser.port.clearSiteData).toHaveBeenCalled());
+    expect(await screen.findAllByText("Cleared")).toHaveLength(2);
+  });
+
+  it("asks before clearing site data, and clears nothing until confirmed", async () => {
+    const browser = fakeBrowser();
+    mount({ browser: browser.port });
+
+    fireEvent.click(await screen.findByText("Clear site data"));
+    expect(screen.getByText("Sign out of all sites and delete what they stored?")).toBeTruthy();
+    expect(browser.port.clearSiteData).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Sign out of all sites and delete what they stored?")).toBeNull();
+    expect(browser.port.clearSiteData).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Clear site data"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(browser.port.clearSiteData).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Cleared")).toBeTruthy();
+  });
+
+  it("leaves the clear actions out where the host has no dApp browser", async () => {
+    const { runtime } = fakeRuntime({ saved: [], recent: ["https://recent.example"] });
+    mount({ runtime, dappBrowser: false });
+    await screen.findByText("recent.example");
+    expect(screen.queryByText("Clear site data")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Clear recent sites" })).toBeNull();
+  });
+
   it("lists saved sites, then the built-in dApps, then recent ones, and opens no page", async () => {
     const browser = fakeBrowser();
     const { runtime } = fakeRuntime({ saved: ["https://mine.example"], recent: ["https://recent.example", "https://mine.example"] });
@@ -179,8 +220,29 @@ describe("BrowserView with a page", () => {
     expect(onBack).not.toHaveBeenCalled();
 
     await browser.emit({ kind: "navigation", url: "https://a.example/", canGoBack: false, loading: false });
-    expect(stack.handle()).toBe(true);
+    act(() => {
+      expect(stack.handle()).toBe(true);
+    });
+    // The first page closes onto the start screen; only a second press leaves the browser.
+    expect(onBack).not.toHaveBeenCalled();
+    await waitFor(() => expect(browser.port.close).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("page-placeholder")).toBeNull();
+    expect(screen.getByLabelText("Address")).toBeTruthy();
+
+    act(() => {
+      expect(stack.handle()).toBe(true);
+    });
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns to the start screen when the close button is tapped", async () => {
+    const browser = fakeBrowser();
+    const { onBack } = mount({ browser: browser.port, initialUrl: "https://a.example/" });
+    fireEvent.click(screen.getByLabelText("Close browser"));
+
+    await waitFor(() => expect(browser.port.close).toHaveBeenCalledTimes(1));
+    expect(onBack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("page-placeholder")).toBeNull();
   });
 
   it("offers a retry over a page that failed to load", async () => {

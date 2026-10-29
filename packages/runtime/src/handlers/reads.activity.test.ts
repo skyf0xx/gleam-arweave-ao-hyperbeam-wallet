@@ -960,6 +960,33 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     expect(activeOnly.currentValue).toBe(40);
   });
 
+  it("prices the wallet the caller names, not the active one, and refuses an address that isn't stored", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:wallets", [
+      { id: "w1", address: "addr1", name: "Wallet One", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+      { id: "w2", address: "addr2", name: "Wallet Two", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
+    ]);
+    await storage.set("local:activeWalletId", "w1");
+    await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null });
+
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
+      if (url.includes("wallet/addr2/balance")) return { ok: true, status: 200, text: async () => "3000000000000" }; // 3 AR
+      if (url.includes("/prices/history")) {
+        return { ok: true, status: 200, json: async () => ({ series: [{ timestamp: 1000, usd: 10 }, { timestamp: 2000, usd: 20 }] }) };
+      }
+      throw new Error(`Unexpected fetch url: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const handler = new ReadsHandler(storage);
+    const named = await handler.getPortfolioHistory({ range: "7D", address: "addr2", scope: "wallet" });
+    expect(named.currentValue).toBe(60);
+
+    await expect(handler.getPortfolioHistory({ range: "7D", address: "stranger", scope: "wallet" })).rejects.toThrow(
+      /isn't in Gleam/,
+    );
+  });
+
   it("falls back to an empty series (not a thrown error) when both price sources fail", async () => {
     const storage = createFakeStorage();
     await storage.set("local:wallets", [

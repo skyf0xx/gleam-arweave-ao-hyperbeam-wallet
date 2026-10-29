@@ -3,7 +3,7 @@ import type { RuntimePort } from "@gleam/core";
 import type { ReactElement, ReactNode } from "react";
 import { PlatformProvider } from "./context";
 import { unavailableDappBrowser } from "./dapp-browser";
-import type { AppPlatform } from "./types";
+import type { AppPlatform, QueryCachePort } from "./types";
 
 export type FakeAppPlatformOverrides = Partial<Omit<AppPlatform, "buildInfo" | "capabilities">> & {
   buildInfo?: Partial<AppPlatform["buildInfo"]>;
@@ -19,6 +19,24 @@ const UNWIRED_RUNTIME: RuntimePort = {
   },
   onMessage: () => () => {},
 };
+
+/** An in-memory `QueryCachePort`; `entries` is exposed for assertions. */
+export function memoryQueryCache(entries = new Map<string, string>()): QueryCachePort & { entries: Map<string, string> } {
+  return {
+    entries,
+    get: async (key) => entries.get(key) ?? null,
+    set: async (key, value) => {
+      entries.set(key, value);
+    },
+    remove: async (key) => {
+      entries.delete(key);
+    },
+    keys: async () => [...entries.keys()],
+    clear: async () => {
+      entries.clear();
+    },
+  };
+}
 
 export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPlatform {
   const state = new Map<string, unknown>();
@@ -49,6 +67,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
         state.delete(key);
       },
     },
+    queryCache: overrides.queryCache ?? memoryQueryCache(),
     unlock: overrides.unlock ?? { passkeyMode: "inline", openPasskeyWindow: async () => {} },
     biometrics: overrides.biometrics ?? {
       availability: async () => ({ available: false, reason: "unavailable" }),

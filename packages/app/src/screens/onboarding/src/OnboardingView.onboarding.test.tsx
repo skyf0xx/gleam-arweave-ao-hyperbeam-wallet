@@ -72,7 +72,7 @@ describe("OnboardingView: create flow", () => {
     expect(send).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
-    await waitFor(() => expect(screen.getByText("Pick your security phrase")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Pick your anti-phishing phrase")).toBeTruthy());
     expect(onComplete).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText("Word"), { target: { value: "willow" } });
@@ -110,7 +110,7 @@ describe("OnboardingView: create flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
     expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
-    expect(screen.queryByText("Pick your security phrase")).toBeNull();
+    expect(screen.queryByText("Pick your anti-phishing phrase")).toBeNull();
   });
 
   async function reachBackup(send: RuntimePort["send"], requestDownloadPermission = vi.fn(async () => true)) {

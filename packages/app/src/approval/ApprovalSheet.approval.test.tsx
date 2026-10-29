@@ -81,6 +81,17 @@ describe("ApprovalSheet", () => {
     expect(layoutRoot.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
+  it("scrolls the request inside the capped sheet", async () => {
+    const { port, show } = fakePort();
+    mount(port);
+    await show("req-1");
+
+    const scroller = (await screen.findByText(/bazar\.arweave\.net/)).closest(".overflow-y-auto");
+
+    expect(scroller).not.toBeNull();
+    expect(scroller?.parentElement?.className).toContain("overflow-hidden");
+  });
+
   it("reports a dismissal when the user presses Escape", async () => {
     const { port, show } = fakePort();
     mount(port);

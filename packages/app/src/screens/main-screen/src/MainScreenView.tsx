@@ -2,7 +2,14 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { explorerUrlFor, isWatchWalletMethod, type Collectible, type CollectibleRef, type DisplayCurrency, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
-import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
+import {
+  DEFAULT_AO_TOKEN,
+  DEFAULT_AR_TOKEN,
+  PullToRefreshIndicator,
+  REFRESH_DIM_DELAY_MS,
+  useDelayedFlag,
+  usePullToRefresh,
+} from "@gleam/ui";
 import {
   AccountAvatar,
   ActivityRow,
@@ -121,7 +128,9 @@ interface DefaultTokenRow {
   name: string;
   logoUrl: string;
   amount: string;
-  value: string | undefined;
+  /** `amount` in display units, only for drawing a tick between two figures; `undefined` when there's no figure. */
+  amountNumber: number | undefined;
+  value: { text: string; number: number } | undefined;
   send: "ar" | TokenBalance | null;
 }
 
@@ -150,9 +159,16 @@ function valueFor(
   currency: DisplayCurrency | undefined,
   processId: string | null,
   amount: number,
-): string | undefined {
+): { text: string; number: number } | undefined {
   const price = prices?.find((entry) => entry.processId === processId)?.price;
-  return typeof price === "number" && currency ? formatCurrencyValue(amount * price, currency) : undefined;
+  if (typeof price !== "number" || !currency) return undefined;
+  const number = amount * price;
+  return { text: formatCurrencyValue(number, currency), number };
+}
+
+/** Whether a figure kept from before this screen opened is being read again. */
+function refreshingCached(query: { isFetching: boolean; isSuccess: boolean; dataUpdatedAt: number }, openedAt: number): boolean {
+  return query.isFetching && query.isSuccess && query.dataUpdatedAt < openedAt;
 }
 
 /**
@@ -178,6 +194,7 @@ function buildDefaultTokenRows(
       name: DEFAULT_AR_TOKEN.name,
       logoUrl: DEFAULT_AR_TOKEN.logoUrl,
       amount: data?.arBalance !== undefined ? formatWinstonAsAr(data.arBalance) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
+      amountNumber: data?.arBalance !== undefined ? arAmount : undefined,
       value: data?.arBalance !== undefined ? valueFor(prices, currency, null, arAmount) : undefined,
       send: "ar",
     },
@@ -191,6 +208,7 @@ function buildDefaultTokenRows(
         : aoBalance
           ? UNAVAILABLE_BALANCE_LABEL
           : DEFAULT_AO_TOKEN.defaultDisplayAmount,
+      amountNumber: aoAvailable ? aoAmount : undefined,
       value: aoAvailable ? valueFor(prices, currency, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
       send: aoAvailable ? (aoBalance ?? null) : null,
     },
@@ -314,6 +332,7 @@ export function MainScreenView({
   onTabChange,
 }: MainScreenViewProps) {
   const [activeTab, setActiveTab] = useState<MainScreenTab>(initialTab);
+  const [openedAt] = useState(Date.now);
   // Discovery is slow, so it starts on first open rather than with the main screen.
   const [collectiblesOpened, setCollectiblesOpened] = useState(initialTab === "collectibles");
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
@@ -390,7 +409,30 @@ export function MainScreenView({
     enabled: !otherWalletsQuery.isPending,
   });
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pullState = usePullToRefresh({
+    target: rootRef,
+    onRefresh: () =>
+      Promise.allSettled([
+        balancesQuery.refetch(),
+        activityQuery.refetch(),
+        tokenPricesQuery.refetch(),
+        portfolioHistoryQuery.refetch(),
+        ...(collectiblesOpened ? [collectiblesQuery.refetch()] : []),
+      ]),
+  });
+
   const defaultTokenRows = buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data, currency);
+  // A refetch that lands within the delay never dims anything.
+  const tokensRefreshing = useDelayedFlag(
+    refreshingCached(balancesQuery, openedAt) || refreshingCached(tokenPricesQuery, openedAt),
+    REFRESH_DIM_DELAY_MS,
+  );
+  const collectiblesRefreshing = useDelayedFlag(refreshingCached(collectiblesQuery, openedAt), REFRESH_DIM_DELAY_MS);
+  const activityRefreshing = useDelayedFlag(refreshingCached(activityQuery, openedAt), REFRESH_DIM_DELAY_MS);
+  // The total waits for every input, so it ticks once instead of once per query.
+  const holdTotal = balancesQuery.isFetching || tokenPricesQuery.isFetching || portfolioHistoryQuery.isFetching;
+  const portfolioHasSeries = (portfolioHistoryQuery.data?.series.length ?? 0) > 0;
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 
@@ -519,7 +561,7 @@ export function MainScreenView({
   );
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div ref={rootRef} className="flex min-h-full flex-col">
       {loadError ? (
         <NetworkErrorBanner
           onRetry={() => {
@@ -590,6 +632,8 @@ export function MainScreenView({
         </div>
       </div>
 
+      <PullToRefreshIndicator {...pullState} />
+
       <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
       <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
 
@@ -617,13 +661,15 @@ export function MainScreenView({
                 headlineRow
                   ? headlineRow.amount === UNAVAILABLE_BALANCE_LABEL
                     ? { amount: `${headlineRow.ticker} unavailable` }
-                    : { amount: headlineRow.amount, unit: headlineRow.ticker }
+                    : { amount: headlineRow.amount, unit: headlineRow.ticker, value: headlineRow.amountNumber }
                   : undefined
               }
               masked={masked}
               onToggleMasked={displaySettings ? toggleMasked : undefined}
               compact={compactHeader}
-              loading={portfolioHistoryQuery.isPending || portfolioHistoryQuery.isFetching}
+              loading={portfolioHistoryQuery.isPending || (portfolioHistoryQuery.isFetching && !portfolioHasSeries)}
+              refreshing={refreshingCached(portfolioHistoryQuery, openedAt)}
+              hold={holdTotal}
               /**
                * `series: []` on a *resolved* response (no thrown query
                * error) is `getPortfolioHistory`'s own signal that both AR
@@ -642,7 +688,8 @@ export function MainScreenView({
                * of leaving it on screen, inert, for the duration of the
                * refetch. `isFetching` rather than `isLoading` for
                * `loading`: a Retry re-runs an already-errored query,
-               * which `isLoading` never reflects.
+               * which `isLoading` never reflects. A series already on
+               * screen stays through a refetch, marked by `refreshing`.
                */
               onRetry={
                 !portfolioHistoryQuery.isFetching &&
@@ -755,9 +802,14 @@ export function MainScreenView({
                       <TokenRow
                         glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: showTokenLogos ? row.logoUrl : undefined }}
                         name={row.name}
-                        amount={masked ? HIDDEN_AMOUNT : row.amount}
-                        value={masked && row.value !== undefined ? HIDDEN_AMOUNT : row.value}
+                        amount={
+                          masked ? HIDDEN_AMOUNT : row.amount
+                        }
+                        value={
+                          row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
+                        }
                         loading={loading}
+                        refreshing={tokensRefreshing}
                         onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                         className="border-b-0"
                       />
@@ -793,6 +845,7 @@ export function MainScreenView({
                                 : formatAtomicAsDisplay(token.quantity, token.denomination)
                           }
                           loading={loading}
+                          refreshing={tokensRefreshing}
                           onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
                           className="border-b-0"
                         />
@@ -901,7 +954,11 @@ export function MainScreenView({
             )}
           </div>
         ) : activeTab === "collectibles" ? (
-          <div className="min-h-60 border-t border-line pt-3.5 phone:min-h-0 phone:border-t-0 phone:pt-1">
+          <div
+            className={`min-h-60 border-t border-line pt-3.5 transition-opacity duration-300 phone:min-h-0 phone:border-t-0 phone:pt-1 ${
+              collectiblesRefreshing ? "opacity-85" : ""
+            }`}
+          >
             {collectiblesQuery.error && !collectiblesQuery.data ? (
               <NetworkErrorBanner onRetry={() => void collectiblesQuery.refetch()} className="phone:mx-0 phone:mt-0" />
             ) : (
@@ -914,7 +971,11 @@ export function MainScreenView({
           </div>
         ) : (
           <>
-            <div className="min-h-60 border-t border-line phone:min-h-0 phone:border-t-0">
+            <div
+              className={`min-h-60 border-t border-line transition-opacity duration-300 phone:min-h-0 phone:border-t-0 ${
+                activityRefreshing ? "opacity-85" : ""
+              }`}
+            >
               {loading && !hasLoadedOnce ? (
                 <>
                   <SkeletonRow />

@@ -102,7 +102,7 @@ export function QrScanner({ expectedType, onProgress, onComplete, onError }: QrS
       muted
       playsInline
       aria-label="Camera preview"
-      className="aspect-square w-full rounded-lg border border-line bg-mist object-cover"
+      className="mx-auto aspect-square w-full max-w-[min(100%,45dvh)] rounded-lg border border-line bg-mist object-cover"
     />
   );
 }

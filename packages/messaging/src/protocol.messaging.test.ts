@@ -123,9 +123,10 @@ describe("ProtocolMap", () => {
     }>();
   });
 
-  it("getPortfolioHistory takes one of the 5 range tabs, an optional scope and the display currency, and returns the series plus its precomputed summary", () => {
+  it("getPortfolioHistory takes one of the 5 range tabs, an optional wallet address and scope, and the display currency, and returns the series plus its precomputed summary", () => {
     expectTypeOf<Parameters<ProtocolMap["getPortfolioHistory"]>[0]>().toEqualTypeOf<{
       range: "24H" | "7D" | "1M" | "1Y" | "ALL";
+      address?: string;
       scope?: "wallet" | "all";
       currency: DisplayCurrency;
     }>();

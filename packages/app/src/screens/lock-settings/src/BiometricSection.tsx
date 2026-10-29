@@ -5,7 +5,7 @@ import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import type { BiometricAvailability, BiometricUnlockPort } from "../../../app-platform/types";
 import { BiometricError, biometryLabel, biometryTitle } from "../../../biometrics/biometrics";
-import { BiometricIcon } from "../../unlock/src/UnlockScreen";
+import { BiometricIcon, Spinner } from "../../unlock/src/UnlockScreen";
 
 type Notice = { text: string; tone: "muted" | "error" };
 
@@ -163,7 +163,18 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
               Cancel
             </Button>
             <Button type="submit" disabled={busy || password.length === 0} aria-busy={busy} className="flex-1">
-              {state.phase === "checking" ? "Checking…" : state.phase === "enrolling" ? `Waiting for ${label}…` : "Turn on"}
+              {state.phase === "checking" ? (
+                "Checking…"
+              ) : state.phase === "enrolling" ? (
+                // The full text would wrap on a phone; screen readers still get it.
+                <>
+                  <Spinner />
+                  <span aria-hidden="true">Waiting…</span>
+                  <span className="sr-only">Waiting for {label}…</span>
+                </>
+              ) : (
+                "Turn on"
+              )}
             </Button>
           </div>
         </form>

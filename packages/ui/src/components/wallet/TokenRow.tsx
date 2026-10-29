@@ -19,10 +19,11 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * holding's value in the display currency.
  *
  * `loading` is for a background refresh of an already-rendered row (e.g.
- * a price re-poll) — it dims the existing value in place rather than
- * tearing the row down to a shimmer skeleton, so a value that's already
- * on screen never disappears. First-ever load is still the caller
- * swapping in `SkeletonRow` instead of mounting `TokenRow` at all.
+ * a cached balance being read again) — it dims the existing figures in
+ * place rather than tearing the row down to a shimmer skeleton, so a
+ * value that's already on screen never disappears. First-ever load is
+ * still the caller swapping in `SkeletonRow` instead of mounting
+ * `TokenRow` at all.
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone" | "logoUrl">;
@@ -32,19 +33,22 @@ export interface TokenRowProps {
    */
   icon?: ReactNode;
   name: string;
-  amount: string;
+  /** A formatted string. It swaps in place; only the portfolio total ticks. */
+  amount: ReactNode;
   /**
    * The unabbreviated amount when `amount` is shortened ("1.2K"). Shown on
    * hover and read by screen readers in place of the short form.
    */
   amountFull?: string;
-  value?: string;
+  value?: ReactNode;
   loading?: boolean;
+  /** A cached figure is being read again for long enough to notice: a light dim, not the `loading` one. */
+  refreshing?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
-export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading = false, refreshing = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -59,7 +63,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
       {icon ?? <TokenGlyph {...glyph} />}
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
-        <div className="text-caption tabular-nums text-muted" title={amountFull}>
+        <div className={cn("text-caption tabular-nums text-muted transition-opacity", loading && "opacity-50", refreshing && !loading && "opacity-85 duration-300")} title={amountFull}>
           {amountFull ? (
             <>
               <span aria-hidden="true" className="phone:hidden">
@@ -74,7 +78,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
         </div>
       </div>
       {value ? (
-        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", loading && "opacity-50 transition-opacity", "phone:group-data-editing:invisible")}>
+        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", "transition-opacity", loading && "opacity-50", refreshing && !loading && "opacity-85 duration-300", "phone:group-data-editing:invisible")}>
           {value}
         </div>
       ) : null}

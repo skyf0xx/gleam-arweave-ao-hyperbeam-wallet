@@ -13,7 +13,8 @@ export interface AddressChunk {
  * The address cut into 4-character chunks in two rows, the first one
  * chunk longer than half (a 43-character Arweave address reads 7 · 4). The first and last
  * chunks are emphasised, plus two middle ones picked by `emphasisPick`.
- * An attacker grinding a lookalike matches the ends people check; the
+ * The phone layout ignores this row split and re-flows the flat chunk list
+ * into 4 · 4 · 3 with CSS (`MemorableAddress`). An attacker grinding a lookalike matches the ends people check; the
  * middle pair is the user's own, so a fake can't know which chunks to copy.
  */
 export function chunkAddress(address: string, emphasisPick: number | null): AddressChunk[][] {

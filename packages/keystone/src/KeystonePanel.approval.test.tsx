@@ -71,6 +71,12 @@ describe("KeystonePanel", () => {
     expect(props.onError).not.toHaveBeenCalled();
   });
 
+  it("bounds the QR by the viewport height as well as its width", () => {
+    renderPanel();
+    const frame = screen.getByRole("img", { name: "Signing request for Keystone" }).parentElement;
+    expect(frame?.className).toMatch(/max-w-\[min\([^\]]*dvh\)\]/);
+  });
+
   it("walks a batch item by item and returns the signatures in order", () => {
     const props = renderPanel({ payloads: [dataItem(1), dataItem(2)] });
     expect(screen.getByText("Item 1 of 2")).toBeTruthy();

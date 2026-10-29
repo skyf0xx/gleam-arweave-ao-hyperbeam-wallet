@@ -20,7 +20,7 @@ export function SecurityPhraseMark({ phrase, iconSvg, layout = "inline", classNa
   return (
     <div
       role="img"
-      aria-label={`Your security phrase: ${phrase.word}`}
+      aria-label={`Your anti-phishing phrase: ${phrase.word}`}
       className={cn(stacked ? "flex flex-col items-center gap-1.5" : "inline-flex items-center gap-2", className)}
     >
       <SecurityPhraseIcon svgMarkup={iconSvg} size={stacked ? 44 : 22} />

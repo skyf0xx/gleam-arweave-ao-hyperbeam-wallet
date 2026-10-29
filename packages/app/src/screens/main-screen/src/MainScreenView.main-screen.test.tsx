@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { renderWithPlatform as render } from "../../../app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
@@ -219,7 +219,7 @@ describe("MainScreenView display settings", () => {
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "EUR" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "wallet", currency: "EUR" } }),
     );
     expect(send).toHaveBeenCalledWith({ type: "getTokenPrices", payload: { currency: "EUR" } });
     const euros = (value: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(value);
@@ -266,7 +266,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "wallet", currency: "USD" } }),
     );
     await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     expect(screen.queryByText("Last 7 days")).toBeNull();
@@ -366,7 +366,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     fireEvent.click(await screen.findByRole("button", { name: "Show all wallets" }));
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all", currency: "USD" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "all", currency: "USD" } }),
     );
     expect(screen.getByText("All wallets")).toBeTruthy();
     expect(window.localStorage.getItem("gleam:portfolioScope")).toBe("all");
@@ -385,10 +385,10 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all", currency: "USD" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "all", currency: "USD" } }),
     );
     expect(screen.getByRole("button", { name: "Show this wallet" }).getAttribute("aria-pressed")).toBe("true");
-    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } });
+    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "wallet", currency: "USD" } });
   });
 });
 
@@ -1155,5 +1155,61 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
     await waitFor(() => expect(screen.getByText("+1 AR")).toBeTruthy());
+  });
+});
+
+describe("MainScreenView pull to refresh", () => {
+  afterEach(() => {
+    delete document.body.dataset.layout;
+  });
+
+  function pullDown(el: Element) {
+    const fire = (type: string, y: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, { touches: type === "touchend" ? [] : [{ clientX: 50, clientY: y }] });
+      act(() => {
+        el.dispatchEvent(event);
+      });
+    };
+    fire("touchstart", 100);
+    fire("touchmove", 260);
+    fire("touchend", 260);
+  }
+
+  const calls = (send: RuntimePort["send"], type: string) =>
+    (send as ReturnType<typeof vi.fn>).mock.calls.filter(([m]) => m.type === type).length;
+
+  it("refetches balances, activity, prices and the chart on a phone", async () => {
+    document.body.dataset.layout = "phone";
+    const send = successfulSend();
+    const { container } = renderMainScreen({ runtime: fakeRuntime({ send }) });
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
+    const before = ["getBalance", "getActivity", "getTokenPrices", "getPortfolioHistory"].map((t) => calls(send, t));
+
+    pullDown(container.firstElementChild!);
+
+    await waitFor(() =>
+      ["getBalance", "getActivity", "getTokenPrices", "getPortfolioHistory"].forEach((t, i) =>
+        expect(calls(send, t)).toBeGreaterThan(before[i]!),
+      ),
+    );
+  });
+
+  it("shows the network error banner when the refresh fails", async () => {
+    document.body.dataset.layout = "phone";
+    let failing = false;
+    const ok = successfulSend();
+    const send = vi.fn(async (message: { type: string }) => {
+      if (failing && message.type === "getBalance") throw new Error("offline");
+      return (ok as (m: unknown) => Promise<unknown>)(message);
+    }) as RuntimePort["send"];
+    const { container } = renderMainScreen({ runtime: fakeRuntime({ send }) });
+    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
+    expect(screen.queryByText(/couldn't reach the network/i)).toBeNull();
+
+    failing = true;
+    pullDown(container.firstElementChild!);
+
+    await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
   });
 });

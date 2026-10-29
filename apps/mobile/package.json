@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "ios": "vite build && cap sync ios && cap open ios",
-    "android": "vite build && cap sync android && cap open android"
+    "android": "vite build && cap sync android && cap open android",
+    "android:wifi": "scripts/android-wireless.sh"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "8.0.0",

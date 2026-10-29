@@ -220,7 +220,7 @@ function QuickUnlockButtons({
   );
 }
 
-function Spinner() {
+export function Spinner() {
   return (
     <span
       aria-hidden="true"

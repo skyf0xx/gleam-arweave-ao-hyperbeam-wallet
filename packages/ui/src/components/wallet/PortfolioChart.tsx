@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
 import { formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
+import { useAnimatedNumber } from "../../primitives/animated-number";
+import { REFRESH_DIM_DELAY_MS, useDelayedFlag } from "../../primitives/use-delayed-flag";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
@@ -38,6 +40,10 @@ import { NetworkErrorBanner } from "./NetworkErrorBanner";
  * `compact` moves the chart beside the figures as a small sparkline, which
  * leaves more of the popup for the token list.
  *
+ * `loading` has nothing to show yet, so the chart shimmers. `refreshing`
+ * has a cached figure on screen while it's read again: the figures dim
+ * lightly if that takes over a moment, and the total ticks once to the new figure.
+ *
  * Color rule: reuses `--color-positive` for gains and `--color-negative`
  * for losses — both real `@theme` tokens, never `--color-beam-red`/
  * `--color-beam-green` (identity-only). Referenced as raw CSS custom
@@ -63,6 +69,9 @@ export interface PortfolioChartProps {
   activeRange: PortfolioChartRange;
   onRangeChange: (range: PortfolioChartRange) => void;
   loading?: boolean;
+  refreshing?: boolean;
+  /** Figures that feed the total are still being read: it keeps its last text, then ticks once when they settle. */
+  hold?: boolean;
   /**
    * Set when the active range's fetch failed (thrown query error, or a
    * resolved-but-empty series). Replaces just the value/chart area with
@@ -72,8 +81,12 @@ export interface PortfolioChartProps {
   scope?: PortfolioScope;
   /** Makes the chart area toggle `scope`. Leave unset when there's only one wallet. */
   onToggleScope?: () => void;
-  /** Shown as the large figure in place of the total value, e.g. `{ amount: "12.5", unit: "AR" }`. */
-  headline?: CurrencyValueParts;
+  /**
+   * Shown as the large figure in place of the total value, e.g.
+   * `{ amount: "12.5", unit: "AR", value: 12.5 }`. `value` lets a change tick
+   * over; without it the figure swaps.
+   */
+  headline?: CurrencyValueParts & { value?: number };
   masked?: boolean;
   onToggleMasked?: () => void;
   compact?: boolean;
@@ -183,6 +196,8 @@ export function PortfolioChart({
   activeRange,
   onRangeChange,
   loading = false,
+  refreshing = false,
+  hold = false,
   onRetry,
   scope = "wallet",
   onToggleScope,
@@ -215,8 +230,30 @@ export function PortfolioChart({
   const linePoints = buildLinePath(downsample(points, compact ? SPARKLINE_POINTS : CHART_POINTS));
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
-  const totalLabel = masked ? HIDDEN_AMOUNT : formatCurrencyValue(currentValue, currency);
-  const headlineParts: CurrencyValueParts = masked ? { amount: HIDDEN_AMOUNT } : (headline ?? formatCurrencyParts(currentValue, currency));
+  const totalText = masked ? HIDDEN_AMOUNT : formatCurrencyValue(currentValue, currency);
+  // Both run on every render so hook order holds; masked figures never show a frame.
+  const totalParts = formatCurrencyParts(currentValue, currency);
+  // While loading, `currentValue` is a stand-in, so the first real figure swaps in rather than ticking up from it.
+  const totalAmount = useAnimatedNumber({
+    value: loading ? Number.NaN : currentValue,
+    text: totalParts.amount,
+    format: (value) => formatCurrencyParts(value, currency).amount,
+    unit: currency,
+    hold,
+  });
+  const headlineAmount = useAnimatedNumber({
+    value: headline?.value ?? Number.NaN,
+    text: headline?.amount ?? "",
+    unit: headline?.unit,
+    hold,
+  });
+  const dimmed = useDelayedFlag(refreshing && !loading, REFRESH_DIM_DELAY_MS);
+  const totalLabel = masked ? HIDDEN_AMOUNT : totalParts.unit ? `${totalAmount} ${totalParts.unit}` : totalAmount;
+  const headlineParts: CurrencyValueParts = masked
+    ? { amount: HIDDEN_AMOUNT }
+    : headline
+      ? { amount: headlineAmount, unit: headline.unit }
+      : { amount: totalAmount, unit: totalParts.unit };
   // The range tabs already name the period, so the scope note briefly takes the %-change's place instead.
   const changeBadge = (
     <span className="grid text-label font-semibold tabular-nums">
@@ -237,7 +274,7 @@ export function PortfolioChart({
   );
 
   const figures = (
-    <div className={cn("flex min-w-0 flex-col gap-0.5", loading && "opacity-50 transition-opacity")}>
+    <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-300", loading && "opacity-50", dimmed && "opacity-85")}>
       <div className="flex items-baseline gap-2.5">
         <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
         {headline === undefined ? changeBadge : null}
@@ -269,7 +306,7 @@ export function PortfolioChart({
           width="100%"
           height="100%"
           role="img"
-          aria-label={`Portfolio value ${totalLabel}, ${formatPercent(change)} for ${periodLabel}`}
+          aria-label={`Portfolio value ${totalText}, ${formatPercent(change)} for ${periodLabel}`}
         >
           {compact ? null : <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />}
           <polyline

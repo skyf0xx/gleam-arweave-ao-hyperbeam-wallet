@@ -32,7 +32,7 @@ describe("UnlockView", () => {
     ) as unknown as RuntimePort["send"];
     render(<UnlockView runtime={fakeRuntime({ send })} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Your anti-phishing phrase: willow")).toBeTruthy());
     expect(document.querySelector('img[src^="data:image/svg+xml"]')).toBeTruthy();
   });
 
@@ -41,7 +41,7 @@ describe("UnlockView", () => {
     render(<UnlockView runtime={fakeRuntime({ send })} onUnlocked={vi.fn()} onResetComplete={vi.fn()} />);
 
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "getSecurityPhrase", payload: undefined }));
-    expect(screen.queryByLabelText(/Your security phrase/)).toBeNull();
+    expect(screen.queryByLabelText(/Your anti-phishing phrase/)).toBeNull();
   });
 
   it("calls unlockWallet with the entered password and onUnlocked on success", async () => {

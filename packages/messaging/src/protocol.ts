@@ -160,10 +160,11 @@ export interface ProtocolMap {
    * series to plot and the summary figures already computed. An empty
    * `series` means both price sources were unavailable — the popup falls
    * back to `NetworkErrorBanner` rather than rendering a broken chart.
-   * `scope` defaults to `"wallet"` (the active wallet); `"all"` totals
+   * `scope` defaults to `"wallet"`: the wallet at `address`, refused when
+   * it isn't stored, or the active wallet without one. `"all"` totals
    * every stored wallet. Values are in `currency`.
    */
-  getPortfolioHistory(req: { range: PortfolioHistoryRange; scope?: PortfolioScope; currency: DisplayCurrency }): PortfolioHistory;
+  getPortfolioHistory(req: { range: PortfolioHistoryRange; address?: string; scope?: PortfolioScope; currency: DisplayCurrency }): PortfolioHistory;
   /**
    * Current spot price in `currency` for every token in `core/pricing`'s
    * `DEFAULT_TOKEN_REGISTRY` (AR, AO) — drives the value line under each

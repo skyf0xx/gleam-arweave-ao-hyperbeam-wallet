@@ -11,6 +11,7 @@ import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
 import { KeystoneConnect, KeystonePanel } from "./adapters/keystone";
 import { createQrScanner } from "./adapters/qr-scanner";
+import { createMobileQueryCache } from "./adapters/query-cache";
 import { createStoreReview } from "./adapters/store-review";
 import { createDappBridge, serveDappTabs } from "./adapters/dapp-bridge";
 import { createDappBrowser } from "./adapters/dapp-browser";
@@ -103,6 +104,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
         ephemeral.delete(key);
       },
     },
+    queryCache: createMobileQueryCache(),
     unlock: {
       passkeyMode: "inline",
       openPasskeyWindow: async () => {
@@ -116,7 +118,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
     backButton: createBackButton(),
     approvalSheet,
     notices: createLinkNotices(worker),
-    activeSite: { subscribe: () => () => {} },
+    activeSite: { subscribe: dapps.subscribe },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {
       openConnectPage: async () => {

@@ -19,6 +19,7 @@
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
 /apps/extension/src/adapters/session-access.ts                             @skyf0xx
+/apps/extension/src/adapters/query-cache.ts                                @skyf0xx
 /apps/mobile/src/adapters/storage.ts                                       @skyf0xx
 /apps/mobile/src/adapters/sqlite-store.ts                                  @skyf0xx
 /apps/mobile/src/adapters/sqlite-channel.ts                                @skyf0xx
@@ -27,6 +28,8 @@
 /apps/mobile/src/adapters/download-channel.ts                         @skyf0xx
 /apps/mobile/src/adapters/downloads.ts                                @skyf0xx
 /apps/mobile/src/adapters/file-saver.ts                               @skyf0xx
+/apps/mobile/src/adapters/query-cache.ts                                   @skyf0xx
+/packages/app/src/query-cache/                                             @skyf0xx
 /packages/app/src/passkey/                                                 @skyf0xx
 /packages/app/src/biometrics/                                              @skyf0xx
 /packages/app/src/screens/lock-settings/src/BiometricSection.tsx           @skyf0xx

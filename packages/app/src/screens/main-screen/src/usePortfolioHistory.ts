@@ -5,10 +5,9 @@ import type { DisplayCurrency, PortfolioHistory, PortfolioHistoryRange, Portfoli
  * Shared, cached source of truth for the main screen's portfolio-value
  * chart.
  *
- * `getPortfolioHistory` takes only `{ range }` — no `address` in the wire
- * payload (`ReadsHandler` resolves the active wallet itself) — but the
- * query key still leads with `address` so switching the active wallet
- * reads from/invalidates a disjoint cache entry, matching
+ * The payload names `address`, so the response is always for the wallet
+ * the key leads with even if another surface switched the active wallet;
+ * leading with it keeps each wallet in a disjoint cache entry, matching
  * `walletQueryKeys`' pattern in `../../activity/src/queryKeys.ts` (kept
  * local to this file rather than added to that module). `range` is part
  * (and `scope` and `currency`) of the key so every range tab keeps its own
@@ -34,9 +33,9 @@ export function usePortfolioHistory(
     enabled: enabled && currency !== undefined,
     queryKey: [address, "portfolioHistory", range, scope, currency] as const,
     queryFn: () =>
-      runtime.send<{ range: PortfolioHistoryRange; scope: PortfolioScope; currency: DisplayCurrency }, PortfolioHistory>({
+      runtime.send<{ range: PortfolioHistoryRange; address: string; scope: PortfolioScope; currency: DisplayCurrency }, PortfolioHistory>({
         type: "getPortfolioHistory",
-        payload: { range, scope, currency: currency as DisplayCurrency },
+        payload: { range, address, scope, currency: currency as DisplayCurrency },
       }),
     staleTime: PORTFOLIO_HISTORY_STALE_TIME_MS,
     // Bounds how long an offline range spends retrying before

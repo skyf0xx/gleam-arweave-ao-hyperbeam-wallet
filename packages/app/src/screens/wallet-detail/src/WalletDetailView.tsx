@@ -167,12 +167,12 @@ export function WalletDetailView({
       <ScreenHeader title="Wallet" onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-7 phone:pt-4">
-        <div className="group flex items-center gap-3.5">
+        <div className="group flex items-center gap-3.5 phone:items-start">
           <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Copy sits in the name line so the address keeps the full width. */}
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <span className="truncate text-label font-semibold text-foreground">
+              <span className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">
                 {wallet.name}
                 {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
               </span>
