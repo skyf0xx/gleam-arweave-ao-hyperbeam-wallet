@@ -1213,3 +1213,89 @@ describe("MainScreenView pull to refresh", () => {
     await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
   });
 });
+
+describe("MainScreenView cached-to-live fade", () => {
+  const CACHED = { arBalance: "1500000000000", tokenBalances: NO_TOKENS };
+
+  /** The token row's amount; the same figure can also appear elsewhere on the screen. */
+  const amountCell = (text: string) => screen.getAllByText(text).find((el) => el.className.includes("text-caption"))!;
+
+  function setup(seed: boolean) {
+    let resolveBalance: (value: Winston) => void = () => {};
+    let rejectBalance: (reason: Error) => void = () => {};
+    const gate = new Promise<Winston>((resolve, reject) => {
+      resolveBalance = resolve;
+      rejectBalance = reject;
+    });
+    let later = false;
+    const base = successfulSend();
+    const send = vi.fn(async (message: { type: string }) => {
+      if (message.type === "getBalance") return later ? "3500000000000" : gate;
+      return base(message as never);
+    }) as RuntimePort["send"];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    if (seed) {
+      queryClient.setQueryData([WALLET.address, "balances"], CACHED, { updatedAt: 1 });
+      queryClient.setQueryData([WALLET.address, "activity"], EMPTY_ACTIVITY, { updatedAt: 1 });
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MainScreenView
+          runtime={fakeRuntime({ send })}
+          wallet={WALLET}
+          onSend={vi.fn()}
+          onSendToken={vi.fn()}
+          onReceive={vi.fn()}
+          onOpenWalletSwitcher={vi.fn()}
+          onOpenSettings={vi.fn()}
+          onOpenPoints={vi.fn()}
+          onUseGleamOnSite={vi.fn()}
+          onOpenCollectible={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    return { queryClient, resolveBalance, rejectBalance, fetchLater: () => (later = true) };
+  }
+
+  it("shows restored rows faded from the first paint, then at full once fresh data lands", async () => {
+    const { resolveBalance } = setup(true);
+    expect(amountCell("1.5").className).toContain("gleam-cached-pulse");
+    await act(async () => {
+      resolveBalance("2500000000000");
+    });
+    await waitFor(() => expect(amountCell("2.5").className).not.toContain("gleam-cached-pulse"));
+    expect(amountCell("2.5").className).not.toContain("opacity-70");
+  });
+
+  it("keeps restored rows faded and still after the refetch fails", async () => {
+    const { rejectBalance } = setup(true);
+    await act(async () => {
+      rejectBalance(new Error("offline"));
+    });
+    await waitFor(() => expect(amountCell("1.5").className).toContain("opacity-70"));
+    expect(amountCell("1.5").className).not.toContain("gleam-cached-pulse");
+  });
+
+  it("renders never-cached rows at full", async () => {
+    const { resolveBalance } = setup(false);
+    await act(async () => {
+      resolveBalance("2500000000000");
+    });
+    await screen.findAllByText("2.5");
+    expect(amountCell("2.5").className).not.toContain("opacity-70");
+  });
+
+  it("does not fade on a later refetch", async () => {
+    const { queryClient, resolveBalance, fetchLater } = setup(true);
+    await act(async () => {
+      resolveBalance("2500000000000");
+    });
+    await waitFor(() => expect(amountCell("2.5").className).not.toContain("opacity-70"));
+    fetchLater();
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: [WALLET.address, "balances"] });
+    });
+    await waitFor(() => expect(amountCell("3.5")).toBeTruthy());
+    expect(amountCell("3.5").className).not.toContain("opacity-70");
+  });
+});

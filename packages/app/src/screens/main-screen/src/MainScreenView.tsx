@@ -6,8 +6,6 @@ import {
   DEFAULT_AO_TOKEN,
   DEFAULT_AR_TOKEN,
   PullToRefreshIndicator,
-  REFRESH_DIM_DELAY_MS,
-  useDelayedFlag,
   usePullToRefresh,
 } from "@gleam/ui";
 import {
@@ -166,9 +164,12 @@ function valueFor(
   return { text: formatCurrencyValue(number, currency), number };
 }
 
-/** Whether a figure kept from before this screen opened is being read again. */
-function refreshingCached(query: { isFetching: boolean; isSuccess: boolean; dataUpdatedAt: number }, openedAt: number): boolean {
-  return query.isFetching && query.isSuccess && query.dataUpdatedAt < openedAt;
+/**
+ * Whether a query still shows data from before this screen opened.
+ * Keyed on the data, not the status: a refetch that fails (status error) keeps the old data, and it stays old.
+ */
+function restoredCache(query: { data: unknown; dataUpdatedAt: number }, openedAt: number): boolean {
+  return query.data !== undefined && query.dataUpdatedAt < openedAt;
 }
 
 /**
@@ -423,15 +424,13 @@ export function MainScreenView({
   });
 
   const defaultTokenRows = buildDefaultTokenRows(balancesQuery.data, tokenPricesQuery.data, currency);
-  // A refetch that lands within the delay never dims anything.
-  const tokensRefreshing = useDelayedFlag(
-    refreshingCached(balancesQuery, openedAt) || refreshingCached(tokenPricesQuery, openedAt),
-    REFRESH_DIM_DELAY_MS,
-  );
-  const collectiblesRefreshing = useDelayedFlag(refreshingCached(collectiblesQuery, openedAt), REFRESH_DIM_DELAY_MS);
-  const activityRefreshing = useDelayedFlag(refreshingCached(activityQuery, openedAt), REFRESH_DIM_DELAY_MS);
+  const tokensCached = restoredCache(balancesQuery, openedAt) || restoredCache(tokenPricesQuery, openedAt);
+  const collectiblesCached = restoredCache(collectiblesQuery, openedAt);
+  const activityCached = restoredCache(activityQuery, openedAt);
   // The total waits for every input, so it ticks once instead of once per query.
-  const holdTotal = balancesQuery.isFetching || tokenPricesQuery.isFetching || portfolioHistoryQuery.isFetching;
+  const tokensFetching = balancesQuery.isFetching || tokenPricesQuery.isFetching;
+  const chartFetching = tokensFetching || portfolioHistoryQuery.isFetching;
+  const chartCached = tokensCached || restoredCache(portfolioHistoryQuery, openedAt);
   const portfolioHasSeries = (portfolioHistoryQuery.data?.series.length ?? 0) > 0;
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
@@ -668,8 +667,9 @@ export function MainScreenView({
               onToggleMasked={displaySettings ? toggleMasked : undefined}
               compact={compactHeader}
               loading={portfolioHistoryQuery.isPending || (portfolioHistoryQuery.isFetching && !portfolioHasSeries)}
-              refreshing={refreshingCached(portfolioHistoryQuery, openedAt)}
-              hold={holdTotal}
+              cached={chartCached}
+              cachedFetching={chartFetching}
+              walletKey={wallet.id}
               /**
                * `series: []` on a *resolved* response (no thrown query
                * error) is `getPortfolioHistory`'s own signal that both AR
@@ -689,7 +689,7 @@ export function MainScreenView({
                * refetch. `isFetching` rather than `isLoading` for
                * `loading`: a Retry re-runs an already-errored query,
                * which `isLoading` never reflects. A series already on
-               * screen stays through a refetch, marked by `refreshing`.
+               * screen stays through a refetch, marked by `cached`.
                */
               onRetry={
                 !portfolioHistoryQuery.isFetching &&
@@ -809,7 +809,8 @@ export function MainScreenView({
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
                         loading={loading}
-                        refreshing={tokensRefreshing}
+                        cached={tokensCached}
+                        cachedFetching={tokensFetching}
                         onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                         className="border-b-0"
                       />
@@ -845,7 +846,8 @@ export function MainScreenView({
                                 : formatAtomicAsDisplay(token.quantity, token.denomination)
                           }
                           loading={loading}
-                          refreshing={tokensRefreshing}
+                          cached={tokensCached}
+                          cachedFetching={tokensFetching}
                           onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
                           className="border-b-0"
                         />
@@ -955,8 +957,8 @@ export function MainScreenView({
           </div>
         ) : activeTab === "collectibles" ? (
           <div
-            className={`min-h-60 border-t border-line pt-3.5 transition-opacity duration-300 phone:min-h-0 phone:border-t-0 phone:pt-1 ${
-              collectiblesRefreshing ? "opacity-85" : ""
+            className={`min-h-60 border-t border-line pt-3.5 transition-opacity duration-500 ease-out phone:min-h-0 phone:border-t-0 phone:pt-1 ${
+              collectiblesCached ? (collectiblesQuery.isFetching ? "gleam-cached-pulse" : "opacity-70") : ""
             }`}
           >
             {collectiblesQuery.error && !collectiblesQuery.data ? (
@@ -972,8 +974,8 @@ export function MainScreenView({
         ) : (
           <>
             <div
-              className={`min-h-60 border-t border-line transition-opacity duration-300 phone:min-h-0 phone:border-t-0 ${
-                activityRefreshing ? "opacity-85" : ""
+              className={`min-h-60 border-t border-line transition-opacity duration-500 ease-out phone:min-h-0 phone:border-t-0 ${
+                activityCached ? (activityQuery.isFetching ? "gleam-cached-pulse" : "opacity-70") : ""
               }`}
             >
               {loading && !hasLoadedOnce ? (

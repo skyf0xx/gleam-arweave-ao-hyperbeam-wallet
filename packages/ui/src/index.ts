@@ -28,5 +28,4 @@ export {
 } from "./primitives/use-pull-to-refresh";
 export { PullToRefreshIndicator } from "./primitives/pull-to-refresh-indicator";
 export { Sheet, type SheetProps } from "./primitives/sheet";
-export { REFRESH_DIM_DELAY_MS, useDelayedFlag } from "./primitives/use-delayed-flag";
 export { AnimatedNumber, useAnimatedNumber, ANIMATED_NUMBER_DURATION_MS, type AnimatedNumberProps } from "./primitives/animated-number";

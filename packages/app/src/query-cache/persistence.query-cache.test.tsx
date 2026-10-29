@@ -87,6 +87,16 @@ describe("QueryCachePersistence", () => {
     expect(client.getQueryData([ADDRESS_A, "balances"])).toEqual(BALANCES);
   });
 
+  it("marks a restored copy stale even within its staleTime, so it is read again on open", async () => {
+    const source = new QueryClient();
+    const chartKey = [ADDRESS_A, "portfolioHistory", "7D", "wallet", "USD"];
+    source.setQueryData(chartKey, { points: [] }, { updatedAt: Date.now() - 60_000 });
+    const persisted: PersistedClient = { buster: "1.2.3", timestamp: Date.now(), clientState: dehydrate(source) };
+    const client = new QueryClient();
+    await mount(client, memoryQueryCache(new Map([["w1", JSON.stringify(persisted)]])), "w1", ADDRESS_A);
+    expect(client.getQueryState(chartKey)?.isInvalidated).toBe(true);
+  });
+
   it("keeps each wallet's cache under its own id", async () => {
     vi.useFakeTimers();
     const walletACache = storedClient("1.2.3", ADDRESS_A);

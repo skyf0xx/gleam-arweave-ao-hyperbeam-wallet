@@ -42,13 +42,15 @@ export interface TokenRowProps {
   amountFull?: string;
   value?: ReactNode;
   loading?: boolean;
-  /** A cached figure is being read again for long enough to notice: a light dim, not the `loading` one. */
-  refreshing?: boolean;
+  /** Shows restored data that fresh data hasn't replaced yet: faded from the first frame, fading up once it lands. */
+  cached?: boolean;
+  /** With `cached`: the live read is in flight, so the figures pulse; otherwise they rest at a still fade. */
+  cachedFetching?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
-export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading = false, refreshing = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading = false, cached = false, cachedFetching = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -63,7 +65,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
       {icon ?? <TokenGlyph {...glyph} />}
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
-        <div className={cn("text-caption tabular-nums text-muted transition-opacity", loading && "opacity-50", refreshing && !loading && "opacity-85 duration-300")} title={amountFull}>
+        <div className={cn("text-caption tabular-nums text-muted transition-opacity duration-500 ease-out", loading && "opacity-50", cached && !loading && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))} title={amountFull}>
           {amountFull ? (
             <>
               <span aria-hidden="true" className="phone:hidden">
@@ -78,7 +80,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
         </div>
       </div>
       {value ? (
-        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", "transition-opacity", loading && "opacity-50", refreshing && !loading && "opacity-85 duration-300", "phone:group-data-editing:invisible")}>
+        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", "transition-opacity duration-500 ease-out", loading && "opacity-50", cached && !loading && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"), "phone:group-data-editing:invisible")}>
           {value}
         </div>
       ) : null}

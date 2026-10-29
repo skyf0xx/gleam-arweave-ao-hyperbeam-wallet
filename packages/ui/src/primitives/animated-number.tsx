@@ -34,44 +34,39 @@ export interface AnimatedNumberProps {
   /** Formats a frame in between. Defaults to `text`'s decimal places, for a plain decimal. */
   format?: (value: number) => string;
   /**
-   * What `value` is measured in, such as the display currency. A change
-   * swaps to the new text: ticking a dollar figure through a euro format
-   * would show amounts that were never true.
+   * What the figure is: wallet, range, scope, currency and so on. A tick
+   * only compares like with like, so a new identity swaps to the new text
+   * (ticking a dollar figure through a euro format would show amounts that
+   * were never true).
    */
-  unit?: string;
+  identity: string;
   /**
-   * While true, keep showing the last settled text and start no tick, so
-   * inputs that land one after another produce a single tick once they've
-   * all settled. A `unit` change ignores it and swaps.
+   * True while `value` still comes from restored data. The figure ticks
+   * once, when `cached` goes from true to false under the same `identity`.
+   * Keep it true until every input feeding `value` is fresh.
    */
-  hold?: boolean;
+  cached: boolean;
 }
 
 /**
- * Returns what to show for `value`: `text`, or while `value` has just
- * changed, frames ticking from the old figure to the new. The first value,
- * a new `unit`, a change under 1%, a reduced-motion preference, or a
- * `text` with no `format` for its frames swaps straight to the new text.
+ * Returns what to show for `value`: `text`, or on the cached-to-live
+ * switch, frames ticking from the cached figure to the live one. The first
+ * value, a new `identity`, a live-to-live change, a change under 1%, a
+ * reduced-motion preference, or a `text` with no `format` for its frames
+ * swaps straight to the new text.
  */
-export function useAnimatedNumber({ value, text, format, unit, hold = false }: AnimatedNumberProps): string {
+export function useAnimatedNumber({ value, text, format, identity, cached }: AnimatedNumberProps): string {
   const [frame, setFrame] = useState<string | null>(null);
   const shownRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
-  const unitRef = useRef(unit);
+  const previousRef = useRef({ identity, cached });
   const formatRef = useRef(format);
   formatRef.current = format;
-  const settledTextRef = useRef(text);
-  // A stand-in value (NaN) or another unit has no settled figure to hold.
-  const holding = hold && unitRef.current === unit && Number.isFinite(value);
-  if (!holding && frame === null) settledTextRef.current = text;
 
   useLayoutEffect(() => {
-    if (holding) {
-      shownRef.current ??= value;
-      return;
-    }
-    const from = unitRef.current === unit ? shownRef.current : null;
-    unitRef.current = unit;
+    const previous = previousRef.current;
+    previousRef.current = { identity, cached };
+    const from = previous.identity === identity && previous.cached && !cached ? shownRef.current : null;
     const formatFrame = formatRef.current ?? plainDecimalFormat(text);
     const cancel = () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -95,19 +90,16 @@ export function useAnimatedNumber({ value, text, format, unit, hold = false }: A
         setFrame(null);
         return;
       }
-      const current = from + (value - from) * easeOutQuart(progress);
-      // A retarget mid-tick starts from what's on screen, not the old target.
-      shownRef.current = current;
-      setFrame(formatFrame(current));
+      setFrame(formatFrame(from + (value - from) * easeOutQuart(progress)));
       rafRef.current = requestAnimationFrame(step);
     };
     rafRef.current = requestAnimationFrame(step);
     return cancel;
-    // `text` follows `value`; only a new figure starts a tick.
+    // `text` follows `value`; only a new figure, identity or cached flip starts a tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, unit, holding]);
+  }, [value, identity, cached]);
 
-  return holding ? (frame ?? settledTextRef.current) : (frame ?? text);
+  return frame ?? text;
 }
 
 /** `useAnimatedNumber` as an inline element. */
