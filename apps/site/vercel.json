@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     { "source": "/android", "destination": "/android.html", "permanent": false },
-    { "source": "/ios", "destination": "https://testflight.apple.com/join/y2t2HeCH", "permanent": false },
+    { "source": "/ios", "destination": "/ios.html", "permanent": false },
     {
       "source": "/chrome",
       "destination": "https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki",
