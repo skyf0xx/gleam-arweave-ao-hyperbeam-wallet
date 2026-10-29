@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render } from "@testing-library/react";
-import { ANIMATED_NUMBER_DURATION_MS, AnimatedNumber as BareAnimatedNumber, type AnimatedNumberProps } from "./animated-number";
+import { ANIMATED_NUMBER_DURATION_MS, ANIMATED_NUMBER_TINT_MS, AnimatedNumber as BareAnimatedNumber, type AnimatedNumberProps } from "./animated-number";
 
 function AnimatedNumber(props: Omit<AnimatedNumberProps, "identity" | "cached"> & Partial<Pick<AnimatedNumberProps, "identity" | "cached">>) {
   return <BareAnimatedNumber identity="a" cached={false} {...props} />;
@@ -102,16 +102,64 @@ describe("AnimatedNumber", () => {
     expect(container.textContent).toBe("3");
   });
 
-  it("ticks with easeOutQuart: most of the way there well before the end", async () => {
+  it("repaints the sweep at a rate the eye can follow, not every frame", async () => {
     stubReducedMotion(false);
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
     const { container, rerender } = render(<AnimatedNumber value={100} text="$100.00" format={usd} cached />);
     rerender(<AnimatedNumber value={200} text="$200.00" format={usd} />);
+    const frames = new Set<string>();
+    for (let elapsed = 0; elapsed < 640; elapsed += 16) {
+      await act(async () => {
+        vi.advanceTimersByTime(16);
+      });
+      frames.add(container.textContent ?? "");
+    }
+    expect(frames.size).toBeLessThanOrEqual(11);
+  });
+
+  it("lands the last three steps of the final digit one at a time", async () => {
+    stubReducedMotion(false);
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
+    const { container, rerender } = render(<AnimatedNumber value={100} text="$100.00" format={usd} step={0.01} cached />);
+    rerender(<AnimatedNumber value={200} text="$200.00" format={usd} step={0.01} />);
+    const after = async (ms: number) => {
+      await act(async () => {
+        vi.advanceTimersByTime(ms);
+      });
+      return container.textContent;
+    };
+    expect(await after(680)).toBe("$199.97");
+    expect(await after(100)).toBe("$199.98");
+    expect(await after(170)).toBe("$199.99");
+    expect(await after(300)).toBe("$200.00");
+  });
+
+  it("takes the settle step from a plain decimal's last place", async () => {
+    stubReducedMotion(false);
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
+    const { container, rerender } = render(<AnimatedNumber value={100.002} text="100.002" cached />);
+    rerender(<AnimatedNumber value={98.76} text="98.76" />);
     await act(async () => {
-      vi.advanceTimersByTime(ANIMATED_NUMBER_DURATION_MS / 2);
+      vi.advanceTimersByTime(680);
     });
-    // easeOutQuart at 0.5 is 0.9375.
-    expect(Number(container.textContent?.slice(1))).toBeGreaterThan(190);
+    expect(container.textContent).toBe("98.79");
+  });
+
+  it("tints the landed figure by direction, then fades it back", async () => {
+    stubReducedMotion(false);
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"] });
+    const { container, rerender } = render(<AnimatedNumber value={100} text="$100.00" format={usd} cached />);
+    rerender(<AnimatedNumber value={80} text="$80.00" format={usd} />);
+    const figure = () => container.firstElementChild as HTMLElement;
+    expect(figure().style.color).toBe("");
+    await act(async () => {
+      vi.advanceTimersByTime(ANIMATED_NUMBER_DURATION_MS + 20);
+    });
+    expect(figure().style.color).toBe("var(--color-negative)");
+    await act(async () => {
+      vi.advanceTimersByTime(ANIMATED_NUMBER_TINT_MS);
+    });
+    expect(figure().style.color).toBe("");
   });
 
   it("swaps without ticking when the change is under 1%", async () => {
