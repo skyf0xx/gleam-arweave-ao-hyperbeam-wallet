@@ -49,4 +49,14 @@ describe("capacitor.config", () => {
     expect(config.plugins?.PrivacyScreen?.preventScreenshots).toBe(false);
     expect(packageJson.dependencies["@capacitor-community/privacy-screen"]).toMatch(/^\d+\.\d+\.\d+$/);
   });
+
+  // Landscape makes Android show its rotate-suggestion button over the app.
+  it("locks the phone to portrait", () => {
+    const manifest = readFileSync(new URL("android/app/src/main/AndroidManifest.xml", import.meta.url), "utf8");
+    expect(manifest).toContain('android:screenOrientation="portrait"');
+
+    const plist = readFileSync(new URL("ios/App/App/Info.plist", import.meta.url), "utf8");
+    const phone = plist.match(/<key>UISupportedInterfaceOrientations<\/key>\s*<array>([\s\S]*?)<\/array>/)?.[1] ?? "";
+    expect([...phone.matchAll(/<string>(.*?)<\/string>/g)].map((m) => m[1])).toEqual(["UIInterfaceOrientationPortrait"]);
+  });
 });
