@@ -25,8 +25,17 @@ the runtime never has to know which one it is running in.
   `key-session.ts` looks after the unlocked key. Others include
   `transfer.ts`, `approval.ts` and `points.ts`.
 
-## Where it sits
+## Location
 
 ```text
-screens / dApp → app → runtime (check → handler) → @gleam/core
+ @gleam/app      dApp page
+     └───────┬───────┘
+             ▼
+         dispatcher     checks the caller
+             │
+             ▼
+          handler       does the work
+             │
+             ▼
+        @gleam/core
 ```

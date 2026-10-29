@@ -23,9 +23,12 @@ finished scan to the wallet so the user can sign it.
   screen.
 - **`img/`, `fonts/`, `*.css`**: images, fonts and styles.
 
-## Where it sits
+## Location
 
 ```text
-website pages ⇄ wallet (invites, scan attestations)
-website pages → points-api (stats, scan rewards)
+            website
+       ┌───────┴───────┐
+       ▼               ▼
+     wallet        points-api
+ invites, scans  stats, rewards
 ```

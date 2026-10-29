@@ -22,8 +22,14 @@ and they never talk to the background themselves.
 - **`components/security-phrase/`**: the security phrase, a personal
   anti-phishing signal that the user sees whenever they unlock.
 
-## Where it sits
+## Location
 
 ```text
-@gleam/core (types) → @gleam/ui (components) → @gleam/app (screens)
+     @gleam/core      types
+          │
+          ▼
+      @gleam/ui       components
+          │
+          ▼
+      @gleam/app      screens
 ```

@@ -26,10 +26,14 @@ to the wallet in the same way they do in Chrome.
 - **`ios/`, `android/`**: the native projects that Xcode and Android
   Studio open.
 
-## Where it sits
+## Location
 
 ```text
-screens ─────────────┐
-                     ├→ worker (@gleam/runtime) → @gleam/core
-dApp browser page ───┘
+ @gleam/app     dApp browser
+     └───────┬───────┘
+             ▼
+           worker       runs @gleam/runtime
+             │
+             ▼
+        @gleam/core
 ```

@@ -18,9 +18,23 @@ instructions are in `security/scan/SKILL.md`.
 - **`api.ts`**: the calls to the points server.
 - **`harness.ts`**, **`shared.ts`**: shared setup and types.
 
-## Where it sits
+## Location
 
 ```text
-agent → pnpm scan start → points-api (challenge)
-agent → pnpm scan finish → gleamwallet.app/attest.html → wallet signs → points-api
+        agent
+          │ pnpm scan start
+          ▼
+      points-api      sends a challenge
+          │
+          ▼
+        agent         scans and answers
+          │ pnpm scan finish
+          ▼
+     attest.html      on gleamwallet.app
+          │
+          ▼
+        wallet        user signs
+          │
+          ▼
+      points-api      checks and rewards
 ```

@@ -24,9 +24,18 @@ importing any of the background's code.
 - **`permissions.ts`**: the privilege levels that decide which callers
   may use which methods.
 
-## Where it sits
+## Location
 
 ```text
-screens / content script ── protocol.ts ──→ background (@gleam/runtime)
-dApp page ── page-protocol.ts ──→ content script
+  dApp page
+      │ page-protocol.ts
+      ▼
+content script       @gleam/app
+      └────────┬─────────┘
+               │ protocol.ts
+               ▼
+           background
+               │ keyring-protocol.ts
+               ▼
+            keyring
 ```

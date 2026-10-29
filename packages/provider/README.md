@@ -23,8 +23,14 @@ the real work happens on the wallet's side.
 - **`native-transport.ts`**: the mobile app's line, which runs through
   the built-in dApp browser.
 
-## Where it sits
+## Location
 
 ```text
-dApp → window.arweaveWallet (this package) → transport → wallet
+           dApp
+            │ window.arweaveWallet
+            ▼
+     @gleam/provider    this package
+            │ transport
+            ▼
+          wallet        extension or app
 ```

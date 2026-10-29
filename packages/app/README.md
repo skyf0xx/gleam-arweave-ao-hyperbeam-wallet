@@ -27,8 +27,14 @@ client from a provider.
 - Shared helpers for avatars, display settings, passkeys, biometrics and
   keyfile downloads.
 
-## Where it sits
+## Location
 
 ```text
-app → AppPlatform → screens (built from @gleam/ui) → background
+ Extension          Mobile
+     └────────┬───────┘
+              ▼
+          @gleam/app    all screens
+              │ AppPlatform
+              ▼
+        @gleam/runtime  the background
 ```
