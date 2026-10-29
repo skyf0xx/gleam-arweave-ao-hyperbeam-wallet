@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Gleam uses the camera to scan QR codes for recipient addresses or Keystone account and signatures.</string>
 	<key>NSFaceIDUsageDescription</key>

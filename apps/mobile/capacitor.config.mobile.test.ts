@@ -5,7 +5,7 @@ import config from "./capacitor.config";
 import packageJson from "./package.json";
 
 // Over-the-air update plugins would let a server push code past store
-// signing (docs/MOBILE.md, "No remote code").
+// signing (README.md, "Security model").
 const LIVE_UPDATE_PACKAGE = /updater|live-?updates?|code-?push|hot-?update|cordova-plugin-ionic|appflow|revopush|capawesome.*update/i;
 
 describe("capacitor.config", () => {

@@ -26,6 +26,30 @@ to the wallet in the same way they do in Chrome.
 - **`ios/`, `android/`**: the native projects that Xcode and Android
   Studio open.
 
+## Security model
+
+- **Two WebViews.** The wallet WebView loads only the bundled assets. The
+  dApp browser is a separate native view. It has no JS bridge to the
+  wallet WebView, only the provider's message channel to native code.
+- **Attested origin.** Native code passes on the sending frame's origin
+  (`WKFrameInfo.securityOrigin` on iOS, `addWebMessageListener`'s
+  `sourceOrigin` on Android) and whether it is the main frame. The plugin
+  only relays. The TypeScript transport makes every decision, so scan
+  challenges can reach it.
+- **Keys** are non-extractable `CryptoKey`s in the worker's memory.
+  Nothing key-related is written to disk. If the OS kills the app, the
+  wallet is locked.
+- **Biometric unlock** keeps the vault password in the Keychain or
+  Keystore. Only the OS releases it, after a biometric check
+  (`.biometryCurrentSet` on iOS, a Keystore key behind a `BiometricPrompt`
+  `CryptoObject` on Android). Unlock then runs exactly as it does with the
+  password.
+- **No remote code.** There is no over-the-air update plugin and no
+  `server.url` in `capacitor.config.ts`, so code reaches users only
+  through signed builds (`capacitor.config.mobile.test.ts`).
+- **Privacy.** The app is hidden in the app switcher, and screenshots are
+  blocked on Android.
+
 ## Location
 
 ```text
