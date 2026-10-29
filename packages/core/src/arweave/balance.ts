@@ -1,5 +1,8 @@
 import type { Winston } from "../models/balance";
 
+/** A gateway that never answers would otherwise hold every balance read open. */
+const BALANCE_TIMEOUT_MS = 10_000;
+
 /**
  * Reads via the gateway's plain REST endpoint rather than `arweave-js`'s
  * `wallets.getBalance`, which round-trips the response through a
@@ -12,7 +15,7 @@ export async function getBalance(
   fetchImpl: typeof fetch = fetch,
 ): Promise<Winston> {
   const url = `${trimTrailingSlash(gatewayUrl)}/wallet/${address}/balance`;
-  const response = await fetchImpl(url);
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(BALANCE_TIMEOUT_MS) });
 
   if (!response.ok) {
     throw new Error(

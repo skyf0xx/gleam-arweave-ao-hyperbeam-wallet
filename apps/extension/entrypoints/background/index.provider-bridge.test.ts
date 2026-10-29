@@ -445,6 +445,7 @@ describe("provider token list methods, end to end", () => {
     await expect(wallet.tokenBalance(PROCESS_ID)).resolves.toBe("1000000");
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
       expect.stringContaining(`/${PROCESS_ID}~process@1.0/compute/balances/${ADDRESS}`),
+      { signal: expect.any(AbortSignal) },
     );
   });
 

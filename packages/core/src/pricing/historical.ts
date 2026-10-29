@@ -5,6 +5,7 @@
  * The server owns the CoinGecko→CoinPaprika fallback and the caching.
  */
 import type { TokenPriceSource } from "./token-sources";
+import { PRICES_TIMEOUT_MS } from "./timeout";
 
 export type HistoricalRange = "24H" | "7D" | "1M" | "1Y" | "ALL";
 
@@ -28,7 +29,7 @@ export async function getHistoricalUsdPrices(
 ): Promise<HistoricalPricePoint[]> {
   try {
     const url = `${apiUrl}/prices/history?id=${encodeURIComponent(source.coinGeckoId)}&range=${range}`;
-    const response = await fetchImpl(url);
+    const response = await fetchImpl(url, { signal: AbortSignal.timeout(PRICES_TIMEOUT_MS) });
     if (!response.ok) return [];
 
     const body = (await response.json()) as { series?: unknown } | null;

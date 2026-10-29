@@ -93,6 +93,7 @@ describe("ReadsHandler: getBalance", () => {
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining("https://arweave.net/wallet/addr1/balance"),
+      { signal: expect.any(AbortSignal) },
     );
   });
 });
@@ -128,7 +129,7 @@ describe("ReadsHandler: getTokenBalances", () => {
     // The watched token plus the default AO token, which is always listed.
     expect(balances).toHaveLength(2);
     expect(balances.find((b) => b.processId === LEGACY)).toMatchObject({ quantity: "42", ticker: "wAR", source: "watched" });
-    expect(globalThis.fetch).toHaveBeenCalledWith(`${PEER}/${LEGACY}~process@1.0/compute/balances/addr1`);
+    expect(globalThis.fetch).toHaveBeenCalledWith(`${PEER}/${LEGACY}~process@1.0/compute/balances/addr1`, { signal: expect.any(AbortSignal) });
   });
 
   it("gives a watched token its logo as a gateway URL, and none for a malformed logo tag", async () => {

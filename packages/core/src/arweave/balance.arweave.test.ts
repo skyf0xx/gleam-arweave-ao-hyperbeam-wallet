@@ -22,7 +22,7 @@ describe("getBalance", () => {
     const fetchImpl = fakeFetch("0");
     await getBalance("addr123", "https://arweave.net/", fetchImpl);
 
-    expect(fetchImpl).toHaveBeenCalledWith("https://arweave.net/wallet/addr123/balance");
+    expect(fetchImpl).toHaveBeenCalledWith("https://arweave.net/wallet/addr123/balance", { signal: expect.any(AbortSignal) });
   });
 
   it("throws on a non-2xx response", async () => {
