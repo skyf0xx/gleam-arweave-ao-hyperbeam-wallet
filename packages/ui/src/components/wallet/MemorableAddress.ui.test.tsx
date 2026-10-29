@@ -19,6 +19,17 @@ describe("MemorableAddress", () => {
     expect(emphasized).toEqual(["weY8", "hGV3", "n8gz", "uFk"]);
   });
 
+  it("renders every chunk flat in one grid, 7 columns by default and 4 on the phone", () => {
+    const { container } = render(<MemorableAddress address={ADDRESS} emphasisPick={null} />);
+    const grid = screen.getByText(addressText(ADDRESS));
+    expect(grid.children).toHaveLength(11);
+    expect(Array.from(grid.children).map((chunk) => chunk.textContent).join("")).toBe(ADDRESS);
+    expect(grid.className).toContain("grid-cols-[repeat(7,max-content)]");
+    expect(grid.className).toContain("phone:grid-cols-[repeat(4,max-content)]");
+    expect(grid.className).not.toContain("flex-wrap");
+    expect(container.querySelector(".flex-wrap")).toBeNull();
+  });
+
   it("copies a selection inside it as the raw address text", () => {
     render(<MemorableAddress address={ADDRESS} emphasisPick={null} />);
     const holder = screen.getByText(addressText(ADDRESS));

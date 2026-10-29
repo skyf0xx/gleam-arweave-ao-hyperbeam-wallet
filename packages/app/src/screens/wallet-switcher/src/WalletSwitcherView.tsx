@@ -197,7 +197,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         onClick={copy}
         aria-label={copied ? `${wallet.name} address copied` : `Copy ${wallet.name} address`}
         title={copied ? "Copied" : "Copy address"}
-        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
       </button>
@@ -205,7 +205,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         type="button"
         aria-label={`Manage ${wallet.name}`}
         onClick={onManage}
-        className="flex h-7 w-5 flex-shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11"
+        className="flex h-7 w-5 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11"
       >
         <ChevronRightIcon />
       </button>

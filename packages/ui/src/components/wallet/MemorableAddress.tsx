@@ -15,10 +15,11 @@ export interface MemorableAddressProps {
 }
 
 /**
- * A full address as a block of two rows (7 · 4 chunks of 4
- * characters). The block keeps one shape for every address, so the
- * emphasised chunks always sit in the same places and the user learns
- * where to look. They are set on a quiet fill in full contrast; the rest
+ * A full address as a block of 4-character chunks laid out on a grid:
+ * two rows (7 · 4) by default, three (4 · 4 · 3) in the phone layout. The
+ * columns are fixed and the chunks never wrap on their own, so the block
+ * keeps one shape for every address, the emphasised chunks always sit in
+ * the same places and the user learns where to look. They are set on a quiet fill in full contrast; the rest
  * are muted. The avatar carries the colour, so the address stays
  * monochrome. A copied selection is the raw address text: the gaps are
  * padding, never characters.
@@ -31,7 +32,7 @@ export function MemorableAddress({
   className,
 }: MemorableAddressProps) {
   const confirm = tone === "confirm";
-  const groups = chunkAddress(address, emphasisPick);
+  const chunks = chunkAddress(address, emphasisPick).flat();
 
   const copyRawText = (event: ClipboardEvent<HTMLElement>) => {
     const selection = window.getSelection();
@@ -51,24 +52,23 @@ export function MemorableAddress({
       ) : null}
       <span
         translate="no"
-        className={cn("flex min-w-0 flex-col text-left font-mono leading-[1.75]", confirm ? "text-[13px]" : "text-label")}
+        className={cn(
+          "grid min-w-0 grid-cols-[repeat(7,max-content)] text-left font-mono leading-[1.75] phone:grid-cols-[repeat(4,max-content)]",
+          confirm ? "text-[13px]" : "text-label",
+        )}
       >
-        {groups.map((group) => (
-          <span key={group[0]!.index} className="whitespace-nowrap">
-            {group.map((chunk) => (
-              <span
-                key={chunk.index}
-                data-emphasized={chunk.emphasized || undefined}
-                className={cn(
-                  "rounded-[4px] px-[0.35ch]",
-                  chunk.emphasized
-                    ? cn("bg-foreground/[0.07] text-foreground", confirm ? "font-semibold" : "font-medium")
-                    : "text-muted",
-                )}
-              >
-                {chunk.text}
-              </span>
-            ))}
+        {chunks.map((chunk) => (
+          <span
+            key={chunk.index}
+            data-emphasized={chunk.emphasized || undefined}
+            className={cn(
+              "whitespace-nowrap rounded-[4px] px-[0.35ch]",
+              chunk.emphasized
+                ? cn("bg-foreground/[0.07] text-foreground", confirm ? "font-semibold" : "font-medium")
+                : "text-muted",
+            )}
+          >
+            {chunk.text}
           </span>
         ))}
       </span>
