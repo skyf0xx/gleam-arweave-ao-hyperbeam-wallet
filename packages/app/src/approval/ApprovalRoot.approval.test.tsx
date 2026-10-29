@@ -331,14 +331,14 @@ describe("ApprovalRoot security phrase", () => {
   it("shows the phrase above a request", async () => {
     render(<ApprovalRoot requestId="req-1" runtime={runtimeWith(UNLOCKED_STATE)} />);
 
-    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Your anti-phishing phrase: willow")).toBeTruthy());
   });
 
   it("shows it once while locked, on the unlock screen", async () => {
     render(<ApprovalRoot requestId="req-1" runtime={runtimeWith({ ...UNLOCKED_STATE, session: null })} />);
 
     await waitFor(() => expect(screen.getByPlaceholderText("Enter your password")).toBeTruthy());
-    await waitFor(() => expect(screen.getAllByLabelText("Your security phrase: willow")).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByLabelText("Your anti-phishing phrase: willow")).toHaveLength(1));
   });
 });
 

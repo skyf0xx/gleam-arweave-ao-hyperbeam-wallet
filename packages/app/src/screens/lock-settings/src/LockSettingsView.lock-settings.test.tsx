@@ -122,7 +122,7 @@ describe("LockSettingsView security phrase section", () => {
     const send = sendFor({ phrase: { word: "willow" } });
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByLabelText("Your security phrase: willow")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Your anti-phishing phrase: willow")).toBeTruthy());
   });
 
   it("changes the phrase in place", async () => {
@@ -134,7 +134,7 @@ describe("LockSettingsView security phrase section", () => {
     fireEvent.change(screen.getByLabelText("Word"), { target: { value: "harbor" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(screen.getByLabelText("Your security phrase: harbor")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Your anti-phishing phrase: harbor")).toBeTruthy());
     expect(send).toHaveBeenCalledWith({ type: "setSecurityPhrase", payload: { word: "harbor" } });
   });
 

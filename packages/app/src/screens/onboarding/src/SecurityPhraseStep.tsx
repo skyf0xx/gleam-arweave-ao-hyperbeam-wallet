@@ -25,7 +25,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Security phrase" />
+      <ScreenHeader title="Anti-phishing phrase" />
       <form
         className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
@@ -45,9 +45,9 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Pick your security phrase</h1>
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Pick your anti-phishing phrase</h1>
           <p className="text-body leading-relaxed text-muted">
-            Your security phrase and icon appear before important actions. If a window asks for your
+            Your anti-phishing phrase and icon appear before important actions. If a window asks for your
             password or signature without them, it isn&apos;t Gleam.
           </p>
         </div>
