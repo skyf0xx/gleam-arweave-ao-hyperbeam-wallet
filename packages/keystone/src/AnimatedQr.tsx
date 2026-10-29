@@ -52,7 +52,8 @@ export function AnimatedQr({ encoder, intervalMs = 300, onFrame, label }: Animat
 
   return (
     // White in both themes: a QR needs dark modules on a light ground to scan.
-    <div className="mx-auto w-full max-w-72 rounded-lg border border-line bg-white p-2">
+    // Width is capped by the height too: the QR is square, so on a short sheet a width-only cap pushes it off-screen.
+    <div className="mx-auto w-full max-w-[min(18rem,45dvh)] rounded-lg border border-line bg-white p-2">
       <svg
         role="img"
         aria-label={label}
