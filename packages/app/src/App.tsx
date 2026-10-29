@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -30,6 +30,8 @@ import { PointsView } from "./screens/points/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
 import { ApprovalSheet } from "./approval/ApprovalSheet";
+import { QueryCachePersistence } from "./query-cache/persistence";
+import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
 import { sitePageUrl } from "@gleam/core";
 
 /**
@@ -234,6 +236,25 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     platform.biometrics.remove().catch((error: unknown) => console.error("Couldn't remove the biometric unlock.", error));
   }, [vaultWithoutPassword, platform]);
 
+  // Every stored cache whose wallet is gone is swept once the list loads,
+  // which also catches one a second surface wrote back after a removal,
+  // or one left by a reset in an approval window. This runs after the
+  // persistence for a removed active wallet has unmounted, so its pending
+  // save can't write the cache back here. A wallet removed while this
+  // surface is open also leaves the in-memory client.
+  const knownWalletsRef = useRef<WalletSummary[]>([]);
+  useEffect(() => {
+    if (view === "loading" || initError !== null) return;
+    const current = new Set(wallets.map((candidate) => candidate.id));
+    for (const known of knownWalletsRef.current) {
+      if (!current.has(known.id) && !wallets.some((candidate) => candidate.address === known.address)) {
+        queryClient.removeQueries({ queryKey: [known.address] });
+      }
+    }
+    knownWalletsRef.current = wallets;
+    void sweepQueryCache(platform.queryCache, current);
+  }, [view, initError, wallets, platform]);
+
   const addressIdentity = useMemo(
     () => makeAddressIdentity(identityKey, () => void loadAddressIdentityKey(runtime).then(setIdentityKey)),
     [identityKey, runtime],
@@ -256,7 +277,11 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
       <UnlockView
         runtime={runtime}
         onUnlocked={() => void refresh(runtime)}
-        onResetComplete={() => void refresh(runtime)}
+        onResetComplete={() => {
+          queryClient.clear();
+          void forgetQueryCache(platform.queryCache.clear());
+          void refresh(runtime);
+        }}
       />
     );
   } else if (!wallet) {
@@ -449,7 +474,20 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
           data-theme={theme === "dark" ? "dark" : undefined}
           className="min-h-full bg-background text-foreground"
         >
-          {content}
+          {view === "main-screen" && wallet && !initError ? (
+            <QueryCachePersistence
+              key={wallet.id}
+              client={queryClient}
+              port={platform.queryCache}
+              walletId={wallet.id}
+              address={wallet.address}
+              buster={platform.buildInfo.version}
+            >
+              {content}
+            </QueryCachePersistence>
+          ) : (
+            content
+          )}
           {notice !== null ? <Toast message={notice} multiline className="fixed bottom-[calc(0.875rem+var(--safe-bottom))] z-40" /> : null}
           {platform.approvalSheet ? <ApprovalSheet port={platform.approvalSheet} container={layoutRoot} /> : null}
         </div>

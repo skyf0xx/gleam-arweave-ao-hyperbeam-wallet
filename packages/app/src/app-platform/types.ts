@@ -36,6 +36,23 @@ export interface EphemeralStatePort {
   remove(key: string): Promise<void>;
 }
 
+/**
+ * Query results kept on the device, so a reopened surface shows the last
+ * known balances at once instead of skeletons. Values are opaque strings
+ * the app writes and reads back; they are stored unencrypted, so only
+ * data already public on chain or as harmless as the local activity log
+ * may go here.
+ */
+export interface QueryCachePort {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+  /** The key of every entry this port holds. */
+  keys(): Promise<string[]>;
+  /** Removes every entry this port wrote. */
+  clear(): Promise<void>;
+}
+
 export type PasskeyWindowMode = "setup" | "unlock";
 
 export interface UnlockPort {
@@ -205,6 +222,7 @@ export interface AppPlatform {
   capabilities: AppCapabilities;
   hostPermissions: HostPermissionsPort;
   ephemeralState: EphemeralStatePort;
+  queryCache: QueryCachePort;
   unlock: UnlockPort;
   /** Reached only when `capabilities.biometrics` is on. */
   biometrics: BiometricUnlockPort;

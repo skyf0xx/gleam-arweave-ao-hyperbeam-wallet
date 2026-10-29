@@ -26,6 +26,7 @@
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
 1 apps/extension/src/adapters/session-access.ts
+1 apps/extension/src/adapters/query-cache.ts
 1 apps/mobile/src/adapters/storage.ts
 1 apps/mobile/src/adapters/sqlite-store.ts
 1 apps/mobile/src/adapters/sqlite-channel.ts
@@ -34,6 +35,8 @@
 1 apps/mobile/src/adapters/download-channel.ts
 1 apps/mobile/src/adapters/downloads.ts
 1 apps/mobile/src/adapters/file-saver.ts
+1 apps/mobile/src/adapters/query-cache.ts
+1 packages/app/src/query-cache/
 1 packages/app/src/passkey/
 1 packages/app/src/biometrics/
 1 packages/app/src/screens/lock-settings/src/BiometricSection.tsx

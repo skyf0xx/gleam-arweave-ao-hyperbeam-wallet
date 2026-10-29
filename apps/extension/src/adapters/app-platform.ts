@@ -6,6 +6,7 @@ import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
 import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
 import { openPasskeyWindow } from "@/src/passkey/open-window";
 import { STORE_REVIEWS_URL } from "@gleam/core";
+import { createExtensionQueryCache } from "./query-cache";
 import { runtimePort } from "./runtime";
 
 /**
@@ -62,6 +63,7 @@ export function createExtensionAppPlatform(
       set: (key, value) => browser.storage.session.set({ [key]: value }),
       remove: (key) => browser.storage.session.remove(key),
     },
+    queryCache: createExtensionQueryCache(),
     unlock: {
       passkeyMode: "inline",
       openPasskeyWindow,

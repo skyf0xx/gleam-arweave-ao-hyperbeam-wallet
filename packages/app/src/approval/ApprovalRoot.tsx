@@ -25,6 +25,7 @@ import { AddTokenScreen } from "./AddTokenScreen";
 import { AwaitingDeviceView } from "./AwaitingDeviceView";
 import { DEVICE_NAMES } from "./device-panels";
 import { usePlatform } from "../app-platform/context";
+import { forgetQueryCache } from "../query-cache/sweep";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
@@ -245,7 +246,10 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
         tagline={`Unlock to review ${hostnameOf(state.request.origin)}'s request`}
         onUnlocked={() => void load(state.runtime, state.request.requestId)}
         // A reset rejects every pending request, this one included.
-        onResetComplete={() => setState({ kind: "done", message: "Gleam was reset. The request was rejected." })}
+        onResetComplete={() => {
+          void forgetQueryCache(platform.queryCache.clear());
+          setState({ kind: "done", message: "Gleam was reset. The request was rejected." });
+        }}
       />
     );
   } else if (state.kind === "awaiting-device") {

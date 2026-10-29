@@ -70,11 +70,11 @@ import type {
  *   wallet's activity is being viewed.
  * - `local:wallets` / `local:activeWalletId` — owned by
  *   `handlers/wallet-lifecycle.ts` (`WalletLifecycleHandler`'s own doc
- *   comment), read-only here. `getPortfolioHistory`'s `ProtocolMap`
- *   signature takes only `{ range }` — no address, unlike every other
- *   read in this file — so this handler resolves "whose balance to
- *   price" itself from these two keys rather than inventing an address
- *   param the contract doesn't have. `Wallet.address` is plaintext (only
+ *   comment), read-only here. `getPortfolioHistory` prices the wallet
+ *   whose `address` the caller names, refusing one that isn't stored,
+ *   so a surface showing one wallet never gets another's chart after a
+ *   switch elsewhere; without an `address` it falls back to the active
+ *   wallet from these two keys. `Wallet.address` is plaintext (only
  *   `encryptedKeyfile` is encrypted, per the `Wallet` model's own doc
  *   comment), so this needs no vault/decryption access — still only
  *   `StoragePort`, the same hexagonal boundary every other method in
@@ -875,9 +875,12 @@ export class ReadsHandler {
   }
 
   /** De-duplicated so the same address imported twice isn't counted twice in the all-wallets total. */
-  private async resolvePortfolioAddresses(scope: PortfolioScope): Promise<string[]> {
+  private async resolvePortfolioAddresses(scope: PortfolioScope, requested: string | undefined): Promise<string[]> {
+    if (requested !== undefined && !(await this.loadTrackedAddresses()).includes(requested)) {
+      throw new Error("That wallet isn't in Gleam.");
+    }
     if (scope === "all") return [...new Set(await this.loadTrackedAddresses())];
-    const address = await this.resolveActiveWalletAddress();
+    const address = requested ?? (await this.resolveActiveWalletAddress());
     return address === null ? [] : [address];
   }
 
@@ -916,6 +919,7 @@ export class ReadsHandler {
    */
   async getPortfolioHistory(req: {
     range: PortfolioHistoryRange;
+    address?: string;
     scope?: PortfolioScope;
     currency?: DisplayCurrency;
   }): Promise<PortfolioHistory> {
@@ -926,7 +930,7 @@ export class ReadsHandler {
     const periodLabel = periodLabelForRange(req.range);
     const empty: PortfolioHistory = { range: req.range, series: [], currentValue: 0, change: 0, periodLabel };
     const currency = req.currency ?? "USD";
-    const addresses = await this.resolvePortfolioAddresses(req.scope ?? "wallet");
+    const addresses = await this.resolvePortfolioAddresses(req.scope ?? "wallet", req.address);
 
     if (addresses.length === 0) return empty;
 

@@ -219,7 +219,7 @@ describe("MainScreenView display settings", () => {
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "EUR" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "wallet", currency: "EUR" } }),
     );
     expect(send).toHaveBeenCalledWith({ type: "getTokenPrices", payload: { currency: "EUR" } });
     const euros = (value: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" }).format(value);
@@ -266,7 +266,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "wallet", currency: "USD" } }),
     );
     await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
     expect(screen.queryByText("Last 7 days")).toBeNull();
@@ -366,7 +366,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     fireEvent.click(await screen.findByRole("button", { name: "Show all wallets" }));
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all", currency: "USD" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "all", currency: "USD" } }),
     );
     expect(screen.getByText("All wallets")).toBeTruthy();
     expect(window.localStorage.getItem("gleam:portfolioScope")).toBe("all");
@@ -385,10 +385,10 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "all", currency: "USD" } }),
+      expect(send).toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "all", currency: "USD" } }),
     );
     expect(screen.getByRole("button", { name: "Show this wallet" }).getAttribute("aria-pressed")).toBe("true");
-    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", scope: "wallet", currency: "USD" } });
+    expect(send).not.toHaveBeenCalledWith({ type: "getPortfolioHistory", payload: { range: "7D", address: WALLET.address, scope: "wallet", currency: "USD" } });
   });
 });
 

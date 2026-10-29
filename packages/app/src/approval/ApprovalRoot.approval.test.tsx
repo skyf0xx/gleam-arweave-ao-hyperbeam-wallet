@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { fakeAppPlatform, renderWithPlatform as render } from "../app-platform/testing";
+import { fakeAppPlatform, memoryQueryCache, renderWithPlatform as render } from "../app-platform/testing";
 import type { ApprovalRequest, RuntimePort, ThemeSettings, WalletState } from "@gleam/core";
 import { ApprovalRoot } from "./ApprovalRoot";
 
@@ -369,5 +369,25 @@ describe("ApprovalRoot: a device request the surface can't reach", () => {
 
     expect(await screen.findByText("Gleam can't reach a Ledger from here.")).toBeTruthy();
     expect(screen.queryByText("keystone-panel")).toBeNull();
+  });
+});
+
+describe("ApprovalRoot reset", () => {
+  it("clears the stored query cache once the wallets are reset", async () => {
+    const send = vi.fn(async (message: { type: string }) => {
+      if (message.type === "getState") return { wallets: [WALLET_SUMMARY], activeWalletId: "wallet-1", session: null };
+      if (message.type === "getApproval") return CONNECT_REQUEST;
+      if (message.type === "getThemePreference") return { theme: "light" } satisfies ThemeSettings;
+      if (message.type === "resetAllWallets") return undefined;
+      return null;
+    });
+    const queryCache = memoryQueryCache(new Map([["wallet-1", "{}"]]));
+
+    render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />, fakeAppPlatform({ queryCache }));
+    fireEvent.click(await screen.findByRole("button", { name: "Forgot password?" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reset wallet" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes, reset wallet" }));
+
+    await waitFor(() => expect(queryCache.entries.size).toBe(0));
   });
 });

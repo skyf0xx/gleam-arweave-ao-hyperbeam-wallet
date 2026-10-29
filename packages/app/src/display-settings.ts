@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { defaultDisplaySettings, type DisplaySettings, type RuntimePort } from "@gleam/core";
 
-const DISPLAY_SETTINGS_QUERY_KEY = ["displaySettings"] as const;
+export const DISPLAY_SETTINGS_QUERY_KEY = ["displaySettings"] as const;
 
 /**
  * The display currency, headline, chart and hidden-balances choices, shared
