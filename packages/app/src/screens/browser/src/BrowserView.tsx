@@ -10,7 +10,7 @@ import { useBrowserSites } from "./useBrowserSites";
 
 export interface BrowserViewProps {
   runtime: RuntimePort;
-  /** Leaves the browser; the open page ends with it. */
+  /** Leaves the browser from its start screen; an open page ends with it. */
   onBack: () => void;
   /** A page to open straight away, such as the one the user left for Connected apps. */
   initialUrl?: string;
@@ -194,9 +194,20 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     browser.goBack().catch(() => undefined);
   };
 
+  // Leaving a page lands on the start screen (saved and recent sites), not the main screen.
+  const closePage = () => {
+    cancelEditing();
+    setFailedUrl(null);
+    setNav(null);
+    setPage(null);
+    recorded.current = null;
+    afterOpen(() => browser.close());
+  };
+
   useBackHandler(() => {
     if (page && editing) cancelEditing();
     else if (page && nav?.canGoBack) goBackInPage();
+    else if (page) closePage();
     else onBack();
   });
 
@@ -327,7 +338,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             </button>
           ) : null}
           <div className="flex-1" />
-          <IconButton label="Close browser" onClick={onBack}><CloseIcon /></IconButton>
+          <IconButton label="Close browser" onClick={closePage}><CloseIcon /></IconButton>
         </div>
       ) : null}
     </div>

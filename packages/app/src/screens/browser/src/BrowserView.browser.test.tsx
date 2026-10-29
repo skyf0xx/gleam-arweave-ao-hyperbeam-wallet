@@ -179,8 +179,29 @@ describe("BrowserView with a page", () => {
     expect(onBack).not.toHaveBeenCalled();
 
     await browser.emit({ kind: "navigation", url: "https://a.example/", canGoBack: false, loading: false });
-    expect(stack.handle()).toBe(true);
+    act(() => {
+      expect(stack.handle()).toBe(true);
+    });
+    // The first page closes onto the start screen; only a second press leaves the browser.
+    expect(onBack).not.toHaveBeenCalled();
+    await waitFor(() => expect(browser.port.close).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("page-placeholder")).toBeNull();
+    expect(screen.getByLabelText("Address")).toBeTruthy();
+
+    act(() => {
+      expect(stack.handle()).toBe(true);
+    });
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns to the start screen when the close button is tapped", async () => {
+    const browser = fakeBrowser();
+    const { onBack } = mount({ browser: browser.port, initialUrl: "https://a.example/" });
+    fireEvent.click(screen.getByLabelText("Close browser"));
+
+    await waitFor(() => expect(browser.port.close).toHaveBeenCalledTimes(1));
+    expect(onBack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("page-placeholder")).toBeNull();
   });
 
   it("offers a retry over a page that failed to load", async () => {
