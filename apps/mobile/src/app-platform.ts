@@ -116,7 +116,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
     backButton: createBackButton(),
     approvalSheet,
     notices: createLinkNotices(worker),
-    activeSite: { subscribe: () => () => {} },
+    activeSite: { subscribe: dapps.subscribe },
     downloads: { requestPermission: async () => true },
     hardwareWallets: {
       openConnectPage: async () => {

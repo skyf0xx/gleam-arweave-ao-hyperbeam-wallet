@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Comlink from "comlink";
 import type { TabsPort } from "@gleam/runtime";
-import { serveDappTabs } from "./dapp-bridge";
+import { createDappBridge, serveDappTabs, type DappViewBridgePlugin } from "./dapp-bridge";
 import { TABS_REQUEST } from "./dapp-tabs";
 
 const channels: MessageChannel[] = [];
@@ -55,5 +55,67 @@ describe("serveDappTabs", () => {
     // have arrived before this one.
     await expect(Comlink.wrap<TabsPort>(worker).webTabs()).resolves.toHaveLength(1);
     expect([...answered]).toEqual([]);
+  });
+});
+
+describe("the dApp tab after the browser closes", () => {
+  function openBridge(closeFails = false) {
+    let navigate: (event: unknown) => void = () => {};
+    const plugin = {
+      open: vi.fn(async () => {}),
+      close: vi.fn(async () => {
+        if (closeFails) throw new Error("native failed");
+      }),
+      reload: vi.fn(async () => {}),
+      setHidden: vi.fn(async () => {}),
+      postMessage: vi.fn(async () => ({ delivered: true })),
+      addListener: vi.fn(async (name: string, listener: (event: unknown) => void) => {
+        if (name === "navigation") navigate = listener;
+        return { remove: async () => {} };
+      }),
+    } as unknown as DappViewBridgePlugin;
+    const runtime = { pageCall: vi.fn(async () => undefined), tabClosed: vi.fn(async () => {}) };
+    const bridge = createDappBridge({ plugin, runtime, providerScript: "" });
+    return { bridge, runtime, navigate: (url: string) => navigate({ url, canGoBack: false, loading: false }) };
+  }
+
+  it("has no active tab once the browser closes, and tells subscribers", async () => {
+    const { bridge, navigate, runtime } = openBridge();
+    await bridge.listening;
+    const onChange = vi.fn();
+    bridge.subscribe(onChange);
+
+    navigate("https://bazar.arweave.net/");
+    await expect(bridge.tabs.activeTab()).resolves.toMatchObject({ url: "https://bazar.arweave.net/" });
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    await bridge.close();
+    await expect(bridge.tabs.activeTab()).resolves.toBeUndefined();
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(runtime.tabClosed).toHaveBeenCalled();
+  });
+
+  it("forgets the tab even when native fails to close", async () => {
+    const { bridge, navigate } = openBridge(true);
+    await bridge.listening;
+    navigate("https://bazar.arweave.net/");
+    await expect(bridge.close()).rejects.toThrow("native failed");
+    await expect(bridge.tabs.activeTab()).resolves.toBeUndefined();
+  });
+
+  it("notifies on open and on same-origin navigation, and stops after unsubscribe", async () => {
+    const { bridge, navigate } = openBridge();
+    await bridge.listening;
+    const onChange = vi.fn();
+    const stop = bridge.subscribe(onChange);
+
+    await bridge.open({ url: "https://a.example/", frame: { x: 0, y: 0, width: 1, height: 1 } });
+    navigate("https://a.example/");
+    navigate("https://a.example/two");
+    expect(onChange).toHaveBeenCalledTimes(3);
+
+    stop();
+    await bridge.close();
+    expect(onChange).toHaveBeenCalledTimes(3);
   });
 });

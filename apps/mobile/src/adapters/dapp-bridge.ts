@@ -36,6 +36,11 @@ export interface DappBridge {
   setHidden(hidden: boolean): Promise<void>;
   /** The dApp view as the runtime's one browser tab, served to the worker by `serveDappTabs`. */
   tabs: TabsPort;
+  /**
+   * Calls `onChange` when the page in view opens, navigates or closes, so the
+   * main screen's site card re-reads `tabs.activeTab()`.
+   */
+  subscribe(onChange: () => void): () => void;
 }
 
 function webOrigin(url: string): string | null {
@@ -104,11 +109,16 @@ export function createDappBridge({
   let lastTabId = 0;
   const freshRelays = () => ({ modeAsked: false, presence: false, use: false, permissions: "" });
   let relayed = freshRelays();
+  const subscribers = new Set<() => void>();
+  const notify = () => {
+    for (const onChange of [...subscribers]) onChange();
+  };
 
   const replaceTab = (next: { id: number; url: string } | null): void => {
     if (tab) runtime.tabClosed(tab.id).catch(() => undefined);
     tab = next;
     relayed = freshRelays();
+    notify();
   };
 
   const webTab = (): { id: number; url: string; origin: string } | null => {
@@ -175,6 +185,7 @@ export function createDappBridge({
     const origin = webOrigin(url);
     if (tab && origin !== null && webOrigin(tab.url) === origin) {
       tab.url = url;
+      notify();
     } else {
       lastTabId += 1;
       replaceTab({ id: lastTabId, url });
@@ -212,13 +223,26 @@ export function createDappBridge({
   ]).then(() => undefined);
 
   return {
-    open: ({ url, frame }) => plugin.open({ url, frame, providerScript }),
+    async open({ url, frame }) {
+      await plugin.open({ url, frame, providerScript });
+      notify();
+    },
     async close() {
-      await plugin.close();
-      replaceTab(null);
+      // The page is gone from the wallet's side even if native fails to say so.
+      try {
+        await plugin.close();
+      } finally {
+        replaceTab(null);
+      }
     },
     setHidden: (hidden) => plugin.setHidden({ hidden }),
     tabs,
+    subscribe(onChange) {
+      subscribers.add(onChange);
+      return () => {
+        subscribers.delete(onChange);
+      };
+    },
     listening,
   };
 }
