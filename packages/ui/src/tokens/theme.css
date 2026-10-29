@@ -706,6 +706,33 @@ select,
  */
 
 /*
+ * Restored (cached) values whose live read is in flight breathe between
+ * their resting 0.7 and full opacity, like a skeleton. Every pulsing element
+ * shares one duration and starts on mount, so they stay in phase. Reduced
+ * motion gets the still 0.7, the same as a cached value with no fetch.
+ */
+@keyframes gleam-cached-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.gleam-cached-pulse {
+  animation: gleam-cached-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-cached-pulse {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/*
  * Empty portfolio-chart shimmer — `PortfolioChart`'s zero-balance state
  * draws its beam-gradient polyline at rest (~13% opacity, see the
  * component), then overlays this second identical-path, identical-

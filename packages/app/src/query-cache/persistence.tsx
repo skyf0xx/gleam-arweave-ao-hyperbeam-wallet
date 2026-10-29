@@ -97,6 +97,7 @@ export function QueryCachePersistence({ client, port, walletId, address, buster,
       }).catch((error: unknown) => console.error("Couldn't save the query cache.", error));
     };
 
+    const restoreStartedAt = Date.now();
     persistQueryClientRestore({
       queryClient: client,
       persister,
@@ -105,8 +106,14 @@ export function QueryCachePersistence({ client, port, walletId, address, buster,
       // Hydrated queries no screen has observed yet don't pick up the defaults above on their own.
       hydrateOptions: { defaultOptions: { queries: { gcTime: QUERY_CACHE_MAX_AGE_MS } } },
     })
-      // Settings are kept fresh for good once read, so a restored copy is read again to pick up a change made elsewhere.
-      .then(() => client.invalidateQueries({ queryKey: DISPLAY_SETTINGS_QUERY_KEY, refetchType: "none" }))
+      // A restored copy is shown as cached until a live read replaces it, so each one is read again on open,
+      // even where its staleTime (the chart's, the settings') would still call it fresh.
+      .then(() =>
+        client.invalidateQueries({
+          predicate: (query) => shouldPersistQuery(query, address) && query.state.dataUpdatedAt < restoreStartedAt,
+          refetchType: "none",
+        }),
+      )
       .catch(() => undefined)
       .finally(() => {
         if (!active) return;

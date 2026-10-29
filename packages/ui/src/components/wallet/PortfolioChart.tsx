@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
 import { formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
 import { useAnimatedNumber } from "../../primitives/animated-number";
-import { REFRESH_DIM_DELAY_MS, useDelayedFlag } from "../../primitives/use-delayed-flag";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 
@@ -69,9 +68,17 @@ export interface PortfolioChartProps {
   activeRange: PortfolioChartRange;
   onRangeChange: (range: PortfolioChartRange) => void;
   loading?: boolean;
-  refreshing?: boolean;
-  /** Figures that feed the total are still being read: it keeps its last text, then ticks once when they settle. */
-  hold?: boolean;
+  /**
+   * The figures show restored data that fresh data hasn't replaced yet. They
+   * render faded from the first frame, fade up when this goes false, and the
+   * totals tick once at that switch. Keep it true until every input feeding
+   * the total is fresh.
+   */
+  cached?: boolean;
+  /** With `cached`: a live read is in flight, so the figures pulse; otherwise they rest at a still fade. */
+  cachedFetching?: boolean;
+  /** Tells this chart's figures apart across wallets; the range, scope and currency are added here. */
+  walletKey?: string;
   /**
    * Set when the active range's fetch failed (thrown query error, or a
    * resolved-but-empty series). Replaces just the value/chart area with
@@ -196,8 +203,9 @@ export function PortfolioChart({
   activeRange,
   onRangeChange,
   loading = false,
-  refreshing = false,
-  hold = false,
+  cached = false,
+  cachedFetching = false,
+  walletKey = "",
   onRetry,
   scope = "wallet",
   onToggleScope,
@@ -234,20 +242,21 @@ export function PortfolioChart({
   // Both run on every render so hook order holds; masked figures never show a frame.
   const totalParts = formatCurrencyParts(currentValue, currency);
   // While loading, `currentValue` is a stand-in, so the first real figure swaps in rather than ticking up from it.
+  const figureIdentity = `${walletKey}|${activeRange}|${scope}|${currency}`;
   const totalAmount = useAnimatedNumber({
     value: loading ? Number.NaN : currentValue,
     text: totalParts.amount,
     format: (value) => formatCurrencyParts(value, currency).amount,
-    unit: currency,
-    hold,
+    identity: figureIdentity,
+    cached,
   });
   const headlineAmount = useAnimatedNumber({
     value: headline?.value ?? Number.NaN,
     text: headline?.amount ?? "",
-    unit: headline?.unit,
-    hold,
+    identity: `${figureIdentity}|${headline?.unit ?? ""}`,
+    cached,
   });
-  const dimmed = useDelayedFlag(refreshing && !loading, REFRESH_DIM_DELAY_MS);
+  const faded = cached && !loading;
   const totalLabel = masked ? HIDDEN_AMOUNT : totalParts.unit ? `${totalAmount} ${totalParts.unit}` : totalAmount;
   const headlineParts: CurrencyValueParts = masked
     ? { amount: HIDDEN_AMOUNT }
@@ -274,7 +283,7 @@ export function PortfolioChart({
   );
 
   const figures = (
-    <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-300", loading && "opacity-50", dimmed && "opacity-85")}>
+    <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", faded && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))}>
       <div className="flex items-baseline gap-2.5">
         <Headline parts={headlineParts} masked={masked} onToggle={onToggleMasked} />
         {headline === undefined ? changeBadge : null}
