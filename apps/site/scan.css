@@ -251,7 +251,7 @@
 .figures-pending .figures-unit { display: none; }
 
 .sc-report-action { margin: 0 0 16px; }
-.sc-report-action .button { height: 44px; font-size: 0.9375rem; }
+.sc-report-action .button { min-height: 44px; font-size: 0.9375rem; }
 
 /* The disclaimer: set apart, quieter than a section. */
 
