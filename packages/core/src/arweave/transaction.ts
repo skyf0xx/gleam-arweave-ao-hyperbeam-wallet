@@ -1,4 +1,5 @@
 import type { Signer } from "../vault/signer";
+import { L1_TOKEN_NODE_URLS } from "../models/network";
 import type { Tag } from "../models/tag";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { clientForGateway } from "./client";
@@ -177,4 +178,51 @@ export async function postTransaction(gatewayUrl: string, signed: ArweaveTransac
   const client = clientForGateway(gatewayUrl);
   const response = await client.transactions.post(fromJson(signed));
   return { status: response.status, statusText: response.statusText };
+}
+
+const BROADCAST_RETRY_DELAYS_MS = [1_000, 2_000];
+
+/** A 400 is the network judging the transaction. These say nothing about it, so another try can land. */
+function worthRetrying(status: number): boolean {
+  return status === 404 || status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Posts a signed transaction, retrying where the gateway fell over rather
+ * than judged it: arweave.net routes each request to one of several
+ * backends, and one can answer 404 `necessary-message-not-found` while the
+ * next accepts the same post. Tries the gateway, then `L1_TOKEN_NODE_URLS`.
+ *
+ * Every try sends the same signed bytes, so it can't spend twice, and a
+ * node answers 200 for a transaction it already has. Returns the gateway's
+ * last answer when nothing accepts it, and throws only if no attempt got
+ * an answer at all.
+ */
+export async function broadcastTransaction(
+  gatewayUrl: string,
+  signed: ArweaveTransactionJson,
+  retryDelaysMs: readonly number[] = BROADCAST_RETRY_DELAYS_MS,
+): Promise<{ status: number; statusText: string }> {
+  let gatewayAnswer: { status: number; statusText: string } | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      gatewayAnswer = await postTransaction(gatewayUrl, signed);
+      if (!worthRetrying(gatewayAnswer.status)) return gatewayAnswer;
+    } catch (error) {
+      lastError = error;
+    }
+    const delayMs = retryDelaysMs[attempt];
+    if (delayMs !== undefined) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  for (const node of L1_TOKEN_NODE_URLS) {
+    try {
+      const response = await postTransaction(node, signed);
+      if (response.status >= 200 && response.status < 300) return response;
+    } catch {
+      // Try the next node; the gateway's answer is the one worth reporting.
+    }
+  }
+  if (gatewayAnswer) return gatewayAnswer;
+  throw lastError;
 }
