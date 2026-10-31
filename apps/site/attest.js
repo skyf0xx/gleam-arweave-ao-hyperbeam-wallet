@@ -86,7 +86,6 @@ if (!decoded.ok) {
     openApp.href = `https://open.gleamwallet.app/attest${location.hash}`;
     openApp.hidden = false;
   }
-  $("[data-footnote]").hidden = false;
 
   let busy = false;
   let final = false;
