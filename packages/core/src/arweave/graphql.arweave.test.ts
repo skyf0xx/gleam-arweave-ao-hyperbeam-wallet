@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AO_MU_SIGNERS, queryActivityTransactions, queryAoTransferActivity, queryL1TokenReceipts } from "./graphql";
+import { AO_MU_SIGNERS, queryActivityTransactions, queryAoTransferActivity, queryBlockHeights, queryL1TokenReceipts } from "./graphql";
 
 const ADDRESS = "myAddr";
 
@@ -492,5 +492,33 @@ describe("queryL1TokenReceipts", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ txId: "one", amount: "1", token: "tokenProcess", unverified: true });
     expect(entries[0]?.collectible).toBeUndefined();
+  });
+});
+
+describe("queryL1TokenReceipts and queryBlockHeights with a gateway's unmined duplicates", () => {
+  const WALLET = "W".repeat(43);
+  const TOKEN = "T".repeat(43);
+  const node = (block: { height: number; timestamp: number } | null) => ({
+    id: "tx",
+    owner: { address: "S".repeat(43) },
+    recipient: TOKEN,
+    quantity: { winston: "0" },
+    tags: [
+      { name: "action", value: "transfer" },
+      { name: "recipient", value: WALLET },
+      { name: "quantity", value: "5" },
+    ],
+    block,
+  });
+  const edges = [{ cursor: "1", node: node({ height: 9, timestamp: 100 }) }, { cursor: "2", node: node(null) }];
+  const gateway = (async () => Response.json({ data: { transactions: { edges } } })) as typeof fetch;
+
+  it("keeps a receipt's mined copy", async () => {
+    const [receipt] = await queryL1TokenReceipts(WALLET, "https://gw.test", 10, gateway);
+    expect(receipt).toMatchObject({ status: "confirmed", timestamp: 100_000 });
+  });
+
+  it("reads the mined copy's height", async () => {
+    expect((await queryBlockHeights(["tx"], "https://gw.test", gateway)).get("tx")).toBe(9);
   });
 });

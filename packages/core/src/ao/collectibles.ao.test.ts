@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { L1_TOKEN_NODE_URLS } from "../models/network";
 import { classifyAsset, discoverCollectibles } from "./collectibles";
 
 const WALLET = "W".repeat(43);
@@ -49,6 +50,8 @@ interface World {
   balances: Record<string, string | number>;
   /** Balances the gateway's HyperBEAM answers; ids missing here get a 500, as legacy assets do. */
   gatewayBalances?: Record<string, string | number>;
+  /** The token nodes answer, and have never credited the wallet. */
+  nodesReachable?: boolean;
 }
 
 function stubFetch(world: World) {
@@ -61,6 +64,7 @@ function stubFetch(world: World) {
       const balance = world.gatewayBalances?.[url.split("/")[3]!.split("~")[0]!];
       return balance === undefined ? new Response("x", { status: 500 }) : Response.json(String(balance));
     }
+    if (L1_TOKEN_NODE_URLS.includes(origin)) return new Response("x", { status: world.nodesReachable ? 404 : 500 });
     if (origin === new URL(PEER).origin) {
       const id = url.split("/")[3]!.split("~")[0]!;
       const balance = world.balances[id];
@@ -127,8 +131,8 @@ describe("discoverCollectibles", () => {
     expect(calls.some((u) => new URL(u).origin === new URL(PEER).origin && u.includes(A))).toBe(false);
   });
 
-  it("treats a 404 balance as not held", async () => {
-    const { result } = run({ initial: [A], descriptors: { [A]: NFT }, balances: {} });
+  it("treats a token node's 404 as not held", async () => {
+    const { result } = run({ nodesReachable: true, initial: [A], descriptors: { [A]: NFT }, balances: {} });
     await expect(result).resolves.toEqual([]);
   });
 

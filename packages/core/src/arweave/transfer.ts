@@ -2,7 +2,7 @@ import { clientForGateway } from "./client";
 import {
   applyTransactionSignature,
   buildUnsignedTransaction,
-  postTransaction,
+  broadcastTransaction,
   signTransactionWithSigner,
   type ArweaveTransactionJson,
 } from "./transaction";
@@ -82,7 +82,7 @@ export async function finishTransfer(
   expectedOwner: string,
 ): Promise<SubmittedTransfer> {
   const { id, transaction } = await applyTransactionSignature(unsigned, signature, expectedOwner);
-  const response = await postTransaction(gatewayUrl, transaction);
+  const response = await broadcastTransaction(gatewayUrl, transaction);
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
       `Failed to submit transfer to ${gatewayUrl} (HTTP ${response.status}: ${response.statusText}).`,

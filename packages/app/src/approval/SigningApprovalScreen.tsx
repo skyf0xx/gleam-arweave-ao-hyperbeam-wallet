@@ -76,8 +76,8 @@ function shortenProcessId(processId: string): string {
  */
 function formatAmount(atomic: string | null, token: string | null, tokenDenomination: number | null): string {
   if (atomic === null) return "—";
-  if (token === null) return formatWinstonAsAr(atomic);
-  return tokenDenomination === null ? atomic : formatAtomicAsDisplay(atomic, tokenDenomination);
+  if (token === null) return formatWinstonAsAr(atomic, 12);
+  return tokenDenomination === null ? atomic : formatAtomicAsDisplay(atomic, tokenDenomination, tokenDenomination);
 }
 
 /**
@@ -98,7 +98,7 @@ function formatAmountUnit(token: string | null, tokenDenomination: number | null
 }
 
 function formatFee(fee: string | null): string {
-  return fee === null ? "—" : formatWinstonAsAr(fee);
+  return fee === null ? "—" : formatWinstonAsAr(fee, 12);
 }
 
 /**
@@ -115,7 +115,7 @@ function formatTotal(
 ): string {
   if (token !== null || amount === null || fee === null) return formatAmount(amount, token, tokenDenomination);
   try {
-    return formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString());
+    return formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString(), 12);
   } catch {
     return "—";
   }

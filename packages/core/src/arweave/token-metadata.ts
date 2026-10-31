@@ -112,8 +112,9 @@ export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): To
     tags.find((tag) => tag.name.toLowerCase() === name)?.value ?? null;
 
   const rawDenomination = tagValue("denomination");
+  // Two digits, like a legacy token's Info: anyone can tag a token, and 10 ** 2e9 throws while it renders.
   const denomination =
-    rawDenomination !== null && /^\d+$/.test(rawDenomination) ? Number(rawDenomination) : null;
+    rawDenomination !== null && /^\d{1,2}$/.test(rawDenomination) ? Number(rawDenomination) : null;
 
   return {
     processId,

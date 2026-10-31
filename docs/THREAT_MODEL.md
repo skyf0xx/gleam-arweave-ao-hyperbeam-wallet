@@ -168,8 +168,9 @@ The extension talks to:
   transactions.
 - **`up.arweave.net`:** the bundler that a site's `dispatch` posts to.
 - **AO:** `mu.ao-testnet.xyz` (sending messages), `cu.ao-testnet.xyz`
-  (reading results), `state.forward.computer` and HyperBEAM peers (token
-  balances).
+  (reading results), `state.forward.computer`, HyperBEAM peers,
+  `alpha.neo.zephyrdev.xyz` and `charlie.neo2.zephyrdev.xyz` (token
+  balances, and posting a signed transaction the gateway can't take).
 - **Gleam:** `api.gleamwallet.app` (prices: the token id only, relayed to
   CoinGecko and CoinPaprika; Gleam Points: the wallet address, a signed
   proof of ownership, and a device id) and `gleamwallet.app`

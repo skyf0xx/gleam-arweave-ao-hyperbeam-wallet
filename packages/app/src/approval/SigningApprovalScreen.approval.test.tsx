@@ -263,6 +263,14 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.getByText("50.0008")).toBeTruthy();
   });
 
+  it("shows a tiny amount and fee exactly, not rounded to 0", () => {
+    const preview: SigningApprovalPreview = { ...TRANSFER_PREVIEW, amount: "10000000", fee: "46409930" };
+    const { container } = render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+    expect(container.textContent).toContain("0.00001");
+    expect(container.textContent).toContain("0.00004640993");
+    expect(container.textContent).toContain("0.00005640993");
+  });
+
   it("shows a placeholder rather than a raw Winston string when fee is unknown", () => {
     const preview: SigningApprovalPreview = { ...TRANSFER_PREVIEW, fee: null };
     render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);

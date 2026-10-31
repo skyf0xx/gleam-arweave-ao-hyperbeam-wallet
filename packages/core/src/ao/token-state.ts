@@ -27,3 +27,21 @@ export async function readTokenStateLogo(
   const logo = response.headers.get("logo")?.trim();
   return logo ? logo : null;
 }
+
+/**
+ * The Arweave block height a `token@1.0` process has applied messages up
+ * to, from the `swap-height` its live state carries. The process reaches a
+ * block about 2 confirmations after it is mined, so a transfer in that
+ * block moves the balance only once this catches up.
+ */
+export async function readTokenSwapHeight(processId: string, nodeUrl: string, fetchImpl: typeof fetch = fetch): Promise<number> {
+  const response = await fetchImpl(`${nodeUrl.replace(/\/+$/, "")}/${processId}~process@1.0/compute&max-age=60`, {
+    method: "HEAD",
+    signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
+  });
+  const height = Number(response.headers.get("swap-height") ?? "");
+  if (!response.ok || !Number.isSafeInteger(height) || height <= 0) {
+    throw new Error(`Token state request failed (${response.status}).`);
+  }
+  return height;
+}

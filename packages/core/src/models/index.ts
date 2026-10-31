@@ -39,7 +39,7 @@ export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";
 export type { ReviewMoment } from "./review-prompt";
 export { isValidArweaveAddress } from "./contact";
-export type { Winston, Balance, TokenBalance } from "./balance";
+export type { Winston, Balance, PendingAmounts, PendingTransfer, TokenBalance } from "./balance";
 export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collectible";
 export { collectibleSendRefusal } from "./collectible";
 export type {
@@ -76,7 +76,7 @@ export type { HyperBeamPeer, NetworkSettings } from "./network";
 export { SITE_URL, SITE_ORIGIN, DEV_SITE_HOSTS } from "./site-origin";
 export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl } from "./site-links";
 export type { SitePage } from "./site-links";
-export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
+export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
 export type { DisplayCurrency, DisplaySettings, FiatCurrency, HeadlineBalance, TokenCurrency } from "./display";
 export {

@@ -279,6 +279,8 @@ export async function queryL1TokenReceipts(
   const byId = new Map<string, ActivityEntry>();
   for (const { node } of body.data?.transactions?.edges ?? []) {
     if (!node.recipient || node.owner.address === address) continue;
+    // Gateways list a mined transaction a second time with no block.
+    if (!node.block && byId.has(node.id)) continue;
     const transfer = l1TokenTransferOf(node);
     if (transfer === null || transfer.recipient !== address) continue;
     byId.set(node.id, {
@@ -294,6 +296,31 @@ export async function queryL1TokenReceipts(
     });
   }
   return [...byId.values()];
+}
+
+/** The block height of each of `ids` that has been mined. */
+export async function queryBlockHeights(
+  ids: string[],
+  gatewayUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Map<string, number>> {
+  const heights = new Map<string, number>();
+  // Doubled below because of the unmined duplicates, and gateways cap a page at 100.
+  const lookup = [...new Set(ids)].slice(0, 50);
+  if (lookup.length === 0) return heights;
+  const body = await postGraphQLWithFailover<{
+    data?: { transactions?: { edges: Array<{ node: { id: string; block: { height: number } | null } }> } };
+  }>(
+    gatewayUrl,
+    `query ($ids: [ID!]!, $first: Int!) { transactions(ids: $ids, first: $first) { edges { node { id block { height } } } } }`,
+    { ids: lookup, first: lookup.length * 2 },
+    fetchImpl,
+    (gw, detail) => `Gateway block-height GraphQL query against "${gw}" failed: ${detail}`,
+  );
+  for (const { node } of body.data?.transactions?.edges ?? []) {
+    if (node.block) heights.set(node.id, node.block.height);
+  }
+  return heights;
 }
 
 /**

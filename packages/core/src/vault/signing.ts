@@ -9,7 +9,7 @@ import { postDataItemToBundler } from "../arweave/bundler";
 import {
   applyTransactionSignature,
   buildUnsignedTransaction,
-  postTransaction,
+  broadcastTransaction,
   signTransactionWithSigner,
   verifyTransactionSignature,
   type ArweaveTransactionJson,
@@ -235,7 +235,7 @@ export async function finishDispatch(
     return { id: signed.id, type: "BUNDLED" };
   }
 
-  const response = await postTransaction(gatewayUrl, signed.transaction);
+  const response = await broadcastTransaction(gatewayUrl, signed.transaction);
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
       `Failed to dispatch transaction to ${gatewayUrl} (HTTP ${response.status}: ${response.statusText}).`,

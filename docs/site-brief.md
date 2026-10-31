@@ -194,6 +194,7 @@ as of this brief:
 - `up.arweave.net`: data uploads.
 - `mu.ao-testnet.xyz`: submitting AO messages (token sends). `cu.ao-testnet.xyz`: reading results.
 - HyperBEAM peers, `state.forward.computer` by default, plus any peer you add: AO balance reads.
+- `alpha.neo.zephyrdev.xyz`, `charlie.neo2.zephyrdev.xyz`: token balance reads when the gateway has no answer, each sending the wallet address and the token's id, and checks on how far a token has got. If the gateway can't take a signed transaction, it is posted here instead.
 - `api.coingecko.com`, `api.coinpaprika.com`: token prices for USD values.
 - `lunar.arweave.net`: a block explorer, opened in a new tab only when you click a transaction or address.
 

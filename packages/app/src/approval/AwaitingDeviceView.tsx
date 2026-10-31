@@ -140,9 +140,9 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   if (summary.kind === "transaction") {
     return (
       <>
-        {summary.recipient !== null ? <Row label="Amount" value={`${formatWinstonAsAr(summary.quantity)} AR`} /> : null}
+        {summary.recipient !== null ? <Row label="Amount" value={`${formatWinstonAsAr(summary.quantity, 12)} AR`} /> : null}
         {summary.recipient !== null ? <AddressRow label="Recipient" address={summary.recipient} /> : null}
-        <Row label="Fee" value={`${formatWinstonAsAr(summary.fee)} AR`} />
+        <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
         {summary.dataSize !== "0" ? <Row label="Data" value={`${summary.dataSize} bytes`} /> : null}
       </>
     );
@@ -153,7 +153,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
     const scale = token?.processId === summary.process ? token : undefined;
     const quantity =
       scale?.denomination != null
-        ? `${formatAtomicAsDisplay(summary.quantity, scale.denomination)} ${scale.ticker ?? ""}`.trim()
+        ? `${formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)} ${scale.ticker ?? ""}`.trim()
         : `${summary.quantity} smallest units`;
     return (
       <>

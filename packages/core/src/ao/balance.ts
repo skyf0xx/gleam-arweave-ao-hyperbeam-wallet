@@ -1,4 +1,5 @@
 import type { TokenBalance } from "../models/balance";
+import { L1_TOKEN_NODE_URLS } from "../models/network";
 import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
@@ -20,12 +21,20 @@ export async function getTokenBalance(
   peerUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<TokenBalance> {
+  return (await queryBalance(processId, address, peerUrl, fetchImpl)) ?? parseBalanceResponse("0", processId, address);
+}
+
+/** `null` for a 404. */
+async function queryBalance(
+  processId: string,
+  address: string,
+  peerUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<TokenBalance | null> {
   const url = `${trimTrailingSlash(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(COMPUTE_TIMEOUT_MS) });
 
-  if (response.status === 404) {
-    return parseBalanceResponse("0", processId, address);
-  }
+  if (response.status === 404) return null;
 
   if (!response.ok) {
     throw new Error(
@@ -126,9 +135,7 @@ export interface ReadTokenBalanceOptions {
  * The atomic balance of `address` on `processId`, read where that kind of
  * token actually lives:
  *
- * - `"l1"` (`arweave-scheduler@1.0`): the gateway's HyperBEAM node first,
- *   then the peer. Legacy-AO peers such as state.forward.computer answer
- *   403 or 500 for these processes.
+ * - `"l1"` (`arweave-scheduler@1.0`): `readL1Balance`.
  * - `"mu"` (legacynet): the peer's compute path first, then a CU
  *   `dry-run`. state.forward.computer serves only an allowlist of legacy
  *   processes and answers 403 for the rest.
@@ -136,34 +143,66 @@ export interface ReadTokenBalanceOptions {
  * Throws one error naming every source tried when none answers.
  */
 export async function readTokenBalance(options: ReadTokenBalanceOptions): Promise<string> {
-  const { processId, address, transport, gatewayUrl, peerUrl } = options;
+  const { processId, address, transport, gatewayUrl, peerUrl, label } = options;
   const fetchImpl = options.fetchImpl ?? fetch;
-  const hosts = [
-    ...new Set(
-      (transport === "l1" ? [gatewayUrl, peerUrl] : [peerUrl])
-        .filter((url): url is string => url !== null)
-        .map(trimTrailingSlash),
-    ),
-  ];
+  if (transport === "l1") return readL1Balance(processId, address, gatewayUrl, peerUrl, fetchImpl, label);
   const failures: string[] = [];
+  if (peerUrl !== null) {
+    try {
+      return (await getTokenBalance(processId, address, trimTrailingSlash(peerUrl), fetchImpl)).quantity;
+    } catch (error) {
+      failures.push(`${hostOf(peerUrl)} (${shortReason(error)})`);
+    }
+  }
+  const cuUrl = options.cuUrl ?? AO_LEGACY_CU_URL;
+  try {
+    return await readLegacyTokenBalance(processId, address, cuUrl, fetchImpl);
+  } catch (error) {
+    failures.push(`${hostOf(cuUrl)} (${shortReason(error)})`);
+  }
+  throw balanceReadError(label, failures);
+}
+
+/**
+ * The balance of an `arweave-scheduler@1.0` process. Tries the gateway's
+ * HyperBEAM node, then `L1_TOKEN_NODE_URLS`, then the peer; legacy-AO
+ * peers such as state.forward.computer answer 403 or 500 for these
+ * processes. The first number wins.
+ *
+ * Only a token node's 404 means "never credited". A gateway answers 404
+ * for a wallet that holds the token whenever its route to a HyperBEAM node
+ * drops out, so on its own that is no answer, and a balance nobody can
+ * vouch for throws rather than showing a holder 0.
+ */
+export async function readL1Balance(
+  processId: string,
+  address: string,
+  gatewayUrl: string,
+  peerUrl: string | null,
+  fetchImpl: typeof fetch = fetch,
+  label?: string,
+): Promise<string> {
+  const nodes = new Set(L1_TOKEN_NODE_URLS);
+  const hosts = [...new Set([gatewayUrl, ...nodes, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlash))];
+  const failures: string[] = [];
+  let notCredited = false;
   for (const host of hosts) {
     try {
-      return (await getTokenBalance(processId, address, host, fetchImpl)).quantity;
+      const balance = await queryBalance(processId, address, host, fetchImpl);
+      if (balance !== null) return balance.quantity;
+      if (nodes.has(host)) notCredited = true;
+      else failures.push(`${hostOf(host)} (HTTP 404)`);
     } catch (error) {
       failures.push(`${hostOf(host)} (${shortReason(error)})`);
     }
   }
-  if (transport === "mu") {
-    const cuUrl = options.cuUrl ?? AO_LEGACY_CU_URL;
-    try {
-      return await readLegacyTokenBalance(processId, address, cuUrl, fetchImpl);
-    } catch (error) {
-      failures.push(`${hostOf(cuUrl)} (${shortReason(error)})`);
-    }
-  }
-  const label = options.label ?? "token";
-  throw new Error(
-    `Couldn't read your ${label} balance. Tried ${failures.join(", ")}. The token's node may be busy, so try again in a minute.`,
+  if (notCredited) return "0";
+  throw balanceReadError(label, failures);
+}
+
+function balanceReadError(label: string | undefined, failures: string[]): Error {
+  return new Error(
+    `Couldn't read your ${label ?? "token"} balance. Tried ${failures.join(", ")}. The token's node may be busy, so try again in a minute.`,
   );
 }
 

@@ -2,7 +2,7 @@
   "name": "@gleam/extension",
   "description": "Gleam - Arweave/AO browser extension wallet",
   "private": true,
-  "version": "1.32.1",
+  "version": "1.33.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

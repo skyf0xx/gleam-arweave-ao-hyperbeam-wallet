@@ -30,6 +30,7 @@ import type {
   ScanStats,
   SecurityPhrase,
   ThemeSettings,
+  PendingTransfer,
   TokenBalance,
   TokenPrice,
   TransferDraft,
@@ -141,6 +142,8 @@ export interface ProtocolMap {
    */
   getArFee(): Winston;
   getTokenBalances(req: { address: string }): TokenBalance[];
+  /** What each balance read doesn't include yet; see `ReadsHandler.getPendingTransfers`. */
+  getPendingTransfers(req: { address: string }): PendingTransfer[];
   /**
    * The AO NFTs `address` holds. Separate from `getTokenBalances` so a slow
    * discovery never delays the token list. Popup-only. Answers from the

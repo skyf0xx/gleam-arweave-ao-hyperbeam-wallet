@@ -781,6 +781,7 @@ export function createRuntime(platform: Platform): Runtime {
     getBalance: (data) => reads.getBalance(data),
     getArFee: () => transfer.getArFee(),
     getTokenBalances: (data) => reads.getTokenBalances(data),
+    getPendingTransfers: (data) => reads.getPendingTransfers(data),
     getCollectibles: (data) => reads.getCollectibles(data),
     getWatchedTokens: (data) => reads.getWatchedTokens(data),
     previewWatchedToken: (data) => reads.previewWatchedToken(data),

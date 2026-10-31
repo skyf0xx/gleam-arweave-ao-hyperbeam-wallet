@@ -1,6 +1,6 @@
 import type { Collectible } from "../models/collectible";
 import { classifyAsset, createAssetScanner, mapLimit, PROCESS_ID, tagMap, withRequestTimeout, type Tag } from "./asset-scan";
-import { getTokenBalance } from "./balance";
+import { readL1Balance } from "./balance";
 
 export { classifyAsset } from "./asset-scan";
 export type { AssetClass } from "./asset-scan";
@@ -78,20 +78,13 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
     return tags !== undefined && classifyAsset(tags) === "unique";
   });
 
-  // Assets on the arweave-scheduler@1.0 device are computed by the
-  // gateway's HyperBEAM node, while legacy-AO peers such as
-  // state.forward.computer answer 500 for them. Ask the gateway first.
-  const balanceHosts = [...new Set([gatewayUrl.replace(/\/+$/, ""), peerUrl.replace(/\/+$/, "")])];
   const checks = await mapLimit(uniques, concurrency, async (id) => {
     if (Date.now() >= deadline) return null;
-    for (const host of balanceHosts) {
-      try {
-        return (await getTokenBalance(id, address, host, fetchImpl)).quantity;
-      } catch {
-        // Try the next host.
-      }
+    try {
+      return await readL1Balance(id, address, gatewayUrl, peerUrl, fetchImpl);
+    } catch {
+      return undefined;
     }
-    return undefined;
   });
   if (uniques.length > 0 && checks.every((quantity) => quantity === undefined)) {
     throw new Error(`Could not read any collectible balance from ${peerUrl}.`);
