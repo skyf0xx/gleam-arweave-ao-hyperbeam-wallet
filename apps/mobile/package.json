@@ -2,7 +2,7 @@
   "name": "@gleam/mobile",
   "description": "Gleam - Arweave/AO wallet for iOS and Android",
   "private": true,
-  "version": "1.32.1",
+  "version": "1.33.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
