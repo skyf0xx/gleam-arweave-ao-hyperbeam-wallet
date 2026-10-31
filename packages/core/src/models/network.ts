@@ -27,6 +27,18 @@ export interface NetworkSettings {
 export const DEFAULT_HYPERBEAM_PEER_URLS: readonly string[] = ["https://state.forward.computer"];
 
 /**
+ * HyperBEAM nodes that compute `arweave-scheduler@1.0` processes. A
+ * gateway's own answer for these processes comes and goes: arweave.net
+ * has been seen flipping between a balance and an HTML 404 for the same
+ * URL within minutes. They answer `Access-Control-Allow-Origin: *`, so
+ * these public reads need no host permission.
+ */
+export const L1_TOKEN_NODE_URLS: readonly string[] = [
+  "https://alpha.neo.zephyrdev.xyz",
+  "https://charlie.neo2.zephyrdev.xyz",
+];
+
+/**
  * ANS-104 bundler that bundled `dispatch` items are posted to.
  * Also listed in apps/extension/wxt.config.ts's `host_permissions`.
  */

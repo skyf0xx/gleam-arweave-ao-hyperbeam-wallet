@@ -46,7 +46,7 @@
   <main class="wrap">
     <article class="prose">
       <h1>Privacy</h1>
-      <p class="updated small">Last updated: 12 October 2026</p>
+      <p class="updated small">Last updated: 31 October 2026</p>
 
       <h2>What Gleam is</h2>
       <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam account. Gleam runs
@@ -78,6 +78,9 @@
           reading their results.</li>
         <li>HyperBEAM peers, <code>state.forward.computer</code> by default, plus any peer you add: AO balance reads.
         </li>
+        <li><code>alpha.neo.zephyrdev.xyz</code>, <code>charlie.neo2.zephyrdev.xyz</code>: token balance reads when the
+          gateway has no answer, each sending your wallet address and the token's id, and checks on how far a token
+          has got. If the gateway can't take a signed transaction, it is posted here instead.</li>
         <li><code>lunar.arweave.net</code>: a block explorer. It opens in a new tab only when you click a transaction or
           address.</li>
         <li><code>gleamwallet.app</code>: when you open the extension, it fetches <code>announcements.json</code> from

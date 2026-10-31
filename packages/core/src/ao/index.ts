@@ -1,8 +1,8 @@
-export { getTokenBalance, readTokenBalance } from "./balance";
+export { getTokenBalance, readL1Balance, readTokenBalance } from "./balance";
 export type { ReadTokenBalanceOptions } from "./balance";
 export { readLegacyTokenBalance, readLegacyTokenInfo } from "./legacy-token";
 export type { LegacyTokenInfo } from "./legacy-token";
-export { readTokenStateLogo } from "./token-state";
+export { readTokenStateLogo, readTokenSwapHeight } from "./token-state";
 export { discoverTokens } from "./token-discovery";
 export type { DiscoverTokensOptions } from "./token-discovery";
 export { l1TransferTags, prepareL1TokenTransfer, readL1TokenTransfer } from "./l1-transfer";
