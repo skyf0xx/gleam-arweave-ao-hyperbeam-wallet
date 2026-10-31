@@ -155,3 +155,10 @@ describe("tokenMetadataFromTags", () => {
     expect(metadata).toMatchObject({ transport: "mu", assetClass: null, ticker: null, name: "artoken" });
   });
 });
+
+describe("tokenMetadataFromTags denomination", () => {
+  it("drops a denomination too large to scale by", () => {
+    expect(tokenMetadataFromTags("p".repeat(43), [{ name: "Denomination", value: "2000000000" }]).denomination).toBeNull();
+    expect(tokenMetadataFromTags("p".repeat(43), [{ name: "Denomination", value: "12" }]).denomination).toBe(12);
+  });
+});
