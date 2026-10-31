@@ -162,6 +162,17 @@ describe("site scan lib: sending to the extension", () => {
     expect(await checkGleam(withRuntime((cb) => cb({ ok: false })))).toBe("ready");
     expect(await checkGleam(withRuntime((cb) => cb(undefined)))).toBe("ready");
   });
+
+  it("leaves the real check to Sign when Gleam never answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const readiness = checkGleam(withRuntime(() => {}));
+      await vi.advanceTimersByTimeAsync(4000);
+      await expect(readiness).resolves.toBe("ready");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("site scan lib: outcomes", () => {
