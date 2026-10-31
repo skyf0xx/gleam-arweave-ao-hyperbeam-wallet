@@ -49,6 +49,29 @@ describe("discoverTokens", () => {
     expect(found[0]).toMatchObject({ ticker: "FODDER", denomination: 12, assetClass: "fungible" });
   });
 
+  it("reports L1 tokens without waiting for the Credit-Notice scan", async () => {
+    let releaseCredit: () => void = () => {};
+    const creditHeld = new Promise<void>((resolve) => {
+      releaseCredit = resolve;
+    });
+    const inner = gateway();
+    const held = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (JSON.parse(String(init?.body)).variables.recipients) await creditHeld;
+      return inner(input, init);
+    }) as typeof fetch;
+
+    const early = new Promise<string[]>((resolve) => {
+      void discoverTokens({
+        address: WALLET,
+        gatewayUrl: GATEWAY,
+        fetchImpl: held,
+        onL1Tokens: async (tokens) => resolve(tokens.map((token) => token.processId)),
+      }).finally(() => undefined);
+    });
+    await expect(early).resolves.toEqual([FODDER]);
+    releaseCredit();
+  });
+
   it("throws when the gateway can't be queried at all", async () => {
     const down = (async () => new Response("x", { status: 502 })) as typeof fetch;
     await expect(discoverTokens({ address: WALLET, gatewayUrl: GATEWAY, fetchImpl: down })).rejects.toThrow(/Token lookup/);

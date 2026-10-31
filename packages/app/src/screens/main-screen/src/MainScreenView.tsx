@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { explorerUrlFor, isWatchWalletMethod, type Collectible, type CollectibleRef, type DisplayCurrency, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, isWatchWalletMethod, type Collectible, type CollectibleRef, type DisplayCurrency, type PendingAmounts, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import {
   DEFAULT_AO_TOKEN,
   DEFAULT_AR_TOKEN,
@@ -22,7 +22,7 @@ import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currenc
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
-import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "./formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "./formatWinston";
 import { useAddressIdentity } from "../../../address-identity";
 import { useDisplaySettings } from "../../../display-settings";
 import { useActivity } from "../../activity/src/useActivity";
@@ -126,6 +126,7 @@ interface DefaultTokenRow {
   name: string;
   logoUrl: string;
   amount: string;
+  pending?: PendingAmounts;
   /** `amount` in display units, only for drawing a tick between two figures; `undefined` when there's no figure. */
   amountNumber: number | undefined;
   value: { text: string; number: number } | undefined;
@@ -140,6 +141,24 @@ interface DefaultTokenRow {
  * of magnitude.
  */
 const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
+
+/** `0.2 sending`, `+0.5 arriving`, or both. With balances hidden the amounts go, and the words stay. */
+function pendingNote(pending: PendingAmounts | undefined, denomination: number, masked: boolean): string | null {
+  if (!pending) return null;
+  const notes: string[] = [];
+  if (pending.outgoing !== "0") notes.push(masked ? "sending" : `${formatAtomicCompact(pending.outgoing, denomination)} sending`);
+  if (pending.incoming !== "0") notes.push(masked ? "arriving" : `+${formatAtomicCompact(pending.incoming, denomination)} arriving`);
+  return notes.length > 0 ? notes.join(", ") : null;
+}
+
+function withPendingNote(amount: string, note: string | null): ReactNode {
+  if (note === null) return amount;
+  return (
+    <>
+      {amount} · <span className="font-medium text-foreground gleam-cached-pulse">{note}</span>
+    </>
+  );
+}
 
 // The rest of the history is one click away through "View all".
 const ACTIVITY_PREVIEW_LIMIT = 6;
@@ -194,7 +213,8 @@ function buildDefaultTokenRows(
       ticker: DEFAULT_AR_TOKEN.ticker,
       name: DEFAULT_AR_TOKEN.name,
       logoUrl: DEFAULT_AR_TOKEN.logoUrl,
-      amount: data?.arBalance !== undefined ? formatWinstonAsAr(data.arBalance) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
+      amount: data?.arBalance !== undefined ? formatAtomicCompact(data.arBalance, 12) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
+      pending: data?.arPending,
       amountNumber: data?.arBalance !== undefined ? arAmount : undefined,
       value: data?.arBalance !== undefined ? valueFor(prices, currency, null, arAmount) : undefined,
       send: "ar",
@@ -205,10 +225,11 @@ function buildDefaultTokenRows(
       name: DEFAULT_AO_TOKEN.name,
       logoUrl: DEFAULT_AO_TOKEN.logoUrl,
       amount: aoAvailable
-        ? formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination)
+        ? formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
         : aoBalance
           ? UNAVAILABLE_BALANCE_LABEL
           : DEFAULT_AO_TOKEN.defaultDisplayAmount,
+      pending: aoAvailable ? aoBalance.pending : undefined,
       amountNumber: aoAvailable ? aoAmount : undefined,
       value: aoAvailable ? valueFor(prices, currency, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
       send: aoAvailable ? (aoBalance ?? null) : null,
@@ -244,11 +265,11 @@ function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance
  */
 function formatActivityAmount(entry: { amount: string | null; token?: string | null }, tokenBalances: TokenBalance[] | undefined): string {
   if (entry.amount === null) return "—";
-  if (!entry.token) return `${formatWinstonAsAr(entry.amount)} AR`;
+  if (!entry.token) return `${formatAtomicCompact(entry.amount, 12)} AR`;
 
   const match = tokenBalances?.find((token) => token.processId === entry.token);
   if (match && match.available !== false) {
-    return `${formatAtomicAsDisplay(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
+    return `${formatAtomicCompact(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
   }
 
   const ticker = match && match.ticker !== entry.token ? match.ticker : entry.token;
@@ -808,9 +829,7 @@ export function MainScreenView({
                       <TokenRow
                         glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: showTokenLogos ? row.logoUrl : undefined }}
                         name={row.name}
-                        amount={
-                          masked ? HIDDEN_AMOUNT : row.amount
-                        }
+                        amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(row.pending, 12, masked))}
                         value={
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
@@ -847,9 +866,10 @@ export function MainScreenView({
                           amount={
                             token.available === false
                               ? UNAVAILABLE_BALANCE_LABEL
-                              : masked
-                                ? HIDDEN_AMOUNT
-                                : formatAtomicAsDisplay(token.quantity, token.denomination)
+                              : withPendingNote(
+                                  masked ? HIDDEN_AMOUNT : formatAtomicCompact(token.quantity, token.denomination),
+                                  pendingNote(token.pending, token.denomination, masked),
+                                )
                           }
                           loading={loading}
                           cached={tokensCached}

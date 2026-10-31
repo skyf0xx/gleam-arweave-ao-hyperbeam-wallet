@@ -445,6 +445,26 @@ describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
     expect(onSendToken).toHaveBeenCalledWith(AO_TOKEN);
   });
 
+  it("shows what can be spent with a note for what's pending, and passes that amount on to Send", async () => {
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "getBalance") return BALANCE;
+      if (type === "getTokenBalances") return [AO_TOKEN];
+      if (type === "getPendingTransfers") return [{ token: AO_TOKEN.processId, outgoing: "200", incoming: "50" }];
+      if (type === "getActivity") return EMPTY_ACTIVITY;
+      if (type === "getPortfolioHistory") return PORTFOLIO_HISTORY_7D;
+      if (type === "getTokenPrices") return [];
+      if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
+      throw new Error(`Unexpected message type "${type}"`);
+    }) as RuntimePort["send"];
+    const onSendToken = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send }), onSendToken });
+
+    const note = await screen.findByText("200 sending, +50 arriving");
+    expect(note.parentElement?.textContent).toContain("300 ·");
+    fireEvent.click(screen.getByRole("button", { name: /PNTS/ }));
+    expect(onSendToken).toHaveBeenCalledWith(expect.objectContaining({ quantity: "300" }));
+  });
+
   it("lists every row alphabetically by name, and opens Gleam Points on click", async () => {
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getBalance") return BALANCE;

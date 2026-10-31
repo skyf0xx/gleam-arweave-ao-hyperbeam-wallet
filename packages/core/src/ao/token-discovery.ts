@@ -13,6 +13,11 @@ export interface DiscoverTokensOptions {
   maxCandidates?: number;
   concurrency?: number;
   budgetMs?: number;
+  /**
+   * Called with the `arweave-scheduler@1.0` tokens as soon as their scans
+   * finish, ahead of the Credit-Notice scan, which can take 20s.
+   */
+  onL1Tokens?: (tokens: TokenMetadata[]) => Promise<void>;
 }
 
 const DEFAULTS = { maxPages: 2, maxCandidates: 50, concurrency: 4, budgetMs: 20_000 };
@@ -57,18 +62,23 @@ export async function discoverTokens(options: DiscoverTokensOptions): Promise<To
     });
   const { scan } = scanner(options.budgetMs ?? DEFAULTS.budgetMs);
 
-  const settled = await Promise.allSettled([
-    scan(
-      {
-        tags: [
-          { name: "action", values: ["transfer"] },
-          { name: "recipient", values: [address] },
-        ],
-      },
-      (node) => node.recipient,
-    ),
-    scan({ tags: [{ name: "action", values: ["register-interest", "make-offer"] }], owners: [address] }, (node) => node.recipient),
-    scan({ tags: [{ name: "initial-holder", values: [address] }] }),
+  const classify = async (ids: string[], legacyIds: ReadonlySet<string>): Promise<TokenMetadata[]> => {
+    // Its own budget: a slow Credit-Notice scan (arweave.net can take
+    // 15s+) must not leave the candidates it did find unclassified.
+    const descriptors = await scanner(DESCRIPTOR_BUDGET_MS).fetchTags(ids);
+    const found: TokenMetadata[] = [];
+    for (const id of ids) {
+      const tags = descriptors.get(id);
+      if (!tags) continue;
+      const metadata = tokenMetadataFromTags(id, tags);
+      const fungibleHyperBeam = metadata.transport === "l1" && metadata.assetClass === "fungible";
+      const legacyToken = metadata.transport === "mu" && legacyIds.has(id);
+      if (fungibleHyperBeam || legacyToken) found.push(metadata);
+    }
+    return found;
+  };
+
+  const legacyScan = Promise.allSettled([
     scan(
       {
         tags: [
@@ -86,28 +96,35 @@ export async function discoverTokens(options: DiscoverTokensOptions): Promise<To
           : null,
     ),
   ]);
+  const l1Settled = await Promise.allSettled([
+    scan(
+      {
+        tags: [
+          { name: "action", values: ["transfer"] },
+          { name: "recipient", values: [address] },
+        ],
+      },
+      (node) => node.recipient,
+    ),
+    scan({ tags: [{ name: "action", values: ["register-interest", "make-offer"] }], owners: [address] }, (node) => node.recipient),
+    scan({ tags: [{ name: "initial-holder", values: [address] }] }),
+  ]);
+  const l1Ids = [...new Set(l1Settled.flatMap((result) => (result.status === "fulfilled" ? result.value : [])))];
+  if (options.onL1Tokens && l1Ids.length > 0) {
+    try {
+      await options.onL1Tokens(await classify(l1Ids.slice(0, maxCandidates), new Set()));
+    } catch {
+      // Early results only; the full pass below classifies these again.
+    }
+  }
+
+  const settled = [...l1Settled, ...(await legacyScan)];
   if (settled.every((result) => result.status === "rejected")) {
     throw (settled[0] as PromiseRejectedResult).reason;
   }
-  const [hyperbeam, market, initial, legacy] = settled.map((result) => (result.status === "fulfilled" ? result.value : []));
-  const legacyIds = new Set(legacy);
-  const candidates = [...new Set([...(hyperbeam ?? []), ...(market ?? []), ...(initial ?? []), ...legacyIds])].slice(
-    0,
-    maxCandidates,
-  );
+  const [legacyResult] = settled.slice(-1);
+  const legacyIds = new Set(legacyResult?.status === "fulfilled" ? legacyResult.value : []);
+  const candidates = [...new Set([...l1Ids, ...legacyIds])].slice(0, maxCandidates);
   if (candidates.length === 0) return [];
-
-  // Its own budget: a slow Credit-Notice scan (arweave.net can take
-  // 15s+) must not leave the candidates it did find unclassified.
-  const descriptors = await scanner(DESCRIPTOR_BUDGET_MS).fetchTags(candidates);
-  const found: TokenMetadata[] = [];
-  for (const id of candidates) {
-    const tags = descriptors.get(id);
-    if (!tags) continue;
-    const metadata = tokenMetadataFromTags(id, tags);
-    const fungibleHyperBeam = metadata.transport === "l1" && metadata.assetClass === "fungible";
-    const legacyToken = metadata.transport === "mu" && legacyIds.has(id);
-    if (fungibleHyperBeam || legacyToken) found.push(metadata);
-  }
-  return found;
+  return classify(candidates, legacyIds);
 }

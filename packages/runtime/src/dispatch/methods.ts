@@ -297,6 +297,7 @@ export const BACKGROUND_MESSAGES = {
   getBalance: EXTENSION,
   getArFee: EXTENSION,
   getTokenBalances: EXTENSION,
+  getPendingTransfers: EXTENSION,
   getCollectibles: EXTENSION,
   getWatchedTokens: EXTENSION,
   previewWatchedToken: EXTENSION,

@@ -1130,7 +1130,7 @@ describe("ReadsHandler: promotePendingActivity", () => {
   it("leaves a still-genuinely-pending entry untouched when the gateway hasn't indexed it yet", async () => {
     const storage = createFakeStorage();
     await storage.set("local:activityLog:addr1", [
-      { txId: "tx-still-pending", type: "send", status: "pending", address: "addr2", amount: "1", tags: [], timestamp: 500 },
+      { txId: "tx-still-pending", type: "send", status: "pending", address: "addr2", amount: "1", tags: [], timestamp: Date.now() },
     ]);
 
     globalThis.fetch = vi.fn(async () => ({
@@ -1388,6 +1388,23 @@ describe("ReadsHandler: discovered tokens", () => {
     expect(balances.map((b) => b.processId)).toEqual([AO, FODDER]);
   });
 
+  it("lists a newly received token on the read that finds it stale, ahead of the slow scan", async () => {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    await storage.set(`local:discoveredTokens:${WALLET}`, { savedAt: 0, processIds: [] });
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+    const legacyScanNeverEnds = new Promise<never>(() => {});
+
+    const balances = await new ReadsHandler(storage, undefined, async ({ onL1Tokens }) => {
+      await onL1Tokens?.([meta(FODDER, "FODDER")]);
+      return legacyScanNeverEnds;
+    }).getTokenBalances({ address: WALLET });
+
+    expect(balances.map((b) => b.processId)).toEqual([AO, FODDER]);
+    // The Credit-Notice scan hasn't reported, so the next read still looks.
+    expect(await storage.get(`local:discoveredTokens:${WALLET}`)).toEqual({ savedAt: 0, processIds: [FODDER] });
+  });
+
   it("shows an L1 receipt for a listed fungible token as unverified, and drops one for any other process", async () => {
     const storage = createFakeStorage();
     await peerSettings(storage);
@@ -1428,6 +1445,128 @@ describe("ReadsHandler: discovered tokens", () => {
     expect(one).toMatchObject({ type: "receive", token: FODDER, amount: "1" });
     expect(one?.collectible).toBeUndefined();
     expect(page.entries.find((e) => e.txId === "forged")).toBeUndefined();
+  });
+});
+
+describe("ReadsHandler: pending transfers", () => {
+  const WALLET = "W".repeat(43);
+  const NODE = "https://alpha.neo.zephyrdev.xyz";
+  const meta = {
+    processId: FODDER,
+    transport: "l1" as const,
+    assetClass: "fungible" as const,
+    denomination: 12,
+    ticker: "FODDER",
+    name: "FODDER",
+    description: null,
+    logo: null,
+    totalSupply: null,
+  };
+  const send = (txId: string, status: "pending" | "confirmed" | "failed", amount: string, token: string | null = FODDER, age = 60_000) => ({
+    txId,
+    type: "send" as const,
+    status,
+    address: "R".repeat(43),
+    amount,
+    tags: [],
+    timestamp: Date.now() - age,
+    token,
+  });
+
+  /** `heights` are mined transactions; `swapHeight` is how far the token has got. */
+  function chain(heights: Record<string, number>, swapHeight: number | null, receipts: unknown[] = []) {
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).startsWith(NODE) || String(url).includes("charlie")) {
+        if (swapHeight === null) return new Response("x", { status: 502 });
+        return new Response(null, { status: 200, headers: { "swap-height": String(swapHeight) } });
+      }
+      const { variables } = JSON.parse(String(init?.body));
+      const edges = variables.ids
+        ? (variables.ids as string[]).map((id) => ({ node: { id, block: heights[id] ? { height: heights[id] } : null } }))
+        : variables.address ? receipts : [];
+      return Response.json({ data: { transactions: { edges } } });
+    }) as unknown as typeof fetch;
+  }
+
+  async function storageWith(log: unknown[]) {
+    const storage = createFakeStorage();
+    await peerSettings(storage);
+    await storage.set(`local:tokenMetadata:${FODDER}`, meta);
+    await storage.set(`local:watchedProcessIds:${WALLET}`, [FODDER]);
+    await storage.set(`local:activityLog:${WALLET}`, log);
+    return storage;
+  }
+
+  const read = (storage: ReturnType<typeof createFakeStorage>) => new ReadsHandler(storage, undefined, noDiscovery).getPendingTransfers({ address: WALLET });
+
+  it("keeps a mined L1 send outgoing until the token reaches its block", async () => {
+    const storage = await storageWith([send("tx", "confirmed", "200")]);
+    chain({ tx: 2032396 }, 2032389);
+    expect(await read(storage)).toEqual([{ token: FODDER, outgoing: "200", incoming: "0" }]);
+    chain({ tx: 2032396 }, 2032396);
+    expect(await read(storage)).toEqual([]);
+  });
+
+  it("keeps an L1 send outgoing while the token nodes are down", async () => {
+    const storage = await storageWith([send("tx", "confirmed", "200")]);
+    chain({ tx: 2032396 }, null);
+    expect(await read(storage)).toEqual([{ token: FODDER, outgoing: "200", incoming: "0" }]);
+  });
+
+  it("counts an AR send only until it settles, and never a failed or too-old send", async () => {
+    const storage = await storageWith([
+      send("ar", "pending", "7", null),
+      send("settled", "confirmed", "8", null),
+      send("failed", "failed", "9"),
+      send("old", "pending", "10", FODDER, 3 * 60 * 60 * 1000),
+    ]);
+    chain({}, 1);
+    expect(await read(storage)).toEqual([{ token: null, outgoing: "7", incoming: "0" }]);
+  });
+
+  it("reports an unapplied receipt for a listed token as incoming, and skips one for any other process", async () => {
+    const storage = await storageWith([]);
+    const receipt = (id: string, target: string) => ({
+      cursor: id,
+      node: {
+        id,
+        owner: { address: "U".repeat(43) },
+        recipient: target,
+        quantity: { winston: "0" },
+        tags: [
+          { name: "action", value: "transfer" },
+          { name: "recipient", value: WALLET },
+          { name: "quantity", value: "5" },
+        ],
+        block: null,
+      },
+    });
+    chain({}, 10, [receipt("in", FODDER), receipt("spam", "S".repeat(43))]);
+    expect(await read(storage)).toEqual([{ token: FODDER, outgoing: "0", incoming: "5" }]);
+  });
+
+  it("doesn't fail an old send the gateway has mined, or when it can't be asked", async () => {
+    const storage = await storageWith([send("mined", "pending", "1", null, 3 * 60 * 60 * 1000)]);
+    // Absent from the activity page, but found by id.
+    chain({ mined: 2032396 }, null);
+    await new ReadsHandler(storage, undefined, noDiscovery).promotePendingActivity(WALLET);
+    const status = async () => (await storage.get<Array<{ status: string }>>(`local:activityLog:${WALLET}`))?.[0]?.status;
+    expect(await status()).toBe("pending");
+
+    globalThis.fetch = vi.fn(async (_url: string, init?: RequestInit) =>
+      String(init?.body).includes("block { height }") ? new Response("x", { status: 502 }) : Response.json({ data: { transactions: { edges: [] } } }),
+    ) as unknown as typeof fetch;
+    await new ReadsHandler(storage, undefined, noDiscovery).promotePendingActivity(WALLET);
+    expect(await status()).toBe("pending");
+  });
+
+  it("fails a send too old to be mined, and leaves a recent one pending", async () => {
+    const storage = await storageWith([send("old", "pending", "1", null, 3 * 60 * 60 * 1000), send("new", "pending", "1", null)]);
+    chain({}, null);
+    await new ReadsHandler(storage, undefined, noDiscovery).promotePendingActivity(WALLET);
+    const log = await storage.get<Array<{ txId: string; status: string; error?: string }>>(`local:activityLog:${WALLET}`);
+    expect(log?.find((entry) => entry.txId === "old")).toMatchObject({ status: "failed", error: "This send never reached a block, so nothing moved." });
+    expect(log?.find((entry) => entry.txId === "new")?.status).toBe("pending");
   });
 });
 

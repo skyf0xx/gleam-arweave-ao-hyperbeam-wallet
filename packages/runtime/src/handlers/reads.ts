@@ -4,11 +4,14 @@ import {
   getTransferOutcome,
   readLegacyTokenInfo,
   readTokenStateLogo,
+  readTokenSwapHeight,
   readTokenBalance,
+  type DiscoverTokensOptions,
 } from "@gleam/core/src/ao/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import {
   queryActivityTransactions,
+  queryBlockHeights,
   queryAoTransferActivity,
   queryL1TokenReceipts,
 } from "@gleam/core/src/arweave/graphql.ts";
@@ -26,7 +29,7 @@ import {
   impersonatesRegisteredToken,
   type HistoricalPricePoint,
 } from "@gleam/core/src/pricing/index.ts";
-import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, isFiatCurrency } from "@gleam/core";
+import { DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, isFiatCurrency } from "@gleam/core";
 import type {
   ActivityEntry,
   ActivityPage,
@@ -34,6 +37,7 @@ import type {
   DisplayCurrency,
   HyperBeamPeer,
   NetworkSettings,
+  PendingTransfer,
   PortfolioHistory,
   PortfolioHistoryRange,
   PortfolioScope,
@@ -98,10 +102,17 @@ const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 const TOKEN_METADATA_KEY_PREFIX = "local:tokenMetadata:";
 const HIDDEN_PROCESS_IDS_KEY_PREFIX = "local:hiddenProcessIds:";
 const DISCOVERED_TOKENS_KEY_PREFIX = "local:discoveredTokens:";
-// Discovery is a handful of gateway queries; a popup open inside this
+// A received token should show up within a minute, and the wallet's own
+// history is the only signal that one arrived. A popup open inside this
 // window reuses the last result.
-const DISCOVERED_TOKENS_TTL_MS = 10 * 60 * 1000;
-const FIRST_DISCOVERY_WAIT_MS = 8_000;
+const DISCOVERED_TOKENS_TTL_MS = 60 * 1000;
+// Long enough for the L1 scans on a slow gateway. Past it the balances
+// return with the last list, and the next read has the new one.
+const DISCOVERY_WAIT_MS = 8_000;
+// A transaction's anchor block expires after about 100 minutes, so one
+// still unmined past this can never land.
+const NEVER_MINED_MS = 2 * 60 * 60 * 1000;
+const NEVER_MINED_ERROR = "This send never reached a block, so nothing moved.";
 const COLLECTIBLES_KEY_PREFIX = "local:collectibles:";
 // Holdings change rarely and discovery is dozens of requests, so a popup
 // open within this window reuses the last result.
@@ -188,7 +199,7 @@ function isValidTokenMetadata(value: unknown): value is TokenMetadata {
     typeof candidate.processId === "string" &&
     (candidate.transport === "l1" || candidate.transport === "mu") &&
     (candidate.assetClass === null || candidate.assetClass === "fungible" || candidate.assetClass === "unique") &&
-    (candidate.denomination === null || typeof candidate.denomination === "number") &&
+    (candidate.denomination === null || (typeof candidate.denomination === "number" && candidate.denomination < 100)) &&
     (candidate.ticker === null || typeof candidate.ticker === "string") &&
     (candidate.name === null || typeof candidate.name === "string") &&
     (candidate.description === null || typeof candidate.description === "string") &&
@@ -278,7 +289,7 @@ export class ReadsHandler {
   constructor(
     private readonly storage: StoragePort,
     private readonly pricesApiUrl: string = POINTS_API_URL,
-    private readonly discover: (options: { address: string; gatewayUrl: string }) => Promise<TokenMetadata[]> = discoverTokens,
+    private readonly discover: (options: DiscoverTokensOptions) => Promise<TokenMetadata[]> = discoverTokens,
   ) {}
 
   async loadNetworkSettings(): Promise<NetworkSettings> {
@@ -491,11 +502,11 @@ export class ReadsHandler {
 
   /**
    * Process ids found from the wallet's history (`core/ao/token-discovery.ts`),
-   * cached per wallet for `DISCOVERED_TOKENS_TTL_MS`. A stale cache is
-   * served while a refresh runs in the background, so only a wallet's
-   * first read waits on discovery, and for at most
-   * `FIRST_DISCOVERY_WAIT_MS`. A failed discovery leaves the cache as it
-   * was, and a successful one adds to it.
+   * cached per wallet for `DISCOVERED_TOKENS_TTL_MS`. Past that a read
+   * waits for the refresh's first results, so a newly received token shows
+   * on this read rather than the next one, but no longer than
+   * `DISCOVERY_WAIT_MS`. A failed discovery leaves the cache as it was, and
+   * a successful one adds to it.
    */
   private async discoveredProcessIds(address: string, settings: NetworkSettings): Promise<string[]> {
     const key = `${DISCOVERED_TOKENS_KEY_PREFIX}${address}`;
@@ -503,20 +514,37 @@ export class ReadsHandler {
     const cached = isDiscoveredTokensCache(raw) ? raw : null;
     if (cached && Date.now() - cached.savedAt < DISCOVERED_TOKENS_TTL_MS) return cached.processIds;
 
+    // Keep what earlier runs found: each gateway scan can fail on its own and discovery still
+    // returns, so a token missing from this run may just be behind a flaky scan. One the wallet
+    // no longer holds drops out of the list on its zero balance.
+    const keep = async (found: TokenMetadata[]): Promise<string[]> => {
+      await Promise.all(
+        found
+          .filter((metadata) => metadata.transport === "l1" && metadata.denomination !== null)
+          .map((metadata) => this.storage.set(`${TOKEN_METADATA_KEY_PREFIX}${metadata.processId}`, metadata)),
+      );
+      return [...new Set([...found.map((metadata) => metadata.processId), ...(cached?.processIds ?? [])])];
+    };
+
     let running = this.discoveryInFlight.get(address);
     if (!running) {
-      running = (async () => {
+      let publishEarly: (processIds: string[]) => void = () => {};
+      const early = new Promise<string[]>((resolve) => {
+        publishEarly = resolve;
+      });
+      const done = (async () => {
         try {
-          const found = await this.discover({ address, gatewayUrl: settings.gatewayUrl });
-          await Promise.all(
-            found
-              .filter((metadata) => metadata.transport === "l1" && metadata.denomination !== null)
-              .map((metadata) => this.storage.set(`${TOKEN_METADATA_KEY_PREFIX}${metadata.processId}`, metadata)),
-          );
-          // Each gateway scan can fail on its own and discovery still returns, so a token missing
-          // from this run may just be behind a flaky scan. Keep what earlier runs found; one the
-          // wallet no longer holds drops out of the list on its zero balance.
-          const processIds = [...new Set([...found.map((metadata) => metadata.processId), ...(cached?.processIds ?? [])])];
+          const found = await this.discover({
+            address,
+            gatewayUrl: settings.gatewayUrl,
+            onL1Tokens: async (tokens) => {
+              const processIds = await keep(tokens);
+              // Not stamped as fresh: the Credit-Notice scan hasn't reported yet.
+              await this.storage.set<DiscoveredTokensCache>(key, { savedAt: cached?.savedAt ?? 0, processIds });
+              publishEarly(processIds);
+            },
+          });
+          const processIds = await keep(found);
           await this.storage.set<DiscoveredTokensCache>(key, { savedAt: Date.now(), processIds });
           return processIds;
         } catch (error) {
@@ -526,14 +554,12 @@ export class ReadsHandler {
           this.discoveryInFlight.delete(address);
         }
       })();
+      running = Promise.race([early, done]);
       this.discoveryInFlight.set(address, running);
     }
-    if (cached) return cached.processIds;
-    // A first discovery can take tens of seconds on a slow gateway; past
-    // this wait the balances return without it, and the next read has it.
     return Promise.race([
       running,
-      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), FIRST_DISCOVERY_WAIT_MS)),
+      new Promise<string[]>((resolve) => setTimeout(() => resolve(cached?.processIds ?? []), DISCOVERY_WAIT_MS)),
     ]);
   }
 
@@ -657,6 +683,81 @@ export class ReadsHandler {
         !impersonatesRegisteredToken({ ticker: row.ticker, name: row.name }),
     );
     return [...base, ...kept];
+  }
+
+  /**
+   * What each balance read doesn't include yet, for the popup to show and
+   * to take off what can be spent. Not applied to the reads themselves, so
+   * a dApp still sees the chain's balance.
+   *
+   * An AR or legacy send is outgoing while its activity entry is pending.
+   * An L1 token send stays outgoing after it is mined, until the token
+   * reaches its block (`readTokenSwapHeight`). If no node answers it stays
+   * outgoing, and ages out with `NEVER_MINED_MS`.
+   *
+   * Incoming amounts are L1 receipts for listed tokens: claims by the
+   * sender until the process applies them, so they only ever go in a note.
+   */
+  async getPendingTransfers(req: { address: string }): Promise<PendingTransfer[]> {
+    const settings = await this.loadNetworkSettings();
+    const recent = (entry: ActivityEntry) => Date.now() - entry.timestamp < NEVER_MINED_MS;
+    const [log, receipts] = await Promise.all([
+      this.loadActivityLog(req.address),
+      queryL1TokenReceipts(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT).catch(() => []),
+    ]);
+    const sends = log.filter((entry) => entry.type === "send" && entry.status !== "failed" && entry.amount !== null && !entry.collectible && recent(entry));
+    const transportOf = new Map<string, TokenTransport | undefined>();
+    await Promise.all(
+      [...new Set(sends.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
+        transportOf.set(id, (await this.tryTokenMetadata(id, settings))?.transport);
+      }),
+    );
+    const l1Sends = sends.filter((entry) => entry.token && transportOf.get(entry.token) === "l1");
+    const otherSends = sends.filter((entry) => !l1Sends.includes(entry) && entry.status === "pending");
+    // An unmined receipt has a timestamp of 0.
+    const incoming = (await this.receiptsForListedTokens(req.address, receipts, settings)).filter(
+      (entry) => entry.timestamp === 0 || recent(entry),
+    );
+
+    const l1Entries = [...l1Sends, ...incoming];
+    const heights = await queryBlockHeights(
+      l1Entries.map((entry) => entry.txId),
+      settings.gatewayUrl,
+    ).catch(() => new Map<string, number>());
+    const swapHeights = new Map<string, number>();
+    await Promise.all(
+      [...new Set(l1Entries.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
+        for (const node of L1_TOKEN_NODE_URLS) {
+          try {
+            swapHeights.set(id, await readTokenSwapHeight(id, node));
+            return;
+          } catch {
+            // Try the next node.
+          }
+        }
+      }),
+    );
+    const notApplied = (entry: ActivityEntry) => {
+      const height = heights.get(entry.txId);
+      const swapHeight = swapHeights.get(entry.token ?? "");
+      return height === undefined || swapHeight === undefined || swapHeight < height;
+    };
+
+    const totals = new Map<string | null, { outgoing: bigint; incoming: bigint }>();
+    const add = (entry: ActivityEntry, side: "outgoing" | "incoming") => {
+      if (entry.amount === null || !/^\d+$/.test(entry.amount)) return;
+      const token = entry.token ?? null;
+      const total = totals.get(token) ?? { outgoing: 0n, incoming: 0n };
+      total[side] += BigInt(entry.amount);
+      totals.set(token, total);
+    };
+    [...otherSends, ...l1Sends.filter(notApplied)].forEach((entry) => add(entry, "outgoing"));
+    incoming.filter(notApplied).forEach((entry) => add(entry, "incoming"));
+    return [...totals].map(([token, total]) => ({
+      token,
+      outgoing: total.outgoing.toString(),
+      incoming: total.incoming.toString(),
+    }));
   }
 
   /**
@@ -801,12 +902,35 @@ export class ReadsHandler {
     const promoted = page.entries.filter((entry) => entry.status !== "pending");
     const promotedIds = new Set(promoted.map((entry) => entry.txId));
 
-    const nextLog = localLog.map((entry) => {
-      if (!promotedIds.has(entry.txId)) return entry;
-      return promoted.find((candidate) => candidate.txId === entry.txId) ?? entry;
-    });
+    // Asked by id: `page` only holds the newest entries, and a failure here
+    // can't be undone once the send does turn up.
+    const overdue = localLog.filter((entry) => entry.status === "pending" && !promotedIds.has(entry.txId) && Date.now() - entry.timestamp >= NEVER_MINED_MS);
+    const unmined = new Set<string>();
+    if (overdue.length > 0) {
+      const ids = overdue.map((entry) => entry.txId).slice(0, 50);
+      const settings = await this.loadNetworkSettings();
+      await queryBlockHeights(ids, settings.gatewayUrl)
+        .then((heights) => ids.filter((id) => !heights.has(id)).forEach((id) => unmined.add(id)))
+        .catch(() => undefined);
+    }
+    const nextLog = await Promise.all(
+      localLog.map(async (entry) => {
+        if (promotedIds.has(entry.txId)) return promoted.find((candidate) => candidate.txId === entry.txId) ?? entry;
+        return unmined.has(entry.txId) && (await this.neverMined(entry))
+          ? { ...entry, status: "failed" as const, error: NEVER_MINED_ERROR }
+          : entry;
+      }),
+    );
 
     await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, nextLog);
+  }
+
+  /** A pending L1 transaction, AR or token, too old to be mined. A legacy AO send settles from its CU result instead. */
+  private async neverMined(entry: ActivityEntry): Promise<boolean> {
+    if (entry.status !== "pending" || Date.now() - entry.timestamp < NEVER_MINED_MS) return false;
+    if (!entry.token) return true;
+    const metadata = await this.storage.get<unknown>(`${TOKEN_METADATA_KEY_PREFIX}${entry.token}`);
+    return isValidTokenMetadata(metadata) && metadata.transport === "l1";
   }
 
   /**

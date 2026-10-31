@@ -11,6 +11,17 @@ export interface Balance {
 }
 
 /** An AO token balance for a given address, read via a HyperBEAM `process@1.0` read. */
+/** Transfers of one token that its balance read doesn't include yet, as atomic-integer strings. */
+export interface PendingAmounts {
+  outgoing: string;
+  incoming: string;
+}
+
+/** `token` is `null` for AR, otherwise the token's process id. */
+export interface PendingTransfer extends PendingAmounts {
+  token: string | null;
+}
+
 export interface TokenBalance {
   address: string;
   processId: string;
@@ -34,6 +45,8 @@ export interface TokenBalance {
   available?: boolean;
   /** Why `available` is `false`, in words the popup can show as-is. */
   unavailableReason?: string;
+  /** Set by the popup when `quantity` has had pending sends taken off it. */
+  pending?: PendingAmounts;
   /**
    * `"discovered"` for a token found from the wallet's own on-chain
    * history rather than added by hand. Such a row can be hidden, and is

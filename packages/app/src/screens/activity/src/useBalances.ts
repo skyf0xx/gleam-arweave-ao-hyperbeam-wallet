@@ -1,10 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
-import type { RuntimePort, TokenBalance, Winston } from "@gleam/core";
+import type { PendingAmounts, PendingTransfer, RuntimePort, TokenBalance, Winston } from "@gleam/core";
 import { walletQueryKeys } from "./queryKeys";
 
+/** An incoming transfer sends the wallet no signal, so an open popup or side panel has to ask. */
+const BALANCES_POLL_MS = 60_000;
+
 export interface WalletBalances {
+  /** What can be spent: the chain's balance less pending sends, as is every `quantity` here. */
   arBalance: Winston;
+  arPending?: PendingAmounts;
   tokenBalances: TokenBalance[];
+}
+
+function spendable(quantity: string, pending: PendingAmounts): string {
+  const left = BigInt(quantity) - BigInt(pending.outgoing);
+  return (left > 0n ? left : 0n).toString();
+}
+
+function withPending(arBalance: Winston, tokenBalances: TokenBalance[], pending: PendingTransfer[]): WalletBalances {
+  const ofToken = new Map(pending.map(({ token, outgoing, incoming }) => [token, { outgoing, incoming }]));
+  const ar = ofToken.get(null);
+  return {
+    arBalance: ar ? spendable(arBalance, ar) : arBalance,
+    ...(ar ? { arPending: ar } : {}),
+    tokenBalances: tokenBalances.map((balance) => {
+      const amounts = ofToken.get(balance.processId);
+      if (!amounts || balance.available === false) return balance;
+      return { ...balance, quantity: spendable(balance.quantity, amounts), pending: amounts };
+    }),
+  };
 }
 
 /**
@@ -22,7 +46,7 @@ export function balancesQuery(runtime: RuntimePort, address: string) {
   return {
     queryKey: walletQueryKeys.balances(address),
     queryFn: async (): Promise<WalletBalances> => {
-      const [arBalance, tokenBalances] = await Promise.all([
+      const [arBalance, tokenBalances, pending] = await Promise.all([
         runtime.send<{ address: string }, Winston>({
           type: "getBalance",
           payload: { address },
@@ -31,12 +55,16 @@ export function balancesQuery(runtime: RuntimePort, address: string) {
           type: "getTokenBalances",
           payload: { address },
         }),
+        // Extra detail; balances still show without it.
+        (async () => runtime.send<{ address: string }, PendingTransfer[]>({ type: "getPendingTransfers", payload: { address } }))().catch(
+          () => [],
+        ),
       ]);
-      return { arBalance, tokenBalances };
+      return withPending(arBalance, tokenBalances, pending ?? []);
     },
   };
 }
 
 export function useBalances(runtime: RuntimePort, address: string) {
-  return useQuery(balancesQuery(runtime, address));
+  return useQuery({ ...balancesQuery(runtime, address), refetchInterval: BALANCES_POLL_MS });
 }
