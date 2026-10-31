@@ -56,7 +56,7 @@ export function validateSendAmount(
       return "That's more than your current balance.";
     }
     if (token === null && arFeeAtomic !== undefined && BigInt(amountAtomic) + BigInt(arFeeAtomic) > BigInt(available)) {
-      const fee = `${formatWinstonAsAr(arFeeAtomic)} AR`;
+      const fee = `${formatWinstonAsAr(arFeeAtomic, 12)} AR`;
       return feeIsNewAddress
         ? `This address is new to Arweave, so the network fee is ${fee}. That plus this amount is more than your balance.`
         : `The network fee is ${fee}. That plus this amount is more than your balance.`;

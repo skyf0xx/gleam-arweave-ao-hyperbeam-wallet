@@ -11,7 +11,7 @@ import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { useDisplaySettings } from "../../../display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
+import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useTokenPrices } from "../../main-screen/src/useTokenPrices";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useActivity } from "../../activity/src/useActivity";
@@ -165,7 +165,7 @@ function tickerFor(token: TokenBalance | null): string {
 }
 
 function formatAmount(atomic: string, token: TokenBalance | null): string {
-  return token === null ? formatWinstonAsAr(atomic) : formatAtomicAsDisplay(atomic, token.denomination);
+  return token === null ? formatWinstonAsAr(atomic, 12) : formatAtomicAsDisplay(atomic, token.denomination, token.denomination);
 }
 
 /** `TokenPrice.price` is `null` for a token that couldn't be priced; that reads as no price here. */
@@ -567,8 +567,9 @@ function ComposeStep({
         ? (BigInt(rawMaxAtomic) > BigInt(arFeeAtomic) ? BigInt(rawMaxAtomic) - BigInt(arFeeAtomic) : 0n).toString()
         : undefined
       : rawMaxAtomic;
-  const maxDisplay = maxAtomic === undefined ? undefined : formatAtomicAsDisplay(maxAtomic, denomination);
-  const balanceDisplay = rawMaxAtomic === undefined ? undefined : formatAtomicAsDisplay(rawMaxAtomic, denomination);
+  // Every digit: Max goes into the amount, so rounding would leave dust behind, or fill 0 for a tiny balance.
+  const maxDisplay = maxAtomic === undefined ? undefined : formatAtomicAsDisplay(maxAtomic, denomination, denomination);
+  const balanceDisplay = rawMaxAtomic === undefined ? undefined : formatAtomicCompact(rawMaxAtomic, denomination);
   const amountNumber = Number(step.amountDisplay);
   // Display only: the value line is an estimate, so a float is fine here.
   // Priced in the token being sent, it would only repeat the amount.
@@ -580,7 +581,7 @@ function ComposeStep({
     Number.isFinite(amountNumber)
       ? formatCurrencyValue(amountNumber * price, currency)
       : undefined;
-  const balanceNumber = Number(balanceDisplay);
+  const balanceNumber = rawMaxAtomic === undefined ? Number.NaN : Number(formatAtomicAsDisplay(rawMaxAtomic, denomination, denomination));
   const balanceValue =
     price !== undefined && currency !== undefined && currency !== ticker && balanceDisplay !== undefined && Number.isFinite(balanceNumber)
       ? formatCurrencyValue(balanceNumber * price, currency)
@@ -1103,7 +1104,7 @@ function ReviewStep({
         <div className="flex flex-col">
           <ReviewRow
             label="Fee"
-            value={step.estimate.fee === null ? "No network fee" : `${formatWinstonAsAr(step.estimate.fee)} AR`}
+            value={step.estimate.fee === null ? "No network fee" : `${formatWinstonAsAr(step.estimate.fee, 12)} AR`}
           />
           <ReviewRow label="Total" value={`${formatAmount(total, token)} ${ticker}`} strong />
         </div>
@@ -1233,7 +1234,7 @@ function TokenPickerStep({
           amount={
             balancesQuery.data === undefined
               ? DEFAULT_AR_TOKEN.defaultDisplayAmount
-              : formatWinstonAsAr(balancesQuery.data.arBalance)
+              : formatAtomicCompact(balancesQuery.data.arBalance, 12)
           }
           loading={loading}
           onClick={() => onSelect(null)}
@@ -1247,7 +1248,7 @@ function TokenPickerStep({
             aoBalance
               ? aoBalance.available === false
                 ? UNAVAILABLE_TOKEN_BALANCE_LABEL
-                : formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination)
+                : formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
               : DEFAULT_AO_TOKEN.defaultDisplayAmount
           }
           loading={loading}
@@ -1269,7 +1270,7 @@ function TokenPickerStep({
               amount={
                 candidate.available === false
                   ? UNAVAILABLE_TOKEN_BALANCE_LABEL
-                  : formatAtomicAsDisplay(candidate.quantity, candidate.denomination)
+                  : formatAtomicCompact(candidate.quantity, candidate.denomination)
               }
               onClick={candidate.available === false ? undefined : () => onSelect(candidate)}
               className={selectedToken?.processId === candidate.processId ? "bg-mist" : undefined}

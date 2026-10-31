@@ -359,6 +359,19 @@ describe("SendView AR Max and balance check account for the network fee", () => 
     expect(amountInput.value).toBe("0.95");
   });
 
+  it("Max fills in every digit of a tiny balance, and the balance shows it in subscript", async () => {
+    const send = routedSend({
+      getBalance: () => "60000000", // 0.00006 AR
+      getArFee: () => "46409930",
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Max:/ }));
+
+    expect((screen.getByPlaceholderText("0") as HTMLInputElement).value).toBe("0.00001359007");
+    expect(screen.getByText(/0\.0₄6 AR/)).toBeTruthy();
+  });
+
   it("hides Max until the fee estimate has resolved", async () => {
     const send = vi.fn((message: { type: string; payload: unknown }) => {
       if (message.type === "getArFee") return new Promise(() => {}); // never resolves

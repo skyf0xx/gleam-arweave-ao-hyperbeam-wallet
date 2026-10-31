@@ -22,6 +22,10 @@ describe("validateSendAmount", () => {
     expect(validateSendAmount("900000000000", null, balances(), "50000000000")).toBeNull();
   });
 
+  it("names a real network fee exactly, not rounded to 0", () => {
+    expect(validateSendAmount(AR_BALANCE, null, balances(), "46409930")).toContain("0.00004640993 AR");
+  });
+
   it("blocks an AR amount that alone fits the balance but overflows once the fee is added", () => {
     // amount === balance, fee on top pushes it over.
     expect(validateSendAmount(AR_BALANCE, null, balances(), "50000000000")).toBe(

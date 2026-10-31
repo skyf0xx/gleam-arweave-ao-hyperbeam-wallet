@@ -49,6 +49,25 @@ export function formatAtomicAsDisplay(atomic: string, denomination: number, maxF
   return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
+const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
+const COMPACT_SIGNIFICANT_DIGITS = 4;
+
+/**
+ * `formatAtomicAsDisplay` for a row, where an amount too small for 4
+ * places would round away to "0": the run of zeros becomes a subscript
+ * count, so 0.00001 reads `0.0₄1`. For showing only. `Number()` can't parse
+ * it, so anything that does arithmetic takes `formatAtomicAsDisplay`.
+ */
+export function formatAtomicCompact(atomic: string, denomination: number): string {
+  const display = formatAtomicAsDisplay(atomic, denomination);
+  if (display !== "0" || !/^0*[1-9]\d*$/.test(atomic) || denomination === 0) return display;
+  const fraction = atomic.replace(/^0+/, "").padStart(denomination, "0");
+  const zeros = fraction.length - fraction.replace(/^0+/, "").length;
+  const digits = fraction.slice(zeros, zeros + COMPACT_SIGNIFICANT_DIGITS).replace(/0+$/, "");
+  const count = [...String(zeros)].map((digit) => SUBSCRIPT_DIGITS[Number(digit)]).join("");
+  return `0.0${count}${digits}`;
+}
+
 function isValidArweaveAddress(address: string): boolean {
   return /^[A-Za-z0-9_-]{43}$/.test(address);
 }
