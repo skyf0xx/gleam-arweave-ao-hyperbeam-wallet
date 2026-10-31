@@ -16,3 +16,13 @@ reason = "node-forge has no patched release. It is only used by web-ext's adbkit
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2027-04-28
 reason = "deepmerge has no patched release. It is only used by web-ext's addons-linter, a dev tool that never ships in the extension."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-01-31
+reason = "minimatch's fix is 11.0.1, a major that eslint and typescript-estree don't accept. It only reaches lint and web-ext tooling matching our own globs, and never ships."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2027-01-31
+reason = "glob's fix is 14.0.2, a major that rimraf doesn't accept. It only reaches web-ext's tooling, which sets no AbortSignal on it, and never ships."
