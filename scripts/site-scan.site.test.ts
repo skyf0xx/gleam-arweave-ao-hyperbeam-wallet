@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   FULL_REWARD_SCANS as CORE_FULL_REWARD_SCANS,
@@ -39,6 +40,17 @@ const attestation = {
   result: "pass" as const,
   report: "Checked the signer. Didn't look at é <img src=x onerror=alert(1)> or the popup.",
 };
+
+describe("attest.html", () => {
+  it("has every element attest.js looks up", () => {
+    const script = readFileSync("apps/site/attest.js", "utf8");
+    const page = readFileSync("apps/site/attest.html", "utf8");
+    const attributes = [...script.matchAll(/\$\("\[(data-[a-z-]+)\]"\)/g)].map(([, attribute]) => attribute!);
+    expect(attributes.length).toBeGreaterThan(0);
+    // A lookup that misses throws before the page wires up its button.
+    expect(attributes.filter((attribute) => !page.includes(attribute))).toEqual([]);
+  });
+});
 
 describe("site scan lib: link payload", () => {
   it("decodes what core encodes, including non-ASCII text", () => {
@@ -149,6 +161,17 @@ describe("site scan lib: sending to the extension", () => {
   it("leaves the real check to Sign when the status reply can't be read", async () => {
     expect(await checkGleam(withRuntime((cb) => cb({ ok: false })))).toBe("ready");
     expect(await checkGleam(withRuntime((cb) => cb(undefined)))).toBe("ready");
+  });
+
+  it("leaves the real check to Sign when Gleam never answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const readiness = checkGleam(withRuntime(() => {}));
+      await vi.advanceTimersByTimeAsync(4000);
+      await expect(readiness).resolves.toBe("ready");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
