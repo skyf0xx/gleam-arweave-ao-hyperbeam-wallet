@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { attestationId, decodeAttestationPayload } from "../../packages/core/src/scan/index.ts";
 import { main, render, renderJson } from "./cli.ts";
-import { runFinish } from "./finish.ts";
+import { FILE_MESSAGE, runFinish, USER_MESSAGE } from "./finish.ts";
 import { CHALLENGE, COMMIT, FUNCTIONS, fakeGit, goodAttestation, json, makeDeps, readJsonFile } from "./harness.ts";
 import type { Deps } from "./shared.ts";
 
@@ -140,6 +140,7 @@ describe("pnpm scan finish: server and output", () => {
     expect(text).toContain("Paid places left: 7");
     expect(text).toContain(`put the attestation id ${id} in every PR and advisory`);
     expect(text).toContain("Tell the user: Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.");
+    expect(text).not.toContain(FILE_MESSAGE);
 
     const link = /^Link: (.+)$/m.exec(text)![1]!;
     expect(link.startsWith("https://site.test/attest.html#")).toBe(true);
@@ -183,6 +184,17 @@ describe("pnpm scan finish: server and output", () => {
   it("fails when the server's id differs from the local one", async () => {
     const deps = setup(goodAttestation(), { fetchImpl: accepted("0".repeat(64)) });
     expect((await lines(deps))[0]).toContain("The server computed a different attestation id");
+  });
+
+  it("on a scanned result asks the user to reply once signed, so the drafts get filed", async () => {
+    const deps = setup(goodAttestation({ result: "scanned" }));
+    deps.fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      const { attestation } = JSON.parse(String(init?.body)) as { attestation: Parameters<typeof attestationId>[0] };
+      return accepted(await attestationId(attestation))(_url as string, init);
+    }) as typeof fetch;
+    const outcome = await runFinish(deps);
+    expect(render(outcome, false)).toContain(`Tell the user: ${USER_MESSAGE} ${FILE_MESSAGE}`);
+    expect(outcome.json).toMatchObject({ userMessage: `${USER_MESSAGE} ${FILE_MESSAGE}` });
   });
 
   it("--json prints exactly one object on stdout", async () => {

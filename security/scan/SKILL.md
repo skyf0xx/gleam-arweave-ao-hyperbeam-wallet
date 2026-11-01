@@ -38,7 +38,9 @@ part of the skill.
   answers, the model id and the coverage report.
 - **Acts as the user, only after asking:** `gh repo fork`, `git push`,
   `gh pr create`, and filing a private advisory (Step 8c). Each one is
-  public or reaches the maintainers, so ask the user before each one.
+  public or reaches the maintainers, so ask the user first. The closing
+  message in Step 8c is that one question, and it covers every draft it
+  lists.
 - **Never:** reads a seed phrase, key, keyfile or wallet; signs anything;
   moves funds.
 
@@ -477,6 +479,9 @@ Link: https://gleamwallet.app/attest.html#<payload>
 Tell the user: Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.
 ```
 
+On a `scanned` result, `Tell the user:` also says to reply "signed" so
+you can file your drafts.
+
 `finish` rewrites `.gleam-scan/attestation.json` with `release` and
 `commit` filled in; that doesn't change the id. You can run `finish` again
 at any time, for example after you edit the report. It doesn't use up the
@@ -487,11 +492,23 @@ challenge, and only the id from the last run counts.
 The attestation id is the SHA-256 of the attestation's content, so it
 changes if any field changes. In this order:
 
-1. Give the user the `Link:` and the sentence after `Tell the user:`, and
-   ask them to sign now. The challenge expires 24 hours after
+1. End your turn with this closing message, so the two things the user
+   has to do can't be missed. Put it first. Any results go under it, in
+   three lines at most. The challenge expires 24 hours after
    `pnpm scan start`.
-2. Wait until the user confirms that Gleam accepted the signature. Don't
-   edit `.gleam-scan/attestation.json` after that.
+
+   ```text
+   Scan done. <n> PR(s) and <n> advisory(ies) are ready to file.
+   1. Sign: <the Link: from pnpm scan finish>
+   2. Reply "signed" and I'll file them, which could earn you more Gleam Points.
+   ```
+
+   With no drafts, leave out the count and line 2, and ask the user to
+   tell you when Gleam accepts the signature.
+2. Wait until the user confirms that Gleam accepted the signature. Their
+   "signed" is the approval to fork, push, open each PR and file each
+   advisory that message listed, so don't ask again. Don't edit
+   `.gleam-scan/attestation.json` after that.
 3. In every draft from Step 7, replace `{{ATTESTATION_ID}}` with the id
    from the last `pnpm scan finish`. Then file it.
 
@@ -500,8 +517,9 @@ the user the new link. If signing can't succeed (see the end of
 Troubleshooting), still file every draft, without the `Attestation id:`
 line.
 
-**File a PR** (needs `gh` signed in to the user's GitHub account; ask the
-user first):
+**File a PR** (needs `gh` signed in to the user's GitHub account). If the
+user can push to the repository, skip the fork: `git push origin HEAD` and
+pass `--head fix/security-<short-name>`.
 
 ```bash
 cd ../gleam-fix-<short-name>
@@ -594,8 +612,8 @@ nothing about what they contain.
 
 ## When you're done
 
-Tell the user the attestation id, which PRs and advisories you filed (or
-the drafts for them to file), and, if `finish` printed a warning that no
+Tell the user, in a few lines, the attestation id, a link to each PR and
+advisory you filed (or the drafts for them to file), and, if `finish` printed a warning that no
 paid places are left, that the scan is recorded but earns no points.
 
 ## Troubleshooting
