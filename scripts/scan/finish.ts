@@ -32,6 +32,9 @@ const START_FIRST = "run `pnpm scan start` first";
 export const USER_MESSAGE =
   "Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.";
 
+/** Follows `USER_MESSAGE` on a `scanned` result, so the drafts waiting on the signature don't get missed. */
+export const FILE_MESSAGE = 'Then reply "signed" and I\'ll file the reports I drafted, which could earn you more Gleam Points.';
+
 export async function runFinish(deps: Deps): Promise<Outcome> {
   const challengeText = await readText(deps, CHALLENGE_FILE);
   if (challengeText === undefined) {
@@ -173,6 +176,7 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
   const startedAt = Number((await readText(deps, STARTED_FILE))?.trim());
   const elapsedMs = Number.isFinite(startedAt) && startedAt > 0 ? deps.now() - startedAt : undefined;
   const link = `${deps.siteUrl.replace(/\/*$/, "/")}attest.html#${encodeAttestationPayload(attestation)}`;
+  const userMessage = attestation.result === "scanned" ? `${USER_MESSAGE} ${FILE_MESSAGE}` : USER_MESSAGE;
   const lines = [
     ...notes,
     `Attestation valid for Gleam v${attestation.release}.`,
@@ -182,14 +186,14 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     ...(paidPlacesLeft === 0 ? ["Warning: no paid places are left, so this scan will be recorded but earns no points."] : []),
     `Once the user has signed, put the attestation id ${id} in every PR and advisory you draft for this scan.`,
     `Link: ${link}`,
-    `Tell the user: ${USER_MESSAGE}`,
+    `Tell the user: ${userMessage}`,
   ];
   return {
     ok: true,
     command: "finish",
     lines,
     issues: [],
-    json: { challenge: challenge.challenge, attestationId: id, link, userMessage: USER_MESSAGE, ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }), ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
+    json: { challenge: challenge.challenge, attestationId: id, link, userMessage, ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }), ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
   };
 }
 
