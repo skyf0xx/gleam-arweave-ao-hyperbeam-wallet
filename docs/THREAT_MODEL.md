@@ -302,9 +302,6 @@ count as a finding.
     and `events` are polyfilled). A production build contains no
     elliptic code: its curve constants, error strings and `HmacDRBG` are
     absent from `.output/chrome-mv3`.
-  - `node-forge` ≤ 1.4.0 (GHSA-86w9-cpqp-85rv): forged RSA PKCS#1 v1.5
-    signatures. It comes only through `wxt` → `web-ext` → `adbkit`, a
-    development tool, and isn't in the build.
   - `deepmerge` 4.3.1 (GHSA-gcqx-w48m-w2h4): it comes only through
     `wxt` → `web-ext` → `addons-linter`, a development tool, and isn't in
     the build. Its ignore runs until 2027-04-28.
