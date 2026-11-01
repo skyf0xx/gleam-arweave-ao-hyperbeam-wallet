@@ -62,15 +62,15 @@ function stubFetch(world: World) {
     const origin = new URL(url).origin;
     if (origin === new URL(GATEWAY).origin && url.includes("~process@1.0")) {
       const balance = world.gatewayBalances?.[url.split("/")[3]!.split("~")[0]!];
-      return balance === undefined ? new Response("x", { status: 500 }) : Response.json(String(balance));
+      return balance === undefined ? new Response("x", { status: 500 }) : new Response(String(balance));
     }
-    if (L1_TOKEN_NODE_URLS.includes(origin)) return new Response("x", { status: world.nodesReachable ? 404 : 500 });
+    if (L1_TOKEN_NODE_URLS.includes(origin)) return world.nodesReachable ? new Response("0") : new Response("x", { status: 500 });
     if (origin === new URL(PEER).origin) {
       const id = url.split("/")[3]!.split("~")[0]!;
       const balance = world.balances[id];
       if (balance === undefined) return new Response("no", { status: 404 });
       if (balance === "boom") return new Response("x", { status: 500 });
-      return Response.json(String(balance));
+      return new Response(String(balance));
     }
     const { query, variables } = JSON.parse(String(init?.body));
     const edge = (id: string, recipient: string | null, t: Record<string, string>) => ({
@@ -131,7 +131,7 @@ describe("discoverCollectibles", () => {
     expect(calls.some((u) => new URL(u).origin === new URL(PEER).origin && u.includes(A))).toBe(false);
   });
 
-  it("treats a token node's 404 as not held", async () => {
+  it("treats a token node's 0 as not held", async () => {
     const { result } = run({ nodesReachable: true, initial: [A], descriptors: { [A]: NFT }, balances: {} });
     await expect(result).resolves.toEqual([]);
   });
