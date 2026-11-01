@@ -177,14 +177,18 @@ export function sendAttestation(runtime, attestation) {
 }
 
 const READINESS_BY_CODE = { no_wallet: "no-wallet", unsupported_wallet: "unsupported", wallet_not_registered: "not-joined" };
+const CHECK_TIMEOUT_MS = 4000;
 
 /**
  * What the Sign button should offer before anyone clicks it: "no-extension",
  * "no-wallet", "unsupported", "not-joined" or "ready". Anything the check
  * can't read counts as "ready", so Sign runs the real check and says what's wrong.
+ * That includes no answer in time: only this check is limited, since a real
+ * signature waits for as long as the user keeps Gleam's window open.
  */
 export async function checkGleam(runtime) {
-  const outcome = await sendToGleam(runtime, { type: ATTEST_STATUS_MESSAGE_TYPE });
+  const timedOut = new Promise((resolve) => setTimeout(() => resolve({ kind: "interrupted" }), CHECK_TIMEOUT_MS));
+  const outcome = await Promise.race([sendToGleam(runtime, { type: ATTEST_STATUS_MESSAGE_TYPE }), timedOut]);
   if (outcome.kind === "no-extension") return "no-extension";
   if (outcome.kind === "reply" && !outcome.reply.ok) return READINESS_BY_CODE[outcome.reply.code] || "ready";
   return "ready";
