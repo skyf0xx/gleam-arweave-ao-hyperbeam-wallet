@@ -215,7 +215,7 @@ describe("MainScreenView display settings", () => {
   }
 
   it("asks for prices and history in the chosen currency and formats them in it", async () => {
-    const send = sendWithDisplay({ currency: "EUR" }, [{ processId: null, price: 3 }]);
+    const send = sendWithDisplay({ currency: "EUR" }, [{ processId: null, price: 3, change24h: null }]);
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() =>
@@ -242,8 +242,19 @@ describe("MainScreenView display settings", () => {
     expect(screen.getByRole("tab", { name: "7D" })).toBeTruthy();
   });
 
+  it("shows the unit price and 24h change on a token row, and hides the price with the balances", async () => {
+    const send = sendWithDisplay({}, [{ processId: null, price: 3, change24h: -0.024 }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("-2.40%")).toBeTruthy());
+    expect(screen.getByText(/× \$3\.00/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide balances" }));
+    await waitFor(() => expect(screen.queryByText(/× \$3\.00/)).toBeNull());
+  });
+
   it("hides every balance when the total is tapped, and saves the choice", async () => {
-    const send = sendWithDisplay({}, [{ processId: null, price: 3 }]);
+    const send = sendWithDisplay({}, [{ processId: null, price: 3, change24h: null }]);
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("$3.00")).toBeTruthy());

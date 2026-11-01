@@ -22,6 +22,7 @@ import {
   AR_TOKEN,
   DEFAULT_TOKEN_REGISTRY,
   buildPriceAtFromSeries,
+  seriesChange,
   estimateHistoricalPortfolioValue,
   getHistoricalUsdPrices,
   getUsdFxRate,
@@ -1145,16 +1146,24 @@ export class ReadsHandler {
    * `price: null` (never a fabricated `0`); a token with no `priceSource`
    * at all (nothing outside the registry today) is skipped entirely
    * rather than returning a meaningless entry.
+   *
+   * `change24h` comes from the same 24H series the chart uses. A fiat
+   * display currency is treated as flat over the day; in AR or AO the move
+   * is relative to that token, and the token itself has no move to show.
    */
   async getTokenPrices(req: { currency?: DisplayCurrency } = {}): Promise<TokenPrice[]> {
     const currency = req.currency ?? "USD";
     const priced = DEFAULT_TOKEN_REGISTRY.filter((token) => token.priceSource !== null);
     const [usdPrices, rate] = await Promise.all([
       Promise.all(
-        priced.map(async (token) => ({
-          token,
-          usd: await getUsdPrice(token.priceSource as NonNullable<typeof token.priceSource>, this.pricesApiUrl),
-        })),
+        priced.map(async (token) => {
+          const source = token.priceSource as NonNullable<typeof token.priceSource>;
+          const [usd, series] = await Promise.all([
+            getUsdPrice(source, this.pricesApiUrl),
+            getHistoricalUsdPrices(source, "24H", this.pricesApiUrl),
+          ]);
+          return { token, usd, change: seriesChange(series) };
+        }),
       ),
       isFiatCurrency(currency) ? getUsdFxRate(currency, this.pricesApiUrl) : Promise.resolve(null),
     ]);
@@ -1163,9 +1172,12 @@ export class ReadsHandler {
       ? rate === null ? null : 1 / rate
       : (usdPrices.find(({ token }) => token.ticker === currency)?.usd ?? null);
 
-    return usdPrices.map(({ token, usd }) => ({
+    const unitChange = isFiatCurrency(currency) ? 0 : (usdPrices.find(({ token }) => token.ticker === currency)?.change ?? null);
+
+    return usdPrices.map(({ token, usd, change }) => ({
       processId: token.processId,
       price: usd === null || unitUsd === null || unitUsd <= 0 ? null : usd / unitUsd,
+      change24h: change === null || unitChange === null || token.ticker === currency ? null : (1 + change) / (1 + unitChange) - 1,
     }));
   }
 }

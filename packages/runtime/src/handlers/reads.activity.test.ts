@@ -1058,12 +1058,12 @@ describe("ReadsHandler: display currency", () => {
     const handler = new ReadsHandler(createFakeStorage());
 
     expect(await handler.getTokenPrices({ currency: "EUR" })).toEqual([
-      { processId: null, price: 10 },
-      { processId: AO, price: 2.5 },
+      { processId: null, price: 10, change24h: 1 },
+      { processId: AO, price: 2.5, change24h: 1 },
     ]);
     expect(await handler.getTokenPrices({ currency: "AO" })).toEqual([
-      { processId: null, price: 4 },
-      { processId: AO, price: 1 },
+      { processId: null, price: 4, change24h: 0 },
+      { processId: AO, price: 1, change24h: null },
     ]);
   });
 
@@ -1071,8 +1071,8 @@ describe("ReadsHandler: display currency", () => {
     globalThis.fetch = pricedFetch({ fxRate: null });
 
     expect(await new ReadsHandler(createFakeStorage()).getTokenPrices({ currency: "EUR" })).toEqual([
-      { processId: null, price: null },
-      { processId: AO, price: null },
+      { processId: null, price: null, change24h: 1 },
+      { processId: AO, price: null, change24h: 1 },
     ]);
   });
 });

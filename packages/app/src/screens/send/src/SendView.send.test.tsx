@@ -298,7 +298,7 @@ describe("SendView compose summary", () => {
   });
 
   it("values the typed amount in the display currency", async () => {
-    const send = routedSend({ getTokenPrices: () => [{ processId: null, price: 10 }] });
+    const send = routedSend({ getTokenPrices: () => [{ processId: null, price: 10, change24h: null }] });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });

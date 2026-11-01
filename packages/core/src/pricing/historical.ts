@@ -45,6 +45,14 @@ export async function getHistoricalUsdPrices(
   }
 }
 
+/** First-to-last move of a series as a fraction, or `null` when it can't show one. */
+export function seriesChange(series: HistoricalPricePoint[]): number | null {
+  const first = series[0]?.usd;
+  const last = series[series.length - 1]?.usd;
+  if (series.length < 2 || first === undefined || last === undefined || first <= 0) return null;
+  return last / first - 1;
+}
+
 /**
  * Builds a `priceAt` callback from a fetched series by locating the
  * nearest point at-or-before the requested timestamp. A timestamp before

@@ -130,6 +130,9 @@ interface DefaultTokenRow {
   /** `amount` in display units, only for drawing a tick between two figures; `undefined` when there's no figure. */
   amountNumber: number | undefined;
   value: { text: string; number: number } | undefined;
+  /** The price of one token, unless the display currency is that token or there's no holding to multiply. */
+  unitPrice: string | undefined;
+  change: number | undefined;
   send: "ar" | TokenBalance | null;
 }
 
@@ -183,6 +186,22 @@ function valueFor(
   return { text: formatCurrencyValue(number, currency), number };
 }
 
+function unitPriceFor(
+  prices: TokenPrice[] | undefined,
+  currency: DisplayCurrency | undefined,
+  processId: string | null,
+  ticker: string,
+  amount: number,
+): string | undefined {
+  const price = prices?.find((entry) => entry.processId === processId)?.price;
+  if (typeof price !== "number" || !currency || currency === ticker || amount === 0) return undefined;
+  return formatCurrencyValue(price, currency);
+}
+
+function changeFor(prices: TokenPrice[] | undefined, processId: string | null): number | undefined {
+  return prices?.find((entry) => entry.processId === processId)?.change24h ?? undefined;
+}
+
 /**
  * Whether a query still shows data from before this screen opened.
  * Keyed on the data, not the status: a refetch that fails (status error) keeps the old data, and it stays old.
@@ -217,6 +236,8 @@ function buildDefaultTokenRows(
       pending: data?.arPending,
       amountNumber: data?.arBalance !== undefined ? arAmount : undefined,
       value: data?.arBalance !== undefined ? valueFor(prices, currency, null, arAmount) : undefined,
+      unitPrice: data?.arBalance !== undefined ? unitPriceFor(prices, currency, null, DEFAULT_AR_TOKEN.ticker, arAmount) : undefined,
+      change: data?.arBalance !== undefined ? changeFor(prices, null) : undefined,
       send: "ar",
     },
     {
@@ -232,6 +253,8 @@ function buildDefaultTokenRows(
       pending: aoAvailable ? aoBalance.pending : undefined,
       amountNumber: aoAvailable ? aoAmount : undefined,
       value: aoAvailable ? valueFor(prices, currency, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
+      unitPrice: aoAvailable ? unitPriceFor(prices, currency, DEFAULT_AO_TOKEN.processId, DEFAULT_AO_TOKEN.ticker, aoAmount) : undefined,
+      change: aoAvailable ? changeFor(prices, DEFAULT_AO_TOKEN.processId) : undefined,
       send: aoAvailable ? (aoBalance ?? null) : null,
     },
   ];
@@ -833,6 +856,9 @@ export function MainScreenView({
                         value={
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
+                        // `amount × price` would give the hidden holding away.
+                        unitPrice={masked ? undefined : row.unitPrice}
+                        change={row.change}
                         loading={loading}
                         cached={tokensCached}
                         cachedFetching={tokensFetching}

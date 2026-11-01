@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getHistoricalUsdPrices, buildPriceAtFromSeries } from "./historical";
+import { getHistoricalUsdPrices, buildPriceAtFromSeries, seriesChange } from "./historical";
 import { estimateHistoricalPortfolioValue } from "./portfolio";
 
 function fakeFetch(body: unknown, ok = true, status = 200): typeof fetch {
@@ -110,5 +110,17 @@ describe("estimateHistoricalPortfolioValue", () => {
   it("returns 0 for an empty tokens array", () => {
     const total = estimateHistoricalPortfolioValue([], 1000);
     expect(total).toBe(0);
+  });
+});
+
+describe("seriesChange", () => {
+  it("reads the move from the first point to the last", () => {
+    expect(seriesChange([{ timestamp: 1, usd: 4 }, { timestamp: 2, usd: 5 }])).toBeCloseTo(0.25);
+  });
+
+  it("has no move for a series too short or starting at zero", () => {
+    expect(seriesChange([])).toBeNull();
+    expect(seriesChange([{ timestamp: 1, usd: 4 }])).toBeNull();
+    expect(seriesChange([{ timestamp: 1, usd: 0 }, { timestamp: 2, usd: 5 }])).toBeNull();
   });
 });
