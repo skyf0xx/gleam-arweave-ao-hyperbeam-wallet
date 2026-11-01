@@ -856,7 +856,7 @@ export function MainScreenView({
                         value={
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
-                        // `amount × price` would give the hidden holding away.
+                        // `amount @ price` would give the hidden holding away.
                         unitPrice={masked ? undefined : row.unitPrice}
                         change={row.change}
                         loading={loading}

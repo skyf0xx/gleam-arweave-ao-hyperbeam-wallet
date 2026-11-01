@@ -42,7 +42,7 @@ export interface TokenRowProps {
    */
   amountFull?: string;
   value?: ReactNode;
-  /** The formatted price of one token, shown after the amount as `amount × price`. */
+  /** The formatted price of one token, shown after the amount as `amount @ price`. */
   unitPrice?: string;
   /** Fractional 24-hour price move, under `value`. Left out when unknown, never shown as 0%. */
   change?: number;
@@ -65,7 +65,7 @@ function ChangeLine({ change }: { change: number }) {
 
 export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPrice, change, loading = false, cached = false, cachedFetching = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
-  const priced = unitPrice ? ` × ${unitPrice}` : null;
+  const priced = unitPrice ? ` @ ${unitPrice}` : null;
   return (
     <Component
       type={onClick ? "button" : undefined}

@@ -247,10 +247,10 @@ describe("MainScreenView display settings", () => {
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
     await waitFor(() => expect(screen.getByText("-2.40%")).toBeTruthy());
-    expect(screen.getByText(/× \$3\.00/)).toBeTruthy();
+    expect(screen.getByText(/@ \$3\.00/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Hide balances" }));
-    await waitFor(() => expect(screen.queryByText(/× \$3\.00/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/@ \$3\.00/)).toBeNull());
   });
 
   it("hides every balance when the total is tapped, and saves the choice", async () => {
