@@ -39,7 +39,7 @@ function stubNetwork(failBalance = false) {
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("~process@1.0")) {
-      return failBalance ? new Response("x", { status: 500 }) : Response.json("1");
+      return failBalance ? new Response("x", { status: 500 }) : new Response("1");
     }
     const { query } = JSON.parse(String(init?.body));
     const node = query.includes("$ids")

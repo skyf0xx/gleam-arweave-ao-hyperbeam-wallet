@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../../primitives/cn";
+import { formatPercent } from "../../format/currency";
 import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
 
 /**
@@ -41,6 +42,10 @@ export interface TokenRowProps {
    */
   amountFull?: string;
   value?: ReactNode;
+  /** The formatted price of one token, shown after the amount as `amount @ price`. */
+  unitPrice?: string;
+  /** Fractional 24-hour price move, under `value`. Left out when unknown, never shown as 0%. */
+  change?: number;
   loading?: boolean;
   /** Shows restored data that fresh data hasn't replaced yet: faded from the first frame, fading up once it lands. */
   cached?: boolean;
@@ -50,8 +55,17 @@ export interface TokenRowProps {
   className?: string;
 }
 
-export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading = false, cached = false, cachedFetching = false, onClick, className }: TokenRowProps) {
+function ChangeLine({ change }: { change: number }) {
+  return (
+    <div className="text-caption font-normal" style={{ color: change >= 0 ? "var(--color-positive)" : "var(--color-negative)" }}>
+      {formatPercent(change)}
+    </div>
+  );
+}
+
+export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPrice, change, loading = false, cached = false, cachedFetching = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
+  const priced = unitPrice ? ` @ ${unitPrice}` : null;
   return (
     <Component
       type={onClick ? "button" : undefined}
@@ -70,18 +84,23 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, loading
             <>
               <span aria-hidden="true" className="phone:hidden">
                 {amount}
+                {priced}
               </span>
               {/* A touch screen has no hover to reveal the full figure, so the phone has room to show it outright. */}
-              <span className="sr-only phone:not-sr-only phone:block phone:truncate">{amountFull}</span>
+              <span className="sr-only phone:not-sr-only phone:block phone:truncate">{amountFull}{priced}</span>
             </>
           ) : (
-            amount
+            <>
+              {amount}
+              {priced}
+            </>
           )}
         </div>
       </div>
       {value ? (
-        <div className={cn("shrink-0 text-label font-semibold tabular-nums text-foreground", "transition-opacity duration-500 ease-out", loading && "opacity-50", cached && !loading && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"), "phone:group-data-editing:invisible")}>
+        <div className={cn("shrink-0 text-right text-label font-semibold tabular-nums text-foreground", "transition-opacity duration-500 ease-out", loading && "opacity-50", cached && !loading && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"), "phone:group-data-editing:invisible")}>
           {value}
+          {change === undefined ? null : <ChangeLine change={change} />}
         </div>
       ) : null}
     </Component>

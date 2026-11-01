@@ -1,3 +1,4 @@
+import { formatPercent } from "../../format/currency";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
 import { currencyStep, formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
@@ -122,17 +123,6 @@ const EMPTY_STATE_POINTS: PortfolioChartPoint[] = [
   { timestamp: 5, value: 0.8 },
   { timestamp: 6, value: 0.65 },
 ];
-
-const PERCENT_FORMAT = new Intl.NumberFormat("en-US", {
-  style: "percent",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  signDisplay: "exceptZero",
-});
-
-function formatPercent(fraction: number): string {
-  return PERCENT_FORMAT.format(fraction);
-}
 
 const SCOPE_FLASH_MS = 2500;
 

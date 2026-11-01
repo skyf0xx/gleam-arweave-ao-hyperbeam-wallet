@@ -121,7 +121,7 @@ describe("ReadsHandler: getTokenBalances", () => {
     await peerSettings(storage);
 
     globalThis.fetch = vi.fn(async (url: string) =>
-      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : { ok: true, status: 200, json: async () => "42" },
+      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : new Response("42"),
     ) as unknown as typeof fetch;
 
     const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
@@ -146,7 +146,7 @@ describe("ReadsHandler: getTokenBalances", () => {
             : [{ id: FODDER, tags: [...FODDER_TAGS, { name: "logo", value: "https://evil.example/x.png" }] }],
         );
       }
-      return { ok: true, status: 200, json: async () => "1" };
+      return new Response("1");
     }) as unknown as typeof fetch;
 
     const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
@@ -165,13 +165,13 @@ describe("ReadsHandler: getTokenBalances", () => {
       calls.push(url);
       if (url.includes("/graphql")) return graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]);
       if (new URL(url).origin === new URL(PEER).origin && url.includes(FODDER)) return { ok: false, status: 403, json: async () => ({}) };
-      return { ok: true, status: 200, json: async () => "1000000000000" };
+      return new Response("1000000000000");
     }) as unknown as typeof fetch;
 
     const balances = await new ReadsHandler(storage, undefined, noDiscovery).getTokenBalances({ address: "addr1" });
 
     expect(balances.find((b) => b.processId === FODDER)).toMatchObject({ ticker: "FODDER", denomination: 12, quantity: "1000000000000" });
-    expect(calls).toContain(`https://arweave.net/${FODDER}~process@1.0/compute/balances/addr1`);
+    expect(calls).toContain(`https://arweave.net/${FODDER}~process@1.0/now/as/balance?as=execution&balance=addr1`);
     expect(calls.some((url) => new URL(url).origin === new URL(PEER).origin && url.includes(FODDER))).toBe(false);
   });
 
@@ -210,7 +210,7 @@ describe("ReadsHandler: getTokenBalances", () => {
         };
       }
       // HyperBEAM compute path for the watched process (and the always-included AO token).
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
@@ -254,7 +254,7 @@ describe("ReadsHandler: getTokenBalances", () => {
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
@@ -274,11 +274,7 @@ describe("ReadsHandler: getTokenBalances", () => {
       activePeerUrl: "https://hyperbeam.example.com",
     });
 
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => "42",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => (new Response("42"))) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
     const balances = await handler.getTokenBalances({ address: "addr1" });
@@ -318,7 +314,7 @@ describe("ReadsHandler: getTokenBalances", () => {
         };
       }
       // Bare-quantity HyperBEAM response: getTokenBalance's own fallback is 12.
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
@@ -345,7 +341,7 @@ describe("ReadsHandler: getTokenBalances", () => {
       }
       // Bare-quantity HyperBEAM response: getTokenBalance's own AO-specific
       // fallback denomination (12) must never surface for a non-AO token.
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
@@ -383,7 +379,7 @@ describe("ReadsHandler: getTokenBalances", () => {
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
@@ -429,7 +425,7 @@ describe("ReadsHandler: getTokenBalances", () => {
       if (url.includes("badProc")) {
         return { ok: false, status: 500, json: async () => ({}) };
       }
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
@@ -485,7 +481,7 @@ describe("ReadsHandler: getTokenBalances", () => {
       }
       // The live-state logo read, which this token answers without a logo.
       if (url.includes("~process@1.0/compute&")) return new Response(null);
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage, undefined, noDiscovery);
@@ -526,7 +522,7 @@ describe("ReadsHandler: getTokenBalances", () => {
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage, undefined, noDiscovery);
@@ -557,7 +553,7 @@ describe("ReadsHandler: tokenBalance", () => {
     const storage = createFakeStorage();
     await peerSettings(storage);
     globalThis.fetch = vi.fn(async (url: string) =>
-      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : { ok: true, status: 200, json: async () => "123" },
+      url.includes("/graphql") ? graphqlNodes([{ id: LEGACY, tags: LEGACY_TAGS }]) : new Response("123"),
     ) as unknown as typeof fetch;
 
     const result = await new ReadsHandler(storage, undefined, noDiscovery).tokenBalance({ address: "addr1", id: LEGACY });
@@ -578,11 +574,7 @@ describe("ReadsHandler: userTokens", () => {
   }
 
   it("returns Wander's shape, with a numeric Denomination and no balance by default", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => "42",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => (new Response("42"))) as unknown as typeof fetch;
 
     const tokens = await new ReadsHandler(await seededStorage()).userTokens({ address: "addr1" });
 
@@ -591,11 +583,7 @@ describe("ReadsHandler: userTokens", () => {
   });
 
   it("adds each balance when fetchBalance is set", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => "42",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => (new Response("42"))) as unknown as typeof fetch;
 
     const tokens = await new ReadsHandler(await seededStorage()).userTokens({
       address: "addr1",
@@ -613,7 +601,7 @@ describe("ReadsHandler: userTokens", () => {
       if (url.includes("/graphql")) {
         return { ok: false, status: 500, json: async () => ({}) };
       }
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const tokens = await new ReadsHandler(storage).userTokens({ address: "addr1", options: { fetchBalance: true } });
@@ -648,7 +636,7 @@ describe("ReadsHandler: userTokens", () => {
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => "42" };
+      return new Response("42");
     }) as unknown as typeof fetch;
 
     const tokens = await new ReadsHandler(storage).userTokens({ address: "addr1", options: { fetchBalance: true } });
@@ -671,7 +659,7 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
     const storage = createFakeStorage();
     await peerSettings(storage);
     globalThis.fetch = vi.fn(async (url: string) =>
-      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: true, status: 200, json: async () => "1000000" },
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : new Response("1000000"),
     ) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage, undefined, noDiscovery);
@@ -734,7 +722,7 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
     await peerSettings(storage);
     await storage.set("local:hiddenProcessIds:addr1", [FODDER]);
     globalThis.fetch = vi.fn(async (url: string) =>
-      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: true, status: 200, json: async () => "1000000" },
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : new Response("1000000"),
     ) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage, undefined, noDiscovery);
@@ -769,7 +757,7 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
     await storage.set("local:watchedProcessIds:addr1", [FODDER]);
     await peerSettings(storage);
     globalThis.fetch = vi.fn(async (url: string) =>
-      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : { ok: true, status: 200, json: async () => "5" },
+      url.includes("/graphql") ? graphqlNodes([{ id: FODDER, tags: FODDER_TAGS }]) : new Response("5"),
     ) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage, undefined, noDiscovery);
@@ -785,7 +773,7 @@ describe("ReadsHandler: getWatchedTokens / previewWatchedToken / addWatchedToken
       peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
       activePeerUrl: "https://hyperbeam.example.com",
     });
-    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => (new Response("5"))) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage);
     await handler.addWatchedToken({ address: "addr1", processId: "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc" });
@@ -1070,12 +1058,12 @@ describe("ReadsHandler: display currency", () => {
     const handler = new ReadsHandler(createFakeStorage());
 
     expect(await handler.getTokenPrices({ currency: "EUR" })).toEqual([
-      { processId: null, price: 10 },
-      { processId: AO, price: 2.5 },
+      { processId: null, price: 10, change24h: 1 },
+      { processId: AO, price: 2.5, change24h: 1 },
     ]);
     expect(await handler.getTokenPrices({ currency: "AO" })).toEqual([
-      { processId: null, price: 4 },
-      { processId: AO, price: 1 },
+      { processId: null, price: 4, change24h: 0 },
+      { processId: AO, price: 1, change24h: null },
     ]);
   });
 
@@ -1083,8 +1071,8 @@ describe("ReadsHandler: display currency", () => {
     globalThis.fetch = pricedFetch({ fxRate: null });
 
     expect(await new ReadsHandler(createFakeStorage()).getTokenPrices({ currency: "EUR" })).toEqual([
-      { processId: null, price: null },
-      { processId: AO, price: null },
+      { processId: null, price: null, change24h: 1 },
+      { processId: AO, price: null, change24h: 1 },
     ]);
   });
 });
@@ -1359,7 +1347,7 @@ describe("ReadsHandler: discovered tokens", () => {
     const discover = vi.fn(async () => [meta(FODDER, "FODDER"), meta(SPAM, "SPAM"), meta(FAKE_AO, "w\u200BA0"), meta(EMPTY, "NONE")]);
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes(EMPTY)) return { ok: false, status: 404, json: async () => ({}) };
-      return { ok: true, status: 200, json: async () => "1000000000000" };
+      return new Response("1000000000000");
     }) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(storage, undefined, discover);
@@ -1379,7 +1367,7 @@ describe("ReadsHandler: discovered tokens", () => {
     await peerSettings(storage);
     await storage.set(`local:discoveredTokens:${WALLET}`, { savedAt: 0, processIds: [FODDER] });
     await storage.set(`local:tokenMetadata:${FODDER}`, meta(FODDER, "FODDER"));
-    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => (new Response("5"))) as unknown as typeof fetch;
 
     const balances = await new ReadsHandler(storage, undefined, async () => {
       throw new Error("gateway down");
@@ -1392,7 +1380,7 @@ describe("ReadsHandler: discovered tokens", () => {
     const storage = createFakeStorage();
     await peerSettings(storage);
     await storage.set(`local:discoveredTokens:${WALLET}`, { savedAt: 0, processIds: [] });
-    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => "5" })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => (new Response("5"))) as unknown as typeof fetch;
     const legacyScanNeverEnds = new Promise<never>(() => {});
 
     const balances = await new ReadsHandler(storage, undefined, async ({ onL1Tokens }) => {
@@ -1579,7 +1567,7 @@ describe("ReadsHandler: discovered balance validation", () => {
       { processId: weird, transport: "l1" as const, assetClass: "fungible" as const, denomination: 6, ticker: "Q", name: "Q", description: null, logo: null, totalSupply: null },
     ];
     globalThis.fetch = vi.fn(async (url: string) =>
-      url.includes(weird) ? { ok: true, status: 200, json: async () => ({ balance: "12abc" }) } : { ok: true, status: 200, json: async () => "5" },
+      url.includes(weird) ? new Response("12abc") : new Response("5"),
     ) as unknown as typeof fetch;
 
     const balances = await new ReadsHandler(storage, undefined, discover).getTokenBalances({ address: "W".repeat(43) });

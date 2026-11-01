@@ -3,6 +3,7 @@ export { getUsdFxRate } from "./fx";
 export {
   getHistoricalUsdPrices,
   buildPriceAtFromSeries,
+  seriesChange,
   type HistoricalRange,
   type HistoricalPricePoint,
   type HistoricalPriceSource,

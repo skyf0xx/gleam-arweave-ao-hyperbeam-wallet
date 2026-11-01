@@ -95,4 +95,6 @@ export async function resolveUnregisteredTokenMetadata(
 export interface TokenPrice {
   processId: string | null;
   price: number | null;
+  /** Fractional price move over 24 hours, in the same currency. `null` when unknown, or when the token is the currency itself. */
+  change24h: number | null;
 }

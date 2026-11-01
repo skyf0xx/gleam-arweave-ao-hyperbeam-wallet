@@ -118,41 +118,47 @@ describe("readTokenBalance", () => {
     return { fetchImpl, calls };
   }
 
+  const l1 = { processId: PID, address: ADDRESS, transport: "l1" as const, gatewayUrl: GATEWAY, peerUrl: SFC };
+
   it("reads an L1 token from the gateway's HyperBEAM before the peer", async () => {
-    const { fetchImpl, calls } = routed({ [GATEWAY]: () => Response.json("1000000000000") });
-    const quantity = await readTokenBalance({ processId: PID, address: ADDRESS, transport: "l1", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl });
-    expect(quantity).toBe("1000000000000");
-    expect(calls).toEqual([`${GATEWAY}/${PID}~process@1.0/compute/balances/${ADDRESS}`]);
+    const { fetchImpl, calls } = routed({ [GATEWAY]: () => new Response("1000000000000") });
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("1000000000000");
+    expect(calls).toEqual([`${GATEWAY}/${PID}~process@1.0/now/as/balance?as=execution&balance=${ADDRESS}`]);
   });
 
-  it("doesn't take a gateway 404 for a zero: it asks the token nodes", async () => {
+  it("keeps a balance past Number.MAX_SAFE_INTEGER exact", async () => {
+    const { fetchImpl } = routed({ [GATEWAY]: () => new Response("20999629495219345476") });
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("20999629495219345476");
+  });
+
+  it("reads an address the token never credited as the node's 0", async () => {
+    const { fetchImpl } = routed({ [GATEWAY]: () => new Response("0") });
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("0");
+  });
+
+  it("doesn't take a gateway's HTML 200 for a balance: it asks the token nodes", async () => {
     const { fetchImpl } = routed({
-      [GATEWAY]: () => new Response("<html>404</html>", { status: 404 }),
-      [NEO]: () => Response.json("500000000000"),
+      [GATEWAY]: () => new Response("<!DOCTYPE html><html></html>", { status: 200 }),
+      [NEO]: () => new Response("500000000000"),
     });
-    const quantity = await readTokenBalance({ processId: PID, address: ADDRESS, transport: "l1", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl });
-    expect(quantity).toBe("500000000000");
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("500000000000");
   });
 
-  it("reads a token node's 404 as never credited, whatever the legacy peer answers", async () => {
+  it("doesn't take a 404 for a zero: it asks the token nodes", async () => {
+    const { fetchImpl } = routed({
+      [GATEWAY]: () => new Response("x", { status: 404 }),
+      [NEO]: () => new Response("500000000000"),
+    });
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("500000000000");
+  });
+
+  it("fails rather than report 0 when every host answers 404", async () => {
     const { fetchImpl } = routed({
       [GATEWAY]: () => new Response("x", { status: 404 }),
       [NEO]: () => new Response("x", { status: 404 }),
       [SFC]: () => new Response("Forbidden", { status: 403 }),
     });
-    const quantity = await readTokenBalance({ processId: PID, address: ADDRESS, transport: "l1", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl });
-    expect(quantity).toBe("0");
-  });
-
-  it("fails rather than report 0 on a gateway 404 alone", async () => {
-    const { fetchImpl } = routed({
-      [GATEWAY]: () => new Response("x", { status: 404 }),
-      [NEO]: () => new Response("x", { status: 502 }),
-      [SFC]: () => new Response("Forbidden", { status: 403 }),
-    });
-    await expect(
-      readTokenBalance({ processId: PID, address: ADDRESS, transport: "l1", gatewayUrl: GATEWAY, peerUrl: SFC, fetchImpl, label: "lldex" }),
-    ).rejects.toThrow(/lldex.*arweave\.net \(HTTP 404\)/);
+    await expect(readTokenBalance({ ...l1, fetchImpl, label: "lldex" })).rejects.toThrow(/lldex.*arweave\.net \(HTTP 404\)/);
   });
 
   it("falls back from a 403ing peer to the CU dry-run for a legacy token", async () => {

@@ -8,7 +8,7 @@ import { AO_LEGACY_CU_URL } from "./result";
 const COMPUTE_TIMEOUT_MS = 8_000;
 
 /**
- * Reads an AO token balance via the HyperBEAM `process@1.0` compute path:
+ * Reads a legacy AO token balance via the HyperBEAM `process@1.0` compute path:
  * `GET /{processId}~process@1.0/compute/balances/{address}`.
  *
  * HyperBEAM answers 404 for an address the token has never credited, which
@@ -164,15 +164,18 @@ export async function readTokenBalance(options: ReadTokenBalanceOptions): Promis
 }
 
 /**
- * The balance of an `arweave-scheduler@1.0` process. Tries the gateway's
- * HyperBEAM node, then `L1_TOKEN_NODE_URLS`, then the peer; legacy-AO
- * peers such as state.forward.computer answer 403 or 500 for these
- * processes. The first number wins.
+ * The balance of an `arweave-scheduler@1.0` process, from its `now/as/balance`
+ * path. Tries the gateway's HyperBEAM node, then `L1_TOKEN_NODE_URLS`, then
+ * the peer; legacy-AO peers such as state.forward.computer answer 403 or 500
+ * for these processes. The first number wins.
  *
- * Only a token node's 404 means "never credited". A gateway answers 404
- * for a wallet that holds the token whenever its route to a HyperBEAM node
- * drops out, so on its own that is no answer, and a balance nobody can
- * vouch for throws rather than showing a holder 0.
+ * These processes keep balances in a trie, so `compute/balances/{address}`
+ * answers 404 for every address, holders included. `now/as/balance` answers
+ * 0 for an address the token never credited, so a 404 here is no answer, and
+ * a balance nobody can vouch for throws rather than showing a holder 0.
+ *
+ * The answer is parsed as text: a JSON number would lose precision on a
+ * large balance, and a gateway can answer 200 with an HTML page.
  */
 export async function readL1Balance(
   processId: string,
@@ -182,21 +185,23 @@ export async function readL1Balance(
   fetchImpl: typeof fetch = fetch,
   label?: string,
 ): Promise<string> {
-  const nodes = new Set(L1_TOKEN_NODE_URLS);
-  const hosts = [...new Set([gatewayUrl, ...nodes, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlash))];
+  const hosts = [...new Set([gatewayUrl, ...L1_TOKEN_NODE_URLS, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlash))];
   const failures: string[] = [];
-  let notCredited = false;
   for (const host of hosts) {
     try {
-      const balance = await queryBalance(processId, address, host, fetchImpl);
-      if (balance !== null) return balance.quantity;
-      if (nodes.has(host)) notCredited = true;
-      else failures.push(`${hostOf(host)} (HTTP 404)`);
+      const url = `${host}/${processId}~process@1.0/now/as/balance?as=execution&balance=${address}`;
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(COMPUTE_TIMEOUT_MS) });
+      if (!response.ok) {
+        failures.push(`${hostOf(host)} (HTTP ${response.status})`);
+        continue;
+      }
+      const quantity = (await response.text()).trim();
+      if (/^\d+$/.test(quantity)) return quantity;
+      failures.push(`${hostOf(host)} (unreadable answer)`);
     } catch (error) {
       failures.push(`${hostOf(host)} (${shortReason(error)})`);
     }
   }
-  if (notCredited) return "0";
   throw balanceReadError(label, failures);
 }
 

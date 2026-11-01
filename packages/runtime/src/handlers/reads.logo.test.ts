@@ -48,6 +48,7 @@ function stubNetwork(options: { tagLogo?: string; tokenInfo: () => Response }) {
     const url = String(input);
     if (url.includes("~process@1.0/compute&max-age")) return options.tokenInfo();
     if (url.includes("compute/balances")) return Response.json("5000");
+    if (url.includes("now/as/balance")) return new Response("5000");
     return Response.json({ data: { transactions: { edges: [{ node: { id: TOKEN, tags } }] } } });
   });
   globalThis.fetch = fn as unknown as typeof fetch;

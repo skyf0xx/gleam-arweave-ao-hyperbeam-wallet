@@ -1,5 +1,16 @@
 import { isFiatCurrency, type DisplayCurrency } from "@gleam/core";
 
+const PERCENT_FORMAT = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: "exceptZero",
+});
+
+export function formatPercent(fraction: number): string {
+  return PERCENT_FORMAT.format(fraction);
+}
+
 /** A formatted value with its token ticker kept apart, so a large figure can set the ticker smaller. */
 export interface CurrencyValueParts {
   amount: string;
