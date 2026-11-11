@@ -49,47 +49,9 @@ jobs:
   # Tracing the full build (every Capacitor plugin, SQLCipher's C) took ~20
   # minutes, so dependencies build untraced and only our own Swift is rebuilt
   # under CodeQL.
-  # The Swift job takes ~17 minutes, so a pull request runs it only when it
-  # changes what that job builds or how. Master pushes and the weekly run
-  # always analyze, and a failure here leaves the output empty, which runs it.
-  swift-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      swift: ${{ steps.diff.outputs.swift }}
-    steps:
-      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 2
-      # A pull request checks out its merge commit, so HEAD^1 is the base.
-      - id: diff
-        env:
-          EVENT: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          swift=false
-          if [ "$EVENT" != pull_request ]; then
-            swift=true
-          else
-            git diff --name-only HEAD^1 HEAD > changed.txt
-            [ -s changed.txt ] || swift=true
-            while IFS= read -r path; do
-              case "$path" in
-                apps/mobile/ios/*|apps/mobile/plugins/*|apps/mobile/package.json|apps/mobile/capacitor.config.*) swift=true ;;
-                .github/workflows/codeql.yml|.github/codeql/*) swift=true ;;
-              esac
-            done < changed.txt
-          fi
-          echo "swift=$swift" | tee -a "$GITHUB_OUTPUT"
-
   analyze-swift:
     name: Analyze (swift)
     runs-on: macos-15
-    needs: swift-changes
-    if: ${{ !cancelled() && needs.swift-changes.outputs.swift != 'false' }}
     permissions:
       contents: read
       security-events: write
