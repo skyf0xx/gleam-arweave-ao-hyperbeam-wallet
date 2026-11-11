@@ -18,7 +18,7 @@
     "tsx": "^4.23.15"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.14",
+    "@electric-sql/pglite": "^0.5.15",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1"
   }
