@@ -276,10 +276,24 @@ describe("the dApp view as the runtime's tab", () => {
     const { view, dapps } = bridge();
     view.navigate(`${DAPP}/`);
     await dapps.tabs.send(1, "providerEvent", { origin: DAPP, event: "walletSwitch", data: { address: "a" } });
-    await dapps.tabs.send(1, "siteWalletMode", { useGleam: false });
+    await dapps.tabs.send(1, "siteWalletMode", { origin: DAPP, useGleam: false });
     expect(view.posted).toEqual([
       { envelope: { type: EVENT, event: "walletSwitch", data: { address: "a" } }, targetOrigin: DAPP, delivered: true },
       { envelope: { type: SITE_MODE, useGleam: false }, targetOrigin: DAPP, delivered: true },
+    ]);
+  });
+
+  it("does not push the site mode to a tab that has navigated to another origin", async () => {
+    const { view, dapps } = bridge();
+    view.navigate(`${DAPP}/`);
+    view.navigate("https://other.example/");
+    await expect(dapps.tabs.send(2, "siteWalletMode", { origin: DAPP, useGleam: false })).rejects.toThrow(
+      /no longer open/,
+    );
+    // Attempted to the origin it was for, and the native layer refused
+    // delivery because the page had moved on.
+    expect(view.posted).toEqual([
+      { envelope: { type: SITE_MODE, useGleam: false }, targetOrigin: DAPP, delivered: false },
     ]);
   });
 

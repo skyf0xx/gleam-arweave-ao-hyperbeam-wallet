@@ -1668,7 +1668,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       expect(await getItem("local:grants")).toEqual([
         expect.objectContaining({ origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS", "ACCESS_TOKENS"] }),
       ]);
-      expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: true }, 7);
+      expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { origin: ORIGIN, useGleam: true }, 7);
       expect(tabsReload).toHaveBeenCalledWith(7);
       expect(windowsCreate).not.toHaveBeenCalled();
     });
@@ -1687,7 +1687,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
       expect(await getItem("local:grants")).toEqual([]);
       expect(sendMessage).toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, 7);
-      expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7);
+      expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { origin: ORIGIN, useGleam: false }, 7);
       expect(tabsReload).toHaveBeenCalledWith(7);
     });
 
@@ -1710,7 +1710,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await connecting;
 
       await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: true });
-      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: true }, 7));
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { origin: ORIGIN, useGleam: true }, 7));
     });
 
     it("a dApp's own disconnect keeps the site on Gleam, so its next connect still comes to Gleam", async () => {
@@ -1746,14 +1746,14 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     it("resetting the vault switches back open tabs of a chosen site that holds no grant", async () => {
       await chooseGleamWithoutGrant();
       await registeredHandlers.get("resetAllWallets")!({ data: undefined });
-      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { origin: ORIGIN, useGleam: false }, 7));
       expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), expect.anything());
     });
 
     it("deleting the last wallet switches back open tabs of a chosen site that holds no grant", async () => {
       await chooseGleamWithoutGrant();
       await registeredHandlers.get("deleteWallet")!({ data: { walletId: "wallet-1" } });
-      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { origin: ORIGIN, useGleam: false }, 7));
       await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: false });
     });
 
@@ -1762,7 +1762,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         { origin: ORIGIN, walletId: "wallet-1", permissions: ["ACCESS_ADDRESS"], createdAt: 0, expiresAt: null, budget: null },
       ]);
       await registeredHandlers.get("revokeGrant")!({ data: { origin: ORIGIN } });
-      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7));
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { origin: ORIGIN, useGleam: false }, 7));
     });
 
     it.each(["useGleamOnSite", "stopGleamOnSite", "dismissSiteSuggestion"])("%s refuses an origin that isn't a web origin", async (method) => {

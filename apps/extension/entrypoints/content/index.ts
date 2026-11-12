@@ -157,7 +157,11 @@ export default defineContentScript({
       if (message.data.origin !== location.origin) return;
       postProviderEvent(message.data.event, message.data.data);
     });
+    // Same navigation guard as `providerEvent` above: a tab can navigate
+    // between the background's tab query and the send, so a push for
+    // another origin is dropped here.
     messenger.onMessage("siteWalletMode", (message) => {
+      if (message.data.origin !== location.origin) return;
       postSiteMode(message.data.useGleam);
     });
 

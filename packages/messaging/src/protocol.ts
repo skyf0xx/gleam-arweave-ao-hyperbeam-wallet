@@ -364,8 +364,11 @@ export interface ProtocolMap {
   getSiteWalletMode(): { useGleam: boolean };
   /** Content script only. Relays a `PageOtherWalletEnvelope` for the sending tab. */
   reportOtherWallet(req: { walletName: string; used: boolean; permissions?: string[] }): void;
-  /** Background → content-script push when a site's grant comes or goes. */
-  siteWalletMode(req: { useGleam: boolean }): void;
+  /** Background → content-script push when a site's grant comes or goes.
+   * The origin is the site the push is for: the content script drops a push
+   * for any other origin, as with `providerEvent`, because a tab can
+   * navigate between the background's tab query and the send. */
+  siteWalletMode(req: { origin: string; useGleam: boolean }): void;
 
   /**
    * The single relay point for every page-originated provider call

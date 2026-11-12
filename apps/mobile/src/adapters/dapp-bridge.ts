@@ -215,11 +215,12 @@ export function createDappBridge({
         if (!(await post(envelope, origin))) throw new Error("That page is no longer open.");
         return;
       }
-      const envelope: PageSiteModeEnvelope = {
-        type: SITE_MODE,
-        useGleam: (data as Parameters<ProtocolMap["siteWalletMode"]>[0]).useGleam,
-      };
-      if (!(await post(envelope, current.origin))) throw new Error("That page is no longer open.");
+      // Posted to the origin the push is for, as with `providerEvent`
+      // above, so a page that has navigated elsewhere since the runtime
+      // chose this tab never gets it.
+      const { origin, useGleam } = data as Parameters<ProtocolMap["siteWalletMode"]>[0];
+      const envelope: PageSiteModeEnvelope = { type: SITE_MODE, useGleam };
+      if (!(await post(envelope, origin))) throw new Error("That page is no longer open.");
     },
   };
 
