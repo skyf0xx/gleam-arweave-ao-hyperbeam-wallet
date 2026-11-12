@@ -108,8 +108,8 @@ Once a round's `pnpm scan finish` has passed, every turn ends like this:
    command keeps failing.
 2. Above it you write only what this skill names: filed links, drafts
    or `Attestation id:` lines handed to the user, an answer of one to
-   three lines, a warning the command printed, or the new-session line
-   (Subagents).
+   three lines, a warning the command printed, the fix-bonus lines
+   (Step 7), or the new-session line (Subagents).
 3. Then that closing message, word for word, as printed. It is the last
    thing you write. No summary, tip, question or sign-off comes after it.
 
@@ -522,10 +522,17 @@ user's words. Then write the description in the shape `REPORT.md` gives:
 a plain **Summary** of about 100 words at reading grade 6 to 7, the
 `Attestation id: {{ATTESTATION_ID}}` line, then `<details>` with
 **Impact**, **Steps**, an optional **Fix** and the triager's evidence.
-If you can fix it, write the fix in a worktree as for a PR draft, run
-its tests, and put `git diff origin/master` in **Fix** as a `diff`
-block. Never push it or open a PR for it. A fix that merges earns the
-bonus.
+Write a fix for every finding you draft, if you can. For an advisory,
+write it in a worktree as for a PR draft, run its tests, and put
+`git diff origin/master` in **Fix** as a `diff` block. Never push it or
+open a PR for it. A fix that merges earns a 1% bonus.
+
+**Fix-bonus lines.** After a round's `pnpm scan finish` passes, write
+one line per finding draft above its round offer, and nothing for a
+hardening, skill or surface PR:
+
+- with a fix: `<Advisory|PR> <n> includes a fix. If it merges, it earns a 1% fix bonus.`
+- without one: `Advisory <n> has no fix yet. Reply "fix <n>" and I'll write one: a fix that merges earns a 1% bonus.`
 Give the evidence from the verdict once: demonstrated, traced, or the
 exact fact a browser check has to settle.
 Save it as `.gleam-scan/rounds/<area>/advisory-<n>.md`. `pnpm scan
@@ -657,8 +664,8 @@ You can run it again at any time, for example after you edit the report.
 It doesn't use up the challenge.
 
 End your turn with the round offer, as Closing messages says. Write
-nothing above it but a `Warning:` line `finish` printed, or the
-new-session line (Subagents).
+nothing above it but a `Warning:` line `finish` printed, the fix-bonus
+lines (Step 7), or the new-session line (Subagents).
 
 ## Replies
 
@@ -669,6 +676,7 @@ ends the turn with the closing message of the last command it names.
 | --- | --- |
 | "next", or names an area to scan | Run `pnpm scan start` (with `--area <id>` if they named one), then the round as How a session runs says, through `pnpm scan finish`. End with its round offer. |
 | "file", or declines another round ("no", "stop", "done") while rounds wait | Run `pnpm scan file`. End with its sign request. |
+| "fix <n>" | Write the fix for advisory `<n>` of the latest round as Step 7 says, and add it to that draft's **Fix**. Then re-run `pnpm scan finish --area <area>` for that round, and end with its message, with the fix-bonus lines above it. |
 | "signed" | Run `pnpm scan next`. File the reports of each round it lists as signed (File the reports). Then run `pnpm scan next` again, and end with its closing message: the round offer, the sign request for rounds still unsigned, or every area done. Above it, one line per filed link. |
 | Anything else | Answer in one to three lines. Then re-run the command that printed the last closing message you showed (`pnpm scan finish`, `pnpm scan file`, `pnpm scan next`, or `pnpm scan start`), and end with its message. |
 
