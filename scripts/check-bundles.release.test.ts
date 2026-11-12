@@ -10,6 +10,10 @@ import {
   lazyChunksOf,
   packageOf,
   pageScriptProblems,
+  uncoveredScriptProblems,
+  unusedWorkerPatterns,
+  workerPatternOf,
+  workerScriptProblems,
 } from "./check-bundles.mjs";
 
 const PNPM = "node_modules/.pnpm/x@1.0.0/node_modules";
@@ -129,5 +133,35 @@ describe("lazy chunks", () => {
     ]);
     map.delete("chunks/keystone.js");
     expect(lazyChunkProblems("approval.html", [], map)).toEqual([`approval.html: no chunk holds ${PANEL}; remove it from LAZY_PACKAGES`]);
+  });
+});
+
+describe("worker scripts and coverage", () => {
+  it("matches the phrase-key worker by pattern, hash and all", () => {
+    expect(workerPatternOf("assets/phrase-key.worker-BcfeyWKM.js")).toBe("assets/phrase-key.worker-*.js");
+    expect(workerPatternOf("assets/other.worker-X.js")).toBeNull();
+    expect(workerPatternOf("chunks/phrase-key.worker-X.js")).toBeNull();
+  });
+
+  it("enforces the worker's size budget", () => {
+    expect(workerScriptProblems("assets/phrase-key.worker-X.js", 310_029)).toEqual([]);
+    expect(workerScriptProblems("assets/phrase-key.worker-X.js", 500_000)).toEqual([
+      "assets/phrase-key.worker-X.js is 500000 bytes, over its 409600-byte budget",
+    ]);
+    expect(workerScriptProblems("chunks/other.js", 999_999)).toEqual([]);
+  });
+
+  it("flags a built script no closure loads and no worker pattern names", () => {
+    expect(uncoveredScriptProblems(["chunks/a.js", "assets/phrase-key.worker-X.js"], new Set(["chunks/a.js"]))).toEqual([]);
+    expect(uncoveredScriptProblems(["chunks/a.js", "chunks/orphan.js"], new Set(["chunks/a.js"]))).toEqual([
+      "chunks/orphan.js is built but no checked closure loads it and no worker pattern names it; add it to the checks or to WORKER_SCRIPTS",
+    ]);
+  });
+
+  it("flags a worker pattern that matches nothing", () => {
+    expect(unusedWorkerPatterns(["assets/phrase-key.worker-X.js"])).toEqual([]);
+    expect(unusedWorkerPatterns(["chunks/a.js"])).toEqual([
+      "no built script matches worker pattern assets/phrase-key.worker-*.js; remove it from WORKER_SCRIPTS",
+    ]);
   });
 });

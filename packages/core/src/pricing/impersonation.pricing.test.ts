@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { impersonatesRegisteredToken } from "./impersonation";
+import { impersonatesRegisteredToken, normalizeTokenLabel } from "./impersonation";
 
 const flagged = (ticker: string, name: string | null = null) => impersonatesRegisteredToken({ ticker, name });
 
@@ -16,5 +16,13 @@ describe("impersonatesRegisteredToken", () => {
     for (const ticker of ["FODDER", "wUSDC", "AOX", "STAR", "MATRIX", "W"]) {
       expect(flagged(ticker, ticker), ticker).toBe(false);
     }
+  });
+
+  it("catches lookalike letters outside the Cyrillic/Greek table", () => {
+    expect(normalizeTokenLabel("\u0251O")).toBe("ao");
+    expect(normalizeTokenLabel("\u0275")).toBe("o");
+    expect(normalizeTokenLabel("\u0585")).toBe("o");
+    expect(flagged("\u0251O")).toBe(true);
+    expect(flagged("A\u0585")).toBe(true);
   });
 });

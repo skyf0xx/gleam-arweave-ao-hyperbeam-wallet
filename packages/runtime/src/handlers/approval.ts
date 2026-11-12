@@ -67,6 +67,7 @@ import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
+import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
@@ -257,9 +258,10 @@ export interface SigningRequestInput {
   /**
    * Display-only token metadata for each `dataItems` entry that is an AO
    * transfer, by index; never signed. The transfer itself is read from
-   * the item.
+   * the item. `collectible` is set when the process is a collectible
+   * rather than a token, so a transfer of 1 previews as that collectible.
    */
-  itemTokenMetadata?: Array<{ tokenDenomination: number | null; tokenTicker: string | null } | null>;
+  itemTokenMetadata?: Array<{ tokenDenomination: number | null; tokenTicker: string | null; collectible?: boolean } | null>;
   /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
   encryptAlgorithm?: EncryptAlgorithm;
   /** `signMessage`'s hash digest selection. */
@@ -585,8 +587,12 @@ const RESOLVING_RECHECK_MS = 5_000;
 
 const textDecoder = new TextDecoder();
 
-function previewCollectibleId(preview: ApprovalRequest["preview"]): string | null {
-  return "collectible" in preview ? (preview.collectible?.id ?? null) : null;
+function previewCollectibleId(preview: ApprovalRequest["preview"], index = 0): string | null {
+  if ("collectible" in preview && preview.collectible) return preview.collectible.id;
+  // A data-item preview names a collectible per item, not at the top level;
+  // payloads run in the same order as the items, so the index picks it.
+  if ("items" in preview) return preview.items?.[index]?.transfer?.collectible?.id ?? null;
+  return null;
 }
 
 function plainTags(tags: SigningRequestInput["tags"]): Array<{ name: string; value: string }> {
@@ -638,7 +644,12 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
           amount: input.amount ?? "",
           token: input.token ?? null,
           fee: input.fee ?? "",
-          collectible: input.collectible,
+          // Only a wallet `transfer` of a collectible is an L1 transaction
+          // carrying the collectible tags. A `transferAoTokens` of one is
+          // an AO data item, so its `collectible` is display-only: passing
+          // it here would check the data item as an L1 transaction and
+          // refuse every approved collectible AO transfer.
+          collectible: input.kind === "transfer" ? input.collectible : undefined,
         },
         payloads[0],
       );
@@ -807,6 +818,12 @@ async function buildDataItemPreviews(
       const tags = item.tags ?? [];
       const transfer = readAoTransferMessage({ target: item.target, tags });
       const metadata = tokenMetadata?.[index] ?? null;
+      // A collectible's transfer of 1 shows as that collectible, as the
+      // L1 path already does, not as 1 raw unit of an unknown token.
+      const collectible =
+        transfer?.kind === "transfer" && metadata?.collectible && transfer.quantity === COLLECTIBLE_TRANSFER_QUANTITY
+          ? { id: transfer.processId }
+          : null;
       return {
         decodedData: decodeDataPreview(bytes),
         tags,
@@ -820,6 +837,7 @@ async function buildDataItemPreviews(
                 amount: transfer.quantity,
                 tokenDenomination: metadata?.tokenDenomination ?? null,
                 tokenTicker: metadata?.tokenTicker ?? null,
+                ...(collectible ? { collectible } : {}),
               }
             : null,
         ...(transfer?.kind === "unreadable" ? { unreadableTokenTransfer: true } : {}),
@@ -1152,7 +1170,7 @@ export class ApprovalHandler {
       device: {
         ...wallet,
         payloads: payloads.map(toWirePayload),
-        summaries: payloads.map((payload) => summarize(payload, previewCollectibleId(entry.request.preview))),
+        summaries: payloads.map((payload, index) => summarize(payload, previewCollectibleId(entry.request.preview, index))),
         deadline: entry.device.deadline,
       },
     };

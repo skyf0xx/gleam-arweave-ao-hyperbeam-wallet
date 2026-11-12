@@ -37,7 +37,7 @@ describe("past transfer-preview advisories", () => {
 
   it("covers every advisory in the class", () => {
     expect(new Set(ADVISORY_FIXTURES.map((fixture) => fixture.advisory))).toEqual(
-      new Set(["v1.41.0 F-1", "v1.41.0 F-2", "v1.41.0 F-6", "v1.42.0 F-1", "v1.42.0 F-5", "v1.43.1 F-1", "v1.44.0 F-2", "v1.44.0 F-3"]),
+      new Set(["v1.41.0 F-1", "v1.41.0 F-2", "v1.41.0 F-6", "v1.42.0 F-1", "v1.42.0 F-5", "v1.43.1 F-1", "v1.44.0 F-2", "v1.44.0 F-3", "R2-W3-1"]),
     );
   });
 });

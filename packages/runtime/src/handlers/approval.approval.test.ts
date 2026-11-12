@@ -1401,6 +1401,54 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await expect(pending).rejects.toThrow();
     });
 
+    it("names an AO Transfer item's collectible when the metadata says so and the amount is 1, and not otherwise", async () => {
+      const target = "Z".repeat(43);
+      const recipient = "R".repeat(43);
+      const tags = (quantity: string) => [
+        { name: "Action", value: "Transfer" },
+        { name: "Recipient", value: recipient },
+        { name: "Quantity", value: quantity },
+      ];
+      const previewOf = async (quantity: string) => {
+        const pending = handler.requestApproval({
+          kind: "signDataItem",
+          origin: "https://bazar.arweave.net",
+          walletId: WALLET_ID,
+          payload: new TextEncoder().encode(" "),
+          tags: tags(quantity),
+          dataItems: [{ data: toBase64(" "), tags: tags(quantity), target }],
+          itemTokenMetadata: [{ tokenDenomination: null, tokenTicker: null, collectible: true }],
+        });
+        await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+        const requestId = presenter.presented[0]!;
+        const request = await handler.getApproval({ requestId });
+        if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+          throw new Error("expected a signing preview");
+        }
+        const transfer = request.preview.items?.[0]?.transfer;
+        await handler.resolveApproval({ requestId, approved: false });
+        await expect(pending).rejects.toThrow();
+        presenter.presented.length = 0;
+        return transfer;
+      };
+
+      expect(await previewOf("1")).toEqual({
+        token: target,
+        recipient,
+        amount: "1",
+        tokenDenomination: null,
+        tokenTicker: null,
+        collectible: { id: target },
+      });
+      expect(await previewOf("5")).toEqual({
+        token: target,
+        recipient,
+        amount: "5",
+        tokenDenomination: null,
+        tokenTicker: null,
+      });
+    });
+
     it("flags each item that looks like an AO Transfer it can't read, and only that item", async () => {
       const target = "Z".repeat(43);
       const recipient = "R".repeat(43);

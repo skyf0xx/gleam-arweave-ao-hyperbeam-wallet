@@ -3,12 +3,14 @@ import type { SigningApprovalPreview } from "@gleam/core";
 import { HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { t } from "../i18n";
 import {
+  amountText,
   balanceAfterParts,
   feeFiatText,
   feeText,
   fiatText,
   glyphLabel,
   groupDigits,
+  isUnknownScale,
   recipientsOf,
   showsWarning,
   transferRequestFromDevice,
@@ -113,6 +115,69 @@ describe("transferRequestFromPreview", () => {
     expect(parsed.transfers[0]!.otherTags).toBe(1);
   });
 
+  it("shows an AO item's transfer of 1 of a collectible as the collectible, not as 1 raw unit", () => {
+    const tags = [
+      { name: "Data-Protocol", value: "ao" },
+      { name: "Action", value: "Transfer" },
+      { name: "Recipient", value: R },
+      { name: "Quantity", value: "1" },
+    ];
+    const parsed = transferRequestFromPreview({
+      ...BASE,
+      kind: "signDataItem",
+      recipient: null,
+      items: [
+        {
+          decodedData: null,
+          tags,
+          target: P,
+          payloadHash: "h",
+          transfer: { token: P, tokenTicker: null, tokenDenomination: null, amount: "1", recipient: R, collectible: { id: P } },
+        },
+      ],
+    })!;
+    const line = parsed.transfers[0]!;
+    expect(line.collectible).toEqual({ id: P });
+    expect(amountText(line)).toBe("1");
+    expect(isUnknownScale(line)).toBe(false);
+    expect(showsWarning(parsed, null)).toBe(false);
+  });
+
+  it("keeps an AO item's transfer of 1 of an unresolved token as raw units", () => {
+    const parsed = transferRequestFromPreview({
+      ...BASE,
+      kind: "signDataItem",
+      recipient: null,
+      items: [
+        {
+          decodedData: null,
+          tags: [],
+          target: P,
+          payloadHash: "h",
+          transfer: { token: P, tokenTicker: null, tokenDenomination: null, amount: "1", recipient: R },
+        },
+      ],
+    })!;
+    expect(parsed.transfers[0]!.collectible).toBeUndefined();
+    expect(isUnknownScale(parsed.transfers[0]!)).toBe(true);
+    expect(showsWarning(parsed, null)).toBe(true);
+  });
+
+  it("shows a transferAoTokens of 1 of a collectible as the collectible", () => {
+    const parsed = transferRequestFromPreview({
+      ...BASE,
+      kind: "transferAoTokens",
+      token: P,
+      tokenDenomination: null,
+      tokenTicker: null,
+      amount: "1",
+      collectible: { id: P },
+    })!;
+    expect(parsed.transfers[0]).toMatchObject({ token: P, amount: "1", collectible: { id: P } });
+    expect(isUnknownScale(parsed.transfers[0]!)).toBe(false);
+    expect(showsWarning(parsed, null)).toBe(false);
+  });
+
   it("is null for a request that moves nothing", () => {
     expect(transferRequestFromPreview({ ...BASE, recipient: null })).toBeNull();
     expect(
@@ -143,6 +208,31 @@ describe("transferRequestFromDevice", () => {
     expect(parsed.transfers.map((transfer) => transfer.denomination)).toEqual([1, null]);
     expect(parsed.fee).toBe("2");
     expect(recipientsOf(parsed)).toEqual([R]);
+  });
+
+  it("shows an AO transfer of 1 as the collectible the preview named, and nothing else as one", () => {
+    const parsed = transferRequestFromDevice(
+      [{ kind: "aoTransfer", process: P, recipient: R, quantity: "1" }],
+      undefined,
+      { id: P },
+    )!;
+    expect(parsed.transfers[0]).toMatchObject({ token: P, amount: "1", collectible: { id: P } });
+    expect(isUnknownScale(parsed.transfers[0]!)).toBe(false);
+    expect(parsed.fee).toBeNull();
+
+    const more = transferRequestFromDevice(
+      [{ kind: "aoTransfer", process: P, recipient: R, quantity: "5" }],
+      undefined,
+      { id: P },
+    )!;
+    expect(more.transfers[0]!.collectible).toBeUndefined();
+
+    const other = transferRequestFromDevice(
+      [{ kind: "aoTransfer", process: "z".repeat(43), recipient: R, quantity: "1" }],
+      undefined,
+      { id: P },
+    )!;
+    expect(other.transfers[0]!.collectible).toBeUndefined();
   });
 });
 

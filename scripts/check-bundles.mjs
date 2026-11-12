@@ -7,7 +7,11 @@
 //   only those in LAZY_PACKAGES;
 // - provider.js (run in every page's world) and the content script
 //   (injected into every page) stay within their size budgets and pull in
-//   no npm package beyond the ones listed here.
+//   no npm package beyond the ones listed here;
+// - every other built script is either in one of those closures or a
+//   listed worker script (Vite emits each `new Worker()` entry as an
+//   asset, so no module map describes it); an unaccounted script fails
+//   the check, and a listed worker stays within its size budget.
 // Reads the chunk-to-module map `apps/extension/build-plugins.ts` writes.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -357,6 +361,71 @@ export const LAZY_PACKAGES = {
 };
 
 /**
+ * Built worker scripts, by file pattern (`*` matches the content hash
+ * Vite appends). Each `new Worker()` entry lands in the bundle as an
+ * asset, not a chunk, so `recordBundleModules` writes no module map for
+ * it and the package checks above never see it; naming it here, with a
+ * size budget, is what brings it under the gate. A pattern that matches
+ * nothing fails the check too, so the list never holds more than the
+ * bundle does.
+ * @type {Record<string, { maxBytes: number }>}
+ */
+export const WORKER_SCRIPTS = {
+  // The seed-phrase key derivation worker: node-forge's prime search.
+  "assets/phrase-key.worker-*.js": { maxBytes: 400 * 1024 },
+};
+
+/**
+ * The worker pattern a built file matches, or null.
+ * @param {string} fileName
+ * @returns {string | null}
+ */
+export function workerPatternOf(fileName) {
+  for (const pattern of Object.keys(WORKER_SCRIPTS)) {
+    const regex = new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`);
+    if (regex.test(fileName)) return pattern;
+  }
+  return null;
+}
+
+/**
+ * Problems with one worker script: over its size budget.
+ * @param {string} fileName
+ * @param {number} bytes
+ */
+export function workerScriptProblems(fileName, bytes) {
+  const pattern = workerPatternOf(fileName);
+  if (pattern === null) return [];
+  const { maxBytes } = WORKER_SCRIPTS[pattern];
+  return bytes > maxBytes ? [`${fileName} is ${bytes} bytes, over its ${maxBytes}-byte budget`] : [];
+}
+
+/**
+ * Problems with built scripts no checked closure loads and no worker
+ * pattern names.
+ * @param {string[]} builtFiles output-relative .js files
+ * @param {ReadonlySet<string>} covered files a checked closure loads
+ */
+export function uncoveredScriptProblems(builtFiles, covered) {
+  return builtFiles
+    .filter((fileName) => !covered.has(fileName) && workerPatternOf(fileName) === null)
+    .map(
+      (fileName) =>
+        `${fileName} is built but no checked closure loads it and no worker pattern names it; add it to the checks or to WORKER_SCRIPTS`,
+    );
+}
+
+/**
+ * Worker patterns that match no built file.
+ * @param {string[]} builtFiles output-relative .js files
+ */
+export function unusedWorkerPatterns(builtFiles) {
+  return Object.keys(WORKER_SCRIPTS)
+    .filter((pattern) => !builtFiles.some((fileName) => workerPatternOf(fileName) === pattern))
+    .map((pattern) => `no built script matches worker pattern ${pattern}; remove it from WORKER_SCRIPTS`);
+}
+
+/**
  * The npm package a module path belongs to, or null for workspace code.
  * @param {string} modulePath
  * @returns {string | null}
@@ -539,6 +608,34 @@ function main() {
     problems.push(...pageScriptProblems(fileName, statSync(join(out, fileName)).size, chunk.modules));
   }
 
+  // Every built script must be accounted for: in a checked closure, or a
+  // listed worker. The closures above stop at lazy chunks, so recompute
+  // them following every dynamic import for coverage purposes.
+  const covered = new Set();
+  for (const script of scripts) for (const file of closureOf(script, chunks).chunks) covered.add(file);
+  for (const entry of Object.keys(BUNDLE_PACKAGES)) {
+    const files = entry.endsWith(".html") ? scriptsOf(join(out, entry)) : [entry];
+    for (const file of files) for (const loaded of closureOf(file, chunks).chunks) covered.add(loaded);
+  }
+  for (const fileName of Object.keys(PAGE_SCRIPTS)) covered.add(fileName);
+
+  /** @type {string[]} */
+  const builtFiles = [];
+  const walk = (/** @type {string} */ dir, /** @type {string} */ prefix) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full, `${prefix}${name}/`);
+      else if (name.endsWith(".js")) builtFiles.push(`${prefix}${name}`);
+    }
+  };
+  walk(out, "");
+  for (const fileName of builtFiles) {
+    if (workerPatternOf(fileName) !== null) {
+      problems.push(...workerScriptProblems(fileName, statSync(join(out, fileName)).size));
+    }
+  }
+  problems.push(...uncoveredScriptProblems(builtFiles, covered), ...unusedWorkerPatterns(builtFiles));
+
   const chunkCount = keyring.reduce((count, { chunks: loaded }) => count + loaded.length, 0);
   if (problems.length > 0) {
     for (const problem of problems) process.stderr.write(`::error::${problem}\n`);
@@ -549,6 +646,10 @@ function main() {
       Object.keys(PAGE_SCRIPTS)
         .map((fileName) => `${fileName} ${statSync(join(out, fileName)).size} bytes`)
         .join(", ") +
+      builtFiles
+        .filter((fileName) => workerPatternOf(fileName) !== null)
+        .map((fileName) => `; worker ${fileName} ${statSync(join(out, fileName)).size} bytes`)
+        .join("") +
       "\n",
   );
 }
