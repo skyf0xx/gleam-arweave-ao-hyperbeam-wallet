@@ -175,7 +175,7 @@ export function SigningApprovalScreen({
                 <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tags")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {preview.tags.map((tag, index) => (
-                    <span key={index} className="rounded-md bg-mist px-2 py-1 font-mono text-micro text-foreground">
+                    <span key={index} className="break-all rounded-md bg-mist px-2 py-1 font-mono text-micro text-foreground">
                       <span className="text-muted"><UntrustedText text={tag.name} />:</span> <UntrustedText text={tag.value} />
                     </span>
                   ))}
