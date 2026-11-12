@@ -15,7 +15,11 @@
 # It runs no pnpm install and no build: npm code that ran on this machine
 # could be waiting for the key to appear. Reproduce the build with
 # scripts/verify-release.sh beforehand, in another terminal session, not the
-# shell that unlocks the key.
+# shell that unlocks the key. That run leaves a receipt holding the
+# reproduced sha256 ($GLEAM_RELEASE_RECEIPTS/<tag>.verified, default
+# ${XDG_STATE_HOME:-~/.local/state}/gleam-release), and the zip is signed
+# only if its hash matches the receipt: the attestation proves where the zip
+# was built, the rebuild proves it is the tag's source.
 #
 # The private key never goes through CI. Keep it as the attachment
 # "gleam-cws.pem" on the entry "gleam-cws" in a KeePassXC database and pass
@@ -157,6 +161,14 @@ gh attestation verify "$zip" --repo "$GH_REPO" \
   --signer-workflow "$GH_REPO/.github/workflows/release.yml" \
   --source-digest "$tag_commit" --source-ref "refs/tags/$tag" \
   || { echo "gh attestation verify failed for $zip_name; refusing to pack" >&2; exit 1; }
+
+echo "== Checking the local rebuild =="
+receipt="${GLEAM_RELEASE_RECEIPTS:-${XDG_STATE_HOME:-$HOME/.local/state}/gleam-release}/$tag.verified"
+[ -f "$receipt" ] \
+  || { echo "no rebuild receipt at $receipt; run scripts/verify-release.sh $tag in another terminal first" >&2; exit 1; }
+[ "$(tr -d '[:space:]' < "$receipt")" = "$got_sha" ] \
+  || { echo "the local rebuild of $tag ($receipt) does not match $zip_name ($got_sha); refusing to pack" >&2; exit 1; }
+echo "$zip_name matches the local rebuild"
 
 unpacked="$work/unpacked"
 mkdir -p "$unpacked"

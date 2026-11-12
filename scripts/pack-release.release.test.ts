@@ -4,7 +4,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const SCRIPT = join(import.meta.dirname, "pack-release.sh");
 const TAG = "v1.2.3";
@@ -32,6 +32,14 @@ function publish(manifest: Record<string, string>): void {
   writeFileSync(join(base, TAG, "release-manifest.json"), JSON.stringify(manifest));
 }
 
+/** What a passing verify-release.sh run leaves behind; null removes it. */
+function receipt(sha: string | null): void {
+  const path = join(root, "receipts", `${TAG}.verified`);
+  mkdirSync(join(root, "receipts"), { recursive: true });
+  if (sha === null) rmSync(path, { force: true });
+  else writeFileSync(path, `${sha}\n`);
+}
+
 function pack(env: Record<string, string> = {}) {
   writeFileSync(calls, "");
   const out = mkdtempSync(join(root, "out-"));
@@ -45,6 +53,7 @@ function pack(env: Record<string, string> = {}) {
       GLEAM_RELEASE_BASE_URL: `file://${base}`,
       GLEAM_GH_REPO: "owner/repo",
       GLEAM_PACK_TEST: "1",
+      GLEAM_RELEASE_RECEIPTS: join(root, "receipts"),
       GH_EXIT: "0",
       ...env,
     },
@@ -93,6 +102,8 @@ function goodManifest(): Record<string, string> {
 }
 
 describe("pack-release.sh", () => {
+  beforeEach(() => receipt(goodManifest().zipSha256!));
+
   it("packs the downloaded zip after the attestation passes, without running pnpm", () => {
     publish(goodManifest());
     const run = pack();
@@ -103,6 +114,24 @@ describe("pack-release.sh", () => {
     expect(run.calls[0]).toContain(`--repo owner/repo`);
     expect(run.calls[0]).toContain(`--signer-workflow owner/repo/.github/workflows/release.yml`);
     expect(run.calls[0]).toContain(`--source-digest ${commit} --source-ref refs/tags/${TAG}`);
+  });
+
+  it("never exports the key without a local rebuild receipt", () => {
+    publish(goodManifest());
+    receipt(null);
+    const run = pack();
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("verify-release.sh");
+    expect(run.calls.map((call) => call.split(" ")[0])).toEqual(["gh"]);
+  });
+
+  it("never exports the key when the local rebuild produced another zip", () => {
+    publish(goodManifest());
+    receipt("0".repeat(64));
+    const run = pack();
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("refusing to pack");
+    expect(run.calls.map((call) => call.split(" ")[0])).toEqual(["gh"]);
   });
 
   it("never exports the key when the attestation check fails", () => {
