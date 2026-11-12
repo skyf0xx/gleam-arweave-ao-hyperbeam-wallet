@@ -41,7 +41,9 @@ Also list `state=draft` for accepted reports that are not yet published.
 6. **Rate** with `SECURITY.md` § Severity, by what was shown, not the
    worst case. Out of scope: anything that needs a compromised OS,
    malware or the user's password. Missing defence in depth alone is
-   Informational.
+   Informational. You are the final arbiter of the rating. Never take
+   the reporter's rating as given, and never ask Will to accept a
+   rating. Set it yourself, apply it, and give a one-line reason.
 
 To close one: `gh api -X PATCH "$API/<GHSA>" -f state=closed`, after a
 comment with the reason. To accept one: set the real severity and
