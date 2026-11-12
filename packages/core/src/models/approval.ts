@@ -76,7 +76,7 @@ export interface SigningApprovalPreview {
   token: string | null;
   tokenDenomination: number | null;
   tokenTicker: string | null;
-  /** Set for a wallet `transfer` that sends this collectible; `amount` is then 0 AR. */
+  /** Set for a wallet `transfer` that sends this collectible, or a `transferAoTokens` call that moves it; `amount` is then 0 AR for a wallet send, and 1 for a token transfer. */
   collectible?: CollectibleRef | null;
   /**
    * Set when a transaction looks like a token transfer (`ao/l1-transfer.ts`)
@@ -112,7 +112,9 @@ export interface SigningApprovalPreview {
  * An AO token transfer carried by a data item. `token`, `recipient` and
  * `amount` come from the signed item; `tokenDenomination` and
  * `tokenTicker` are the same best-effort metadata a `transferAoTokens`
- * preview carries, `null` when unresolved.
+ * preview carries, `null` when unresolved. `collectible` is set when the
+ * item is that collectible's transfer of 1, so the preview shows the
+ * collectible instead of 1 raw unit of an unknown token.
  */
 export interface DataItemTransferPreview {
   token: string;
@@ -120,6 +122,7 @@ export interface DataItemTransferPreview {
   amount: string;
   tokenDenomination: number | null;
   tokenTicker: string | null;
+  collectible?: CollectibleRef | null;
 }
 
 /**

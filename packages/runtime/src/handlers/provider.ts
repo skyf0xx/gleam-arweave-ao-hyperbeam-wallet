@@ -135,14 +135,6 @@ export function createProviderHandlers(deps: ProviderDeps): ProviderHandlers {
     quoteTokenTransferFee,
   } = deps;
 
-  async function resolveTokenDenominationAndTicker(
-    address: string,
-    processId: string,
-  ): Promise<{ tokenDenomination: number | null; tokenTicker: string | null }> {
-    const { tokenDenomination, tokenTicker } = await resolveTokenPreview(address, processId);
-    return { tokenDenomination, tokenTicker };
-  }
-
   /**
    * The work behind each `PAGE_METHODS` entry. Params arrive parsed, and
    * for every method but `connect`/`disconnect` the origin's active grant
@@ -246,10 +238,14 @@ export function createProviderHandlers(deps: ProviderDeps): ProviderHandlers {
       // `TOKEN_METADATA_LOOKUP_TIMEOUT_MS` so a hung peer can't stall the
       // window open. `formatAmount`/`formatAmountUnit` fall back to the raw
       // amount and a "smallest units" label when either comes back `null`.
-      const [{ tokenDenomination, tokenTicker }, fee] = await Promise.all([
-        resolveTokenDenominationAndTicker(wallet.address, token),
+      // A collectible's transfer of 1 shows as that collectible, as the
+      // L1 path already does, not as 1 unit of an unknown token.
+      const [{ tokenDenomination, tokenTicker, collectible }, fee] = await Promise.all([
+        resolveTokenPreview(wallet.address, token),
         quoteTokenTransferFee(token),
       ]);
+      const collectibleRef =
+        collectible && amount === COLLECTIBLE_TRANSFER_QUANTITY ? { id: token } : null;
 
       return requestApproval({
         kind: "transferAoTokens",
@@ -261,6 +257,7 @@ export function createProviderHandlers(deps: ProviderDeps): ProviderHandlers {
         token,
         tokenDenomination,
         tokenTicker,
+        ...(collectibleRef ? { collectible: collectibleRef } : {}),
         payload: new Uint8Array(),
         tags: [],
       });
@@ -399,11 +396,14 @@ export function createProviderHandlers(deps: ProviderDeps): ProviderHandlers {
     const [first] = items;
     const signed = kind === "signDataItem" ? items.slice(0, 1) : items;
     // Scale and ticker for each AO transfer, so it shows like a
-    // `transferAoTokens` request. Unresolved metadata shows raw units.
+    // `transferAoTokens` request. Unresolved metadata shows raw units; a
+    // collectible's transfer of 1 shows as that collectible, as the L1
+    // path already does. The full preview is carried, not the
+    // denom/ticker-only wrapper, so the flag survives.
     const itemTokenMetadata = await Promise.all(
       signed.map((item) => {
         const transfer = readAoTransferMessage({ target: item.target, tags: item.tags });
-        return transfer?.kind === "transfer" && wallet ? resolveTokenDenominationAndTicker(wallet.address, transfer.processId) : null;
+        return transfer?.kind === "transfer" && wallet ? resolveTokenPreview(wallet.address, transfer.processId) : null;
       }),
     );
     return requestApproval({

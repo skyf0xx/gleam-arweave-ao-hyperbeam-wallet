@@ -8,6 +8,7 @@ import {
   type TokenPrice,
 } from "@gleam/core";
 import { otherTags } from "@gleam/core/src/ao/other-tags.ts";
+import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { currencyStep, formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
@@ -122,9 +123,16 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
     items.forEach((item, index) => {
       const part = { tags: item.tags, decodedData: item.decodedData, payloadHash: item.payloadHash };
       if (item.transfer) {
-        const { token, tokenTicker, tokenDenomination, amount, recipient } = item.transfer;
+        const { token, tokenTicker, tokenDenomination, amount, recipient, collectible } = item.transfer;
         transfers.push({
-          ...line(token, tokenTicker, tokenDenomination, amount, recipient),
+          ...line(
+            token,
+            tokenTicker,
+            tokenDenomination,
+            collectible ? COLLECTIBLE_TRANSFER_QUANTITY : amount,
+            recipient,
+            collectible,
+          ),
           otherTags: otherTags(item.tags, "ao").length,
           part,
           index,
@@ -207,8 +215,18 @@ export function transferRequestFromDevice(
       addFee(summary.fee);
     } else if (summary.kind === "aoTransfer" || summary.kind === "l1TokenTransfer") {
       const known = scale?.processId === summary.process ? scale : undefined;
+      // The device step re-reads the payload, so an AO transfer the preview
+      // named as a collectible reads as one here too, not as raw units.
+      const collectibleRef =
+        summary.kind === "aoTransfer" &&
+        collectible?.id === summary.process &&
+        summary.quantity === COLLECTIBLE_TRANSFER_QUANTITY
+          ? collectible
+          : undefined;
       transfers.push({
-        ...line(summary.process, known?.ticker ?? null, known?.denomination ?? null, summary.quantity, summary.recipient),
+        ...(collectibleRef
+          ? line(summary.process, null, 0, COLLECTIBLE_TRANSFER_QUANTITY, summary.recipient, collectibleRef)
+          : line(summary.process, known?.ticker ?? null, known?.denomination ?? null, summary.quantity, summary.recipient)),
         part: empty,
         index,
       });

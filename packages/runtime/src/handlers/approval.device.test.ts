@@ -333,6 +333,49 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     ]);
   });
 
+  it("summarizes an AO Transfer item of 1 as the collectible the preview named, and a transfer of more as the token", async () => {
+    const tags = (quantity: string) => [
+      { name: "Action", value: "Transfer" },
+      { name: "Recipient", value: RECIPIENT },
+      { name: "Quantity", value: quantity },
+    ];
+    const { view } = await approveOnDevice({
+      kind: "batchSignDataItem",
+      payload: new TextEncoder().encode(" "),
+      dataItems: [
+        { data: btoa(" "), tags: tags("1"), target: PROCESS_ID },
+        { data: btoa(" "), tags: tags("5"), target: PROCESS_ID },
+      ],
+      itemTokenMetadata: [
+        { tokenDenomination: null, tokenTicker: null, collectible: true },
+        { tokenDenomination: null, tokenTicker: null, collectible: true },
+      ],
+    });
+    expect(view.device!.summaries).toEqual([
+      { kind: "collectibleTransfer", asset: PROCESS_ID, recipient: RECIPIENT, fee: "0" },
+      { kind: "aoTransfer", process: PROCESS_ID, recipient: RECIPIENT, quantity: "5" },
+    ]);
+  });
+
+  it("summarizes an AO Transfer item of 1 as the token when the preview named no collectible", async () => {
+    const { view } = await approveOnDevice({
+      kind: "signDataItem",
+      payload: new TextEncoder().encode(" "),
+      dataItems: [
+        {
+          data: btoa(" "),
+          tags: [
+            { name: "Action", value: "Transfer" },
+            { name: "Recipient", value: RECIPIENT },
+            { name: "Quantity", value: "1" },
+          ],
+          target: PROCESS_ID,
+        },
+      ],
+    });
+    expect(view.device!.summaries).toEqual([{ kind: "aoTransfer", process: PROCESS_ID, recipient: RECIPIENT, quantity: "1" }]);
+  });
+
   it("batchSignDataItem: needs one signature per item, and resolves to every item in order", async () => {
     const { pending, requestId, device } = await approveOnDevice({
       kind: "batchSignDataItem",
