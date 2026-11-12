@@ -8,6 +8,8 @@
 /packages/core/src/keys/                                                   @skyf0xx
 /packages/core/src/signer/                                                 @skyf0xx
 /packages/core/src/ports/session-keys.ts                                   @skyf0xx
+/packages/core/src/backup/                                                 @skyf0xx
+/packages/core/src/ports/cloud-file.ts                                     @skyf0xx
 /apps/extension/src/keyring/                                               @skyf0xx
 /apps/extension/entrypoints/keyring/                                       @skyf0xx
 /apps/extension/src/adapters/offscreen-keyring.ts                          @skyf0xx

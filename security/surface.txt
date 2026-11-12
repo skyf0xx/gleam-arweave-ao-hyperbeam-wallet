@@ -15,6 +15,8 @@
 1 packages/core/src/keys/
 1 packages/core/src/signer/
 1 packages/core/src/ports/session-keys.ts
+1 packages/core/src/backup/
+1 packages/core/src/ports/cloud-file.ts
 1 apps/extension/src/keyring/
 1 apps/extension/entrypoints/keyring/
 1 apps/extension/src/adapters/offscreen-keyring.ts
