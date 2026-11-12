@@ -258,8 +258,22 @@ describe("content.ts: page <-> background relay", () => {
     const contentScript = (await import("./index")).default;
     await contentScript.main!({} as never);
 
-    registeredHandlers.get("siteWalletMode")!({ data: { useGleam: false } });
+    registeredHandlers.get("siteWalletMode")!({ data: { origin: location.origin, useGleam: false } });
     await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({ type: SITE_MODE, useGleam: false }));
+  });
+
+  it("drops a siteWalletMode push meant for another origin, as after a navigation", async () => {
+    const spy = siteModeSpy();
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    const handler = registeredHandlers.get("siteWalletMode")!;
+    handler({ data: { origin: "https://connected.example", useGleam: true } });
+    handler({ data: { origin: location.origin, useGleam: false } });
+
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ type: SITE_MODE, useGleam: false });
   });
 
   it("relays an other-wallet report from the page, listening before the provider is injected", async () => {

@@ -315,7 +315,7 @@ export function createRuntime(platform: Platform): Runtime {
   async function pushSiteWalletMode(origin: string, useGleam: boolean): Promise<void> {
     const tabIds = await findTabsForOrigin(origin);
     await Promise.all(
-      tabIds.map((tabId) => tabs.send(tabId, "siteWalletMode", { useGleam }).catch(() => undefined)),
+      tabIds.map((tabId) => tabs.send(tabId, "siteWalletMode", { origin, useGleam }).catch(() => undefined)),
     );
   }
 
