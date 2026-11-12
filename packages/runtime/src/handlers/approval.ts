@@ -866,7 +866,7 @@ export class ApprovalHandler {
 
   constructor(
     private readonly storage: StoragePort,
-    private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod" | "getStoredWallet">,
+    private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod" | "getStoredWallet" | "isVaultLocked">,
     private readonly presenter: ApprovalPresenterPort,
     private readonly transfers?: TransferSubmitter,
     private readonly bundlerUrl: string = DEFAULT_BUNDLER_URL,
@@ -1190,6 +1190,9 @@ export class ApprovalHandler {
       } else {
         if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
         try {
+          // A window opened while unlocked stays open across a lock, so
+          // approving re-checks the lock instead of trusting the window.
+          if (await this.keySession.isVaultLocked()) throw new Error(userErrorMessage("keyringLocked"));
           if (await this.signsOnDevice(entry)) {
             const view = await this.startDeviceSigning(entry);
             if (!(await this.lapsedSince(entry))) return view;

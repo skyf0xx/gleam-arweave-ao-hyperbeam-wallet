@@ -199,6 +199,13 @@ export interface KeySession {
    */
   enforceAutoLock(): Promise<boolean>;
   /**
+   * Whether the vault is locked: it holds a password-protected key and
+   * there is no unexpired session. An empty vault, or one of only
+   * hardware and watch wallets, has no password, so it never reads as
+   * locked.
+   */
+  isVaultLocked(): Promise<boolean>;
+  /**
    * Drops keys the keyring holds with no session to use them, such as after
    * the worker stopped between importing keys and writing the session.
    * Called once per worker start, ahead of any queued unlock.
@@ -324,13 +331,17 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
    * auto-locks it. Matched here so the alarm doesn't end a session that
    * `loadSession` would only start again.
    */
-  async function isHardwareOnlyVault(): Promise<boolean> {
+  async function storedWalletMethods(): Promise<Array<{ method: WalletMethod }>> {
     const wallets = await storage.get<unknown>(WALLETS_KEY);
-    if (!Array.isArray(wallets)) return false;
-    const methods = (wallets as unknown[]).flatMap((wallet) => {
+    if (!Array.isArray(wallets)) return [];
+    return (wallets as unknown[]).flatMap((wallet) => {
       const method = wallet !== null && typeof wallet === "object" ? (wallet as { method?: unknown }).method : undefined;
       return typeof method === "string" ? [{ method: method as WalletMethod }] : [];
     });
+  }
+
+  async function isHardwareOnlyVault(): Promise<boolean> {
+    const methods = await storedWalletMethods();
     return methods.length > 0 && !vaultHasPassword(methods);
   }
 
@@ -408,8 +419,20 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     return (await readStoredKey(walletId)) !== null;
   }
 
+  async function isVaultLocked(): Promise<boolean> {
+    if (!vaultHasPassword(await storedWalletMethods())) return false;
+    const session = await storage.get<unknown>(SESSION_KEY);
+    if (!isValidSession(session)) return true;
+    if (isSessionExpired(session.lastActivityAt, session.autoLockTimeout)) {
+      await enforceAutoLock();
+      return true;
+    }
+    return false;
+  }
+
   return {
     withSessionLock,
+    isVaultLocked,
     cacheKey,
     getStoredWallet,
     getWalletMethod,
