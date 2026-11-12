@@ -544,6 +544,8 @@ const WALLET_SWITCHED = "The active wallet changed.";
 const SITE_DISCONNECTED = "The site was disconnected.";
 const DISCONNECTED_OUTCOME: ApprovalOutcome = { approved: false, error: SITE_DISCONNECTED };
 
+const SWITCHED_OUTCOME: ApprovalOutcome = { approved: false, error: WALLET_SWITCHED };
+
 /** Kinds whose only effect is the result handed back: nothing is posted or stored. */
 const RESULT_ONLY_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "sign",
@@ -1207,17 +1209,26 @@ export class ApprovalHandler {
         outcome = { approved: false };
       } else {
         if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
+        if (await this.walletSwitched(entry)) return await this.complete(entry, SWITCHED_OUTCOME, undefined);
         try {
           // A window opened while unlocked stays open across a lock, so
           // approving re-checks the lock instead of trusting the window.
           if (await this.keySession.isVaultLocked()) throw new Error(userErrorMessage("keyringLocked"));
           if (await this.signsOnDevice(entry)) {
             const view = await this.startDeviceSigning(entry);
-            if (!(await this.lapsedSince(entry))) return view;
-            outcome = DISCONNECTED_OUTCOME;
+            if (await this.switchedSince(entry)) {
+              outcome = SWITCHED_OUTCOME;
+            } else if (await this.lapsedSince(entry)) {
+              outcome = DISCONNECTED_OUTCOME;
+            } else {
+              return view;
+            }
           } else {
             result = await this.finalizeApproval(entry);
-            outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
+            outcome = await this.withheldIfSwitched(
+              entry,
+              await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) }),
+            );
           }
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
@@ -1285,6 +1296,53 @@ export class ApprovalHandler {
   private async withheldIfLapsed(entry: PendingApprovalRecord, outcome: ApprovalOutcome): Promise<ApprovalOutcome> {
     if (!RESULT_ONLY_KINDS.has(entry.request.kind)) return outcome;
     return (await this.lapsedSince(entry)) ? DISCONNECTED_OUTCOME : outcome;
+  }
+
+  /**
+   * The wallet this request signs for is no longer the active one. No
+   * active wallet means none is left, which already rejects every pending
+   * request, so that reads as not switched. Mirrors `grantLapsed`, for
+   * the wallet binding instead of the grant.
+   */
+  private async walletSwitched(entry: PendingApprovalRecord): Promise<boolean> {
+    if (!signsForActiveWallet(entry) || !entry.walletId) return false;
+    const active = await this.activeWalletId();
+    return active !== null && active !== entry.walletId;
+  }
+
+  /**
+   * `walletSwitched` once the request's work is done. A switch landing
+   * during it skipped the record, since it was resolving. A failed read
+   * keeps what was done rather than leave the request without an outcome.
+   */
+  private async switchedSince(entry: PendingApprovalRecord): Promise<boolean> {
+    try {
+      return await this.walletSwitched(entry);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Withholds a signature or plaintext from a site whose wallet stopped
+   * being active while it was made. A request that already posted or
+   * stored something keeps its real outcome, so the site doesn't retry
+   * and send twice — the same split `withheldIfLapsed` makes for a
+   * lapsed grant.
+   */
+  private async withheldIfSwitched(entry: PendingApprovalRecord, outcome: ApprovalOutcome): Promise<ApprovalOutcome> {
+    if (!RESULT_ONLY_KINDS.has(entry.request.kind)) return outcome;
+    return (await this.switchedSince(entry)) ? SWITCHED_OUTCOME : outcome;
+  }
+
+  /**
+   * Throws once the wallet this request signs for has stopped being
+   * active. A failed read lets the request stand, as `switchedSince`
+   * does. Used at the last check before an irreversible step — signing
+   * a prepared payload, or handing a signed transfer to its submitter.
+   */
+  private async throwIfWalletSwitched(entry: PendingApprovalRecord): Promise<void> {
+    if (await this.switchedSince(entry)) throw new Error(WALLET_SWITCHED);
   }
 
   private async signsOnDevice(entry: PendingApprovalRecord): Promise<boolean> {
@@ -1374,6 +1432,7 @@ export class ApprovalHandler {
         throw new Error(userErrorMessage("approvalNotWaitingForSignature", { id: req.requestId }));
       }
       if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
+      if (await this.walletSwitched(entry)) return await this.complete(entry, SWITCHED_OUTCOME, undefined);
       const walletId = entry.walletId;
       const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
       const wallet = await this.hardwareWallet(walletId);
@@ -1382,8 +1441,18 @@ export class ApprovalHandler {
       let outcome: ApprovalOutcome;
       let result: unknown;
       try {
-        result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
-        outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
+        result = await this.finishDeviceSigning(
+          walletId,
+          wallet,
+          this.signingInputOf(entry),
+          payloads,
+          signatures,
+          () => this.throwIfWalletSwitched(entry),
+        );
+        outcome = await this.withheldIfSwitched(
+          entry,
+          await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) }),
+        );
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
@@ -1538,6 +1607,7 @@ export class ApprovalHandler {
     input: SigningRequestInput,
     payloads: UnsignedPayload[],
     signatures: Uint8Array[],
+    beforePost: () => Promise<void>,
   ): Promise<unknown> {
     const owner = wallet.publicKey;
     const [payload] = payloads;
@@ -1547,11 +1617,12 @@ export class ApprovalHandler {
       case "dispatch":
       case "signDataItem":
       case "batchSignDataItem":
+        await beforePost();
         return this.finishDappPayloads(owner, input, payloads, signatures);
       case "transferAoTokens":
       case "transfer": {
         const { txId } = await this.deviceTransfers().finishDeviceTransfer(
-          this.transferRequestOf(walletId, input),
+          { ...this.transferRequestOf(walletId, input), beforePost },
           payload!,
           signature!,
           owner,
@@ -1812,7 +1883,7 @@ export class ApprovalHandler {
     }
 
     if (input.kind === "transferAoTokens" || input.kind === "transfer") {
-      return this.performTransfer(walletId, input);
+      return this.performTransfer(walletId, input, () => this.throwIfWalletSwitched(entry));
     }
 
     switch (input.kind) {
@@ -1824,6 +1895,9 @@ export class ApprovalHandler {
         const method = (await this.keySession.getWalletMethod(walletId)) ?? "jwk";
         const payloads = await this.prepareDappPayloads(signer.owner, method, input);
         assertPreparedMatches(input, payloads, signer.address);
+        // A switch landing while the payloads were prepared must not sign
+        // or post for the wallet that stopped being active.
+        await this.throwIfWalletSwitched(entry);
         const signatures: Uint8Array[] = [];
         for (const payload of payloads) signatures.push(await signPayloadWithSigner(payload, signer));
         return this.finishDappPayloads(signer.owner, input, payloads, signatures);
@@ -1870,14 +1944,18 @@ export class ApprovalHandler {
    * shape (`{ id }`), mirroring `submitTransfer`'s `{ txId }` under the
    * ArConnect-compatible `dispatch()`-style field name the dApp expects.
    */
-  private async performTransfer(walletId: string, input: SigningRequestInput): Promise<{ id: string } | { txId: string }> {
+  private async performTransfer(
+    walletId: string,
+    input: SigningRequestInput,
+    beforePost: () => Promise<void>,
+  ): Promise<{ id: string } | { txId: string }> {
     if (!this.transfers) {
       throw new Error(
         `${input.kind} is not wired to a transfer submitter — ApprovalHandler was constructed ` +
           "without an AoTransferSubmitter.",
       );
     }
-    const { txId } = await this.transfers.submitTransfer(this.transferRequestOf(walletId, input));
+    const { txId } = await this.transfers.submitTransfer({ ...this.transferRequestOf(walletId, input), beforePost });
     return input.kind === "transfer" ? { txId } : { id: txId };
   }
 
@@ -1924,8 +2002,11 @@ export class ApprovalHandler {
 
   /**
    * Skips requests `resolveApproval` is already finishing: it re-reads the
-   * record to attach its outcome, and signing fails on its own once the
-   * wallet's key is gone.
+   * record to attach its outcome, and the resolve path re-checks the
+   * wallet itself — before the work, before each irreversible step, and
+   * after it — so a switch landing mid-resolution is still caught there.
+   * (Switching wallets does not clear the old wallet's cached key, so
+   * signing would not fail on its own.)
    */
   private async rejectPendingWhere(
     matches: (entry: PendingApprovalRecord) => boolean,

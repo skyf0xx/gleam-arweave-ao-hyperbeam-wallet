@@ -11,6 +11,7 @@ import {
 import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
 import { createKeySession } from "./key-session";
+import type { SubmitTransferRequest } from "./transfer";
 
 let jwkPromise: Promise<JWKInterface> | null = null;
 
@@ -865,6 +866,119 @@ describe("ApprovalHandler: a site's pending requests end with its grant", () => 
   });
 });
 
+describe("ApprovalHandler: a wallet switch ends the approval", () => {
+  const ORIGIN = "https://bazar.arweave.net";
+  const OTHER_WALLET_ID = "wallet-2";
+  let storage: StoragePort;
+  let presenter: ReturnType<typeof createFakePresenter>;
+
+  beforeEach(async () => {
+    storage = createWatchableStorage();
+    presenter = createFakePresenter();
+    await seedWallet(storage);
+    await seedGrant(storage);
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
+  });
+
+  afterEach(async () => {
+    await clearKeyCache();
+  });
+
+  async function requestTransfer(handler: ApprovalHandler) {
+    const before = presenter.presented.length;
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin: ORIGIN,
+      walletId: WALLET_ID,
+      recipient: "recipient",
+      amount: "1",
+      token: "token-process",
+      payload: new Uint8Array(),
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(before + 1));
+    return { pending, requestId: presenter.presented[before]! };
+  }
+
+  it("a switch landing while a transfer posts stops the post, so the site gets nothing for the old wallet", async () => {
+    let active = WALLET_ID;
+    let releaseTransfer: () => void = () => {};
+    const posted: string[] = [];
+    const transfers = {
+      submitTransfer: vi.fn(async (req: SubmitTransferRequest) => {
+        // Blocked on the network, as a real submitTransfer is — then the
+        // guard is consulted before posting, as TransferHandler does.
+        await new Promise<void>((resolve) => (releaseTransfer = resolve));
+        await req.beforePost?.();
+        posted.push(req.walletId);
+        return { txId: "tx-1" };
+      }),
+    };
+    const handler = new ApprovalHandler(storage, keySession, presenter, transfers, undefined, async () => active);
+
+    const { pending, requestId } = await requestTransfer(handler);
+    const resolving = handler.resolveApproval({ requestId, approved: true });
+    await vi.waitFor(() => expect(transfers.submitTransfer).toHaveBeenCalled());
+
+    // The production switch path: the new wallet is active first, then
+    // the rejection scan runs. The resolving entry is skipped there, so
+    // the guard inside the submitter is what stops the post.
+    active = OTHER_WALLET_ID;
+    await handler.rejectSwitchedApprovals(OTHER_WALLET_ID);
+    releaseTransfer();
+
+    await expect(resolving).rejects.toThrow("The active wallet changed.");
+    await expect(pending).rejects.toThrow("The active wallet changed.");
+    expect(posted).toEqual([]);
+  });
+
+  it("approving after the wallet switched rejects the request instead of signing", async () => {
+    let active = WALLET_ID;
+    const submitTransfer = vi.fn().mockResolvedValue({ txId: "tx-1" });
+    const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer }, undefined, async () => active);
+
+    const { pending, requestId } = await requestTransfer(handler);
+    active = OTHER_WALLET_ID;
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow("The active wallet changed.");
+
+    await expect(pending).rejects.toThrow("The active wallet changed.");
+    expect(presenter.dismissed).toEqual([requestId]);
+    expect(submitTransfer).not.toHaveBeenCalled();
+  });
+
+  it("a switch landing while a message is signed withholds the signature", async () => {
+    // The active-wallet reads, in order: the pre-present check when the
+    // window opens, the pre-work check when the user approves, and the
+    // post-work check once the message is signed.
+    const activeReads = [WALLET_ID, WALLET_ID, OTHER_WALLET_ID];
+    const handler = new ApprovalHandler(
+      storage,
+      keySession,
+      presenter,
+      undefined,
+      undefined,
+      async () => activeReads.shift() ?? OTHER_WALLET_ID,
+    );
+
+    const pending = handler.requestApproval({
+      kind: "signMessage",
+      origin: ORIGIN,
+      walletId: WALLET_ID,
+      payload: new TextEncoder().encode("hello"),
+      hashAlgorithm: "SHA-256",
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow("The active wallet changed.");
+
+    await expect(pending).rejects.toThrow("The active wallet changed.");
+    expect(presenter.dismissed).toEqual([requestId]);
+  });
+});
+
 describe("ApprovalHandler: removing wallets", () => {
   const OTHER_WALLET_ID = "wallet-2";
   let storage: StoragePort;
@@ -1536,13 +1650,18 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
     await handler.resolveApproval({ requestId, approved: true });
 
     await expect(pending).resolves.toEqual({ id: "ao-message-id-123" });
-    expect(submitTransfer).toHaveBeenCalledWith({
-      token: "ao-process-id",
-      recipient: "recipient-addr",
-      amount: "1000",
-      fee: null,
-      walletId: WALLET_ID,
-    });
+    expect(submitTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: "ao-process-id",
+        recipient: "recipient-addr",
+        amount: "1000",
+        fee: null,
+        walletId: WALLET_ID,
+      }),
+    );
+    // The submitter must be able to stop the post: the approval hands it
+    // the wallet re-check to run once the transfer is signed.
+    expect(submitTransfer.mock.calls[0]![0].beforePost).toEqual(expect.any(Function));
   });
 
   it("rejecting a transferAoTokens request never calls the submitter", async () => {

@@ -67,6 +67,14 @@ import { assertTransferMatches } from "./prepared-check";
  */
 export interface SubmitTransferRequest extends TransferDraft {
   walletId: string;
+  /**
+   * Checked after the transfer is signed and before it is posted. Only
+   * the approval flow sets it: a dApp approval must not post once its
+   * wallet has stopped being active, while a send from the popup has no
+   * approval to outlive. A submitter that posts without consulting it
+   * reopens that hole.
+   */
+  beforePost?: () => Promise<void>;
 }
 
 export type EstimateTransferRequest = SubmitTransferRequest;
@@ -365,14 +373,16 @@ export class TransferHandler {
         unsigned,
       );
       if (unsigned.kind === "transaction") {
-        ({ txId } = await finishArweaveTransfer(
-          settings.gatewayUrl,
-          unsigned.transaction,
-          await signTransactionWithSigner(unsigned.transaction, signer),
-          signer.owner,
-        ));
+        const signature = await signTransactionWithSigner(unsigned.transaction, signer);
+        // The approval's wallet may have changed while the transaction
+        // was prepared: posting for a wallet that stopped being active
+        // is exactly what `beforePost` exists to stop.
+        await req.beforePost?.();
+        ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned.transaction, signature, signer.owner));
       } else if (unsigned.kind === "dataItem") {
-        ({ messageId: txId } = await finishAoTransfer(unsigned.raw, await signDataItemWithSigner(unsigned.raw, signer), signer.owner));
+        const signature = await signDataItemWithSigner(unsigned.raw, signer);
+        await req.beforePost?.();
+        ({ messageId: txId } = await finishAoTransfer(unsigned.raw, signature, signer.owner));
       } else {
         throw new Error(dappError("A transfer can't be signed as a message."));
       }
@@ -433,6 +443,8 @@ export class TransferHandler {
     const wallet = await this.loadWallet(req.walletId);
     let txId: string;
     try {
+      // The device may have signed while another wallet became active.
+      await req.beforePost?.();
       if (unsigned.kind === "transaction") {
         const settings = await this.loadNetworkSettings();
         ({ txId } = await finishArweaveTransfer(settings.gatewayUrl, unsigned.transaction, signature, expectedOwner));

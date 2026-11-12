@@ -256,6 +256,33 @@ describe("TransferHandler: submitTransfer", () => {
     expect(entry?.token).toBe(AO_PROCESS_ID);
   });
 
+  it("consults beforePost after signing and posts nothing once it throws", async () => {
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    aoFinishMock.mockResolvedValue({ messageId: "ao-msg-id-1" });
+
+    const handler = new TransferHandler(storage, keySession);
+    await expect(
+      handler.submitTransfer({
+        walletId: WALLET_ID,
+        recipient: AO_RECIPIENT,
+        token: AO_PROCESS_ID,
+        amount: "42",
+        fee: null,
+        beforePost: async () => {
+          throw new Error("The active wallet changed.");
+        },
+      }),
+    ).rejects.toThrow("The active wallet changed.");
+    expect(aoFinishMock).not.toHaveBeenCalled();
+
+    const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
+    expect(log ?? []).toHaveLength(0);
+  });
+
   it("hands a Ledger AO send to the approval window, where the device signs it", async () => {
     keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", encryptedKeyfile: null }]);
     const requestTransfer = vi.fn().mockResolvedValue({ txId: "ao-msg-id-ledger" });
