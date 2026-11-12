@@ -40,6 +40,18 @@ describe("escapeHiddenCharacters", () => {
     ]);
   });
 
+  it("splits out invisible Hangul fillers, the grapheme joiner, Khmer invisibles and variation selectors", () => {
+    expect(escapeHiddenCharacters("A\u115fO")).toEqual(["A", { codePoint: "U+115F" }, "O"]);
+    expect(escapeHiddenCharacters("A\u1160O")).toEqual(["A", { codePoint: "U+1160" }, "O"]);
+    expect(escapeHiddenCharacters("A\u3164O")).toEqual(["A", { codePoint: "U+3164" }, "O"]);
+    expect(escapeHiddenCharacters("A\uffa0O")).toEqual(["A", { codePoint: "U+FFA0" }, "O"]);
+    expect(escapeHiddenCharacters("A\u034fO")).toEqual(["A", { codePoint: "U+034F" }, "O"]);
+    expect(escapeHiddenCharacters("A\u17b4O")).toEqual(["A", { codePoint: "U+17B4" }, "O"]);
+    expect(escapeHiddenCharacters("A\u17b5O")).toEqual(["A", { codePoint: "U+17B5" }, "O"]);
+    expect(escapeHiddenCharacters("A\ufe00O")).toEqual(["A", { codePoint: "U+FE00" }, "O"]);
+    expect(escapeHiddenCharacters("A\ufe0fO")).toEqual(["A", { codePoint: "U+FE0F" }, "O"]);
+  });
+
   it("leaves ordinary text, newlines, tabs and right-to-left letters alone", () => {
     expect(escapeHiddenCharacters("שלום 100\n\tok")).toEqual(["שלום 100\n\tok"]);
   });
@@ -101,5 +113,43 @@ describe("SigningApprovalScreen hidden characters", () => {
     );
     expect(HIDDEN.test(container.textContent!)).toBe(false);
     expect(container.textContent).toContain("Trans<U+202E>fer");
+  });
+
+  it("breaks long unbroken tag values in the generic screen's tag chips", () => {
+    const { container } = render(
+      <SigningApprovalScreen
+        origin="https://example.com"
+        preview={{ ...SIGN_MESSAGE_PREVIEW, kind: "signDataItem", decodedData: "x", tags: [{ name: "Action", value: "a".repeat(2000) }] }}
+        onReject={vi.fn()}
+        onSign={vi.fn()}
+      />,
+    );
+    const chip = Array.from(container.querySelectorAll("span")).find((element) => element.textContent?.startsWith("Action:"));
+    expect(chip?.className).toContain("break-all");
+  });
+
+  it("breaks long unbroken tag values in batch item cards", () => {
+    const { container } = render(
+      <SigningApprovalScreen
+        origin="https://example.com"
+        preview={{
+          ...SIGN_MESSAGE_PREVIEW,
+          kind: "batchSignDataItem",
+          items: [
+            {
+              decodedData: "",
+              tags: [{ name: "Action", value: "a".repeat(2000) }],
+              target: null,
+              payloadHash: SIGN_MESSAGE_PREVIEW.payloadHash,
+              transfer: null,
+            },
+          ],
+        }}
+        onReject={vi.fn()}
+        onSign={vi.fn()}
+      />,
+    );
+    const chip = Array.from(container.querySelectorAll("span")).find((element) => element.textContent?.startsWith("Action:"));
+    expect(chip?.className).toContain("break-all");
   });
 });
