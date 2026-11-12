@@ -7,6 +7,7 @@ import {
   parseVoidArgs,
   voidAttestation,
   type Confirm,
+  type Severity,
 } from "./bounty";
 import type { Db } from "./db";
 import { createTestDb } from "./test-db";
@@ -31,7 +32,7 @@ async function seed(db: Db, id = ID, address = "alice") {
 const fund = (db: Db, atomic: string, day = "2026-10-01") =>
   db.query("INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ($1, $2, 'daily', now())", [day, atomic]);
 
-async function run(db: Db, severity: "critical" | "high" | "medium" | "low", confirm: Confirm = yes, ref = REF, attestation = ID) {
+async function run(db: Db, severity: Severity, confirm: Confirm = yes, ref = REF, attestation = ID) {
   const lines: string[] = [];
   const result = await awardFinding(db, { attestation, severity, ref, yes: false }, confirm, (l) => lines.push(l));
   return { result, lines };
@@ -55,6 +56,7 @@ describe("parse args", () => {
     expect(() => parseAwardArgs(["--severity", "high", "--ref", REF])).toThrow(/--attestation/);
     expect(() => parseAwardArgs(["--attestation", ID, "--severity", "huge", "--ref", REF])).toThrow(/--severity must be one of/);
     expect(() => parseAwardArgs(["--attestation", ID, "--severity", "low", "--ref", "nope"])).toThrow(/--ref/);
+    expect(parseAwardArgs(["--attestation", ID, "--severity", "fix", "--ref", REF]).ref).toBe(`${REF}#fix`);
     expect(() => parseAwardArgs(["--attestation", ID, "--severity", "low", "--ref", "http://x.io/1"])).toThrow(/https/);
   });
 
@@ -70,6 +72,7 @@ describe("awardFinding", () => {
     ["high", "250"],
     ["medium", "100"],
     ["low", "20"],
+    ["fix", "10"],
   ] as const)("pays the %s share of the pool", async (severity, amount) => {
     const db = await createTestDb();
     await seed(db);
@@ -130,6 +133,17 @@ describe("awardFinding", () => {
     await run(db, "high");
     await expect(run(db, "high", yes, REF, ID2)).rejects.toThrow(/already been paid/);
     expect(await balance(db)).toBe("750");
+  });
+
+  it("pays a fix bonus once, beside the finding it fixes", async () => {
+    const db = await createTestDb();
+    await seed(db);
+    await fund(db, "1000");
+    await awardFinding(db, parseAwardArgs(["--attestation", ID, "--severity", "medium", "--ref", REF, "--yes"]), yes, () => {});
+    const fix = parseAwardArgs(["--attestation", ID, "--severity", "fix", "--ref", REF, "--yes"]);
+    await expect(awardFinding(db, fix, yes, () => {})).resolves.toEqual({ paid: true, amount: 9n });
+    await expect(awardFinding(db, fix, yes, () => {})).rejects.toThrow(/already been paid/);
+    expect(await balance(db)).toBe("891");
   });
 
   it("refuses an unknown, voided or departed attestation and an empty pool", async () => {
