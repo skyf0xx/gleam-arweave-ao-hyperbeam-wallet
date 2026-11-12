@@ -39,29 +39,41 @@ export function isLookalike(recipient: string, known: string): boolean {
 }
 
 /**
- * `history` is every activity entry available (local log plus gateway
- * results); `entry.address` is the counterparty. `knownAddresses` are
- * trusted without history: saved contacts and the user's own wallets.
+ * `trustedHistory` is the wallet's own local log; `untrustedHistory` is
+ * what a gateway claims (see `TransferHandler.loadRecipientHistory`).
+ * `knownAddresses` are trusted without history: saved contacts and the
+ * user's own wallets.
  *
- * Only known addresses and addresses the user has sent to count as
- * references for the lookalike check. The poisoner's dust arrives as a
- * receive, so a received-only address can itself be the fake: it shows up in
- * history, which is why `lookalikeOf` is checked even when the address has
- * been seen. When several references resemble the recipient, the most
- * recently sent-to one wins.
+ * Only known addresses and addresses the user has sent to *in the local
+ * log* count as references that clear first-time status. A gateway entry
+ * is the gateway's word for what happened, so a gateway-claimed send only
+ * ever adds a lookalike reference: a lying gateway that fabricates a
+ * prior send to a lookalike address must not silence the warning for it.
+ * That is the same direction the dust defense below already takes — fail
+ * toward warning — extended from receives to gateway claims.
+ *
+ * The poisoner's dust arrives as a receive, so a received-only address
+ * can itself be the fake: it shows up in history, which is why
+ * `lookalikeOf` is checked even when the address has been seen. When
+ * several references resemble the recipient, the most recently sent-to
+ * trusted one wins; a gateway-only resemblance is named only when no
+ * trusted reference resembles it.
  */
 export function assessRecipient(
   recipient: string,
-  history: ActivityEntry[],
+  trustedHistory: ActivityEntry[],
   knownAddresses: string[] = [],
+  untrustedHistory: ActivityEntry[] = [],
 ): RecipientAssessment {
-  const sentTo = history
-    .filter((entry) => entry.type === "send")
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .map((entry) => entry.address);
-  const references = [...knownAddresses, ...sentTo];
+  const sentTo = (entries: ActivityEntry[]) =>
+    entries
+      .filter((entry) => entry.type === "send")
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .map((entry) => entry.address);
+  const trustedReferences = [...knownAddresses, ...sentTo(trustedHistory)];
+  const references = [...trustedReferences, ...sentTo(untrustedHistory)];
 
-  if (references.includes(recipient)) {
+  if (trustedReferences.includes(recipient)) {
     return { firstTime: false, lookalikeOf: null };
   }
 

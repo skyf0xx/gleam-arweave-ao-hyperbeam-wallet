@@ -19,5 +19,10 @@ export function useLookalikeOf(
   const parsed = recipientSchema.safeParse(recipient);
   if (!parsed.success) return null;
   const known = [wallet.address, ...contacts.map((contact) => contact.address), ...otherWallets.map((other) => other.address)];
-  return assessRecipient(parsed.data, activityQuery.data?.entries ?? [], known).lookalikeOf;
+  // The cached activity page mixes the local log with gateway results and
+  // carries no provenance, so the whole page is untrusted here: it can
+  // only add lookalike references, never clear first-time. Only
+  // `lookalikeOf` is read, so a genuine past counterparty is still named
+  // when a new address resembles it.
+  return assessRecipient(parsed.data, [], known, activityQuery.data?.entries ?? []).lookalikeOf;
 }

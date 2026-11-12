@@ -130,6 +130,40 @@ function mockFetchSequence(responses: Array<{ status: number; body: unknown }>) 
   }) as unknown as typeof fetch;
 }
 
+/**
+ * A gateway that fabricates one prior "send" from the wallet to
+ * `recipient` in its `owners:` answer, and nothing in its `recipients:`
+ * answer — the lying-gateway shape: no on-chain transaction exists
+ * behind the node.
+ */
+function mockFabricatedGatewaySend(walletAddress: string, recipient: string) {
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (!url.includes("/graphql")) return new Response("999", { status: 200 });
+    const body = JSON.parse(String(init?.body ?? "{}")) as { query?: string };
+    const edges = body.query?.includes("owners:")
+      ? [
+          {
+            cursor: "c",
+            node: {
+              id: "fabricated-tx",
+              owner: { address: walletAddress },
+              recipient,
+              quantity: { winston: "1" },
+              tags: [],
+              data: { size: "0" },
+              block: { timestamp: 1 },
+            },
+          },
+        ]
+      : [];
+    return new Response(JSON.stringify({ data: { transactions: { edges } } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+}
+
 describe("TransferHandler: estimateTransfer", () => {
   let storage: StoragePort;
   let wallet: Wallet;
@@ -447,5 +481,20 @@ describe("TransferHandler: lookalike recipients", () => {
     mockFetchSequence([]);
     const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: SENT_TO });
     expect(assessment).toEqual({ firstTime: false, lookalikeOf: null });
+  });
+
+  it("does not let a fabricated gateway send silence the lookalike warning", async () => {
+    await storage.set(`local:activityLog:${wallet.address}`, [
+      { txId: "t", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 1 },
+    ]);
+    mockFabricatedGatewaySend(wallet.address, POISON);
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: POISON });
+    expect(assessment).toEqual({ firstTime: true, lookalikeOf: SENT_TO });
+  });
+
+  it("stays first time when the only prior send to the recipient is the gateway's claim", async () => {
+    mockFabricatedGatewaySend(wallet.address, POISON);
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: POISON });
+    expect(assessment).toEqual({ firstTime: true, lookalikeOf: null });
   });
 });

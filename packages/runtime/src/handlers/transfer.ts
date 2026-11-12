@@ -248,7 +248,12 @@ export class TransferHandler {
       this.loadRecipientHistory(settings, wallet.address),
       this.loadKnownAddresses(),
     ]);
-    return assessRecipient(req.recipient, [...localLog, ...gatewayEntries], known);
+    // The split is kept on purpose: only the local log can vouch that the
+    // wallet has sent to an address. Gateway entries are untrusted — a
+    // lying gateway must not fabricate a prior send that clears
+    // first-time status or suppresses the lookalike match — so they only
+    // ever add lookalike references.
+    return assessRecipient(req.recipient, localLog, known, gatewayEntries);
   }
 
   /**

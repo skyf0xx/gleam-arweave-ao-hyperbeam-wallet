@@ -104,3 +104,36 @@ describe("assessRecipient", () => {
     expect(assessRecipient(STRANGER, [entry({})], [FRIEND])).toEqual({ firstTime: true, lookalikeOf: null });
   });
 });
+
+describe("assessRecipient with gateway-only history (untrusted)", () => {
+  it("does not let a fabricated gateway send silence the warning for a lookalike", () => {
+    const gatewaySendToPoison = [entry({ txId: "fabricated", address: POISON, timestamp: 200 })];
+    expect(assessRecipient(POISON, [], [FRIEND], gatewaySendToPoison)).toEqual({ firstTime: true, lookalikeOf: FRIEND });
+  });
+
+  it("does not let a gateway-only send clear first-time status for its own address", () => {
+    const gatewaySendToPoison = [entry({ txId: "fabricated", address: POISON, timestamp: 200 })];
+    expect(assessRecipient(POISON, [], [], gatewaySendToPoison)).toEqual({ firstTime: true, lookalikeOf: null });
+  });
+
+  it("still uses a gateway send as a lookalike reference for an address never sent to locally", () => {
+    const gatewaySendToFriend = [entry({ txId: "gateway", address: FRIEND, timestamp: 200 })];
+    expect(assessRecipient(POISON, [], [], gatewaySendToFriend)).toEqual({ firstTime: true, lookalikeOf: FRIEND });
+  });
+
+  it("does not treat a gateway receive as a lookalike reference", () => {
+    const gatewayReceiveFromFriend = [entry({ txId: "gateway", type: "receive", address: FRIEND, timestamp: 200 })];
+    expect(assessRecipient(POISON, [], [], gatewayReceiveFromFriend)).toEqual({ firstTime: true, lookalikeOf: null });
+  });
+
+  it("still stays quiet for a local-log send even when the gateway claims more", () => {
+    const gatewaySendToPoison = [entry({ txId: "fabricated", address: POISON, timestamp: 200 })];
+    expect(assessRecipient(FRIEND, [entry({})], [], gatewaySendToPoison)).toEqual({ firstTime: false, lookalikeOf: null });
+  });
+
+  it("names the trusted resemblance first when both histories resemble the recipient", () => {
+    const older = "AbcdOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOwxyz";
+    const gatewaySendToOlder = [entry({ txId: "gateway", address: older, timestamp: 300 })];
+    expect(assessRecipient(POISON, [entry({})], [], gatewaySendToOlder)).toEqual({ firstTime: true, lookalikeOf: FRIEND });
+  });
+});
