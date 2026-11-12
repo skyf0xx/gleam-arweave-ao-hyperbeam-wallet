@@ -37,7 +37,7 @@ import {
   recordPriceSample,
   type HistoricalPricePoint,
 } from "@gleam/core/src/pricing/index.ts";
-import { DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, isFiatCurrency } from "@gleam/core";
+import { DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, isFiatCurrency, isValidNetworkSettings } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls } from "../peers";
 import type {
@@ -45,7 +45,6 @@ import type {
   ActivityPage,
   Collectible,
   DisplayCurrency,
-  HyperBeamPeer,
   NetworkSettings,
   PendingTransfer,
   PortfolioHistory,
@@ -216,24 +215,6 @@ function isValidTokenMetadata(value: unknown): value is TokenMetadata {
     (candidate.description === null || typeof candidate.description === "string") &&
     (candidate.logo === null || typeof candidate.logo === "string") &&
     (candidate.totalSupply === null || typeof candidate.totalSupply === "string")
-  );
-}
-
-function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.url === "string" && typeof candidate.enabled === "boolean";
-}
-
-function isValidNetworkSettings(value: unknown): value is NetworkSettings {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.gatewayUrl === "string" &&
-    Array.isArray(candidate.peers) &&
-    candidate.peers.every(isValidHyperBeamPeer) &&
-    (candidate.activePeerUrl === null || typeof candidate.activePeerUrl === "string") &&
-    (candidate.bundlerUrl === undefined || candidate.bundlerUrl === null || typeof candidate.bundlerUrl === "string")
   );
 }
 

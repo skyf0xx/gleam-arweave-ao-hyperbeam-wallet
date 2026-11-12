@@ -4,18 +4,20 @@ import {
   deriveAddress,
   capabilitiesFor,
   defaultDisplaySettings,
-  isDisplayCurrency,
+  AUTO_LOCK_TIMEOUTS,
+  THEME_PREFERENCES,
+  isDisplaySettings,
   isHardwareWalletMethod,
-  isHeaderStyle,
-  isHeadlineBalance,
   isKeylessWalletMethod,
-  isTokenRowDetail,
+  isLockSettings,
+  isThemeSettings,
   isValidArweaveAddress,
+  isValidHardwareDevice,
+  isValidWallet,
   keyfileFilename,
   validateJWKShape,
   validatePassword,
   type Argon2idParams,
-  type AutoLockTimeout,
   type DisplaySettings,
   type DownloadPort,
   type FileDownloadResult,
@@ -100,16 +102,6 @@ const DISPLAY_SETTINGS_KEY = "local:displaySettings";
 const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "1hr" };
 const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
 
-const VALID_THEME_PREFERENCES: readonly ThemeSettings["theme"][] = ["light", "dark"];
-
-const VALID_AUTO_LOCK_TIMEOUTS: readonly AutoLockTimeout[] = [
-  "never",
-  "immediate",
-  "5min",
-  "1hr",
-  "4hr",
-];
-
 function toSummary(wallet: Wallet): WalletSummary {
   return {
     id: wallet.id,
@@ -126,31 +118,10 @@ function toSummary(wallet: Wallet): WalletSummary {
 
 /** An RSA-4096 modulus, the only key size Arweave addresses are made from. */
 const RSA_MODULUS_BYTES = 512;
-const KEYSTONE_XFP_PATTERN = /^[0-9a-fA-F]{8}$/;
 const HARDWARE_METHOD_NAME: Record<HardwareWalletMethod, string> = {
   keystone: "Keystone",
   ledger: "Ledger",
 };
-
-function isOptionalString(value: unknown): boolean {
-  return value === undefined || typeof value === "string";
-}
-
-function isValidDevice(value: unknown): value is HardwareDevice {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  if (candidate.kind === "keystone") {
-    return typeof candidate.xfp === "string" && KEYSTONE_XFP_PATTERN.test(candidate.xfp);
-  }
-  if (candidate.kind === "ledger") {
-    return (
-      isOptionalString(candidate.model) &&
-      isOptionalString(candidate.appVersion) &&
-      (candidate.app === undefined || candidate.app === "Arweave" || candidate.app === "Permaweb")
-    );
-  }
-  return false;
-}
 
 /** Hardware and watch wallets need no decrypted key, so they are usable whenever Gleam is unlocked. */
 function keylessWalletIds(wallets: Wallet[]): string[] {
@@ -160,45 +131,6 @@ function keylessWalletIds(wallets: Wallet[]): string[] {
 /** A vault has a password exactly when some wallet holds a keyfile encrypted under it. */
 function hasVaultPassword(wallets: Wallet[]): boolean {
   return wallets.some((wallet) => wallet.encryptedKeyfile !== null);
-}
-
-/**
- * Storage is untrusted input: every
- * record read back is re-validated here, on every load, dropping anything
- * malformed rather than trusting the shape a previous schema version (or
- * corruption) may have left behind.
- */
-function isValidWallet(value: unknown): value is Wallet {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.id === "string" &&
-    candidate.id.length > 0 &&
-    typeof candidate.address === "string" &&
-    candidate.address.length > 0 &&
-    typeof candidate.name === "string" &&
-    (candidate.method === "jwk" ||
-      candidate.method === "ethereum" ||
-      candidate.method === "ledger" ||
-      candidate.method === "keystone" ||
-      candidate.method === "watch") &&
-    typeof candidate.publicKey === "string" &&
-    typeof candidate.createdAt === "number" &&
-    typeof candidate.updatedAt === "number" &&
-    (candidate.encryptedKeyfile === null ||
-      (typeof candidate.encryptedKeyfile === "object" && candidate.encryptedKeyfile !== null)) &&
-    // Older stored records predate this field — treated as "never
-    // confirmed" (normalized below), not as a reason to drop the wallet.
-    (candidate.backupConfirmedAt === undefined ||
-      candidate.backupConfirmedAt === null ||
-      typeof candidate.backupConfirmedAt === "number") &&
-    (isHardwareWalletMethod(candidate.method as Wallet["method"])
-      ? candidate.encryptedKeyfile === null &&
-        isValidDevice(candidate.device) &&
-        candidate.device.kind === candidate.method
-      : candidate.device === undefined) &&
-    (candidate.method !== "watch" || candidate.encryptedKeyfile === null)
-  );
 }
 
 async function loadWallets(storage: StoragePort): Promise<Wallet[]> {
@@ -227,39 +159,14 @@ async function loadActiveWalletId(
 
 async function loadLockSettings(storage: StoragePort): Promise<LockSettings> {
   const raw = await storage.get<unknown>(LOCK_SETTINGS_KEY);
-  if (
-    raw !== null &&
-    typeof raw === "object" &&
-    VALID_AUTO_LOCK_TIMEOUTS.includes((raw as Record<string, unknown>).autoLockTimeout as AutoLockTimeout)
-  ) {
-    return { autoLockTimeout: (raw as LockSettings).autoLockTimeout };
-  }
+  if (isLockSettings(raw)) return { autoLockTimeout: raw.autoLockTimeout };
   return DEFAULT_LOCK_SETTINGS;
 }
 
 async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
   const raw = await storage.get<unknown>(THEME_SETTINGS_KEY);
-  if (
-    raw !== null &&
-    typeof raw === "object" &&
-    VALID_THEME_PREFERENCES.includes((raw as Record<string, unknown>).theme as ThemeSettings["theme"])
-  ) {
-    return { theme: (raw as ThemeSettings).theme };
-  }
+  if (isThemeSettings(raw)) return { theme: raw.theme };
   return DEFAULT_THEME_SETTINGS;
-}
-
-function isDisplaySettings(value: unknown): value is DisplaySettings {
-  if (value === null || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
-  return (
-    isDisplayCurrency(record.currency) &&
-    isHeaderStyle(record.header) &&
-    typeof record.tokenLogos === "boolean" &&
-    isTokenRowDetail(record.tokenRows) &&
-    isHeadlineBalance(record.headline) &&
-    typeof record.balancesHidden === "boolean"
-  );
 }
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
@@ -684,7 +591,7 @@ export class WalletLifecycleHandler {
       if (!isHardwareWalletMethod(req.method)) {
         throw new Error(dappError(`"${String(req.method)}" isn't a hardware wallet type.`));
       }
-      if (!isValidDevice(req.device) || req.device.kind !== req.method) {
+      if (!isValidHardwareDevice(req.device) || req.device.kind !== req.method) {
         throw new Error(userErrorMessage("deviceDetailsMismatch"));
       }
       let modulus: Uint8Array;
@@ -1187,7 +1094,7 @@ export class WalletLifecycleHandler {
    */
   async setLockSettings(req: LockSettings): Promise<void> {
     return this.keySession.withSessionLock(async () => {
-      if (!VALID_AUTO_LOCK_TIMEOUTS.includes(req.autoLockTimeout)) {
+      if (!AUTO_LOCK_TIMEOUTS.includes(req.autoLockTimeout)) {
         throw new Error(dappError(`Invalid auto-lock timeout "${req.autoLockTimeout}".`));
       }
       await this.storage.set(LOCK_SETTINGS_KEY, req);
@@ -1217,7 +1124,7 @@ export class WalletLifecycleHandler {
    * the theme value, unlike `setLockSettings`'s session-timeout sync.
    */
   async setThemePreference(req: ThemeSettings): Promise<void> {
-    if (!VALID_THEME_PREFERENCES.includes(req.theme)) {
+    if (!THEME_PREFERENCES.includes(req.theme)) {
       throw new Error(dappError(`Invalid theme preference "${req.theme}".`));
     }
     await this.storage.set(THEME_SETTINGS_KEY, req);

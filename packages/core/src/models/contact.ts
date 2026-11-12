@@ -22,6 +22,18 @@ export interface Contact {
  */
 const ARWEAVE_ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
+export function isValidContact(value: unknown): value is Contact {
+  if (value === null || typeof value !== "object") return false;
+  const { address, name, createdAt } = value as Record<string, unknown>;
+  return (
+    typeof address === "string" &&
+    isValidArweaveAddress(address) &&
+    typeof name === "string" &&
+    name.length > 0 &&
+    typeof createdAt === "number"
+  );
+}
+
 export function isValidArweaveAddress(value: string): boolean {
   return ARWEAVE_ADDRESS_PATTERN.test(value);
 }

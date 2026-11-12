@@ -13,6 +13,24 @@ export interface NetworkSettings {
   bundlerUrl?: string | null;
 }
 
+function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.url === "string" && typeof candidate.enabled === "boolean";
+}
+
+export function isValidNetworkSettings(value: unknown): value is NetworkSettings {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.gatewayUrl === "string" &&
+    Array.isArray(candidate.peers) &&
+    candidate.peers.every(isValidHyperBeamPeer) &&
+    (candidate.activePeerUrl === null || typeof candidate.activePeerUrl === "string") &&
+    (candidate.bundlerUrl === undefined || candidate.bundlerUrl === null || typeof candidate.bundlerUrl === "string")
+  );
+}
+
 /**
  * HyperBEAM peers shipped with the wallet so AO balance reads work out of
  * the box, with no user setup. Granted statically in the extension's

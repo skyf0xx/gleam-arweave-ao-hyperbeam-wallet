@@ -32,6 +32,7 @@ import {
   type TransferFeeQuote,
   type Wallet,
   type Winston,
+  isValidNetworkSettings,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
@@ -92,12 +93,6 @@ const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
   activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
 };
-
-function isValidNetworkSettings(value: unknown): value is NetworkSettings {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.gatewayUrl === "string" && Array.isArray(candidate.peers);
-}
 
 function isValidWallet(value: unknown): value is Wallet {
   if (value === null || typeof value !== "object") return false;

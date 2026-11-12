@@ -10,7 +10,7 @@ export type {
   HardwareWalletMethod,
   HardwareDevice,
 } from "./wallet";
-export { isHardwareWalletMethod, isKeylessWalletMethod, isWatchWalletMethod, vaultHasPassword } from "./wallet";
+export { isHardwareWalletMethod, isKeylessWalletMethod, isValidHardwareDevice, isValidWallet, isWatchWalletMethod, vaultHasPassword } from "./wallet";
 export { USER_ERRORS, matchUserError, userErrorMessage } from "./user-errors";
 export type { UserErrorCode } from "./user-errors";
 export type { WalletCapabilities } from "./capabilities";
@@ -21,6 +21,7 @@ export type {
   LockSettings,
   WalletState,
 } from "./session";
+export { AUTO_LOCK_TIMEOUTS, isLockSettings } from "./session";
 export { PERMISSION_TYPES } from "./permission";
 export type { PermissionType } from "./permission";
 export type { Grant } from "./grant";
@@ -41,7 +42,7 @@ export type {
 export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";
 export type { ReviewMoment } from "./review-prompt";
-export { isValidArweaveAddress } from "./contact";
+export { isValidArweaveAddress, isValidContact } from "./contact";
 export type { Winston, Balance, PendingAmounts, PendingTransfer, TokenBalance } from "./balance";
 export type { Collectible, CollectibleRef, CollectibleSendDraft, CollectibleSendRequest } from "./collectible";
 export { collectibleSendRefusal } from "./collectible";
@@ -79,8 +80,9 @@ export type { HyperBeamPeer, NetworkSettings } from "./network";
 export { SITE_URL, SITE_ORIGIN, DEV_SITE_HOSTS } from "./site-origin";
 export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl } from "./site-links";
 export type { SitePage } from "./site-links";
-export { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, bundlerUrlOf, explorerUrlFor } from "./network";
+export { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, bundlerUrlOf, explorerUrlFor, isValidNetworkSettings } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
+export { THEME_PREFERENCES, isThemeSettings } from "./theme";
 export type { DisplayCurrency, DisplaySettings, FiatCurrency, HeaderStyle, HeadlineBalance, TokenCurrency, TokenRowDetail } from "./display";
 export {
   FIAT_CURRENCIES,
@@ -88,6 +90,7 @@ export {
   defaultDisplayCurrency,
   defaultDisplaySettings,
   isDisplayCurrency,
+  isDisplaySettings,
   isFiatCurrency,
   isHeaderStyle,
   isHeadlineBalance,
@@ -101,6 +104,7 @@ export {
   suggestSecurityPhrase,
 } from "./security-phrase";
 export type { PasskeyEnrollment, PasskeyStatus } from "./passkey";
+export { isPasskeyEnrollment } from "./passkey";
 export type {
   PortfolioHistoryRange,
   PortfolioScope,
