@@ -98,6 +98,9 @@ function dataItemPreview(
                 amount: reading.quantity,
                 tokenDenomination: metadata.tokenDenomination,
                 tokenTicker: metadata.tokenTicker,
+                ...(metadata.collectible && reading.quantity === COLLECTIBLE_TRANSFER_QUANTITY
+                  ? { collectible: { id: reading.processId } }
+                  : {}),
               }
             : null,
         ...(reading?.kind === "unreadable" ? { unreadableTokenTransfer: true } : {}),
@@ -113,6 +116,16 @@ const AO_TRANSFER: Tag[] = [
   { name: "Action", value: "Transfer" },
   { name: "Recipient", value: RECIPIENT },
   { name: "Quantity", value: "5000" },
+];
+
+/** The same AO `Transfer`, moving one whole collectible. */
+const AO_COLLECTIBLE_TRANSFER: Tag[] = [
+  { name: "Data-Protocol", value: "ao" },
+  { name: "Variant", value: "ao.TN.1" },
+  { name: "Type", value: "Message" },
+  { name: "Action", value: "Transfer" },
+  { name: "Recipient", value: RECIPIENT },
+  { name: "Quantity", value: COLLECTIBLE_TRANSFER_QUANTITY },
 ];
 
 /**
@@ -260,6 +273,41 @@ export const ADVISORY_FIXTURES: AdvisoryFixture[] = [
       },
       { tokenDenomination: null, tokenTicker: null, collectible: true },
     ),
+    outcome: { kind: "exact", token: COLLECTIBLE, collectible: true },
+    headline: { recipient: RECIPIENT, amount: "1" },
+  },
+  {
+    // R2-W3-1 (GHSA-8w6v follow-up): a collectible's AO transfer of 1 via a data item previewed as 1 raw unit of an unknown token.
+    advisory: "R2-W3-1",
+    shape: "AO data item transferring 1 of a collectible",
+    preview: dataItemPreview("signDataItem", [
+      {
+        target: COLLECTIBLE,
+        tags: AO_COLLECTIBLE_TRANSFER,
+        metadata: { tokenDenomination: null, tokenTicker: null, collectible: true },
+      },
+    ]),
+    outcome: { kind: "exact", token: COLLECTIBLE, collectible: true },
+    headline: { recipient: RECIPIENT, amount: "1" },
+  },
+  {
+    // R2-W3-1 (GHSA-8w6v follow-up): the same framing on the `transferAoTokens` top-level branch.
+    advisory: "R2-W3-1",
+    shape: "transferAoTokens of 1 of a collectible",
+    preview: {
+      kind: "transferAoTokens",
+      recipient: RECIPIENT,
+      amount: COLLECTIBLE_TRANSFER_QUANTITY,
+      fee: "1000",
+      token: COLLECTIBLE,
+      tokenDenomination: null,
+      tokenTicker: null,
+      collectible: { id: COLLECTIBLE },
+      decodedData: null,
+      tags: [],
+      payloadHash: "h",
+      items: null,
+    },
     outcome: { kind: "exact", token: COLLECTIBLE, collectible: true },
     headline: { recipient: RECIPIENT, amount: "1" },
   },

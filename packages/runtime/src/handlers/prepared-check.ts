@@ -6,7 +6,7 @@ import {
   type DeviceSigningSummary,
   type UnsignedPayload,
 } from "@gleam/core";
-import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
+import { collectibleTransferTags, readCollectibleTransfer, COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
@@ -48,7 +48,8 @@ export function decodeTransactionTag(tag: { name: string; value: string }): { na
  * `collectibleId` is the collectible the approved preview named, if any. A
  * transfer of 1 is shown as a collectible only for that asset: for a
  * fungible token it is 1 atomic unit, and the device step must read it the
- * way the first review did.
+ * way the first review did. That holds for a data item too: an AO Transfer
+ * of 1 to the named asset summarizes as the collectible, with no AR fee.
  */
 export function summarize(payload: UnsignedPayload, collectibleId?: string | null): DeviceSigningSummary {
   if (payload.kind === "message") {
@@ -83,6 +84,9 @@ export function summarize(payload: UnsignedPayload, collectibleId?: string | nul
   const { target, tags, data } = readDataItemFields(payload.raw);
   const transfer = readAoTransferMessage({ target, tags });
   if (transfer?.kind === "transfer") {
+    if (transfer.quantity === COLLECTIBLE_TRANSFER_QUANTITY && transfer.processId === collectibleId) {
+      return { kind: "collectibleTransfer", asset: transfer.processId, recipient: transfer.recipient, fee: "0" };
+    }
     return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
   }
   return {
