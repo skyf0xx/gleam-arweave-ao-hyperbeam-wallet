@@ -111,7 +111,9 @@ link, already holds at another layer, edge case not worth the code), then
 ## 7. Awards
 
 A merged PR that improves security and carries an `Attestation id:` earns
-a Low share (2%). A docs-only or skill-wording PR earns none. List the
+a Low share (2%). If it fixes a real low finding, not only hardening, it
+also earns the fix bonus (`--severity fix`, same `--ref`, 1%). A
+docs-only or skill-wording PR earns none. List the
 proposed awards (PR, attestation id, severity) for Will. Once he approves
 the list, run them as `CLAUDE.local.md` says: preview with `n`, check the
 wallet, then `--yes` with `--ref <PR url>`.

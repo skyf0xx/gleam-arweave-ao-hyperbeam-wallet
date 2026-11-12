@@ -271,12 +271,17 @@ does every model.
 holding points. An accepted finding takes a share of the pool's current
 balance:
 
-| Accepted as                   | Share |
-| ----------------------------- | ----: |
-| Critical                      |   50% |
-| High                          |   25% |
-| Medium                        |   10% |
-| Low, or a merged hardening PR |    2% |
+| Accepted as                       | Share |
+| --------------------------------- | ----: |
+| Critical                          |   50% |
+| High                              |   25% |
+| Medium                            |   10% |
+| Low, or a merged hardening PR     |    2% |
+| Bonus: a merged fix for a finding |   +1% |
+
+A finding's fix earns the bonus when it merges largely as written: a fix
+PR for a low finding, or a patch in a medium-or-above advisory. A public
+PR for a medium-or-above finding earns no bonus.
 
 The pool grows while nothing is found, so bounties rise over time.
 Only the first report of a root cause earns. A finding in the release
@@ -299,6 +304,8 @@ These are the current values. They are tuned per release.
   privately, ship the fix, and publish the advisory with credit to
   the reporter. Close duplicates, reports that don't reproduce, and
   by-design reports with a one-line reason.
+- **Fix bonus:** once a reporter's fix merges, pay it with
+  `--severity fix` and the finding's `--ref`.
 
 To pay a finding, run the award script locally, as with `drop-code`:
 
@@ -368,7 +375,8 @@ style of an advisory or PR body. In summary:
    candidate, such as a fix, a test that pins a security property, a
    `security/surface.txt` entry or a skill change, and drafts it if it is
    real. A weak PR is closed and earns nothing. Medium and above go in a
-   private advisory, never a PR or a public issue. File nothing yet,
+   private advisory, never a PR or a public issue, with the fix as a
+   patch inside it when the agent has one. File nothing yet,
    since each one has to quote the attestation id.
 8. Answer the challenge from the code you read by filling in the
    round's `attestation.json`. Run `pnpm scan finish` until it passes,

@@ -455,9 +455,9 @@ candidate:
 - a change to `CHECKS.md`, `VERIFY.md`, `REPORT.md` or this skill.
 
 Draft it if it is real. A weak PR is closed and earns nothing, so don't
-pad. A merged fix for a low finding, or a merged hardening PR, takes 2% of
-the bounty pool (`SCANS.md` § Points). The maintainer decides what counts
-as hardening.
+pad. A low finding or a merged hardening PR takes 2% of the bounty pool
+(`SCANS.md` § Points). A finding's fix that merges adds 1%. The
+maintainer decides what counts as hardening.
 
 Draft each candidate that survived Step 6, at the severity its verdict
 gives:
@@ -522,6 +522,10 @@ user's words. Then write the description in the shape `REPORT.md` gives:
 a plain **Summary** of about 100 words at reading grade 6 to 7, the
 `Attestation id: {{ATTESTATION_ID}}` line, then `<details>` with
 **Impact**, **Steps**, an optional **Fix** and the triager's evidence.
+If you can fix it, write the fix in a worktree as for a PR draft, run
+its tests, and put `git diff origin/master` in **Fix** as a `diff`
+block. Never push it or open a PR for it. A fix that merges earns the
+bonus.
 Give the evidence from the verdict once: demonstrated, traced, or the
 exact fact a browser check has to settle.
 Save it as `.gleam-scan/rounds/<area>/advisory-<n>.md`. `pnpm scan
