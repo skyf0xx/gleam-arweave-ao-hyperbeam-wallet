@@ -222,6 +222,38 @@ describe("ApprovalHandler: connect() -> Grant", () => {
     expect(raw).toHaveLength(1);
   });
 
+  it("refuses a connect approved after the vault locked, and grants nothing", async () => {
+    keySessionStore.set("local:wallets", await storage.get("local:wallets"));
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin: "https://untrusted.example",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
+
+    keySessionStore.delete("session:unlockedSession");
+    const dappRejected = expect(pending).rejects.toThrow(/locked/i);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/locked/i);
+    await dappRejected;
+    expect(await handler.getConnectedApps()).toEqual([]);
+  });
+
+  it("grants a connect approved while the vault is unlocked", async () => {
+    keySessionStore.set("local:wallets", await storage.get("local:wallets"));
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: true });
+    await expect(pending).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+  });
+
   it("rejecting a connect request creates no Grant", async () => {
     const pending = handler.requestApproval({
       kind: "connect",
@@ -1620,7 +1652,6 @@ describe("ApprovalHandler: addToken approval", () => {
     const presenter = createFakePresenter();
     const addWatchedToken = vi.fn().mockResolvedValue(undefined);
     const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });
-    keySessionStore.clear();
 
     const pending = requestAddToken(handler);
     await vi.waitFor(() => expect(presenter.presented.length).toBe(1));

@@ -209,11 +209,18 @@ export function readTransaction(value: unknown, method: "sign" | "dispatch"): Pr
   const lastTx = readOptionalString(transaction.last_tx, "last_tx", method);
   if (lastTx !== undefined) decodeBase64Url(lastTx, "transaction last_tx", method);
 
+  // AR moved to no one: the approval preview has no recipient to show it
+  // against, and the Ledger app refuses the same shape.
+  const quantity = readAtomicAmount(transaction.quantity, "quantity", method);
+  if (target === undefined && quantity !== undefined && BigInt(quantity) > 0n) {
+    throw new Error(dappError(`${method}: a transaction with a quantity needs a target.`));
+  }
+
   return {
     data,
     tags,
     target,
-    quantity: readAtomicAmount(transaction.quantity, "quantity", method),
+    quantity,
     reward: reward === "0" ? undefined : reward,
     last_tx: lastTx,
   };

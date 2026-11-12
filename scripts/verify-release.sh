@@ -18,6 +18,11 @@
 #   GLEAM_RELEASE_BASE_URL  default https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/download
 #                           (files are fetched from <base>/<tag>/<file>; file:// works)
 #   GLEAM_REPO_URL          default https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.git
+#
+# When every check passes, it writes the reproduced sha256 to
+# $GLEAM_RELEASE_RECEIPTS/<tag>.verified (default
+# ${XDG_STATE_HOME:-~/.local/state}/gleam-release). pack-release.sh refuses
+# to sign a zip without that receipt.
 set -uo pipefail
 
 REPO_URL="${GLEAM_REPO_URL:-https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet.git}"
@@ -235,7 +240,12 @@ if [ -n "$installed" ]; then
 fi
 
 echo
-if [ "$failures" -eq 0 ]; then
+if [ "$failures" -eq 0 ] && [ "${built_sha:-}" = "$want_sha" ]; then
+  receipts="${GLEAM_RELEASE_RECEIPTS:-${XDG_STATE_HOME:-$HOME/.local/state}/gleam-release}"
+  mkdir -p "$receipts" && printf '%s\n' "$built_sha" > "$receipts/$tag.verified" \
+    || { echo "could not write the receipt to $receipts/$tag.verified" >&2; exit 1; }
+  echo "All checks passed for $tag (receipt: $receipts/$tag.verified)"
+elif [ "$failures" -eq 0 ]; then
   echo "All checks passed for $tag"
 else
   echo "$failures check(s) failed for $tag"

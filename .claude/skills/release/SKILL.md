@@ -27,8 +27,9 @@ key or store credential.
    zip and `release-manifest.json` (with `mobileBundleSha256`) as a GitHub
    Release. Run `scripts/verify-release.sh v<version>` in its own terminal
    session first: it rebuilds the tag and runs npm code. `pack-release.sh`
-   then checks the Release's zip against its manifest and attestation and
-   signs that zip as the `.crx`, running no npm code.
+   then checks the Release's zip against its manifest, its attestation
+   and the receipt the rebuild left, and signs that zip as the `.crx`,
+   running no npm code. Without a matching receipt it refuses.
 3. **Apps**, from a clean checkout of the tag:
    `apps/mobile/scripts/release-app.sh v<version> ios|ios-ipa|android|android-bundle|android-apk`.
    It checks the tag against `origin/master`, rebuilds the web bundle and

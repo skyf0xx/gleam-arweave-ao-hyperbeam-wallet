@@ -117,13 +117,19 @@ describe("readTransaction", () => {
 
   it("treats arweave-js's empty defaults as unset", () => {
     const transaction = readTransaction(
-      { ...toJsonOutput, target: "", last_tx: "", reward: "0", tags: [] },
+      { ...toJsonOutput, target: "", quantity: "0", last_tx: "", reward: "0", tags: [] },
       "dispatch",
     );
     expect(transaction.target).toBeUndefined();
     expect(transaction.last_tx).toBeUndefined();
     expect(transaction.reward).toBeUndefined();
     expect(transaction.tags).toEqual([]);
+  });
+
+  it("refuses a quantity with no target", () => {
+    expect(() => readTransaction({ ...toJsonOutput, target: "" }, "sign")).toThrow(/quantity needs a target/);
+    expect(() => readTransaction({ ...toJsonOutput, target: undefined }, "dispatch")).toThrow(/quantity needs a target/);
+    expect(readTransaction({ ...toJsonOutput, target: "", quantity: "000" }, "sign").target).toBeUndefined();
   });
 
   it("rejects what can't be signed as given", () => {
