@@ -105,7 +105,12 @@ echo n | pnpm exec tsx --env-file=local.env scripts/scan-award.ts \
 ```
 
 Check that the wallet and release look right, then run the same command
-with `--yes`. Each payment shrinks the pool, so later shares come out
+with `--yes`.
+
+When the reporter's patch from **Fix** merges largely as written, also
+pay the fix bonus: the same command with `--severity fix` and the
+advisory's `--ref`. The script records it under `<ref>#fix`, so it pays
+once beside the finding. Credit the reporter as the commit's author. Each payment shrinks the pool, so later shares come out
 smaller. The script won't pay the same `--ref` twice.
 
 ## 5. Report

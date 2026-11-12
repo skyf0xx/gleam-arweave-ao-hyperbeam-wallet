@@ -57,7 +57,8 @@ A maintainer sees only the title and the summary. Everything else goes in
 - A `<details><summary>Details</summary>` block, written for an agent:
   - **Impact**: who is affected, what they lose, the severity and why;
   - **Steps**: numbered, from the attacker's access to the harm;
-  - **Fix** (optional): one line;
+  - **Fix** (optional): one line, or the fix and its test as a `diff`
+    block against `origin/master`;
   - the six-field table from `VERIFY.md` (Attacker, Entry, Control,
     Boundary, Harm, Evidence);
   - the `file:line` trace;

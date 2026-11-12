@@ -1,7 +1,8 @@
 import { parseArgs } from "node:util";
 import type { Db, Queryable } from "./db";
 
-export const SEVERITIES = ["critical", "high", "medium", "low"] as const;
+/** `fix` is the bonus for a finding's fix that was merged, paid apart from the finding itself. */
+export const SEVERITIES = ["critical", "high", "medium", "low", "fix"] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
 /** Percent of the pool's balance a finding takes (SCANS.md § Points). */
@@ -10,6 +11,7 @@ export const SEVERITY_SHARE_PERCENT: Record<Severity, bigint> = {
   high: 25n,
   medium: 10n,
   low: 2n,
+  fix: 1n,
 };
 
 const DECIMALS = 12;
@@ -57,11 +59,14 @@ export function parseAwardArgs(argv: string[]): AwardOptions {
   });
   const attestation = attestationArg(values.attestation);
   if (!values.severity || !(SEVERITIES as readonly string[]).includes(values.severity)) {
-    throw new Error("--severity must be one of critical, high, medium or low.");
+    throw new Error("--severity must be one of critical, high, medium, low or fix.");
   }
   let ref: string | undefined;
   try {
     const url = new URL(values.ref ?? "");
+    // The finding was already paid against its plain ref, so the fix bonus
+    // is recorded under its own and can be paid once too.
+    if (values.severity === "fix") url.hash = "fix";
     if (url.protocol === "https:") ref = url.toString();
   } catch {
     // falls through to the error below
