@@ -42,6 +42,13 @@ const LOOKALIKES: Record<string, string> = {
   "α": "a",
   "ο": "o",
   "ρ": "p",
+  // Confusable letters outside the Cyrillic/Greek set: U+0251 LATIN SMALL
+  // LETTER ALPHA, U+0275 LATIN SMALL LETTER BARRED O, U+0585 ARMENIAN
+  // SMALL LETTER OH. NFKC does not fold them, so the strip below would
+  // delete them instead of folding them.
+  "\u0251": "a",
+  "\u0275": "o",
+  "\u0585": "o",
 };
 
 /** A wrapped or bridged form of a registered token (wAR, wAO). */

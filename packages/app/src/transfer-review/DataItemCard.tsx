@@ -40,7 +40,7 @@ export function DataItemCard({ index, item }: { index: number; item: OtherItem }
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tags")}</span>
           <div className="flex flex-wrap gap-1.5">
             {item.tags.map((tag, tagIndex) => (
-              <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-micro text-foreground">
+              <span key={tagIndex} className="break-all rounded-md bg-mist px-2 py-1 font-mono text-micro text-foreground">
                 <span className="text-muted"><UntrustedText text={tag.name} />:</span> <UntrustedText text={tag.value} />
               </span>
             ))}
