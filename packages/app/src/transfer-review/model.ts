@@ -421,6 +421,13 @@ export function showsWarning(request: TransferRequest, risk: RecipientRisk | nul
   return risk.firstTime || risk.lookalikeOf !== null || risk.unchecked === true;
 }
 
+/** Whether the red box and destructive button apply: any reason but a first-time recipient alone. */
+export function showsRisk(request: TransferRequest, risk: RecipientRisk | null): boolean {
+  if (request.unreadableTokenTransfer || request.transfers.some(isUnknownScale)) return true;
+  if (!risk) return false;
+  return risk.lookalikeOf !== null || risk.unchecked === true;
+}
+
 /** The provider method behind a request, as Details names it. */
 export function methodText(request: TransferRequest, t: TFunction): string | undefined {
   if (request.method === undefined) return undefined;

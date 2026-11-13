@@ -53,16 +53,28 @@ function prfFirst(credential: PublicKeyCredential): Uint8Array<ArrayBuffer> | nu
   return new Uint8Array(ArrayBuffer.isView(first) ? first.buffer.slice(first.byteOffset, first.byteOffset + first.byteLength) : first);
 }
 
-async function evaluatePrf(credentialId: string, prfSalt: string): Promise<Uint8Array<ArrayBuffer>> {
+/**
+ * One prompt offering every candidate. With several, the authenticator
+ * evaluates the salt of whichever passkey the user picks
+ * (`evalByCredential`); a single one uses plain `eval`, as unlock always has.
+ */
+async function evaluatePrf(
+  candidates: readonly { credentialId: string; prfSalt: string }[],
+): Promise<{ credentialId: string; output: Uint8Array<ArrayBuffer> }> {
   let credential: Credential | null;
   try {
     credential = await navigator.credentials.get({
       publicKey: {
         challenge: randomBytes(32),
-        allowCredentials: [{ type: "public-key", id: base64UrlToBytes(credentialId) }],
+        allowCredentials: candidates.map(({ credentialId }) => ({ type: "public-key", id: base64UrlToBytes(credentialId) })),
         userVerification: "required",
         timeout: CEREMONY_TIMEOUT_MS,
-        extensions: { prf: { eval: { first: base64UrlToBytes(prfSalt) } } },
+        extensions: {
+          prf:
+            candidates.length === 1
+              ? { eval: { first: base64UrlToBytes(candidates[0]!.prfSalt) } }
+              : { evalByCredential: Object.fromEntries(candidates.map(({ credentialId, prfSalt }) => [credentialId, { first: base64UrlToBytes(prfSalt) }])) },
+        },
       },
     });
   } catch (error) {
@@ -73,7 +85,7 @@ async function evaluatePrf(credentialId: string, prfSalt: string): Promise<Uint8
   }
   const output = prfFirst(credential);
   if (!output) throw new PasskeyError("unsupported", t("app.passkeyUnsupported"));
-  return output;
+  return { credentialId: bytesToBase64Url(new Uint8Array(credential.rawId)), output };
 }
 
 export interface CreatedPasskey {
@@ -123,7 +135,7 @@ export async function createUnlockPasskey(): Promise<CreatedPasskey> {
   let output = prfFirst(credential);
   if (!output) {
     try {
-      output = await evaluatePrf(credentialId, prfSalt);
+      output = (await evaluatePrf([{ credentialId, prfSalt }])).output;
     } catch (error) {
       forgetPasskey(credentialId);
       throw error;
@@ -134,7 +146,15 @@ export async function createUnlockPasskey(): Promise<CreatedPasskey> {
 
 /** Asks the user to verify with the enrolled passkey and returns its PRF output (base64url). */
 export async function readPasskeyPrf(status: { credentialId: string; prfSalt: string }): Promise<string> {
-  return bytesToBase64Url(await evaluatePrf(status.credentialId, status.prfSalt));
+  return bytesToBase64Url((await evaluatePrf([status])).output);
+}
+
+/** Asks the user to verify with any of `candidates`, and returns which one answered with its PRF output (base64url). */
+export async function readAnyPasskeyPrf(
+  candidates: readonly { credentialId: string; prfSalt: string }[],
+): Promise<{ credentialId: string; prfOutput: string }> {
+  const { credentialId, output } = await evaluatePrf(candidates);
+  return { credentialId, prfOutput: bytesToBase64Url(output) };
 }
 
 /**

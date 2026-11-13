@@ -30,12 +30,13 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
+import { feeFiatText } from "../../../transfer-review/model";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
 import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { fetchSendFeeQuote, useRecipientAssessment, useSendFeeQuote } from "./useSendQuotes";
-import { readRowVisibility, sendTokenLogo, shownTokenLogo } from "../../../token-visibility";
+import { isTokenHidden, readRowVisibility, sendTokenLogo, shownTokenLogo } from "../../../token-visibility";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
@@ -108,6 +109,7 @@ type Step =
       kind: "review";
       recipient: string;
       amountAtomic: string;
+      amountDisplay: string;
       estimate: TransferFeeQuote;
       submitting: boolean;
       error?: string;
@@ -304,6 +306,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
           kind: "review",
           recipient,
           amountAtomic,
+          amountDisplay: step.amountDisplay,
           estimate,
           submitting: false,
         });
@@ -386,7 +389,10 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
           setSavedComposeStep(step);
           setStep({ kind: "token-picker" });
         }}
-        onOpenSavedAddresses={() => setStep({ kind: "saved-addresses" })}
+        onOpenSavedAddresses={() => {
+          setSavedComposeStep(step);
+          setStep({ kind: "saved-addresses" });
+        }}
       />
     );
   }
@@ -426,9 +432,21 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
         contactsLoading={contactsQuery.isLoading}
         otherWallets={otherWalletsQuery.data ?? []}
         otherWalletsLoading={otherWalletsQuery.isLoading}
-        onSelect={(recipient) => setStep({ ...INITIAL_STEP, recipient })}
+        onSelect={(recipient) => {
+          setStep({
+            ...(savedComposeStep ?? INITIAL_STEP),
+            recipient,
+            recipientError: undefined,
+            showSaveAddress: false,
+            saveAddressName: "",
+          });
+          setSavedComposeStep(null);
+        }}
         onEditContacts={() => setStep({ kind: "edit-contacts" })}
-        onBack={() => setStep(INITIAL_STEP)}
+        onBack={() => {
+          setStep(savedComposeStep ?? INITIAL_STEP);
+          setSavedComposeStep(null);
+        }}
       />
     );
   }
@@ -498,7 +516,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
         contact={contactFor(step.recipient)}
         ownWallet={ownWalletFor(step.recipient)}
         signsOnDevice={isHardwareWalletMethod(wallet.method)}
-        onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient })}
+        onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient, amountDisplay: step.amountDisplay })}
         onSign={() => void handleSign()}
       />
     );
@@ -515,9 +533,6 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
     />
   );
 }
-
-/** What you can do with the token, shown as tabs in the compose header. */
-const TOKEN_ACTIONS = [{ id: "send", labelKey: "send.sendTab" }] as const;
 
 function ComposeStep({
   wallet,
@@ -595,7 +610,11 @@ function ComposeStep({
       ? balancesQuery.data?.arBalance
       : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
   const holdsNone = typeof rawMaxAtomic === "string" && BigInt(rawMaxAtomic) === 0n;
-  const canContinue = !step.submitting && unsupported === null && !holdsNone && recipientValid && amountValid;
+  const typedAtomic = parseDisplayToAtomic(step.amountDisplay, denomination);
+  const overBalance =
+    typedAtomic === null ? null : validateSendAmount(typedAtomic, token, balancesQuery.data, arFeeAtomic);
+  const canContinue =
+    !step.submitting && unsupported === null && !holdsNone && recipientValid && amountValid && overBalance === null;
   // A disabled button names what's missing rather than leaving it to guesswork.
   const continueLabel = step.submitting
     ? t("send.estimatingFee")
@@ -605,7 +624,9 @@ function ComposeStep({
       ? t("send.enterAddress")
       : !amountValid
         ? t("send.enterAmount")
-        : t("send.reviewAndSend");
+        : overBalance !== null
+          ? t("send.notEnough", { ticker })
+          : t("send.reviewAndSend");
   // For AR, Max is balance minus the rough fee estimate (clamped to 0),
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
@@ -636,17 +657,17 @@ function ComposeStep({
       ? formatCurrencyValue(balanceNumber * price, currency)
       : undefined;
   const feeAtomic = feeQuote.data?.fee ?? null;
-  const feeFiat =
-    feeAtomic !== null && arPrice !== undefined && currency !== undefined && currency !== "AR"
-      ? formatCurrencyValue(Number(formatAtomicAsDisplay(feeAtomic, 12, 12)) * arPrice, currency)
-      : undefined;
+  const feeFiat = feeFiatText(feeAtomic, {
+    currency,
+    prices: arPrice === undefined ? undefined : [{ processId: null, price: arPrice, change24h: null }],
+  });
   const identity = useAddressIdentity();
 
   if (showInfo) {
     return (
       <div className="flex min-h-full flex-col">
         <ScreenHeader title={t("send.tokenDetails")} onBack={() => onShowInfo(false)} />
-        <div className="px-5 py-5">
+        <div className="px-6 py-5 phone:px-5">
           <TokenInfoPanel
             token={token}
             logoUrl={sendTokenLogo(token, readRowVisibility(wallet.address), tokenLogos)}
@@ -662,22 +683,8 @@ function ComposeStep({
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader
+        title={t("send.sendTab")}
         onBack={onBack}
-        center={
-          <div role="tablist" aria-label={t("send.tokenActions", { ticker })} className="flex items-center gap-1">
-            {TOKEN_ACTIONS.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                role="tab"
-                aria-selected={action.id === "send"}
-                className={`rounded-md px-2.5 py-1 text-body phone:hit-target ${action.id === "send" ? "font-semibold text-foreground" : "text-muted hover:text-foreground"}`}
-              >
-                {t(action.labelKey)}
-              </button>
-            ))}
-          </div>
-        }
         end={
           <button
             type="button"
@@ -690,7 +697,7 @@ function ComposeStep({
           </button>
         }
       />
-      <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
+      <div className="flex flex-1 flex-col gap-6 px-6 py-5 phone:px-5 phone:pb-0">
         <div className="flex items-center justify-between gap-3 text-label">
           <span className="font-semibold text-muted">{t("send.from")}</span>
           <span className="flex min-w-0 items-center gap-2">
@@ -749,13 +756,7 @@ function ComposeStep({
                 placeholder="0"
                 value={step.amountDisplay}
                 onChange={(event) => {
-                  const sanitized = sanitizeAmountInput(event.target.value);
-                  const denomination = token === null ? 12 : token.denomination;
-                  const atomic = parseDisplayToAtomic(sanitized, denomination);
-                  if (atomic !== null && maxAtomic !== undefined && BigInt(atomic) > BigInt(maxAtomic)) {
-                    return;
-                  }
-                  onChange({ amountDisplay: sanitized });
+                  onChange({ amountDisplay: sanitizeAmountInput(event.target.value) });
                 }}
                 onBlur={onBlurAmount}
                 className="min-w-0 flex-1 border-none bg-transparent text-display-sm font-semibold tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
@@ -947,6 +948,7 @@ export function RecipientField({
           name={knownName ?? null}
           avatarSvg={avatarSvg}
           emphasisPick={emphasisPick}
+          diffAgainst={lookalikeOf ?? undefined}
           onEdit={() => setEditing("refocus")}
         />
       ) : (
@@ -996,9 +998,12 @@ export function RecipientField({
               <button
                 type="button"
                 onClick={onOpenSavedAddresses}
-                className="w-full px-3.5 py-3 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
+                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
               >
                 {t("send.savedContacts")}
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
               </button>
             </div>
           ) : null}
@@ -1017,6 +1022,7 @@ export function RecipientField({
       {lookalikeOf ? (
         <RecipientWarning
           firstTime={false}
+          recipient={recipient}
           lookalikeOf={lookalikeOf}
           lookalikeAvatarSvg={identity.avatarSvg(lookalikeOf)}
           emphasisPick={emphasisPick}
@@ -1286,7 +1292,9 @@ function TokenPickerStep({
   const aoToken = aoBalance ?? defaultAoTokenBalance(walletAddress);
   const visibility = readRowVisibility(walletAddress);
   const otherTokenBalances = (balancesQuery.data?.tokenBalances ?? []).filter(
-    (candidate) => candidate.processId !== DEFAULT_AO_TOKEN.processId,
+    (candidate) =>
+      candidate.processId !== DEFAULT_AO_TOKEN.processId &&
+      (candidate.processId === selectedToken?.processId || !isTokenHidden(candidate, visibility)),
   );
 
   return (

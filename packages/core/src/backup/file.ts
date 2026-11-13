@@ -28,9 +28,29 @@ export interface BackupStamp {
   writer: string;
 }
 
-/** The clear part of the file. `wrapped` is the backup key wrapped under the vault password. */
+/**
+ * A passkey that can stand in for the password on restore: the vault
+ * password wrapped under the passkey's PRF output, exactly as
+ * `local:passkey` holds it. Only the authenticator holding the passkey can
+ * compute the key that opens it, so it sits in the clear header beside
+ * the password-wrapped backup key.
+ */
+export interface BackupPasskey {
+  credentialId: string;
+  prfSalt: string;
+  iv: string;
+  ciphertext: string;
+}
+
+/**
+ * The clear part of the file. `wrapped` is the backup key wrapped under
+ * the vault password. `passkeys`, newest install first, lets a restore
+ * offer a passkey before the body can be opened; a release that doesn't
+ * know the field ignores it.
+ */
 export interface BackupHeader extends BackupStamp {
   wrapped: VaultEnvelopeV2;
+  passkeys?: BackupPasskey[];
 }
 
 /** Storage values by storage key. */
@@ -206,6 +226,40 @@ export function isValidBackupHeader(value: unknown): value is BackupHeader {
   return isBackupStamp(value) && isWrappedKey((value as { wrapped?: unknown }).wrapped);
 }
 
+function isBackupPasskey(value: unknown): value is BackupPasskey {
+  if (value === null || typeof value !== "object") return false;
+  const { credentialId, prfSalt, iv, ciphertext } = value as Record<string, unknown>;
+  return [credentialId, prfSalt, iv, ciphertext].every((field) => typeof field === "string" && field.length > 0);
+}
+
+/**
+ * The header's passkeys, keeping only well-formed ones. A bad entry costs
+ * only itself: the password still restores.
+ */
+function readBackupPasskeys(value: unknown): BackupPasskey[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isBackupPasskey)
+    .slice(0, MAX_BACKUP_DEVICES)
+    .map(({ credentialId, prfSalt, iv, ciphertext }) => ({ credentialId, prfSalt, iv, ciphertext }));
+}
+
+/**
+ * The passkeys the installs in `devices` have enrolled, newest install
+ * first and each credential once. Built from the decrypted body at write
+ * time, never copied from a header, which nothing authenticates.
+ */
+export function backupPasskeysOf(devices: Record<string, BackupDevice>): BackupPasskey[] {
+  const passkeys: BackupPasskey[] = [];
+  for (const device of Object.values(devices).sort((a, b) => b.updatedAt - a.updatedAt)) {
+    const enrollment = device.data["local:passkey"];
+    if (!isPasskeyEnrollment(enrollment) || passkeys.some((known) => known.credentialId === enrollment.credentialId)) continue;
+    const { credentialId, prfSalt, iv, ciphertext } = enrollment;
+    passkeys.push({ credentialId, prfSalt, iv, ciphertext });
+  }
+  return passkeys;
+}
+
 function isBackupDevice(value: unknown): value is BackupDevice {
   if (value === null || typeof value !== "object") return false;
   const { updatedAt, data } = value as Record<string, unknown>;
@@ -235,8 +289,10 @@ export function newBackupId(): string {
 }
 
 export function encodeBackupFile({ header, sealed }: BackupFile): Bytes {
-  const { v, backupId, updatedAt, writer, wrapped } = header;
-  return new TextEncoder().encode(JSON.stringify({ v, backupId, updatedAt, writer, wrapped, body: bytesToBase64(sealed) }));
+  const { v, backupId, updatedAt, writer, wrapped, passkeys } = header;
+  return new TextEncoder().encode(
+    JSON.stringify({ v, backupId, updatedAt, writer, wrapped, ...(passkeys?.length ? { passkeys } : {}), body: bytesToBase64(sealed) }),
+  );
 }
 
 /** The file's header and sealed body, or null for bytes that are not a backup this release can read. */
@@ -246,9 +302,13 @@ export function decodeBackupFile(bytes: Uint8Array): BackupFile | null {
     const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     if (!isValidBackupHeader(parsed)) return null;
     const { v, backupId, updatedAt, writer, wrapped } = parsed;
-    const body = (parsed as { body?: unknown }).body;
+    const { body, passkeys: listed } = parsed as { body?: unknown; passkeys?: unknown };
     if (typeof body !== "string") return null;
-    return { header: { v, backupId, updatedAt, writer, wrapped }, sealed: base64ToBytes(body) };
+    const passkeys = readBackupPasskeys(listed);
+    return {
+      header: { v, backupId, updatedAt, writer, wrapped, ...(passkeys.length > 0 ? { passkeys } : {}) },
+      sealed: base64ToBytes(body),
+    };
   } catch {
     return null;
   }

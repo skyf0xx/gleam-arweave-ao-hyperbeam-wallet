@@ -61,12 +61,16 @@ tab, reporting it here is still welcome.
 ## Vault backup
 
 The optional vault backup is one file in the user's own Google Drive app
-folder. It is encrypted under a random key, and that key is stored beside
-it wrapped under the vault password with Argon2id. Google holds ciphertext
-it cannot read, Gleam runs no server and holds nothing, and the password
-is the only key to the file. Someone who takes over the Google account
-gets an offline guess at that password, so a report that weakens the
-password policy, the key wrapping or the file's encryption is in scope.
+folder, or iCloud on iOS. It is encrypted under a random key, and that key
+is stored beside it wrapped under the vault password with Argon2id. Where
+an install has a passkey, the file's header also carries the vault
+password wrapped under that passkey's PRF output, so a restore can use the
+passkey; only the authenticator can compute that key. Google and Apple
+hold ciphertext they cannot read, Gleam runs no server and holds nothing,
+and the password or a passkey that wraps it is the only key to the file.
+Someone who takes over the account gets an offline guess at the password,
+so a report that weakens the password policy, the key wrapping, the
+passkey wrapping or the file's encryption is in scope.
 
 ## Response
 

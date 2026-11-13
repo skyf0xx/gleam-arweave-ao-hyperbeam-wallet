@@ -58,7 +58,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     expect(screen.getByText("hyperbeam.arweave.net")).toBeTruthy();
     expect(screen.getByText("ao-testnet.xyz")).toBeTruthy();
     expect(screen.getByText("Active")).toBeTruthy();
-    expect(screen.getByText("Disabled")).toBeTruthy();
+    expect(screen.queryByText("Disabled")).toBeNull();
     expect(send).toHaveBeenCalledWith({ type: "getNetworkSettings", payload: undefined });
   });
 

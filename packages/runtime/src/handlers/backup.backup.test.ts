@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { decodeBackupFile, type Wallet } from "@gleam/core";
+import { bytesToBase64, bytesToBase64Url, decodeBackupFile, type Wallet } from "@gleam/core";
 import { Keyring } from "@gleam/core/signer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { InMemoryCloudAccount, InMemoryCloudFile, InMemoryStorage, InMemoryTimer } from "../../testing";
@@ -8,6 +8,7 @@ import { BACKUP_KEY, BACKUP_STATE_KEY, CONTACTS_KEY, WALLETS_KEY } from "../stor
 import { BackupHandler } from "./backup";
 import { ContactsHandler } from "./contacts";
 import { createKeySession, type KeySession } from "./key-session";
+import { PasskeyHandler } from "./passkey";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 
 const PASSWORD = "correct horse battery staple 42";
@@ -204,7 +205,7 @@ describe("BackupHandler: restore", () => {
     const original = await backedUp();
     const fresh = device(original.cloud.account);
 
-    expect(await fresh.backup.find()).toEqual({ found: true });
+    expect(await fresh.backup.find()).toEqual({ found: true, passkeys: [] });
     const { unlockedWalletIds } = await fresh.backup.restore({ password: PASSWORD });
 
     expect(walletsOf(fresh)).toEqual(walletsOf(original));
@@ -247,7 +248,7 @@ describe("BackupHandler: restore", () => {
 
   it("reports an account with no backup", async () => {
     const fresh = device(new InMemoryCloudAccount());
-    expect(await fresh.backup.find()).toEqual({ found: false });
+    expect(await fresh.backup.find()).toEqual({ found: false, passkeys: [] });
     await expect(fresh.backup.restore({ password: PASSWORD })).rejects.toThrow(userErrorMessage("backupFileMissing"));
   });
 
@@ -317,5 +318,58 @@ describe("vault reset", () => {
     await target.lifecycle.resetAllWallets();
     expect((await target.backup.status()).enabled).toBe(false);
     expect(target.cloud.account.file).not.toBeNull();
+  });
+});
+
+describe("BackupHandler: restore with a passkey", () => {
+  const CREDENTIAL = "credential-1";
+  const SALT = "salt-1";
+  const prf = (fill: number) => bytesToBase64Url(new Uint8Array(32).fill(fill));
+
+  async function withPasskey(): Promise<Device> {
+    const target = await unlocked(new InMemoryCloudAccount());
+    await new PasskeyHandler(target.storage, target.lifecycle).enrollPasskey({
+      password: PASSWORD,
+      credentialId: CREDENTIAL,
+      prfSalt: SALT,
+      prfOutput: prf(7),
+    });
+    await target.backup.setUp({ password: PASSWORD });
+    return target;
+  }
+
+  it("lists the passkey in the clear header, without the vault data", async () => {
+    const original = await withPasskey();
+    const file = decodeBackupFile(original.cloud.account.file!.bytes)!;
+    expect(file.header.passkeys).toEqual([expect.objectContaining({ credentialId: CREDENTIAL, prfSalt: SALT })]);
+    expect(await device(original.cloud.account).backup.find()).toEqual({ found: true, passkeys: [{ credentialId: CREDENTIAL, prfSalt: SALT }] });
+  });
+
+  it("restores and unlocks with the passkey's answer alone", async () => {
+    const original = await withPasskey();
+    const fresh = device(original.cloud.account);
+    const { unlockedWalletIds } = await fresh.backup.restore({ credentialId: CREDENTIAL, prfOutput: prf(7) });
+    expect(walletsOf(fresh)).toEqual(walletsOf(original));
+    expect(unlockedWalletIds).toHaveLength(3);
+  });
+
+  it("refuses another passkey's answer and leaves the vault empty", async () => {
+    const original = await withPasskey();
+    const fresh = device(original.cloud.account);
+    await expect(fresh.backup.restore({ credentialId: CREDENTIAL, prfOutput: prf(8) })).rejects.toThrow(userErrorMessage("passkeyFailed"));
+    await expect(fresh.backup.restore({ credentialId: "unknown", prfOutput: prf(7) })).rejects.toThrow(userErrorMessage("passkeyWrongCredential"));
+    expect([...fresh.storage.entries.keys()]).toEqual([]);
+  });
+
+  it("says the passkey failed when its password no longer opens the backup key", async () => {
+    const original = await withPasskey();
+    // A key wrapped under another derivation, as after a password change on another install.
+    const parsed = JSON.parse(new TextDecoder().decode(original.cloud.account.file!.bytes)) as { wrapped: { salt: string } };
+    parsed.wrapped.salt = bytesToBase64(new Uint8Array(16).fill(9));
+    original.cloud.account.file!.bytes = new TextEncoder().encode(JSON.stringify(parsed));
+
+    const fresh = device(original.cloud.account);
+    await expect(fresh.backup.restore({ credentialId: CREDENTIAL, prfOutput: prf(7) })).rejects.toThrow(userErrorMessage("passkeyFailed"));
+    expect([...fresh.storage.entries.keys()]).toEqual([]);
   });
 });

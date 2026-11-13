@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
-import { renderWithPlatform as render } from "../../../app-platform/testing";
-import type { RuntimePort, WalletSummary } from "@gleam/core";
-import { WalletDetailView } from "./WalletDetailView";
+import { fakeAppPlatform, renderWithPlatform as render } from "../../../app-platform/testing";
+import type { BackupStatus, RuntimePort, WalletSummary } from "@gleam/core";
+import { cloudBackupOf, WalletDetailView } from "./WalletDetailView";
 
 afterEach(() => {
   cleanup();
@@ -292,5 +292,71 @@ describe("WalletDetailView", () => {
 
     expect(screen.getByText("Not backed up yet")).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("cloudBackupOf", () => {
+  const on: BackupStatus = { provider: "google", enabled: true, lastBackupAt: 2_000, problem: null };
+
+  it("names the drive once a write after the wallet was added went through", () => {
+    expect(cloudBackupOf(on, { createdAt: 1_000 })).toBe("Google Drive");
+    expect(cloudBackupOf({ ...on, provider: "icloud" }, { createdAt: 2_000 })).toBe("iCloud");
+  });
+
+  it("doesn't count a wallet added after the last write", () => {
+    expect(cloudBackupOf(on, { createdAt: 3_000 })).toBeNull();
+  });
+
+  it("doesn't count a backup that is off, stopped or never written", () => {
+    expect(cloudBackupOf({ ...on, enabled: false }, { createdAt: 0 })).toBeNull();
+    expect(cloudBackupOf({ ...on, problem: "signIn" }, { createdAt: 0 })).toBeNull();
+    expect(cloudBackupOf({ ...on, problem: "missing" }, { createdAt: 0 })).toBeNull();
+    expect(cloudBackupOf({ ...on, lastBackupAt: null }, { createdAt: 0 })).toBeNull();
+  });
+});
+
+describe("WalletDetailView with a cloud backup", () => {
+  const status: BackupStatus = { provider: "google", enabled: true, lastBackupAt: 5_000, problem: null };
+  const withCloud = () => fakeAppPlatform({ capabilities: { cloudBackup: "google" } });
+
+  function renderDetail(send: RuntimePort["send"], wallet: WalletSummary = WALLET, platform = withCloud()) {
+    render(
+      <WalletDetailView runtime={fakeRuntime({ send })} wallet={wallet} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
+      platform,
+    );
+  }
+
+  it("says the wallet is in the cloud backup instead of warning", async () => {
+    renderDetail(vi.fn(async () => status) as RuntimePort["send"]);
+    expect(await screen.findByText("Backed up to Google Drive")).toBeTruthy();
+    expect(screen.queryByText("Not backed up yet")).toBeNull();
+  });
+
+  it("still warns about a wallet the backup hasn't caught up with", async () => {
+    const send = vi.fn(async () => status) as RuntimePort["send"];
+    renderDetail(send, { ...WALLET, createdAt: 6_000 });
+    await waitFor(() => expect(send).toHaveBeenCalled());
+    expect(screen.getByText("Not backed up yet")).toBeTruthy();
+  });
+
+  it("keeps the keyfile download's date when there is one", async () => {
+    const send = vi.fn(async () => status) as RuntimePort["send"];
+    renderDetail(send, { ...WALLET, backupConfirmedAt: Date.now() });
+    await waitFor(() => expect(send).toHaveBeenCalled());
+    expect(screen.getByText("Backed up today")).toBeTruthy();
+  });
+
+  it("doesn't ask on a shell without cloud backup", () => {
+    const send = vi.fn();
+    renderDetail(send, WALLET, fakeAppPlatform());
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByText("Not backed up yet")).toBeTruthy();
+  });
+
+  it("still warns before removing, since removal also drops the wallet from the backup", async () => {
+    renderDetail(vi.fn(async () => status) as RuntimePort["send"]);
+    await screen.findByText("Backed up to Google Drive");
+    fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
+    expect(screen.getByText(/You haven't backed up this wallet's keyfile/)).toBeTruthy();
   });
 });

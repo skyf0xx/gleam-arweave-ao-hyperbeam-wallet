@@ -64,8 +64,6 @@ export const DEFAULT_UI_LABELS: UiLabels = {
   addressDisplay: {
     copied: "Address copied",
     copy: (address) => `Copy address ${address}`,
-    copiedHint: "Copied to clipboard",
-    copyHint: "Tap or hold to copy",
   },
   addressReveal: {
     title: "Wallet keyfile",
@@ -78,9 +76,9 @@ export const DEFAULT_UI_LABELS: UiLabels = {
   },
   recipientWarning: {
     irreversible: "This cannot be undone.",
-    lookalikeTitle: "This address looks like one you've used but it's different.",
-    lookalikeScammers: "Scammers create lookalike addresses to trick you.",
-    lookalikeCompare: "Compare every character before sending.",
+    lookalikeTitle: "This may be a phishing attempt.",
+    lookalikeScammers: "Scammers create lookalikes to trick you.",
+    lookalikeLabel: "Known address",
     firstTime: "You haven't sent to this address before.",
     doubleCheck: "Double-check the recipient before signing.",
   },

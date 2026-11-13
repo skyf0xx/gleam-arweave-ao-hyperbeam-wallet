@@ -26,8 +26,11 @@ Three tiers drive how much friction a screen imposes:
 - **Consequential** — one clear review screen, full address, neutral
   colors (a normal send/upload review, a connection request).
 - **Irreversible** — explicit named-risk acknowledgment, the only tier
-  allowed a warning-red accent (first-seen-address sends, unlimited
+  allowed a warning-red accent (lookalike recipients, unknown token
+  scale, unreadable token transfers, unchecked recipients, unlimited
   grants, wallet removal with no backup, the "forgot password" reset).
+  A first-seen address is the exception: an orange caution notice
+  (`caution` tokens), never red, so red keeps meaning danger.
 
 State the specific consequence in plain language before anything else on
 Consequential/Irreversible screens — never a generic "Are you sure?".
@@ -58,8 +61,8 @@ explicit confirmation naming exactly what gets wiped).
 1. Recipient & amount (Routine) — address input (paste/scan), token
    picker (AR + AO tokens from balances), amount with max-button, inline
    address-format validation, no fee shown yet.
-2. Review & confirm (Consequential, or Irreversible if first-seen
-   address) — full untruncated address, amount, fee, total; state
+2. Review & confirm (Consequential, or Irreversible for a lookalike or
+   unchecked recipient; a first-seen address gets an orange caution notice, not red) — full untruncated address, amount, fee, total; state
    consequence first ("You're sending 12 AR to `<address>`. This can't be
    undone."); single primary action "Sign and send," no secondary
    distractions.

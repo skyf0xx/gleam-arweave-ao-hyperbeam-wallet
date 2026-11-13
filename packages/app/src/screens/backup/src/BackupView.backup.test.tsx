@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { BackupStatus, RuntimePort } from "@gleam/core";
 import { renderWithPlatform as render } from "../../../app-platform/testing";
-import { BackupView } from "./BackupView";
+import { BackupView, DONE_MS } from "./BackupView";
 
 afterEach(cleanup);
 
@@ -59,6 +59,38 @@ describe("BackupView: on", () => {
     expect(await screen.findByText("5m ago")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back up now" }));
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "backUpNow", payload: undefined }));
+  });
+
+  it("holds the button on Backed up for a moment after a write, then offers it again", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { runtime } = runtimeWith(ON);
+      render(<BackupView runtime={runtime} onBack={vi.fn()} />);
+      // A loaded CI runner can take longer than findBy's default second to settle.
+      fireEvent.click(await screen.findByRole("button", { name: "Back up now" }, { timeout: 5000 }));
+
+      const held = await screen.findByRole("button", { name: "Backed up" }, { timeout: 5000 });
+      expect(held).toHaveProperty("disabled", true);
+      expect(screen.getByRole("status").textContent).toBe("Backed up");
+
+      act(() => vi.advanceTimersByTime(DONE_MS));
+      expect(await screen.findByRole("button", { name: "Back up now" }, { timeout: 5000 })).toHaveProperty("disabled", false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("doesn't claim a backup that failed", async () => {
+    const { runtime } = runtimeWith(ON, {
+      backUpNow: async () => {
+        throw new Error("Couldn't reach your backup. Check your connection and try again.");
+      },
+    });
+    render(<BackupView runtime={runtime} onBack={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Back up now" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Backed up" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Back up now" })).toHaveProperty("disabled", false);
   });
 
   it("offers a sign-in when the account wants one", async () => {

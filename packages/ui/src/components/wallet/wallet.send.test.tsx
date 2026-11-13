@@ -25,7 +25,7 @@ describe("AddressDisplay", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Copy address/ }));
 
     expect(onCopy).toHaveBeenCalledOnce();
-    expect(screen.getByText("Copied to clipboard")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Address copied" })).toBeTruthy();
   });
 });
 

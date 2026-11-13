@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bytesToBase64Url } from "@gleam/core";
-import { createUnlockPasskey, PasskeyError, readPasskeyPrf } from "./webauthn";
+import { createUnlockPasskey, PasskeyError, readAnyPasskeyPrf, readPasskeyPrf } from "./webauthn";
 
 class FakePublicKeyCredential {
   static signalUnknownCredential = vi.fn(async () => undefined);
@@ -88,5 +88,22 @@ describe("readPasskeyPrf", () => {
   it("fails when the authenticator returns no PRF output", async () => {
     get.mockResolvedValue(new FakePublicKeyCredential(RAW_ID.buffer, {}));
     await expect(readPasskeyPrf({ credentialId: "AQID", prfSalt: "AQID" })).rejects.toMatchObject({ reason: "unsupported" });
+  });
+});
+
+describe("readAnyPasskeyPrf", () => {
+  it("offers every passkey with its own salt and reports which one answered", async () => {
+    const other = new Uint8Array([9, 9, 9]);
+    get.mockResolvedValue(new FakePublicKeyCredential(RAW_ID.buffer, { prf: { results: { first: PRF } } }));
+    const candidates = [
+      { credentialId: bytesToBase64Url(other), prfSalt: bytesToBase64Url(new Uint8Array(32).fill(2)) },
+      { credentialId: bytesToBase64Url(RAW_ID), prfSalt: bytesToBase64Url(new Uint8Array(32).fill(1)) },
+    ];
+
+    expect(await readAnyPasskeyPrf(candidates)).toEqual({ credentialId: bytesToBase64Url(RAW_ID), prfOutput: bytesToBase64Url(PRF) });
+    const options = get.mock.calls[0]![0].publicKey;
+    expect(options.allowCredentials).toHaveLength(2);
+    expect(options.extensions.prf.evalByCredential[bytesToBase64Url(RAW_ID)].first).toEqual(new Uint8Array(32).fill(1));
+    expect(options.extensions.prf.eval).toBeUndefined();
   });
 });
