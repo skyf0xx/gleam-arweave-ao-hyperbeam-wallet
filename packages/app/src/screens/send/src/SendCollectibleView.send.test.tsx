@@ -87,7 +87,7 @@ describe("SendCollectibleView", () => {
     const { send, queryClient, onDone } = setup();
 
     enterRecipient(RECIPIENT);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
 
     await screen.findByText("Review send");
     expect(send).toHaveBeenCalledWith({
@@ -126,7 +126,7 @@ describe("SendCollectibleView", () => {
     const { send } = setup();
 
     enterRecipient(WALLET.address);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
 
     expect(await screen.findByText(/this wallet's own address/)).toBeTruthy();
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "estimateCollectibleSend" }));
@@ -136,7 +136,7 @@ describe("SendCollectibleView", () => {
     const { send } = setup();
 
     enterRecipient(COLLECTIBLE.id);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
 
     expect(await screen.findByText("That's the collectible's own address. Enter the recipient's wallet address.")).toBeTruthy();
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "estimateCollectibleSend" }));
@@ -150,7 +150,7 @@ describe("SendCollectibleView", () => {
     });
 
     enterRecipient(RECIPIENT);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
 
     expect(await screen.findByText("Sending needs about 0.000000654321 AR for the network fee.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
@@ -164,7 +164,7 @@ describe("SendCollectibleView", () => {
     });
 
     enterRecipient(RECIPIENT);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
     fireEvent.click(await screen.findByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Gateway down"));
@@ -194,7 +194,7 @@ describe("SendCollectibleView", () => {
     setup({ assess: () => new Promise<RecipientAssessment>((resolve) => (resolveAssessment = resolve)) });
 
     enterRecipient(RECIPIENT);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
 
     expect(((await screen.findByRole("button", { name: "Checking recipient…" })) as HTMLButtonElement).disabled).toBe(true);
     resolveAssessment({ firstTime: true, lookalikeOf: null });

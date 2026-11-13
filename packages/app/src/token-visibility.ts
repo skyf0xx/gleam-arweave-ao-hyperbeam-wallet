@@ -48,3 +48,9 @@ export function sendTokenLogo(token: TokenBalance | null, visibility: RowVisibil
   if (token.processId === DEFAULT_AO_TOKEN.processId) return DEFAULT_AO_TOKEN.logoUrl;
   return shownTokenLogo(token, visibility, true);
 }
+
+/** Whether a token row or picker entry is left out: hidden by choice, or discovered and never shown. */
+export function isTokenHidden(token: TokenBalance, visibility: RowVisibility): boolean {
+  const choice = visibility[token.processId];
+  return choice === "hidden" || (choice !== "shown" && token.source === "discovered");
+}
