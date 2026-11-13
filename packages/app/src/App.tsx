@@ -360,10 +360,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         wallet={detailWallet}
         onBack={() => setSubView({ kind: "wallet-switcher" })}
-        onRenamed={() => {
-          setSubView({ kind: "wallet-switcher" });
-          void refresh(runtime);
-        }}
+        onRenamed={() => void refresh(runtime)}
         onRemoved={() => {
           const remaining = wallets.filter((candidate) => candidate.id !== detailWallet.id);
           // Drop it now so the list doesn't flash the removed wallet. With none
