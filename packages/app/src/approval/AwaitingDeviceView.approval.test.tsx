@@ -361,7 +361,7 @@ describe("ApprovalRoot with a hardware wallet", () => {
 
   it("moves from the preview to the device step on approval, then submits the device's signatures", async () => {
     const { runtime, send } = runtimeFor(REQUEST);
-    renderRoot(<ApprovalRoot requestId="req-hw" runtime={runtime} />, SigningPanel);
+    renderRoot(<ApprovalRoot armDelayMs={0} requestId="req-hw" runtime={runtime} />, SigningPanel);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign message" }));
 
@@ -374,13 +374,13 @@ describe("ApprovalRoot with a hardware wallet", () => {
 
   it("opens straight on the device step when the request already waits for it", async () => {
     const { runtime } = runtimeFor({ ...REQUEST, device: DEVICE });
-    renderRoot(<ApprovalRoot requestId="req-hw" runtime={runtime} />);
+    renderRoot(<ApprovalRoot armDelayMs={0} requestId="req-hw" runtime={runtime} />);
     expect(await screen.findByText("Confirm on your Ledger")).toBeTruthy();
   });
 
   it("Cancel on the device step rejects the request", async () => {
     const { runtime, send } = runtimeFor({ ...REQUEST, device: DEVICE });
-    renderRoot(<ApprovalRoot requestId="req-hw" runtime={runtime} />);
+    renderRoot(<ApprovalRoot armDelayMs={0} requestId="req-hw" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
 

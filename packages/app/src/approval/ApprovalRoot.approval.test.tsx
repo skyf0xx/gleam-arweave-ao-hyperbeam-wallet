@@ -56,7 +56,7 @@ describe("ApprovalRoot theme application (provider-bridge closing wallet-core's 
       throw new Error(`unexpected message ${message.type}`);
     });
 
-    const { container } = render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
+    const { container } = render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
 
     await waitFor(() => {
       expect(container.querySelector('[data-theme="dark"]')).toBeTruthy();
@@ -71,7 +71,7 @@ describe("ApprovalRoot theme application (provider-bridge closing wallet-core's 
       throw new Error(`unexpected message ${message.type}`);
     });
 
-    const { container } = render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
+    const { container } = render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
 
     await waitFor(() => {
       expect(container.querySelector("[data-theme]")).toBeNull();
@@ -86,7 +86,7 @@ describe("ApprovalRoot theme application (provider-bridge closing wallet-core's 
       throw new Error(`unexpected message ${message.type}`);
     });
 
-    const { container } = render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
+    const { container } = render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
 
     await waitFor(() => {
       expect(container.querySelector("[data-theme]")).toBeNull();
@@ -136,7 +136,7 @@ function runtimeResolvingWith(request: ApprovalRequest, resolveApproval: () => P
 describe("ApprovalRoot auto-lock activity", () => {
   it("reads the wallet state without counting the window's load as activity", async () => {
     const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, async () => undefined);
-    render(<ApprovalRoot requestId="req-2" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-2" runtime={runtime} />);
 
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith(expect.objectContaining({ type: "getState" })));
     const stateCalls = vi.mocked(runtime.send).mock.calls.filter(([message]) => message.type === "getState");
@@ -149,7 +149,7 @@ describe("ApprovalRoot outcome", () => {
     const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, async () => {
       throw new Error('Wallet "wallet-1" is locked. Unlock it to continue.');
     });
-    render(<ApprovalRoot requestId="req-2" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-2" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign message" }));
 
@@ -163,7 +163,7 @@ describe("ApprovalRoot outcome", () => {
 
   it("shows success once resolveApproval succeeds", async () => {
     const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, async () => undefined);
-    render(<ApprovalRoot requestId="req-2" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-2" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign message" }));
 
@@ -175,7 +175,7 @@ describe("ApprovalRoot outcome", () => {
     const runtime = runtimeResolvingWith(CONNECT_REQUEST, async () => {
       throw new Error("storage unavailable");
     });
-    render(<ApprovalRoot requestId="req-1" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Grant" }));
 
@@ -186,7 +186,7 @@ describe("ApprovalRoot outcome", () => {
   it("shows an addToken request on its own screen and approves it", async () => {
     const resolve = vi.fn(async () => undefined);
     const runtime = runtimeResolvingWith(ADD_TOKEN_REQUEST, resolve);
-    render(<ApprovalRoot requestId="req-3" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-3" runtime={runtime} />);
 
     expect(await screen.findByText("TKN")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add token" }));
@@ -235,7 +235,7 @@ describe("ApprovalRoot: locked wallet", () => {
 
   it("asks for the password before showing the request, then continues it", async () => {
     const { runtime, send } = statefulRuntime(LOCKED_STATE, SIGN_MESSAGE_REQUEST);
-    render(<ApprovalRoot requestId="req-2" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-2" runtime={runtime} />);
 
     expect(await screen.findByText("Unlock to review bazar.arweave.net's request")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Sign message" })).toBeNull();
@@ -255,7 +255,7 @@ describe("ApprovalRoot: locked wallet", () => {
 
   it("stays on unlock with the error when the password is wrong", async () => {
     const { runtime } = statefulRuntime(LOCKED_STATE, CONNECT_REQUEST);
-    render(<ApprovalRoot requestId="req-1" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={runtime} />);
 
     fireEvent.change(await screen.findByPlaceholderText("Enter your password"), {
       target: { value: "wrong password" },
@@ -272,7 +272,7 @@ describe("ApprovalRoot: locked wallet", () => {
       session: { ...UNLOCKED_STATE.session!, unlockedWalletIds: ["wallet-2"] },
     };
     const { runtime } = statefulRuntime(otherUnlocked, CONNECT_REQUEST);
-    render(<ApprovalRoot requestId="req-1" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={runtime} />);
 
     expect(await screen.findByPlaceholderText("Enter your password")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Grant" })).toBeNull();
@@ -284,7 +284,7 @@ describe("ApprovalRoot: no wallet yet", () => {
 
   it("runs onboarding in place, then shows the pending request", async () => {
     const { runtime } = statefulRuntime(EMPTY_STATE, CONNECT_REQUEST);
-    render(<ApprovalRoot requestId="req-1" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Create a wallet" }));
     fireEvent.change(screen.getByPlaceholderText("At least 12 characters"), {
@@ -307,7 +307,7 @@ describe("ApprovalRoot: no wallet yet", () => {
       if (message.type === "getThemePreference") return { theme: "light" } satisfies ThemeSettings;
       throw new Error(`unexpected message ${message.type}`);
     });
-    render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={fakeRuntime({ send: send as never })} />);
 
     expect(await screen.findByText(/no pending approval request/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Create a wallet" })).toBeNull();
@@ -329,13 +329,13 @@ describe("ApprovalRoot security phrase", () => {
   }
 
   it("shows the phrase above a request", async () => {
-    render(<ApprovalRoot requestId="req-1" runtime={runtimeWith(UNLOCKED_STATE)} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={runtimeWith(UNLOCKED_STATE)} />);
 
     await waitFor(() => expect(screen.getByLabelText("Your anti-phishing phrase: willow")).toBeTruthy());
   });
 
   it("shows it once while locked, on the unlock screen", async () => {
-    render(<ApprovalRoot requestId="req-1" runtime={runtimeWith({ ...UNLOCKED_STATE, session: null })} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={runtimeWith({ ...UNLOCKED_STATE, session: null })} />);
 
     await waitFor(() => expect(screen.getByPlaceholderText("Enter your password")).toBeTruthy());
     await waitFor(() => expect(screen.getAllByLabelText("Your anti-phishing phrase: willow")).toHaveLength(1));
@@ -365,7 +365,7 @@ describe("ApprovalRoot: a device request the surface can't reach", () => {
       hardwareWallets: { openConnectPage: vi.fn(), connectViews: {}, signPanels: { keystone: () => <p>keystone-panel</p> } },
     });
 
-    render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />, keystoneOnly);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={fakeRuntime({ send: send as never })} />, keystoneOnly);
 
     expect(await screen.findByText("Gleam can't reach a Ledger from here.")).toBeTruthy();
     expect(screen.queryByText("keystone-panel")).toBeNull();
@@ -383,7 +383,7 @@ describe("ApprovalRoot reset", () => {
     });
     const queryCache = memoryQueryCache(new Map([["wallet-1", "{}"]]));
 
-    render(<ApprovalRoot requestId="req-1" runtime={fakeRuntime({ send: send as never })} />, fakeAppPlatform({ queryCache }));
+    render(<ApprovalRoot armDelayMs={0} requestId="req-1" runtime={fakeRuntime({ send: send as never })} />, fakeAppPlatform({ queryCache }));
     fireEvent.click(await screen.findByRole("button", { name: "Forgot password?" }));
     fireEvent.click(await screen.findByRole("button", { name: "Reset wallet" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes, reset wallet" }));
@@ -436,7 +436,7 @@ describe("ApprovalRoot transfer review", () => {
       throw new Error(`unexpected message ${message.type}`);
     });
 
-    render(<ApprovalRoot requestId="req-item" runtime={fakeRuntime({ send: send as never })} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-item" runtime={fakeRuntime({ send: send as never })} />);
 
     expect(await screen.findByText("Transfer request")).toBeTruthy();
     expect(send).toHaveBeenCalledWith({ type: "assessRecipient", payload: { walletId: "wallet-1", recipient: RECIPIENT } });
@@ -444,5 +444,34 @@ describe("ApprovalRoot transfer review", () => {
     expect(screen.getByText("Main")).toBeTruthy();
     expect((await screen.findByText("Balance after")).nextElementSibling?.textContent).toBe("7 TOK");
     expect(screen.getByRole("button", { name: "Sign" }).className).not.toContain("bg-warning");
+  });
+});
+
+describe("ApprovalRoot input arming", () => {
+  it("ignores a click on the request until the window has shown it for a moment", async () => {
+    const resolveApproval = vi.fn(async () => undefined);
+    const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, resolveApproval);
+    const { container } = render(<ApprovalRoot armDelayMs={150} requestId="req-2" runtime={runtime} />);
+
+    const approve = await screen.findByRole("button", { name: "Sign message" });
+    fireEvent.click(approve);
+    expect(resolveApproval).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(container.querySelector('[data-input-armed="true"]')).toBeTruthy());
+    fireEvent.click(approve);
+    await waitFor(() => expect(resolveApproval).toHaveBeenCalledTimes(1));
+  });
+
+  it("stops accepting clicks when the window loses focus", async () => {
+    const resolveApproval = vi.fn(async () => undefined);
+    const runtime = runtimeResolvingWith(SIGN_MESSAGE_REQUEST, resolveApproval);
+    const { container } = render(<ApprovalRoot armDelayMs={50} requestId="req-2" runtime={runtime} />);
+
+    const approve = await screen.findByRole("button", { name: "Sign message" });
+    await waitFor(() => expect(container.querySelector('[data-input-armed="true"]')).toBeTruthy());
+    fireEvent.blur(window);
+    expect(container.querySelector('[data-input-armed="false"]')).toBeTruthy();
+    fireEvent.click(approve);
+    expect(resolveApproval).not.toHaveBeenCalled();
   });
 });

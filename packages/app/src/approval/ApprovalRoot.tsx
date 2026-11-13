@@ -35,6 +35,7 @@ import { SigningApprovalScreen } from "./SigningApprovalScreen";
 import { errorText } from "../i18n/errors";
 import { recipientsOf, transferRequestFromPreview } from "../transfer-review/model";
 import { useApprovalTransferContext } from "../transfer-review/useApprovalTransferContext";
+import { INPUT_ARM_DELAY_MS, useInputArmed } from "./input-arming";
 
 /**
  * The approval UI's top-level state machine, in a window or a sheet: loads the pending
@@ -68,6 +69,8 @@ export interface ApprovalRootProps {
   runtime?: RuntimePort;
   /** Closes the surface the request shows in, once the user is finished with it. Defaults to closing the window. */
   onClose?: () => void;
+  /** How long a review screen waits before it accepts clicks (`input-arming.ts`). */
+  armDelayMs?: number;
 }
 
 type LoadState =
@@ -169,7 +172,12 @@ export function ApprovalRoot(props: ApprovalRootProps) {
   );
 }
 
-function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => window.close() }: ApprovalRootProps) {
+function ApprovalRootContent({
+  requestId,
+  runtime: runtimeProp,
+  onClose = () => window.close(),
+  armDelayMs = INPUT_ARM_DELAY_MS,
+}: ApprovalRootProps) {
   const platform = usePlatform();
   const t = useT();
   const devicePanels = platform.hardwareWallets.signPanels;
@@ -274,6 +282,10 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
   };
 
   const reviewing = state.kind === "ready" || state.kind === "awaiting-device" ? state : null;
+  // Clicks on a review screen count only once it has been on screen and
+  // focused for a moment: the site picks when this window opens.
+  const armed = useInputArmed(`${state.kind}:${requestId ?? ""}`, armDelayMs);
+  const guardClicks = reviewing !== null && !armed;
   const transferContext = useApprovalTransferContext(
     reviewing?.runtime ?? null,
     reviewing?.kind === "awaiting-device" ? reviewing.device.address : (reviewing?.wallet?.address ?? null),
@@ -454,7 +466,17 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
             <SecurityPhraseMark phrase={securityPhrase.phrase} iconSvg={securityPhrase.icon} />
           </div>
         ) : null}
-        {content}
+        <div
+          className="contents"
+          data-input-armed={reviewing ? String(armed) : undefined}
+          onClickCapture={(event) => {
+            if (!guardClicks) return;
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          {content}
+        </div>
       </div>
     </AddressIdentityProvider>
   );
