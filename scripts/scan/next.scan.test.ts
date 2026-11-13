@@ -87,7 +87,7 @@ describe("pnpm scan next", () => {
       "2 rounds are ready to sign, with 2 reports to file.",
       "",
       `1. Open this link and sign each round in Gleam: https://site.test/attest.html#${payload("signing")}.${payload("preview")}`,
-      '2. Reply "signed" and I\'ll file the reports.',
+      '2. Reply "signed" and I\'ll file the reports: fork, push, open each PR and file each advisory.',
     ]);
     expect(exists(deps, ".gleam-scan/rounds/keys/signed.json")).toBe(true);
     expect(exists(deps, ".gleam-scan/rounds/signing/signed.json")).toBe(false);

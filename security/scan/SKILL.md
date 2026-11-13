@@ -49,8 +49,11 @@ part of the skill.
 - **Acts as the user, only after asking:** `gh repo fork`, `git push`,
   `gh pr create`, and filing a private advisory (File the reports). Each
   one is public or reaches the maintainers, so ask the user first. The
-  sign request that `pnpm scan file` prints is that one question. The
-  user's "signed" reply covers every draft of the rounds they signed.
+  scan prompt's "Ask me before any gh action" means exactly this, and
+  the sign request that `pnpm scan file` prints is that question: its
+  line 2 names each action. The user's "signed" reply approves every
+  action for every draft of the rounds they signed. This is not a
+  conflict with the prompt, so don't ask again before each action.
 - **Never:** reads a seed phrase, key, keyfile or wallet; signs anything;
   moves funds.
 
@@ -692,7 +695,7 @@ the sign request:
 3 rounds are ready to sign, with 4 reports to file.
 
 1. Open this link and sign each round in Gleam: https://gleamwallet.app/attest.html#<payload>.<payload>.<payload>
-2. Reply "signed" and I'll file the reports.
+2. Reply "signed" and I'll file the reports: fork, push, open each PR and file each advisory.
 ```
 
 For rounds with no reports, line 2 is `2. Reply "signed" when you're
@@ -770,9 +773,10 @@ after that line.
 
 ## File the reports
 
-The user's "signed" is the approval to fork, push, open each PR and file
-each advisory of the rounds `pnpm scan next` lists as signed. Don't ask
-again. For each such round:
+The user's "signed" answers the sign request, which named each of these
+actions, so it is the approval the scan prompt asks for: fork, push, open
+each PR and file each advisory of the rounds `pnpm scan next` lists as
+signed. Don't ask again. For each such round:
 
 1. In each `pr-*.md` and `advisory-*.md` in its round folder that its
    `filed.txt` doesn't list, replace `{{ATTESTATION_ID}}` with the
