@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#F7F7F7">
   <title>Privacy: Gleam</title>
   <meta name="description"
-    content="What the Gleam wallet and this website collect, store and send. Short version: nothing leaves your device unless you redeem an invite code or join Gleam Points.">
+    content="What the Gleam wallet and this website collect, store and send. Short version: your data stays on your device unless you redeem an invite code, join Gleam Points or enable backup.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -16,7 +16,7 @@
   <meta property="og:site_name" content="Gleam">
   <meta property="og:title" content="Privacy: Gleam">
   <meta property="og:description"
-    content="What the Gleam wallet and this website collect, store and send. Short version: nothing leaves your device unless you redeem an invite code or join Gleam Points.">
+    content="What the Gleam wallet and this website collect, store and send. Short version: your data stays on your device unless you redeem an invite code, join Gleam Points or enable backup.">
   <meta property="og:url" content="https://gleamwallet.app/privacy.html">
   <meta property="og:image" content="https://gleamwallet.app/img/og.jpg?v=4">
   <meta property="og:image:width" content="1200">
@@ -29,7 +29,7 @@
   <meta name="twitter:site" content="@gleam_wallet">
   <meta name="twitter:title" content="Privacy: Gleam">
   <meta name="twitter:description"
-    content="What the Gleam wallet and this website collect, store and send. Short version: nothing leaves your device unless you redeem an invite code or join Gleam Points.">
+    content="What the Gleam wallet and this website collect, store and send. Short version: your data stays on your device unless you redeem an invite code, join Gleam Points or enable backup.">
   <meta name="twitter:image" content="https://gleamwallet.app/img/og.jpg?v=4">
   <meta name="twitter:image:alt"
     content="gleam: Crypto without the clutter. Your wallet for AO and Arweave. Beside it, the Gleam wallet home screen.">
@@ -46,11 +46,11 @@
   <main class="wrap">
     <article class="prose">
       <h1>Privacy</h1>
-      <p class="updated small">Last updated: 31 October 2026</p>
+      <p class="updated small">Last updated: 13 November 2026</p>
 
       <h2>What Gleam is</h2>
-      <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam account. Gleam runs
-        one server, for Gleam Points, and it's optional: the extension sends it nothing unless you redeem an invite code
+      <p>Gleam is a browser extension wallet for Arweave and AO, plus this website. There's no Gleam account. Gleam
+        operates one optional server for Gleam Points. The extension only sends it data when you redeem an invite code
         or join.</p>
 
       <h2>What stays on your device</h2>
@@ -91,10 +91,24 @@
           These requests only name the token. They don't include your address. The server also runs Gleam Points: the
           extension contacts it for that only when you redeem an invite code or join, and after you join, for the
           regular check-ins described below.</li>
+        <li><code>accounts.google.com</code>, <code>oauth2.googleapis.com</code> and <code>www.googleapis.com</code>:
+          signing in to Google, and reading and writing your backup file.</li>
       </ul>
       <p>Each of these services receives your IP address, as with any web request. Gateways and AO nodes also receive
         your public address when looking up your balances and activity, because that's how public blockchains work.
         Transactions you send are public and permanent on Arweave and AO.</p>
+
+      <h2 id="backup">Vault backup (optional)</h2>
+      <p>When enabled, Gleam saves an encrypted backup of your wallets, contacts and settings to a hidden folder in your
+        Google Drive. Your password encrypts the file on your device before it's uploaded, so neither Google nor Gleam
+        can read its contents.</p>
+      <p>Gleam only has access to this backup folder. It cannot access your other Drive files, Gmail or Google profile.
+        Your backup never passes through a Gleam server.</p>
+      <p>Turning off backup deletes the stored file and revokes Gleam's access. You can also revoke access at any time
+        through your Google Account's third-party connections.</p>
+      <p>Gleam's use of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
+        Policy</a>, including the Limited Use requirements.</p>
 
       <h2 id="points">Gleam Points</h2>
       <p>Gleam Points is optional. Nothing is sent to its server until you enter an invite code or choose to join a
