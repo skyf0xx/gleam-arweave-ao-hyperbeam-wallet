@@ -4,6 +4,7 @@ import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { CheckIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { relativeTime } from "../../../relative-time";
@@ -46,7 +47,10 @@ export interface BackupViewProps {
   onBack: () => void;
 }
 
-type Phase = "idle" | "settingUp" | "backingUp" | "turningOff";
+type Phase = "idle" | "settingUp" | "backingUp" | "turningOff" | "done";
+
+/** How long "Backed up" holds the button after a write, so a fast one is still seen. */
+export const DONE_MS = 2_500;
 
 /**
  * Settings → Backup. Off, it is one password field and one button: the
@@ -63,6 +67,12 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
   const [error, setError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    if (phase !== "done") return;
+    const timer = setTimeout(() => setPhase("idle"), DONE_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  useEffect(() => {
     let cancelled = false;
     runtime
       .send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined })
@@ -77,18 +87,18 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
     };
   }, [runtime]);
 
-  const run = async (next: Exclude<Phase, "idle">, request: () => Promise<BackupStatus>) => {
+  const run = async (next: "settingUp" | "backingUp", request: () => Promise<BackupStatus>) => {
     setPhase(next);
     setError(undefined);
     try {
       setStatus(await request());
       setPassword("");
       setConfirmingOff(false);
+      setPhase("done");
     } catch (reason) {
       setError(errorText(reason));
       // A sign-in that was closed leaves a problem only a fresh read shows.
       runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }).then(setStatus, () => {});
-    } finally {
       setPhase("idle");
     }
   };
@@ -173,12 +183,19 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
               </div>
             ) : (
               <div className="mt-auto flex flex-col gap-2.5">
-                <Button type="button" disabled={busy} aria-busy={busy} onClick={() => void backUpNow()}>
-                  {phase === "backingUp"
-                    ? t("backup.backingUp")
-                    : status.problem === "signIn"
-                      ? t("backup.signIn")
-                      : t("backup.backUpNow")}
+                <Button type="button" disabled={busy} aria-busy={busy && phase !== "done"} onClick={() => void backUpNow()}>
+                  {phase === "done" ? (
+                    <span role="status" className="flex items-center gap-1.5">
+                      <CheckIcon size={16} />
+                      {t("backup.backedUp")}
+                    </span>
+                  ) : phase === "backingUp" ? (
+                    t("backup.backingUp")
+                  ) : status.problem === "signIn" ? (
+                    t("backup.signIn")
+                  ) : (
+                    t("backup.backUpNow")
+                  )}
                 </Button>
                 <Button type="button" variant="ghost" disabled={busy} onClick={() => setConfirmingOff(true)}>
                   {t("backup.turnOff")}
