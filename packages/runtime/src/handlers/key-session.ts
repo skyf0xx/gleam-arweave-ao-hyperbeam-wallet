@@ -12,11 +12,12 @@ import {
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
-import { signerFromKeyStore } from "@gleam/core/signer";
+import { signerFromKeyStore, unwrapBackupKey, zeroize, type VaultKeys } from "@gleam/core/signer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { WALLETS_KEY } from "../storage-keys";
 export { WALLETS_KEY } from "../storage-keys";
+import { loadBackupKey } from "./backup-state";
 
 /**
  * The signing keys of currently-unlocked wallets, held in two places:
@@ -187,6 +188,14 @@ export interface KeySession {
    * collection. Callers hold `withSessionLock`.
    */
   cacheKey(walletId: string, jwk: JWKInterface, address: string): Promise<void>;
+  /**
+   * Hands the vault backup's key to the keyring for the unlocked session,
+   * when backup is set up. It goes with the wallets' keys at lock. Never
+   * throws: a backup that can't be unlocked must not keep the vault shut,
+   * and writes then wait for an unlock that does open it. Callers hold
+   * `withSessionLock`.
+   */
+  cacheBackupKey(keys: VaultKeys): Promise<void>;
   /** The public fields of a stored wallet, or null when no wallet has this id. */
   getStoredWallet(walletId: string): Promise<StoredWalletInfo | null>;
   /** The stored wallet's method, or null when no wallet has this id. */
@@ -297,6 +306,21 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
       await trackWalletId(walletId);
     } catch (error) {
       throw new SessionKeyStorageError(error);
+    }
+  }
+
+  async function cacheBackupKey(keys: VaultKeys): Promise<void> {
+    try {
+      const stored = await loadBackupKey(storage);
+      if (!stored) return;
+      const raw = await unwrapBackupKey(stored.wrapped, keys, stored.backupId);
+      try {
+        await sessionKeys.importBackupKey(raw);
+      } finally {
+        zeroize(raw);
+      }
+    } catch (error) {
+      console.error("Couldn't unlock the backup key; the backup waits for the next unlock.", error);
     }
   }
 
@@ -434,6 +458,7 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     withSessionLock,
     isVaultLocked,
     cacheKey,
+    cacheBackupKey,
     getStoredWallet,
     getWalletMethod,
     enforceAutoLock,

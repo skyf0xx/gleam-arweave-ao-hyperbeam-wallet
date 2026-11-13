@@ -1,10 +1,12 @@
+import type { BackupProvider } from "../models/backup";
+
 /**
  * One file in the user's own cloud account: a Google Drive app folder, or
  * iCloud on iOS. The port moves bytes and knows nothing of their contents;
  * whatever it returns is untrusted until the caller has decrypted it.
  */
 export interface CloudFilePort {
-  readonly provider: "google" | "icloud";
+  readonly provider: BackupProvider;
   /**
    * Whether the account can be reached. With `interactive` false it never
    * shows UI and resolves false when it would have to.

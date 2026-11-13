@@ -49,7 +49,7 @@ import {
 import { isSessionExpired, isValidSession, SESSION_KEY, type KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
-import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
 
 /**
@@ -861,6 +861,9 @@ export class WalletLifecycleHandler {
     await this.storage.remove(ACTIVE_WALLET_ID_KEY);
     await this.storage.remove(BROWSER_SAVED_SITES_KEY);
     await this.storage.remove(BROWSER_RECENT_SITES_KEY);
+    // The file stays in the account: a reset is for a forgotten password, and it may be remembered.
+    await this.storage.remove(BACKUP_KEY);
+    await this.storage.remove(BACKUP_STATE_KEY);
     await saveSession(this.storage, null);
   }
 
@@ -954,6 +957,7 @@ export class WalletLifecycleHandler {
           unlockedWalletIds,
         };
         await saveSession(this.storage, session);
+        await this.keySession.cacheBackupKey(keys);
 
         this.pendingUpgrade = this.upgradeEnvelopes(opened, keys, req.password);
         return { unlockedWalletIds };

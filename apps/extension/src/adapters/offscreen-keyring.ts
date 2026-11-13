@@ -145,6 +145,26 @@ export class OffscreenKeyring implements SessionKeyStorePort {
     await this.request({ op: "remove", walletId });
   }
 
+  async importBackupKey(raw: Bytes): Promise<void> {
+    await this.ensureDocument();
+    await this.request({ op: "importBackup", raw: bytesToBase64(raw) });
+  }
+
+  async sealBackup(plaintext: Bytes, backupId: string): Promise<Bytes> {
+    if (!(await this.host.hasDocument())) throw new KeyringLockedError();
+    return base64ToBytes(await this.request({ op: "sealBackup", backupId, data: bytesToBase64(plaintext) }));
+  }
+
+  async openBackup(sealed: Bytes, backupId: string): Promise<Bytes> {
+    if (!(await this.host.hasDocument())) throw new KeyringLockedError();
+    return base64ToBytes(await this.request({ op: "openBackup", backupId, data: bytesToBase64(sealed) }));
+  }
+
+  async removeBackupKey(): Promise<void> {
+    if (!(await this.host.hasDocument())) return;
+    await this.request({ op: "removeBackup" });
+  }
+
   /** Clears the keys, then closes the document, so its whole heap goes too. */
   async clear(): Promise<void> {
     if (!(await this.host.hasDocument())) return;

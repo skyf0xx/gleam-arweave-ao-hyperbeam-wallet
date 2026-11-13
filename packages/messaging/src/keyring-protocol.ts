@@ -24,6 +24,11 @@ export type KeyringRequest =
   | { op: "decrypt"; walletId: string; data: string; label?: string }
   | { op: "has"; walletIds: string[] }
   | { op: "remove"; walletId: string }
+  /** `raw` is the base64 backup key. */
+  | { op: "importBackup"; raw: string }
+  | { op: "sealBackup"; backupId: string; data: string }
+  | { op: "openBackup"; backupId: string; data: string }
+  | { op: "removeBackup" }
   | { op: "clear" };
 
 /** What each request's `result` holds on success. */
@@ -35,6 +40,12 @@ export interface KeyringResults {
   decrypt: string;
   has: string[];
   remove: null;
+  importBackup: null;
+  /** Base64 sealed body. */
+  sealBackup: string;
+  /** Base64 body. */
+  openBackup: string;
+  removeBackup: null;
   clear: null;
 }
 

@@ -1,6 +1,7 @@
 import type { JWKInterface } from "../models/wallet";
 import type { SessionKeyStorePort } from "../ports/session-keys";
 import type { RsaPssSignParams } from "../vault/signer";
+import { importBackupKey, openBackup, sealBackup } from "./backup-key";
 import { decryptOaepWithHandles, importSessionKeys, signPssWithHandles, type SessionKeyHandles } from "./keys";
 
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -20,6 +21,7 @@ export class KeyringLockedError extends Error {
  */
 export class Keyring implements SessionKeyStorePort {
   private readonly keys = new Map<string, SessionKeyHandles>();
+  private backupKey: CryptoKey | null = null;
 
   async importKey(walletId: string, jwk: JWKInterface): Promise<void> {
     if (!jwk.d) throw new Error("This keyfile has no private key.");
@@ -42,8 +44,30 @@ export class Keyring implements SessionKeyStorePort {
     this.keys.delete(walletId);
   }
 
+  async importBackupKey(raw: Bytes): Promise<void> {
+    this.backupKey = await importBackupKey(raw);
+  }
+
+  async sealBackup(plaintext: Bytes, backupId: string): Promise<Bytes> {
+    return sealBackup(this.heldBackupKey(), plaintext, backupId);
+  }
+
+  async openBackup(sealed: Bytes, backupId: string): Promise<Bytes> {
+    return openBackup(this.heldBackupKey(), sealed, backupId);
+  }
+
+  async removeBackupKey(): Promise<void> {
+    this.backupKey = null;
+  }
+
   async clear(): Promise<void> {
     this.keys.clear();
+    this.backupKey = null;
+  }
+
+  private heldBackupKey(): CryptoKey {
+    if (!this.backupKey) throw new KeyringLockedError();
+    return this.backupKey;
   }
 
   private handles(walletId: string): SessionKeyHandles {

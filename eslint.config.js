@@ -27,7 +27,7 @@ const signerImport = (dirTail = "(/|$)") =>
   `^@gleam/core/signer(/|$)|(^|/)(\\.\\.|src)/signer${dirTail}|^\\./signer/`;
 const SIGNER_IMPORT = signerImport();
 const SIGNER_IMPORT_MESSAGE =
-  "Only key-session.ts, wallet-lifecycle.ts and the keyring import core/signer. Sign through a `Signer` from `getSigner(walletId)`.";
+  "Only key-session.ts, wallet-lifecycle.ts, backup.ts and the keyring import core/signer. Sign through a `Signer` from `getSigner(walletId)`.";
 
 // `no-restricted-imports` reads only static `import`/`export … from`, so
 // this catches `import("…")` with a literal path against the same regex.
@@ -409,6 +409,8 @@ export default tseslint.config(
       "packages/core/src/signer/**",
       "packages/runtime/src/handlers/key-session.ts",
       "packages/runtime/src/handlers/wallet-lifecycle.ts",
+      // Wraps and unwraps the vault backup's key under the password.
+      "packages/runtime/src/handlers/backup.ts",
       "apps/extension/src/keyring/server.ts",
       "apps/extension/src/adapters/offscreen-keyring.ts",
       "apps/extension/entrypoints/keyring/main.ts",
@@ -440,6 +442,7 @@ export default tseslint.config(
       "packages/runtime/testing/**",
       "packages/runtime/src/handlers/key-session.ts",
       "packages/runtime/src/handlers/wallet-lifecycle.ts",
+      "packages/runtime/src/handlers/backup.ts",
     ],
     rules: {
       ...runtimeFence({ regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE }),

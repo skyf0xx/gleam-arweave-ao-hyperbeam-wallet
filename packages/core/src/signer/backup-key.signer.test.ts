@@ -26,12 +26,14 @@ async function setUp() {
 }
 
 function bodyFor(backupId: string): BackupBody {
+  const writer = newBackupId();
+  const updatedAt = 1_700_000_000_000;
   return {
     v: 1,
     backupId,
-    updatedAt: 1_700_000_000_000,
-    writer: newBackupId(),
-    data: { "local:themeSettings": { theme: "dark" } },
+    updatedAt,
+    writer,
+    devices: { [writer]: { updatedAt, data: { "local:themeSettings": { theme: "dark" } } } },
   };
 }
 

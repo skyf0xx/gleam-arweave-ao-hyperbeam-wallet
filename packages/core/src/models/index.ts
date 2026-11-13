@@ -104,6 +104,7 @@ export {
   suggestSecurityPhrase,
 } from "./security-phrase";
 export type { PasskeyEnrollment, PasskeyStatus } from "./passkey";
+export type { BackupProvider, BackupStatus } from "./backup";
 export { isPasskeyEnrollment } from "./passkey";
 export type {
   PortfolioHistoryRange,

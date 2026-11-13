@@ -16,6 +16,8 @@ const SIGNER_IMPORTERS = [
   "^packages/core/src/signer/",
   "^packages/runtime/src/handlers/key-session\\.ts$",
   "^packages/runtime/src/handlers/wallet-lifecycle\\.ts$",
+  // Wraps and unwraps the vault backup's key under the password.
+  "^packages/runtime/src/handlers/backup\\.ts$",
   "^apps/extension/src/keyring/server\\.ts$",
   "^apps/extension/src/adapters/offscreen-keyring\\.ts$",
   "^apps/extension/entrypoints/keyring/main\\.ts$",

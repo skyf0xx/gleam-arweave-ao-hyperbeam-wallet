@@ -17,6 +17,9 @@
 /packages/runtime/src/handlers/key-session.ts                              @skyf0xx
 /packages/runtime/src/handlers/wallet-lifecycle.ts                         @skyf0xx
 /packages/runtime/src/handlers/passkey.ts                                  @skyf0xx
+/packages/runtime/src/handlers/backup.ts                                   @skyf0xx
+/packages/runtime/src/handlers/backup-state.ts                             @skyf0xx
+/packages/runtime/src/backup-sync.ts                                       @skyf0xx
 /apps/extension/src/passkey/                                               @skyf0xx
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
@@ -45,6 +48,7 @@
 /packages/core/src/models/wallet.ts                                        @skyf0xx
 /packages/core/src/models/session.ts                                       @skyf0xx
 /packages/core/src/models/passkey.ts                                       @skyf0xx
+/packages/core/src/models/backup.ts                                        @skyf0xx
 /packages/app/src/keyfile/                                                 @skyf0xx
 
 # 2 Signing

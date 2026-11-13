@@ -5,6 +5,7 @@ import {
   WATCHED_TOKENS_BACKUP_PREFIX,
   walletsOf,
   type BackupData,
+  type BackupDevice,
 } from "./file";
 
 /** `newer`'s items in their order, then `older`'s that `newer` lacks. A shared item is whichever `pick` keeps. */
@@ -55,4 +56,11 @@ export function mergeBackupData(older: BackupData, newer: BackupData): BackupDat
     merged[key] = union(listOf<string>(older, key), listOf<string>(newer, key), (id) => id, (_, theirs) => theirs);
   }
   return merged;
+}
+
+/** Every device's vault as one, the device that wrote last counting as newest. */
+export function mergeBackupDevices(devices: Readonly<Record<string, BackupDevice>>): BackupData {
+  return Object.values(devices)
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+    .reduce<BackupData>((merged, device) => mergeBackupData(merged, device.data), {});
 }

@@ -22,5 +22,16 @@ export interface SessionKeyStorePort {
   /** The subset of `walletIds` that currently has a key. */
   has(walletIds: readonly string[]): Promise<string[]>;
   remove(walletId: string): Promise<void>;
+  /**
+   * Holds the vault backup's key (`signer/backup-key.ts`) beside the
+   * wallets' keys, replacing any earlier one. The caller zeroizes `raw`.
+   */
+  importBackupKey(raw: Bytes): Promise<void>;
+  /** Encrypts a backup body. Rejects with no backup key. */
+  sealBackup(plaintext: Bytes, backupId: string): Promise<Bytes>;
+  /** Decrypts a backup body. Rejects with no backup key, or when the body isn't this key's and this backup's. */
+  openBackup(sealed: Bytes, backupId: string): Promise<Bytes>;
+  removeBackupKey(): Promise<void>;
+  /** Drops every wallet's key and the backup key. */
   clear(): Promise<void>;
 }

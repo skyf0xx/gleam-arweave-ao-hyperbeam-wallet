@@ -17,6 +17,7 @@ import type {
   InviteUnlock,
   JWKInterface,
   LockSettings,
+  BackupStatus,
   PasskeyStatus,
   DisplayCurrency,
   DisplaySettings,
@@ -127,6 +128,17 @@ export interface ProtocolMap {
   /** Unlocks with the PRF output (base64url) of the enrolled passkey. */
   unlockWithPasskey(req: { credentialId: string; prfOutput: string }): { unlockedWalletIds: string[] };
   removePasskey(): void;
+  getBackupStatus(): BackupStatus;
+  /** Turns the vault backup on and writes the first file. Opens the account's sign-in. */
+  setUpBackup(req: { password: string }): BackupStatus;
+  /** Writes the backup now, opening the account's sign-in when it is needed. */
+  backUpNow(): BackupStatus;
+  /** Deletes the backup from the account and stops backing up. */
+  turnOffBackup(): BackupStatus;
+  /** Signs in to the account and reports whether it holds a backup. */
+  findBackup(): { found: boolean };
+  /** Restores the account's backup onto an empty vault. No wallet is unlocked when its wallets are under another password. */
+  restoreBackup(req: { password: string }): { unlockedWalletIds: string[] };
 
   // reads
   /**

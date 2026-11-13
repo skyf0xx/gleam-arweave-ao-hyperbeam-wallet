@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBackedUpKey, isValidBackupData, watchedTokensBackupKey, type BackupData } from "./file";
+import { isBackedUpKey, isValidBackupBody, isValidBackupData, newBackupId, watchedTokensBackupKey, type BackupData } from "./file";
 import { readBackupData, writeBackupData } from "./select";
 import { address, contact, keyfileWallet, memoryStorage } from "./fixtures.testing";
 
@@ -93,5 +93,25 @@ describe("isBackedUpKey", () => {
     expect(Object.keys(EXCLUDED).some(isBackedUpKey)).toBe(false);
     expect(isBackedUpKey("local:backupKey")).toBe(false);
     expect(isBackedUpKey("local:watchedProcessIds:not-an-address")).toBe(false);
+  });
+});
+
+describe("isValidBackupBody", () => {
+  const writer = newBackupId();
+  const body = { v: 1, backupId: newBackupId(), updatedAt: 2, writer, devices: { [writer]: { updatedAt: 2, data: INCLUDED } } };
+
+  it("accepts a body holding its writer's vault and another device's", () => {
+    expect(isValidBackupBody(body)).toBe(true);
+    expect(isValidBackupBody({ ...body, devices: { ...body.devices, [newBackupId()]: { updatedAt: 1, data: {} } } })).toBe(true);
+  });
+
+  it.each<[string, unknown]>([
+    ["no vault for its writer", { ...body, devices: {} }],
+    ["a device with a malformed wallet", { ...body, devices: { ...body.devices, [newBackupId()]: { updatedAt: 1, data: { "local:wallets": [{ id: "broken" }] } } } }],
+    ["a device id that is not one", { ...body, devices: { ...body.devices, "../x": { updatedAt: 1, data: {} } } }],
+    ["more devices than Gleam writes", { ...body, devices: { ...body.devices, ...Object.fromEntries(Array.from({ length: 16 }, () => [newBackupId(), { updatedAt: 1, data: {} }])) } }],
+    ["another version", { ...body, v: 2 }],
+  ])("refuses a body with %s", (_, value) => {
+    expect(isValidBackupBody(value)).toBe(false);
   });
 });

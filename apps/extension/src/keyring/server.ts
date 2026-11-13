@@ -102,6 +102,7 @@ export async function serveKeyringRequest(keyring: SessionKeyStorePort, message:
     if (request.op === "import") {
       for (const field of Object.keys(request.jwk)) delete (request.jwk as unknown as Record<string, unknown>)[field];
     }
+    if (request.op === "importBackup") request.raw = "";
   }
 }
 
@@ -131,6 +132,22 @@ async function run(keyring: SessionKeyStorePort, request: KeyringRequest): Promi
       return keyring.has(request.walletIds);
     case "remove":
       await keyring.remove(request.walletId);
+      return null;
+    case "importBackup": {
+      const raw = base64ToBytes(request.raw);
+      try {
+        await keyring.importBackupKey(raw);
+        return null;
+      } finally {
+        zeroize(raw);
+      }
+    }
+    case "sealBackup":
+      return bytesToBase64(await keyring.sealBackup(base64ToBytes(request.data), request.backupId));
+    case "openBackup":
+      return bytesToBase64(await keyring.openBackup(base64ToBytes(request.data), request.backupId));
+    case "removeBackup":
+      await keyring.removeBackupKey();
       return null;
     case "clear":
       await keyring.clear();
@@ -169,6 +186,16 @@ function parseRequest(message: unknown): KeyringRequest | null {
     }
     case "remove":
       return walletId === null ? null : { op: "remove", walletId };
+    case "importBackup":
+      return typeof value.raw === "string" ? { op: "importBackup", raw: value.raw } : null;
+    case "sealBackup":
+    case "openBackup": {
+      const { backupId, data } = value;
+      if (typeof backupId !== "string" || typeof data !== "string") return null;
+      return { op: value.op, backupId, data };
+    }
+    case "removeBackup":
+      return { op: "removeBackup" };
     case "clear":
       return { op: "clear" };
     default:

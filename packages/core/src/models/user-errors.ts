@@ -57,6 +57,11 @@ export const USER_ERRORS = {
   keyfileNoKeyMaterial: 'No exportable key material for wallet "{wallet}".',
 
   passkeyUnexpectedSecret: "The passkey returned an unexpected secret.",
+  backupUnavailable: "Backup isn't available on this device.",
+  backupSignInNeeded: "Sign in to back up.",
+  backupFileMissing: "No backup found in this account.",
+  backupFileCorrupt: "This backup can't be read.",
+  backupWrongPassword: "That password didn't open this backup.",
   passkeyBadResponse: "The passkey didn't return what Gleam needs.",
   passkeyNotSetUp: "No passkey is set up for Gleam. Unlock with your password.",
   passkeyWrongCredential: "That isn't the passkey set up for Gleam. Try again, or use your password.",

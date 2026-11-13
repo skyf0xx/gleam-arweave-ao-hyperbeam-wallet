@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isValidBackupData, watchedTokensBackupKey, type BackupData } from "./file";
-import { mergeBackupData } from "./merge";
+import { mergeBackupData, mergeBackupDevices } from "./merge";
 import { address, contact, keyfileWallet } from "./fixtures.testing";
 
 const TOKENS = watchedTokensBackupKey(address("2"));
@@ -63,5 +63,17 @@ describe("mergeBackupData", () => {
     const b = structuredClone(B);
     mergeBackupData(a, b);
     expect([a, b]).toEqual([A, B]);
+  });
+});
+
+describe("mergeBackupDevices", () => {
+  it("merges every device, the last writer counting as newest", () => {
+    const merged = mergeBackupDevices({ b: { updatedAt: 2, data: B }, a: { updatedAt: 1, data: A } });
+    expect(merged).toEqual(mergeBackupData(A, B));
+  });
+
+  it("is one device's vault when it is alone", () => {
+    expect(mergeBackupDevices({ a: { updatedAt: 1, data: A } })).toEqual(A);
+    expect(mergeBackupDevices({})).toEqual({});
   });
 });

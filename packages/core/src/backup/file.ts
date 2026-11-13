@@ -36,12 +36,26 @@ export interface BackupHeader extends BackupStamp {
 /** Storage values by storage key. */
 export type BackupData = Record<string, unknown>;
 
+/** One install's vault, as of its last write. */
+export interface BackupDevice {
+  updatedAt: number;
+  data: BackupData;
+}
+
+/** Past this many installs the file is not one Gleam wrote. */
+export const MAX_BACKUP_DEVICES = 16;
+
 /**
  * The encrypted part of the file. It repeats the stamp so the header,
  * which nothing authenticates, can be checked against it after decryption.
+ *
+ * Each install sharing the backup keeps its own vault under its `writer`
+ * id and replaces only that on a write, so no device overwrites what
+ * another added, and a wallet deleted on every device that had it is gone
+ * from the backup. A restore merges them all (`mergeBackupDevices`).
  */
 export interface BackupBody extends BackupStamp {
-  data: BackupData;
+  devices: Record<string, BackupDevice>;
 }
 
 export interface BackupFile {
@@ -192,8 +206,22 @@ export function isValidBackupHeader(value: unknown): value is BackupHeader {
   return isBackupStamp(value) && isWrappedKey((value as { wrapped?: unknown }).wrapped);
 }
 
+function isBackupDevice(value: unknown): value is BackupDevice {
+  if (value === null || typeof value !== "object") return false;
+  const { updatedAt, data } = value as Record<string, unknown>;
+  return typeof updatedAt === "number" && Number.isSafeInteger(updatedAt) && isValidBackupData(data);
+}
+
 export function isValidBackupBody(value: unknown): value is BackupBody {
-  return isBackupStamp(value) && isValidBackupData((value as { data?: unknown }).data);
+  if (!isBackupStamp(value)) return false;
+  const devices = (value as { devices?: unknown }).devices;
+  if (devices === null || typeof devices !== "object" || Array.isArray(devices)) return false;
+  const entries = Object.entries(devices);
+  return (
+    entries.length <= MAX_BACKUP_DEVICES &&
+    Object.hasOwn(devices, value.writer) &&
+    entries.every(([writer, device]) => ID_PATTERN.test(writer) && isBackupDevice(device))
+  );
 }
 
 /** Whether a decrypted body belongs under this header. A mismatch means the clear header was altered. */

@@ -295,6 +295,12 @@ export const BACKGROUND_MESSAGES = {
   enrollPasskey: EXTENSION,
   unlockWithPasskey: EXTENSION,
   removePasskey: EXTENSION,
+  getBackupStatus: EXTENSION,
+  setUpBackup: EXTENSION,
+  backUpNow: EXTENSION,
+  turnOffBackup: EXTENSION,
+  findBackup: EXTENSION,
+  restoreBackup: EXTENSION,
   resetAllWallets: EXTENSION,
 
   // reads

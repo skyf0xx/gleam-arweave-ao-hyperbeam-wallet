@@ -28,6 +28,8 @@ import {
 } from "@gleam/messaging/src/page-protocol.ts";
 import { WalletLifecycleHandler } from "./handlers/wallet-lifecycle";
 import { PasskeyHandler } from "./handlers/passkey";
+import { BackupHandler } from "./handlers/backup";
+import { registerBackupSync } from "./backup-sync";
 import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
 import { BrowserSitesHandler } from "./handlers/browser-sites";
 import { ContactsHandler } from "./handlers/contacts";
@@ -164,6 +166,12 @@ export function createRuntime(platform: Platform): Runtime {
 
   const lifecycle = new WalletLifecycleHandler(storage, keySession, { downloads: platform.downloads });
   const passkey = new PasskeyHandler(storage, lifecycle);
+  const backup = new BackupHandler({ storage, sessionKeys: platform.sessionKeys, cloudFile: platform.cloudFile, vault: lifecycle });
+  if (platform.cloudFile) registerBackupSync(storage, platform.timer, backup);
+  // A change made while locked waits for the unlock that brings the backup key back.
+  const syncBackup = () => {
+    backup.sync().catch((error: unknown) => console.error("Vault backup failed.", error));
+  };
   const reads = new ReadsHandler(storage);
   // `approval` is declared below; hardware sends reach it only at call time.
   const transfer: TransferHandler = new TransferHandler(storage, keySession, {
@@ -577,6 +585,7 @@ export function createRuntime(platform: Platform): Runtime {
     unlockWallet: async (data) => {
       const result = await lifecycle.unlockWallet(data);
       void platform.lockIndicator.setLocked(false);
+      syncBackup();
       return result;
     },
     getPasskeyStatus: () => passkey.getPasskeyStatus(),
@@ -586,6 +595,17 @@ export function createRuntime(platform: Platform): Runtime {
     unlockWithPasskey: async (data) => {
       const result = await passkey.unlockWithPasskey(data);
       void platform.lockIndicator.setLocked(false);
+      syncBackup();
+      return result;
+    },
+    getBackupStatus: () => backup.status(),
+    setUpBackup: (data) => backup.setUp(data),
+    backUpNow: () => backup.backUpNow(),
+    turnOffBackup: () => backup.turnOff(),
+    findBackup: () => backup.find(),
+    restoreBackup: async (data) => {
+      const result = await backup.restore(data);
+      if (result.unlockedWalletIds.length > 0) void platform.lockIndicator.setLocked(false);
       return result;
     },
     removePasskey: () => passkey.removePasskey(),
