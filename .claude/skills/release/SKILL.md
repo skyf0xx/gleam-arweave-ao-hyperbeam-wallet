@@ -35,6 +35,13 @@ key or store credential.
    It checks the tag against `origin/master`, rebuilds the web bundle and
    compares it with the manifest before unlocking any credential
    (`apps/mobile/fastlane/README.md`).
+   Before the first iOS build that ships vault backup, and after any
+   change to the CloudKit record (`VaultBackup` in
+   `plugins/cloud-backup/.../ICloudFilePlugin.swift`), the maintainer
+   deploys the schema: https://icloud.developer.apple.com/dashboard →
+   `iCloud.app.gleamwallet` → Schema → "Deploy Schema Changes…" to
+   Production. TestFlight builds read Production and refuse an
+   undeployed record type.
 4. **Stores stay manual:** the Chrome Web Store upload, App Store review,
    and promoting the Android build.
 
