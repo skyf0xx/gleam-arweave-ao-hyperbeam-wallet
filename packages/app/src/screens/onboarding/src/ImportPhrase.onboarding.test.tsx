@@ -40,6 +40,28 @@ describe("ImportPhrase", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/13 words/);
   });
 
+  it("blocks submit while an off-length paste is shown, and never derives", async () => {
+    const { paste, derive } = setup();
+    paste(1, `${"abandon ".repeat(23)}art abandon`);
+    expect(screen.getByRole("alert").textContent).toMatch(/25 words/);
+    const button = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    // A disabled button can't be clicked, but Enter still submits the
+    // form, so the handler itself has to refuse too.
+    fireEvent.submit(document.querySelector("form")!);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(derive).not.toHaveBeenCalled();
+  });
+
+  it("lets an edited cell clear the off-length paste error", () => {
+    const { paste, cell } = setup();
+    paste(1, `${"abandon ".repeat(23)}art abandon`);
+    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(cell(24), { target: { value: "zoo" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("keeps the words out of password managers, autocorrect and view", () => {
     const { cell } = setup();
     const input = cell(1);
