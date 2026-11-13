@@ -43,16 +43,42 @@ export function ExistingWalletOptions({ onImport, onImportPhrase, onConnectKeyst
   );
 }
 
-export interface ExistingWalletProps extends ExistingWalletOptionsProps {
-  onBack: () => void;
+/** The vault backup in the user's cloud account, offered where the shell can reach one. */
+export interface RestoreOption {
+  /** "Google" or "iCloud". */
+  account: string;
+  onRestore: () => void;
+  /** Signing in and looking for the backup. */
+  busy: boolean;
+  error?: string;
 }
 
-export function ExistingWallet({ onBack, ...options }: ExistingWalletProps) {
+export interface ExistingWalletProps extends ExistingWalletOptionsProps {
+  onBack: () => void;
+  restore?: RestoreOption;
+}
+
+export function ExistingWallet({ onBack, restore, ...options }: ExistingWalletProps) {
   const t = useT();
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title={t("onboarding.useExistingWallet")} onBack={onBack} />
+      <ScreenHeader title={t("onboarding.useExistingWallet")} onBack={onBack} busy={restore?.busy} />
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 py-6">
+        {restore ? (
+          <div className="flex flex-col">
+            <OptionRow
+              title={t("backup.restoreFrom", { account: restore.account })}
+              description={t("backup.restoreHint")}
+              disabled={restore.busy}
+              onClick={restore.onRestore}
+            />
+            {restore.error ? (
+              <p role="alert" className="text-caption text-warning">
+                {restore.error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <ExistingWalletOptions {...options} />
       </div>
     </div>

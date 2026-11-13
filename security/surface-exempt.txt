@@ -19,6 +19,7 @@ packages/app/src/app-platform/qr-scanner.ts The AppPlatform port and its React c
 packages/app/src/app-platform/types.ts The AppPlatform port and its React context; the shells' implementations are listed.
 packages/app/src/display-settings.ts Display preferences and share text.
 packages/app/src/points-share.ts Display preferences and share text.
+packages/app/src/relative-time.ts Words a timestamp as "5m ago"; reads nothing and decides nothing.
 packages/app/src/screens/activity/src/AddressRow.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/activity/src/queryKeys.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/activity/src/useActivity.ts A screen outside the key, signing and approval paths.
@@ -29,6 +30,7 @@ packages/app/src/screens/activity/src/useOtherWallets.ts A screen outside the ke
 packages/app/src/screens/contacts/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/contacts/src/ContactsView.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useTokenPrices.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/backup/index.tsx Route entry; mounts backup/src, which is listed.
 packages/app/src/screens/onboarding/index.tsx Route entry; mounts onboarding/src, which is listed.
 packages/app/src/screens/points/src/JoinNote.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/points/src/formatPoints.ts A screen outside the key, signing and approval paths.

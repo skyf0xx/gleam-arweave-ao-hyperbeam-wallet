@@ -1,5 +1,6 @@
 import {
   base64UrlToBytes,
+  isPasskeyEnrollment,
   unwrapWithPasskey,
   wrapWithPasskey,
   type PasskeyEnrollment,
@@ -15,20 +16,6 @@ export interface PasskeyVault {
   checkVaultPassword(req: { password: string }): Promise<void>;
   unlockWallet(req: { password: string }): Promise<{ unlockedWalletIds: string[] }>;
   hasVaultPassword(): Promise<boolean>;
-}
-
-function isEnrollment(value: unknown): value is PasskeyEnrollment {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    candidate.version === 1 &&
-    typeof candidate.credentialId === "string" &&
-    candidate.credentialId.length > 0 &&
-    typeof candidate.prfSalt === "string" &&
-    typeof candidate.iv === "string" &&
-    typeof candidate.ciphertext === "string" &&
-    typeof candidate.createdAt === "number"
-  );
 }
 
 function decodePrfOutput(value: string): Uint8Array<ArrayBuffer> {
@@ -57,7 +44,7 @@ export class PasskeyHandler {
    */
   private async loadEnrollment(): Promise<PasskeyEnrollment | null> {
     const raw = await this.storage.get<unknown>(PASSKEY_KEY);
-    if (!isEnrollment(raw)) return null;
+    if (!isPasskeyEnrollment(raw)) return null;
     if (!(await this.vault.hasVaultPassword())) {
       await this.removePasskey();
       return null;

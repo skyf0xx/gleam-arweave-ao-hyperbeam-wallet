@@ -96,6 +96,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
       qrScanner: preview?.capabilities.qrScanner ?? true,
       hostPermissions: false,
       lockOnSystemLock: false,
+      cloudBackup: null,
     },
     hostPermissions: { contains: async () => true, request: async () => true },
     ephemeralState: {

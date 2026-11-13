@@ -27,7 +27,8 @@ tests check Gleam's ANS-104 bytes against it.
   and allowed no npm imports but `hash-wasm`), `vault/` and `keys/`
   (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL,
   bundler), `ao/` (AO balance, transfer, result, peers), `hardware/`
-  (Ledger APDUs), `points/`, `scan/`, `recipients/`, `activity/`,
+  (Ledger APDUs), `backup/` (the vault backup's file format, merge and
+  Drive client), `points/`, `scan/`, `recipients/`, `activity/`,
   `pricing/`, `policy/` and `models/`. `ports/` holds the interfaces for
   storage, session keys, the approval presenter, timer, badge, downloads,
   device key and the runtime client.
@@ -130,6 +131,13 @@ tests check Gleam's ANS-104 bytes against it.
   pending approvals. Handlers get a signer through `handlers/key-session.ts`
   (`getSigner`). Never write key material to `chrome.storage` or
   IndexedDB, and never re-derive it from a password.
+- **Vault backup** keeps one encrypted file in the user's cloud account
+  through `CloudFilePort` (`handlers/backup.ts`, `backup-sync.ts`). Its
+  random key is stored wrapped under the vault password
+  (`signer/backup-key.ts`) and held unwrapped only by the keyring, from
+  unlock to lock. The file holds one vault per install; a write replaces
+  only this install's, and a restore merges them all. A storage key is
+  backed up only when `core/backup/file.ts` lists it with a guard.
 - **Passkey unlock** wraps the vault password under the passkey's
   WebAuthn PRF output (`core/vault/passkey.ts`, `handlers/passkey.ts`),
   so it unlocks exactly like the password. The RP id is the extension

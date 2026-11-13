@@ -15,13 +15,19 @@
 1 packages/core/src/keys/
 1 packages/core/src/signer/
 1 packages/core/src/ports/session-keys.ts
+1 packages/core/src/backup/
+1 packages/core/src/ports/cloud-file.ts
 1 apps/extension/src/keyring/
 1 apps/extension/entrypoints/keyring/
 1 apps/extension/src/adapters/offscreen-keyring.ts
+1 apps/extension/src/adapters/google-auth.ts
 1 apps/extension/src/adapters/session-key-store.ts
 1 packages/runtime/src/handlers/key-session.ts
 1 packages/runtime/src/handlers/wallet-lifecycle.ts
 1 packages/runtime/src/handlers/passkey.ts
+1 packages/runtime/src/handlers/backup.ts
+1 packages/runtime/src/handlers/backup-state.ts
+1 packages/runtime/src/backup-sync.ts
 1 apps/extension/src/passkey/
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
@@ -46,10 +52,12 @@
 1 apps/extension/src/adapters/downloads.ts
 1 packages/app/src/screens/onboarding/src/
 1 packages/app/src/screens/lock-settings/src/
+1 packages/app/src/screens/backup/src/
 1 packages/app/src/screens/unlock/
 1 packages/core/src/models/wallet.ts
 1 packages/core/src/models/session.ts
 1 packages/core/src/models/passkey.ts
+1 packages/core/src/models/backup.ts
 1 packages/app/src/keyfile/
 
 2 packages/core/src/ao/transfer.ts

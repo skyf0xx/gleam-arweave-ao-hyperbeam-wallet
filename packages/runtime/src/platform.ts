@@ -1,6 +1,7 @@
 import type {
   ApprovalPresenterPort,
   BadgePort,
+  CloudFilePort,
   DeviceKeyPort,
   DownloadPort,
   SessionKeyStorePort,
@@ -48,6 +49,8 @@ export interface Platform {
   badge: BadgePort;
   lockIndicator: LockIndicatorPort;
   downloads: DownloadPort;
+  /** Where the vault backup is kept. Absent on a shell that has nowhere to keep one. */
+  cloudFile?: CloudFilePort;
   tabs: TabsPort;
   /** The wallet's release version, as reported to the scans API. */
   version(): string;

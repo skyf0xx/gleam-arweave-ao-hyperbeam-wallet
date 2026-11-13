@@ -21,6 +21,8 @@ export type { TimerPort } from "./ports/timer";
 export type { DeviceKey, DeviceKeyPort } from "./ports/device-key";
 export type { SessionKeyStorePort } from "./ports/session-keys";
 export type { DownloadPort, FileDownloadResult } from "./ports/downloads";
+export type { CloudFilePort } from "./ports/cloud-file";
+export * from "./backup/index";
 export {
   estimateHistoricalPortfolioValue,
   type PricedHistoricalToken,

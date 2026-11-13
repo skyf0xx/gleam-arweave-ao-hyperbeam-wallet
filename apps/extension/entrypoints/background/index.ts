@@ -1,3 +1,5 @@
+import { createGoogleDriveFile } from "@gleam/core/src/backup/google-drive.ts";
+import { createGoogleAuth } from "@/src/adapters/google-auth";
 import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
@@ -38,6 +40,7 @@ const platform: Platform = {
   badge: actionBadge,
   lockIndicator: actionLockIcon,
   downloads: browserDownloads,
+  cloudFile: createGoogleDriveFile(createGoogleAuth({ storage })),
   tabs: createBrowserTabs(messenger),
   version: () => browser.runtime.getManifest().version,
   shell: "extension",

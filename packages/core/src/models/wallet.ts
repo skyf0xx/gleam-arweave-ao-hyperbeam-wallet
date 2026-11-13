@@ -71,6 +71,65 @@ export interface Wallet {
   device?: HardwareDevice;
 }
 
+const KEYSTONE_XFP_PATTERN = /^[0-9a-fA-F]{8}$/;
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+export function isValidHardwareDevice(value: unknown): value is HardwareDevice {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.kind === "keystone") {
+    return typeof candidate.xfp === "string" && KEYSTONE_XFP_PATTERN.test(candidate.xfp);
+  }
+  if (candidate.kind === "ledger") {
+    return (
+      isOptionalString(candidate.model) &&
+      isOptionalString(candidate.appVersion) &&
+      (candidate.app === undefined || candidate.app === "Arweave" || candidate.app === "Permaweb")
+    );
+  }
+  return false;
+}
+
+/**
+ * Whether `value` is a wallet record as storage or a backup may hold it.
+ * Both are untrusted input: a record is re-checked on every load, and a
+ * malformed one is dropped rather than trusted.
+ */
+export function isValidWallet(value: unknown): value is Wallet {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    typeof candidate.address === "string" &&
+    candidate.address.length > 0 &&
+    typeof candidate.name === "string" &&
+    (candidate.method === "jwk" ||
+      candidate.method === "ethereum" ||
+      candidate.method === "ledger" ||
+      candidate.method === "keystone" ||
+      candidate.method === "watch") &&
+    typeof candidate.publicKey === "string" &&
+    typeof candidate.createdAt === "number" &&
+    typeof candidate.updatedAt === "number" &&
+    (candidate.encryptedKeyfile === null ||
+      (typeof candidate.encryptedKeyfile === "object" && candidate.encryptedKeyfile !== null)) &&
+    // Records stored before this field existed lack it; they read as never confirmed.
+    (candidate.backupConfirmedAt === undefined ||
+      candidate.backupConfirmedAt === null ||
+      typeof candidate.backupConfirmedAt === "number") &&
+    (isHardwareWalletMethod(candidate.method as Wallet["method"])
+      ? candidate.encryptedKeyfile === null &&
+        isValidHardwareDevice(candidate.device) &&
+        candidate.device.kind === candidate.method
+      : candidate.device === undefined) &&
+    (candidate.method !== "watch" || candidate.encryptedKeyfile === null)
+  );
+}
+
 /**
  * The subset of a Wallet safe to return across the messaging boundary
  * for lifecycle calls (create/import/switch) — never includes

@@ -3,7 +3,9 @@
  * no "system/auto" option — light is the default for a wallet with no
  * stored preference yet.
  */
-export type ThemePreference = "light" | "dark";
+export const THEME_PREFERENCES = ["light", "dark"] as const;
+
+export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 
 /**
  * Mirrors `LockSettings`/`NetworkSettings`'s single-field settings-object
@@ -17,4 +19,12 @@ export type ThemePreference = "light" | "dark";
  */
 export interface ThemeSettings {
   theme: ThemePreference;
+}
+
+export function isThemeSettings(value: unknown): value is ThemeSettings {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    THEME_PREFERENCES.includes((value as Record<string, unknown>).theme as ThemePreference)
+  );
 }

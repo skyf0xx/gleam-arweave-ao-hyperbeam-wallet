@@ -138,6 +138,40 @@ export function describeSessionKeyStorePort(name: string, makeHarness: () => Pro
         await expect(verifies(jwkB, data, signature)).resolves.toBe(true);
       }));
 
+    it("seals and opens a backup body under the imported backup key", () =>
+      withPort(async (port) => {
+        await port.importBackupKey(crypto.getRandomValues(new Uint8Array(32)));
+
+        const sealed = await port.sealBackup(bytes("vault"), "backup-a");
+
+        expect(new TextDecoder().decode(await port.openBackup(sealed, "backup-a"))).toBe("vault");
+        await expect(port.openBackup(sealed, "backup-b")).rejects.toThrow();
+      }));
+
+    it("rejects sealing and opening with no backup key, and after it is removed or cleared", () =>
+      withPort(async (port) => {
+        await expect(port.sealBackup(bytes("vault"), "backup-a")).rejects.toThrow();
+
+        await port.importBackupKey(crypto.getRandomValues(new Uint8Array(32)));
+        const sealed = await port.sealBackup(bytes("vault"), "backup-a");
+        await port.removeBackupKey();
+        await expect(port.openBackup(sealed, "backup-a")).rejects.toThrow();
+
+        await port.importBackupKey(crypto.getRandomValues(new Uint8Array(32)));
+        await port.clear();
+        await expect(port.sealBackup(bytes("vault"), "backup-a")).rejects.toThrow();
+      }));
+
+    it("keeps the wallets' keys when the backup key is removed", () =>
+      withPort(async (port) => {
+        await port.importKey("a", jwkA);
+        await port.importBackupKey(crypto.getRandomValues(new Uint8Array(32)));
+
+        await port.removeBackupKey();
+
+        await expect(port.has(["a"])).resolves.toEqual(["a"]);
+      }));
+
     it("exposes only the port's operations, never a way to read a key", () =>
       withPort(async (port) => {
         await port.importKey("a", jwkA);

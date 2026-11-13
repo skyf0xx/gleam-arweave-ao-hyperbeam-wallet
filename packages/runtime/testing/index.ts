@@ -12,3 +12,4 @@ export { describeApprovalPresenterPort, type ApprovalPresenterHarness } from "./
 export { describeSessionKeyStorePort, type SessionKeysHarness } from "./conformance/session-keys";
 export { describeStoragePort, type StorageHarness } from "./conformance/storage";
 export { describeTimerPort, type TimerHarness } from "./conformance/timer";
+export { InMemoryCloudAccount, InMemoryCloudFile } from "./in-memory-cloud-file";

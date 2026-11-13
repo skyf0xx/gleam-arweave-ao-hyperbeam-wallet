@@ -53,6 +53,7 @@ export function createExtensionAppPlatform(
       qrScanner: false,
       hostPermissions: true,
       lockOnSystemLock: true,
+      cloudBackup: "google",
     },
     hostPermissions: {
       contains: (origins) => browser.permissions.contains({ origins: [...origins] }),

@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { HardwareWalletMethod, RuntimePort, WalletSummary } from "@gleam/core";
+import type { BackupProvider, HardwareWalletMethod, RuntimePort, WalletSummary } from "@gleam/core";
 import type { DeviceSignPanels } from "../approval/device-panels";
 
 /**
@@ -21,6 +21,8 @@ export interface AppCapabilities {
   hostPermissions: boolean;
   /** The wallet locks when the OS session does (the extension listens for the computer locking). */
   lockOnSystemLock: boolean;
+  /** The cloud account the shell can keep a vault backup in, or null when it has none. */
+  cloudBackup: BackupProvider | null;
 }
 
 export interface HostPermissionsPort {

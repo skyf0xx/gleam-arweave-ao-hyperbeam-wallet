@@ -17,6 +17,20 @@ export interface PasskeyEnrollment {
   createdAt: number;
 }
 
+export function isPasskeyEnrollment(value: unknown): value is PasskeyEnrollment {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.version === 1 &&
+    typeof candidate.credentialId === "string" &&
+    candidate.credentialId.length > 0 &&
+    typeof candidate.prfSalt === "string" &&
+    typeof candidate.iv === "string" &&
+    typeof candidate.ciphertext === "string" &&
+    typeof candidate.createdAt === "number"
+  );
+}
+
 /** What the UI needs to run a passkey ceremony. Never carries the wrapped password. */
 export type PasskeyStatus =
   | { enrolled: false }

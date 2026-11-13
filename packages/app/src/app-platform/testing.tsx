@@ -49,6 +49,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
       dappBrowser: false,
       qrScanner: false,
       lockOnSystemLock: true,
+      cloudBackup: null,
       hostPermissions: true,
       ...overrides.capabilities,
       hardwareWallets: { ledger: true, keystone: true, ...overrides.capabilities?.hardwareWallets },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { HardwareWalletMethod, RuntimePort, SecurityPhrase, WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
@@ -12,6 +12,8 @@ import { Import } from "./Import";
 import { ImportPhrase } from "./ImportPhrase";
 import { AddWalletStart } from "./AddWalletStart";
 import { ExistingWallet } from "./ExistingWallet";
+import { RestoreBackup } from "./RestoreBackup";
+import { backupAccountName } from "../../backup/index.tsx";
 import { ConnectDevice } from "./ConnectDevice";
 import { WatchAddress } from "./WatchAddress";
 import { usePlatform } from "../../../app-platform/context";
@@ -34,6 +36,7 @@ import { errorText } from "../../../i18n/errors";
 type Step =
   | { kind: "welcome" }
   | { kind: "existing" }
+  | { kind: "restore"; account: string }
   | { kind: "create-password" }
   // The password is kept only until the first download attempt resolves,
   // so the background can decrypt the keyfile when the user saves it.
@@ -117,13 +120,16 @@ const DEFAULT_WALLET_NAMES = [
   "Zircon",
 ];
 
+/** Set while a restore is between finding the backup and finishing it. */
+const RESTORE_PENDING_KEY = "session:onboardingRestorePending";
+
 function randomDefaultWalletName(): string {
   return DEFAULT_WALLET_NAMES[Math.floor(Math.random() * DEFAULT_WALLET_NAMES.length)]!;
 }
 
 export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultHasPassword = true, onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
   const t = useT();
-  const { hardwareWallets, downloads } = usePlatform();
+  const { hardwareWallets, downloads, capabilities, ephemeralState } = usePlatform();
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const connectDevice = (device: HardwareWalletMethod) => {
     if (hardwareWallets.connectViews[device]) setStep({ kind: "connect-device", device });
@@ -141,6 +147,72 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     savedAs: null,
     error: null,
   });
+
+  // A first run can restore from wherever this shell keeps a vault backup.
+  const restoreAccount = !addingWallet && capabilities.cloudBackup ? backupAccountName(capabilities.cloudBackup) : null;
+
+  // The Google sign-in window closes the action popup. The background
+  // carries on, so a popup reopened mid-restore picks it up where it was.
+  const [resuming, setResuming] = useState(restoreAccount !== null);
+
+  const findBackup = async (account: string) => {
+    setSubmitting(true);
+    setServerError(undefined);
+    await ephemeralState.set(RESTORE_PENDING_KEY, true).catch(() => {});
+    try {
+      const { found } = await runtime.send<void, { found: boolean }>({ type: "findBackup", payload: undefined });
+      if (found) {
+        setStep({ kind: "restore", account });
+        return;
+      }
+      setServerError(t("errors.backupFileMissing"));
+    } catch (error) {
+      setServerError(errorText(error));
+    } finally {
+      setSubmitting(false);
+    }
+    await ephemeralState.remove(RESTORE_PENDING_KEY).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (restoreAccount === null) return;
+    let cancelled = false;
+    void ephemeralState
+      .get(RESTORE_PENDING_KEY)
+      .catch(() => undefined)
+      .then((pending) => {
+        if (cancelled) return;
+        setResuming(false);
+        if (pending !== true) return;
+        setStep({ kind: "existing" });
+        void findBackup(restoreAccount);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Once, on mount: a later render must not restart a restore the user backed out of.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const leaveRestore = () => {
+    void ephemeralState.remove(RESTORE_PENDING_KEY).catch(() => {});
+    setServerError(undefined);
+    setStep({ kind: "existing" });
+  };
+
+  const handleRestore = async (password: string) => {
+    setSubmitting(true);
+    setServerError(undefined);
+    try {
+      await runtime.send<{ password: string }, { unlockedWalletIds: string[] }>({ type: "restoreBackup", payload: { password } });
+      await ephemeralState.remove(RESTORE_PENDING_KEY).catch(() => {});
+      onComplete();
+    } catch (error) {
+      setServerError(errorText(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const proceed = (wallet: WalletSummary) => {
     if (claim) setStep({ kind: "claim", wallet });
@@ -229,6 +301,9 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     }
   };
 
+  // Blank for the moment it takes to read, rather than flashing Welcome before the restore step.
+  if (resuming) return null;
+
   switch (step.kind) {
     case "welcome":
       if (addingWallet) {
@@ -260,6 +335,27 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
           onConnectKeystone={connectKeystone}
           onConnectLedger={connectLedger}
           onWatch={() => setStep({ kind: "watch" })}
+          restore={
+            restoreAccount
+              ? {
+                  account: restoreAccount,
+                  onRestore: () => void findBackup(restoreAccount),
+                  busy: submitting,
+                  error: serverError,
+                }
+              : undefined
+          }
+        />
+      );
+
+    case "restore":
+      return (
+        <RestoreBackup
+          account={step.account}
+          onBack={leaveRestore}
+          onSubmit={(password) => void handleRestore(password)}
+          submitting={submitting}
+          serverError={serverError}
         />
       );
 

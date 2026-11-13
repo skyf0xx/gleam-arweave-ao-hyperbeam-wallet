@@ -8,13 +8,19 @@
 /packages/core/src/keys/                                                   @skyf0xx
 /packages/core/src/signer/                                                 @skyf0xx
 /packages/core/src/ports/session-keys.ts                                   @skyf0xx
+/packages/core/src/backup/                                                 @skyf0xx
+/packages/core/src/ports/cloud-file.ts                                     @skyf0xx
 /apps/extension/src/keyring/                                               @skyf0xx
 /apps/extension/entrypoints/keyring/                                       @skyf0xx
 /apps/extension/src/adapters/offscreen-keyring.ts                          @skyf0xx
+/apps/extension/src/adapters/google-auth.ts                                @skyf0xx
 /apps/extension/src/adapters/session-key-store.ts                          @skyf0xx
 /packages/runtime/src/handlers/key-session.ts                              @skyf0xx
 /packages/runtime/src/handlers/wallet-lifecycle.ts                         @skyf0xx
 /packages/runtime/src/handlers/passkey.ts                                  @skyf0xx
+/packages/runtime/src/handlers/backup.ts                                   @skyf0xx
+/packages/runtime/src/handlers/backup-state.ts                             @skyf0xx
+/packages/runtime/src/backup-sync.ts                                       @skyf0xx
 /apps/extension/src/passkey/                                               @skyf0xx
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
@@ -39,10 +45,12 @@
 /apps/extension/src/adapters/downloads.ts                           @skyf0xx
 /packages/app/src/screens/onboarding/src/                           @skyf0xx
 /packages/app/src/screens/lock-settings/src/                        @skyf0xx
+/packages/app/src/screens/backup/src/                               @skyf0xx
 /packages/app/src/screens/unlock/                                        @skyf0xx
 /packages/core/src/models/wallet.ts                                        @skyf0xx
 /packages/core/src/models/session.ts                                       @skyf0xx
 /packages/core/src/models/passkey.ts                                       @skyf0xx
+/packages/core/src/models/backup.ts                                        @skyf0xx
 /packages/app/src/keyfile/                                                 @skyf0xx
 
 # 2 Signing

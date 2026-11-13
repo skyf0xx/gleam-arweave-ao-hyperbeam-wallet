@@ -5,7 +5,9 @@ import type { WalletSummary } from "./wallet";
  * service-worker restarts to honor `never`, which is why session metadata is modeled
  * separately from any in-memory-only implementation detail.
  */
-export type AutoLockTimeout = "never" | "immediate" | "5min" | "1hr" | "4hr";
+export const AUTO_LOCK_TIMEOUTS = ["never", "immediate", "5min", "1hr", "4hr"] as const;
+
+export type AutoLockTimeout = (typeof AUTO_LOCK_TIMEOUTS)[number];
 
 /**
  * The unlocked state of the extension. Global, not per-Wallet — a
@@ -22,6 +24,14 @@ export interface Session {
 
 export interface LockSettings {
   autoLockTimeout: AutoLockTimeout;
+}
+
+export function isLockSettings(value: unknown): value is LockSettings {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    AUTO_LOCK_TIMEOUTS.includes((value as Record<string, unknown>).autoLockTimeout as AutoLockTimeout)
+  );
 }
 
 /**

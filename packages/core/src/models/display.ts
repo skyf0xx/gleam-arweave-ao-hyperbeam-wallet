@@ -97,6 +97,18 @@ const CURRENCY_BY_REGION: Record<string, FiatCurrency> = {
   MX: "MXN", HK: "HKD", SG: "SGD", TR: "TRY", NG: "NGN", KE: "KES", ZA: "ZAR", AE: "AED", PL: "PLN", SE: "SEK",
   NO: "NOK", ID: "IDR", PH: "PHP", VN: "VND", UA: "UAH", RU: "RUB",
 };
+export function isDisplaySettings(value: unknown): value is DisplaySettings {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    isDisplayCurrency(record.currency) &&
+    isHeaderStyle(record.header) &&
+    typeof record.tokenLogos === "boolean" &&
+    isTokenRowDetail(record.tokenRows) &&
+    isHeadlineBalance(record.headline) &&
+    typeof record.balancesHidden === "boolean"
+  );
+}
 
 /** The currency of a BCP 47 locale's region (`"de-AT"` → EUR), or USD when it has none we list. */
 export function defaultDisplayCurrency(locale: string | undefined): FiatCurrency {
