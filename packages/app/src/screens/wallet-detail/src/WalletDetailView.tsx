@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
-import { capabilitiesFor, isHardwareWalletMethod, type RuntimePort, type WalletSummary } from "@gleam/core";
+import { capabilitiesFor, isHardwareWalletMethod, type BackupStatus, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
   keyfileDownloadError,
@@ -18,6 +18,7 @@ import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { backupDriveName } from "../../backup/src/BackupView";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -40,6 +41,16 @@ function formatBackupDate(t: TFunction, timestamp: number): string {
   if (days <= 0) return t("walletDetail.backedUpToday");
   if (days === 1) return t("walletDetail.backedUpYesterday");
   return t("walletDetail.backedUpDaysAgo", { days });
+}
+
+/**
+ * Where the cloud backup holds this wallet, or null. It does once a write
+ * that came after the wallet was added has gone through and nothing has
+ * stopped writes since.
+ */
+export function cloudBackupOf(status: BackupStatus, wallet: Pick<WalletSummary, "createdAt">): string | null {
+  if (!status.provider || !status.enabled || status.problem !== null || status.lastBackupAt === null) return null;
+  return status.lastBackupAt >= wallet.createdAt ? backupDriveName(status.provider) : null;
 }
 
 /**
@@ -73,7 +84,7 @@ export function WalletDetailView({
   requestDownloadPermission,
 }: WalletDetailViewProps) {
   const t = useT();
-  const { downloads } = usePlatform();
+  const { downloads, capabilities } = usePlatform();
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
   const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
@@ -84,6 +95,23 @@ export function WalletDetailView({
   const [backupConfirmedAt, setBackupConfirmedAt] = useState(wallet.backupConfirmedAt);
   const [step, setStep] = useState<Step>({ kind: "detail" });
   const [savedAs, setSavedAs] = useState<string | null>(null);
+  const [cloudBackup, setCloudBackup] = useState<string | null>(null);
+
+  const cloudProvider = capabilities.cloudBackup;
+  const createdAt = wallet.createdAt;
+  useEffect(() => {
+    if (!cloudProvider) return;
+    let cancelled = false;
+    runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }).then(
+      (status) => {
+        if (!cancelled) setCloudBackup(cloudBackupOf(status, { createdAt }));
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [runtime, cloudProvider, createdAt]);
 
   const trimmedName = name.trim();
   const nameChanged = trimmedName.length > 0 && trimmedName !== wallet.name;
@@ -229,13 +257,15 @@ export function WalletDetailView({
               <span className="text-label font-semibold text-foreground">{t("walletDetail.backUpKeyfile")}</span>
               <span
                 id="keyfile-backup-status"
-                className={`truncate text-caption ${backupConfirmedAt !== null || savedAs ? "text-muted" : "font-semibold text-warning"}`}
+                className={`truncate text-caption ${backupConfirmedAt !== null || savedAs || cloudBackup ? "text-muted" : "font-semibold text-warning"}`}
               >
                 {savedAs
                   ? t("walletDetail.savedAs", { filename: savedAs })
                   : backupConfirmedAt !== null
                     ? formatBackupDate(t, backupConfirmedAt)
-                    : t("walletDetail.notBackedUp")}
+                    : cloudBackup
+                      ? t("walletDetail.inCloudBackup", { drive: cloudBackup })
+                      : t("walletDetail.notBackedUp")}
               </span>
             </span>
             <ChevronIcon />
