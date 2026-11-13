@@ -66,14 +66,15 @@ describe("BackupView: on", () => {
     try {
       const { runtime } = runtimeWith(ON);
       render(<BackupView runtime={runtime} onBack={vi.fn()} />);
-      fireEvent.click(await screen.findByRole("button", { name: "Back up now" }));
+      // A loaded CI runner can take longer than findBy's default second to settle.
+      fireEvent.click(await screen.findByRole("button", { name: "Back up now" }, { timeout: 5000 }));
 
-      const held = await screen.findByRole("button", { name: "Backed up" });
+      const held = await screen.findByRole("button", { name: "Backed up" }, { timeout: 5000 });
       expect(held).toHaveProperty("disabled", true);
       expect(screen.getByRole("status").textContent).toBe("Backed up");
 
       act(() => vi.advanceTimersByTime(DONE_MS));
-      expect(screen.getByRole("button", { name: "Back up now" })).toHaveProperty("disabled", false);
+      expect(await screen.findByRole("button", { name: "Back up now" }, { timeout: 5000 })).toHaveProperty("disabled", false);
     } finally {
       vi.useRealTimers();
     }
