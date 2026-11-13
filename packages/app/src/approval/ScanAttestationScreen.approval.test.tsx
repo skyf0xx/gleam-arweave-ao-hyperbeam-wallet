@@ -65,7 +65,7 @@ const member = {
 describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
   it("shows every field, and the report as plain text, never as HTML or markdown", async () => {
     const { runtime } = runtimeWith(member);
-    const { container } = render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    const { container } = render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     await screen.findByText("Sign scan attestation", {}, SLOW);
     expect(screen.getByText(/signs a message, not an Arweave transaction/)).toBeTruthy();
@@ -84,7 +84,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
   it("tells a hardware wallet its device signs a proof that is never posted", async () => {
     const keystone = { ...STATE, wallets: [{ ...STATE.wallets[0]!, method: "keystone" as const }] };
     const { runtime } = runtimeWith(member, keystone);
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     await screen.findByText(/0 AR proof of ownership that is never posted/, {}, SLOW);
   });
@@ -93,7 +93,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
     const second = { ...STATE.wallets[0]!, id: "wallet-2", address: "addr-2", name: "Second" };
     // wallet-1 is pinned and unlocked; the user has since switched to a locked wallet-2.
     const switched: WalletState = { ...STATE, wallets: [...STATE.wallets, second], activeWalletId: "wallet-2" };
-    render(<ApprovalRoot requestId="req-attest" runtime={runtimeWith(member, switched).runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtimeWith(member, switched).runtime} />);
     await screen.findByText("Sign scan attestation", {}, SLOW);
     expect(screen.getByText("Main")).toBeTruthy();
   });
@@ -105,7 +105,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       activeWalletId: "wallet-2",
       session: { ...STATE.session!, unlockedWalletIds: ["wallet-2"] },
     };
-    render(<ApprovalRoot requestId="req-attest" runtime={runtimeWith(member, pinnedLocked).runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtimeWith(member, pinnedLocked).runtime} />);
     await screen.findByText(/Unlock to review gleamwallet\.app's request/, {}, SLOW);
     expect(screen.queryByText("Sign scan attestation")).toBeNull();
   });
@@ -116,7 +116,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       result: { ok: true, attestationId: PREVIEW.attestationId, points: "12500000000000", paid: true, unpaidReason: null, paidPlacesLeft: 4 },
     };
     const { runtime, send } = runtimeWith({ ...member, resolveApproval: () => shown });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
 
@@ -133,7 +133,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       checkScanAttestation: () => ({ ok: false, error }),
       resolveApproval,
     });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
 
@@ -149,7 +149,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       result: { ok: false, code: "already_attested", error: "This wallet already attested v1.4.0." },
     };
     const { runtime } = runtimeWith({ ...member, resolveApproval: () => shown });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
 
@@ -162,7 +162,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       result: { ok: true, attestationId: PREVIEW.attestationId, points: "0", paid: false, unpaidReason: "places_taken", paidPlacesLeft: 0 },
     };
     const { runtime } = runtimeWith({ ...member, resolveApproval: () => shown });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
 
@@ -175,7 +175,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       result: { ok: true, attestationId: PREVIEW.attestationId, points: "0", paid: false, unpaidReason: "no_snapshot", paidPlacesLeft: 7 },
     };
     const { runtime } = runtimeWith({ ...member, resolveApproval: () => shown });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign" }, SLOW));
 
@@ -192,7 +192,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
         return { address: "addr-1", inviteCode: "ME", referred: false, joinedAt: 0 };
       },
     });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     await screen.findByText(/isn't in Gleam Points yet/, {}, SLOW);
     expect(screen.queryByText("Sign scan attestation")).toBeNull();
@@ -208,7 +208,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
       getPointsPendingInvite: () => null,
       resolveApproval: () => undefined,
     });
-    render(<ApprovalRoot requestId="req-attest" runtime={runtime} />);
+    render(<ApprovalRoot armDelayMs={0} requestId="req-attest" runtime={runtime} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }, SLOW));
 
