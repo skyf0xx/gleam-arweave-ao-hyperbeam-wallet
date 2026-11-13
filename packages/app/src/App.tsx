@@ -396,7 +396,6 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "home" })}
         onOpenLockSettings={vaultHasPassword(wallets) ? () => setSubView({ kind: "lock-settings" }) : undefined}
-        onOpenBackup={vaultHasPassword(wallets) ? () => setSubView({ kind: "backup" }) : undefined}
         onOpenConnectedApps={() => setSubView({ kind: "connected-apps" })}
         onOpenAppearance={() => setSubView({ kind: "appearance" })}
         onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
@@ -416,7 +415,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
       />
     );
   } else if (subView.kind === "backup") {
-    content = <BackupView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+    content = <BackupView runtime={runtime} onBack={() => setSubView({ kind: "lock-settings" })} />;
   } else if (subView.kind === "lock-settings") {
     content = (
       <LockSettingsView
@@ -426,6 +425,11 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         onSetUpPasskey={platform.capabilities.passkey ? () => platform.unlock.openPasskeyWindow("setup") : undefined}
         biometrics={platform.capabilities.biometrics ? platform.biometrics : undefined}
         lockOnSystemLock={platform.capabilities.lockOnSystemLock}
+        backup={
+          platform.capabilities.cloudBackup
+            ? { provider: platform.capabilities.cloudBackup, open: () => setSubView({ kind: "backup" }) }
+            : undefined
+        }
       />
     );
   } else if (subView.kind === "network-peers") {

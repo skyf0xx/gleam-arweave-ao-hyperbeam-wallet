@@ -24,7 +24,8 @@ describe("BackupView: off", () => {
     const { runtime } = runtimeWith(OFF);
     render(<BackupView runtime={runtime} onBack={vi.fn()} />);
     expect(await screen.findByRole("button", { name: "Back up to Google" })).toHaveProperty("disabled", true);
-    expect(screen.getByText(/in your Google account/)).toBeTruthy();
+    expect(screen.getByText("wallets, contacts and settings").tagName).toBe("STRONG");
+    expect(screen.getByText(/backed up to Google Drive/)).toBeTruthy();
   });
 
   it("sets up with the typed password, then shows the backup as current", async () => {
@@ -75,13 +76,14 @@ describe("BackupView: on", () => {
 
   it("turns off only after the delete is confirmed", async () => {
     const { runtime, send } = runtimeWith(ON, { turnOffBackup: async () => OFF });
-    render(<BackupView runtime={runtime} onBack={vi.fn()} />);
+    const onBack = vi.fn();
+    render(<BackupView runtime={runtime} onBack={onBack} />);
     fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
     expect(send).not.toHaveBeenCalledWith({ type: "turnOffBackup", payload: undefined });
     expect(screen.getByText("Delete the backup from Google?")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete backup" }));
-    expect(await screen.findByRole("button", { name: "Back up to Google" })).toBeTruthy();
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
   });
 
   it("keeps the backup when the delete is cancelled", async () => {

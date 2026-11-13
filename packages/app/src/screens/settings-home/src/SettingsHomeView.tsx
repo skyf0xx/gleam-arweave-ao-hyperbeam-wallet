@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
-import type { AutoLockTimeout, BackupStatus, Grant, LockSettings, NetworkSettings, RuntimePort, ThemePreference } from "@gleam/core";
-import { backupSummary } from "../../backup/src/BackupView";
+import type { AutoLockTimeout, Grant, LockSettings, NetworkSettings, RuntimePort, ThemePreference } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow } from "@gleam/ui/src/primitives/option-list.tsx";
 import { SegmentedRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
@@ -36,8 +35,6 @@ export interface SettingsHomeViewProps {
   onBack: () => void;
   /** Omitted when the vault has no password, which hides Security. */
   onOpenLockSettings?: () => void;
-  /** Omitted when the vault has no password: there is nothing to lock a backup with. */
-  onOpenBackup?: () => void;
   onOpenConnectedApps: () => void;
   onOpenAppearance: () => void;
   onOpenNetworkPeers: () => void;
@@ -48,7 +45,6 @@ interface LoadState {
   lockSettings: LockSettings | null;
   networkSettings: NetworkSettings | null;
   connectedApps: number | null;
-  backup: BackupStatus | null;
   loading: boolean;
 }
 
@@ -56,7 +52,6 @@ export function SettingsHomeView({
   runtime,
   onBack,
   onOpenLockSettings,
-  onOpenBackup,
   onOpenConnectedApps,
   onOpenAppearance,
   onOpenNetworkPeers,
@@ -66,28 +61,24 @@ export function SettingsHomeView({
   const t = useT();
   const language = useLanguage();
   const { version } = platform.buildInfo;
-  const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, connectedApps: null, backup: null, loading: true });
+  const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, connectedApps: null, loading: true });
   const theme = useTheme(runtime);
   const { settings: display } = useDisplaySettings(runtime);
 
-  const showBackup = onOpenBackup !== undefined && platform.capabilities.cloudBackup !== null;
-
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
-    const [lockSettings, networkSettings, connectedApps, backup] = await Promise.allSettled([
+    const [lockSettings, networkSettings, connectedApps] = await Promise.allSettled([
       runtime.send<void, LockSettings>({ type: "getLockSettings", payload: undefined }),
       runtime.send<void, NetworkSettings>({ type: "getNetworkSettings", payload: undefined }),
       runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined }),
-      showBackup ? runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }) : null,
     ]);
     setState({
       lockSettings: lockSettings.status === "fulfilled" ? lockSettings.value : null,
       networkSettings: networkSettings.status === "fulfilled" ? networkSettings.value : null,
       connectedApps: connectedApps.status === "fulfilled" ? (connectedApps.value?.length ?? null) : null,
-      backup: backup.status === "fulfilled" ? (backup.value ?? null) : null,
       loading: false,
     });
-  }, [runtime, showBackup]);
+  }, [runtime]);
 
   useEffect(() => {
     void load();
@@ -134,9 +125,6 @@ export function SettingsHomeView({
               value={state.loading ? undefined : state.lockSettings ? t(TIMEOUT_KEYS[state.lockSettings.autoLockTimeout]) : "—"}
               onClick={onOpenLockSettings}
             />
-          ) : null}
-          {showBackup && state.backup ? (
-            <OptionRow title={t("backup.title")} value={backupSummary(t, state.backup)} onClick={onOpenBackup} />
           ) : null}
           <OptionRow
             title={t("settingsHome.appearance")}

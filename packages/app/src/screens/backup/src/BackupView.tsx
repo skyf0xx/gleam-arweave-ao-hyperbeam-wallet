@@ -13,12 +13,32 @@ export function backupAccountName(provider: BackupProvider): string {
   return provider === "google" ? "Google" : "iCloud";
 }
 
+/** Where the file lives, as the account's owner knows it. */
+export function backupDriveName(provider: BackupProvider): string {
+  return provider === "google" ? "Google Drive" : "iCloud";
+}
+
 /** The backup's state in a few words, for the Settings row and this screen. */
 export function backupSummary(t: TFunction, status: BackupStatus): string {
   if (!status.enabled) return t("backup.off");
   if (status.problem === "signIn") return t("backup.needsSignIn");
   if (status.problem === "missing") return t("backup.notFound");
   return status.lastBackupAt === null ? t("backup.never") : relativeTime(t, status.lastBackupAt);
+}
+
+/** Stands in for the bold words while the sentence around them is translated. */
+const BOLD_MARK = "\u0000";
+
+/** `text` with `bold` set in its place, so a translation can put the words anywhere in the sentence. */
+function WithBold({ text, bold }: { text: string; bold: string }) {
+  const [before, after = ""] = text.split(BOLD_MARK);
+  return (
+    <>
+      {before}
+      <strong className="font-semibold text-foreground">{bold}</strong>
+      {after}
+    </>
+  );
 }
 
 export interface BackupViewProps {
@@ -76,7 +96,17 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
   const setUp = () =>
     run("settingUp", () => runtime.send<{ password: string }, BackupStatus>({ type: "setUpBackup", payload: { password } }));
   const backUpNow = () => run("backingUp", () => runtime.send<void, BackupStatus>({ type: "backUpNow", payload: undefined }));
-  const turnOff = () => run("turningOff", () => runtime.send<void, BackupStatus>({ type: "turnOffBackup", payload: undefined }));
+  const turnOff = async () => {
+    setPhase("turningOff");
+    setError(undefined);
+    try {
+      await runtime.send<void, BackupStatus>({ type: "turnOffBackup", payload: undefined });
+      onBack();
+    } catch (reason) {
+      setError(errorText(reason));
+      setPhase("idle");
+    }
+  };
 
   const busy = phase !== "idle";
   const account = status?.provider ? backupAccountName(status.provider) : "";
@@ -95,7 +125,19 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
               if (!busy && password.length > 0) void setUp();
             }}
           >
-            <p className="text-body leading-relaxed text-muted">{t("backup.intro", { account })}</p>
+            <div className="flex flex-col gap-2.5">
+              <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("backup.setUpTitle")}</h1>
+              <ol className="flex list-decimal flex-col gap-1.5 pl-4 text-label leading-relaxed text-muted marker:text-faint">
+                <li>
+                  <WithBold
+                    text={t("backup.pointEncrypted", { items: BOLD_MARK, drive: status.provider ? backupDriveName(status.provider) : "" })}
+                    bold={t("backup.backedUpItems")}
+                  />
+                </li>
+                <li>{t("backup.pointRestore")}</li>
+                <li>{t("backup.pointLost")}</li>
+              </ol>
+            </div>
             <PasswordField
               label={t("backup.password")}
               placeholder={t("backup.passwordPlaceholder")}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
+  BackupProvider,
   AutoLockTimeout,
   LockSettings,
   PasskeyStatus,
@@ -14,6 +15,7 @@ import {
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
+import { BackupSection } from "./BackupSection";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
 import { useT, type MessageKey } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
@@ -44,6 +46,8 @@ export interface LockSettingsViewProps {
   biometrics?: BiometricUnlockPort;
   /** Whether the shell locks the wallet when the OS locks. Off, the copy stops promising it. */
   lockOnSystemLock?: boolean;
+  /** Where the shell keeps a vault backup, and how to open its screen. Omitted, the backup section is hidden. */
+  backup?: { provider: BackupProvider; open: () => void };
 }
 
 interface LoadState {
@@ -60,6 +64,7 @@ export function LockSettingsView({
   passkeysSupported = passkeysAvailable(),
   biometrics,
   lockOnSystemLock = true,
+  backup,
 }: LockSettingsViewProps) {
   const t = useT();
   const [state, setState] = useState<LoadState>({
@@ -165,6 +170,8 @@ export function LockSettingsView({
             onSetUp={onSetUpPasskey}
           />
         ) : null}
+
+        {backup ? <BackupSection runtime={runtime} provider={backup.provider} onOpen={backup.open} /> : null}
 
         <SecurityPhraseSection runtime={runtime} />
 
