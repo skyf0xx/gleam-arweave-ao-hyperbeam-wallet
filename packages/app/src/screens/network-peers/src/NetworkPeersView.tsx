@@ -591,7 +591,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                           {peerHost(peer.url)}
                         </span>
                         <span className={`text-caption ${isActive ? "text-positive" : "text-muted"}`}>
-                          {isActive ? t("networkPeers.active") : peer.enabled ? t("networkPeers.enabled") : t("networkPeers.disabled")}
+                          {isActive ? t("networkPeers.active") : null}
                         </span>
                       </button>
                       <div className="flex flex-shrink-0 items-center gap-2.5">
