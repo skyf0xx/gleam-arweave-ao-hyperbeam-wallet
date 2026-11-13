@@ -34,7 +34,7 @@ describe("pnpm scan file", () => {
       "2 rounds are ready to sign, with 4 reports to file.",
       "",
       `1. Open this link and sign each round in Gleam: ${link}`,
-      '2. Reply "signed" and I\'ll file the reports.',
+      '2. Reply "signed" and I\'ll file the reports: fork, push, open each PR and file each advisory.',
     ]);
     const payloads = link.split("#")[1]!.split(".");
     expect(payloads).toHaveLength(2);
