@@ -42,3 +42,6 @@ apps/mobile/.bundle/
 .stryker-tmp/
 reports/
 stryker-setup-*.js
+
+# Local account and console notes
+ACCOUNTS.md
