@@ -224,3 +224,6 @@
 5 osv-scanner.toml
 5 apps/extension/src/shims/function-bind.cjs
 5 .semgrepignore
+5 package.json
+5 apps/extension/package.json
+5 apps/mobile/package.json

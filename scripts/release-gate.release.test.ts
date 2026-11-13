@@ -165,8 +165,10 @@ describe("runGate against a throwaway repo", () => {
   beforeEach(() => {
     repo = mkdtempSync(join(tmpdir(), "gleam-release-gate-"));
     run("init", "--quiet", "-b", "master");
-    write("apps/extension/package.json", JSON.stringify({ version: "1.2.3" }));
-    write("security/surface.txt", "# surface\n1 core/vault/\n5 lock.yaml\n");
+    write("package.json", JSON.stringify({ name: "root", version: "0.0.0", scripts: { "mobile:build": "echo hi" } }));
+    write("apps/extension/package.json", JSON.stringify({ version: "1.2.3", scripts: { build: "echo hi" } }));
+    write("apps/mobile/package.json", JSON.stringify({ version: "1.2.3", scripts: { build: "echo hi" } }));
+    write("security/surface.txt", "# surface\n1 core/vault/\n5 lock.yaml\n5 package.json\n5 apps/extension/package.json\n5 apps/mobile/package.json\n");
     write("core/vault/key.ts", "export const k = 1;\n");
     write("lock.yaml", "a: 1\n");
     write("README.md", "hello\n");
@@ -205,6 +207,61 @@ describe("runGate against a throwaway repo", () => {
     if (result.ok) return;
     expect(result.reason).toMatch(/2 security-surface file\(s\) changed/);
     expect(result.details).toEqual(["core/vault/key.ts", "lock.yaml"]);
+  });
+
+  it("passes when only the version changed in the app package.json files", () => {
+    // The audit for the new version names the pre-bump commit, as the
+    // release flow does: the bump lands between the audited commit and HEAD.
+    const sha = commit("base");
+    write("security/audits/v1.2.4.md", audit({ version: "1.2.4", commit: sha }));
+    commit("audit");
+    write("apps/extension/package.json", JSON.stringify({ version: "1.2.4", scripts: { build: "echo hi" } }));
+    write("apps/mobile/package.json", JSON.stringify({ version: "1.2.4", scripts: { build: "echo hi" } }));
+    commit("version bump");
+    expect(runGate({ cwd: repo }).ok).toBe(true);
+  });
+
+  it("fails and names the file when a script changed in the root package.json", () => {
+    audited();
+    write("package.json", JSON.stringify({ name: "root", version: "0.0.0", scripts: { "mobile:build": "echo changed" } }));
+    commit("change script");
+    const result = runGate({ cwd: repo });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.details).toEqual(["package.json"]);
+  });
+
+  it("fails and names the file when a script changed in the extension package.json", () => {
+    audited();
+    write("apps/extension/package.json", JSON.stringify({ version: "1.2.3", scripts: { build: "echo changed" } }));
+    commit("change script");
+    const result = runGate({ cwd: repo });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.details).toEqual(["apps/extension/package.json"]);
+  });
+
+  it("fails and names the file when a script changed in the mobile package.json", () => {
+    audited();
+    write("apps/mobile/package.json", JSON.stringify({ version: "1.2.3", scripts: { build: "echo changed" } }));
+    commit("change script");
+    const result = runGate({ cwd: repo });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.details).toEqual(["apps/mobile/package.json"]);
+  });
+
+  it("still fails when a version bump ships with a script change", () => {
+    const sha = commit("base");
+    write("security/audits/v1.2.4.md", audit({ version: "1.2.4", commit: sha }));
+    commit("audit");
+    write("apps/extension/package.json", JSON.stringify({ version: "1.2.4", scripts: { build: "echo hi" } }));
+    write("apps/mobile/package.json", JSON.stringify({ version: "1.2.4", scripts: { build: "echo changed" } }));
+    commit("version bump with script change");
+    const result = runGate({ cwd: repo });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.details).toEqual(["apps/mobile/package.json"]);
   });
 
   it("still sees a change to a path dropped from surface.txt after the audit", () => {

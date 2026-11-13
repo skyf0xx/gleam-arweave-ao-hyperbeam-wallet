@@ -167,6 +167,38 @@ export function readVersion(root) {
 }
 
 /**
+ * The app package.json files whose "version" the release bump rewrites on
+ * every release (`scripts/app-versions.mjs`). The root package.json needs
+ * no carve-out: its version stays 0.0.0, so the bump never touches it.
+ */
+export const VERSION_ONLY_FILES = ["apps/extension/package.json", "apps/mobile/package.json"];
+
+/**
+ * True when `file` differs between `commit` and the working tree only in
+ * its top-level "version" field. Any other difference — a script, a
+ * dependency, a reordered file, unparseable JSON — returns false, so the
+ * gate still fails on it.
+ * @param {string} root
+ * @param {string} commit
+ * @param {string} file
+ * @returns {boolean}
+ */
+export function isVersionOnlyChange(root, commit, file) {
+  if (!VERSION_ONLY_FILES.includes(file)) return false;
+  const then = git(root, ["show", `${commit}:${file}`]);
+  if (!then.ok) return false;
+  try {
+    const oldPkg = JSON.parse(then.out);
+    const newPkg = JSON.parse(readFileSync(join(root, file), "utf8"));
+    delete oldPkg.version;
+    delete newPkg.version;
+    return JSON.stringify(oldPkg) === JSON.stringify(newPkg);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Runs every check against the repo at `cwd` and stops at the first failure.
  * @param {{ cwd?: string }} [options]
  * @returns {GateResult}
@@ -227,8 +259,12 @@ export function runGate({ cwd = process.cwd() } = {}) {
 
   const diff = git(root, ["diff", "--name-only", meta.commit, "HEAD", "--", ...paths]);
   if (!diff.ok) return { ok: false, reason: `git diff failed: ${diff.out}` };
-  if (diff.out !== "") {
-    const changed = diff.out.split("\n");
+  // The release bump rewrites the version in the two app package.json
+  // files on every release, so a change to nothing but that field is not
+  // a surface change. Anything else in those files still fails the gate.
+  const changed =
+    diff.out === "" ? [] : diff.out.split("\n").filter((file) => !isVersionOnlyChange(root, meta.commit, file));
+  if (changed.length > 0) {
     return {
       ok: false,
       reason: `${changed.length} security-surface file(s) changed since the audited commit ${meta.commit.slice(0, 12)}`,

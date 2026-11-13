@@ -221,3 +221,6 @@
 /osv-scanner.toml                                                         @skyf0xx
 /apps/extension/src/shims/function-bind.cjs                               @skyf0xx
 /.semgrepignore                                                           @skyf0xx
+/package.json                                                              @skyf0xx
+/apps/extension/package.json                                               @skyf0xx
+/apps/mobile/package.json                                                  @skyf0xx
