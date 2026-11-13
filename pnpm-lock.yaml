@@ -190,6 +190,9 @@ importers:
       '@gleam/app':
         specifier: workspace:*
         version: link:../../packages/app
+      '@gleam/cloud-backup':
+        specifier: workspace:*
+        version: link:plugins/cloud-backup
       '@gleam/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -245,6 +248,12 @@ importers:
       vite-plugin-node-polyfills:
         specifier: 0.28.0
         version: 0.28.0(rollup@4.63.2)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  apps/mobile/plugins/cloud-backup:
+    dependencies:
+      '@capacitor/core':
+        specifier: 8.6.0
+        version: 8.6.0
 
   apps/mobile/plugins/dapp-view:
     dependencies:

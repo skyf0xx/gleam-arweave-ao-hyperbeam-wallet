@@ -24,6 +24,7 @@
     "@capacitor/share": "8.0.3",
     "@capgo/capacitor-native-biometric": "8.9.1",
     "@gleam/app": "workspace:*",
+    "@gleam/cloud-backup": "workspace:*",
     "@gleam/core": "workspace:*",
     "@gleam/dapp-view": "workspace:*",
     "@gleam/keystone": "workspace:*",

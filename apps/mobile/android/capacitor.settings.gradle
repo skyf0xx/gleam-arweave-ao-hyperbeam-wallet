@@ -26,5 +26,8 @@ project(':capacitor-share').projectDir = new File('../../../node_modules/.pnpm/@
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.9.1_@capacitor+core@8.6.0/node_modules/@capgo/capacitor-native-biometric/android')
 
+include ':gleam-cloud-backup'
+project(':gleam-cloud-backup').projectDir = new File('../plugins/cloud-backup/android')
+
 include ':gleam-dapp-view'
 project(':gleam-dapp-view').projectDir = new File('../plugins/dapp-view/android')
