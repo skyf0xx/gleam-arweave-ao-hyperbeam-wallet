@@ -57,7 +57,7 @@ export function RecipientWarning({
         <div className="flex min-w-0 flex-col gap-2">
           <strong className="font-bold">{labels.lookalikeTitle}</strong>
           <span>{labels.lookalikeScammers}</span>
-          <span className="flex items-center gap-2 pt-1 font-semibold text-muted">
+          <span className="flex items-center gap-2 pt-1 font-semibold text-positive">
             {lookalikeAvatarSvg ? (
               <span aria-hidden="true" className="shrink-0">
                 <AccountAvatar svgMarkup={lookalikeAvatarSvg} label="" size={20} />
@@ -65,7 +65,7 @@ export function RecipientWarning({
             ) : null}
             {labels.lookalikeLabel}
           </span>
-          <MemorableAddress address={lookalikeOf} emphasisPick={emphasisPick} diffAgainst={recipient} />
+          <MemorableAddress address={lookalikeOf} emphasisPick={emphasisPick} diffAgainst={recipient} diffTone="positive" />
           {firstTime ? <span>{labels.firstTime}</span> : null}
           {extraReasons.map((reason) => (
             <span key={reason}>{reason}</span>

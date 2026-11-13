@@ -15,6 +15,8 @@ export interface MemorableAddressProps {
   trailing?: ReactNode;
   /** Another address to compare with: chunks that differ from it at the same position are marked. */
   diffAgainst?: string;
+  /** `positive` marks the differences on the known side of a lookalike pair, so only the suspect address is red. */
+  diffTone?: "warning" | "positive";
   className?: string;
 }
 
@@ -36,6 +38,7 @@ export function MemorableAddress({
   tone = "default",
   trailing,
   diffAgainst,
+  diffTone = "warning",
   className,
 }: MemorableAddressProps) {
   const confirm = tone === "confirm";
@@ -72,7 +75,9 @@ export function MemorableAddress({
               className={cn(
                 "whitespace-nowrap rounded-[4px] px-[0.35ch] phone:px-[0.25ch]",
                 otherChunks && otherChunks[chunk.index]?.text !== chunk.text
-                  ? "bg-warning/10 font-semibold text-warning"
+                  ? diffTone === "positive"
+                    ? "bg-positive/10 font-semibold text-positive"
+                    : "bg-warning/10 font-semibold text-warning"
                   : chunk.emphasized
                   ? cn("bg-foreground/[0.07] text-foreground", confirm ? "font-semibold" : "font-medium")
                   : "text-muted",
