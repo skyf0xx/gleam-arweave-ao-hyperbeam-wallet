@@ -11,7 +11,6 @@ packages/ui/src/components/security-phrase/ The security phrase picture; shown t
 apps/extension/src/adapters/badge.ts Badge and alarm adapters: no data crosses them.
 apps/extension/src/adapters/timer.ts Badge and alarm adapters: no data crosses them.
 apps/extension/src/site-pages.ts Opens Gleam site pages in a tab; takes no page input.
-apps/mobile/package.json Read for the app version only.
 apps/mobile/src/adapters/timer.ts Badge and alarm adapters: no data crosses them.
 packages/app/src/app-platform/context.tsx The AppPlatform port and its React context; the shells' implementations are listed.
 packages/app/src/app-platform/hardware.ts The AppPlatform port and its React context; the shells' implementations are listed.
