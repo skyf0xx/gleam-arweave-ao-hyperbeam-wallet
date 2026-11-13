@@ -90,6 +90,9 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
 
   const setCell = (index: number, value: string) => {
     clearFeedback();
+    // Hand-editing a cell supersedes whatever a paste reported, so a
+    // stale word-count error can't block a fixed phrase.
+    setFoundCount(undefined);
     setCells((previous) => previous.map((cell, position) => (position === index ? value : cell)));
   };
 
@@ -109,6 +112,11 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
     .slice(0, 4);
 
   const submit = async () => {
+    // A shown word-count error gates the import: the grid only holds the
+    // first 24 words of an over-long paste, so deriving from it would
+    // silently drop the extra word. The button is disabled in this state
+    // too, but Enter still submits the form, so the handler refuses.
+    if (foundCount !== undefined) return;
     const check = await checkMnemonic(cells);
     if (!check.valid) {
       setProblem(check.problem);
@@ -292,7 +300,7 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
         {pasted ? <p className="text-caption leading-relaxed text-muted">{t("onboarding.phraseClipboard")}</p> : null}
 
         <ScreenFooter className="mt-8">
-          <Button type="submit" disabled={!filled}>
+          <Button type="submit" disabled={!filled || foundCount !== undefined}>
             {t("onboarding.continue")}
           </Button>
         </ScreenFooter>
