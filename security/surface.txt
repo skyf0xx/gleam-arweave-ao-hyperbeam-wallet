@@ -42,6 +42,11 @@
 1 apps/mobile/src/adapters/downloads.ts
 1 apps/mobile/src/adapters/file-saver.ts
 1 apps/mobile/src/adapters/query-cache.ts
+1 apps/mobile/src/adapters/cloud-file-channel.ts
+1 apps/mobile/src/adapters/cloud-file.ts
+1 apps/mobile/src/adapters/cloud-file-google.ts
+1 apps/mobile/src/adapters/cloud-file-icloud.ts
+1 apps/mobile/plugins/cloud-backup/
 1 packages/app/src/query-cache/
 1 packages/app/src/passkey/
 1 packages/app/src/biometrics/

@@ -138,6 +138,10 @@ tests check Gleam's ANS-104 bytes against it.
   unlock to lock. The file holds one vault per install; a write replaces
   only this install's, and a restore merges them all. A storage key is
   backed up only when `core/backup/file.ts` lists it with a guard.
+  The extension and Android use a Drive app folder
+  (`core/backup/google-drive.ts`), and iOS a CloudKit record. On mobile
+  the plugins (`plugins/cloud-backup`) run on the UI thread, which serves
+  the port to the runtime worker (`adapters/cloud-file-channel.ts`).
 - **Passkey unlock** wraps the vault password under the passkey's
   WebAuthn PRF output (`core/vault/passkey.ts`, `handlers/passkey.ts`),
   so it unlocks exactly like the password. The RP id is the extension

@@ -9,6 +9,9 @@ import { createLinkNotices, listenForAppLinks } from "./adapters/app-links";
 import { createApprovalSheet, serveApprovalSheet } from "./adapters/approval-sheet";
 import { createBackButton } from "./adapters/back-button";
 import { createBiometricUnlock } from "./adapters/biometric-unlock";
+import { serveCloudFile } from "./adapters/cloud-file-channel";
+import { createAndroidGoogleDriveFile } from "./adapters/cloud-file-google";
+import { createICloudFile } from "./adapters/cloud-file-icloud";
 import { KeystoneConnect, KeystonePanel } from "./adapters/keystone";
 import { createQrScanner } from "./adapters/qr-scanner";
 import { createMobileQueryCache } from "./adapters/query-cache";
@@ -49,6 +52,10 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
   serveSqliteStore(worker, preview?.store ?? createSqliteStore(openCapacitorDb));
   if (!preview) void sweepCapacitorExports();
   serveFileSaver(worker, preview?.fileSaver ?? createCapacitorFileSaver());
+  // Google isn't offered on iOS (VAULT_BACKUP.md, Shells). The worker asks
+  // for the file only on these two, by the same platform name.
+  const cloudBackup = ({ ios: "icloud", android: "google" } as const)[Capacitor.getPlatform() as "ios" | "android"] ?? null;
+  if (cloudBackup) serveCloudFile(worker, cloudBackup === "icloud" ? createICloudFile() : createAndroidGoogleDriveFile());
   const workerRuntime = createWorkerRuntimePort(worker);
   const dapps = createDappBridge({ plugin: DappView, runtime: workerRuntime, providerScript });
   const dappBrowser = preview?.dappBrowser ?? createDappBrowser({ bridge: dapps, plugin: DappView });
@@ -96,7 +103,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
       qrScanner: preview?.capabilities.qrScanner ?? true,
       hostPermissions: false,
       lockOnSystemLock: false,
-      cloudBackup: null,
+      cloudBackup,
     },
     hostPermissions: { contains: async () => true, request: async () => true },
     ephemeralState: {

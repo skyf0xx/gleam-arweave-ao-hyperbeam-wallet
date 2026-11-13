@@ -1,6 +1,7 @@
 import { deviceKeyPort } from "@gleam/runtime/src/device-key-store.ts";
 import type { Platform } from "@gleam/runtime";
 import { createWorkerApprovalPresenter } from "../adapters/approval-presenter";
+import { createWorkerCloudFile } from "../adapters/cloud-file";
 import { createWorkerTabs } from "../adapters/dapp-tabs";
 import { createWorkerDownloads } from "../adapters/downloads";
 import { createWorkerSessionKeys } from "../adapters/session-key-store";
@@ -30,6 +31,8 @@ export function createWorkerPlatform(
     lockIndicator: { setLocked: async () => {} },
     downloads: createWorkerDownloads(scope),
     tabs: createWorkerTabs(scope),
+    // The browser preview has no native cloud account to back up to.
+    ...(shell === "web" ? {} : { cloudFile: createWorkerCloudFile(scope, shell === "ios" ? "icloud" : "google") }),
     version: () => version,
     shell,
     dev: import.meta.env.DEV,
