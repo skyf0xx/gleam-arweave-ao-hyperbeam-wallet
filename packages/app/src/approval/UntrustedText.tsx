@@ -4,12 +4,13 @@
  * `0.001`), zero-width and other format characters, line separators, and
  * control codes other than tab, newline and carriage return. Also the
  * invisible Hangul fillers, the combining grapheme joiner, the Khmer
- * invisible characters and the variation selectors, which render as
- * nothing but make two byte-distinct strings look identical.
+ * invisible characters and the variation selectors (including the
+ * Mongolian and supplementary ones), which render as nothing but make two
+ * byte-distinct strings look identical.
  */
 // Combining marks come first: eslint's no-misleading-character-class
 // flags any character in the class that a combining mark follows.
-const HIDDEN_CHARACTER = /(?![\t\n\r])[\u034f\u17b4\ufe00-\ufe0f\u17b5\p{Cf}\p{Cc}\u2028\u2029\u115f\u1160\u3164\uffa0]/gu;
+const HIDDEN_CHARACTER = /(?![\t\n\r])[\u034f\u17b4\u180b-\u180d\ufe00-\ufe0f\u{e0100}-\u{e01ef}\u17b5\p{Cf}\p{Cc}\u2028\u2029\u115f\u1160\u3164\uffa0]/gu;
 
 export type TextPart = string | { codePoint: string };
 
