@@ -49,7 +49,7 @@ function sentence(code: SiteAttestErrorCode, release: string, detail?: string): 
     case "challenge_wrong_commit":
       return `The scan's challenge doesn't match v${release}. To start over, ${NEW_SCAN}.`;
     case "challenge_expired":
-      return `The scan's challenge expired after 24 hours. To start over, ${NEW_SCAN}.`;
+      return `The scan's challenge expired after 72 hours. To start over, ${NEW_SCAN}.`;
     case "challenge_used":
       return `The scan's challenge was already used. To start over, ${NEW_SCAN}.`;
     case "answers_failed":

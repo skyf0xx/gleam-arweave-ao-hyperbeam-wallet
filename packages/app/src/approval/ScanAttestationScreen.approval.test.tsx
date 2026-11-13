@@ -126,7 +126,7 @@ describe("ApprovalRoot: scan attestation", { timeout: 30_000 }, () => {
   });
 
   it("checks the attestation first, and a failed check asks for no signature and says what to do", async () => {
-    const error = "The scan's challenge expired after 24 hours. To start over, ask your agent to run `pnpm scan start` and finish a new scan.";
+    const error = "The scan's challenge expired after 72 hours. To start over, ask your agent to run `pnpm scan start` and finish a new scan.";
     const resolveApproval = vi.fn();
     const { runtime, send } = runtimeWith({
       ...member,
