@@ -58,6 +58,16 @@ logic (`packages/core`), and the messaging contracts between them
 via Dependabot; if you find one that isn't already flagged in the Security
 tab, reporting it here is still welcome.
 
+## Vault backup
+
+The optional vault backup is one file in the user's own Google Drive app
+folder. It is encrypted under a random key, and that key is stored beside
+it wrapped under the vault password with Argon2id. Google holds ciphertext
+it cannot read, Gleam runs no server and holds nothing, and the password
+is the only key to the file. Someone who takes over the Google account
+gets an offline guess at that password, so a report that weakens the
+password policy, the key wrapping or the file's encryption is in scope.
+
 ## Response
 
 We aim to acknowledge reports within a few days and to keep the reporter
