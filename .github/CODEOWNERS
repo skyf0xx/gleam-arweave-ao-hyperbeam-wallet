@@ -13,6 +13,7 @@
 /apps/extension/src/keyring/                                               @skyf0xx
 /apps/extension/entrypoints/keyring/                                       @skyf0xx
 /apps/extension/src/adapters/offscreen-keyring.ts                          @skyf0xx
+/apps/extension/src/adapters/google-auth.ts                                @skyf0xx
 /apps/extension/src/adapters/session-key-store.ts                          @skyf0xx
 /packages/runtime/src/handlers/key-session.ts                              @skyf0xx
 /packages/runtime/src/handlers/wallet-lifecycle.ts                         @skyf0xx

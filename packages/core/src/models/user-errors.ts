@@ -59,6 +59,7 @@ export const USER_ERRORS = {
   passkeyUnexpectedSecret: "The passkey returned an unexpected secret.",
   backupUnavailable: "Backup isn't available on this device.",
   backupSignInNeeded: "Sign in to back up.",
+  backupUnreachable: "Couldn't reach your backup. Check your connection and try again.",
   backupFileMissing: "No backup found in this account.",
   backupFileCorrupt: "This backup can't be read.",
   backupWrongPassword: "That password didn't open this backup.",

@@ -48,7 +48,10 @@ export default defineConfig({
     // to confirmed once the gateway indexes them, and the auto-lock tick.
     // 'offscreen' backs the keyring document (entrypoints/keyring), which
     // holds unlocked wallets' non-extractable keys in memory only.
-    permissions: ['storage', 'sidePanel', 'tabs', 'alarms', 'offscreen', 'idle'],
+    // 'identity' runs the Google sign-in for the vault backup
+    // (src/adapters/google-auth.ts); it shows no install warning. Drive
+    // answers with CORS headers, so it needs no host permission.
+    permissions: ['storage', 'sidePanel', 'tabs', 'alarms', 'offscreen', 'idle', 'identity'],
     // 'downloads' lets the background save a keyfile backup itself, so the
     // plaintext key never reaches the popup. It is optional because a new
     // required permission disables the extension on update until the user

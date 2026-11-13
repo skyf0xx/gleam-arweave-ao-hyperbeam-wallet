@@ -20,6 +20,7 @@
 1 apps/extension/src/keyring/
 1 apps/extension/entrypoints/keyring/
 1 apps/extension/src/adapters/offscreen-keyring.ts
+1 apps/extension/src/adapters/google-auth.ts
 1 apps/extension/src/adapters/session-key-store.ts
 1 packages/runtime/src/handlers/key-session.ts
 1 packages/runtime/src/handlers/wallet-lifecycle.ts
