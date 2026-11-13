@@ -35,6 +35,11 @@
 /apps/mobile/src/adapters/downloads.ts                                @skyf0xx
 /apps/mobile/src/adapters/file-saver.ts                               @skyf0xx
 /apps/mobile/src/adapters/query-cache.ts                                   @skyf0xx
+/apps/mobile/src/adapters/cloud-file-channel.ts                            @skyf0xx
+/apps/mobile/src/adapters/cloud-file.ts                                    @skyf0xx
+/apps/mobile/src/adapters/cloud-file-google.ts                             @skyf0xx
+/apps/mobile/src/adapters/cloud-file-icloud.ts                             @skyf0xx
+/apps/mobile/plugins/cloud-backup/                                         @skyf0xx
 /packages/app/src/query-cache/                                             @skyf0xx
 /packages/app/src/passkey/                                                 @skyf0xx
 /packages/app/src/biometrics/                                              @skyf0xx
