@@ -23,6 +23,7 @@ import { FoundingRevealScreen } from "./FoundingReveal";
 import { SecurityPhraseStep } from "./SecurityPhraseStep";
 import { t as translate, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { PasskeyError, passkeysAvailable, readAnyPasskeyPrf } from "../../../passkey/webauthn";
 
 /**
  * Onboarding view module (`screens/onboarding/`) — a folder, not
@@ -36,7 +37,8 @@ import { errorText } from "../../../i18n/errors";
 type Step =
   | { kind: "welcome" }
   | { kind: "existing" }
-  | { kind: "restore"; account: string }
+  // `passkeys` are the ones the backup lists that this device can prompt for.
+  | { kind: "restore"; account: string; passkeys: { credentialId: string; prfSalt: string }[] }
   | { kind: "create-password" }
   // The password is kept only until the first download attempt resolves,
   // so the background can decrypt the keyfile when the user saves it.
@@ -141,6 +143,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
   const addingWallet = mode === "add-wallet";
   const askVaultPassword = addingWallet && vaultHasPassword;
   const [submitting, setSubmitting] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [serverError, setServerError] = useState<string>();
   const [backup, setBackup] = useState<{ downloading: boolean; savedAs: string | null; error: string | null }>({
     downloading: false,
@@ -160,9 +163,12 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     setServerError(undefined);
     await ephemeralState.set(RESTORE_PENDING_KEY, true).catch(() => {});
     try {
-      const { found } = await runtime.send<void, { found: boolean }>({ type: "findBackup", payload: undefined });
+      const { found, passkeys } = await runtime.send<void, { found: boolean; passkeys?: { credentialId: string; prfSalt: string }[] }>({
+        type: "findBackup",
+        payload: undefined,
+      });
       if (found) {
-        setStep({ kind: "restore", account });
+        setStep({ kind: "restore", account, passkeys: capabilities.passkey && passkeysAvailable() ? (passkeys ?? []) : [] });
         return;
       }
       setServerError(t("errors.backupFileMissing"));
@@ -200,19 +206,29 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     setStep({ kind: "existing" });
   };
 
-  const handleRestore = async (password: string) => {
+  const restoreWith = async (open: () => Promise<{ password: string } | { credentialId: string; prfOutput: string }>) => {
     setSubmitting(true);
     setServerError(undefined);
     try {
-      await runtime.send<{ password: string }, { unlockedWalletIds: string[] }>({ type: "restoreBackup", payload: { password } });
+      const payload = await open();
+      setPasskeyBusy(false);
+      await runtime.send<typeof payload, { unlockedWalletIds: string[] }>({ type: "restoreBackup", payload });
       await ephemeralState.remove(RESTORE_PENDING_KEY).catch(() => {});
       onComplete();
     } catch (error) {
-      setServerError(errorText(error));
+      setServerError(error instanceof PasskeyError ? error.message : errorText(error));
     } finally {
+      setPasskeyBusy(false);
       setSubmitting(false);
     }
   };
+
+  const handleRestore = (password: string) => restoreWith(async () => ({ password }));
+  const handleRestorePasskey = (passkeys: { credentialId: string; prfSalt: string }[]) =>
+    restoreWith(() => {
+      setPasskeyBusy(true);
+      return readAnyPasskeyPrf(passkeys);
+    });
 
   const proceed = (wallet: WalletSummary) => {
     if (claim) setStep({ kind: "claim", wallet });
@@ -354,6 +370,8 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
           account={step.account}
           onBack={leaveRestore}
           onSubmit={(password) => void handleRestore(password)}
+          onUsePasskey={step.passkeys.length > 0 ? () => void handleRestorePasskey(step.passkeys) : undefined}
+          passkeyBusy={passkeyBusy}
           submitting={submitting}
           serverError={serverError}
         />

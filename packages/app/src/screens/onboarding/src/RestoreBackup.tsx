@@ -6,19 +6,24 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useT } from "../../../i18n";
 
 /**
- * The one step of a restore: the vault password, which opens the backup
- * found in the account. Nothing is written to this device until it does.
+ * The one step of a restore: the vault password, or a passkey the backup
+ * lists, which opens the backup found in the account. Nothing is written
+ * to this device until it does.
  */
 export interface RestoreBackupProps {
   /** "Google" or "iCloud". */
   account: string;
   onBack: () => void;
   onSubmit: (password: string) => void;
+  /** Set when the backup lists a passkey this device can use in place of the password. */
+  onUsePasskey?: () => void;
+  /** The passkey prompt is open. */
+  passkeyBusy?: boolean;
   submitting?: boolean;
   serverError?: string;
 }
 
-export function RestoreBackup({ account, onBack, onSubmit, submitting = false, serverError }: RestoreBackupProps) {
+export function RestoreBackup({ account, onBack, onSubmit, onUsePasskey, passkeyBusy = false, submitting = false, serverError }: RestoreBackupProps) {
   const t = useT();
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -52,9 +57,14 @@ export function RestoreBackup({ account, onBack, onSubmit, submitting = false, s
         />
 
         <ScreenFooter className="mt-8">
-          <Button type="submit" disabled={submitting || password.length === 0} aria-busy={submitting}>
-            {submitting ? t("backup.restoring") : t("backup.restore")}
+          <Button type="submit" disabled={submitting || password.length === 0} aria-busy={submitting && !passkeyBusy}>
+            {submitting && !passkeyBusy ? t("backup.restoring") : t("backup.restore")}
           </Button>
+          {onUsePasskey ? (
+            <Button type="button" variant="secondary" disabled={submitting} aria-busy={passkeyBusy} onClick={onUsePasskey}>
+              {passkeyBusy ? t("unlock.waitingForPasskey") : t("unlock.usePasskey")}
+            </Button>
+          ) : null}
         </ScreenFooter>
       </form>
     </div>

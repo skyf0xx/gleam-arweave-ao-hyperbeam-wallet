@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import type { RuntimePort } from "@gleam/core";
+import { bytesToBase64Url, type RuntimePort } from "@gleam/core";
 import { fakeAppPlatform, renderWithPlatform as render } from "../../../app-platform/testing";
 import { OnboardingView } from "./OnboardingView";
 
@@ -100,5 +100,75 @@ describe("OnboardingView: a restore the popup closed on", () => {
 
     render(<OnboardingView runtime={runtime} onComplete={vi.fn()} />, platform);
     expect(await screen.findByRole("button", { name: "Create a wallet" })).toBeTruthy();
+  });
+});
+
+describe("OnboardingView: restore with a passkey", () => {
+  const RAW_ID = new Uint8Array([1, 2, 3, 4]);
+  const PRF = new Uint8Array(32).fill(9);
+  const PASSKEY = { credentialId: bytesToBase64Url(RAW_ID), prfSalt: bytesToBase64Url(new Uint8Array(32).fill(1)) };
+  const get = vi.fn();
+
+  class FakePublicKeyCredential {
+    constructor(readonly rawId: ArrayBuffer) {}
+    getClientExtensionResults() {
+      return { prf: { results: { first: PRF } } };
+    }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("PublicKeyCredential", FakePublicKeyCredential);
+    Object.defineProperty(navigator, "credentials", { value: { create: vi.fn(), get }, configurable: true });
+    get.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const withPasskeys = () => fakeAppPlatform({ capabilities: { cloudBackup: "google", passkey: true } });
+
+  it("restores with a passkey the backup lists, without the password", async () => {
+    get.mockResolvedValue(new FakePublicKeyCredential(RAW_ID.buffer));
+    const { runtime, send } = runtimeWith({
+      findBackup: async () => ({ found: true, passkeys: [PASSKEY] }),
+      restoreBackup: async () => ({ unlockedWalletIds: ["wallet-1"] }),
+    });
+    const onComplete = await openExisting(runtime, vi.fn(), withPasskeys());
+    fireEvent.click(screen.getByText("Restore from Google"));
+    fireEvent.click(await screen.findByRole("button", { name: "Use passkey" }));
+
+    await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenLastCalledWith({
+      type: "restoreBackup",
+      payload: { credentialId: PASSKEY.credentialId, prfOutput: bytesToBase64Url(PRF) },
+    });
+  });
+
+  it("shows a closed prompt on the field and keeps the password way in", async () => {
+    get.mockRejectedValue(new DOMException("closed", "NotAllowedError"));
+    const { runtime, send } = runtimeWith({ findBackup: async () => ({ found: true, passkeys: [PASSKEY] }) });
+    await openExisting(runtime, vi.fn(), withPasskeys());
+    fireEvent.click(screen.getByText("Restore from Google"));
+    fireEvent.click(await screen.findByRole("button", { name: "Use passkey" }));
+
+    expect(await screen.findByText("The passkey request was cancelled or timed out.")).toBeTruthy();
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "restoreBackup" }));
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+  });
+
+  it("isn't offered where the shell has no passkeys, or the backup lists none", async () => {
+    const listed = runtimeWith({ findBackup: async () => ({ found: true, passkeys: [PASSKEY] }) });
+    await openExisting(listed.runtime, vi.fn(), fakeAppPlatform({ capabilities: { cloudBackup: "google", passkey: false } }));
+    fireEvent.click(screen.getByText("Restore from Google"));
+    await screen.findByLabelText("Password");
+    expect(screen.queryByRole("button", { name: "Use passkey" })).toBeNull();
+    cleanup();
+
+    const none = runtimeWith({ findBackup: async () => ({ found: true, passkeys: [] }) });
+    await openExisting(none.runtime, vi.fn(), withPasskeys());
+    fireEvent.click(screen.getByText("Restore from Google"));
+    await screen.findByLabelText("Password");
+    expect(screen.queryByRole("button", { name: "Use passkey" })).toBeNull();
   });
 });
