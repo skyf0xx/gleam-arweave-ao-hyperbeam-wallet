@@ -1,4 +1,6 @@
 import {
+  backupPasskeysOf,
+  base64UrlToBytes,
   bodyMatchesHeader,
   createSerializer,
   decodeBackupBody,
@@ -10,8 +12,10 @@ import {
   mergeBackupDevices,
   newBackupId,
   readBackupData,
+  unwrapWithPasskey,
   writeBackupData,
   type BackupBody,
+  type BackupHeader,
   type BackupDevice,
   type BackupStatus,
   type CloudFilePort,
@@ -50,6 +54,15 @@ export interface BackupHandlerDeps {
   cloudFile: CloudFilePort | undefined;
   vault: BackupVault;
   now?: () => number;
+}
+
+/** What a restore opens the backup with: the vault password, or a passkey's answer for one in the file's header. */
+export type RestoreRequest = { password: string } | { credentialId: string; prfOutput: string };
+
+/** What the UI needs to ask for one of the header's passkeys. */
+export interface FoundBackup {
+  found: boolean;
+  passkeys: { credentialId: string; prfSalt: string }[];
 }
 
 type WriteOutcome = "written" | "off" | "locked" | "signIn" | "missing";
@@ -157,13 +170,18 @@ export class BackupHandler {
     return this.status();
   }
 
-  /** Signs in and reports whether the account holds a backup, before the restore asks for a password. */
-  async find(): Promise<{ found: boolean }> {
+  /**
+   * Signs in and reports whether the account holds a backup, and which
+   * passkeys can open it, before the restore asks for a password.
+   */
+  async find(): Promise<FoundBackup> {
     const cloud = this.requireCloud();
     return this.inTurn(async () => {
       await this.signIn(cloud);
       const remote = await cloud.read();
-      return { found: remote !== null && decodeBackupFile(remote.bytes) !== null };
+      const file = remote && decodeBackupFile(remote.bytes);
+      if (!file) return { found: false, passkeys: [] };
+      return { found: true, passkeys: (file.header.passkeys ?? []).map(({ credentialId, prfSalt }) => ({ credentialId, prfSalt })) };
     });
   }
 
@@ -176,9 +194,9 @@ export class BackupHandler {
    * `unlockedWalletIds` is empty when the backup restored but its wallets
    * are under another password; the vault is then there, locked.
    */
-  async restore(req: { password: string }): Promise<{ unlockedWalletIds: string[] }> {
+  async restore(req: RestoreRequest): Promise<{ unlockedWalletIds: string[] }> {
     const cloud = this.requireCloud();
-    await this.inTurn(async () => {
+    const password = await this.inTurn(async () => {
       const wallets = await this.storage.get<unknown>(WALLETS_KEY);
       if (Array.isArray(wallets) && wallets.length > 0) throw dappError("A backup restores only onto an empty vault.");
       await this.signIn(cloud);
@@ -187,11 +205,13 @@ export class BackupHandler {
       const file = decodeBackupFile(remote.bytes);
       if (!file) throw new Error(userErrorMessage("backupFileCorrupt"));
       const { backupId, wrapped } = file.header;
+      const password = "password" in req ? req.password : await passkeyPassword(file.header, req);
 
-      const raw = await unwrapBackupKey(wrapped, req.password, backupId).catch((error: unknown) => {
+      const raw = await unwrapBackupKey(wrapped, password, backupId).catch((error: unknown) => {
         // A check that couldn't run is not a wrong password.
         if (error instanceof VaultKdfError) throw error;
-        throw new Error(userErrorMessage("backupWrongPassword"));
+        // The passkey opened a password from another time: the backup moved on since.
+        throw new Error(userErrorMessage("password" in req ? "backupWrongPassword" : "passkeyFailed"));
       });
       let body: BackupBody | null;
       try {
@@ -212,9 +232,10 @@ export class BackupHandler {
         [BACKUP_KEY]: { backupId, wrapped } satisfies StoredBackupKey,
         [BACKUP_STATE_KEY]: { writer: newBackupId(), lastWriteAt: null, dirtyAt: this.now(), problem: null } satisfies BackupState,
       });
+      return password;
     });
 
-    const unlocked = await this.vault.unlockWallet(req).catch(() => ({ unlockedWalletIds: [] }));
+    const unlocked = await this.vault.unlockWallet({ password }).catch(() => ({ unlockedWalletIds: [] }));
     // The restored vault is every device's merged. Writing it alone drops the
     // copies of installs that are gone; one still in use adds its own back
     // on its next write.
@@ -298,7 +319,7 @@ export class BackupHandler {
         const devices = { ...others, [state.writer]: { updatedAt: startedAt, data: await readBackupData(this.storage) } };
         const stamp = { v: 1, backupId: stored.backupId, updatedAt: startedAt, writer: state.writer } as const;
         const sealed = await this.sessionKeys.sealBackup(encodeBackupBody({ ...stamp, devices }), stored.backupId);
-        await cloud.write(encodeBackupFile({ header: { ...stamp, wrapped: stored.wrapped }, sealed }));
+        await cloud.write(encodeBackupFile({ header: { ...stamp, wrapped: stored.wrapped, passkeys: backupPasskeysOf(devices) }, sealed }));
       } catch (error) {
         if (error instanceof KeyringLockedError) return "locked";
         throw error;
@@ -342,5 +363,22 @@ export class BackupHandler {
         .sort(([, a], [, b]) => b.updatedAt - a.updatedAt)
         .slice(0, MAX_BACKUP_DEVICES - 1),
     );
+  }
+}
+
+/** The vault password one of the header's passkeys wraps, opened with that passkey's PRF output. */
+async function passkeyPassword(header: BackupHeader, answer: { credentialId: string; prfOutput: string }): Promise<string> {
+  const passkey = header.passkeys?.find((candidate) => candidate.credentialId === answer.credentialId);
+  if (!passkey) throw new Error(userErrorMessage("passkeyWrongCredential"));
+  let prfOutput: Bytes;
+  try {
+    prfOutput = base64UrlToBytes(answer.prfOutput);
+  } catch {
+    throw new Error(userErrorMessage("passkeyUnexpectedSecret"));
+  }
+  try {
+    return await unwrapWithPasskey(passkey, prfOutput, passkey.credentialId);
+  } finally {
+    zeroize(prfOutput);
   }
 }

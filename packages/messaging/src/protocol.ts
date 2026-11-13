@@ -136,9 +136,10 @@ export interface ProtocolMap {
   /** Deletes the backup from the account and stops backing up. */
   turnOffBackup(): BackupStatus;
   /** Signs in to the account and reports whether it holds a backup. */
-  findBackup(): { found: boolean };
+  /** Whether the account holds a backup, and the passkeys its header lists, which can stand in for the password. */
+  findBackup(): { found: boolean; passkeys: { credentialId: string; prfSalt: string }[] };
   /** Restores the account's backup onto an empty vault. No wallet is unlocked when its wallets are under another password. */
-  restoreBackup(req: { password: string }): { unlockedWalletIds: string[] };
+  restoreBackup(req: { password: string } | { credentialId: string; prfOutput: string }): { unlockedWalletIds: string[] };
 
   // reads
   /**
