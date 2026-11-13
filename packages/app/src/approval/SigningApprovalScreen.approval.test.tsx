@@ -228,10 +228,11 @@ describe("SigningApprovalScreen primary action and warning", () => {
     expect(primary("Sign").className).not.toContain("bg-warning");
   });
 
-  it("is red under the warning box for a first-time recipient", () => {
+  it("notes a first-time recipient without the red box or a red Sign", () => {
     renderScreen({ preview: AO_PREVIEW, assessment: { firstTime: true, lookalikeOf: null } });
-    expect(screen.getByRole("alert").textContent).toMatch(/haven't sent to this address before/);
-    expect(primary("Sign").className).toContain("bg-warning");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("note").textContent).toMatch(/haven't sent to this address before/);
+    expect(primary("Sign").className).not.toContain("bg-warning");
   });
 
   it("still warns, in red, when the recipient lookup failed", () => {
@@ -240,13 +241,12 @@ describe("SigningApprovalScreen primary action and warning", () => {
     expect(primary("Sign").className).toContain("bg-warning");
   });
 
-  it("names the address a lookalike recipient imitates, in one notice that says \"cannot be undone\" once", () => {
+  it("names the address a lookalike recipient imitates, in one red notice", () => {
     const known = "xU9zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk3kL";
     renderScreen({ preview: AO_PREVIEW, assessment: { firstTime: true, lookalikeOf: known } });
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     const text = screen.getByRole("alert").textContent ?? "";
-    expect(text.match(/cannot be undone/gi)).toHaveLength(1);
-    expect(text).toMatch(/looks like one you've used but it's different/);
+    expect(text).toMatch(/This may be a phishing attempt/);
     expect(screen.getByText(addressText(known))).toBeTruthy();
     expect(primary("Sign").hasAttribute("disabled")).toBe(false);
   });

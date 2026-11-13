@@ -14,6 +14,8 @@ export interface RecipientCardProps {
   avatarSvg: string;
   emphasisPick: number | null;
   tone?: "default" | "confirm";
+  /** The address this one imitates; differing chunks are marked. */
+  diffAgainst?: string;
   /** Makes the whole card a button, for a card standing in for an address field. */
   onEdit?: () => void;
   /** Visible and accessible text; English unless the caller passes its own. */
@@ -34,7 +36,17 @@ export interface RecipientCardLabels {
  * the address field back, so it's built from spans (a button holds only
  * phrasing content).
  */
-export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "default", onEdit, labels: labelsProp, className }: RecipientCardProps) {
+export function RecipientCard({
+  address,
+  name,
+  avatarSvg,
+  emphasisPick,
+  tone = "default",
+  diffAgainst,
+  onEdit,
+  labels: labelsProp,
+  className,
+}: RecipientCardProps) {
   const contextLabels = useUiLabels();
   const labels = labelsProp ?? contextLabels.recipientCard;
   const body = (
@@ -47,7 +59,7 @@ export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "
           </span>
         ) : null}
         {/* Pulls the padded chunks back so the address lines up with the name. */}
-        <MemorableAddress address={address} emphasisPick={emphasisPick} tone={tone} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
+        <MemorableAddress address={address} emphasisPick={emphasisPick} tone={tone} diffAgainst={diffAgainst} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
       </span>
     </>
   );

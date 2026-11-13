@@ -16,19 +16,23 @@ import { cn } from "./cn";
  */
 export interface RiskNoticeProps {
   children: ReactNode;
+  /** The warning triangle; off where the headline carries the message and the width is needed. */
+  icon?: boolean;
   className?: string;
 }
 
-export function RiskNotice({ children, className }: RiskNoticeProps) {
+export function RiskNotice({ children, icon = true, className }: RiskNoticeProps) {
   return (
     <div
       role="alert"
-      className={cn("flex gap-2.5 rounded-md border border-warning-border bg-warning-surface px-3.5 py-3", className)}
+      className={cn("flex gap-2.5 rounded-md bg-warning-surface px-3.5 py-3", className)}
     >
-      <span className="mt-px flex-shrink-0 text-warning">
-        <WarningIcon />
-      </span>
-      <div className="min-w-0 text-label leading-snug text-foreground">{children}</div>
+      {icon ? (
+        <span className="mt-px flex-shrink-0 text-warning">
+          <WarningIcon />
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1 text-label leading-snug text-foreground">{children}</div>
     </div>
   );
 }

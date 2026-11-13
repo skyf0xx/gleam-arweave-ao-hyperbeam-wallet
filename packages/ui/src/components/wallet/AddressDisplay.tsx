@@ -2,6 +2,7 @@ import * as React from "react";
 import { cn } from "../../primitives/cn";
 import { MemorableAddress } from "./MemorableAddress";
 import { useUiLabels } from "../../labels";
+import { CheckIcon, CopyIcon } from "../../primitives/copy-icons";
 
 const HOLD_MS = 500;
 
@@ -28,8 +29,6 @@ export interface AddressDisplayProps {
 export interface AddressDisplayLabels {
   copied: string;
   copy: (address: string) => string;
-  copiedHint: string;
-  copyHint: string;
 }
 
 export function AddressDisplay({
@@ -99,18 +98,15 @@ export function AddressDisplay({
         // Holding would otherwise select the text or open the OS menu.
         onContextMenu={(event) => event.preventDefault()}
         aria-label={copied ? labels.copied : labels.copy(address)}
-        className="flex w-full select-none justify-center rounded-lg border border-line bg-foreground/[0.03] px-4 py-3 transition-colors [-webkit-touch-callout:none] hover:bg-foreground/[0.05] focus:outline-none focus-visible:border-foreground"
+        className="flex w-full select-none items-center justify-center gap-3 rounded-lg border border-line bg-foreground/[0.03] px-4 py-3 transition-colors [-webkit-touch-callout:none] hover:bg-foreground/[0.05] focus:outline-none focus-visible:border-foreground"
       >
         <MemorableAddress address={address} emphasisPick={emphasisPick} className="justify-center" />
+        <span aria-hidden="true" className={cn("flex-shrink-0", copied ? "text-positive" : "text-faint")}>
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </span>
       </button>
-      <span
-        aria-live="polite"
-        className={cn(
-          "h-[14px] text-center text-caption",
-          copied ? "font-semibold text-positive" : "text-faint",
-        )}
-      >
-        {copied ? labels.copiedHint : labels.copyHint}
+      <span aria-live="polite" className="sr-only">
+        {copied ? labels.copied : ""}
       </span>
     </div>
   );

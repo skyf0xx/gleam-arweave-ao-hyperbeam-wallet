@@ -28,8 +28,6 @@ export function LocalizedRoot({ children }: { children: ReactNode }) {
       addressDisplay: {
         copied: t("common.addressCopied"),
         copy: (address) => t("common.copyAddress", { address }),
-        copiedHint: t("common.copiedHint"),
-        copyHint: t("common.copyHint"),
       },
       addressReveal: {
         title: t("common.keyfileTitle"),
@@ -44,7 +42,7 @@ export function LocalizedRoot({ children }: { children: ReactNode }) {
         irreversible: t("common.irreversible"),
         lookalikeTitle: t("common.lookalikeTitle"),
         lookalikeScammers: t("common.lookalikeScammers"),
-        lookalikeCompare: t("common.lookalikeCompare"),
+        lookalikeLabel: t("common.lookalikeLabel"),
         firstTime: t("common.firstTimeRecipient"),
         doubleCheck: t("common.doubleCheckRecipient"),
       },

@@ -443,6 +443,6 @@ describe("ApprovalRoot transfer review", () => {
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
     expect(screen.getByText("Main")).toBeTruthy();
     expect((await screen.findByText("Balance after")).nextElementSibling?.textContent).toBe("7 TOK");
-    expect(screen.getByRole("button", { name: "Sign" }).className).toContain("bg-warning");
+    expect(screen.getByRole("button", { name: "Sign" }).className).not.toContain("bg-warning");
   });
 });

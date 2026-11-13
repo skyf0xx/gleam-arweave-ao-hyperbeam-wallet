@@ -24,6 +24,7 @@ import {
   isUnknownScale,
   logoFor,
   methodText,
+  showsRisk,
   showsWarning,
   totalFiatText,
   unitText,
@@ -81,16 +82,19 @@ export function TransferReview({
 }: TransferReviewProps) {
   const t = useT();
   const identity = useAddressIdentity();
-  const warned = showsWarning(request, risk);
+  const noticed = showsWarning(request, risk);
+  const warned = showsRisk(request, risk);
   const batch = request.transfers.length > 1 || request.others.length > 0;
   const first = request.transfers[0]!;
   const balanceAfter = balanceAfterParts(context, request);
   const lookalikeOf = risk?.lookalikeOf ?? null;
 
-  const warning = warned ? (
+  const warning = noticed ? (
     <div className={`${GUTTER} pt-4`}>
       <RecipientWarning
         firstTime={risk?.firstTime ?? false}
+        recipient={first.recipient}
+        tone={warned ? "risk" : "caution"}
         lookalikeOf={lookalikeOf}
         lookalikeAvatarSvg={lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined}
         emphasisPick={identity.emphasisPick}
@@ -132,7 +136,7 @@ export function TransferReview({
       ) : (
         <>
           <Hero transfer={first} context={context} />
-          <Parties from={from} to={first.recipient} toName={toName ?? null} />
+          <Parties from={from} to={first.recipient} toName={toName ?? null} diffAgainst={lookalikeOf ?? undefined} />
           {warning}
           <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
             <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={first} />} />
@@ -312,7 +316,17 @@ function TransferCard({ transfer, context }: { transfer: TransferLine; context: 
   );
 }
 
-function Parties({ from, to, toName }: { from: TransferReviewProps["from"]; to: string; toName: string | null }) {
+function Parties({
+  from,
+  to,
+  toName,
+  diffAgainst,
+}: {
+  from: TransferReviewProps["from"];
+  to: string;
+  toName: string | null;
+  diffAgainst?: string;
+}) {
   const t = useT();
   const identity = useAddressIdentity();
   return (
@@ -343,7 +357,7 @@ function Parties({ from, to, toName }: { from: TransferReviewProps["from"]; to: 
       <div className="flex min-w-0 flex-col">
         <span className="text-label text-muted">{t("transferReview.to")}</span>
         {toName ? <span className="break-words text-body font-medium text-foreground">{toName}</span> : null}
-        <MemorableAddress address={to} emphasisPick={identity.emphasisPick} tone="confirm" />
+        <MemorableAddress address={to} emphasisPick={identity.emphasisPick} tone="confirm" diffAgainst={diffAgainst} />
       </div>
     </div>
   );
