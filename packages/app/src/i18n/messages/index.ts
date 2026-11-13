@@ -2,6 +2,7 @@ import type { MessageSet } from "../define";
 import { activity } from "./activity";
 import { app } from "./app";
 import { approval } from "./approval";
+import { backup } from "./backup";
 import { browser } from "./browser";
 import { collectibles } from "./collectibles";
 import { common } from "./common";
@@ -32,6 +33,7 @@ export const NAMESPACES = {
   activity,
   app,
   approval,
+  backup,
   browser,
   collectibles,
   common,

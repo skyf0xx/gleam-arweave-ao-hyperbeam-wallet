@@ -45,6 +45,7 @@
 /apps/extension/src/adapters/downloads.ts                           @skyf0xx
 /packages/app/src/screens/onboarding/src/                           @skyf0xx
 /packages/app/src/screens/lock-settings/src/                        @skyf0xx
+/packages/app/src/screens/backup/src/                               @skyf0xx
 /packages/app/src/screens/unlock/                                        @skyf0xx
 /packages/core/src/models/wallet.ts                                        @skyf0xx
 /packages/core/src/models/session.ts                                       @skyf0xx

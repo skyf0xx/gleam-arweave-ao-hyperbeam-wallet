@@ -12,6 +12,8 @@ import { Import } from "./Import";
 import { ImportPhrase } from "./ImportPhrase";
 import { AddWalletStart } from "./AddWalletStart";
 import { ExistingWallet } from "./ExistingWallet";
+import { RestoreBackup } from "./RestoreBackup";
+import { backupAccountName } from "../../backup/index.tsx";
 import { ConnectDevice } from "./ConnectDevice";
 import { WatchAddress } from "./WatchAddress";
 import { usePlatform } from "../../../app-platform/context";
@@ -34,6 +36,7 @@ import { errorText } from "../../../i18n/errors";
 type Step =
   | { kind: "welcome" }
   | { kind: "existing" }
+  | { kind: "restore"; account: string }
   | { kind: "create-password" }
   // The password is kept only until the first download attempt resolves,
   // so the background can decrypt the keyfile when the user saves it.
@@ -123,7 +126,7 @@ function randomDefaultWalletName(): string {
 
 export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultHasPassword = true, onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
   const t = useT();
-  const { hardwareWallets, downloads } = usePlatform();
+  const { hardwareWallets, downloads, capabilities } = usePlatform();
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const connectDevice = (device: HardwareWalletMethod) => {
     if (hardwareWallets.connectViews[device]) setStep({ kind: "connect-device", device });
@@ -141,6 +144,36 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     savedAs: null,
     error: null,
   });
+
+  // A first run can restore from wherever this shell keeps a vault backup.
+  const restoreAccount = !addingWallet && capabilities.cloudBackup ? backupAccountName(capabilities.cloudBackup) : null;
+
+  const handleFindBackup = async (account: string) => {
+    setSubmitting(true);
+    setServerError(undefined);
+    try {
+      const { found } = await runtime.send<void, { found: boolean }>({ type: "findBackup", payload: undefined });
+      if (found) setStep({ kind: "restore", account });
+      else setServerError(t("errors.backupFileMissing"));
+    } catch (error) {
+      setServerError(errorText(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRestore = async (password: string) => {
+    setSubmitting(true);
+    setServerError(undefined);
+    try {
+      await runtime.send<{ password: string }, { unlockedWalletIds: string[] }>({ type: "restoreBackup", payload: { password } });
+      onComplete();
+    } catch (error) {
+      setServerError(errorText(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const proceed = (wallet: WalletSummary) => {
     if (claim) setStep({ kind: "claim", wallet });
@@ -260,6 +293,30 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
           onConnectKeystone={connectKeystone}
           onConnectLedger={connectLedger}
           onWatch={() => setStep({ kind: "watch" })}
+          restore={
+            restoreAccount
+              ? {
+                  account: restoreAccount,
+                  onRestore: () => void handleFindBackup(restoreAccount),
+                  busy: submitting,
+                  error: serverError,
+                }
+              : undefined
+          }
+        />
+      );
+
+    case "restore":
+      return (
+        <RestoreBackup
+          account={step.account}
+          onBack={() => {
+            setServerError(undefined);
+            setStep({ kind: "existing" });
+          }}
+          onSubmit={(password) => void handleRestore(password)}
+          submitting={submitting}
+          serverError={serverError}
         />
       );
 

@@ -19,6 +19,7 @@ import { ReceiveView } from "./screens/receive/index.tsx";
 import { WalletSwitcherView } from "./screens/wallet-switcher/index.tsx";
 import { WalletDetailView } from "./screens/wallet-detail/index.tsx";
 import { LockSettingsView } from "./screens/lock-settings/index.tsx";
+import { BackupView } from "./screens/backup/index.tsx";
 import { NetworkPeersView } from "./screens/network-peers/index.tsx";
 import { AppearanceView, SettingsHomeView } from "./screens/settings-home/index.tsx";
 import { BrowserView } from "./screens/browser/index.tsx";
@@ -99,6 +100,7 @@ type MainSubView =
   | { kind: "settings-home" }
   | { kind: "appearance" }
   | { kind: "lock-settings" }
+  | { kind: "backup" }
   | { kind: "network-peers" }
   | { kind: "browser"; url?: string }
   /** `origin` is the site whose entry to show; `returnToUrl` is the browser page to go back to. */
@@ -394,6 +396,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         onBack={() => setSubView({ kind: "home" })}
         onOpenLockSettings={vaultHasPassword(wallets) ? () => setSubView({ kind: "lock-settings" }) : undefined}
+        onOpenBackup={vaultHasPassword(wallets) ? () => setSubView({ kind: "backup" }) : undefined}
         onOpenConnectedApps={() => setSubView({ kind: "connected-apps" })}
         onOpenAppearance={() => setSubView({ kind: "appearance" })}
         onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
@@ -412,6 +415,8 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         onOpenHomeScreen={() => setSubView({ kind: "home-screen" })}
       />
     );
+  } else if (subView.kind === "backup") {
+    content = <BackupView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "lock-settings") {
     content = (
       <LockSettingsView
