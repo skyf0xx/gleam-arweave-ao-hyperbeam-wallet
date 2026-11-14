@@ -95,7 +95,8 @@ describe("BackupHandler: set up", () => {
       expect(text).not.toContain(wallet.address);
       expect(text).not.toContain(wallet.name);
     }
-    expect(text).not.toContain("Ada");
+    // Quoted as JSON, since a bare "Ada" turns up in random base64 now and then.
+    expect(text).not.toContain('"Ada"');
   });
 
   it("refuses a password that doesn't open the vault, before signing in", async () => {

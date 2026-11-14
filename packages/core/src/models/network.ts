@@ -68,6 +68,8 @@ export const COMMUNITY_HYPERBEAM_PEER_URLS: readonly string[] = [
   "https://market-2.mystical.computer",
   "https://market-3.mystical.computer",
   "https://iloveao.online",
+  "https://public-hb.tylerw.ai",
+  "https://rng-hb.tylerw.ai",
 ];
 
 /**
