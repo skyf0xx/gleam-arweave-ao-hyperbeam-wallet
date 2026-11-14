@@ -125,7 +125,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
           errorMessage={passwordError}
         />
 
-        <p className="border-t border-line pt-4 text-caption leading-relaxed text-faint">
+        <p className="text-caption leading-relaxed text-faint">
           {t("extension.passkeyKeepPassword")}
         </p>
 
