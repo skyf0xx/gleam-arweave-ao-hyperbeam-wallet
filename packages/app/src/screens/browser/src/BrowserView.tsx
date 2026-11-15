@@ -320,7 +320,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             <button
               type="button"
               onClick={retry}
-              className="min-h-11 rounded-lg bg-foreground px-5 text-label font-semibold text-background"
+              className="min-h-11 rounded-lg bg-primary-fill px-5 text-label font-semibold text-background"
             >
               {t("browser.tryAgain")}
             </button>

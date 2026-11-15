@@ -18,14 +18,14 @@ import { cn } from "./cn";
  *   first-seen-address send). Never the beam.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:pointer-events-none",
   {
     variants: {
       variant: {
-        primary: "bg-primary-fill text-background hover:opacity-85",
-        secondary: "border border-line bg-background text-foreground hover:bg-mist",
-        ghost: "rounded-md text-muted hover:bg-mist hover:text-foreground",
-        destructive: "bg-warning-fill text-white hover:brightness-110",
+        primary: "bg-primary-fill text-background hover:opacity-85 disabled:bg-primary-disabled disabled:text-primary-disabled-text",
+        secondary: "border border-line bg-background text-foreground hover:bg-mist disabled:opacity-50",
+        ghost: "rounded-md text-muted hover:bg-mist hover:text-foreground disabled:opacity-50",
+        destructive: "bg-warning-fill text-white hover:brightness-110 disabled:opacity-50",
       },
       size: {
         default: "h-11 w-full px-4 py-3",

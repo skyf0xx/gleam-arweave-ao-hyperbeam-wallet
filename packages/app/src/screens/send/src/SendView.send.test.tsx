@@ -984,7 +984,7 @@ describe("SendView recipient lookalike warning", () => {
   it("keeps Send black for a recipient sent to before, and Cancel goes back to compose", async () => {
     await reviewWith({ firstTime: false, lookalikeOf: null });
     expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
-    expect(screen.getByRole("button", { name: "Send" }).className).toContain("bg-foreground");
+    expect(screen.getByRole("button", { name: "Send" }).className).toContain("bg-primary-fill");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByText("Review send")).toBeNull();
   });

@@ -45,6 +45,9 @@
   --color-foreground: #111111;
   /* The primary button's fill; in dark mode a step below the foreground so it is not the brightest thing on screen. */
   --color-primary-fill: #111111;
+  /* A disabled primary button. Light matches the old 50% fade. Dark is a quiet fill, since a faded light button reads as muddy grey. */
+  --color-primary-disabled: #888888;
+  --color-primary-disabled-text: #c4c4c4;
   --color-muted: #737373;
   --color-faint: #a3a3a3;
 
@@ -168,20 +171,6 @@
  * on a dark canvas. The beam colors stay the same in both themes;
  * beam-purple is not text-safe on the dark canvas.
  */
-[data-theme="dark"] { @theme {...} }`
- * block silently overwrites the light block's same-named tokens
- * unconditionally instead of scoping them to the attribute. Redeclaring
- * the custom properties directly here, under the plain attribute
- * selector, is what actually makes them apply only when `data-theme`
- * is present.
- *
- * Only the foundation neutrals invert — the five beam colors and the
- * warning-red carry over unchanged (same hex) per guidelines.md's
- * explicit rule, with the one stated exception: beam-purple is
- * non-text-safe on the dark canvas (3.3:1 against #111111), so it is
- * not redefined here (redefining its hex would be wrong) but flagged in
- * this file for any component choosing text color from the beam set.
- */
 [data-theme="dark"] {
   --color-canvas: #171717;
   --color-background: #171717;
@@ -190,6 +179,8 @@
   --color-line: #2e2e2e;
   --color-foreground: #e5e5e5;
   --color-primary-fill: #d4d4d4;
+  --color-primary-disabled: #262626;
+  --color-primary-disabled-text: #808080;
   --color-muted: #a3a3a3;
   --color-faint: #737373;
 

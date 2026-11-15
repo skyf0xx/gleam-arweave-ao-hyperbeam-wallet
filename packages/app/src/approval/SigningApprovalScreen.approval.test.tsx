@@ -224,7 +224,7 @@ describe("SigningApprovalScreen primary action and warning", () => {
   it("is black, with no warning box, for a recipient sent to before", () => {
     renderScreen({ preview: AO_PREVIEW });
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(primary("Sign").className).toContain("bg-foreground");
+    expect(primary("Sign").className).toContain("bg-primary-fill");
     expect(primary("Sign").className).not.toContain("bg-warning");
   });
 

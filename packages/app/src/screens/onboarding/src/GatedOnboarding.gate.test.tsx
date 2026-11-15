@@ -98,14 +98,14 @@ describe("GatedOnboarding", () => {
     setup({ redeem });
     await screen.findByText("You're early.");
     const button = screen.getByRole("button", { name: "Unlock Gleam" });
-    expect(button.className).not.toContain("bg-foreground");
+    expect(button.className).not.toContain("bg-primary-fill");
     expect(button.hasAttribute("disabled")).toBe(false);
     submit();
     expect(await screen.findByText("Enter your invite code.")).toBeTruthy();
     expect(redeem).not.toHaveBeenCalled();
     type("K7M2QX9P");
     expect(screen.queryByText("Enter your invite code.")).toBeNull();
-    expect(screen.getByRole("button", { name: "Unlock Gleam" }).className).toContain("bg-foreground");
+    expect(screen.getByRole("button", { name: "Unlock Gleam" }).className).toContain("bg-primary-fill");
   });
 
   it("checks the code, then plays You're in and moves on to Welcome", async () => {
@@ -137,14 +137,14 @@ describe("GatedOnboarding", () => {
     type("GLEAMDROP7");
     submit();
     expect(await screen.findByText("That code has no seats left.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).toContain("bg-foreground");
+    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).toContain("bg-primary-fill");
     expect(field().value).toBe("GLEAMDROP7");
   });
 
   it("keeps Ask secondary when no code is full", async () => {
     setup();
     fireEvent.click(await screen.findByRole("button", { name: "Get an invitation" }));
-    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).not.toContain("bg-foreground");
+    expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).not.toContain("bg-primary-fill");
   });
 
   it("says an unknown code wasn't found", async () => {
