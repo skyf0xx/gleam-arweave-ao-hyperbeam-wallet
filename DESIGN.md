@@ -134,16 +134,31 @@ The neutral foundation is refined and minimal, with separate tokens for structur
 - **Faint** `#a3a3a3` — Tertiary text, placeholder text
 
 **Dark Mode**
-- **Canvas** `#111111` — Outermost container background
-- **Background** `#111111` — Primary surface for content
-- **Surface** `#1c1c1c` — Elevated or grouped content areas
-- **Mist** `#1c1c1c` — Subtle background for inactive/secondary states
-- **Line** `#2a2a2a` — Dividers and borders
-- **Foreground** `#ffffff` — Primary text
+- **Canvas** `#171717` — Outermost container background
+- **Background** `#171717` — Primary surface for content
+- **Surface** `#212121` — Elevated or grouped content areas
+- **Mist** `#212121` — Subtle background for inactive/secondary states
+- **Line** `#2e2e2e` — Dividers and borders
+- **Foreground** `#e5e5e5` — Primary text
+- **Primary fill** `#d4d4d4` — The primary button, a step below the text so it is not the brightest thing on screen
 - **Muted** `#a3a3a3` — Secondary text, disabled states
 - **Faint** `#737373` — Tertiary text, placeholder text
 
-The neutral palette is deliberately high-contrast (7:1+) to ensure readability and accessibility in all contexts. Dark mode inverts the foundation while keeping the beam colors and semantic reds unchanged—the brand's identity and safety signals never waver.
+Light mode is high contrast (7:1+). Dark mode is softened, not inverted: no pure white or near-black, and body text sits around 14:1 so the screen doesn't glare. Text still passes AA.
+
+### Semantic Colors
+
+Red marks errors and the Irreversible risk tier only, never a status default or decoration. Routine notices use **Caution** or **Muted**.
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| **Warning** | `#ff1717` | `#f87171` | Warning and error text, icons |
+| **Warning fill** | `#c93a3f` | `#c93a3f` | Behind white text (destructive button), 5:1 |
+| **Warning surface** | `#fff5f5` | `#2a1515` | Critical notice background |
+| **Caution** | `#c2410c` | `#fb923c` | Worth reading, not a danger |
+| **Positive** | `#16a34a` | `#4ade80` | Confirmed amounts, gains |
+
+Beam red (`#ff1717`) is identity only and stays the same in both themes. In dark mode, warning uses its own softer red, because the saturated beam red glows on a dark canvas.
 
 ### The Gleam Beam — Identity
 

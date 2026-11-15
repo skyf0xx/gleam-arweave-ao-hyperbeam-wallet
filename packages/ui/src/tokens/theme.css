@@ -43,6 +43,8 @@
   --color-mist: #f5f5f5;
   --color-line: #e5e5e5;
   --color-foreground: #111111;
+  /* The primary button's fill; in dark mode a step below the foreground so it is not the brightest thing on screen. */
+  --color-primary-fill: #111111;
   --color-muted: #737373;
   --color-faint: #a3a3a3;
 
@@ -59,6 +61,8 @@
    * shared meaning.
    */
   --color-warning: #ff1717;
+  /* Behind white text, e.g. the destructive button; #ff1717 gives white only 3.9:1. */
+  --color-warning-fill: #c93a3f;
   --color-warning-surface: #fff5f5;
   --color-warning-border: #ffd6d6;
 
@@ -159,6 +163,18 @@
  * selector, is what actually makes them apply only when `data-theme`
  * is present.
  *
+ * Dark mode is softened, not inverted: no pure white or near-black, and
+ * the warning red gets its own value because the saturated beam red glows
+ * on a dark canvas. The beam colors stay the same in both themes;
+ * beam-purple is not text-safe on the dark canvas.
+ */
+[data-theme="dark"] { @theme {...} }`
+ * block silently overwrites the light block's same-named tokens
+ * unconditionally instead of scoping them to the attribute. Redeclaring
+ * the custom properties directly here, under the plain attribute
+ * selector, is what actually makes them apply only when `data-theme`
+ * is present.
+ *
  * Only the foundation neutrals invert — the five beam colors and the
  * warning-red carry over unchanged (same hex) per guidelines.md's
  * explicit rule, with the one stated exception: beam-purple is
@@ -167,19 +183,23 @@
  * this file for any component choosing text color from the beam set.
  */
 [data-theme="dark"] {
-  --color-canvas: #111111;
-  --color-background: #111111;
-  --color-surface: #1c1c1c;
-  --color-mist: #1c1c1c;
-  --color-line: #2a2a2a;
-  --color-foreground: #ffffff;
+  --color-canvas: #171717;
+  --color-background: #171717;
+  --color-surface: #212121;
+  --color-mist: #212121;
+  --color-line: #2e2e2e;
+  --color-foreground: #e5e5e5;
+  --color-primary-fill: #d4d4d4;
   --color-muted: #a3a3a3;
   --color-faint: #737373;
 
-  --color-shimmer-base: #1c1c1c;
+  --color-shimmer-base: #212121;
 
-  --color-warning-surface: #2a1414;
-  --color-warning-border: #4a1f1f;
+  --color-warning: #f87171;
+  --color-warning-fill: #c93a3f;
+  --color-warning-surface: #2a1515;
+  --color-warning-border: #4a2020;
+  --color-positive: #4ade80;
   --color-caution: #fb923c;
   --color-caution-surface: #2a1c0f;
 }

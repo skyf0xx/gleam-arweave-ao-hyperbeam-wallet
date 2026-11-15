@@ -15,20 +15,20 @@ describe("ui: Button variants", () => {
   it("renders the primary variant by default", () => {
     render(<Button>Sign and send</Button>);
     const button = screen.getByRole("button", { name: "Sign and send" });
-    expect(button.className).toContain("bg-foreground");
+    expect(button.className).toContain("bg-primary-fill");
   });
 
   it("renders the destructive variant for irreversible-tier actions", () => {
     render(<Button variant="destructive">Reset wallet</Button>);
     const button = screen.getByRole("button", { name: "Reset wallet" });
-    expect(button.className).toContain("bg-warning");
+    expect(button.className).toContain("bg-warning-fill");
   });
 
   it("renders the secondary variant with a border, not a fill", () => {
     render(<Button variant="secondary">Cancel</Button>);
     const button = screen.getByRole("button", { name: "Cancel" });
     expect(button.className).toContain("border-line");
-    expect(button.className).not.toContain("bg-foreground");
+    expect(button.className).not.toContain("bg-primary-fill");
   });
 });
 
