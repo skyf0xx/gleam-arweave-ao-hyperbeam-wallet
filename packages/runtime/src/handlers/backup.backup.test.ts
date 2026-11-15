@@ -5,7 +5,7 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { InMemoryCloudAccount, InMemoryCloudFile, InMemoryStorage, InMemoryTimer } from "../../testing";
 import { registerBackupSync } from "../backup-sync";
 import { BACKUP_KEY, BACKUP_STATE_KEY, CONTACTS_KEY, WALLETS_KEY } from "../storage-keys";
-import { BackupHandler } from "./backup";
+import { BackupHandler, PULL_EVERY_MS } from "./backup";
 import { ContactsHandler } from "./contacts";
 import { createKeySession, type KeySession } from "./key-session";
 import { PasskeyHandler } from "./passkey";
@@ -32,7 +32,14 @@ function device(account: InMemoryCloudAccount, seed: Record<string, unknown> = {
   const lifecycle = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   const cloud = new InMemoryCloudFile(account);
   const clock = { now: 1_700_000_000_000 };
-  const backup = new BackupHandler({ storage, sessionKeys, cloudFile: cloud, vault: lifecycle, now: () => (clock.now += 1_000) });
+  const backup = new BackupHandler({
+    storage,
+    sessionKeys,
+    cloudFile: cloud,
+    vault: lifecycle,
+    session: keySession,
+    now: () => (clock.now += 1_000),
+  });
   return { storage, keySession, lifecycle, backup, cloud, clock };
 }
 
@@ -116,8 +123,8 @@ describe("BackupHandler: set up", () => {
   });
 
   it("is unavailable on a shell with nowhere to keep a backup", async () => {
-    const { storage, lifecycle } = await unlocked(new InMemoryCloudAccount());
-    const backup = new BackupHandler({ storage, sessionKeys: new Keyring(), cloudFile: undefined, vault: lifecycle });
+    const { storage, lifecycle, keySession } = await unlocked(new InMemoryCloudAccount());
+    const backup = new BackupHandler({ storage, sessionKeys: new Keyring(), cloudFile: undefined, vault: lifecycle, session: keySession });
     expect((await backup.status()).provider).toBeNull();
     await expect(backup.setUp({ password: PASSWORD })).rejects.toThrow(userErrorMessage("backupUnavailable"));
   });
@@ -156,7 +163,7 @@ describe("BackupHandler: keeping up to date", () => {
     await target.backup.sync();
     expect(target.cloud.account.writes).toBe(1);
 
-    expect((await target.backup.backUpNow()).problem).toBeNull();
+    expect((await target.backup.syncNow()).problem).toBeNull();
     expect(target.cloud.account.writes).toBe(2);
   });
 
@@ -168,7 +175,7 @@ describe("BackupHandler: keeping up to date", () => {
     expect((await target.backup.status()).problem).toBe("missing");
     expect(target.cloud.account.file).toBeNull();
 
-    expect((await target.backup.backUpNow()).problem).toBeNull();
+    expect((await target.backup.syncNow()).problem).toBeNull();
     expect(target.cloud.account.file).not.toBeNull();
   });
 
@@ -298,10 +305,10 @@ describe("BackupHandler: two devices", () => {
   });
 });
 
-describe("BackupHandler: turn off", () => {
+describe("BackupHandler: delete", () => {
   it("deletes the file, ends access and forgets the key", async () => {
     const target = await backedUp();
-    expect(await target.backup.turnOff()).toEqual({ provider: "google", enabled: false, lastBackupAt: null, problem: null });
+    expect(await target.backup.deleteBackup()).toEqual({ provider: "google", enabled: false, lastBackupAt: null, problem: null });
     expect(target.cloud.account.file).toBeNull();
     expect(target.cloud.account.revoked).toBe(1);
     expect(target.storage.entries.has(BACKUP_KEY)).toBe(false);
@@ -310,6 +317,30 @@ describe("BackupHandler: turn off", () => {
     await target.backup.markChanged();
     await target.backup.sync();
     expect(target.cloud.account.file).toBeNull();
+  });
+});
+
+describe("BackupHandler: stop syncing", () => {
+  it("stops this device alone and leaves the file and the sign-in for the others", async () => {
+    const { first, second } = await (async () => {
+      const first = await backedUp();
+      const second = await unlocked(first.cloud.account, otherVault);
+      await second.backup.setUp({ password: PASSWORD });
+      return { first, second };
+    })();
+    const file = first.cloud.account.file;
+    expect(await first.backup.stopSyncing()).toEqual({ provider: "google", enabled: false, lastBackupAt: null, problem: null });
+    expect(first.cloud.account.file).toBe(file);
+    expect(first.cloud.account.revoked).toBe(0);
+    expect(first.storage.entries.has(BACKUP_KEY)).toBe(false);
+
+    await first.backup.markChanged();
+    await first.backup.sync({ pull: true });
+    expect(first.cloud.account.file).toBe(file);
+
+    await second.backup.markChanged();
+    await second.backup.sync();
+    expect((await second.backup.status()).problem).toBeNull();
   });
 });
 
@@ -372,5 +403,104 @@ describe("BackupHandler: restore with a passkey", () => {
     const fresh = device(original.cloud.account);
     await expect(fresh.backup.restore({ credentialId: CREDENTIAL, prfOutput: prf(7) })).rejects.toThrow(userErrorMessage("passkeyFailed"));
     expect([...fresh.storage.entries.keys()]).toEqual([]);
+  });
+});
+
+describe("BackupHandler: sync between devices", () => {
+  /** Two installs sharing one backup: `first` holds Main, Savings, Watched and Ada; `second` joined with Travel. */
+  async function pair(): Promise<{ first: Device; second: Device }> {
+    const first = await backedUp();
+    const second = await unlocked(first.cloud.account, otherVault);
+    await second.backup.setUp({ password: PASSWORD });
+    return { first, second };
+  }
+
+  it("pulls the other device's wallets and contacts when joining and on unlock", async () => {
+    const { first, second } = await pair();
+    expect(names(second)).toEqual(["Main", "Savings", "Travel", "Watched"]);
+    expect(second.storage.entries.get(CONTACTS_KEY)).toEqual(first.storage.entries.get(CONTACTS_KEY));
+
+    await first.backup.sync({ pull: true });
+    expect(names(first)).toEqual(["Main", "Savings", "Travel", "Watched"]);
+  });
+
+  it("leaves this device's settings and active wallet as they are", async () => {
+    const { first, second } = await pair();
+    const active = first.storage.entries.get("local:activeWalletId");
+    await second.storage.set("local:themeSettings", { theme: "dark" });
+    await second.backup.markChanged();
+    await second.backup.sync();
+    await first.backup.sync({ pull: true });
+    expect(first.storage.entries.get("local:themeSettings")).toBeUndefined();
+    expect(first.storage.entries.get("local:activeWalletId")).toBe(active);
+  });
+
+  it("shows a pulled keyfile wallet locked until the next unlock", async () => {
+    const { first } = await pair();
+    await first.backup.sync({ pull: true });
+    const travel = walletsOf(first).find((wallet) => wallet.name === "Travel")!;
+    expect(await first.keySession.getSigner(travel.id)).toBeNull();
+
+    await first.lifecycle.lockWallet();
+    await first.lifecycle.unlockWallet({ password: PASSWORD });
+    expect(await first.keySession.getSigner(travel.id)).not.toBeNull();
+  });
+
+  it("doesn't pull back a wallet deleted here while another device still has it", async () => {
+    const { first, second } = await pair();
+    await first.backup.sync({ pull: true });
+    const travel = walletsOf(first).find((wallet) => wallet.name === "Travel")!;
+    await first.lifecycle.deleteWallet({ walletId: travel.id });
+    await first.backup.markChanged();
+    await first.backup.sync();
+
+    await second.backup.markChanged();
+    await second.backup.sync();
+    for (let round = 0; round < 2; round += 1) {
+      await first.backup.sync({ pull: true });
+      expect(names(first)).toEqual(["Main", "Savings", "Watched"]);
+    }
+    expect(names(second)).toContain("Travel");
+  });
+
+  it("pulls again on its own every few minutes, and not between", async () => {
+    const { first, second } = await pair();
+    await first.backup.sync({ pull: true });
+    await new ContactsHandler(second.storage).saveContact({ address: "e".repeat(43), name: "Lin" });
+    await second.backup.markChanged();
+    await second.backup.sync();
+
+    await first.backup.sync();
+    expect((first.storage.entries.get(CONTACTS_KEY) as unknown[]).length).toBe(1);
+    first.clock.now += PULL_EVERY_MS;
+    await first.backup.sync();
+    expect((first.storage.entries.get(CONTACTS_KEY) as unknown[]).length).toBe(2);
+  });
+
+  it("writes nothing when a pull finds nothing new", async () => {
+    const { first } = await pair();
+    await first.backup.sync({ pull: true });
+    const writes = first.cloud.account.writes;
+    await first.backup.sync({ pull: true });
+    expect(first.cloud.account.writes).toBe(writes);
+  });
+
+  it("reads nothing from the account while locked", async () => {
+    const { first } = await pair();
+    await first.lifecycle.lockWallet();
+    let reads = 0;
+    const read = first.cloud.read.bind(first.cloud);
+    first.cloud.read = async () => {
+      reads += 1;
+      return read();
+    };
+    await first.backup.sync({ pull: true });
+    expect(reads).toBe(0);
+  });
+
+  it("pulls on the Sync button", async () => {
+    const { first } = await pair();
+    expect((await first.backup.syncNow()).problem).toBeNull();
+    expect(names(first)).toEqual(["Main", "Savings", "Travel", "Watched"]);
   });
 });

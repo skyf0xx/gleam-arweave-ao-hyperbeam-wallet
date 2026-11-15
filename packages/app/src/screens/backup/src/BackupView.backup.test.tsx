@@ -57,24 +57,24 @@ describe("BackupView: on", () => {
     const { runtime, send } = runtimeWith({ ...ON, lastBackupAt: Date.now() - 5 * 60_000 });
     render(<BackupView runtime={runtime} onBack={vi.fn()} />);
     expect(await screen.findByText("5m ago")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Back up now" }));
-    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "backUpNow", payload: undefined }));
+    fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "syncBackupNow", payload: undefined }));
   });
 
-  it("holds the button on Backed up for a moment after a write, then offers it again", async () => {
+  it("holds the button on Synced for a moment after a sync, then offers it again", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const { runtime } = runtimeWith(ON);
       render(<BackupView runtime={runtime} onBack={vi.fn()} />);
       // A loaded CI runner can take longer than findBy's default second to settle.
-      fireEvent.click(await screen.findByRole("button", { name: "Back up now" }, { timeout: 5000 }));
+      fireEvent.click(await screen.findByRole("button", { name: "Sync now" }, { timeout: 5000 }));
 
-      const held = await screen.findByRole("button", { name: "Backed up" }, { timeout: 5000 });
+      const held = await screen.findByRole("button", { name: "Synced" }, { timeout: 5000 });
       expect(held).toHaveProperty("disabled", true);
-      expect(screen.getByRole("status").textContent).toBe("Backed up");
+      expect(screen.getByRole("status").textContent).toBe("Synced");
 
       act(() => vi.advanceTimersByTime(DONE_MS));
-      expect(await screen.findByRole("button", { name: "Back up now" }, { timeout: 5000 })).toHaveProperty("disabled", false);
+      expect(await screen.findByRole("button", { name: "Sync now" }, { timeout: 5000 })).toHaveProperty("disabled", false);
     } finally {
       vi.useRealTimers();
     }
@@ -82,15 +82,15 @@ describe("BackupView: on", () => {
 
   it("doesn't claim a backup that failed", async () => {
     const { runtime } = runtimeWith(ON, {
-      backUpNow: async () => {
+      syncBackupNow: async () => {
         throw new Error("Couldn't reach your backup. Check your connection and try again.");
       },
     });
     render(<BackupView runtime={runtime} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Back up now" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Backed up" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Back up now" })).toHaveProperty("disabled", false);
+    expect(screen.queryByRole("button", { name: "Synced" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Sync now" })).toHaveProperty("disabled", false);
   });
 
   it("offers a sign-in when the account wants one", async () => {
@@ -106,24 +106,45 @@ describe("BackupView: on", () => {
     expect(await screen.findByText("Not found")).toBeTruthy();
   });
 
-  it("turns off only after the delete is confirmed", async () => {
-    const { runtime, send } = runtimeWith(ON, { turnOffBackup: async () => OFF });
+  it("stops syncing on this device only after it is confirmed, and leaves the file", async () => {
+    const { runtime, send } = runtimeWith(ON, { stopBackupSync: async () => OFF });
     const onBack = vi.fn();
     render(<BackupView runtime={runtime} onBack={onBack} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
-    expect(send).not.toHaveBeenCalledWith({ type: "turnOffBackup", payload: undefined });
-    expect(screen.getByText("Delete the backup from Google?")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Stop syncing" }));
+    expect(send).not.toHaveBeenCalledWith({ type: "stopBackupSync", payload: undefined });
+    expect(screen.getByText("Stop syncing on this device?")).toBeTruthy();
+    expect(screen.getByText("Your backup will remain on Google Drive")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop syncing" }));
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenCalledWith({ type: "stopBackupSync", payload: undefined });
+    expect(send).not.toHaveBeenCalledWith({ type: "deleteBackup", payload: undefined });
+  });
+
+  it("deletes the file for every device only past a second confirmation", async () => {
+    const { runtime, send } = runtimeWith(ON, { deleteBackup: async () => OFF });
+    const onBack = vi.fn();
+    render(<BackupView runtime={runtime} onBack={onBack} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Stop syncing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete backup from Google Drive" }));
+    expect(screen.getByText("Delete the backup from Google Drive?")).toBeTruthy();
+    expect(screen.getByText("Every device will stop syncing")).toBeTruthy();
+    expect(send).not.toHaveBeenCalledWith({ type: "deleteBackup", payload: undefined });
 
     fireEvent.click(screen.getByRole("button", { name: "Delete backup" }));
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
+    expect(send).toHaveBeenCalledWith({ type: "deleteBackup", payload: undefined });
   });
 
-  it("keeps the backup when the delete is cancelled", async () => {
+  it("keeps syncing when either step is cancelled", async () => {
     const { runtime, send } = runtimeWith(ON);
     render(<BackupView runtime={runtime} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Turn off" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop syncing" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByRole("button", { name: "Back up now" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Stop syncing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete backup from Google Drive" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Sync now" })).toBeTruthy();
     expect(send).toHaveBeenCalledTimes(1);
   });
 });

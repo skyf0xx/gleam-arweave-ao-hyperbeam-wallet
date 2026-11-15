@@ -11,11 +11,14 @@ import {
   MAX_BACKUP_DEVICES,
   mergeBackupDevices,
   newBackupId,
+  planPull,
+  pulledItemId,
   readBackupData,
   unwrapWithPasskey,
   writeBackupData,
   type BackupBody,
   type BackupHeader,
+  type BackupData,
   type BackupDevice,
   type BackupStatus,
   type CloudFilePort,
@@ -36,10 +39,15 @@ import {
 } from "@gleam/core/signer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { dappError } from "../dapp-error";
+import { updateStored } from "../storage-update";
 import { BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY } from "../storage-keys";
 import { loadBackupKey, loadBackupState, updateBackupState, type BackupState, type StoredBackupKey } from "./backup-state";
+import type { KeySession } from "./key-session";
 
 type Bytes = Uint8Array<ArrayBuffer>;
+
+/** How often an unlocked install with no change of its own looks for other devices' additions. */
+export const PULL_EVERY_MS = 5 * 60_000;
 
 /** The vault operations backup needs. `WalletLifecycleHandler` provides them. */
 export interface BackupVault {
@@ -53,6 +61,8 @@ export interface BackupHandlerDeps {
   /** Absent on a shell with nowhere to keep a backup. */
   cloudFile: CloudFilePort | undefined;
   vault: BackupVault;
+  /** A pull writes the wallets under the session lock, as every other wallet write does. */
+  session: Pick<KeySession, "withSessionLock" | "isVaultLocked">;
   now?: () => number;
 }
 
@@ -65,7 +75,7 @@ export interface FoundBackup {
   passkeys: { credentialId: string; prfSalt: string }[];
 }
 
-type WriteOutcome = "written" | "off" | "locked" | "signIn" | "missing";
+type WriteOutcome = "written" | "current" | "off" | "locked" | "signIn" | "missing";
 
 interface WriteOptions {
   /** A person asked for this write, so the account may show its sign-in and a removed file is made again. */
@@ -85,15 +95,19 @@ export class BackupHandler {
   private readonly sessionKeys: SessionKeyStorePort;
   private readonly cloudFile: CloudFilePort | undefined;
   private readonly vault: BackupVault;
+  private readonly session: BackupHandlerDeps["session"];
   private readonly now: () => number;
+  /** In memory: a stopped worker pulls on its first tick back. */
+  private lastPullAt = Number.NEGATIVE_INFINITY;
   /** One cloud operation at a time: two writes racing would each drop what the other read. */
   private readonly inTurn = createSerializer();
 
-  constructor({ storage, sessionKeys, cloudFile, vault, now = Date.now }: BackupHandlerDeps) {
+  constructor({ storage, sessionKeys, cloudFile, vault, session, now = Date.now }: BackupHandlerDeps) {
     this.storage = storage;
     this.sessionKeys = sessionKeys;
     this.cloudFile = cloudFile;
     this.vault = vault;
+    this.session = session;
     this.now = now;
   }
 
@@ -132,8 +146,8 @@ export class BackupHandler {
     return this.status();
   }
 
-  /** "Back up now", and the sign-in button: writes with the account's sign-in allowed. */
-  async backUpNow(): Promise<BackupStatus> {
+  /** "Sync", and the sign-in button: pulls and writes with the account's sign-in allowed. */
+  async syncNow(): Promise<BackupStatus> {
     const outcome = await this.write({ interactive: true });
     if (outcome === "off") throw new Error(userErrorMessage("backupUnavailable"));
     if (outcome === "signIn") throw new Error(userErrorMessage("backupSignInNeeded"));
@@ -146,18 +160,37 @@ export class BackupHandler {
   }
 
   /**
-   * Writes the backup when the vault changed since the last write, with no
-   * UI. Does nothing while a problem only the user can clear stands, or
-   * while Gleam is locked; the change stays recorded for the next call.
+   * Pulls other devices' additions and writes the backup, with no UI:
+   * when the vault changed since the last write, when `pull` asks, or
+   * every few minutes. Does nothing while a problem only the user can clear
+   * stands, or while Gleam is locked; a change stays recorded for the next
+   * call.
    */
-  async sync(): Promise<void> {
+  async sync({ pull = false }: { pull?: boolean } = {}): Promise<void> {
     const state = await loadBackupState(this.storage);
-    if (!state || state.dirtyAt === null || state.problem !== null) return;
+    if (!state || state.problem !== null) return;
+    if (state.dirtyAt === null && !pull && this.now() - this.lastPullAt < PULL_EVERY_MS) return;
+    if (await this.session.isVaultLocked()) return;
     await this.write({ interactive: false });
   }
 
-  /** Deletes the file, ends this install's access to the account and forgets the backup key. */
-  async turnOff(): Promise<BackupStatus> {
+  /**
+   * Stops syncing on this install alone: forgets the backup key and state
+   * and leaves the file, which other devices may still share. The account's
+   * sign-in is kept, since revoking a Google grant would sign those devices
+   * out too.
+   */
+  async stopSyncing(): Promise<BackupStatus> {
+    await this.inTurn(async () => {
+      await this.storage.remove(BACKUP_KEY);
+      await this.storage.remove(BACKUP_STATE_KEY);
+      await this.sessionKeys.removeBackupKey();
+    });
+    return this.status();
+  }
+
+  /** Deletes the file for every device, ends this install's access to the account and forgets the backup key. */
+  async deleteBackup(): Promise<BackupStatus> {
     const cloud = this.requireCloud();
     await this.inTurn(async () => {
       await this.signIn(cloud);
@@ -315,8 +348,15 @@ export class BackupHandler {
       if (!remote && state.lastWriteAt !== null && !interactive) return this.stopped("missing");
 
       try {
-        const others = remote && !alone ? await this.otherDevices(remote.bytes, stored, state.writer) : {};
-        const devices = { ...others, [state.writer]: { updatedAt: startedAt, data: await readBackupData(this.storage) } };
+        const { [state.writer]: own, ...others } = remote && !alone ? await this.devicesIn(remote.bytes, stored) : {};
+        const { add, removed } = planPull(await readBackupData(this.storage), own, Object.values(others));
+        const pulled = await this.addPulled(add);
+        this.lastPullAt = startedAt;
+        if (!pulled && !interactive && state.dirtyAt === null && own !== undefined) return "current";
+
+        const mine: BackupDevice = { updatedAt: startedAt, data: await readBackupData(this.storage) };
+        if (Object.keys(removed).length > 0) mine.removed = removed;
+        const devices = { ...newestDevices(others, MAX_BACKUP_DEVICES - 1), [state.writer]: mine };
         const stamp = { v: 1, backupId: stored.backupId, updatedAt: startedAt, writer: state.writer } as const;
         const sealed = await this.sessionKeys.sealBackup(encodeBackupBody({ ...stamp, devices }), stored.backupId);
         await cloud.write(encodeBackupFile({ header: { ...stamp, wrapped: stored.wrapped, passkeys: backupPasskeysOf(devices) }, sealed }));
@@ -342,11 +382,33 @@ export class BackupHandler {
   }
 
   /**
-   * The other installs' vaults in the account's file, to carry into the
-   * next write. A file that isn't this backup's, or that this key can't
-   * open, contributes nothing and is replaced.
+   * Adds what `planPull` found to storage, each key merged with its value
+   * at write time. Returns whether anything was added.
    */
-  private async otherDevices(bytes: Uint8Array, stored: StoredBackupKey, writer: string): Promise<Record<string, BackupDevice>> {
+  private async addPulled(add: BackupData): Promise<boolean> {
+    let added = false;
+    const merge = async (key: string, items: unknown[]) => {
+      const written = await updateStored<unknown[]>(this.storage, key, (current) => {
+        const existing = Array.isArray(current) ? current : [];
+        const known = new Set(existing.map((item) => pulledItemId(key, item)));
+        const fresh = items.filter((item) => !known.has(pulledItemId(key, item)));
+        return fresh.length > 0 ? [...existing, ...fresh] : undefined;
+      });
+      if (written !== undefined) added = true;
+    };
+    const { [WALLETS_KEY]: wallets, ...rest } = add;
+    if (Array.isArray(wallets)) {
+      await this.session.withSessionLock(() => merge(WALLETS_KEY, wallets.filter(isValidWallet)));
+    }
+    for (const [key, items] of Object.entries(rest)) if (Array.isArray(items)) await merge(key, items);
+    return added;
+  }
+
+  /**
+   * Every install's vault in the account's file. A file that isn't this
+   * backup's, or that this key can't open, holds none and is replaced.
+   */
+  private async devicesIn(bytes: Uint8Array, stored: StoredBackupKey): Promise<Record<string, BackupDevice>> {
     const file = decodeBackupFile(bytes);
     if (!file || file.header.backupId !== stored.backupId) return {};
     let body: BackupBody | null;
@@ -357,13 +419,16 @@ export class BackupHandler {
       return {};
     }
     if (!body || !bodyMatchesHeader(body, file.header)) return {};
-    return Object.fromEntries(
-      Object.entries(body.devices)
-        .filter(([id]) => id !== writer)
-        .sort(([, a], [, b]) => b.updatedAt - a.updatedAt)
-        .slice(0, MAX_BACKUP_DEVICES - 1),
-    );
+    return body.devices;
   }
+}
+
+function newestDevices(devices: Record<string, BackupDevice>, count: number): Record<string, BackupDevice> {
+  return Object.fromEntries(
+    Object.entries(devices)
+      .sort(([, a], [, b]) => b.updatedAt - a.updatedAt)
+      .slice(0, count),
+  );
 }
 
 /** The vault password one of the header's passkeys wraps, opened with that passkey's PRF output. */

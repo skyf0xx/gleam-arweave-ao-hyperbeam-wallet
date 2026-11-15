@@ -166,11 +166,17 @@ export function createRuntime(platform: Platform): Runtime {
 
   const lifecycle = new WalletLifecycleHandler(storage, keySession, { downloads: platform.downloads });
   const passkey = new PasskeyHandler(storage, lifecycle);
-  const backup = new BackupHandler({ storage, sessionKeys: platform.sessionKeys, cloudFile: platform.cloudFile, vault: lifecycle });
+  const backup = new BackupHandler({
+    storage,
+    sessionKeys: platform.sessionKeys,
+    cloudFile: platform.cloudFile,
+    vault: lifecycle,
+    session: keySession,
+  });
   if (platform.cloudFile) registerBackupSync(storage, platform.timer, backup);
-  // A change made while locked waits for the unlock that brings the backup key back.
+  // An unlock brings the backup key back: it writes a change made while locked and pulls other devices' additions.
   const syncBackup = () => {
-    backup.sync().catch((error: unknown) => console.error("Vault backup failed.", error));
+    backup.sync({ pull: true }).catch((error: unknown) => console.error("Vault backup failed.", error));
   };
   const reads = new ReadsHandler(storage);
   // `approval` is declared below; hardware sends reach it only at call time.
@@ -600,8 +606,9 @@ export function createRuntime(platform: Platform): Runtime {
     },
     getBackupStatus: () => backup.status(),
     setUpBackup: (data) => backup.setUp(data),
-    backUpNow: () => backup.backUpNow(),
-    turnOffBackup: () => backup.turnOff(),
+    syncBackupNow: () => backup.syncNow(),
+    stopBackupSync: () => backup.stopSyncing(),
+    deleteBackup: () => backup.deleteBackup(),
     findBackup: () => backup.find(),
     restoreBackup: async (data) => {
       const result = await backup.restore(data);

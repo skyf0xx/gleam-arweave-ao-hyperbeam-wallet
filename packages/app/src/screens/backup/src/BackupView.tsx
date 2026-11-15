@@ -47,23 +47,24 @@ export interface BackupViewProps {
   onBack: () => void;
 }
 
-type Phase = "idle" | "settingUp" | "backingUp" | "turningOff" | "done";
+type Phase = "idle" | "settingUp" | "syncing" | "stopping" | "deleting" | "done";
 
-/** How long "Backed up" holds the button after a write, so a fast one is still seen. */
+/** How long "Synced" holds the button after a sync, so a fast one is still seen. */
 export const DONE_MS = 2_500;
 
 /**
  * Settings → Backup. Off, it is one password field and one button: the
  * password wraps the backup's key, and an unlocked vault doesn't keep it.
- * On, it shows when the backup was last written and lets the user write
- * it now or turn it off.
+ * On, it shows when the backup was last written and lets the user sync
+ * now (pull other devices' additions, then write), stop syncing on this
+ * device, or, past that, delete the file for every device.
  */
 export function BackupView({ runtime, onBack }: BackupViewProps) {
   const t = useT();
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [password, setPassword] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
-  const [confirmingOff, setConfirmingOff] = useState(false);
+  const [confirming, setConfirming] = useState<"stop" | "delete" | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -87,13 +88,13 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
     };
   }, [runtime]);
 
-  const run = async (next: "settingUp" | "backingUp", request: () => Promise<BackupStatus>) => {
+  const run = async (next: "settingUp" | "syncing", request: () => Promise<BackupStatus>) => {
     setPhase(next);
     setError(undefined);
     try {
       setStatus(await request());
       setPassword("");
-      setConfirmingOff(false);
+      setConfirming(null);
       setPhase("done");
     } catch (reason) {
       setError(errorText(reason));
@@ -105,12 +106,12 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
 
   const setUp = () =>
     run("settingUp", () => runtime.send<{ password: string }, BackupStatus>({ type: "setUpBackup", payload: { password } }));
-  const backUpNow = () => run("backingUp", () => runtime.send<void, BackupStatus>({ type: "backUpNow", payload: undefined }));
-  const turnOff = async () => {
-    setPhase("turningOff");
+  const syncNow = () => run("syncing", () => runtime.send<void, BackupStatus>({ type: "syncBackupNow", payload: undefined }));
+  const leave = async (next: "stopping" | "deleting") => {
+    setPhase(next);
     setError(undefined);
     try {
-      await runtime.send<void, BackupStatus>({ type: "turnOffBackup", payload: undefined });
+      await runtime.send<void, BackupStatus>({ type: next === "stopping" ? "stopBackupSync" : "deleteBackup", payload: undefined });
       onBack();
     } catch (reason) {
       setError(errorText(reason));
@@ -120,6 +121,7 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
 
   const busy = phase !== "idle";
   const account = status?.provider ? backupAccountName(status.provider) : "";
+  const drive = status?.provider ? backupDriveName(status.provider) : "";
 
   return (
     <div className="flex min-h-full flex-col">
@@ -169,36 +171,63 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
                 {backupSummary(t, status)}
               </span>
             </div>
-            {confirmingOff ? (
+            {confirming === "stop" ? (
               <div className="mt-auto flex flex-col gap-3">
-                <p className="text-body text-foreground">{t("backup.turnOffConfirm", { account })}</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-body text-foreground">{t("backup.stopConfirm")}</p>
+                  <p className="text-caption text-muted">{t("backup.stillIn", { drive })}</p>
+                </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirmingOff(false)} className="flex-1">
+                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(null)} className="flex-1">
                     {t("backup.cancel")}
                   </Button>
-                  <Button type="button" variant="destructive" disabled={busy} aria-busy={busy} onClick={() => void turnOff()} className="flex-1">
-                    {phase === "turningOff" ? t("backup.turningOff") : t("backup.deleteBackup")}
+                  <Button type="button" disabled={busy} aria-busy={busy} onClick={() => void leave("stopping")} className="flex-1">
+                    {t("backup.stopSyncing")}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setConfirming("delete")}
+                  className="text-warning hover:text-warning"
+                >
+                  {t("backup.deleteFrom", { drive })}
+                </Button>
+              </div>
+            ) : confirming === "delete" ? (
+              <div className="mt-auto flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <p className="text-body text-foreground">{t("backup.deleteConfirm", { drive })}</p>
+                  <p className="text-caption text-muted">{t("backup.everyDevice")}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(null)} className="flex-1">
+                    {t("backup.cancel")}
+                  </Button>
+                  <Button type="button" variant="destructive" disabled={busy} aria-busy={busy} onClick={() => void leave("deleting")} className="flex-1">
+                    {phase === "deleting" ? t("backup.deleting") : t("backup.deleteBackup")}
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="mt-auto flex flex-col gap-2.5">
-                <Button type="button" disabled={busy} aria-busy={busy && phase !== "done"} onClick={() => void backUpNow()}>
+                <Button type="button" disabled={busy} aria-busy={busy && phase !== "done"} onClick={() => void syncNow()}>
                   {phase === "done" ? (
                     <span role="status" className="flex items-center gap-1.5">
                       <CheckIcon size={16} />
-                      {t("backup.backedUp")}
+                      {t("backup.synced")}
                     </span>
-                  ) : phase === "backingUp" ? (
-                    t("backup.backingUp")
+                  ) : phase === "syncing" ? (
+                    t("backup.syncing")
                   ) : status.problem === "signIn" ? (
                     t("backup.signIn")
                   ) : (
-                    t("backup.backUpNow")
+                    t("backup.syncNow")
                   )}
                 </Button>
-                <Button type="button" variant="ghost" disabled={busy} onClick={() => setConfirmingOff(true)}>
-                  {t("backup.turnOff")}
+                <Button type="button" variant="ghost" disabled={busy} onClick={() => setConfirming("stop")}>
+                  {t("backup.stopSyncing")}
                 </Button>
               </div>
             )}

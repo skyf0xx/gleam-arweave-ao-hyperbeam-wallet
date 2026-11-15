@@ -56,10 +56,19 @@ export interface BackupHeader extends BackupStamp {
 /** Storage values by storage key. */
 export type BackupData = Record<string, unknown>;
 
+/**
+ * What an install removed that another install's copy still holds, by
+ * storage key: wallet and contact addresses, token process ids and site
+ * origins. A pull never adds these back (`planPull`).
+ */
+export type BackupRemoved = Record<string, string[]>;
+
 /** One install's vault, as of its last write. */
 export interface BackupDevice {
   updatedAt: number;
   data: BackupData;
+  /** Absent in files older releases wrote. Read through `removedOf`, since nothing here checks it. */
+  removed?: BackupRemoved;
 }
 
 /** Past this many installs the file is not one Gleam wrote. */
@@ -89,6 +98,7 @@ export const ACTIVE_WALLET_BACKUP_KEY = "local:activeWalletId";
 export const CONTACTS_BACKUP_KEY = "local:contacts";
 /** Followed by a wallet's address. */
 export const WATCHED_TOKENS_BACKUP_PREFIX = "local:watchedProcessIds:";
+export const SAVED_SITES_BACKUP_KEY = "local:browserSavedSites";
 
 interface BackupRule {
   /** A list is checked item by item, so one bad item costs only itself when a backup is built. */
@@ -125,7 +135,7 @@ const RULES: Readonly<Record<string, BackupRule>> = {
   "local:lockSettings": { list: false, ok: isLockSettings },
   "local:securityPhrase": { list: false, ok: (value) => readSecurityPhrase(value) !== null },
   "local:passkey": { list: false, ok: isPasskeyEnrollment },
-  "local:browserSavedSites": { list: true, ok: isWebOrigin },
+  [SAVED_SITES_BACKUP_KEY]: { list: true, ok: isWebOrigin },
 };
 
 const WATCHED_TOKENS_RULE: BackupRule = { list: true, ok: isTokenId };

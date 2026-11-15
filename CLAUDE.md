@@ -136,7 +136,10 @@ tests check Gleam's ANS-104 bytes against it.
   random key is stored wrapped under the vault password
   (`signer/backup-key.ts`) and held unwrapped only by the keyring, from
   unlock to lock. The file holds one vault per install; a write replaces
-  only this install's, and a restore merges them all. A storage key is
+  only this install's, and a restore merges them all. Each write first
+  pulls the other installs' wallets, contacts, added tokens and saved
+  sites into this one (`core/backup/pull.ts`): never settings, never a
+  changed copy of an item already here, and never an item removed here. A storage key is
   backed up only when `core/backup/file.ts` lists it with a guard.
   The extension and Android use a Drive app folder
   (`core/backup/google-drive.ts`), and iOS a CloudKit record. On mobile

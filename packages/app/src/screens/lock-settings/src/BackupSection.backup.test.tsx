@@ -20,7 +20,7 @@ describe("BackupSection", () => {
 
   it("shows the last backup when it is current", async () => {
     render(<BackupSection runtime={runtimeWith({ ...OFF, enabled: true, lastBackupAt: Date.now() })} provider="google" onOpen={vi.fn()} />);
-    expect(await screen.findByText("Last backup · just now")).toBeTruthy();
+    expect(await screen.findByText("Last synced · just now")).toBeTruthy();
   });
 
   it("shows what needs the user", async () => {

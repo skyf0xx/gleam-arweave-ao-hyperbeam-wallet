@@ -132,9 +132,10 @@ export interface ProtocolMap {
   /** Turns the vault backup on and writes the first file. Opens the account's sign-in. */
   setUpBackup(req: { password: string }): BackupStatus;
   /** Writes the backup now, opening the account's sign-in when it is needed. */
-  backUpNow(): BackupStatus;
+  syncBackupNow(): BackupStatus;
   /** Deletes the backup from the account and stops backing up. */
-  turnOffBackup(): BackupStatus;
+  stopBackupSync(): BackupStatus;
+  deleteBackup(): BackupStatus;
   /** Signs in to the account and reports whether it holds a backup. */
   /** Whether the account holds a backup, and the passkeys its header lists, which can stand in for the password. */
   findBackup(): { found: boolean; passkeys: { credentialId: string; prfSalt: string }[] };
