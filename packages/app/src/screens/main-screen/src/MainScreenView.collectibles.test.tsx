@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderWithPlatform as render } from "../../../app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Collectible, RuntimePort, WalletSummary } from "@gleam/core";
 import { MainScreenView } from "./MainScreenView";
 import { CollectibleDetailView } from "../../collectibles/index.tsx";
+import { resetCollectiblesGalleryForTests } from "../../collectibles/src/CollectiblesGallery";
 
 afterEach(cleanup);
 
@@ -72,7 +73,9 @@ const collectiblesCalls = (runtime: { send: ReturnType<typeof vi.fn> }) =>
   runtime.send.mock.calls.filter(([message]) => message.type === "getCollectibles").length;
 
 describe("Collectibles tab", () => {
-  it("does not fetch until the tab is opened, then shows the grid", async () => {
+  beforeEach(resetCollectiblesGalleryForTests);
+
+  it("does not fetch until the tab is opened, then shows the gallery", async () => {
     const runtime = runtimeWith(async () => [FROG, FROG2, DOC]);
     renderMain(runtime);
     expect(screen.getByRole("tab", { name: "Collectibles" }).getAttribute("aria-selected")).toBe("false");
@@ -83,8 +86,7 @@ describe("Collectibles tab", () => {
 
     expect(screen.getByRole("tab", { name: "Collectibles" }).getAttribute("aria-selected")).toBe("true");
     expect(await screen.findByRole("button", { name: "Frog #1" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Frogs" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "A Document" })).toBeTruthy();
+    expect(screen.getAllByRole("option").map((option) => option.getAttribute("aria-label"))).toEqual(["Frog #1", "Frog #2", "A Document"]);
     expect(collectiblesCalls(runtime)).toBe(1);
   });
 
@@ -110,11 +112,27 @@ describe("Collectibles tab", () => {
     await waitFor(() => expect(collectiblesCalls(runtime)).toBe(2));
   });
 
-  it("opens a collectible when its tile is tapped", async () => {
+  it("shows the picked thumbnail large and opens it when the large piece is tapped", async () => {
     const onOpenCollectible = vi.fn();
     renderMain(runtimeWith(async () => [FROG, FROG2]), { initialTab: "collectibles", onOpenCollectible });
-    fireEvent.click(await screen.findByRole("button", { name: "Frog #2" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Frog #2" }));
+    expect(screen.getByRole("option", { name: "Frog #2" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Frog #2" }));
     expect(onOpenCollectible).toHaveBeenCalledWith(FROG2);
+  });
+
+  it("steps with the arrow keys and swipes on the large piece", async () => {
+    renderMain(runtimeWith(async () => [FROG, FROG2, DOC]), { initialTab: "collectibles" });
+    await screen.findByRole("button", { name: "Frog #1" });
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(await screen.findByRole("button", { name: "Frog #2" })).toBeTruthy();
+    const hero = screen.getByRole("button", { name: "Frog #2" });
+    fireEvent.pointerDown(hero, { clientX: 200 });
+    fireEvent.pointerUp(hero, { clientX: 100 });
+    expect(await screen.findByRole("button", { name: "A Document" })).toBeTruthy();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "A Document" }), { clientX: 100 });
+    fireEvent.pointerUp(screen.getByRole("button", { name: "A Document" }), { clientX: 200 });
+    expect(await screen.findByRole("button", { name: "Frog #2" })).toBeTruthy();
   });
 
   it("reports tab changes so the caller can restore the tab after the detail screen", async () => {
@@ -126,11 +144,12 @@ describe("Collectibles tab", () => {
 
   it("keeps a thumbnail pulsing rather than showing the file icon after one failed load", async () => {
     renderMain(runtimeWith(async () => [FROG]), { initialTab: "collectibles" });
-    const img = await screen.findByAltText("Frog #1");
-    fireEvent.error(img);
-    expect(screen.queryByAltText("Frog #1")).toBeNull();
+    const tileImages = () => screen.getAllByTestId("collectible-tile").flatMap((tile) => Array.from(tile.querySelectorAll("img")));
+    await waitFor(() => expect(tileImages().length).toBeGreaterThan(0));
+    for (const img of tileImages()) fireEvent.error(img);
+    await waitFor(() => expect(tileImages()).toHaveLength(0));
     expect(screen.queryByTestId("collectible-placeholder")).toBeNull();
-    expect(screen.getByTestId("collectible-tile").className).toContain("gleam-cached-pulse");
+    for (const tile of screen.getAllByTestId("collectible-tile")) expect(tile.className).toContain("gleam-cached-pulse");
   });
 });
 

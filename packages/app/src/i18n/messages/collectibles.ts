@@ -10,7 +10,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "View on Lunar",
     send: "Send",
     empty: "No collectibles yet. NFTs you hold on AO show up here.",
-    other: "Other",
+    previous: "Previous",
+    next: "Next",
   },
   es: {
     title: "Coleccionables",
@@ -21,7 +22,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Ver en Lunar",
     send: "Enviar",
     empty: "Aún no hay coleccionables. Los NFT que tengas en AO aparecen aquí.",
-    other: "Otros",
+    previous: "Anterior",
+    next: "Siguiente",
   },
   id: {
     title: "Koleksi",
@@ -32,7 +34,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Lihat di Lunar",
     send: "Kirim",
     empty: "Belum ada koleksi. NFT yang Anda miliki di AO muncul di sini.",
-    other: "Lainnya",
+    previous: "Sebelumnya",
+    next: "Berikutnya",
   },
   "pt-BR": {
     title: "Colecionáveis",
@@ -43,7 +46,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Ver no Lunar",
     send: "Enviar",
     empty: "Nenhum colecionável ainda. Os NFTs que você tem na AO aparecem aqui.",
-    other: "Outros",
+    previous: "Anterior",
+    next: "Próximo",
   },
   vi: {
     title: "Sưu tập",
@@ -54,7 +58,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Xem trên Lunar",
     send: "Gửi",
     empty: "Chưa có vật phẩm sưu tập. NFT bạn giữ trên AO sẽ hiện ở đây.",
-    other: "Khác",
+    previous: "Trước",
+    next: "Tiếp",
   },
   tr: {
     title: "Koleksiyonlar",
@@ -65,7 +70,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Lunar'da görüntüle",
     send: "Gönder",
     empty: "Henüz koleksiyon öğesi yok. AO'da tuttuğunuz NFT'ler burada görünür.",
-    other: "Diğer",
+    previous: "Önceki",
+    next: "Sonraki",
   },
   ru: {
     title: "Коллекция",
@@ -76,7 +82,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Открыть в Lunar",
     send: "Отправить",
     empty: "Коллекция пуста. Здесь появятся ваши NFT в AO.",
-    other: "Другое",
+    previous: "Назад",
+    next: "Далее",
   },
   ja: {
     title: "コレクティブル",
@@ -87,7 +94,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Lunar で表示",
     send: "送信",
     empty: "コレクティブルはまだありません。AO で保有している NFT がここに表示されます。",
-    other: "その他",
+    previous: "前へ",
+    next: "次へ",
   },
   ko: {
     title: "컬렉터블",
@@ -98,7 +106,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "Lunar에서 보기",
     send: "보내기",
     empty: "아직 컬렉터블이 없어요. AO에서 보유한 NFT가 여기에 표시돼요.",
-    other: "기타",
+    previous: "이전",
+    next: "다음",
   },
   "zh-CN": {
     title: "收藏品",
@@ -109,7 +118,8 @@ export const collectibles = defineMessages({
     viewOnLunar: "在 Lunar 上查看",
     send: "发送",
     empty: "暂无收藏品。你在 AO 上持有的 NFT 会显示在这里。",
-    other: "其他",
+    previous: "上一个",
+    next: "下一个",
   },
   "zh-TW": {
     title: "收藏品",
@@ -120,6 +130,7 @@ export const collectibles = defineMessages({
     viewOnLunar: "在 Lunar 上檢視",
     send: "傳送",
     empty: "尚無收藏品。你在 AO 上持有的 NFT 會顯示在這裡。",
-    other: "其他",
+    previous: "上一個",
+    next: "下一個",
   },
 });

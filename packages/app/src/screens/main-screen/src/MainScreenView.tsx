@@ -28,7 +28,7 @@ import { useLocale, useT, type TFunction } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
-import { CollectiblesGrid } from "../../collectibles/index.tsx";
+import { CollectiblesGallery } from "../../collectibles/index.tsx";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
@@ -1163,7 +1163,7 @@ export function MainScreenView({
             {collectiblesQuery.error && !collectiblesQuery.data ? (
               <NetworkErrorBanner onRetry={() => void collectiblesQuery.refetch()} className="phone:mx-0 phone:mt-0" />
             ) : (
-              <CollectiblesGrid
+              <CollectiblesGallery
                 items={collectiblesQuery.data}
                 loading={collectiblesQuery.isLoading}
                 onOpen={onOpenCollectible}
