@@ -174,6 +174,7 @@ function JoinedView({
     countNote.phase !== "hidden" && seatsLeft !== null ? invitesRemainingLine(seatsLeft) : welcome ? null : (prompt?.text ?? null);
   // A full code sends friends to a "full" invite page, so there's nothing to share.
   const full = seatsLeft !== null && seatsLeft <= 0;
+  const friends = score?.refereeCount ?? 0;
 
   return (
     <div className="flex flex-1 flex-col gap-9 px-6 phone:px-5 pb-6 pt-6">
@@ -195,14 +196,10 @@ function JoinedView({
             </h2>
             <div className="flex flex-col gap-6 rounded-xl bg-mist p-4">
               <EarnItem label={t("points.invite")}>
-                <p className="text-label text-muted">
-                  {t("points.referralBefore")}
-                  {REFERRAL_PERCENT}%{t("points.referralAfter")}
-                </p>
                 {full ? (
-                  <p className="mt-1.5 text-label text-foreground">{t("points.invitesFull")}</p>
+                  <p className="text-label text-foreground">{t("points.invitesFull")}</p>
                 ) : (
-                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <button
                       type="button"
                       className={cn(ACTION_LINK, copied && "text-positive")}
@@ -228,6 +225,15 @@ function JoinedView({
                     ) : null}
                   </div>
                 )}
+                <p className="mt-1.5 text-label text-muted">
+                  {t("points.referralBefore")}
+                  {REFERRAL_PERCENT}%{t("points.referralAfter")}
+                </p>
+                {friends > 0 ? (
+                  <p className="text-label text-muted">
+                    {t(friends === 1 ? "points.joinedOne" : "points.joinedMany", { count: friends })}
+                  </p>
+                ) : null}
               </EarnItem>
               <ReviewItem runtime={runtime} />
             </div>
@@ -402,7 +408,11 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
 
   return (
     <EarnItem label={t("points.review")}>
-      <p className="text-label text-muted">
+      <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer" className={ACTION_LINK}>
+        {t("points.startReview")}
+        <span aria-hidden="true"> ↗</span>
+      </a>
+      <p className="mt-1.5 text-label text-muted">
         <span>
           {paying && rewardAtomic
             ? `${t("points.reviewEarnBefore")}${formatPoints(rewardAtomic)} GLEAM${t("points.reviewEarnAfter")}`
@@ -414,10 +424,6 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
           <span>{t("points.poolPlus", { pool })}</span>
         ) : null}
       </p>
-      <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer" className={cn(ACTION_LINK, "mt-1.5")}>
-        {t("points.startReview")}
-        <span aria-hidden="true"> ↗</span>
-      </a>
     </EarnItem>
   );
 }
