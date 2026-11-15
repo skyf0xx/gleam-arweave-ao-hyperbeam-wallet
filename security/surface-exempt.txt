@@ -137,8 +137,7 @@ packages/app/src/screens/browser/src/StartScreen.tsx A screen outside the key, s
 packages/app/src/screens/browser/src/useBrowserSites.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/collectibles/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/collectibles/src/CollectibleDetailView.tsx A screen outside the key, signing and approval paths.
-packages/app/src/screens/collectibles/src/CollectiblesGrid.tsx A screen outside the key, signing and approval paths.
-packages/app/src/screens/collectibles/src/groupCollectibles.ts Groups collectibles for display; decides nothing.
+packages/app/src/screens/collectibles/src/CollectiblesGallery.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/connected-apps/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/connected-apps/src/ConnectedAppsView.tsx Grant list and revoke buttons; revocation is the listed revokeGrant handler, which also rejects pending approvals.
 packages/app/src/screens/site-wallet/index.tsx A screen outside the key, signing and approval paths.
