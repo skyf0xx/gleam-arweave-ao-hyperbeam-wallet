@@ -191,6 +191,14 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     setRejected(false);
   };
 
+  // Editing opens on the page's own URL, so the user sees the whole
+  // address — scheme, host and path — instead of an empty box.
+  const startEditing = () => {
+    setText(currentUrl ?? "");
+    setRejected(false);
+    setEditing(true);
+  };
+
   const goBackInPage = () => {
     setFailedUrl(null);
     browser.goBack().catch(() => undefined);
@@ -285,7 +293,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
           <button
             type="button"
             aria-label={t("browser.addressEdit", { host: host?.host ?? "" })}
-            onClick={() => setEditing(true)}
+            onClick={startEditing}
             className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-mist px-3.5 text-body text-foreground"
           >
             {host?.insecure ? (
@@ -294,7 +302,8 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
                 {t("browser.notSecure")}
               </span>
             ) : null}
-            <span className="truncate">{host?.host ?? ""}</span>
+            {/* The host is shown whole and wraps instead of truncating, since a lookalike host hides in a cut-off tail. */}
+            <span className="break-all">{host?.host ?? ""}</span>
           </button>
         )}
       </div>

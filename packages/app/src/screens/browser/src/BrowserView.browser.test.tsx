@@ -209,6 +209,24 @@ describe("BrowserView with a page", () => {
     expect(screen.getByText("Not secure")).toBeTruthy();
   });
 
+  it("shows a long host whole in the address bar instead of cutting it off", async () => {
+    const browser = fakeBrowser();
+    const longHost = "very-long-subdomain-that-looks-like-a-real-site-but-is-a-lookalike.example";
+    mount({ browser: browser.port, initialUrl: `https://${longHost}/` });
+    await browser.emit({ kind: "navigation", url: `https://${longHost}/page`, canGoBack: false, loading: false });
+    const bar = screen.getByText(longHost);
+    expect(bar).toBeTruthy();
+    expect(bar.className).not.toContain("truncate");
+  });
+
+  it("opens editing on the page's own full URL instead of an empty box", async () => {
+    const browser = fakeBrowser();
+    mount({ browser: browser.port, initialUrl: "https://a.example/page?x=1" });
+    await browser.emit({ kind: "navigation", url: "https://a.example/page?x=1", canGoBack: false, loading: false });
+    fireEvent.click(screen.getByLabelText(/^Address, a\.example/));
+    expect((screen.getByLabelText("Address") as HTMLInputElement).value).toBe("https://a.example/page?x=1");
+  });
+
   it("records the origin as a recent site and saves it with the star", async () => {
     const browser = fakeBrowser();
     const { runtime, send } = fakeRuntime();

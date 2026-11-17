@@ -35,6 +35,34 @@ describe("ConnectionRequestScreen (6.1 connection request)", () => {
     expect(screen.getByText("See your token balances")).toBeTruthy();
   });
 
+  it("shows the full origin, not just the hostname, under an attacker-supplied name", () => {
+    render(
+      <ConnectionRequestScreen
+        origin="https://bazar.arweave.net"
+        preview={{ ...SCOPED_PREVIEW, appInfo: { name: "Permaswap", logo: null } }}
+        onReject={vi.fn()}
+        onGrant={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("https://")).toBeTruthy();
+    expect(screen.getByText("bazar.arweave.net")).toBeTruthy();
+  });
+
+  it("shows a long lookalike host whole instead of cutting its tail off", () => {
+    const longHost = "very-long-subdomain-that-looks-like-a-real-site-but-is-a-lookalike.example";
+    render(
+      <ConnectionRequestScreen
+        origin={`https://${longHost}`}
+        preview={SCOPED_PREVIEW}
+        onReject={vi.fn()}
+        onGrant={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(longHost)).toBeTruthy();
+  });
+
   it("never uses the word 'connection' or 'approval' for the scope itself (brand vocabulary rule)", () => {
     render(
       <ConnectionRequestScreen

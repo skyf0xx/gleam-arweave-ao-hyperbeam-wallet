@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { useT, type MessageKey } from "../i18n";
+import { splitOrigin } from "../transfer-review/RequestHeader";
 import { UntrustedText } from "./UntrustedText";
 
 /**
@@ -59,6 +60,10 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
   const [logoFailed, setLogoFailed] = useState(false);
   const logoUrl = !logoFailed ? (appInfo?.logo ?? null) : null;
   const [wantsBefore = "", wantsAfter = ""] = t("approval.wantsTo", { name: NAME_SLOT }).split(NAME_SLOT);
+  // The full origin, shown whole and wrapping like RequestHeader: the
+  // hostname alone under an attacker-supplied appInfo name lets a
+  // lookalike host pass for the real site.
+  const { scheme, host } = splitOrigin(origin);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -81,7 +86,10 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
           <div className="text-body font-bold text-foreground">
             <UntrustedText text={displayName} />
           </div>
-          <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
+          <div className="break-all font-mono text-caption text-muted">
+            {scheme ? <span className="font-normal">{scheme}</span> : null}
+            <span>{host}</span>
+          </div>
         </div>
 
         <div className="text-center text-caption font-semibold text-muted">
