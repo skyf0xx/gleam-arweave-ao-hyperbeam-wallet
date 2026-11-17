@@ -321,7 +321,7 @@ describe("BrowserView with a page", () => {
     expect(browser.port.close).toHaveBeenCalled();
   });
 
-  it("tells the app when a state read finds the wallet locked, without counting as activity", async () => {
+  it("checks for a lock every 2 s, so a locked wallet's page is gone within 2 s, without counting as activity", async () => {
     vi.useFakeTimers();
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getState") return { wallets: [{}], session: null };
@@ -330,7 +330,11 @@ describe("BrowserView with a page", () => {
     const runtime = { send, onMessage: () => () => {} } as unknown as RuntimePort;
     const view = mount({ runtime, initialUrl: "https://a.example/" });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(1_999);
+    });
+    expect(send).not.toHaveBeenCalledWith({ type: "getState", payload: { recordActivity: false } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
     });
     expect(send).toHaveBeenCalledWith({ type: "getState", payload: { recordActivity: false } });
     expect(view.onLocked).toHaveBeenCalled();

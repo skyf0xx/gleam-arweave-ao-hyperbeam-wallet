@@ -27,7 +27,7 @@ interface Navigation {
   loading: boolean;
 }
 
-const LOCK_POLL_MS = 10_000;
+const LOCK_POLL_MS = 2_000;
 
 function frameOf(element: HTMLElement): DappBrowserFrame {
   const { x, y, width, height } = element.getBoundingClientRect();
@@ -172,7 +172,10 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
 
   // Auto-lock fires in the background with nothing telling the screen, and
   // the page sits above the lock screen, so the screen asks. Asking isn't
-  // activity, or it would keep the wallet awake.
+  // activity, or it would keep the wallet awake. The ask runs every 2 s,
+  // so a locked wallet's page stays visible for at most 2 s; a push from
+  // the worker on auto-lock would close that window entirely, but that
+  // needs a new worker-to-UI channel.
   useEffect(() => {
     const timer = setInterval(() => {
       runtime
