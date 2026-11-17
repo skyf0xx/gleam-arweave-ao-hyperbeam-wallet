@@ -84,6 +84,30 @@ describe("createRuntime", () => {
         runtime.dispatch("reportOtherWallet", { walletName: "Wander", used: false }, { ...CONTENT_SCRIPT, tabId: undefined }),
       ).toThrow("reportOtherWallet is only accepted from a web page's content script.");
     });
+
+    it.each(["getSiteWalletMode", "reportOtherWallet"] as const)(
+      "%s is refused from a plain-http page, which must not learn whether a Gleam grant exists",
+      (method) => {
+        const { runtime, storage } = setup();
+
+        expect(() =>
+          runtime.dispatch(
+            method,
+            method === "reportOtherWallet" ? { walletName: "Wander", used: false } : undefined,
+            { ...CONTENT_SCRIPT, origin: "http://dapp.example" },
+          ),
+        ).toThrow("Gleam only works with secure (https) sites.");
+        expect(storage.entries.has(otherWalletKey(7))).toBe(false);
+      },
+    );
+
+    it("still answers a loopback page, which is a secure signing origin", async () => {
+      const { runtime } = setup();
+
+      await expect(
+        runtime.dispatch("getSiteWalletMode", undefined, { ...CONTENT_SCRIPT, origin: "http://localhost:3000" }),
+      ).resolves.toEqual({ useGleam: false });
+    });
   });
 
   describe("a transaction with no reward of its own", () => {

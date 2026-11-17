@@ -770,6 +770,19 @@ export function createRuntime(platform: Platform): Runtime {
       return handle(data);
     }
     if (caller?.tier !== "contentScript") throw new Error(dappError(`${type} is only accepted from a web page's content script.`));
+    // A plain-http page must not learn whether the user holds a Gleam
+    // grant: the one-bit answer to `getSiteWalletMode` is a wallet-
+    // membership oracle, and `reportOtherWallet` writes per-tab state
+    // keyed by it. Signing calls already refuse such origins in
+    // `dispatchProviderCall`; these two do the same. The content script
+    // already treats a refused answer as "the other wallet keeps the
+    // site", so a refused page simply never switches to Gleam.
+    if (
+      (type === "getSiteWalletMode" || type === "reportOtherWallet") &&
+      !isSecureSigningOrigin(caller.origin)
+    ) {
+      throw new Error(INSECURE_ORIGIN_ERROR);
+    }
     return handle(parseParams(spec.params, data), caller);
   }
 
