@@ -59,6 +59,17 @@ describe("discoverHyperBeamPeers", () => {
     ]);
   });
 
+  it("never uses entries past the requested page size in an oversized gateway reply", async () => {
+    const edges = Array.from({ length: 99 }, (_, i) => record(`https://filler-${i}.test`, `owner-${i}`, 1000 + i));
+    edges.push(record("https://in-cap.test", "owner-live", 5000));
+    // The 101st entry is past the page size the query asked for. It names a
+    // live peer with the newest timestamp of all, so if it were kept it
+    // would be probed and returned ahead of the in-cap peer.
+    edges.push(record("https://beyond-cap.test", "owner-beyond", 999999));
+    const fetchImpl = stubFetch(edges, new Set(["https://in-cap.test", "https://beyond-cap.test"]));
+    await expect(discoverHyperBeamPeers({ gatewayUrl: "https://gw.test", fetchImpl })).resolves.toEqual(["https://in-cap.test"]);
+  });
+
   it("returns an empty list when the gateway fails", async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError("Failed to fetch");

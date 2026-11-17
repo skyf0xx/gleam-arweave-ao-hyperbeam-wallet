@@ -34,8 +34,14 @@ const LOCATION_TAG_FILTERS = [
   [{ name: "type", values: ["location"] }],
 ] as const;
 
+/** Entries requested per GraphQL page; also the most one page may contribute. */
+const PAGE_SIZE = 100;
+
+/** Largest gateway reply body, in bytes, that one page read will parse. */
+const MAX_PAGE_BYTES = 8 * 1024 * 1024;
+
 const QUERY = `query($tags: [TagFilter!], $after: String) {
-  transactions(tags: $tags, first: 100, after: $after, sort: HEIGHT_DESC) {
+  transactions(tags: $tags, first: ${PAGE_SIZE}, after: $after, sort: HEIGHT_DESC) {
     pageInfo { hasNextPage }
     edges { cursor node { id owner { address } block { timestamp } tags { name value } } }
   }
@@ -106,6 +112,41 @@ function withTimeout(signal: AbortSignal | undefined, timeoutMs: number): AbortS
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+/**
+ * The parsed JSON body of a gateway reply, or undefined when the reply is
+ * larger than MAX_PAGE_BYTES. The gateway is untrusted, so an oversized body
+ * is dropped as it streams in instead of being buffered and parsed whole;
+ * a malformed body throws, like `response.json()` did.
+ */
+async function readJsonBody(response: Response): Promise<unknown> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_PAGE_BYTES) return undefined;
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const text = await response.text();
+    return text.length <= MAX_PAGE_BYTES ? (JSON.parse(text) as unknown) : undefined;
+  }
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_PAGE_BYTES) {
+      await reader.cancel();
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+}
+
 async function readLocationRecords(
   gatewayUrl: string,
   tags: (typeof LOCATION_TAG_FILTERS)[number],
@@ -125,8 +166,11 @@ async function readLocationRecords(
         signal: withTimeout(signal, timeoutMs),
       });
       if (!response.ok) break;
-      const body = (await response.json()) as LocationPage;
-      const edges = body.data?.transactions?.edges ?? [];
+      const body = (await readJsonBody(response)) as LocationPage | undefined;
+      if (!body) break;
+      // The gateway may return more than the PAGE_SIZE entries asked for;
+      // entries past the cap are never kept or worked on.
+      const edges = (body.data?.transactions?.edges ?? []).slice(0, PAGE_SIZE);
       for (const edge of edges) nodes.push(edge.node);
       if (!body.data?.transactions?.pageInfo?.hasNextPage || edges.length === 0) break;
       after = edges[edges.length - 1]!.cursor;
