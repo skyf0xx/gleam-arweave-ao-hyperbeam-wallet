@@ -23,6 +23,8 @@ export interface AddressDisplayProps {
   copiedDurationMs?: number;
   /** Accessible names and hints; English unless the caller passes its own. */
   labels?: AddressDisplayLabels;
+  /** Lays paper's glass over the card. */
+  glass?: boolean;
   className?: string;
 }
 
@@ -37,6 +39,7 @@ export function AddressDisplay({
   onCopy,
   copiedDurationMs = 2000,
   labels: labelsProp,
+  glass = false,
   className,
 }: AddressDisplayProps) {
   const contextLabels = useUiLabels();
@@ -98,7 +101,7 @@ export function AddressDisplay({
         // Holding would otherwise select the text or open the OS menu.
         onContextMenu={(event) => event.preventDefault()}
         aria-label={copied ? labels.copied : labels.copy(address)}
-        className="flex w-full select-none items-center justify-center gap-3 rounded-lg border border-line bg-foreground/[0.03] px-4 py-3 transition-colors [-webkit-touch-callout:none] hover:bg-foreground/[0.05] focus:outline-none focus-visible:border-foreground"
+        className={cn("flex w-full select-none items-center justify-center gap-3 rounded-lg border border-line bg-foreground/[0.03] px-4 py-3 transition-colors [-webkit-touch-callout:none] hover:bg-foreground/[0.05] focus:outline-none focus-visible:border-foreground", glass && "gleam-paper-glass")}
       >
         <MemorableAddress address={address} emphasisPick={emphasisPick} className="justify-center" />
         <span aria-hidden="true" className={cn("flex-shrink-0", copied ? "text-positive" : "text-faint")}>

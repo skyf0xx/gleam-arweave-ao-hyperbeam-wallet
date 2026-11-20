@@ -35,6 +35,7 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
         <div className="flex w-full flex-col gap-2">
           <span className="text-center text-label font-semibold text-muted">{watchOnly ? t("receive.watchedAddress") : t("receive.yourAddress")}</span>
           <AddressDisplay
+            glass
             address={wallet.address}
             emphasisPick={emphasisPick}
             onCopy={() => void navigator.clipboard?.writeText(wallet.address)}

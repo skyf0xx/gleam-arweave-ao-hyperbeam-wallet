@@ -172,11 +172,12 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   return (
     // The row bleeds 8px past the list edge so the hover fill has room
     // around its content while text stays aligned with the header. A green
-    // fill and label mark the active row; grey is hover. Copy floats beside
-    // the chevron instead of taking a column, so the address keeps the full
-    // width for its 7-chunk first row.
+    // fill and label mark the active row; grey is hover. On paper the active
+    // row is under glass instead, lifted where hover is pressed in. Copy
+    // floats beside the chevron instead of taking a column, so the address
+    // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-positive/[0.06]" : "hover:bg-mist"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "gleam-paper-glass bg-positive/[0.06] paper:bg-foreground/[0.03]" : "hover:bg-mist"}`}
     >
       <button
         type="button"

@@ -206,27 +206,22 @@ export function WalletDetailView({
       <ScreenHeader title={t("walletDetail.title")} onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-7 phone:pt-4">
-        <div className="group flex items-center gap-3.5 phone:items-start">
+        <div className="gleam-paper-glass-up group flex items-center gap-3.5 phone:items-start paper:-mx-6 paper:-mt-7 paper:px-6 paper:pb-5 paper:pt-7 phone:paper:-mx-5 phone:paper:-mt-4 phone:paper:px-5 phone:paper:pt-4">
           <AccountAvatar svgMarkup={avatarSvg} label={t("walletDetail.avatarOf", { name: wallet.name })} size={44} />
+          {/* The name is edited in the field below, so this block shows only the address. */}
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            {/* Copy sits in the name line so the address keeps the full width. */}
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <span className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">
-                {wallet.name}
-                {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
-              </span>
-              <button
-                type="button"
-                onClick={copyAddress}
-                aria-label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
-                title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
-                className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
-              >
-                {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
-              </button>
-            </div>
+            {methodLabel ? <span className="text-label text-faint">{methodLabel}</span> : null}
             <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
           </div>
+          <button
+            type="button"
+            onClick={copyAddress}
+            aria-label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
+            title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
+            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+          >
+            {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
+          </button>
         </div>
 
         <TextField
