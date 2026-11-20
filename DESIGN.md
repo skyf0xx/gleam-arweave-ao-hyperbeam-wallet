@@ -191,9 +191,9 @@ Before styling something new, ask in order:
 
 Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without glass.
 
-- **A pane you can act on is a card.** Changing the recipient, copying the address, the active wallet's row: a rounded pane laid on the paper with a light rim and a slight lift (`.gleam-paper-glass`).
+- **A pane you can change is a card.** Changing the recipient, switching wallets: a rounded pane laid on the paper with a light rim and a slight lift (`.gleam-paper-glass`). Copying changes nothing, so an address you can only copy is read-only.
 - **A read-only pane is set into the page.** It runs the full width, curves only its open edge (14px, a little less than the token sheet), lights that edge and fades out where it continues. It hangs down from its subject (`.gleam-paper-glass-down`) or rises to it from under the header (`.gleam-paper-glass-up`).
-- **It covers what depends on the address.** On a transfer review the pane runs from the recipient through the token, fee and balance after; the sender stays on the paper. A pane follows the screen's own reading order: don't reorder a screen to keep a row off the glass.
+- **It covers what depends on the address.** On a transfer review the pane runs from the recipient through the token, fee and balance after; the sender stays on the paper. On Receive the pane runs from "Your address" to the foot of the screen; the QR stays on the paper, and the copy card drops its own edge and fill so it doesn't read as a second pane. A pane follows the screen's own reading order: don't reorder a screen to keep a row off the glass.
 - **One pane per screen, never on another surface.** Related addresses share one pane. In a list of wallets, only the active one is under glass, and a dot in the Active label's green on its avatar finds it at a glance. No glass on mist cards, notices or Details.
 - **Grey and a hard edge read as glass.** The pane is tinted a step darker than the paper, with a crisp lit edge whose thickness shows inside it, and only a faint blur for lift. A white fill with the sheet's soft shadow reads as paper; a dark line outside the lit edge, above a darker pane, reads as a groove.
 - **Text stays sharp.** The sheen lies under the text, not over it, so an address keeps its full contrast.
