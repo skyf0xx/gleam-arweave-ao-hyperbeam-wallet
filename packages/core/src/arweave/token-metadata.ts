@@ -1,5 +1,6 @@
 import { classifyAsset } from "../ao/asset-scan";
 import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
+import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
@@ -101,6 +102,50 @@ export async function queryTokenMetadata(
   }
 
   return tokenMetadataFromTags(processId, edge.node.tags);
+}
+
+/** The gateways a token's decimals are checked against: two besides `gatewayUrl`. */
+export function crossCheckGatewayUrls(gatewayUrl: string): string[] {
+  const host = (url: string) => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  };
+  return ["https://arweave.net", ...FALLBACK_GATEWAY_URLS].filter((url) => host(url) !== host(gatewayUrl)).slice(0, 2);
+}
+
+/**
+ * `agreed`: at least one other gateway answered, and every one that did
+ * gave the same decimals. `disagreed`: one gave other decimals, so they
+ * come back `null` and the amount shows unscaled. `unconfirmed`: no other
+ * gateway answered.
+ */
+export type TokenMetadataCheck = "agreed" | "disagreed" | "unconfirmed";
+
+/**
+ * `queryTokenMetadata` on `gatewayUrl`, with the decimals checked against
+ * `checkUrls` in parallel. One gateway alone could report 12 decimals for
+ * a 6-decimal token and make an amount read a million times smaller. A
+ * gateway that fails to answer has no vote. Throws as `queryTokenMetadata`
+ * does for `gatewayUrl`.
+ */
+export async function queryCheckedTokenMetadata(
+  processId: string,
+  gatewayUrl: string,
+  checkUrls: readonly string[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ metadata: TokenMetadata; check: TokenMetadataCheck }> {
+  const [metadata, others] = await Promise.all([
+    queryTokenMetadata(processId, gatewayUrl, fetchImpl),
+    Promise.allSettled(checkUrls.map((url) => queryTokenMetadata(processId, url, fetchImpl))),
+  ]);
+  const answers = others.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+  if (answers.some((other) => other.denomination !== metadata.denomination)) {
+    return { metadata: { ...metadata, denomination: null }, check: "disagreed" };
+  }
+  return { metadata, check: answers.length > 0 ? "agreed" : "unconfirmed" };
 }
 
 /** `arweave-scheduler@1.0` is the one scheduler that takes messages as L1 transactions. */

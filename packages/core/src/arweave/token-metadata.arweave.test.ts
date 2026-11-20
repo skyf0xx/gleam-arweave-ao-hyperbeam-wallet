@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { queryTokenMetadata, tokenLogoUrl, tokenMetadataFromTags } from "./token-metadata";
+import { crossCheckGatewayUrls, queryCheckedTokenMetadata, queryTokenMetadata, tokenLogoUrl, tokenMetadataFromTags } from "./token-metadata";
 
 const PROCESS_ID = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
 
@@ -167,5 +167,59 @@ describe("tokenMetadataFromTags denomination", () => {
   it("drops a denomination too large to scale by", () => {
     expect(tokenMetadataFromTags("p".repeat(43), [{ name: "Denomination", value: "2000000000" }]).denomination).toBeNull();
     expect(tokenMetadataFromTags("p".repeat(43), [{ name: "Denomination", value: "12" }]).denomination).toBe(12);
+  });
+});
+
+describe("queryCheckedTokenMetadata", () => {
+  /** Each gateway host answers with its own denomination tag; `null` fails the request. */
+  function gatewaysFetch(denominations: Record<string, string | null>): typeof fetch {
+    return vi.fn(async (url: string) => {
+      const denomination = denominations[new URL(url).host];
+      if (denomination === null || denomination === undefined) return { ok: false, status: 503, json: async () => ({}) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { transactions: { edges: [{ node: { id: PROCESS_ID, tags: [{ name: "Denomination", value: denomination }] } }] } },
+        }),
+      };
+    }) as unknown as typeof fetch;
+  }
+  const CHECKS = ["https://ar-io.dev", "https://permagate.io"];
+
+  it("keeps the decimals when the other gateways agree", async () => {
+    const fetchImpl = gatewaysFetch({ "arweave.net": "6", "ar-io.dev": "6", "permagate.io": "6" });
+    const result = await queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl);
+    expect(result).toMatchObject({ check: "agreed", metadata: { denomination: 6 } });
+  });
+
+  it("drops the decimals when one other gateway reports different ones", async () => {
+    const fetchImpl = gatewaysFetch({ "arweave.net": "12", "ar-io.dev": "6", "permagate.io": "12" });
+    const result = await queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl);
+    expect(result).toMatchObject({ check: "disagreed", metadata: { denomination: null } });
+  });
+
+  it("gives a gateway that fails no vote", async () => {
+    const fetchImpl = gatewaysFetch({ "arweave.net": "6", "ar-io.dev": null, "permagate.io": "6" });
+    expect((await queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl)).check).toBe("agreed");
+  });
+
+  it("is unconfirmed when no other gateway answers", async () => {
+    const fetchImpl = gatewaysFetch({ "arweave.net": "6", "ar-io.dev": null, "permagate.io": null });
+    const result = await queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl);
+    expect(result).toMatchObject({ check: "unconfirmed", metadata: { denomination: 6 } });
+  });
+
+  it("throws when the user's own gateway fails, as queryTokenMetadata does", async () => {
+    const fetchImpl = gatewaysFetch({ "arweave.net": null, "ar-io.dev": "6", "permagate.io": "6" });
+    await expect(queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl)).rejects.toThrow(/HTTP 503/);
+  });
+});
+
+describe("crossCheckGatewayUrls", () => {
+  it("picks two gateways other than the user's own", () => {
+    expect(crossCheckGatewayUrls("https://arweave.net/")).toEqual(["https://ar-io.dev", "https://permagate.io"]);
+    expect(crossCheckGatewayUrls("https://ar-io.dev")).toEqual(["https://arweave.net", "https://permagate.io"]);
+    expect(crossCheckGatewayUrls("https://g.example")).toEqual(["https://arweave.net", "https://ar-io.dev"]);
   });
 });

@@ -18,7 +18,7 @@ import {
   queryAoTransferActivity,
   queryL1TokenReceipts,
 } from "@gleam/core/src/arweave/graphql.ts";
-import { queryTokenMetadata, tokenLogoUrl } from "@gleam/core/src/arweave/token-metadata.ts";
+import { crossCheckGatewayUrls, queryCheckedTokenMetadata, tokenLogoUrl, type TokenMetadataCheck } from "@gleam/core/src/arweave/token-metadata.ts";
 import { mergeActivity } from "@gleam/core/src/activity/index.ts";
 import {
   AO_TOKEN,
@@ -493,8 +493,9 @@ export class ReadsHandler {
     if (isValidTokenMetadata(cached)) return cached;
 
     let metadata: TokenMetadata;
+    let check: TokenMetadataCheck;
     try {
-      metadata = await queryTokenMetadata(processId, gatewayUrl);
+      ({ metadata, check } = await queryCheckedTokenMetadata(processId, gatewayUrl, crossCheckGatewayUrls(gatewayUrl)));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(
@@ -503,6 +504,8 @@ export class ReadsHandler {
           : userErrorMessage("tokenLookupUnreachable", { host: hostOf(gatewayUrl) }),
       );
     }
+    // Gateways that disagree on the decimals leave them unknown, so amounts show unscaled. Not cached: asked again next time.
+    if (check === "disagreed") return metadata;
     if (metadata.transport === "mu" && (metadata.ticker === null || metadata.denomination === null)) {
       try {
         const info = await readLegacyTokenInfo(processId);
@@ -530,6 +533,8 @@ export class ReadsHandler {
         return metadata;
       }
     }
+    // Unchecked decimals aren't kept, so the next read checks them again.
+    if (check === "unconfirmed") return metadata;
     // A cache fill: the value comes from the network, not from what was stored.
     // eslint-disable-next-line gleam/no-storage-read-modify-write
     await this.storage.set(cacheKey, metadata);
@@ -608,17 +613,11 @@ export class ReadsHandler {
 
     // Keep what earlier runs found: each gateway scan can fail on its own and discovery still
     // returns, so a token missing from this run may just be behind a flaky scan. One the wallet
-    // no longer holds drops out of the list on its zero balance.
-    const keep = async (found: TokenMetadata[]): Promise<string[]> => {
-      await Promise.all(
-        found
-          .filter((metadata) => metadata.transport === "l1" && metadata.denomination !== null)
-          // A cache fill from the network, which never changes once complete.
-          // eslint-disable-next-line gleam/no-storage-read-modify-write
-          .map((metadata) => this.storage.set(`${TOKEN_METADATA_KEY_PREFIX}${metadata.processId}`, metadata)),
-      );
-      return [...new Set([...found.map((metadata) => metadata.processId), ...(cached?.processIds ?? [])])];
-    };
+    // no longer holds drops out of the list on its zero balance. What it found isn't
+    // cached as token details: those come from `loadTokenMetadata`, which checks the
+    // decimals against other gateways first.
+    const keep = async (found: TokenMetadata[]): Promise<string[]> =>
+      [...new Set([...found.map((metadata) => metadata.processId), ...(cached?.processIds ?? [])])];
 
     let running = this.discoveryInFlight.get(address);
     if (!running) {
