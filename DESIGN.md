@@ -150,7 +150,7 @@ Dark mode has its own rules. It is not the light theme inverted.
 
 - **Elevation is lightness.** Shadows don't show on near-black, so each level up is a step lighter. Separate with a level change or spacing, not a border.
 - **One bright item per row.** The balance is the only display weight. A row's name and value are foreground; everything else drops back.
-- **No colour fill larger than a figure.** The portfolio chart is neutral (a smoothed foreground line, a fill that fades out, a dotted line at the period's opening value, a dot on the current value). Only the %-change says which way it went.
+- **No colour fill larger than a figure.** The portfolio chart is neutral (a smoothed foreground line, a fill that fades out, a dot on the current value). Only the %-change says which way it went.
 - **Commit actions are bright.** Send and Receive are equal level-2 tiles on the main screen. The bright primary fill is kept for the button that commits.
 - **Two kinds of tab.** Section tabs (Tokens, Collectibles, Activity) are underlined labels. The chart's range picker uses chips.
 
