@@ -184,6 +184,7 @@
 /scripts/release.mjs                                                       @skyf0xx
 /scripts/app-versions.mjs                                                  @skyf0xx
 /scripts/verify-release.sh                                                 @skyf0xx
+/scripts/scan/                                                             @skyf0xx
 /security/surface.mjs                                                      @skyf0xx
 /security/surface.txt                                                      @skyf0xx
 /apps/mobile/ios/App/App/App.entitlements                           @skyf0xx
