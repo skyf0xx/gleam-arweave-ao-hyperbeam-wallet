@@ -150,7 +150,7 @@ Dark mode has its own rules. It is not the light theme inverted.
 
 - **Elevation is lightness.** Shadows don't show on near-black, so each level up is a step lighter. Separate with a level change or spacing, not a border.
 - **One bright item per row.** The balance is the only display weight. A row's name and value are foreground; everything else drops back.
-- **No colour fill larger than a figure.** The portfolio chart is neutral (a smoothed foreground line, a fill that fades out, a dotted line at the period's opening value, a dot on the current value). Only the %-change says which way it went.
+- **No colour fill larger than a figure.** The portfolio chart is neutral (a smoothed foreground line, a fill that fades out, a dot on the current value). Only the %-change says which way it went.
 - **Commit actions are bright.** Send and Receive are equal level-2 tiles on the main screen. The bright primary fill is kept for the button that commits.
 - **Two kinds of tab.** Section tabs (Tokens, Collectibles, Activity) are underlined labels. The chart's range picker uses chips.
 
@@ -158,7 +158,7 @@ Layout rules that tokens can't carry use Tailwind's `layered:` variant, which ma
 
 **Paper**
 
-Paper is a light theme on a grey paper with a little warmth. It shares dark's layered layout: the token sheet, underlined section tabs, tile actions and the neutral chart.
+Paper is a light theme on a grey paper with a little warmth, with glass where a person checks who. People see it as **Silica**; the code, the stored setting and this file call it paper. It shares dark's layered layout: the token sheet, underlined section tabs, tile actions and the neutral chart.
 
 | Token | Paper | Level |
 |---|---|---|
@@ -176,8 +176,27 @@ Paper is a light theme on a grey paper with a little warmth. It shares dark's la
 - **Material.** The token sheet lifts off the paper with a soft edge, and settles in once.
 - **Barely any texture.** The header paper is flat colour. The token sheet has a grain you only notice up close; anything stronger, or ruled lines, competes with the rows.
 - **Light on paper.** The beam is light lying flat on the paper, not ink: clear spectral stops mixed about a third of the way toward the paper, with no glow, and 2px rather than 3px, so it sits in the pressed header. Warning, gains and losses are a step deeper than light's so they hold on the paper.
-- **Glass catches the light** only where it faces the beam: the sheet's top edge while undocked, and the commit buttons (primary and destructive) with a hairline inside the top and a faint sheen. Tiles and chips stay pressed in.
+- **The beam's colour catches** only where an edge faces the beam: the sheet's top edge while undocked, and the commit buttons (primary and destructive) with a hairline inside the top and a faint sheen. Tiles and chips stay pressed in.
 - **Bare chart lines.** The portfolio and token charts draw the line alone, with no shading under it, its gain or loss colour mixed a quarter of the way toward the paper.
+
+**Glass marks who, pressing marks a setting**
+
+On paper, glass is kept for identity: an address a person checks before trusting it, or the wallet they hold. A choice about how something is shown is pressed in, never glass. Kept that narrow, glass stays a signal: "this is the one, look closely".
+
+Before styling something new, ask in order:
+
+1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the wallet a site connects to, the active wallet in the switcher. It goes under glass.
+2. **Is it a selected setting or view?** A chart period, a tab, a theme, a language, a currency. It is pressed in: mist, a step darker, or an underline for tabs. Not glass, even though it is "selected".
+3. **Is it under the pointer or a finger?** It takes `bg-hover`: mist in light and dark, a 4% ink wash on paper, rounded and reaching past the row's text. Never glass, and never paper's mist, which reads as a scorch on the sheet.
+
+Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without glass.
+
+- **A pane you can change is a card.** Changing the recipient, switching wallets: a rounded pane laid on the paper with a light rim and a slight lift (`.gleam-paper-glass`). Copying changes nothing, so an address you can only copy is read-only.
+- **A read-only pane is set into the page.** It runs the full width, curves only its open edge (14px, a little less than the token sheet), lights that edge and fades out where it continues. It hangs down from its subject (`.gleam-paper-glass-down`) or rises to it from under the header (`.gleam-paper-glass-up`).
+- **It covers what depends on the address.** On a transfer review the pane runs from the recipient through the token, fee and balance after; the sender stays on the paper. On Receive the pane runs from "Your address" to the foot of the screen; the QR stays on the paper, and the copy card drops its own edge and fill so it doesn't read as a second pane. A pane follows the screen's own reading order: don't reorder a screen to keep a row off the glass.
+- **One pane per screen, never on another surface.** Related addresses share one pane. In a list of wallets, only the active one is under glass, and a dot in the Active label's green on its avatar finds it at a glance. No glass on mist cards, notices or Details.
+- **Grey and a hard edge read as glass.** The pane is tinted a step darker than the paper, with a crisp lit edge whose thickness shows inside it, and only a faint blur for lift. A white fill with the sheet's soft shadow reads as paper; a dark line outside the lit edge, above a darker pane, reads as a groove.
+- **Text stays sharp.** The sheen lies under the text, not over it, so an address keeps its full contrast.
 
 The paper-only touches use the `paper:` variant and the `.gleam-*` paper classes in `theme.css`.
 

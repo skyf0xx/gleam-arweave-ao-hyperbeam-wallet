@@ -51,7 +51,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             onClick={() => setRevealed((value) => !value)}
             className="absolute right-2 top-0 flex h-11 w-7 flex-shrink-0 phone:right-0 phone:w-11 items-center justify-center text-faint hover:text-muted"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-xs hover:bg-mist">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xs hover:bg-hover">
               <EyeIcon />
             </span>
           </button>

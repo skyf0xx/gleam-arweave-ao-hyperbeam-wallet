@@ -111,7 +111,7 @@ export function StartScreen({
             <button
               type="button"
               onClick={onOpenHistory}
-              className="-mx-3 flex min-h-11 items-center gap-0.5 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+              className="-mx-3 flex min-h-11 items-center gap-0.5 rounded-lg px-3 text-label font-semibold text-muted active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
             >
               {t("browser.history")}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -151,7 +151,7 @@ const clearLabel = (t: TFunction, state: ClearState, idle: string) =>
   state === "done" ? t("browser.cleared") : state === "failed" ? t("browser.clearFailed") : idle;
 
 const CLEAR_BUTTON =
-  "-mx-3 min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
+  "-mx-3 min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
 
 /** Wipes something and says so; recents hold nothing worth a second tap. */
 function ClearButton({ label, clear }: { label: string; clear: () => Promise<unknown> }) {
@@ -182,10 +182,10 @@ function ClearSiteData({ clear }: { clear: () => Promise<unknown> }) {
       <div role="group" aria-label={t("browser.clearSiteData")} className="flex flex-col items-start gap-1">
         <p className="text-label text-foreground">{t("browser.clearSiteDataAsk")}</p>
         <div className="-mx-3 flex items-center">
-          <button type="button" onClick={() => setAsking(false)} className="min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist">
+          <button type="button" onClick={() => setAsking(false)} className="min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-hover">
             {t("browser.cancel")}
           </button>
-          <button type="button" onClick={run} className="min-h-11 rounded-lg px-3 text-label font-semibold text-warning active:bg-mist">
+          <button type="button" onClick={run} className="min-h-11 rounded-lg px-3 text-label font-semibold text-warning active:bg-hover">
             {t("browser.clear")}
           </button>
         </div>
@@ -282,7 +282,7 @@ function SiteRow({ host, icon, insecure = false, caption, go = false, onOpen, on
         onContextMenu={(event) => {
           if (onRemove) event.preventDefault();
         }}
-        className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl py-2 text-left active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+        className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl py-2 text-left active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
       >
         <SiteAvatar host={host} icon={icon} />
         <span className="flex min-w-0 flex-1 flex-col">

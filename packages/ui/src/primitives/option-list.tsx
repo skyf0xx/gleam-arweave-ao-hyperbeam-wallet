@@ -59,7 +59,7 @@ export function OptionRow({
       onClick={onClick}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      className="flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:enabled:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50"
+      className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-2.5 rounded-lg px-3 py-3.5 text-left hover:enabled:bg-hover phone:min-h-[3.75rem] phone:py-2.5 phone:active:enabled:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50"
     >
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span id={titleId} className="text-label font-semibold text-foreground">

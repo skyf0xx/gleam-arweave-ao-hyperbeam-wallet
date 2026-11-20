@@ -58,8 +58,8 @@ import { useUiLabels, useUiLocale } from "../../labels";
  * since `isPositive` picks per render and SVG attributes need a color
  * value, not a class name.
  *
- * Dark also smooths the line, fades the area out toward the bottom, marks
- * the period's opening value with a dotted line. Paper does the same but
+ * Dark also smooths the line and fades the area out toward the bottom.
+ * Paper does the same but
  * drops the area and softens the line (`--color-chart-line-up`/`-down`).
  * These are `layered:` classes so light renders as before.
  */
@@ -193,7 +193,6 @@ export function PortfolioChart({
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const smoothPath = toSmoothPath(coords);
   const smoothArea = smoothPath ? `${smoothPath}L${CHART_WIDTH} ${CHART_HEIGHT}L0 ${CHART_HEIGHT}Z` : "";
-  const openY = coords[0]?.y;
   const fillId = `portfolio-chart-fill-${useId()}`;
   const changeColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
   const lineColorVar = isPositive ? "var(--color-chart-up)" : "var(--color-chart-down)";
@@ -313,19 +312,6 @@ export function PortfolioChart({
               </defs>
               <polygon className="layered:hidden" points={areaPoints} fill={`url(#${fillId})`} stroke="none" />
               <path className="hidden layered:inline paper:hidden" d={smoothArea} fill={`url(#${fillId})`} stroke="none" />
-              {openY === undefined ? null : (
-                <line
-                  className="hidden text-faint layered:inline"
-                  x1={0}
-                  x2={CHART_WIDTH}
-                  y1={openY}
-                  y2={openY}
-                  stroke="currentColor"
-                  strokeWidth={1}
-                  strokeDasharray="2 4"
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
             </>
           )}
           <polyline
@@ -399,7 +385,8 @@ export function PortfolioChart({
               className={cn(
                 "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
                 range === activeRange
-                  ? "bg-mist text-foreground"
+                  ? // Paper's mist matches the Send/Receive tiles below; a lighter wash keeps the range a quiet part of the chart.
+                    "bg-mist text-foreground paper:bg-foreground/[0.035]"
                   : "text-muted hover:text-foreground layered:text-faint",
               )}
             >

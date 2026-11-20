@@ -258,7 +258,7 @@ function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: stri
           type="button"
           aria-label={copyLabel}
           onClick={() => void copyToClipboard(value)}
-          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-muted"
+          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-muted"
         >
           <CopyIcon />
         </button>

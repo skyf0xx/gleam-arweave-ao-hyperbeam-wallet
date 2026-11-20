@@ -58,27 +58,30 @@ export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: A
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.processId")}</span>
-          <MemorableAddress
-            address={preview.processId}
-            emphasisPick={identity.emphasisPick}
-            avatarSvg={identity.avatarSvg(preview.processId)}
-          />
-        </div>
+        {/* On paper, one pane of glass holds both addresses and what adding the token means. */}
+        <div className="gleam-paper-glass-down flex flex-col gap-5 paper:-mx-6 paper:px-6 paper:pb-6 paper:pt-4 phone:paper:-mx-5 phone:paper:px-5">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.processId")}</span>
+            <MemorableAddress
+              address={preview.processId}
+              emphasisPick={identity.emphasisPick}
+              avatarSvg={identity.avatarSvg(preview.processId)}
+            />
+          </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.toWallet")}</span>
-          <MemorableAddress
-            address={preview.address}
-            emphasisPick={identity.emphasisPick}
-            avatarSvg={identity.avatarSvg(preview.address)}
-          />
-        </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.toWallet")}</span>
+            <MemorableAddress
+              address={preview.address}
+              emphasisPick={identity.emphasisPick}
+              avatarSvg={identity.avatarSvg(preview.address)}
+            />
+          </div>
 
-        <p className="text-caption leading-snug text-muted">
-          {t("approval.tokenNotice")}
-        </p>
+          <p className="text-caption leading-snug text-muted">
+            {t("approval.tokenNotice")}
+          </p>
+        </div>
 
         {error ? (
           <div role="alert" className="text-caption leading-snug text-warning">

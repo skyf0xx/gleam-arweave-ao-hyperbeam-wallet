@@ -139,13 +139,17 @@ export function TransferReview({
       ) : (
         <>
           <Hero transfer={first} context={context} />
-          <Parties from={from} to={first.recipient} toName={toName ?? null} diffAgainst={lookalikeOf ?? undefined} />
-          {warning}
-          <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
-            <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={first} />} />
-            <DataRow transfer={first} />
-            <SummaryRow label={t("transferReview.networkFee")} value={<FeeValue fee={request.fee} context={context} />} />
-            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
+          {from ? <FromParty from={from} /> : null}
+          {/* On paper, glass is laid from the recipient down through the summary. */}
+          <div className="gleam-paper-glass-down paper:pt-3.5 paper:pb-6">
+            <ToParty to={first.recipient} toName={toName ?? null} diffAgainst={lookalikeOf ?? undefined} />
+            {warning}
+            <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
+              <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={first} />} />
+              <DataRow transfer={first} />
+              <SummaryRow label={t("transferReview.networkFee")} value={<FeeValue fee={request.fee} context={context} />} />
+              {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
+            </div>
           </div>
         </>
       )}
@@ -190,7 +194,7 @@ export function NameTargetReview({
     <div className="flex min-h-full flex-col">
       {header}
       {banner ? <div className={`${GUTTER} pt-5`}>{banner}</div> : null}
-      <div className={`flex flex-col items-center gap-3 pb-8 pt-9 text-center ${GUTTER}`}>
+      <div className={`flex flex-col items-center gap-3 pb-3 pt-9 text-center ${GUTTER}`}>
         <span className="max-w-full break-words text-h2 font-semibold text-foreground">
           <UntrustedText text={`@${label}`} />
         </span>
@@ -206,16 +210,19 @@ export function NameTargetReview({
         >
           <path d="M6 1v25M1.5 21.5 6 26l4.5-4.5" />
         </svg>
-        <div className="flex max-w-full flex-col items-center gap-1">
+      </div>
+      {/* On paper, glass is laid from the new target down through the summary. */}
+      <div className="gleam-paper-glass-down paper:pb-6 paper:pt-4">
+        <div className={`flex flex-col items-center gap-1 pb-8 text-center ${GUTTER}`}>
           <span className="text-label text-muted">{t("collectibles.pointsTo")}</span>
           <span dir="ltr" className="max-w-full break-all font-mono text-body leading-relaxed text-foreground">
             <UntrustedText text={target} />
           </span>
         </div>
-      </div>
-      <div className={`flex flex-col gap-3.5 ${GUTTER}`}>
-        {from ? <SummaryRow label={t("transferReview.from")} value={<FromValue from={from} />} /> : null}
-        <SummaryRow label={t("transferReview.networkFee")} value={<FeeValue fee={fee} context={context} />} />
+        <div className={`flex flex-col gap-3.5 ${GUTTER}`}>
+          {from ? <SummaryRow label={t("transferReview.from")} value={<FromValue from={from} />} /> : null}
+          <SummaryRow label={t("transferReview.networkFee")} value={<FeeValue fee={fee} context={context} />} />
+        </div>
       </div>
       {children ? <div className={`flex flex-col gap-3 pt-5 ${GUTTER}`}>{children}</div> : null}
       {footer}
@@ -400,43 +407,40 @@ function DataRow({ transfer }: { transfer: TransferLine & { part: SignedPart } }
   return <SummaryRow label={t("approval.data")} value={t("approval.bytes", { size: String(size) })} />;
 }
 
-function Parties({
-  from,
-  to,
-  toName,
-  diffAgainst,
-}: {
-  from: TransferReviewProps["from"];
-  to: string;
-  toName: string | null;
-  diffAgainst?: string;
-}) {
+const PARTY_GRID = `grid grid-cols-[36px_minmax(0,1fr)] gap-x-3.5 ${GUTTER}`;
+
+function FromParty({ from }: { from: NonNullable<TransferReviewProps["from"]> }) {
   const t = useT();
   const identity = useAddressIdentity();
   return (
-    <div className={`grid grid-cols-[36px_minmax(0,1fr)] gap-x-3.5 ${GUTTER}`}>
-      {from ? (
-        <>
-          <AccountAvatar svgMarkup={identity.avatarSvg(from.address)} label="" size={36} />
-          <div className="flex min-w-0 flex-col justify-center">
-            <span className="text-label text-muted">{t("transferReview.from")}</span>
-            <FromValue from={from} />
-          </div>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 12 28"
-            className="my-2.5 h-7 w-3 justify-self-center text-muted/60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M6 1v25M1.5 21.5 6 26l4.5-4.5" />
-          </svg>
-          <div />
-        </>
-      ) : null}
+    <div className={PARTY_GRID}>
+      <AccountAvatar svgMarkup={identity.avatarSvg(from.address)} label="" size={36} />
+      <div className="flex min-w-0 flex-col justify-center">
+        <span className="text-label text-muted">{t("transferReview.from")}</span>
+        <FromValue from={from} />
+      </div>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 12 28"
+        className="my-2.5 h-7 w-3 justify-self-center text-muted/60"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 1v25M1.5 21.5 6 26l4.5-4.5" />
+      </svg>
+      <div />
+    </div>
+  );
+}
+
+function ToParty({ to, toName, diffAgainst }: { to: string; toName: string | null; diffAgainst?: string }) {
+  const t = useT();
+  const identity = useAddressIdentity();
+  return (
+    <div className={PARTY_GRID}>
       <AccountAvatar svgMarkup={identity.avatarSvg(to)} label="" size={36} />
       <div className="flex min-w-0 flex-col">
         <span className="text-label text-muted">{t("transferReview.to")}</span>

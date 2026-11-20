@@ -177,7 +177,8 @@ export function AwaitingDeviceView({
           <AddressValue address={device.address} />
         </div>
 
-        <div className="flex flex-col gap-3">
+        {/* On paper, the rows to compare against the device sit under one pane of glass; the signer stays on the paper. */}
+        <div className="gleam-paper-glass-down flex flex-col gap-3 paper:-mx-6 paper:px-6 paper:pb-5 paper:pt-3 phone:paper:-mx-5 phone:paper:px-5">
           {device.summaries.map((summary, index) => (
             <div key={index} className="flex flex-col">
               {device.summaries.length > 1 ? (

@@ -442,6 +442,7 @@ function ApprovalRootContent({
         <ConnectionRequestScreen
           origin={request.origin}
           preview={preview}
+          wallet={wallet ? { name: wallet.name, address: wallet.address } : null}
           onReject={() => void handleReject()}
           onGrant={() => void handleApprove("approval.grantApproved", "approval.couldntConnect")}
         />

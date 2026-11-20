@@ -32,18 +32,22 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
 
         <QrCode value={wallet.address} />
 
-        <div className="flex w-full flex-col gap-2">
-          <span className="text-center text-label font-semibold text-muted">{watchOnly ? t("receive.watchedAddress") : t("receive.yourAddress")}</span>
-          <AddressDisplay
-            address={wallet.address}
-            emphasisPick={emphasisPick}
-            onCopy={() => void navigator.clipboard?.writeText(wallet.address)}
-          />
-        </div>
+        {/* On paper, glass is laid from the address down to the foot of the screen; the QR stays on the paper. */}
+        <div className="gleam-paper-glass-down flex flex-1 flex-col items-center gap-5 self-stretch paper:-mx-6 paper:-mb-6 paper:px-6 paper:pb-6 paper:pt-5 phone:paper:-mx-5 phone:paper:px-5">
+          <div className="flex w-full flex-col gap-2">
+            <span className="text-center text-label font-semibold text-muted">{watchOnly ? t("receive.watchedAddress") : t("receive.yourAddress")}</span>
+            <AddressDisplay
+              onGlass
+              address={wallet.address}
+              emphasisPick={emphasisPick}
+              onCopy={() => void navigator.clipboard?.writeText(wallet.address)}
+            />
+          </div>
 
-        <p className="max-w-[280px] text-center text-label leading-relaxed text-faint">
-          {t("receive.warning")}
-        </p>
+          <p className="max-w-[280px] text-center text-label leading-relaxed text-faint">
+            {t("receive.warning")}
+          </p>
+        </div>
       </div>
     </div>
   );

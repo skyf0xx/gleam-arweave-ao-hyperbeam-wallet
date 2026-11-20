@@ -63,7 +63,7 @@ export function RecipientCard({
       </span>
     </>
   );
-  const frame = "flex w-full items-center gap-3.5 phone:gap-3 rounded-md bg-foreground/[0.03] py-3 pl-3.5 pr-3 text-left phone:pl-3";
+  const frame = "gleam-paper-glass flex w-full items-center gap-3.5 phone:gap-3 rounded-md bg-foreground/[0.03] py-3 pl-3.5 pr-3 text-left phone:pl-3";
 
   if (onEdit) {
     return (

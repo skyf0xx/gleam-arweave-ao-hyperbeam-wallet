@@ -133,7 +133,7 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
         <button
           type="button"
           onClick={onAddWallet}
-          className="mt-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-mist"
+          className="mt-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-hover"
         >
           <span
             aria-hidden="true"
@@ -172,11 +172,12 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   return (
     // The row bleeds 8px past the list edge so the hover fill has room
     // around its content while text stays aligned with the header. A green
-    // fill and label mark the active row; grey is hover. Copy floats beside
-    // the chevron instead of taking a column, so the address keeps the full
-    // width for its 7-chunk first row.
+    // fill and label mark the active row; grey is hover. On paper the active
+    // row is under glass instead, lifted where hover is pressed in. Copy
+    // floats beside the chevron instead of taking a column, so the address
+    // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-positive/[0.06]" : "hover:bg-mist"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "gleam-paper-glass bg-positive/[0.06] paper:bg-foreground/[0.03]" : "hover:bg-hover"}`}
     >
       <button
         type="button"
@@ -185,7 +186,13 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         aria-current={active ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left disabled:opacity-60"
       >
-        <AccountAvatar svgMarkup={avatarSvg} label={t("walletSwitcher.avatarOf", { name: wallet.name })} size={36} />
+        {/* The dot breaks the avatar's outline, so the active wallet shows in the avatar column before any text is read. It takes the Active label's green so the two read as one signal. */}
+        <span className="relative flex-shrink-0">
+          <AccountAvatar svgMarkup={avatarSvg} label={t("walletSwitcher.avatarOf", { name: wallet.name })} size={36} />
+          {active ? (
+            <span aria-hidden="true" className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-positive ring-2 ring-background" />
+          ) : null}
+        </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex min-w-0 items-baseline text-label">
             <span className="truncate font-semibold text-foreground">

@@ -494,7 +494,7 @@ function AboutLink({
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-mist phone:px-0"
+        className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 hover:bg-hover phone:-mx-3 phone:px-3"
       >
         <span className="flex flex-col gap-0.5">
           <span className="text-label font-semibold text-foreground">

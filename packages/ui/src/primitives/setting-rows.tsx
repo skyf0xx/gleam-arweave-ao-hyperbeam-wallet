@@ -53,7 +53,7 @@ export function SelectRow<T extends string>({
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value as T)}
-          className="cursor-pointer appearance-none rounded-md bg-transparent py-1 pl-2 pr-6 text-right text-label text-muted hover:enabled:bg-mist hover:enabled:text-foreground focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-60"
+          className="cursor-pointer appearance-none rounded-md bg-transparent py-1 pl-2 pr-6 text-right text-label text-muted hover:enabled:bg-hover hover:enabled:text-foreground focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-60"
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
