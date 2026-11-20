@@ -63,7 +63,7 @@ export function AddressReveal({
             aria-label={labels.save}
             onClick={onDownload}
             disabled={downloading || !canDownload}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground disabled:opacity-50 phone:hit-target"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground disabled:opacity-50 phone:hit-target"
           >
             <DownloadIcon />
           </button>

@@ -132,7 +132,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
               setAdding((prev) => !prev);
               setAddError(null);
             }}
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-foreground hover:bg-mist phone:hit-target"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-foreground hover:bg-hover phone:hit-target"
           >
             <PlusIcon />
           </button>
@@ -227,7 +227,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                   type="button"
                   aria-label={t("contacts.delete", { name: contact.name })}
                   onClick={() => handleDelete(contact)}
-                  className="mr-2.5 flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning"
+                  className="mr-2.5 flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-warning"
                 >
                   <RemoveIcon />
                 </button>

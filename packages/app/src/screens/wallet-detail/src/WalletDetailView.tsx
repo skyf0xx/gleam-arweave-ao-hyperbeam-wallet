@@ -218,7 +218,7 @@ export function WalletDetailView({
             onClick={copyAddress}
             aria-label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
             title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
-            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-hover focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
           >
             {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
           </button>

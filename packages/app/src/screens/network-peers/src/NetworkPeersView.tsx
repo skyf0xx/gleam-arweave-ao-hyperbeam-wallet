@@ -619,7 +619,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                             aria-label={t("networkPeers.removePeer", { host: peerHost(peer.url) })}
                             disabled={saving}
                             onClick={() => handleRemovePeer(peer.url)}
-                            className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
+                            className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-warning disabled:opacity-60"
                           >
                             <RemoveIcon />
                           </button>

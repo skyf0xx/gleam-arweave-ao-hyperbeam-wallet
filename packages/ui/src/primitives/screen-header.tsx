@@ -36,7 +36,7 @@ export function ScreenHeader({ title, center, onBack, busy = false, end, subtitl
           type="button"
           aria-label={backLabel ?? labels.back}
           onClick={onBack}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11 phone:active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11 phone:active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
         >
           <BackIcon />
         </button>

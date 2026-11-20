@@ -45,7 +45,7 @@ export function HistoryScreen({ history, onOpen }: { history: readonly BrowserVi
           type="button"
           aria-expanded={expanded}
           onClick={() => toggle(row.key)}
-          className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl py-2 text-left active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+          className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl py-2 text-left active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
         >
           <SiteAvatar host={host} />
           <span className="flex min-w-0 flex-1 flex-col">
@@ -71,7 +71,7 @@ export function HistoryScreen({ history, onOpen }: { history: readonly BrowserVi
                 key={`${visit.at}:${visit.url}`}
                 type="button"
                 onClick={() => onOpen(visit.url)}
-                className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl py-1.5 text-left active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+                className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl py-1.5 text-left active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
               >
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-label text-foreground">
@@ -124,7 +124,7 @@ function PageRow({ visit, time, onOpen }: { visit: BrowserVisit; time: string; o
     <button
       type="button"
       onClick={() => onOpen(visit.url)}
-      className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl py-2 text-left active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+      className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl py-2 text-left active:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
     >
       <SiteAvatar host={host} />
       <span className="flex min-w-0 flex-1 flex-col">

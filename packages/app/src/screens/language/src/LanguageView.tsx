@@ -45,7 +45,7 @@ export function LanguageView({ onBack }: LanguageViewProps) {
         role="radio"
         aria-checked={selected}
         onClick={() => setLanguagePreference(value)}
-        className="flex w-full items-center gap-3 py-3 text-left phone:py-3.5 hover:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+        className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3 text-left phone:py-3.5 hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
       >
         {icon}
         <span className="min-w-0 flex-1">

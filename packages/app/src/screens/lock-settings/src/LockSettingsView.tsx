@@ -145,7 +145,7 @@ export function LockSettingsView({
             type="button"
             disabled={locking}
             onClick={() => void handleLockNow()}
-            className="flex w-full items-center gap-3 py-3.5 text-left hover:bg-mist disabled:opacity-60"
+            className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
           >
             <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
               <LockIcon />
@@ -195,7 +195,7 @@ export function LockSettingsView({
                     type="button"
                     disabled={savingTimeout !== null}
                     onClick={() => void handleSelectTimeout(option.value)}
-                    className="flex w-full items-center gap-2.5 py-3.5 text-left hover:bg-mist disabled:opacity-60"
+                    className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-2.5 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
                   >
                     <span className="flex-1 text-label font-semibold text-foreground">
                       {t(option.key)}
@@ -337,7 +337,7 @@ function PasskeySection({
             type="button"
             disabled={passkey.busy}
             onClick={() => void handleRemove()}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60"
+            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
           >
             {passkey.busy ? t("lockSettings.removing") : t("lockSettings.remove")}
           </button>
@@ -347,7 +347,7 @@ function PasskeySection({
           type="button"
           disabled={passkey.busy}
           onClick={() => void handleSetUp()}
-          className="flex w-full items-center gap-3 py-3.5 text-left hover:bg-mist disabled:opacity-60"
+          className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
         >
           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
             <PasskeyIcon />

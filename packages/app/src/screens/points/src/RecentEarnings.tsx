@@ -104,7 +104,7 @@ export function RecentEarnings({
                   return (
                     <li key={`${row.kind}-${row.at}-${index}`}>
                       {href ? (
-                        <a href={href} target="_blank" rel="noreferrer" className="-mx-2 flex items-baseline gap-4 rounded-md px-2 py-1.5 hover:bg-mist">
+                        <a href={href} target="_blank" rel="noreferrer" className="-mx-2 flex items-baseline gap-4 rounded-md px-2 py-1.5 hover:bg-hover">
                           {body}
                         </a>
                       ) : (

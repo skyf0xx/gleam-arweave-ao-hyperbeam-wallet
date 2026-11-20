@@ -426,7 +426,7 @@ function IconButton({
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-muted active:bg-mist disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-muted active:bg-hover disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
     >
       {children}
     </button>

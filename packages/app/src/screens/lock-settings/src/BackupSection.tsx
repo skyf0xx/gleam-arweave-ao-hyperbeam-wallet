@@ -33,7 +33,7 @@ export function BackupSection({ runtime, provider, onOpen }: { runtime: RuntimeP
       {status === null ? (
         <SkeletonRow />
       ) : (
-        <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 py-3.5 text-left hover:bg-mist">
+        <button type="button" onClick={onOpen} className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover">
           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
             <CloudIcon />
           </span>

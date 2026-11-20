@@ -133,7 +133,7 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
         <button
           type="button"
           onClick={onAddWallet}
-          className="mt-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-mist"
+          className="mt-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-hover"
         >
           <span
             aria-hidden="true"
@@ -177,7 +177,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
     // floats beside the chevron instead of taking a column, so the address
     // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "gleam-paper-glass bg-positive/[0.06] paper:bg-foreground/[0.03]" : "hover:bg-mist"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "gleam-paper-glass bg-positive/[0.06] paper:bg-foreground/[0.03]" : "hover:bg-hover"}`}
     >
       <button
         type="button"

@@ -168,7 +168,7 @@ function GrantRow({
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="mt-px flex-shrink-0 rounded-md px-2 py-1.5 text-label font-semibold text-muted hover:bg-mist hover:text-warning"
+            className="mt-px flex-shrink-0 rounded-md px-2 py-1.5 text-label font-semibold text-muted hover:bg-hover hover:text-warning"
           >
             {t("connectedApps.revoke")}
           </button>
@@ -194,7 +194,7 @@ function GrantRow({
               setConfirming(false);
               setFailed(false);
             }}
-            className="rounded-md px-2 py-1.5 text-label font-semibold text-muted hover:bg-mist disabled:opacity-50"
+            className="rounded-md px-2 py-1.5 text-label font-semibold text-muted hover:bg-hover disabled:opacity-50"
           >
             {t("connectedApps.cancel")}
           </button>
@@ -202,7 +202,7 @@ function GrantRow({
             type="button"
             disabled={revoking}
             onClick={() => void revoke()}
-            className="rounded-md px-2 py-1.5 text-label font-semibold text-warning hover:bg-mist disabled:opacity-50"
+            className="rounded-md px-2 py-1.5 text-label font-semibold text-warning hover:bg-hover disabled:opacity-50"
           >
             {t("connectedApps.revoke")}
           </button>

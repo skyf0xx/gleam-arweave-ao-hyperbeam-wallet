@@ -112,7 +112,7 @@ function ProcessId({ processId }: { processId: string }) {
       onClick={copy}
       title={processId}
       aria-label={copied ? t("send.processIdCopied") : t("send.copyProcessId")}
-      className="rounded px-1 font-mono text-caption font-medium text-foreground hover:bg-mist"
+      className="rounded px-1 font-mono text-caption font-medium text-foreground hover:bg-hover"
     >
       {copied ? t("send.copied") : truncateAddress(processId, 6)}
     </button>

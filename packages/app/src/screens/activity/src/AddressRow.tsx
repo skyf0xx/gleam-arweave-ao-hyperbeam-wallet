@@ -30,7 +30,7 @@ export function AddressRow({
     <button
       type="button"
       onClick={onSelect}
-      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left hover:bg-mist"
+      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left hover:bg-hover"
     >
       <AccountAvatar svgMarkup={avatarSvg} label={name ? t("activity.avatarOf", { name }) : t("activity.addressAvatar")} size={32} />
       {name ? (

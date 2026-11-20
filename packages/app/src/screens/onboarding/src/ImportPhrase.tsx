@@ -214,7 +214,7 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
                 }}
                 className={cn(
                   "rounded-md px-2 py-1 text-caption font-semibold tabular-nums transition-colors",
-                  cells.length === size ? "bg-foreground text-background" : "text-muted hover:bg-mist hover:text-foreground",
+                  cells.length === size ? "bg-foreground text-background" : "text-muted hover:bg-hover hover:text-foreground",
                 )}
               >
                 {size}
@@ -289,7 +289,7 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
                 // Keeps focus in the cell so the choice applies to it.
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => chooseSuggestion(word)}
-                className="rounded-md border border-line px-2 py-1 font-mono text-caption text-foreground hover:bg-mist"
+                className="rounded-md border border-line px-2 py-1 font-mono text-caption text-foreground hover:bg-hover"
               >
                 {word}
               </button>

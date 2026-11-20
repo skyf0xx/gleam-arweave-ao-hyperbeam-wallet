@@ -150,7 +150,7 @@ function ExternalLink({ href, label }: { href: string; label: string }) {
       rel="noopener noreferrer"
       aria-label={label}
       title={label}
-      className="ml-1.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md align-middle text-muted hover:bg-mist hover:text-foreground"
+      className="ml-1.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md align-middle text-muted hover:bg-hover hover:text-foreground"
     >
       <ExternalLinkIcon />
     </a>

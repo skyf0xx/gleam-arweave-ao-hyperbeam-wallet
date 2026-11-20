@@ -41,6 +41,8 @@
   --color-background: #ffffff;
   --color-surface: #ffffff;
   --color-mist: #f5f5f5;
+  /* A row or control under the pointer or a finger. Mist, except on paper. */
+  --color-hover: var(--color-mist);
   --color-line: #e5e5e5;
   --color-foreground: #111111;
   /* The primary button's fill; in dark mode a step below the foreground so it is not the brightest thing on screen. */
@@ -193,6 +195,8 @@
   --color-background: #0d0d0f;
   --color-surface: #161618;
   --color-mist: #1f1f22;
+  /* Restated so it resolves against dark's mist where the theme is set below the root. */
+  --color-hover: var(--color-mist);
   --color-line: #2a2a2e;
   --color-foreground: #ededef;
   --color-primary-fill: #d4d4d8;
@@ -244,6 +248,10 @@
   --color-background: #f1f1ee;
   --color-surface: #fafaf9;
   --color-mist: #e5e3e0;
+  /* Paper's mist is a pressed tile, a step darker; as a hover it reads as a
+     scorch on the sheet and swallows the token tiles. A thin ink wash
+     instead, over whatever sheet is under it. */
+  --color-hover: color-mix(in srgb, var(--color-foreground) 4%, transparent);
   --color-line: #dcdad6;
   --color-foreground: #1a1a19;
   --color-primary-fill: #1a1a19;

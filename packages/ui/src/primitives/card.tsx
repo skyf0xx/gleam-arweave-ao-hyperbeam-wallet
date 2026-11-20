@@ -36,7 +36,7 @@ export function ListRow({ title, subtitle, start, end, onClick, className }: Lis
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 phone:border-b-0 phone:px-0 phone:py-3.5",
-        onClick && "cursor-pointer hover:bg-mist phone:active:bg-mist",
+        onClick && "cursor-pointer hover:bg-hover phone:active:bg-hover",
         className,
       )}
     >

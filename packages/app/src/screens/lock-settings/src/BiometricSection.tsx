@@ -127,7 +127,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
             type="button"
             disabled={busy}
             onClick={() => void handleRemove()}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60"
+            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
           >
             {state.phase === "removing" ? t("lockSettings.turningOff") : t("lockSettings.turnOff")}
           </button>
@@ -185,7 +185,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
         <button
           type="button"
           onClick={() => setState({ ...state, setUp: true, notice: undefined })}
-          className="flex w-full items-center gap-3 py-3.5 text-left hover:bg-mist"
+          className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover"
         >
           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
             <BiometricIcon />

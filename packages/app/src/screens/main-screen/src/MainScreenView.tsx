@@ -764,13 +764,13 @@ export function MainScreenView({
             type="button"
             aria-label={t("mainScreen.back")}
             onClick={returnHome}
-            className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:-ml-3 phone:h-11 phone:w-11"
+            className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:-ml-3 phone:h-11 phone:w-11"
           >
             <BackIcon />
           </button>
         ) : (
           // The copy button can't nest inside the pill's button, so the wrapper carries the shared hover background.
-          <div className="group -ml-3 flex min-w-0 items-center rounded-lg pr-1 hover:bg-mist phone:ml-0 phone:pr-0">
+          <div className="group -ml-3 flex min-w-0 items-center rounded-lg pr-1 hover:bg-hover phone:ml-0 phone:pr-0">
             <button
               type="button"
               onClick={onOpenWalletSwitcher}
@@ -819,7 +819,7 @@ export function MainScreenView({
               type="button"
               aria-label={t("mainScreen.browser")}
               onClick={onOpenBrowser}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11"
             >
               <GlobeIcon />
             </button>
@@ -828,7 +828,7 @@ export function MainScreenView({
             type="button"
             aria-label={t("mainScreen.settings")}
             onClick={onOpenSettings}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11"
           >
             <SettingsIcon />
           </button>
@@ -1132,7 +1132,7 @@ export function MainScreenView({
                   <button
                     type="button"
                     onClick={onAddToken}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left hover:bg-mist phone:gap-3 phone:px-0 phone:py-3.5 phone:active:bg-mist"
+                    className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left hover:bg-hover phone:gap-3 phone:px-0 phone:py-3.5 phone:active:bg-hover"
                   >
                     <span aria-hidden="true" className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-line bg-background text-foreground">
                       <PlusIcon />

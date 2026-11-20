@@ -41,7 +41,7 @@ export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
           type="button"
           disabled={stop.isPending}
           onClick={() => stop.mutate(card.origin)}
-          className="flex-shrink-0 rounded-md px-2 py-1 text-caption font-semibold text-muted hover:bg-mist hover:text-foreground disabled:opacity-50"
+          className="flex-shrink-0 rounded-md px-2 py-1 text-caption font-semibold text-muted hover:bg-hover hover:text-foreground disabled:opacity-50"
         >
           {stop.isPending ? t("siteWallet.disconnecting") : t("siteWallet.disconnect")}
         </button>

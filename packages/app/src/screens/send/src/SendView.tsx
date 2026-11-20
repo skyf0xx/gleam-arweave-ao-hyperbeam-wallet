@@ -754,7 +754,7 @@ function ComposeStep({
                   type="button"
                   aria-label={t("send.maxAria", { amount: maxDisplay })}
                   onClick={() => onChange({ amountDisplay: maxDisplay })}
-                  className="rounded-full px-2 py-1 text-caption font-semibold uppercase tracking-wide text-foreground hover:bg-mist phone:hit-target"
+                  className="rounded-full px-2 py-1 text-caption font-semibold uppercase tracking-wide text-foreground hover:bg-hover phone:hit-target"
                 >
                   {t("send.max")}
                 </button>
@@ -1015,7 +1015,7 @@ export function RecipientField({
               <button
                 type="button"
                 onClick={onOpenSavedAddresses}
-                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
+                className="flex w-full items-center justify-between px-3.5 py-3 text-left text-label font-medium text-muted hover:bg-hover hover:text-foreground"
               >
                 {t("send.savedContacts")}
                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1459,7 +1459,7 @@ export function SavedAddressesStep({
               type="button"
               aria-label={t("send.editContacts")}
               onClick={onEditContacts}
-              className="rounded-md px-2 py-1 text-label font-semibold text-muted hover:bg-mist hover:text-foreground phone:hit-target"
+              className="rounded-md px-2 py-1 text-label font-semibold text-muted hover:bg-hover hover:text-foreground phone:hit-target"
             >
               {t("send.edit")}
             </button>

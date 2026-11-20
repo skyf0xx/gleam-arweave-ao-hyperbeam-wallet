@@ -99,7 +99,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           <button
             type="button"
             onClick={() => setState({ kind: "editing", phrase: state.phrase, draft: state.phrase!, saving: false })}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground phone:-my-2.5 phone:flex phone:min-h-11 phone:items-center phone:px-3"
+            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground phone:-my-2.5 phone:flex phone:min-h-11 phone:items-center phone:px-3"
           >
             {t("lockSettings.change")}
           </button>
@@ -108,7 +108,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
         <button
           type="button"
           onClick={() => setState({ kind: "editing", phrase: null, draft: suggestSecurityPhrase(), saving: false })}
-          className="flex w-full flex-col gap-0.5 py-3.5 text-left hover:bg-mist"
+          className="-mx-3 flex w-[calc(100%+1.5rem)] flex-col gap-0.5 rounded-lg px-3 py-3.5 text-left hover:bg-hover"
         >
           <span className="text-label font-semibold text-foreground">{t("lockSettings.phraseSetUp")}</span>
           <span className="text-caption text-muted">{t("lockSettings.phraseSetUpHint")}</span>
