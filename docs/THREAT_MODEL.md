@@ -281,10 +281,21 @@ count as a finding.
   `packages/runtime/src/handlers/provider.ts`). A user who keeps wallets
   apart disconnects the site before switching.
   *Still a finding if,* by any path, a site without "See your address"
-  learns any address; a site with only "See your address" learns the
+  learns any address other than from a signature the user approved (see
+  the next entry); a site with only "See your address" learns the
   address of a wallet that wasn't active while it was connected, or the
   list of wallets that "See all your wallets" covers; or an approval names
   a different wallet from the one that signs.
+- **A signature tells the site which wallet signed.** A signed
+  transaction or data item carries the signer's public key, and the
+  address is its hash. So `sign`, `signDataItem` and `batchSignDataItem`
+  hand a site the signing wallet's address once the user approves, even
+  without "See your address". Every Arweave wallet does the same: a
+  signature can't be checked or posted without its owner, and the
+  approval window names the wallet that signs.
+  *Still a finding if* a site learns an address without a signature the
+  user approved, or a signed result carries a different wallet's key
+  from the one the approval named.
 - **A connected site can ask whether a token is in the wallet's list.**
   `addToken` and `isTokenAdded` need a connection and no other
   permission, as in Wander. `isTokenAdded` answers one process id at a
