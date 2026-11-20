@@ -158,7 +158,7 @@ Layout rules that tokens can't carry use Tailwind's `layered:` variant, which ma
 
 **Paper**
 
-Paper is a light theme on a grey paper with a little warmth. It shares dark's layered layout: the token sheet, underlined section tabs, tile actions and the neutral chart.
+Paper is a light theme on a grey paper with a little warmth, with glass where a person checks who. People see it as **Silica**; the code, the stored setting and this file call it paper. It shares dark's layered layout: the token sheet, underlined section tabs, tile actions and the neutral chart.
 
 | Token | Paper | Level |
 |---|---|---|
