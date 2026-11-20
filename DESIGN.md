@@ -179,14 +179,22 @@ Paper is a light theme on a grey paper with a little warmth. It shares dark's la
 - **The beam's colour catches** only where an edge faces the beam: the sheet's top edge while undocked, and the commit buttons (primary and destructive) with a hairline inside the top and a faint sheen. Tiles and chips stay pressed in.
 - **Bare chart lines.** The portfolio and token charts draw the line alone, with no shading under it, its gain or loss colour mixed a quarter of the way toward the paper.
 
-**Glass over addresses**
+**Glass marks who, pressing marks a setting**
 
-On paper, a full address a person checks before trusting it sits under a pane of frosted glass: a send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval, and the active wallet in the switcher. Short addresses, the rest of an address list and tag rows go without.
+On paper, glass is kept for identity: an address a person checks before trusting it, or the wallet they hold. A choice about how something is shown is pressed in, never glass. Kept that narrow, glass stays a signal: "this is the one, look closely".
 
-- **A pane you can act on is a card.** Changing the recipient or copying the address: a rounded pane laid on the paper with a light rim and a slight lift (`.gleam-paper-glass`).
+Before styling something new, ask in order:
+
+1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the active wallet in the switcher. It goes under glass.
+2. **Is it a selected setting or view?** A chart period, a tab, a theme, a language, a currency. It is pressed in: mist, a step darker, or an underline for tabs. Not glass, even though it is "selected".
+3. **Is it under the pointer or a finger?** It takes `bg-hover`: mist in light and dark, a 4% ink wash on paper, rounded and reaching past the row's text. Never glass, and never paper's mist, which reads as a scorch on the sheet.
+
+Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without glass.
+
+- **A pane you can act on is a card.** Changing the recipient, copying the address, the active wallet's row: a rounded pane laid on the paper with a light rim and a slight lift (`.gleam-paper-glass`).
 - **A read-only pane is set into the page.** It runs the full width, curves only its open edge (14px, a little less than the token sheet), lights that edge and fades out where it continues. It hangs down from its subject (`.gleam-paper-glass-down`) or rises to it from under the header (`.gleam-paper-glass-up`).
-- **It covers what depends on the address.** On a review the pane runs from the recipient through the token, fee and balance after; the sender stays on the paper.
-- **One pane per screen, never on another surface.** Related addresses share one pane. In a list, only the selected item is under glass: the active wallet is a lifted card where hover is pressed in, so selection needs no colour. No glass on mist cards, notices or Details.
+- **It covers what depends on the address.** On a transfer review the pane runs from the recipient through the token, fee and balance after; the sender stays on the paper. A pane follows the screen's own reading order: don't reorder a screen to keep a row off the glass.
+- **One pane per screen, never on another surface.** Related addresses share one pane. In a list of wallets, only the active one is under glass, and a dot in the Active label's green on its avatar finds it at a glance. No glass on mist cards, notices or Details.
 - **Grey and a hard edge read as glass.** The pane is tinted a step darker than the paper, with a crisp lit edge whose thickness shows inside it, and only a faint blur for lift. A white fill with the sheet's soft shadow reads as paper; a dark line outside the lit edge, above a darker pane, reads as a groove.
 - **Text stays sharp.** The sheen lies under the text, not over it, so an address keeps its full contrast.
 
