@@ -1,4 +1,5 @@
 import type { Contact } from "../models/contact";
+import { isHardwareWalletMethod, type Wallet } from "../models/wallet";
 import {
   ACTIVE_WALLET_BACKUP_KEY,
   CONTACTS_BACKUP_KEY,
@@ -22,6 +23,18 @@ function union<T>(older: readonly T[], newer: readonly T[], idOf: (item: T) => s
   return [...merged, ...older.filter((item) => !seen.has(idOf(item)))];
 }
 
+/** A copy that can sign outranks one that can't, so a watch copy never replaces the key. */
+function signingRank(wallet: Wallet): number {
+  if (wallet.encryptedKeyfile !== null) return 2;
+  return isHardwareWalletMethod(wallet.method) ? 1 : 0;
+}
+
+function keptWallet(mine: Wallet, theirs: Wallet): Wallet {
+  const rank = signingRank(mine) - signingRank(theirs);
+  if (rank !== 0) return rank > 0 ? mine : theirs;
+  return mine.updatedAt > theirs.updatedAt ? mine : theirs;
+}
+
 function listOf<T>(data: BackupData, key: string): T[] {
   const value = data[key];
   return Array.isArray(value) ? (value as T[]) : [];
@@ -31,8 +44,9 @@ function listOf<T>(data: BackupData, key: string): T[] {
  * Two devices' backups as one, with nothing lost: wallets and contacts by
  * address and added tokens by process id are the union of both sides, and
  * every other key is `newer`'s where it has one. A wallet or contact on
- * both sides is the copy changed last. Wallets match by address because
- * one key imported on two installs gets a different id on each.
+ * both sides is the copy changed last, except that a wallet copy holding a
+ * key beats one that doesn't. Wallets match by address because one key
+ * imported on two installs gets a different id on each.
  */
 export function mergeBackupData(older: BackupData, newer: BackupData): BackupData {
   const merged: BackupData = { ...older, ...newer };
@@ -41,7 +55,7 @@ export function mergeBackupData(older: BackupData, newer: BackupData): BackupDat
     walletsOf(older),
     walletsOf(newer),
     (wallet) => wallet.address,
-    (mine, theirs) => (mine.updatedAt > theirs.updatedAt ? mine : theirs),
+    keptWallet,
   );
   if (wallets.length > 0) merged[WALLETS_BACKUP_KEY] = wallets;
 

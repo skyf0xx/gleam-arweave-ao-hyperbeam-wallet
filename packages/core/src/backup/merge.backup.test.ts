@@ -74,6 +74,18 @@ describe("mergeBackupData", () => {
     expect(isValidBackupData(merged)).toBe(true);
   });
 
+  it("keeps the copy holding the key over a newer watch copy of the same address", () => {
+    const signer = keyfileWallet("2", { id: "signer", updatedAt: 1 });
+    const watch = keyfileWallet("2", { id: "watch", method: "watch", encryptedKeyfile: null, updatedAt: 9 });
+    const merged = mergeBackupData(
+      { "local:wallets": [signer] },
+      { "local:wallets": [watch], "local:activeWalletId": "watch" },
+    );
+    expect(merged["local:wallets"]).toEqual([signer]);
+    expect(merged["local:activeWalletId"]).toBe("signer");
+    expect(mergeBackupData({ "local:wallets": [watch] }, { "local:wallets": [signer] })["local:wallets"]).toEqual([signer]);
+  });
+
   it("merges with an empty side", () => {
     expect(mergeBackupData({}, B)).toEqual(B);
     expect(mergeBackupData(A, {})).toEqual(A);
