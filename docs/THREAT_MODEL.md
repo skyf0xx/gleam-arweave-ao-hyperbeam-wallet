@@ -348,12 +348,6 @@ count as a finding.
     `rimraf` doesn't accept. It reaches only `@capacitor/cli` at build
     time, which passes `rimraf` no `AbortSignal`, and isn't in the build.
     Its ignore runs until 2027-01-31.
-  - `picomatch` 2.3.2 and 4.0.7 (GHSA-fc5q-39xc-vjpf): no fixed
-    release. It reaches only build tooling
-    (`@aklinker1/rollup-plugin-visualizer`, `@rollup/pluginutils`,
-    `tinyglobby` → `fdir` via vite, `dependency-cruiser`), which match
-    the repository's own globs, and isn't in the build: a production
-    build contains no `picomatch` strings.
 
   *Still a finding if,* by any path, `.output/chrome-mv3` contains code
   from any of these packages, or shipped code signs or verifies with ECDSA or
