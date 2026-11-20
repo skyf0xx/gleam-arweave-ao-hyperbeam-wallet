@@ -53,6 +53,27 @@ describe("mergeBackupData", () => {
     expect(merged["local:wallets"]).toEqual([keyfileWallet("2", { name: "Newer" })]);
   });
 
+  it("keeps one copy of a wallet imported on two installs under different ids", () => {
+    const here = keyfileWallet("2", { id: "here", name: "Quartz", updatedAt: 1 });
+    const there = keyfileWallet("2", { id: "there", name: "Starlight", updatedAt: 5 });
+    const merged = mergeBackupData(
+      { "local:wallets": [here], "local:activeWalletId": "here" },
+      { "local:wallets": [there], "local:activeWalletId": "there" },
+    );
+    expect(merged["local:wallets"]).toEqual([there]);
+    expect(merged["local:activeWalletId"]).toBe("there");
+    expect(isValidBackupData(merged)).toBe(true);
+  });
+
+  it("moves the active wallet to the copy kept when its own copy is dropped", () => {
+    const older = keyfileWallet("2", { id: "older", updatedAt: 9 });
+    const newer = keyfileWallet("2", { id: "newer", updatedAt: 1 });
+    const merged = mergeBackupData({ "local:wallets": [older] }, { "local:wallets": [newer], "local:activeWalletId": "newer" });
+    expect(merged["local:wallets"]).toEqual([older]);
+    expect(merged["local:activeWalletId"]).toBe("older");
+    expect(isValidBackupData(merged)).toBe(true);
+  });
+
   it("merges with an empty side", () => {
     expect(mergeBackupData({}, B)).toEqual(B);
     expect(mergeBackupData(A, {})).toEqual(A);
