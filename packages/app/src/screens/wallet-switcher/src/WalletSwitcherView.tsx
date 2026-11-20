@@ -186,16 +186,11 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         aria-current={active ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left disabled:opacity-60"
       >
-        {/* The check breaks the avatar's outline, so the active wallet shows in the avatar column before any text is read. */}
+        {/* The dot breaks the avatar's outline, so the active wallet shows in the avatar column before any text is read. It takes the Active label's green so the two read as one signal. */}
         <span className="relative flex-shrink-0">
           <AccountAvatar svgMarkup={avatarSvg} label={t("walletSwitcher.avatarOf", { name: wallet.name })} size={36} />
           {active ? (
-            <span
-              aria-hidden="true"
-              className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-background ring-2 ring-background"
-            >
-              <CheckIcon size={10} />
-            </span>
+            <span aria-hidden="true" className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-positive ring-2 ring-background" />
           ) : null}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
