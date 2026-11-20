@@ -385,7 +385,8 @@ export function PortfolioChart({
               className={cn(
                 "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
                 range === activeRange
-                  ? "bg-mist text-foreground"
+                  ? // Paper's mist matches the Send/Receive tiles below; a lighter wash keeps the range a quiet part of the chart.
+                    "bg-mist text-foreground paper:bg-foreground/[0.035]"
                   : "text-muted hover:text-foreground layered:text-faint",
               )}
             >
