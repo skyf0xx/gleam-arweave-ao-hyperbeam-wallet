@@ -92,6 +92,7 @@ export const approval = defineMessages({
 
     confirmOnDevice: "Confirm on your {device}",
     signingAs: "Signing as",
+    connectingAs: "Connecting as",
     checkingSignature: "Checking the signature…",
 
     signAttestation: "Sign scan attestation",
@@ -211,6 +212,7 @@ export const approval = defineMessages({
     tokenNotice: "El nombre y el ticker los define quien creó el token. Agregarlo solo muestra su saldo en tu billetera.",
     confirmOnDevice: "Confirma en tu {device}",
     signingAs: "Firmando como",
+    connectingAs: "Conectando como",
     checkingSignature: "Comprobando la firma…",
     signAttestation: "Firmar atestación de escaneo",
     attestIntroDevice: "Garantizas que tu agente escaneó Gleam v{release} como se describe abajo. Tu dispositivo firma una prueba de propiedad de 0 AR que nunca se publica.",
@@ -323,6 +325,7 @@ export const approval = defineMessages({
     tokenNotice: "Nama dan ticker ditentukan oleh pembuat token. Menambahkannya hanya menampilkan saldonya di dompet Anda.",
     confirmOnDevice: "Konfirmasi di {device} Anda",
     signingAs: "Menandatangani sebagai",
+    connectingAs: "Terhubung sebagai",
     checkingSignature: "Memeriksa tanda tangan…",
     signAttestation: "Tanda tangani atestasi pindaian",
     attestIntroDevice: "Anda menjamin bahwa agen Anda memindai Gleam v{release} seperti dijelaskan di bawah. Perangkat Anda menandatangani bukti kepemilikan 0 AR yang tidak pernah dikirim.",
@@ -435,6 +438,7 @@ export const approval = defineMessages({
     tokenNotice: "O nome e o ticker são definidos por quem criou o token. Adicioná-lo só mostra o saldo na sua carteira.",
     confirmOnDevice: "Confirme no seu {device}",
     signingAs: "Assinando como",
+    connectingAs: "Conectando como",
     checkingSignature: "Verificando a assinatura…",
     signAttestation: "Assinar atestado de scan",
     attestIntroDevice: "Você atesta que seu agente analisou o Gleam v{release} conforme descrito abaixo. Seu dispositivo assina uma prova de posse de 0 AR que nunca é publicada.",
@@ -547,6 +551,7 @@ export const approval = defineMessages({
     tokenNotice: "Tên và ký hiệu do người tạo token đặt. Thêm token chỉ hiển thị số dư của nó trong ví bạn.",
     confirmOnDevice: "Xác nhận trên {device}",
     signingAs: "Ký bằng",
+    connectingAs: "Kết nối bằng",
     checkingSignature: "Đang kiểm tra chữ ký…",
     signAttestation: "Ký chứng thực quét",
     attestIntroDevice: "Bạn xác nhận agent của bạn đã quét Gleam v{release} như mô tả dưới đây. Thiết bị của bạn ký một bằng chứng sở hữu 0 AR, không bao giờ được gửi lên mạng.",
@@ -659,6 +664,7 @@ export const approval = defineMessages({
     tokenNotice: "Ad ve sembol, token'ı oluşturan kişi tarafından belirlenir. Eklemek yalnızca bakiyesini cüzdanınızda gösterir.",
     confirmOnDevice: "Cihazınızda onaylayın: {device}",
     signingAs: "İmzalayan",
+    connectingAs: "Bağlanan cüzdan",
     checkingSignature: "İmza kontrol ediliyor…",
     signAttestation: "Tarama onay belgesini imzala",
     attestIntroDevice: "Ajanınızın Gleam v{release} sürümünü aşağıda açıklandığı gibi taradığını onaylıyorsunuz. Cihazınız, asla gönderilmeyen 0 AR'lik bir sahiplik kanıtı imzalar.",
@@ -771,6 +777,7 @@ export const approval = defineMessages({
     tokenNotice: "Название и тикер задаёт создатель токена. Добавление лишь показывает его баланс в вашем кошельке.",
     confirmOnDevice: "Подтвердите на устройстве {device}",
     signingAs: "Подпись от имени",
+    connectingAs: "Подключение от имени",
     checkingSignature: "Проверка подписи…",
     signAttestation: "Подписать аттестацию скана",
     attestIntroDevice: "Вы подтверждаете, что ваш агент просканировал Gleam v{release}, как описано ниже. Устройство подписывает доказательство владения на 0 AR, которое никогда не публикуется.",
@@ -883,6 +890,7 @@ export const approval = defineMessages({
     tokenNotice: "名前とティッカーはトークンの作成者が設定したものです。追加しても、ウォレットに残高が表示されるだけです。",
     confirmOnDevice: "{device} で確認してください",
     signingAs: "署名するアドレス",
+    connectingAs: "接続するウォレット",
     checkingSignature: "署名を確認中…",
     signAttestation: "スキャン証明に署名",
     attestIntroDevice: "エージェントが以下のとおり Gleam v{release} をスキャンしたことを保証します。デバイスは 0 AR の所有権証明に署名しますが、これは送信されません。",
@@ -995,6 +1003,7 @@ export const approval = defineMessages({
     tokenNotice: "이름과 티커는 토큰 생성자가 정해요. 추가하면 지갑에 잔액만 표시돼요.",
     confirmOnDevice: "{device}에서 확인하세요",
     signingAs: "서명 지갑",
+    connectingAs: "연결할 지갑",
     checkingSignature: "서명 확인 중…",
     signAttestation: "스캔 증명 서명",
     attestIntroDevice: "에이전트가 아래 내용대로 Gleam v{release}을(를) 스캔했음을 보증해요. 기기가 0 AR 소유 증명에 서명하며, 이 증명은 게시되지 않아요.",
@@ -1113,6 +1122,7 @@ export const approval = defineMessages({
 
     confirmOnDevice: "请在你的 {device} 上确认",
     signingAs: "签名地址",
+    connectingAs: "连接的钱包",
     checkingSignature: "正在检查签名…",
 
     signAttestation: "为扫描证明签名",
@@ -1237,6 +1247,7 @@ export const approval = defineMessages({
 
     confirmOnDevice: "請在你的 {device} 上確認",
     signingAs: "簽名地址",
+    connectingAs: "連接的錢包",
     checkingSignature: "正在檢查簽名…",
 
     signAttestation: "為掃描證明簽名",

@@ -35,6 +35,21 @@ describe("ConnectionRequestScreen (6.1 connection request)", () => {
     expect(screen.getByText("See your token balances")).toBeTruthy();
   });
 
+  it("names the wallet the site will see", () => {
+    render(
+      <ConnectionRequestScreen
+        origin="https://bazar.arweave.net"
+        preview={SCOPED_PREVIEW}
+        wallet={{ name: "Diamond", address: "weY8d0VhGi9BhGV3B-pkKVWA1ox_n8gzSK0H0J14uFk" }}
+        onReject={vi.fn()}
+        onGrant={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Connecting as")).toBeTruthy();
+    expect(screen.getByText("Diamond")).toBeTruthy();
+  });
+
   it("never uses the word 'connection' or 'approval' for the scope itself (brand vocabulary rule)", () => {
     render(
       <ConnectionRequestScreen

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { AccountAvatar, MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
+import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey } from "../i18n";
 import { UntrustedText } from "./UntrustedText";
 import { ArmingLabel } from "./ArmingLabel";
@@ -12,10 +14,14 @@ import { ArmingLabel } from "./ArmingLabel";
  * reject/grant action row. Spending scopes carry no risk escalation here:
  * they only let the app *request* a payment, and every payment opens its
  * own signing approval, which is where the Irreversible tier lives.
+ *
+ * `wallet` is the account the site will see: a site is shown whichever
+ * wallet is active, so it is the active one.
  */
 export interface ConnectionRequestScreenProps {
   origin: string;
   preview: ConnectApprovalPreview;
+  wallet?: { name: string; address: string } | null;
   onReject: () => void;
   onGrant: () => void;
 }
@@ -52,8 +58,9 @@ function hostnameOf(origin: string): string {
   }
 }
 
-export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: ConnectionRequestScreenProps) {
+export function ConnectionRequestScreen({ origin, preview, wallet = null, onReject, onGrant }: ConnectionRequestScreenProps) {
   const t = useT();
+  const identity = useAddressIdentity();
   const { requestedPermissions, appInfo } = preview;
   const fallbackName = hostnameOf(origin).split(".")[0] ?? origin;
   const displayName = appInfo?.name?.trim() || fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
@@ -85,27 +92,43 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
           <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
         </div>
 
-        <div className="text-center text-caption font-semibold text-muted">
-          {wantsBefore}
-          <UntrustedText text={displayName} />
-          {wantsAfter}
-        </div>
-
-        <div className="flex flex-col">
-          {requestedPermissions.map((permission) => {
-            const copy = SCOPE_COPY[permission];
-            return (
-              <div key={permission} className="flex items-start gap-2.5 border-b border-line py-3 last:border-b-0">
-                <div className="mt-px flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-                  <ScopeIcon />
-                </div>
-                <div className="flex flex-col gap-px">
-                  <span className="text-label font-semibold text-foreground">{t(copy.title)}</span>
-                  <span className="text-caption text-muted">{t(copy.detail)}</span>
+        {/* On paper, glass is laid from the wallet the site will see down through what it may do with it. */}
+        <div className="gleam-paper-glass-down flex flex-col gap-5 paper:-mx-5 paper:px-5 paper:pb-5 paper:pt-4">
+          {wallet ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.connectingAs")}</span>
+              <div className="flex items-center gap-3">
+                <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label="" size={32} />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-label font-semibold text-foreground">{wallet.name}</span>
+                  <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ) : null}
+
+          <div className="text-center text-caption font-semibold text-muted">
+            {wantsBefore}
+            <UntrustedText text={displayName} />
+            {wantsAfter}
+          </div>
+
+          <div className="flex flex-col">
+            {requestedPermissions.map((permission) => {
+              const copy = SCOPE_COPY[permission];
+              return (
+                <div key={permission} className="flex items-start gap-2.5 border-b border-line py-3 last:border-b-0">
+                  <div className="mt-px flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
+                    <ScopeIcon />
+                  </div>
+                  <div className="flex flex-col gap-px">
+                    <span className="text-label font-semibold text-foreground">{t(copy.title)}</span>
+                    <span className="text-caption text-muted">{t(copy.detail)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="mt-auto flex gap-2.5">

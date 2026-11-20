@@ -185,7 +185,7 @@ On paper, glass is kept for identity: an address a person checks before trusting
 
 Before styling something new, ask in order:
 
-1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the active wallet in the switcher. It goes under glass.
+1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the wallet a site connects to, the active wallet in the switcher. It goes under glass.
 2. **Is it a selected setting or view?** A chart period, a tab, a theme, a language, a currency. It is pressed in: mist, a step darker, or an underline for tabs. Not glass, even though it is "selected".
 3. **Is it under the pointer or a finger?** It takes `bg-hover`: mist in light and dark, a 4% ink wash on paper, rounded and reaching past the row's text. Never glass, and never paper's mist, which reads as a scorch on the sheet.
 
