@@ -101,7 +101,7 @@ export function QrCode({ value, size = 176, label, className }: QrCodeProps) {
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center rounded-xl border border-line/50 bg-background p-3",
+        "inline-flex items-center justify-center rounded-xl bg-background p-3",
         className,
       )}
     >
