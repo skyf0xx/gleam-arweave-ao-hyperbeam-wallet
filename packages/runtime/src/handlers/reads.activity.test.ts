@@ -484,7 +484,8 @@ describe("ReadsHandler: getTokenBalances", () => {
     let graphqlCalls = 0;
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes("/graphql")) {
-        graphqlCalls += 1;
+        // The two cross-check gateways are asked too; only the user's gateway is counted.
+        if (url.startsWith("https://arweave.net/")) graphqlCalls += 1;
         return {
           ok: true,
           status: 200,
@@ -537,7 +538,8 @@ describe("ReadsHandler: getTokenBalances", () => {
     let shouldFail = true;
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes("/graphql")) {
-        graphqlCalls += 1;
+        // The two cross-check gateways are asked too; only the user's gateway is counted.
+        if (url.startsWith("https://arweave.net/")) graphqlCalls += 1;
         if (shouldFail) return { ok: false, status: 500, json: async () => ({}) };
         return {
           ok: true,
@@ -563,6 +565,54 @@ describe("ReadsHandler: getTokenBalances", () => {
     const second = await handler.getTokenBalances({ address: "addr1" });
     expect(second.find((b) => b.processId === processId)?.ticker).toBe("RECOVERED");
     expect(graphqlCalls).toBe(2);
+  });
+});
+
+describe("ReadsHandler: token decimals across gateways", () => {
+  const processId = "hmW7EXCHRzfC6YAE8FKInptdS8-6BOl3fxjZfxmAOpY";
+
+  async function setup(denominations: Record<string, string>) {
+    const storage = createFakeStorage();
+    await storage.set("local:watchedProcessIds:addr1", [processId]);
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [{ url: "https://hyperbeam.example.com", enabled: true }],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        const denomination = denominations[new URL(url).host] ?? "6";
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              transactions: {
+                edges: [{ node: { id: processId, tags: [{ name: "ticker", value: "wUSDC" }, { name: "denomination", value: denomination }] } }],
+              },
+            },
+          }),
+        };
+      }
+      if (url.includes("~process@1.0/compute&")) return new Response(null);
+      return new Response("1000000000");
+    }) as unknown as typeof fetch;
+    return { storage, handler: new ReadsHandler(storage, undefined, noDiscovery) };
+  }
+
+  it("leaves the decimals unknown and uncached when the user's gateway disagrees with the others", async () => {
+    const { storage, handler } = await setup({ "arweave.net": "12" });
+    // Unknown decimals make the token unavailable, so an approval gets none and shows the raw amount.
+    const preview = await handler.previewWatchedToken({ address: "addr1", processId });
+    expect(preview.available).toBe(false);
+    expect(await storage.get(`local:tokenMetadata:${processId}`)).toBeNull();
+  });
+
+  it("keeps and caches the decimals the gateways agree on", async () => {
+    const { storage, handler } = await setup({});
+    const preview = await handler.previewWatchedToken({ address: "addr1", processId });
+    expect(preview.denomination).toBe(6);
+    expect(await storage.get<{ denomination: number }>(`local:tokenMetadata:${processId}`)).toMatchObject({ denomination: 6 });
   });
 });
 
@@ -1599,6 +1649,24 @@ describe("ReadsHandler: discovered tokens", () => {
   const FAKE_AO = "F".repeat(43);
   const EMPTY = "E".repeat(43);
 
+  /** Every gateway's spawn tags for `tokens`, as `loadTokenMetadata` reads them; null for anything else. */
+  function spawnTags(tokens: ReturnType<typeof meta>[], init?: RequestInit): Response | null {
+    const ids = (JSON.parse(String(init?.body ?? "{}")) as { variables?: { ids?: string[] } }).variables?.ids ?? [];
+    const edges = tokens
+      .filter((token) => ids.includes(token.processId))
+      .map((token) => ({
+        node: {
+          id: token.processId,
+          tags: [
+            { name: "scheduler-device", value: "arweave-scheduler@1.0" },
+            { name: "ticker", value: token.ticker },
+            { name: "denomination", value: String(token.denomination) },
+          ],
+        },
+      }));
+    return new Response(JSON.stringify({ data: { transactions: { edges } } }));
+  }
+
   function meta(processId: string, ticker: string) {
     return {
       processId,
@@ -1617,8 +1685,10 @@ describe("ReadsHandler: discovered tokens", () => {
     const storage = createFakeStorage();
     await peerSettings(storage);
     await storage.set(`local:hiddenProcessIds:${WALLET}`, [SPAM]);
-    const discover = vi.fn(async () => [meta(FODDER, "FODDER"), meta(SPAM, "SPAM"), meta(FAKE_AO, "w\u200BA0"), meta(EMPTY, "NONE")]);
-    globalThis.fetch = vi.fn(async (url: string) => {
+    const found = [meta(FODDER, "FODDER"), meta(SPAM, "SPAM"), meta(FAKE_AO, "w\u200BA0"), meta(EMPTY, "NONE")];
+    const discover = vi.fn(async () => found);
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/graphql")) return spawnTags(found, init);
       if (url.includes(EMPTY)) return { ok: false, status: 404, json: async () => ({}) };
       return new Response("1000000000000");
     }) as unknown as typeof fetch;
@@ -1628,8 +1698,8 @@ describe("ReadsHandler: discovered tokens", () => {
 
     expect(balances.map((b) => b.processId)).toEqual([AO, FODDER]);
     expect(balances[1]).toMatchObject({ ticker: "FODDER", source: "discovered", quantity: "1000000000000" });
-    // Seeded metadata means no per-token gateway lookup.
-    expect(vi.mocked(globalThis.fetch).mock.calls.some(([url]) => String(url).includes("/graphql"))).toBe(false);
+    // Discovery doesn't seed token details: they come from the lookup that checks the decimals across gateways.
+    expect(await storage.get(`local:tokenMetadata:${FODDER}`)).toMatchObject({ denomination: 12 });
 
     await handler.getTokenBalances({ address: WALLET });
     expect(discover).toHaveBeenCalledTimes(1);
@@ -1653,7 +1723,9 @@ describe("ReadsHandler: discovered tokens", () => {
     const storage = createFakeStorage();
     await peerSettings(storage);
     await storage.set(`local:discoveredTokens:${WALLET}`, { savedAt: 0, processIds: [] });
-    globalThis.fetch = vi.fn(async () => (new Response("5"))) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) =>
+      url.includes("/graphql") ? spawnTags([meta(FODDER, "FODDER")], init) : new Response("5"),
+    ) as unknown as typeof fetch;
     const legacyScanNeverEnds = new Promise<never>(() => {});
 
     const balances = await new ReadsHandler(storage, undefined, async ({ onL1Tokens }) => {

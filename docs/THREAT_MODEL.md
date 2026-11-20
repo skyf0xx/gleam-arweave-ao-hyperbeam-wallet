@@ -161,7 +161,7 @@ is refused before any approval opens.
 | Compromised maintainer machine | Steal the CRX signing key or the store and keystore credentials, or ship a tampered build | The keys live in a KeePassXC database unlocked only at the signing step; the release zip is built and attested in CI; `pack-release.sh` signs that downloaded zip after checking its hash and `gh attestation verify`, and runs no npm code. The local rebuild (`verify-release.sh`) runs in a separate terminal session and leaves a receipt of the hash it reproduced; `pack-release.sh` signs only a zip that matches it | A compromised machine itself. The CRX key is written to a private temp file for the `chrome --pack-extension` call. |
 | Compromised CI or GitHub Action | Swap the release zip or manifest, mint a provenance attestation for another file, or exfiltrate a token | Every Action is pinned to a commit SHA; Dependabot never auto-merges an Action bump or a production dependency; release jobs block egress (harden-runner) and hold no signing key or store credential; the CRX is signed only for a zip a local rebuild of the tag reproduced | A malicious Action merged after review runs with the release job's write and OIDC tokens. |
 | Thief with the phone, or someone at an unlocked phone | Send funds, export the key | The vault is encrypted at rest; biometric unlock keeps the password behind the OS's own biometric check (`biometric-unlock.ts`); leaving the app dismisses any open approval sheet (`app-away.ts`); auto-lock locks after the chosen time without use, as in the extension | Locking the phone or leaving the app doesn't lock Gleam, and Lock settings on the phone say only that it locks after the chosen time. Within that time, the same as an unlocked browser. See the mobile entries under Known limitations. |
-| Lying gateway, AO unit, HyperBEAM peer or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input; peers discovered from on-chain Location records only serve reads and never get a host permission of their own | Wrong balances or history on screen; a dishonest gateway can drop a transaction. A discovered peer is anyone who published a Location record. |
+| Lying gateway, AO unit, HyperBEAM peer or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input; a token's decimals are kept only when two other gateways agree, and otherwise stay unknown so amounts show unscaled (`queryCheckedTokenMetadata`); peers discovered from on-chain Location records only serve reads and never get a host permission of their own | Wrong balances or history on screen; a dishonest gateway can drop a transaction. A discovered peer is anyone who published a Location record. |
 
 ## Network
 
@@ -281,10 +281,21 @@ count as a finding.
   `packages/runtime/src/handlers/provider.ts`). A user who keeps wallets
   apart disconnects the site before switching.
   *Still a finding if,* by any path, a site without "See your address"
-  learns any address; a site with only "See your address" learns the
+  learns any address other than from a signature the user approved (see
+  the next entry); a site with only "See your address" learns the
   address of a wallet that wasn't active while it was connected, or the
   list of wallets that "See all your wallets" covers; or an approval names
   a different wallet from the one that signs.
+- **A signature tells the site which wallet signed.** A signed
+  transaction or data item carries the signer's public key, and the
+  address is its hash. So `sign`, `signDataItem` and `batchSignDataItem`
+  hand a site the signing wallet's address once the user approves, even
+  without "See your address". Every Arweave wallet does the same: a
+  signature can't be checked or posted without its owner, and the
+  approval window names the wallet that signs.
+  *Still a finding if* a site learns an address without a signature the
+  user approved, or a signed result carries a different wallet's key
+  from the one the approval named.
 - **A connected site can ask whether a token is in the wallet's list.**
   `addToken` and `isTokenAdded` need a connection and no other
   permission, as in Wander. `isTokenAdded` answers one process id at a
@@ -337,12 +348,6 @@ count as a finding.
     `rimraf` doesn't accept. It reaches only `@capacitor/cli` at build
     time, which passes `rimraf` no `AbortSignal`, and isn't in the build.
     Its ignore runs until 2027-01-31.
-  - `picomatch` 2.3.2 and 4.0.7 (GHSA-fc5q-39xc-vjpf): no fixed
-    release. It reaches only build tooling
-    (`@aklinker1/rollup-plugin-visualizer`, `@rollup/pluginutils`,
-    `tinyglobby` → `fdir` via vite, `dependency-cruiser`), which match
-    the repository's own globs, and isn't in the build: a production
-    build contains no `picomatch` strings.
 
   *Still a finding if,* by any path, `.output/chrome-mv3` contains code
   from any of these packages, or shipped code signs or verifies with ECDSA or
