@@ -45,6 +45,13 @@ grade 7:
 Docked <N> points for mislabelling the severity of this report @<login>. <One-sentence reason.>
 ```
 
+A report with no attestation id has nothing to dock, so leave out the
+"Docked <N> points" part and keep the rest:
+
+```text
+This report mislabels its severity @<login>. <One-sentence reason.>
+```
+
 For example: "Docked 12 points for mislabelling the severity of this
 report @someone. Only a person who already has the unlocked phone can
 change its clock, so this is Low." The bot can't edit or delete an
@@ -177,7 +184,8 @@ echo n | pnpm exec tsx --env-file=local.env scripts/scan-dock.ts \
 ```
 
 It removes the scan points of the attestation the report quotes and
-keeps its coverage. List docks with the awards for Will's approval.
+keeps its coverage. A report with no attestation id skips `scan-dock`:
+post the comment without points (§ Acting as the bot) and close it. List docks with the awards for Will's approval.
 
 ## 5. Report
 
