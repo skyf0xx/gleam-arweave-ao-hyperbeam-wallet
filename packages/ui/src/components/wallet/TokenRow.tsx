@@ -71,7 +71,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPri
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2.5 border-b border-line px-3.5 py-3 text-left last:border-b-0 phone:gap-3 phone:border-b-0 phone:px-0 phone:py-3.5 phone:[@media(max-height:700px)]:py-3",
+        "flex w-full items-center gap-2.5 rounded-lg border-b border-line px-3.5 py-3 text-left last:border-b-0 phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:gap-3 phone:border-b-0 phone:px-3 phone:py-3.5 phone:[@media(max-height:700px)]:py-3",
         onClick && "cursor-pointer hover:bg-hover phone:active:bg-hover",
         className,
       )}

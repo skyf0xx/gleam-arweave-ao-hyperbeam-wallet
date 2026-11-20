@@ -67,7 +67,7 @@ export function ActivityRow({
       onClick={onClick}
       data-pending={pending || undefined}
       className={cn(
-        "gleam-pencil-row flex w-full flex-col gap-2 px-3.5 py-3 text-left phone:px-0 phone:py-3.5",
+        "gleam-pencil-row flex w-full flex-col gap-2 rounded-lg px-3.5 py-3 text-left phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:px-3 phone:py-3.5",
         onClick && "cursor-pointer hover:bg-hover phone:active:bg-hover",
         className,
       )}

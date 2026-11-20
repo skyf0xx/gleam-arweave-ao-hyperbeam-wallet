@@ -1132,7 +1132,7 @@ export function MainScreenView({
                   <button
                     type="button"
                     onClick={onAddToken}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left hover:bg-hover phone:gap-3 phone:px-0 phone:py-3.5 phone:active:bg-hover"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-left hover:bg-hover phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:gap-3 phone:px-3 phone:py-3.5 phone:active:bg-hover"
                   >
                     <span aria-hidden="true" className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-line bg-background text-foreground">
                       <PlusIcon />
