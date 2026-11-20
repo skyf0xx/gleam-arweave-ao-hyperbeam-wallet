@@ -1,5 +1,6 @@
 import type { Contact } from "../models/contact";
 import {
+  ACTIVE_WALLET_BACKUP_KEY,
   CONTACTS_BACKUP_KEY,
   WALLETS_BACKUP_KEY,
   WATCHED_TOKENS_BACKUP_PREFIX,
@@ -27,10 +28,11 @@ function listOf<T>(data: BackupData, key: string): T[] {
 }
 
 /**
- * Two devices' backups as one, with nothing lost: wallets by id, contacts
- * by address and added tokens by process id are the union of both sides,
- * and every other key is `newer`'s where it has one. A wallet or contact
- * on both sides is the copy changed last.
+ * Two devices' backups as one, with nothing lost: wallets and contacts by
+ * address and added tokens by process id are the union of both sides, and
+ * every other key is `newer`'s where it has one. A wallet or contact on
+ * both sides is the copy changed last. Wallets match by address because
+ * one key imported on two installs gets a different id on each.
  */
 export function mergeBackupData(older: BackupData, newer: BackupData): BackupData {
   const merged: BackupData = { ...older, ...newer };
@@ -38,10 +40,18 @@ export function mergeBackupData(older: BackupData, newer: BackupData): BackupDat
   const wallets = union(
     walletsOf(older),
     walletsOf(newer),
-    (wallet) => wallet.id,
+    (wallet) => wallet.address,
     (mine, theirs) => (mine.updatedAt > theirs.updatedAt ? mine : theirs),
   );
   if (wallets.length > 0) merged[WALLETS_BACKUP_KEY] = wallets;
+
+  // The active wallet may be a copy the union dropped: point at the one kept.
+  const active = merged[ACTIVE_WALLET_BACKUP_KEY];
+  if (typeof active === "string" && !wallets.some((wallet) => wallet.id === active)) {
+    const activeAddress = [...walletsOf(newer), ...walletsOf(older)].find((wallet) => wallet.id === active)?.address;
+    const kept = wallets.find((wallet) => wallet.address === activeAddress);
+    if (kept) merged[ACTIVE_WALLET_BACKUP_KEY] = kept.id;
+  }
 
   const contacts = union(
     listOf<Contact>(older, CONTACTS_BACKUP_KEY),
