@@ -34,33 +34,36 @@ describe("PortfolioChart empty wallet", () => {
   });
 });
 
+describe("PortfolioChart first load", () => {
+  it("shows a shimmer in place of the total, not a made-up figure", () => {
+    render(<PortfolioChart {...BASE} points={[]} currentValue={0} loading />);
+    expect(screen.getByTestId("figure-placeholder")).toBeTruthy();
+  });
+
+  it("shows the figure once it loads", () => {
+    const { rerender } = render(<PortfolioChart {...BASE} loading />);
+    rerender(<PortfolioChart {...BASE} />);
+    expect(screen.queryByTestId("figure-placeholder")).toBeNull();
+  });
+});
+
 describe("PortfolioChart cached", () => {
-  it("renders faded from the first frame, with no delay", () => {
+  it("renders restored figures at full strength", () => {
     const { container } = render(<PortfolioChart {...BASE} cached />);
-    expect(figures(container).className).toContain("opacity-70");
-  });
-
-  it("pulses while fetching and rests still when not", () => {
-    const { container, rerender } = render(<PortfolioChart {...BASE} cached cachedFetching />);
-    expect(figures(container).className).toContain("gleam-cached-pulse");
     expect(figures(container).className).not.toContain("opacity-70");
-    rerender(<PortfolioChart {...BASE} cached />);
-    expect(figures(container).className).toContain("opacity-70");
     expect(figures(container).className).not.toContain("gleam-cached-pulse");
+    expect(figures(container).className).not.toContain("gleam-fresh");
   });
 
-  it("fades up to full when fresh data lands", () => {
+  it("settles once when fresh data lands", () => {
     const { container, rerender } = render(<PortfolioChart {...BASE} cached />);
     rerender(<PortfolioChart {...BASE} />);
-    const className = figures(container).className;
-    expect(className).not.toContain("opacity-70");
-    expect(className).toContain("duration-500");
-    expect(className).toContain("ease-out");
+    expect(figures(container).className).toContain("gleam-fresh");
   });
 
-  it("renders never-cached data at full", () => {
+  it("gives never-cached data no settle", () => {
     const { container } = render(<PortfolioChart {...BASE} />);
-    expect(figures(container).className).not.toContain("opacity-70");
+    expect(figures(container).className).not.toContain("gleam-fresh");
   });
 });
 

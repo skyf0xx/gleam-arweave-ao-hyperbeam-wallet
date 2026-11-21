@@ -28,6 +28,7 @@ export {
   type UsePullToRefreshOptions,
 } from "./primitives/use-pull-to-refresh";
 export { PullToRefreshIndicator } from "./primitives/pull-to-refresh-indicator";
+export { LoadingBar, useFreshAfterCache, type LoadingBarProps } from "./primitives/loading-bar";
 export { Sheet, type SheetProps } from "./primitives/sheet";
 export { AnimatedNumber, useAnimatedNumber, animatedNumberTintStyle, ANIMATED_NUMBER_DURATION_MS, ANIMATED_NUMBER_TINT_MS, type AnimatedNumberProps, type AnimatedFigure, type AnimatedNumberTrend } from "./primitives/animated-number";
 export { UiLabelsProvider, useUiLabels, useUiLocale, DEFAULT_UI_LABELS, type UiLabels } from "./labels";

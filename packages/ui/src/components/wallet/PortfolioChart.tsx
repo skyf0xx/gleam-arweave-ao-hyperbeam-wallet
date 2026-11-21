@@ -4,6 +4,7 @@ import type { DisplayCurrency, HeaderStyle, PortfolioScope } from "@gleam/core";
 import { currencyStep, formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
 import { animatedNumberTintStyle, useAnimatedNumber, type AnimatedNumberTrend } from "../../primitives/animated-number";
 import { cn } from "../../primitives/cn";
+import { useFreshAfterCache } from "../../primitives/loading-bar";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 import { buildLinePath, CHART_HEIGHT, CHART_WIDTH, chartCoordinates, downsample, toPolyline, toSmoothPath } from "./chart-path";
 import { useUiLabels, useUiLocale } from "../../labels";
@@ -83,13 +84,10 @@ export interface PortfolioChartProps {
   loading?: boolean;
   /**
    * The figures show restored data that fresh data hasn't replaced yet. They
-   * render faded from the first frame, fade up when this goes false, and the
-   * totals tick once at that switch. Keep it true until every input feeding
-   * the total is fresh.
+   * render as-is, settle once when this goes false, and the totals tick once
+   * at that switch. Keep it true until every input feeding the total is fresh.
    */
   cached?: boolean;
-  /** With `cached`: a live read is in flight, so the figures pulse; otherwise they rest at a still fade. */
-  cachedFetching?: boolean;
   /** Tells this chart's figures apart across wallets; the range, scope and currency are added here. */
   walletKey?: string;
   /**
@@ -149,7 +147,6 @@ export function PortfolioChart({
   onRangeChange,
   loading = false,
   cached = false,
-  cachedFetching = false,
   walletKey = "",
   onRetry,
   retrying,
@@ -216,7 +213,7 @@ export function PortfolioChart({
     identity: `${figureIdentity}|${headline?.unit ?? ""}`,
     cached,
   });
-  const faded = cached && !loading;
+  const fresh = useFreshAfterCache(cached) && !loading;
   const totalLabel = masked ? HIDDEN_AMOUNT : totalParts.unit ? `${total.text} ${totalParts.unit}` : total.text;
   const headlineParts: CurrencyValueParts = masked
     ? { amount: HIDDEN_AMOUNT }
@@ -264,15 +261,15 @@ export function PortfolioChart({
   );
 
   const figures = (
-    <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", faded && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))}>
+    <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", fresh && "gleam-fresh")}>
       <div className="flex items-baseline gap-2.5">
-        <Headline parts={headlineParts} trend={headlineTrend} masked={masked} onToggle={onToggleMasked} />
+        <Headline parts={headlineParts} trend={headlineTrend} masked={masked} onToggle={onToggleMasked} placeholder={loading && headline === undefined} />
         {headline === undefined && showsHistory ? changeNote : null}
       </div>
       {headline !== undefined ? (
         <div className="flex items-baseline gap-2.5">
           <span className="text-label tabular-nums text-muted" style={animatedNumberTintStyle(masked ? null : total.trend)}>
-            {totalLabel}
+            {loading ? <FigurePlaceholder text={totalLabel} /> : totalLabel}
           </span>
           {showsHistory ? changeNote : null}
         </div>
@@ -401,10 +398,30 @@ export function PortfolioChart({
 
 const HEADLINE_CLASS = "gleam-figure text-display font-semibold tracking-[-0.02em] tabular-nums text-foreground";
 
+/**
+ * Stands in for a total that has never loaded: a shimmer the size of the
+ * stand-in text, so no made-up $0 shows and nothing shifts when the figure lands.
+ */
+function FigurePlaceholder({ text }: { text: string }) {
+  return (
+    <span data-testid="figure-placeholder" className="relative inline-block">
+      <span className="invisible">{text}</span>
+      <span aria-hidden="true" className="gleam-shimmer absolute inset-x-0 inset-y-[0.15em] rounded-md" />
+    </span>
+  );
+}
+
 /** The large figure; a button that hides or shows balances when `onToggle` is set. */
-function Headline({ parts, trend, masked, onToggle }: { parts: CurrencyValueParts; trend: AnimatedNumberTrend | null; masked: boolean; onToggle?: () => void }) {
+function Headline({ parts, trend, masked, onToggle, placeholder = false }: { parts: CurrencyValueParts; trend: AnimatedNumberTrend | null; masked: boolean; onToggle?: () => void; placeholder?: boolean }) {
   const labels = useUiLabels();
   const toggleLabel = masked ? labels.chart.showBalances : labels.chart.hideBalances;
+  if (placeholder) {
+    return (
+      <span className={HEADLINE_CLASS}>
+        <FigurePlaceholder text={parts.unit ? `${parts.amount} ${parts.unit}` : parts.amount} />
+      </span>
+    );
+  }
   const label = (
     <>
       <span style={animatedNumberTintStyle(trend)}>{parts.amount}</span>

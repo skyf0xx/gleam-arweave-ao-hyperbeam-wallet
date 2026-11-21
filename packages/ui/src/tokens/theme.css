@@ -841,10 +841,9 @@ select,
  */
 
 /*
- * Restored (cached) values whose live read is in flight breathe between
- * their resting 0.7 and full opacity, like a skeleton. Every pulsing element
- * shares one duration and starts on mount, so they stay in phase. Reduced
- * motion gets the still 0.7, the same as a cached value with no fetch.
+ * Something in flight that isn't settled yet (a pending transfer's note, a
+ * collectible's image) breathes between 0.7 and full opacity. Every pulsing
+ * element shares one duration and starts on mount, so they stay in phase.
  */
 @keyframes gleam-cached-pulse {
   0%,
@@ -864,6 +863,65 @@ select,
   .gleam-cached-pulse {
     animation: none;
     opacity: 0.7;
+  }
+}
+
+/*
+ * The top loading bar: a soft window of light travelling along a full-width
+ * beam, so each colour sits where it does on the home beam and the theme's
+ * own beam set (light, dark, paper) carries over. Reduced motion shows the
+ * whole beam, dimmed.
+ */
+@keyframes gleam-loading-sweep {
+  from {
+    -webkit-mask-position: -70% 0;
+    mask-position: -70% 0;
+  }
+  to {
+    -webkit-mask-position: 170% 0;
+    mask-position: 170% 0;
+  }
+}
+
+.gleam-loading-sweep {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 35%, #000 65%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 35%, #000 65%, transparent);
+  -webkit-mask-size: 40% 100%;
+  mask-size: 40% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: gleam-loading-sweep 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-loading-sweep {
+    -webkit-mask-image: none;
+    mask-image: none;
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/*
+ * A restored value renders at full strength; when the live read replaces it,
+ * it settles once. One short dip, never a loop.
+ */
+@keyframes gleam-fresh {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.gleam-fresh {
+  animation: gleam-fresh 450ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gleam-fresh {
+    animation: none;
   }
 }
 

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { PendingAmounts, PendingTransfer, RuntimePort, TokenBalance, Winston } from "@gleam/core";
 import { walletQueryKeys } from "./queryKeys";
+import { HOME_READ_STALE_MS } from "../../../query-cache/retry";
 
 /** An incoming transfer sends the wallet no signal, so an open popup or side panel has to ask. */
 const BALANCES_POLL_MS = 60_000;
@@ -66,5 +67,5 @@ export function balancesQuery(runtime: RuntimePort, address: string) {
 }
 
 export function useBalances(runtime: RuntimePort, address: string) {
-  return useQuery({ ...balancesQuery(runtime, address), refetchInterval: BALANCES_POLL_MS });
+  return useQuery({ ...balancesQuery(runtime, address), staleTime: HOME_READ_STALE_MS, refetchInterval: BALANCES_POLL_MS });
 }

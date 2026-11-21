@@ -5,14 +5,15 @@ import { explorerUrlFor, isWatchWalletMethod, type ActivityEntry, type Collectib
 import {
   DEFAULT_AO_TOKEN,
   DEFAULT_AR_TOKEN,
+  LoadingBar,
   PullToRefreshIndicator,
+  useFreshAfterCache,
   usePullToRefresh,
 } from "@gleam/ui";
 import {
   AccountAvatar,
   ActivityRow,
   EmptyState,
-  NetworkErrorBanner,
   PortfolioChart,
   SendReceiveActions,
   SkeletonRow,
@@ -64,9 +65,9 @@ import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
  * pattern this screen's balances/activity already use. Switching a range
  * tab reads/fetches that range's own cache entry and updates the chart,
  * %-change badge, and period label together from one query response,
- * never a stale combination. An empty `series` (both price sources
- * unavailable) falls back to `NetworkErrorBanner`, matching the
- * balance/activity failure path, rather than a broken/blank chart.
+ * never a stale combination. A failed read, or an empty `series` (both
+ * price sources unavailable), keeps the last series on screen, or the
+ * shimmer when there is none, while `LoadingBar` shows the retry.
  *
  * Display settings (`useDisplaySettings`): values are priced in the
  * chosen currency, the large figure is the total or the AR/AO balance,
@@ -223,6 +224,11 @@ function unitPriceFor(
 
 function changeFor(prices: TokenPrice[] | undefined, processId: string | null): number | undefined {
   return prices?.find((entry) => entry.processId === processId)?.change24h ?? undefined;
+}
+
+/** No data yet and either a first read in flight or a failed one waiting on its retry, so nothing is shown as zero. */
+function waiting(query: { isLoading: boolean; isError: boolean; data: unknown }): boolean {
+  return query.isLoading || (query.isError && query.data === undefined);
 }
 
 /**
@@ -530,8 +536,7 @@ export function MainScreenView({
   const orderbookPricesQuery = useOrderbookPrices(runtime, currency, pricedTokenIds(balancesQuery.data));
   const tokenPrices = tokenPricesQuery.data ? [...tokenPricesQuery.data, ...(orderbookPricesQuery.data ?? [])] : undefined;
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
-  const loading = balancesQuery.isLoading || activityQuery.isLoading;
-  const loadError = balancesQuery.error ?? activityQuery.error ?? null;
+  const loading = waiting(balancesQuery) || waiting(activityQuery);
   const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>(readPortfolioRange);
   const selectRange = (range: PortfolioHistoryRange) => {
     setSelectedRange(range);
@@ -563,18 +568,6 @@ export function MainScreenView({
   const portfolioHistoryQuery = usePortfolioHistory(runtime, wallet.address, selectedRange, portfolioScope, currency, {
     enabled: !otherWalletsQuery.isPending,
   });
-  // A refetch of a query that never had data resets it to pending and drops the error, which would take the banner
-  // down mid-retry; this keeps it up until that retry settles. Keyed so switching range doesn't carry it over.
-  const portfolioKey = `${wallet.address}|${selectedRange}|${portfolioScope}|${currency}`;
-  const [portfolioRetryKey, setPortfolioRetryKey] = useState<string | null>(null);
-  const portfolioRetrying = portfolioRetryKey === portfolioKey;
-  const portfolioFailed =
-    portfolioRetrying || portfolioHistoryQuery.isError || (portfolioHistoryQuery.isSuccess && portfolioHistoryQuery.data.series.length === 0);
-  const retryPortfolio = () => {
-    setPortfolioRetryKey(portfolioKey);
-    void portfolioHistoryQuery.refetch().finally(() => setPortfolioRetryKey((key) => (key === portfolioKey ? null : key)));
-  };
-
   const rootRef = useRef<HTMLDivElement>(null);
   const pullState = usePullToRefresh({
     target: rootRef,
@@ -592,11 +585,21 @@ export function MainScreenView({
   const tokensCached = restoredCache(balancesQuery, openedAt) || restoredCache(tokenPricesQuery, openedAt);
   const collectiblesCached = restoredCache(collectiblesQuery, openedAt);
   const activityCached = restoredCache(activityQuery, openedAt);
+  const collectiblesFresh = useFreshAfterCache(collectiblesCached);
+  const activityFresh = useFreshAfterCache(activityCached);
   // The total waits for every input, so it ticks once instead of once per query.
-  const tokensFetching = balancesQuery.isFetching || tokenPricesQuery.isFetching;
-  const chartFetching = tokensFetching || portfolioHistoryQuery.isFetching;
   const chartCached = tokensCached || restoredCache(portfolioHistoryQuery, openedAt);
   const portfolioHasSeries = (portfolioHistoryQuery.data?.series.length ?? 0) > 0;
+  /**
+   * The bar shows a read the screen is waiting on: replacing restored data,
+   * filling an empty slot, or retrying a failure. A routine poll of data
+   * already fresh on this screen stays silent.
+   */
+  const awaited = (query: { isFetching: boolean; isError: boolean; data: unknown; dataUpdatedAt: number }) =>
+    query.isFetching && (query.data === undefined || query.isError || restoredCache(query, openedAt));
+  const homeQueries = [balancesQuery, activityQuery, tokenPricesQuery, portfolioHistoryQuery, ...(collectiblesOpened ? [collectiblesQuery] : [])];
+  const homeFetching = pullState.refreshing || homeQueries.some(awaited);
+  const homeFailed = homeQueries.some((query) => query.isError) || (portfolioHistoryQuery.isSuccess && !portfolioHasSeries);
   // Only the open wallet's tokens are known here, so the all-wallets total is left as the chart has it.
   const history = portfolioHistoryQuery.data;
   const extraValue =
@@ -747,15 +750,7 @@ export function MainScreenView({
 
   return (
     <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
-      {loadError ? (
-        <NetworkErrorBanner
-          onRetry={() => {
-            void balancesQuery.refetch();
-            void activityQuery.refetch();
-          }}
-          retrying={balancesQuery.isFetching || activityQuery.isFetching}
-        />
-      ) : null}
+      <LoadingBar active={homeFetching} failed={homeFailed} />
 
       <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
         {headerCollapsed ? (
@@ -796,7 +791,7 @@ export function MainScreenView({
           </div>
         )}
 
-        {headerCollapsed && history && !portfolioFailed ? (
+        {headerCollapsed && history && portfolioHasSeries ? (
           // The range tabs fade out with the chart, so the range rides along to say what the change covers.
           <button
             type="button"
@@ -835,7 +830,8 @@ export function MainScreenView({
         </div>
       </div>
 
-      <PullToRefreshIndicator {...pullState} />
+      {/* Once released, the pull hands over to the top bar instead of holding a second spinner. */}
+      <PullToRefreshIndicator {...pullState} pull={pullState.refreshing ? 0 : pullState.pull} refreshing={false} />
 
       <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
       <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
@@ -871,31 +867,10 @@ export function MainScreenView({
               onToggleMasked={displaySettings ? toggleMasked : undefined}
               layout={headerStyle}
               chartClassName="layered:h-20"
-              loading={portfolioHistoryQuery.isPending || (portfolioHistoryQuery.isFetching && !portfolioHasSeries)}
+              // A failed or empty read with no series to keep holds the shimmer while it retries, never a fabricated $0.
+              loading={!portfolioHasSeries}
               cached={chartCached}
-              cachedFetching={chartFetching}
               walletKey={wallet.id}
-              /**
-               * `series: []` on a *resolved* response (no thrown query
-               * error) is `getPortfolioHistory`'s own signal that both AR
-               * price sources failed (`reads.ts`'s doc comment) — a real
-               * zero-balance wallet still gets a non-empty series (AR/USD
-               * prices exist independent of the user's balance, just
-               * every point's `value` is 0), so an empty series here
-               * only ever means the fetch effectively failed. Passed
-               * through as `onRetry` rather than swapping `PortfolioChart`
-               * out for `NetworkErrorBanner` at this level, so the range
-               * tabs (rendered inside `PortfolioChart`) stay visible and
-               * clickable even while the active range is failed — a
-               * failed "ALL" no longer strands the user without a way
-               * back to a previously-cached "7D". The banner stays up
-               * through a retry with `retrying` set, so the tap visibly
-               * does something even when the retry fails again at once.
-               * A series already on screen stays through a refetch,
-               * marked by `cached`.
-               */
-              onRetry={portfolioFailed ? retryPortfolio : undefined}
-              retrying={portfolioFailed && portfolioHistoryQuery.isFetching}
             />
           </div>
 
@@ -1008,7 +983,6 @@ export function MainScreenView({
                         change={simpleRows ? undefined : row.change}
                         loading={loading}
                         cached={tokensCached}
-                        cachedFetching={tokensFetching}
                         onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                         className="border-b-0"
                       />
@@ -1052,7 +1026,6 @@ export function MainScreenView({
                           change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
                           loading={loading}
                           cached={tokensCached}
-                          cachedFetching={tokensFetching}
                           onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
                           className="border-b-0"
                         />
@@ -1183,26 +1156,14 @@ export function MainScreenView({
           </div>
         ) : activeTab === "collectibles" ? (
           <div
-            className={`min-h-60 pt-3.5 transition-opacity duration-500 ease-out phone:min-h-0 phone:pt-1 ${
-              collectiblesCached ? (collectiblesQuery.isFetching ? "gleam-cached-pulse" : "opacity-70") : ""
-            }`}
+            className={`min-h-60 pt-3.5 phone:min-h-0 phone:pt-1 ${collectiblesFresh ? "gleam-fresh" : ""}`}
           >
-            {collectiblesQuery.error && !collectiblesQuery.data ? (
-              <NetworkErrorBanner onRetry={() => void collectiblesQuery.refetch()} className="phone:mx-0 phone:mt-0" />
-            ) : (
-              <CollectiblesGallery
-                items={collectiblesQuery.data}
-                loading={collectiblesQuery.isLoading}
-                onOpen={onOpenCollectible}
-              />
-            )}
+            <CollectiblesGallery items={collectiblesQuery.data} loading={waiting(collectiblesQuery)} onOpen={onOpenCollectible} />
           </div>
         ) : (
           <>
             <div
-              className={`min-h-60 transition-opacity duration-500 ease-out phone:min-h-0 ${
-                activityCached ? (activityQuery.isFetching ? "gleam-cached-pulse" : "opacity-70") : ""
-              }`}
+              className={`min-h-60 phone:min-h-0 ${activityFresh ? "gleam-fresh" : ""}`}
             >
               {loading && !hasLoadedOnce ? (
                 <>

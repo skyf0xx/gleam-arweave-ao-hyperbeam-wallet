@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { DisplayCurrency, RuntimePort, TokenPrice } from "@gleam/core";
+import { HOME_READ_STALE_MS, retryWhileFailed } from "../../../query-cache/retry";
 
 /**
  * Current spot price, in the display currency, for every token
@@ -18,6 +19,8 @@ export function useTokenPrices(runtime: RuntimePort, currency: DisplayCurrency |
         type: "getTokenPrices",
         payload: { currency: currency as DisplayCurrency },
       }),
+    staleTime: HOME_READ_STALE_MS,
+    refetchInterval: retryWhileFailed,
   });
 }
 

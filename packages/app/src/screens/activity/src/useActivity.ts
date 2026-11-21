@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ActivityPage, RuntimePort } from "@gleam/core";
 import { walletQueryKeys } from "./queryKeys";
+import { HOME_READ_STALE_MS, retryWhileFailed } from "../../../query-cache/retry";
 
 const PENDING_REFETCH_MS = 15_000;
 
@@ -23,7 +24,8 @@ export function useActivity(runtime: RuntimePort, address: string) {
         type: "getActivity",
         payload: { address },
       }),
+    staleTime: HOME_READ_STALE_MS,
     refetchInterval: (query) =>
-      query.state.data?.entries.some((entry) => entry.status === "pending") ? PENDING_REFETCH_MS : false,
+      query.state.data?.entries.some((entry) => entry.status === "pending") ? PENDING_REFETCH_MS : retryWhileFailed(query),
   });
 }

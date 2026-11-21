@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { FAILED_READ_RETRY_MS } from "../../../query-cache/retry";
 import type { DisplayCurrency, PortfolioHistory, PortfolioHistoryRange, PortfolioScope, RuntimePort } from "@gleam/core";
 
 /**
@@ -38,12 +39,12 @@ export function usePortfolioHistory(
         payload: { range, address, scope, currency: currency as DisplayCurrency },
       }),
     staleTime: PORTFOLIO_HISTORY_STALE_TIME_MS,
-    // Bounds how long an offline range spends retrying before
-    // `NetworkErrorBanner`'s retry button takes over, rather than the
-    // default `retry: 3` exponential backoff stalling one range for
-    // several seconds. `retryDelay: 0` skips TanStack's default ~1s
-    // backoff so the single retry fires immediately.
+    // One immediate retry, then the slower interval below, rather than the
+    // default `retry: 3` backoff stalling one range for several seconds.
     retry: 1,
     retryDelay: 0,
+    // An empty series is the read's own "both price sources failed", so it retries like an error.
+    refetchInterval: (query) =>
+      query.state.status === "error" || query.state.data?.series.length === 0 ? FAILED_READ_RETRY_MS : false,
   });
 }
