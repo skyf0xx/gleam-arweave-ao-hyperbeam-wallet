@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../../primitives/cn";
+import { useFreshAfterCache } from "../../primitives/loading-bar";
 import { formatPercent } from "../../format/currency";
 import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
 
@@ -47,10 +48,8 @@ export interface TokenRowProps {
   /** Fractional 24-hour price move, under `value`. Left out when unknown, never shown as 0%. */
   change?: number;
   loading?: boolean;
-  /** Shows restored data that fresh data hasn't replaced yet: faded from the first frame, fading up once it lands. */
+  /** Shows restored data that fresh data hasn't replaced yet. It renders as-is; the figures settle once when this goes false. */
   cached?: boolean;
-  /** With `cached`: the live read is in flight, so the figures pulse; otherwise they rest at a still fade. */
-  cachedFetching?: boolean;
   onClick?: () => void;
   className?: string;
 }
@@ -63,8 +62,9 @@ function ChangeLine({ change }: { change: number }) {
   );
 }
 
-export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPrice, change, loading = false, cached = false, cachedFetching = false, onClick, className }: TokenRowProps) {
+export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPrice, change, loading = false, cached = false, onClick, className }: TokenRowProps) {
   const Component = onClick ? "button" : "div";
+  const fresh = useFreshAfterCache(cached);
   const priced = unitPrice ? ` @ ${unitPrice}` : null;
   return (
     <Component
@@ -79,7 +79,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPri
       {icon ?? <TokenGlyph {...glyph} />}
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
-        <div className={cn("text-caption tabular-nums text-muted paper:font-light transition-opacity duration-500 ease-out", loading && "opacity-50", cached && !loading && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))} title={amountFull}>
+        <div className={cn("text-caption tabular-nums text-muted paper:font-light transition-opacity duration-500 ease-out", loading && "opacity-50", fresh && !loading && "gleam-fresh")} title={amountFull}>
           {amountFull ? (
             <>
               <span aria-hidden="true" className="phone:hidden">
@@ -98,7 +98,7 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPri
         </div>
       </div>
       {value ? (
-        <div className={cn("shrink-0 text-right text-label font-semibold tabular-nums text-foreground", "transition-opacity duration-500 ease-out", loading && "opacity-50", cached && !loading && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"), "phone:group-data-editing:invisible")}>
+        <div className={cn("shrink-0 text-right text-label font-semibold tabular-nums text-foreground", "transition-opacity duration-500 ease-out", loading && "opacity-50", fresh && !loading && "gleam-fresh", "phone:group-data-editing:invisible")}>
           {value}
           {change === undefined ? null : <ChangeLine change={change} />}
         </div>

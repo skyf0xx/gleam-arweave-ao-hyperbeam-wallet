@@ -85,84 +85,82 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
     </button>
   );
 
-  const stamp = receiptStamp(entry);
+  const status = statusWord(entry);
 
   return (
     <div className="flex flex-col gap-6 px-6 pb-6 pt-4 phone:px-5">
-      {/* In paper this pair is a receipt: a slip with a tear line between the amount and who it was with. */}
-      <div className="flex flex-col gap-6 paper:gap-0 paper:rounded-[4px] paper:bg-surface paper:shadow-[0_1px_2px_rgba(40,35,25,0.06),0_8px_24px_rgba(40,35,25,0.06)]">
-        <div className="flex flex-col items-center gap-1 text-center paper:px-4 paper:pb-4 paper:pt-5">
-          {stamp ? (
-            <span aria-hidden="true" className={`gleam-stamp mb-3 hidden text-caption paper:inline-block ${stamp.tone}`}>
-              {t(stamp.key)}
-            </span>
-          ) : null}
-          {detail.amountLabel ? <p className="gleam-figure text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p> : null}
-          {isUpload ? <p className="text-label text-muted">{detail.title}</p> : null}
-        </div>
-
-        <div aria-hidden="true" className="gleam-perforation hidden paper:block" />
-
-        <div className="flex flex-col gap-2 paper:px-4 paper:pb-4 paper:pt-2">
-          {isUpload ? null : (
-            <p className="text-label font-semibold text-muted">
-              {entry.type === "send" ? t("send.to") : t("send.from")}
-              {knownName !== undefined ? <span className="font-normal text-foreground"> {knownName}</span> : null}
-            </p>
-          )}
-          <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} />
-          {knownName === undefined && !naming && !isUpload ? (
-            <button type="button" onClick={() => setNaming(true)} className="self-start text-caption text-muted underline-offset-2 hover:underline phone:min-h-11">
-              {t("mainScreen.saveAddress")}
-            </button>
-          ) : null}
-        </div>
+      <div className="flex flex-col items-center gap-1 text-center">
+        {detail.amountLabel ? <p className="gleam-figure text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p> : null}
+        {isUpload ? <p className="text-label text-muted">{detail.title}</p> : null}
+        {/* Paper names the outcome in a word under the figure; light and dark carry it in the footer alone. */}
+        {status ? <p className={`hidden text-label paper:block ${status.tone}`}>{t(status.key)}</p> : null}
       </div>
 
-      {naming ? (
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            save();
-          }}
-        >
-          <TextField
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.stopPropagation();
-                cancel();
-              }
-            }}
-            placeholder={t("mainScreen.contactName")}
-            aria-label={t("mainScreen.contactName")}
-            errorMessage={saveContact.error instanceof Error ? errorText(saveContact.error) : undefined}
-          />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={cancel}>
-              {t("mainScreen.cancel")}
-            </Button>
-            <Button type="submit" size="sm" disabled={!name.trim() || saveContact.isPending}>
-              {t("mainScreen.save")}
-            </Button>
-          </div>
-        </form>
-      ) : null}
+      {/* In paper the address is glass: a read-only pane hanging from "From" over everything that uses it. */}
+      <div className="gleam-paper-glass-down flex flex-col gap-6 paper:-mx-6 paper:px-6 paper:pb-8 paper:pt-5 phone:paper:-mx-5 phone:paper:px-5">
+        <div className="flex flex-col gap-2">
+          {isUpload ? null : (
+            // Actions on the address sit on the right, in line with its copy button.
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate text-label font-semibold text-muted">
+                {entry.type === "send" ? t("send.to") : t("send.from")}
+                {knownName !== undefined ? <span className="font-normal text-foreground"> {knownName}</span> : null}
+              </p>
+              {knownName === undefined && !naming ? (
+                <button type="button" onClick={() => setNaming(true)} className="shrink-0 text-caption text-muted underline-offset-2 hover:underline phone:hit-target">
+                  {t("mainScreen.saveAddress")}
+                </button>
+              ) : null}
+            </div>
+          )}
+          <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} onGlass />
+        </div>
 
-      {detail.onSendTo ? (
-        <Button onClick={detail.onSendTo}>{entry.type === "send" ? t("mainScreen.resendToAddress") : t("mainScreen.sendToAddress")}</Button>
-      ) : null}
+        {naming ? (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              save();
+            }}
+          >
+            <TextField
+              autoFocus
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  cancel();
+                }
+              }}
+              placeholder={t("mainScreen.contactName")}
+              aria-label={t("mainScreen.contactName")}
+              errorMessage={saveContact.error instanceof Error ? errorText(saveContact.error) : undefined}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={cancel}>
+                {t("mainScreen.cancel")}
+              </Button>
+              <Button type="submit" size="sm" disabled={!name.trim() || saveContact.isPending}>
+                {t("mainScreen.save")}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+
+        {detail.onSendTo ? (
+          <Button onClick={detail.onSendTo}>{entry.type === "send" ? t("mainScreen.resendToAddress") : t("mainScreen.sendToAddress")}</Button>
+        ) : null}
+      </div>
 
       {txLink}
     </div>
   );
 }
 
-/** The status stamped on a paper receipt; a pending entry or a swap order has none. */
-function receiptStamp(entry: ActivityEntry): { key: "mainScreen.verbSent" | "mainScreen.verbReceived" | "mainScreen.verbUploaded" | "mainScreen.failed"; tone: string } | null {
+/** The outcome named under the figure in paper; a pending entry or a swap order has none. */
+function statusWord(entry: ActivityEntry): { key: "mainScreen.verbSent" | "mainScreen.verbReceived" | "mainScreen.verbUploaded" | "mainScreen.failed"; tone: string } | null {
   if (entry.status === "failed") return { key: "mainScreen.failed", tone: "text-warning" };
   if (entry.status !== "confirmed") return null;
   if (entry.type === "send") return { key: "mainScreen.verbSent", tone: "text-foreground" };

@@ -140,13 +140,12 @@ describe("BrowserView start screen", () => {
     expect(within(dapps).getAllByRole("button").map((row) => row.textContent)).toEqual([
       "ao.arweave.net",
       "bazar.arweave.net",
-      // No bundled icon, so its tile leads with its letter.
-      "Iiwashere.ar.io",
+      "iwashere.ar.io",
       "www.permatell.xyz",
     ]);
-    // ao and bazar are single-colour, so they take the theme's colour as a mask; permatell stays an image.
+    // ao and bazar are single-colour, so they take the theme's colour as a mask; iwashere and permatell stay images.
     expect(dapps.querySelectorAll("[data-mono-icon]")).toHaveLength(2);
-    expect(dapps.querySelectorAll("img")).toHaveLength(1);
+    expect(dapps.querySelectorAll("img")).toHaveLength(2);
     const saved = screen.getByRole("region", { name: "Saved" });
     expect(saved.querySelector("img")?.getAttribute("src")).toBe(PNG);
     // A recent site has no stored icon, so it keeps its letter.
@@ -344,6 +343,28 @@ describe("BrowserView with a page", () => {
       await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "saveBrowserSite", payload }));
       cleanup();
     }
+  });
+
+  it("fills the star on tap, before the save lands, and empties it if the save fails", async () => {
+    const browser = fakeBrowser();
+    let failSave!: (error: Error) => void;
+    const send = vi.fn(async ({ type }: { type: string }) => {
+      if (type === "listBrowserSites") return { saved: [], recent: [], icons: {}, history: [] };
+      if (type === "getConnectedApps") return [];
+      if (type === "saveBrowserSite") return new Promise((_, reject) => (failSave = reject));
+      return undefined;
+    });
+    const runtime = { send, onMessage: () => () => {} } as unknown as RuntimePort;
+    mount({ browser: browser.port, runtime, initialUrl: "https://a.example/" });
+    await browser.emit({ kind: "navigation", url: "https://a.example/page", canGoBack: false, loading: false });
+
+    fireEvent.click(screen.getByLabelText("Save site"));
+    const star = screen.getByLabelText("Remove from saved sites");
+    expect(star.getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "saveBrowserSite" })));
+
+    await act(async () => failSave(new Error("offline")));
+    await waitFor(() => expect(screen.getByLabelText("Save site").getAttribute("aria-pressed")).toBe("false"));
   });
 
   it("still saves the site when reading its icon fails", async () => {

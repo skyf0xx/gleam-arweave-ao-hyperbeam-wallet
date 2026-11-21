@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Collectible, RuntimePort } from "@gleam/core";
 import { walletQueryKeys } from "./queryKeys";
+import { retryWhileFailed } from "../../../query-cache/retry";
 
 /**
  * The wallet's AO NFTs. Its own query, apart from `useBalances`, so a slow
@@ -17,6 +18,7 @@ export function useCollectibles(runtime: RuntimePort, address: string, options: 
         payload: { address },
       }),
     staleTime: 60_000,
+    refetchInterval: retryWhileFailed,
     enabled: options.enabled ?? true,
   });
 }

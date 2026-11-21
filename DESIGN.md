@@ -172,7 +172,7 @@ Paper is a light theme on a grey paper with a little warmth, with glass where a 
 
 - **Weight contrast.** The headline figure is extra bold, set tight and pressed into the paper (`.gleam-figure`). Secondary amounts and prices are light.
 - **Pencil, then ink.** A pending activity row is written in pencil and inks in when it settles.
-- **Receipts.** An activity's detail is a slip with a tear line, its status a rubber stamp.
+- **Activity detail.** The figure is pressed into the sheet's paper with its outcome in a word beneath it, and the counterparty's address hangs under a read-only glass pane that covers what uses it.
 - **Material.** The token sheet lifts off the paper with a soft edge, and settles in once.
 - **Barely any texture.** The header paper is flat colour. The token sheet has a grain you only notice up close; anything stronger, or ruled lines, competes with the rows.
 - **Light on paper.** The beam is light lying flat on the paper, not ink: clear spectral stops mixed about a third of the way toward the paper, with no glow, and 2px rather than 3px, so it sits in the pressed header. Warning, gains and losses are a step deeper than light's so they hold on the paper.
@@ -187,7 +187,7 @@ Before styling something new, ask in order:
 
 1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the wallet a site connects to, the active wallet in the switcher. It goes under glass.
 2. **Is it a selected setting or view?** A chart period, a tab, a theme, a language, a currency. It is pressed in: mist, a step darker, or an underline for tabs. Not glass, even though it is "selected".
-3. **Is it under the pointer or a finger?** It takes `bg-hover`: mist in light and dark, a 4% ink wash on paper, rounded and reaching past the row's text. Never glass, and never paper's mist, which reads as a scorch on the sheet.
+3. **Is it under the pointer or a finger?** It takes `bg-hover`: mist in light and dark, a 4% ink wash on paper, rounded and reaching past the row's text. On glass it brightens instead, a 35% white sheen, since an ink wash there darkens the pane into a second one. Never glass, and never paper's mist, which reads as a scorch on the sheet.
 
 Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without glass.
 

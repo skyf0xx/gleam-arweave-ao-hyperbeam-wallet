@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithPlatform as render } from "../../../app-platform/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Collectible, RuntimePort, WalletSummary } from "@gleam/core";
@@ -101,15 +101,13 @@ describe("Collectibles tab", () => {
     expect(await screen.findByText(/No collectibles yet/)).toBeTruthy();
   });
 
-  it("offers a retry when discovery fails", async () => {
+  it("marks a failed discovery on the top bar, with no retry button", async () => {
     const runtime = runtimeWith(async () => {
       throw new Error("down");
     });
     renderMain(runtime, { initialTab: "collectibles" });
-    const list = (await screen.findByRole("tablist", { name: "Tokens, collectibles and activity" })).parentElement!;
-    const retry = await within(list).findByRole("button", { name: "Retry" });
-    fireEvent.click(retry);
-    await waitFor(() => expect(collectiblesCalls(runtime)).toBe(2));
+    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
   it("shows the picked thumbnail large and opens it when the large piece is tapped", async () => {

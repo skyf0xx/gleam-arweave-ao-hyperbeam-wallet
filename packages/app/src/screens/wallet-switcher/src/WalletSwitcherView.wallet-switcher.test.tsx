@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { RuntimePort, WalletState } from "@gleam/core";
-import { WalletSwitcherView } from "./WalletSwitcherView";
+import { sortByName, WalletSwitcherView } from "./WalletSwitcherView";
 
 afterEach(() => {
   cleanup();
@@ -62,14 +62,21 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
     expect(send).toHaveBeenCalledWith({ type: "getState", payload: undefined });
   });
 
-  it("keeps the saved order when the active wallet isn't first", async () => {
-    const send = vi.fn().mockResolvedValue({ ...STATE, activeWalletId: "wallet-2" });
+  it("lists wallets by name, whichever is active or saved first", async () => {
+    const [first, second] = STATE.wallets;
+    const send = vi.fn().mockResolvedValue({ ...STATE, wallets: [second, first], activeWalletId: "wallet-2" });
     render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} onManage={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
-    const position = screen.getByText("Wallet One").compareDocumentPosition(screen.getByText("Trading"));
+    const position = screen.getByText("Trading").compareDocumentPosition(screen.getByText("Wallet One"));
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Trading").closest("button")?.getAttribute("aria-current")).toBe("true");
+  });
+
+  it("sorts names naturally, ignoring case", () => {
+    const named = (name: string) => ({ ...STATE.wallets[0]!, id: name, name });
+    const sorted = sortByName([named("wallet 10"), named("Wallet 2"), named("alpha")], "en").map((wallet) => wallet.name);
+    expect(sorted).toEqual(["alpha", "Wallet 2", "wallet 10"]);
   });
 
   it("calls switchWallet with the tapped row's walletId, then onSwitched", async () => {

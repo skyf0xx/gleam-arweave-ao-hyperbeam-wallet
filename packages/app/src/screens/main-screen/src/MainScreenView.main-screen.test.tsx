@@ -124,17 +124,13 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
     expect(onOpenSettings).toHaveBeenCalled();
   });
 
-  it("shows the network error banner and skeleton rows already established for this screen", async () => {
+  it("marks a failed load on the top bar instead of a banner", async () => {
     const send = vi.fn().mockRejectedValue(new Error("unreachable"));
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    // Both the balance/activity load and the portfolio-history load fail
-    // here (the same rejecting `send`), so two `NetworkErrorBanner`s render
-    // — one per independent failure, matching this screen's existing
-    // per-section error-banner pattern rather than a single shared one.
-    await waitFor(() =>
-      expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0),
-    );
+    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    expect(screen.queryByText(/couldn't reach the network/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 });
 
@@ -389,7 +385,7 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     expect(badge.style.color).toBe("var(--color-negative)");
   });
 
-  it("shows NetworkErrorBanner (not a broken/blank chart) when getPortfolioHistory fails", async () => {
+  it("holds the chart and total on their shimmer, not a $0 total, when getPortfolioHistory fails", async () => {
     const send = vi.fn(async ({ type }: { type: string }) => {
       if (type === "getBalance") return BALANCE;
       if (type === "getTokenBalances") return NO_TOKENS;
@@ -399,34 +395,14 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
       if (type === "getNetworkSettings") return { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
       throw new Error(`Unexpected message type "${type}"`);
     }) as RuntimePort["send"];
-    renderMainScreen({ runtime: fakeRuntime({ send }) });
+    const { container } = renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
+    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    expect(container.querySelector(".gleam-shimmer")).toBeTruthy();
+    expect(screen.getByTestId("figure-placeholder")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
-  it("keeps the portfolio banner up and shows Retrying until the retry lands", async () => {
-    let portfolioCalls = 0;
-    let finishRetry!: () => void;
-    const base = successfulSend();
-    const send = vi.fn(async (message: Parameters<RuntimePort["send"]>[0]) => {
-      if (message.type !== "getPortfolioHistory") return base(message);
-      portfolioCalls += 1;
-      // The first fetch and its one automatic retry fail; the user's Retry then waits on `finishRetry`.
-      if (portfolioCalls <= 2) throw new Error("unreachable");
-      await new Promise<void>((resolve) => (finishRetry = resolve));
-      return PORTFOLIO_HISTORY_7D;
-    }) as RuntimePort["send"];
-    renderMainScreen({ runtime: fakeRuntime({ send }) });
-
-    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
-    expect(screen.getByRole("button", { name: "Retrying" })).toBeTruthy();
-    await waitFor(() => expect(portfolioCalls).toBe(3));
-    expect(screen.getByRole("button", { name: "Retrying" })).toBeTruthy();
-
-    finishRetry();
-    await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
-    expect(screen.queryByText(/couldn't reach the network/i)).toBeNull();
-  });
   it("formats a large %-change with thousands separators", async () => {
     const send = successfulSend({ portfolioHistory: { ...PORTFOLIO_HISTORY_7D, change: 27.6866 } });
     renderMainScreen({ runtime: fakeRuntime({ send }) });
@@ -1459,7 +1435,7 @@ describe("MainScreenView pull to refresh", () => {
     );
   });
 
-  it("shows the network error banner when the refresh fails", async () => {
+  it("marks the top bar when the refresh fails", async () => {
     document.body.dataset.layout = "phone";
     let failing = false;
     const ok = successfulSend();
@@ -1469,16 +1445,16 @@ describe("MainScreenView pull to refresh", () => {
     }) as RuntimePort["send"];
     const { container } = renderMainScreen({ runtime: fakeRuntime({ send }) });
     await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
-    expect(screen.queryByText(/couldn't reach the network/i)).toBeNull();
+    expect(screen.queryByRole("status", { name: /couldn't reach the network/i })).toBeNull();
 
     failing = true;
     pullDown(container.firstElementChild!);
 
-    await waitFor(() => expect(screen.getAllByText(/couldn't reach the network/i).length).toBeGreaterThan(0));
+    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
   });
 });
 
-describe("MainScreenView cached-to-live fade", () => {
+describe("MainScreenView cached-to-live", () => {
   const CACHED = { arBalance: "1500000000000", tokenBalances: NO_TOKENS };
 
   /** The token row's amount; the same figure can also appear elsewhere on the screen. */
@@ -1522,23 +1498,25 @@ describe("MainScreenView cached-to-live fade", () => {
     return { queryClient, resolveBalance, rejectBalance, fetchLater: () => (later = true) };
   }
 
-  it("shows restored rows faded from the first paint, then at full once fresh data lands", async () => {
+  it("shows restored rows at full strength, then settles them once fresh data lands", async () => {
     const { resolveBalance } = setup(true);
-    expect(amountCell("1.5").className).toContain("gleam-cached-pulse");
+    expect(amountCell("1.5").className).not.toContain("gleam-cached-pulse");
+    expect(amountCell("1.5").className).not.toContain("opacity-70");
+    expect(screen.getByRole("status", { name: "Refreshing" })).toBeTruthy();
     await act(async () => {
       resolveBalance("2500000000000");
     });
-    await waitFor(() => expect(amountCell("2.5").className).not.toContain("gleam-cached-pulse"));
-    expect(amountCell("2.5").className).not.toContain("opacity-70");
+    await waitFor(() => expect(amountCell("2.5").className).toContain("gleam-fresh"));
   });
 
-  it("keeps restored rows faded and still after the refetch fails", async () => {
+  it("keeps restored rows as they are after the refetch fails", async () => {
     const { rejectBalance } = setup(true);
     await act(async () => {
       rejectBalance(new Error("offline"));
     });
-    await waitFor(() => expect(amountCell("1.5").className).toContain("opacity-70"));
-    expect(amountCell("1.5").className).not.toContain("gleam-cached-pulse");
+    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    expect(amountCell("1.5").className).not.toContain("opacity-70");
+    expect(amountCell("1.5").className).not.toContain("gleam-fresh");
   });
 
   it("renders never-cached rows at full", async () => {
@@ -1547,20 +1525,20 @@ describe("MainScreenView cached-to-live fade", () => {
       resolveBalance("2500000000000");
     });
     await screen.findAllByText("2.5");
-    expect(amountCell("2.5").className).not.toContain("opacity-70");
+    expect(amountCell("2.5").className).not.toContain("gleam-fresh");
   });
 
-  it("does not fade on a later refetch", async () => {
+  it("keeps a later poll of fresh data off the top bar", async () => {
     const { queryClient, resolveBalance, fetchLater } = setup(true);
     await act(async () => {
       resolveBalance("2500000000000");
     });
-    await waitFor(() => expect(amountCell("2.5").className).not.toContain("opacity-70"));
+    await waitFor(() => expect(amountCell("2.5")).toBeTruthy());
     fetchLater();
     await act(async () => {
       await queryClient.refetchQueries({ queryKey: [WALLET.address, "balances"] });
     });
     await waitFor(() => expect(amountCell("3.5")).toBeTruthy());
-    expect(amountCell("3.5").className).not.toContain("opacity-70");
+    expect(screen.queryByRole("status", { name: "Refreshing" })).toBeNull();
   });
 });

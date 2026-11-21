@@ -4,7 +4,7 @@ import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
-import { useT } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
@@ -52,8 +52,14 @@ interface LoadState {
   error: string | null;
 }
 
+/** "Wallet 2" before "Wallet 10", and case and accents don't split names apart. */
+export function sortByName(wallets: WalletSummary[], locale: string): WalletSummary[] {
+  return [...wallets].sort((a, b) => a.name.localeCompare(b.name, locale, { numeric: true, sensitivity: "base" }));
+}
+
 export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalletId = null, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
   const t = useT();
+  const locale = useLocale();
   const [state, setState] = useState<LoadState>({
     wallets: initialWallets ?? [],
     activeWalletId: initialActiveWalletId,
@@ -116,8 +122,8 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
               <SkeletonRow />
             </>
           ) : (
-            // Saved order, never active-first: a list that reshuffles on every switch loses people.
-            state.wallets.map((wallet) => (
+            // By name, never active-first: a list that reshuffles on every switch loses people.
+            sortByName(state.wallets, locale).map((wallet) => (
               <WalletSwitcherRow
                 key={wallet.id}
                 wallet={wallet}
@@ -216,7 +222,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         onClick={copy}
         aria-label={copied ? t("walletSwitcher.addressCopied", { name: wallet.name }) : t("walletSwitcher.copyAddressOf", { name: wallet.name })}
         title={copied ? t("walletSwitcher.copied") : t("walletSwitcher.copyAddress")}
-        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background ${active ? "paper:hover:bg-hover" : ""} focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
         {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
       </button>
@@ -224,7 +230,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         type="button"
         aria-label={t("walletSwitcher.manage", { name: wallet.name })}
         onClick={onManage}
-        className="flex h-7 w-5 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11"
+        className={`flex h-7 w-5 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11 ${active ? "paper:hover:bg-hover" : ""}`}
       >
         <ChevronRightIcon />
       </button>

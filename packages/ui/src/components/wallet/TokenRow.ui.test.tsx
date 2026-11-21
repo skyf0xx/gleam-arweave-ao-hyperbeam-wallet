@@ -23,33 +23,22 @@ describe("TokenRow amount", () => {
 });
 
 describe("TokenRow cached", () => {
-  it("renders faded from the first frame while cached, and lighter than while loading", () => {
+  it("renders restored figures at full strength, and dims only while loading", () => {
     const { rerender } = render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached />);
-    expect(screen.getByText("1.5").className).toContain("opacity-70");
-    expect(screen.getByText("$3.00").className).toContain("opacity-70");
+    for (const text of ["1.5", "$3.00"]) {
+      expect(screen.getByText(text).className).not.toContain("opacity-70");
+      expect(screen.getByText(text).className).not.toContain("gleam-cached-pulse");
+    }
     rerender(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" loading cached />);
     expect(screen.getByText("1.5").className).toContain("opacity-50");
-    expect(screen.getByText("1.5").className).not.toContain("opacity-70");
   });
 
-  it("pulses while the live read is in flight, and rests still when it is not", () => {
-    const { rerender } = render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached cachedFetching />);
-    for (const text of ["1.5", "$3.00"]) {
-      expect(screen.getByText(text).className).toContain("gleam-cached-pulse");
-      expect(screen.getByText(text).className).not.toContain("opacity-70");
-    }
-    rerender(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached />);
-    expect(screen.getByText("1.5").className).toContain("opacity-70");
-    expect(screen.getByText("1.5").className).not.toContain("gleam-cached-pulse");
-  });
-
-  it("fades up to full once the data is fresh", () => {
-    const { rerender } = render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" cached />);
-    rerender(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" />);
-    const className = screen.getByText("1.5").className;
-    expect(className).not.toContain("opacity-70");
-    expect(className).toContain("duration-500");
-    expect(className).toContain("ease-out");
+  it("settles once the data is fresh", () => {
+    const { rerender } = render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached />);
+    expect(screen.getByText("1.5").className).not.toContain("gleam-fresh");
+    rerender(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" />);
+    expect(screen.getByText("1.5").className).toContain("gleam-fresh");
+    expect(screen.getByText("$3.00").className).toContain("gleam-fresh");
   });
 
   it("swaps a changed amount in place without ticking through frames", () => {

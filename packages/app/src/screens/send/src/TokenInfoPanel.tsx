@@ -65,20 +65,8 @@ export function TokenInfoPanel({
 }
 
 /** The details screen's header title: the token's name, with its ticker quieter beside it when the two differ. */
-export function TokenHeaderTitle({ token }: { token: TokenBalance | null }) {
-  const ticker = token === null ? "AR" : displayTicker(token.ticker);
-  const name = token === null ? "Arweave" : (token.name ?? ticker);
-  return (
-    <span className="flex min-w-0 max-w-full items-baseline gap-1.5">
-      {/* eslint-disable-next-line gleam/type-scale -- matches ScreenHeader's 16px phone title. */}
-      <span className="truncate text-body font-semibold text-foreground phone:text-[1rem]">{name}</span>
-      {ticker !== name ? <span className="flex-shrink-0 text-label text-muted">{ticker}</span> : null}
-    </span>
-  );
-}
-
-/** The token's logo for the details screen's header. */
-export function TokenHeaderGlyph({
+/** The details screen's title: the token's logo, small, beside its name, so the logo belongs to the name. */
+export function TokenHeaderTitle({
   token,
   logoUrl,
 }: {
@@ -87,9 +75,21 @@ export function TokenHeaderGlyph({
   logoUrl: string | undefined;
 }) {
   const ticker = token === null ? "AR" : displayTicker(token.ticker);
+  const name = token === null ? "Arweave" : (token.name ?? ticker);
   return (
-    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center phone:h-11 phone:w-11">
-      <TokenGlyph label={token === null ? "AR" : ticker.slice(0, 2).toUpperCase()} tone={token === null ? 1 : 2} logoUrl={logoUrl} className="h-8 w-8 text-caption" />
+    <span className="flex min-w-0 max-w-full items-center gap-2">
+      {/* Bare on the header: the plate behind a logo is for rows. */}
+      <TokenGlyph
+        label={token === null ? "AR" : ticker.slice(0, 2).toUpperCase()}
+        tone={token === null ? 1 : 2}
+        logoUrl={logoUrl}
+        className={`h-5 w-5 flex-shrink-0 rounded-md text-micro ${logoUrl ? "bg-transparent layered:p-0" : ""}`}
+      />
+      <span className="flex min-w-0 items-baseline gap-1.5">
+        {/* eslint-disable-next-line gleam/type-scale -- matches ScreenHeader's 16px phone title. */}
+        <span className="truncate text-body font-semibold text-foreground phone:text-[1rem]">{name}</span>
+        {ticker !== name ? <span className="flex-shrink-0 text-label text-muted">{ticker}</span> : null}
+      </span>
     </span>
   );
 }
