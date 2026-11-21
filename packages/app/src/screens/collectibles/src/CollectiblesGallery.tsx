@@ -108,7 +108,7 @@ export function CollectiblesGallery({ items, loading, onOpen }: CollectiblesGall
   if (loading && items === undefined) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 phone:order-last">
           {Array.from({ length: 5 }, (_, key) => (
             <div key={key} className="aspect-square w-14 shrink-0 gleam-shimmer rounded-lg" />
           ))}
@@ -124,7 +124,8 @@ export function CollectiblesGallery({ items, loading, onOpen }: CollectiblesGall
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative -mx-6 phone:-mx-5">
+      {/* On a phone the ribbon sits under the piece, where the thumb rests; the extension keeps it on top. */}
+      <div className="relative -mx-6 phone:order-last phone:-mx-5">
         <button
           type="button"
           aria-label={t("collectibles.previous")}
