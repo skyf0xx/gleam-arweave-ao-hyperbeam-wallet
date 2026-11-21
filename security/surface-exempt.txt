@@ -138,6 +138,7 @@ packages/app/src/theme.tsx Theme context and document attribute; display only.
 packages/app/src/screens/browser/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/browser/icons/ao.svg A bundled image the start screen draws; no script.
 packages/app/src/screens/browser/icons/bazar.svg A bundled image the start screen draws; no script.
+packages/app/src/screens/browser/icons/iwashere.svg A bundled image the start screen draws; no script.
 packages/app/src/screens/browser/icons/permatell.svg A bundled image the start screen draws; no script.
 packages/app/src/screens/browser/src/built-in-icons.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/browser/src/HistoryScreen.tsx A screen outside the key, signing and approval paths.
