@@ -99,18 +99,16 @@ export function QrCode({ value, size = 176, label, className }: QrCodeProps) {
   }, [value, size]);
 
   return (
-    <div
-      className={cn(
-        "inline-flex items-center justify-center rounded-xl bg-background p-3",
-        className,
-      )}
-    >
-      <div
-        ref={containerRef}
-        role="img"
-        aria-label={(label ?? labels.qrCode)(value)}
-        style={{ width: size, height: size }}
-      />
+    // The cut lands on the plate's padding, clear of the code, which is drawn with no margin of its own.
+    <div className={cn("gleam-crystal-cut inline-flex", className)}>
+      <div className="inline-flex items-center justify-center bg-background p-3">
+        <div
+          ref={containerRef}
+          role="img"
+          aria-label={(label ?? labels.qrCode)(value)}
+          style={{ width: size, height: size }}
+        />
+      </div>
     </div>
   );
 }
