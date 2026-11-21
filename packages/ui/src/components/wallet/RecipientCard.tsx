@@ -71,7 +71,7 @@ export function RecipientCard({
         type="button"
         onClick={onEdit}
         aria-label={labels.change(name ?? null)}
-        className={cn(frame, "transition-colors hover:bg-foreground/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground", className)}
+        className={cn(frame, "transition-colors hover:bg-foreground/[0.05] paper:hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground", className)}
       >
         {body}
       </button>
