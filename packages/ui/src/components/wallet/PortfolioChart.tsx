@@ -137,6 +137,17 @@ const SCOPE_FLASH_MS = 2500;
 const SPARKLINE_POINTS = 32;
 const CHART_POINTS = 90;
 
+/** A chart's range tab, shared by every chart so the pickers can't drift apart. */
+export function rangeTabClass(selected: boolean): string {
+  return cn(
+    "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
+    selected
+      ? // Paper's mist matches the Send/Receive tiles; a lighter wash keeps the range a quiet part of the chart.
+        "bg-mist text-foreground paper:bg-foreground/[0.035]"
+      : "text-muted hover:text-foreground layered:text-faint",
+  );
+}
+
 export function PortfolioChart({
   points,
   currentValue,
@@ -379,13 +390,7 @@ export function PortfolioChart({
               role="tab"
               aria-selected={range === activeRange}
               onClick={() => onRangeChange(range)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
-                range === activeRange
-                  ? // Paper's mist matches the Send/Receive tiles below; a lighter wash keeps the range a quiet part of the chart.
-                    "bg-mist text-foreground paper:bg-foreground/[0.035]"
-                  : "text-muted hover:text-foreground layered:text-faint",
-              )}
+              className={rangeTabClass(range === activeRange)}
             >
               {range}
             </button>

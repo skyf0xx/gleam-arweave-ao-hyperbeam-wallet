@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { priceSourceForProcessId, type DisplayCurrency, type PortfolioHistoryRange, type RuntimePort } from "@gleam/core";
 import { buildLinePath, chartCoordinates, CHART_HEIGHT, CHART_WIDTH, downsample, type ChartPoint } from "@gleam/ui/src/components/wallet/chart-path.ts";
 import { formatCurrencyValue, formatPercent } from "@gleam/ui/src/format/currency.ts";
+import { rangeTabClass } from "@gleam/ui/src/components/wallet/index.ts";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { useLocale, useT } from "../../../i18n";
 import { useTokenPriceHistory } from "./useTokenPriceHistory";
@@ -146,10 +147,7 @@ export function TokenPriceChart({
               setRange(option);
               setActive(null);
             }}
-            className={cn(
-              "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
-              option === range ? "bg-mist text-foreground" : "text-muted hover:text-foreground",
-            )}
+            className={rangeTabClass(option === range)}
           >
             {option}
           </button>
