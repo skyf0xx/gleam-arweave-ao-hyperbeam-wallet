@@ -84,6 +84,8 @@ export function StartScreen({
     );
   }
 
+  const hasHistory = recentSites.length > 0 || history.length > 0;
+
   return (
     <div className="flex flex-col gap-6 px-5 pb-6 pt-2">
       {savedSites.length > 0 ? (
@@ -104,7 +106,7 @@ export function StartScreen({
           <SiteRow key={site.url} host={site.host} icon={iconOf(site.url)} onOpen={() => onOpen(site.url)} />
         ))}
       </Section>
-      {recentSites.length > 0 || history.length > 0 ? (
+      {hasHistory ? (
         <Section
           title={t("browser.recent")}
           action={
@@ -119,15 +121,18 @@ export function StartScreen({
               </svg>
             </button>
           }
-          footer={onClearRecent ? <ClearButton label={t("browser.clearHistory")} clear={onClearRecent} /> : undefined}
         >
           {recentSites.map((site) => (
             <SiteRow key={site.url} host={site.host} caption={lastVisit(site.url)} onOpen={() => onOpen(site.url)} />
           ))}
         </Section>
       ) : null}
-      {onClearSiteData ? (
-        <ClearSiteData clear={onClearSiteData} />
+      {/* Housekeeping sits apart at the foot, so the site lists stay lists. */}
+      {(onClearRecent && hasHistory) || onClearSiteData ? (
+        <div className="flex flex-col items-start pt-4">
+          {onClearRecent && hasHistory ? <ClearButton label={t("browser.clearHistory")} clear={onClearRecent} /> : null}
+          {onClearSiteData ? <ClearSiteData clear={onClearSiteData} /> : null}
+        </div>
       ) : null}
     </div>
   );
@@ -206,13 +211,11 @@ function Section({
   title,
   hint,
   action,
-  footer,
   children,
 }: {
   title: string;
   hint?: string;
   action?: React.ReactNode;
-  footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -223,7 +226,6 @@ function Section({
       </div>
       <div className="flex flex-col">{children}</div>
       {hint ? <p className="pt-1 text-caption text-faint">{hint}</p> : null}
-      {footer ? <div className="flex pt-1">{footer}</div> : null}
     </section>
   );
 }
