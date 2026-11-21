@@ -248,10 +248,10 @@
   --color-background: #f1f1ee;
   --color-surface: #fafaf9;
   --color-mist: #e5e3e0;
-  /* Paper's mist is a pressed tile, a step darker; as a hover it reads as a
-     scorch on the sheet and swallows the token tiles. A thin ink wash
-     instead, over whatever sheet is under it. */
-  --color-hover: color-mix(in srgb, var(--color-foreground) 4%, transparent);
+  /* A hover catches the light: any darkening, mist or ink, reads as a scorch
+     on paper. The white sheet, where white can't show, takes a faint warm
+     ink instead (below). */
+  --color-hover: rgba(255, 255, 255, 0.5);
   --color-line: #dcdad6;
   --color-foreground: #1a1a19;
   --color-primary-fill: #1a1a19;
@@ -1111,6 +1111,56 @@ select,
     var(--gleam-frost),
     linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12) 70%);
   pointer-events: none;
+}
+
+[data-theme="paper"] :is(.gleam-paper-sheet, .bg-surface) {
+  --color-hover: color-mix(in srgb, #5a4630 3%, transparent);
+}
+
+/*
+ * A control with a shape (a card, an outlined button, a chip) turns to
+ * glass under the pointer: frost, a sheen and a lit top edge over its own
+ * fill. A row without a shape takes `--color-hover`, and its chevron inks
+ * in. In a layer so a position utility on the control still wins. Send and
+ * Receive are glass already, with their own pane in `::before`.
+ */
+@layer components {
+  [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile) {
+    position: relative;
+    isolation: isolate;
+  }
+
+  [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile)::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    background:
+      var(--gleam-frost),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18) 75%);
+    transition: opacity 150ms;
+    pointer-events: none;
+  }
+
+  @media (hover: hover) {
+    [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile):hover:not(:disabled) {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile):hover:not(:disabled)::before {
+      opacity: 1;
+    }
+
+    [data-theme="paper"] :is(button, a, label):hover .gleam-chevron {
+      color: var(--color-foreground);
+    }
+  }
+
+  [data-theme="paper"] .gleam-chevron {
+    transition: color 150ms;
+  }
 }
 
 /*

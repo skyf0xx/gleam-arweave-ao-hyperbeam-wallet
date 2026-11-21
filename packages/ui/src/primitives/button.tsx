@@ -23,7 +23,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: "bg-primary-fill text-background hover:opacity-85 disabled:bg-primary-disabled disabled:text-primary-disabled-text",
-        secondary: "border border-line bg-background text-foreground hover:bg-hover disabled:opacity-50",
+        secondary: "gleam-hover-glass border border-line bg-background text-foreground hover:bg-hover disabled:opacity-50",
         ghost: "rounded-md text-muted hover:bg-hover hover:text-foreground disabled:opacity-50",
         destructive: "bg-warning-fill text-white hover:brightness-110 disabled:opacity-50",
       },

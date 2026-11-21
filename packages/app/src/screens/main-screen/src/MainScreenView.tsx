@@ -1182,7 +1182,7 @@ export function MainScreenView({
                       <span className="text-label font-semibold text-foreground">{t("mainScreen.addToken")}</span>
                       <span className="text-caption text-muted">{t("mainScreen.addTokenHint")}</span>
                     </span>
-                    <span aria-hidden="true" className="flex-shrink-0 text-faint">
+                    <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
                       <ChevronRightIcon />
                     </span>
                   </button>
