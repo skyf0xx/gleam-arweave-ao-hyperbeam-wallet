@@ -1250,6 +1250,22 @@ select,
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.14  0 0 0 0 0.12  0 0 0 0.07 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
 }
 
+/*
+ * A bottom sheet (vaul) rises in 300ms and drops away in 220ms; vaul's own
+ * 500ms both ways lingers. `forwards` holds it off screen until Radix
+ * unmounts it on `animationend`. A drag keeps vaul's own release timing.
+ */
+[data-vaul-drawer][data-state="open"],
+[data-vaul-overlay][data-state="open"] {
+  animation-duration: 300ms;
+}
+
+[data-vaul-drawer][data-state="closed"],
+[data-vaul-overlay][data-state="closed"] {
+  animation-duration: 220ms;
+  animation-fill-mode: forwards;
+}
+
 /* A sheet is laid down: it settles into place with no bounce. */
 @keyframes gleam-paper-settle {
   from {
