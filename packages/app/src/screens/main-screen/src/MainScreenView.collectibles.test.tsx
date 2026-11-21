@@ -124,12 +124,16 @@ describe("Collectibles tab", () => {
     await screen.findByRole("button", { name: "Frog #1" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(await screen.findByRole("button", { name: "Frog #2" })).toBeTruthy();
-    const hero = screen.getByRole("button", { name: "Frog #2" });
-    fireEvent.pointerDown(hero, { clientX: 200 });
-    fireEvent.pointerUp(hero, { clientX: 100 });
+    // jsdom lays nothing out, so the stage is given a width and scrolled by hand: each piece is 300px plus the 16px gap.
+    const stage = screen.getByTestId("collectibles-stage");
+    Object.defineProperty(stage, "clientWidth", { value: 300, configurable: true });
+    fireEvent.pointerDown(stage);
+    stage.scrollLeft = 2 * 316;
+    fireEvent.scroll(stage);
     expect(await screen.findByRole("button", { name: "A Document" })).toBeTruthy();
-    fireEvent.pointerDown(screen.getByRole("button", { name: "A Document" }), { clientX: 100 });
-    fireEvent.pointerUp(screen.getByRole("button", { name: "A Document" }), { clientX: 200 });
+    expect(screen.queryByRole("button", { name: "Frog #2" })).toBeNull();
+    stage.scrollLeft = 316 + 40;
+    fireEvent.scroll(stage);
     expect(await screen.findByRole("button", { name: "Frog #2" })).toBeTruthy();
   });
 

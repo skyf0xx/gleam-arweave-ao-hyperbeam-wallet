@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { File, FileText, Globe, Music, type LucideIcon } from "lucide-react";
 import type { CollectibleKind } from "@gleam/core";
 import { cn } from "../../primitives/cn";
@@ -109,6 +109,15 @@ export function CollectibleThumbnail({
     fade && !load.loaded && "opacity-0",
   );
   const loop = play && !prefersReducedMotion();
+  const video = useRef<HTMLVideoElement>(null);
+
+  // `autoPlay` only counts at load, so a gallery neighbour that becomes the piece in view starts here.
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    if (loop) void element.play?.()?.catch?.(() => {});
+    else element.pause?.();
+  }, [loop]);
 
   if (nameLabel !== undefined) {
     return (
@@ -140,6 +149,7 @@ export function CollectibleThumbnail({
       {mediaUrl !== undefined && !failed ? (
         showMedia && imageUrl === undefined ? (
           <video
+            ref={video}
             key={load.tries}
             src={src}
             aria-label={decorative ? undefined : name}

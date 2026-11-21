@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { collectibleKind, type Collectible, type CollectibleKind } from "@gleam/core";
 import { CollectibleThumbnail, EmptyState } from "@gleam/ui/src/components/wallet/index.ts";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
@@ -10,7 +10,8 @@ export interface CollectiblesGalleryProps {
   onOpen: (collectible: Collectible) => void;
 }
 
-const SWIPE_PX = 40;
+/** The gap between large pieces, matching `gap-4` on the stage. */
+const STAGE_GAP_PX = 16;
 
 type Translate = ReturnType<typeof useT>;
 
@@ -69,26 +70,71 @@ const CHEVRON_CLASS =
  * A strip of thumbnails over one large piece with its name, in
  * `sortForGallery` order. Tapping the large piece opens its detail
  * screen. The arrows show only where a pointer can hover; on touch the
- * large piece swipes.
+ * large pieces sit side by side in a snap scroller, so a swipe follows
+ * the finger and settles on the next piece with the browser's own
+ * momentum. Only the piece in view and its neighbours load their media.
  */
 export function CollectiblesGallery({ items, loading, onOpen }: CollectiblesGalleryProps) {
   const t = useT();
   const [shownId, setShownId] = useState(lastShownId);
   const strip = useRef<HTMLDivElement>(null);
-  const swipeFrom = useRef<number | null>(null);
-  const swiped = useRef(false);
+  const stage = useRef<HTMLDivElement>(null);
+  const scrollFrame = useRef<number | null>(null);
+  /** Where an arrow, thumbnail or key sent the stage; the pieces it slides past on the way aren't selected. */
+  const heading = useRef<number | null>(null);
 
   const list = useMemo(() => sortForGallery(items ?? []), [items]);
   const found = list.findIndex((item) => item.id === shownId);
   const index = found === -1 ? 0 : found;
   const shown = list[index];
 
-  const show = (next: number) => {
-    const target = list[Math.max(0, Math.min(list.length - 1, next))];
+  const stageStep = () => (stage.current ? stage.current.clientWidth + STAGE_GAP_PX : 0);
+
+  const select = (next: number) => {
+    const target = list[next];
     if (!target) return;
     lastShownId = target.id;
     setShownId(target.id);
   };
+
+  /** Arrows, thumbnails and keys move the stage; the scroll then selects the piece. A long jump cuts rather than sliding past every piece between. */
+  const show = (next: number) => {
+    const clamped = Math.max(0, Math.min(list.length - 1, next));
+    if (!list[clamped]) return;
+    select(clamped);
+    heading.current = clamped;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    stage.current?.scrollTo?.({
+      left: clamped * stageStep(),
+      behavior: Math.abs(clamped - index) === 1 && !reduced ? "smooth" : "auto",
+    });
+  };
+
+  const onStageScroll = () => {
+    if (scrollFrame.current !== null) return;
+    scrollFrame.current = requestAnimationFrame(() => {
+      scrollFrame.current = null;
+      const step = stageStep();
+      if (!stage.current || step <= 0) return;
+      const next = Math.max(0, Math.min(list.length - 1, Math.round(stage.current.scrollLeft / step)));
+      if (heading.current !== null) {
+        if (next === heading.current) heading.current = null;
+        return;
+      }
+      if (next !== index) select(next);
+    });
+  };
+
+  useEffect(() => () => {
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+  }, []);
+
+  // Opens on the remembered piece, and stays on it when the list reloads.
+  useLayoutEffect(() => {
+    if (stage.current) stage.current.scrollLeft = index * stageStep();
+    // Only a new list moves the stage; a scroll already put it where `index` says.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list]);
 
   useEffect(() => {
     const thumb = strip.current?.children[index];
@@ -178,39 +224,45 @@ export function CollectiblesGallery({ items, loading, onOpen }: CollectiblesGall
         </button>
       </div>
 
-      <button
-        type="button"
-        aria-label={shown.name}
-        onPointerDown={(event) => {
-          swipeFrom.current = event.clientX;
-          swiped.current = false;
-        }}
-        onPointerUp={(event) => {
-          const from = swipeFrom.current;
-          swipeFrom.current = null;
-          if (from === null || Math.abs(event.clientX - from) < SWIPE_PX) return;
-          swiped.current = true;
-          show(index + (event.clientX < from ? 1 : -1));
-        }}
-        onClick={() => {
-          if (swiped.current) swiped.current = false;
-          else onOpen(shown);
-        }}
-        className="block w-full touch-pan-y rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+      <div
+        ref={stage}
+        data-testid="collectibles-stage"
+        onScroll={onStageScroll}
+        onPointerDown={() => (heading.current = null)}
+        onWheel={() => (heading.current = null)}
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <CollectibleThumbnail
-          key={shown.id}
-          name={shown.name}
-          imageUrl={shown.imageUrl}
-          videoUrl={shown.videoUrl}
-          play
-          kind={collectibleKind(shown.contentType)}
-          kindLabel={collectibleKindLabel(t, shown.contentType)}
-          nameLabel={shown.permawebName?.label}
-          decorative
-          className="rounded-2xl"
-        />
-      </button>
+        {list.map((item, position) => {
+          const current = position === index;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={item.name}
+              aria-hidden={current ? undefined : true}
+              tabIndex={current ? undefined : -1}
+              onClick={() => onOpen(item)}
+              className="block w-full shrink-0 snap-center snap-always rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+            >
+              {Math.abs(position - index) <= 1 ? (
+                <CollectibleThumbnail
+                  name={item.name}
+                  imageUrl={item.imageUrl}
+                  videoUrl={item.videoUrl}
+                  play={current}
+                  kind={collectibleKind(item.contentType)}
+                  kindLabel={collectibleKindLabel(t, item.contentType)}
+                  nameLabel={item.permawebName?.label}
+                  decorative
+                  className="rounded-2xl"
+                />
+              ) : (
+                <div className="aspect-square w-full rounded-2xl bg-mist" />
+              )}
+            </button>
+          );
+        })}
+      </div>
       <p className="truncate text-body font-medium text-foreground">{shown.name}</p>
     </div>
   );
