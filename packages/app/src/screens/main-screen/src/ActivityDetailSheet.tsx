@@ -100,17 +100,20 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
       <div className="gleam-paper-glass-down flex flex-col gap-6 paper:-mx-6 paper:px-6 paper:pb-8 paper:pt-5 phone:paper:-mx-5 phone:paper:px-5">
         <div className="flex flex-col gap-2">
           {isUpload ? null : (
-            <p className="text-label font-semibold text-muted">
-              {entry.type === "send" ? t("send.to") : t("send.from")}
-              {knownName !== undefined ? <span className="font-normal text-foreground"> {knownName}</span> : null}
-            </p>
+            // Actions on the address sit on the right, in line with its copy button.
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate text-label font-semibold text-muted">
+                {entry.type === "send" ? t("send.to") : t("send.from")}
+                {knownName !== undefined ? <span className="font-normal text-foreground"> {knownName}</span> : null}
+              </p>
+              {knownName === undefined && !naming ? (
+                <button type="button" onClick={() => setNaming(true)} className="shrink-0 text-caption text-muted underline-offset-2 hover:underline phone:hit-target">
+                  {t("mainScreen.saveAddress")}
+                </button>
+              ) : null}
+            </div>
           )}
           <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} onGlass />
-          {knownName === undefined && !naming && !isUpload ? (
-            <button type="button" onClick={() => setNaming(true)} className="self-start text-caption text-muted underline-offset-2 hover:underline phone:min-h-11">
-              {t("mainScreen.saveAddress")}
-            </button>
-          ) : null}
         </div>
 
         {naming ? (
