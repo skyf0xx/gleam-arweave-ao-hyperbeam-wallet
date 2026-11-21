@@ -144,7 +144,7 @@ export function CollectibleThumbnail({
     <div
       data-testid="collectible-tile"
       data-loading={pending || undefined}
-      className={cn("relative aspect-square w-full overflow-hidden rounded-lg bg-mist", pending && "gleam-cached-pulse", className)}
+      className={cn("relative aspect-square w-full overflow-hidden rounded-lg bg-mist", pending && "gleam-shimmer", className)}
     >
       {mediaUrl !== undefined && !failed ? (
         showMedia && imageUrl === undefined ? (

@@ -303,8 +303,10 @@ and loops that ask for attention are not reasons.
   over mid-flight.
 - **One at a time.** Motions run in sequence, not on top of each other.
 - **Only `transform` and `opacity`** animate.
-- **Loops are status only** and stop when the wait ends. Loading has one
-  look: the sweep.
+- **Loops are status only** and stop when the wait ends. Loading data
+  has one look, the sweep (`gleam-shimmer` on a shape, `gleam-loading-sweep`
+  on a beam). Only an action the person started, in its button, spins.
+  Nothing pulses.
 - **Approval and review stay still.** Nothing moves where a person checks
   what they are about to sign. Amounts and addresses never roll, count or
   slide in.

@@ -841,32 +841,6 @@ select,
  */
 
 /*
- * Something in flight that isn't settled yet (a pending transfer's note, a
- * collectible's image) breathes between 0.7 and full opacity. Every pulsing
- * element shares one duration and starts on mount, so they stay in phase.
- */
-@keyframes gleam-cached-pulse {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.gleam-cached-pulse {
-  animation: gleam-cached-pulse 1.6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gleam-cached-pulse {
-    animation: none;
-    opacity: 0.7;
-  }
-}
-
-/*
  * The top loading bar: a soft window of light travelling along a full-width
  * beam, so each colour sits where it does on the home beam and the theme's
  * own beam set (light, dark, paper) carries over. Reduced motion shows the

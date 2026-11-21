@@ -158,7 +158,7 @@ describe("Collectibles tab", () => {
     for (const img of tileImages()) fireEvent.error(img);
     await waitFor(() => expect(tileImages()).toHaveLength(0));
     expect(screen.queryByTestId("collectible-placeholder")).toBeNull();
-    for (const tile of screen.getAllByTestId("collectible-tile")) expect(tile.className).toContain("gleam-cached-pulse");
+    for (const tile of screen.getAllByTestId("collectible-tile")) expect(tile.className).toContain("gleam-shimmer");
   });
 });
 

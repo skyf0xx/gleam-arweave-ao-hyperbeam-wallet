@@ -169,7 +169,7 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
       <div className="flex min-h-full flex-col">
         <ScreenHeader title={t("onboarding.importWallet")} />
         <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0">
-          <Beam className="animate-pulse motion-reduce:animate-none" />
+          <Beam className="gleam-loading-sweep" />
           <div className="flex flex-col gap-1.5" role="status" aria-live="polite">
             <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.phraseDeriving")}</h1>
             <p className="text-body leading-relaxed text-muted">{t("onboarding.phraseDerivingBody")}</p>

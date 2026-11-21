@@ -1530,7 +1530,7 @@ describe("MainScreenView cached-to-live", () => {
 
   it("shows restored rows at full strength, then settles them once fresh data lands", async () => {
     const { resolveBalance } = setup(true);
-    expect(amountCell("1.5").className).not.toContain("gleam-cached-pulse");
+    expect(amountCell("1.5").className).not.toContain("gleam-shimmer");
     expect(amountCell("1.5").className).not.toContain("opacity-70");
     expect(screen.getByRole("status", { name: "Refreshing" })).toBeTruthy();
     await act(async () => {

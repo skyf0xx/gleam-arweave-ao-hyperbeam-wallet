@@ -182,7 +182,7 @@ function withPendingNote(amount: string, note: string | null): ReactNode {
   if (note === null) return amount;
   return (
     <>
-      {amount} · <span className="font-medium text-foreground gleam-cached-pulse">{note}</span>
+      {amount} · <span className="font-medium text-foreground">{note}</span>
     </>
   );
 }
