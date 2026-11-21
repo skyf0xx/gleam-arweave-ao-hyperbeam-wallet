@@ -1140,6 +1140,44 @@ select,
 }
 
 /*
+ * Send and Receive are clear panes lying flat on the header: no frame and
+ * no shadow, only a lit top edge, a faint frost and a sheen that never
+ * fades out, since a pane that darkens toward its foot reads as raised. Unlayered, so it wins over the tile's mist fill utilities.
+ */
+[data-theme="paper"] .gleam-tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-foreground) 2.5%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="paper"] .gleam-tile::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    var(--gleam-frost),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.12) 75%);
+  pointer-events: none;
+}
+
+[data-theme="paper"] .gleam-tile:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-foreground) 2.5%, rgba(255, 255, 255, 0.3));
+}
+
+[data-theme="paper"] .gleam-tile:disabled {
+  background: color-mix(in srgb, var(--color-foreground) 1.5%, transparent);
+  box-shadow: none;
+}
+
+[data-theme="paper"] .gleam-tile:disabled::before {
+  content: none;
+}
+
+/*
  * Read-only glass is set into the page rather than laid on it: it runs
  * the full width, lights only its free edge and fades out where it
  * continues. The free edge curves like the token sheet's, a little less. `-down` hangs from a lit top edge; `-up` rises to a lit
