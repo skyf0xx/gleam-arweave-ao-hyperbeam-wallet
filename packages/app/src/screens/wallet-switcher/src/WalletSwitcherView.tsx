@@ -4,7 +4,7 @@ import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
-import { useT } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
@@ -52,8 +52,14 @@ interface LoadState {
   error: string | null;
 }
 
+/** "Wallet 2" before "Wallet 10", and case and accents don't split names apart. */
+export function sortByName(wallets: WalletSummary[], locale: string): WalletSummary[] {
+  return [...wallets].sort((a, b) => a.name.localeCompare(b.name, locale, { numeric: true, sensitivity: "base" }));
+}
+
 export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalletId = null, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
   const t = useT();
+  const locale = useLocale();
   const [state, setState] = useState<LoadState>({
     wallets: initialWallets ?? [],
     activeWalletId: initialActiveWalletId,
@@ -116,8 +122,8 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
               <SkeletonRow />
             </>
           ) : (
-            // Saved order, never active-first: a list that reshuffles on every switch loses people.
-            state.wallets.map((wallet) => (
+            // By name, never active-first: a list that reshuffles on every switch loses people.
+            sortByName(state.wallets, locale).map((wallet) => (
               <WalletSwitcherRow
                 key={wallet.id}
                 wallet={wallet}
