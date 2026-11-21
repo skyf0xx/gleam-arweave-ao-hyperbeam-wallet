@@ -1119,6 +1119,24 @@ select,
 }
 
 /*
+ * The home header lies in daylight from above: the paper lightens toward
+ * the top and dims a shade toward the sheet, which covers the rest. Light
+ * only reads against a little shade. It rises from the screen's top edge
+ * rather than starting there, so a phone's status-bar strip, which can't
+ * take it, meets it without a seam.
+ */
+[data-theme="paper"] .gleam-paper-daylight {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.7) 80px,
+    rgba(255, 255, 255, 0) 340px,
+    rgba(38, 35, 30, 0.045) 640px
+  );
+  background-repeat: no-repeat;
+}
+
+/*
  * A control with a shape (a card, an outlined button, a chip) turns to
  * glass under the pointer: frost, a sheen and a lit top edge over its own
  * fill. A row without a shape takes `--color-hover`, and its chevron inks

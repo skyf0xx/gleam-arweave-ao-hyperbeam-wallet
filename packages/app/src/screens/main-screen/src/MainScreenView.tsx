@@ -817,10 +817,13 @@ export function MainScreenView({
   );
 
   return (
-    <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
+    <div ref={rootRef} className="gleam-paper-daylight flex min-h-full flex-col overflow-x-clip">
       <LoadingBar active={homeFetching} failed={homeFailed} />
 
-      <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
+      {/* At the top, paper's light shows through the bar; once the list scrolls under it, the bar is solid. */}
+      <div
+        className={`sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0 ${headerCollapsed ? "" : "paper:bg-transparent"}`}
+      >
         {headerCollapsed ? (
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
