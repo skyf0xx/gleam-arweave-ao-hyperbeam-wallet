@@ -255,8 +255,9 @@
   --color-line: #dcdad6;
   --color-foreground: #1a1a19;
   --color-primary-fill: #1a1a19;
-  --color-primary-disabled: #8d8b87;
-  --color-primary-disabled-text: #c7c5c1;
+  /* Disabled is pressed into the paper, with nothing to push: a grey slab reads as burnt. */
+  --color-primary-disabled: var(--color-mist);
+  --color-primary-disabled-text: var(--color-faint);
   --color-muted: #696764;
   --color-faint: #979591;
   /* Pending activity is written in pencil and inks in once it settles. */
