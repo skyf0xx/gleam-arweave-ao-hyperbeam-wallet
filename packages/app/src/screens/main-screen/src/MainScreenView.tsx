@@ -437,6 +437,9 @@ const HEADER_FADE_DURATION_MS = 300;
  */
 const LIST_DOCK_TOP_PX = 64;
 
+/** How far a pull past the docked list's top travels before the header comes back. */
+const LIST_UNDOCK_PULL_PX = 48;
+
 export function MainScreenView({
   runtime,
   wallet,
@@ -673,6 +676,48 @@ export function MainScreenView({
     }, HEADER_FADE_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [headerCollapsed]);
+
+  /**
+   * Docked, the list scrolls on its own, while the header waits on the
+   * window, which sits a whole header's height down behind it. A pull past
+   * the list's top would otherwise scroll that hidden window with nothing
+   * moving on screen (and a trackpad gesture stays latched to the list, so
+   * the first one does nothing at all). So the pull jumps the window home
+   * instead, and the header comes straight back.
+   */
+  useEffect(() => {
+    const section = listSectionRef.current;
+    if (!listDocked || !section) return;
+    let wheelPull = 0;
+    let touchStartY: number | null = null;
+    const undock = () => window.scrollTo({ top: 0, behavior: "auto" });
+    const onWheel = (event: WheelEvent) => {
+      if (section.scrollTop > 0 || event.deltaY >= 0) {
+        wheelPull = 0;
+        return;
+      }
+      wheelPull -= event.deltaY;
+      if (wheelPull >= LIST_UNDOCK_PULL_PX) undock();
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      touchStartY = section.scrollTop <= 0 && event.touches.length === 1 ? event.touches[0]!.clientY : null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (touchStartY === null || section.scrollTop > 0) return;
+      if (event.touches[0]!.clientY - touchStartY >= LIST_UNDOCK_PULL_PX) {
+        touchStartY = null;
+        undock();
+      }
+    };
+    section.addEventListener("wheel", onWheel, { passive: true });
+    section.addEventListener("touchstart", onTouchStart, { passive: true });
+    section.addEventListener("touchmove", onTouchMove, { passive: true });
+    return () => {
+      section.removeEventListener("wheel", onWheel);
+      section.removeEventListener("touchstart", onTouchStart);
+      section.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [listDocked]);
 
   /**
    * Back at the top, the home screen shows Tokens again, with the hidden

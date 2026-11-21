@@ -689,6 +689,36 @@ describe("MainScreenView hidden token rows", () => {
     scrollTo.mockRestore();
   });
 
+  it("brings the header back when the docked list is pulled past its top, by wheel or by touch", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }) });
+
+    await screen.findByText("Gleam Points");
+    setScrollY(200);
+    const section = await waitFor(() => {
+      const docked = document.querySelector<HTMLElement>(".gleam-dock-in");
+      expect(docked).toBeTruthy();
+      return docked!;
+    });
+    const home = () => scrollTo.mock.calls.filter(([options]) => (options as ScrollToOptions)?.top === 0).length;
+
+    fireEvent.wheel(section, { deltaY: -30 });
+    expect(home()).toBe(0);
+    fireEvent.wheel(section, { deltaY: -30 });
+    expect(home()).toBe(1);
+
+    fireEvent.touchStart(section, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(section, { touches: [{ clientY: 130 }] });
+    expect(home()).toBe(1);
+    fireEvent.touchMove(section, { touches: [{ clientY: 160 }] });
+    expect(home()).toBe(2);
+
+    section.scrollTop = 50;
+    fireEvent.wheel(section, { deltaY: -100 });
+    expect(home()).toBe(2);
+    scrollTo.mockRestore();
+  });
+
   it("opens with the list in edit mode when coming back from Add a token", async () => {
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }), initialTokenEditing: true });
