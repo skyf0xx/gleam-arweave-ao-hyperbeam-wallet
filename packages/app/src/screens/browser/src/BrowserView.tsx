@@ -87,6 +87,8 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const host = currentUrl ? siteHost(currentUrl) : null;
   const trail = currentUrl ? pageTrail(currentUrl) : [];
   const saved = origin !== null && sites.saved.includes(origin);
+  // Bumped by a tap that saves, so the star pops then and not when a saved page opens.
+  const [starPop, setStarPop] = useState(0);
   const grant = origin === null ? undefined : grants.find((candidate) => candidate.origin === origin);
 
   const open = (url: string) => {
@@ -242,10 +244,15 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const toggleSaved = () => {
     if (!currentUrl || !origin) return;
     const url = currentUrl;
-    const request = saved
-      ? runtime.send({ type: "removeBrowserSite", payload: { origin } })
-      : savedIcon(origin).then((icon) => runtime.send({ type: "saveBrowserSite", payload: icon ? { url, icon } : { url } }));
-    request.then(() => sites.reload()).catch(() => undefined);
+    const site = origin;
+    if (saved) {
+      sites.setSaved(site, false, () => runtime.send({ type: "removeBrowserSite", payload: { origin: site } }));
+      return;
+    }
+    setStarPop((count) => count + 1);
+    sites.setSaved(site, true, () =>
+      savedIcon(site).then((icon) => runtime.send({ type: "saveBrowserSite", payload: icon ? { url, icon } : { url } })),
+    );
   };
 
   /** The page's icon, if it is still on `site`; saving never waits on or fails for it. */
@@ -256,10 +263,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     );
 
   const removeSaved = (site: string) => {
-    runtime
-      .send({ type: "removeBrowserSite", payload: { origin: site } })
-      .then(() => sites.reload())
-      .catch(() => undefined);
+    sites.setSaved(site, false, () => runtime.send({ type: "removeBrowserSite", payload: { origin: site } }));
   };
 
   const clearRecent = () =>
@@ -386,7 +390,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             onClick={toggleSaved}
             disabled={origin === null}
           >
-            <StarIcon filled={saved} />
+            <StarIcon key={saved ? starPop : "off"} filled={saved} pop={saved && starPop > 0} />
           </IconButton>
           {grant && origin ? (
             <button
@@ -451,9 +455,9 @@ function ReloadIcon() {
   );
 }
 
-function StarIcon({ filled }: { filled: boolean }) {
+function StarIcon({ filled, pop }: { filled: boolean; pop: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden="true" className={pop ? "gleam-star-pop" : undefined}>
       <path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z" {...stroke} />
     </svg>
   );
