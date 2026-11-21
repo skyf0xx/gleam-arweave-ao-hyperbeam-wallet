@@ -87,9 +87,10 @@ export function TokenHeaderGlyph({
   logoUrl: string | undefined;
 }) {
   const ticker = token === null ? "AR" : displayTicker(token.ticker);
+  // The logo stands on the header bare; the plate behind it is for rows.
   return (
     <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center phone:h-11 phone:w-11">
-      <TokenGlyph label={token === null ? "AR" : ticker.slice(0, 2).toUpperCase()} tone={token === null ? 1 : 2} logoUrl={logoUrl} className="h-8 w-8 text-caption" />
+      <TokenGlyph label={token === null ? "AR" : ticker.slice(0, 2).toUpperCase()} tone={token === null ? 1 : 2} logoUrl={logoUrl} className="h-8 w-8 bg-transparent text-caption layered:p-0" />
     </span>
   );
 }
