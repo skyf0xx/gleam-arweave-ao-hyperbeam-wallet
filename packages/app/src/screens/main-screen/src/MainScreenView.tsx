@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { explorerUrlFor, isWatchWalletMethod, type ActivityEntry, type Collectible, type CollectibleRef, type DisplayCurrency, type PendingAmounts, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import {
@@ -437,6 +437,9 @@ const HEADER_FADE_DURATION_MS = 300;
  */
 const LIST_DOCK_TOP_PX = 64;
 
+/** The undock slide: a little quicker than the dock, since leaving is faster than arriving. */
+const LIST_UNDOCK_DURATION_MS = 200;
+
 /** How far a pull past the docked list's top travels before the header comes back. */
 const LIST_UNDOCK_PULL_PX = 48;
 
@@ -676,6 +679,26 @@ export function MainScreenView({
     }, HEADER_FADE_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [headerCollapsed]);
+
+  /**
+   * Undocking drops the section back into flow, below the header. It starts
+   * where it was pinned and slides down to that place, uncovering the
+   * header as it fades back in, rather than jumping there.
+   */
+  const wasDockedRef = useRef(false);
+  useLayoutEffect(() => {
+    const was = wasDockedRef.current;
+    wasDockedRef.current = listDocked;
+    const section = listSectionRef.current;
+    if (!was || listDocked || !section) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const from = LIST_DOCK_TOP_PX - section.getBoundingClientRect().top;
+    if (from >= 0) return;
+    section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
+      duration: LIST_UNDOCK_DURATION_MS,
+      easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+    });
+  }, [listDocked]);
 
   /**
    * Docked, the list scrolls on its own, while the header waits on the
