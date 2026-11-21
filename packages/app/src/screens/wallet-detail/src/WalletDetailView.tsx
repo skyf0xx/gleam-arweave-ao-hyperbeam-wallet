@@ -246,7 +246,7 @@ export function WalletDetailView({
             type="button"
             onClick={() => setStep({ kind: "export-password", submitting: false })}
             aria-describedby="keyfile-backup-status"
-            className="flex w-full items-center gap-2.5 rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05]"
+            className="flex w-full items-center gap-2.5 gleam-hover-glass rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05] paper:hover:bg-foreground/[0.03]"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-label font-semibold text-foreground">{t("walletDetail.backUpKeyfile")}</span>
@@ -283,7 +283,7 @@ export function WalletDetailView({
 
 function ChevronIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="flex-shrink-0 text-faint">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
       <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

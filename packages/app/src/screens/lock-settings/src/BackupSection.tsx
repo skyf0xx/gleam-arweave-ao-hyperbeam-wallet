@@ -43,7 +43,7 @@ export function BackupSection({ runtime, provider, onOpen }: { runtime: RuntimeP
               {current ? `${t("backup.lastBackup")} · ${summary}` : summary}
             </span>
           </span>
-          <span aria-hidden="true" className="flex-shrink-0 text-faint">
+          <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>

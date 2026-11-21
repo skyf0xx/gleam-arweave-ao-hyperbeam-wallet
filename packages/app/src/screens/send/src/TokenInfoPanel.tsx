@@ -5,9 +5,7 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { displayTicker } from "../../main-screen/src/formatWinston";
 import { useT } from "../../../i18n";
 import { useCopy } from "../../points/src/useCopy";
-
-/** AR is native and has no process page, so it links to the network's transactions. */
-const AR_EXPLORER_URL = "https://lunar.arweave.net/#/transactions/";
+import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 /**
  * The send screen's Info tab. A detail the token doesn't publish is left
@@ -15,21 +13,15 @@ const AR_EXPLORER_URL = "https://lunar.arweave.net/#/transactions/";
  */
 export function TokenInfoPanel({
   token,
-  balanceDisplay,
-  balanceValue,
   priceDisplay,
   chart,
 }: {
   token: TokenBalance | null;
-  balanceDisplay: string | undefined;
-  /** The balance in the display currency, already formatted. */
-  balanceValue: string | undefined;
   priceDisplay: string | undefined;
   /** The price chart, or nothing for a token without a price history. */
   chart?: ReactNode;
 }) {
   const t = useT();
-  const ticker = token === null ? "AR" : displayTicker(token.ticker);
   const denomination = token === null ? 12 : token.denomination;
 
   return (
@@ -37,29 +29,19 @@ export function TokenInfoPanel({
       {chart}
 
       <dl className="flex flex-col gap-3">
-        {balanceDisplay !== undefined ? (
-          <InfoRow label={t("send.yourBalance")}>
-            {balanceDisplay} {ticker}
-            {balanceValue !== undefined ? <span className="ml-1.5 font-normal text-muted">≈ {balanceValue}</span> : null}
-          </InfoRow>
-        ) : null}
-        {priceDisplay !== undefined ? <InfoRow label={t("send.price")}>{priceDisplay}</InfoRow> : null}
+        {/* The chart's figure is the price; the row stands in for a token without one. */}
+        {priceDisplay !== undefined && !chart ? <InfoRow label={t("send.price")}>{priceDisplay}</InfoRow> : null}
         <InfoRow label={t("send.decimals")}>{denomination}</InfoRow>
         {token !== null ? (
           <InfoRow label={t("send.process")}>
-            <ProcessId processId={token.processId} />
+            {/* On a phone the two 44px tap areas sit side by side rather than overlapping. */}
+            <span className="flex items-center justify-end gap-0.5 phone:gap-6">
+              <ProcessId processId={token.processId} />
+              <ExplorerLink processId={token.processId} />
+            </span>
           </InfoRow>
         ) : null}
       </dl>
-
-      <a
-        href={token === null ? AR_EXPLORER_URL : explorerUrlFor(token.processId)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="self-start text-label font-semibold text-foreground hover:underline"
-      >
-        {t("send.viewOnExplorer")}
-      </a>
     </div>
   );
 }
@@ -103,18 +85,42 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** The id reads as plain text; copying and the explorer each get their own icon, so neither is a guess. */
 function ProcessId({ processId }: { processId: string }) {
   const t = useT();
   const { copied, copy } = useCopy(processId);
   return (
-    <button
-      type="button"
-      onClick={copy}
-      title={processId}
-      aria-label={copied ? t("send.processIdCopied") : t("send.copyProcessId")}
-      className="rounded px-1 font-mono text-caption font-medium text-foreground hover:bg-hover"
+    <>
+      <span title={processId} className="mr-1 font-mono text-caption font-medium text-foreground">
+        {truncateAddress(processId, 6)}
+      </span>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={copied ? t("send.processIdCopied") : t("send.copyProcessId")}
+        title={t("send.copyProcessId")}
+        className="rounded p-1 text-muted hover:bg-hover hover:text-foreground phone:hit-target"
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+      </button>
+    </>
+  );
+}
+
+function ExplorerLink({ processId }: { processId: string }) {
+  const t = useT();
+  return (
+    <a
+      href={explorerUrlFor(processId)}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={t("send.viewOnExplorer")}
+      title={t("send.viewOnExplorer")}
+      className="rounded p-1 text-muted hover:bg-hover hover:text-foreground phone:hit-target"
     >
-      {copied ? t("send.copied") : truncateAddress(processId, 6)}
-    </button>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </a>
   );
 }

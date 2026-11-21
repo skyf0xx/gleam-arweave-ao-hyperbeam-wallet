@@ -656,11 +656,6 @@ function ComposeStep({
     Number.isFinite(amountNumber)
       ? formatCurrencyValue(amountNumber * price, currency)
       : undefined;
-  const balanceNumber = rawMaxAtomic === undefined ? Number.NaN : Number(formatAtomicAsDisplay(rawMaxAtomic, denomination, denomination));
-  const balanceValue =
-    price !== undefined && currency !== undefined && currency !== ticker && balanceDisplay !== undefined && Number.isFinite(balanceNumber)
-      ? formatCurrencyValue(balanceNumber * price, currency)
-      : undefined;
   const feeAtomic = feeQuote.data?.fee ?? null;
   const feeFiat = feeFiatText(feeAtomic, {
     currency,
@@ -679,8 +674,6 @@ function ComposeStep({
         <div className="px-6 py-5 phone:px-5">
           <TokenInfoPanel
             token={token}
-            balanceDisplay={balanceDisplay}
-            balanceValue={balanceValue}
             priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
             chart={
               currency !== undefined && currency !== ticker && hasPriceHistory(token?.processId ?? null) ? (
@@ -778,7 +771,7 @@ function ComposeStep({
                 type="button"
                 onClick={onOpenTokenPicker}
                 aria-haspopup="dialog"
-                className="flex flex-shrink-0 items-center gap-1.5 rounded-[7px] border border-line bg-mist py-1.5 pl-1.5 pr-2.5 text-label font-bold text-foreground hover:bg-line phone:hit-target"
+                className="gleam-hover-glass flex flex-shrink-0 items-center gap-1.5 rounded-[7px] border border-line bg-mist py-1.5 pl-1.5 pr-2.5 text-label font-bold text-foreground hover:bg-line paper:hover:bg-mist phone:hit-target"
               >
                 <TokenGlyph
                   label={ticker.slice(0, 2).toUpperCase()}
@@ -1384,10 +1377,10 @@ function TokenPickerStep({
 function SkeletonPickerRow() {
   return (
     <div className="flex w-full items-center gap-2.5 px-3.5 py-3 phone:px-0">
-      <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-full bg-mist" aria-hidden="true" />
+      <div className="h-8 w-8 flex-shrink-0 gleam-shimmer rounded-full" aria-hidden="true" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="h-3 w-20 animate-pulse rounded bg-mist" />
-        <div className="h-2.5 w-10 animate-pulse rounded bg-mist" />
+        <div className="h-3 w-20 gleam-shimmer rounded" />
+        <div className="h-2.5 w-10 gleam-shimmer rounded" />
       </div>
     </div>
   );

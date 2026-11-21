@@ -248,15 +248,16 @@
   --color-background: #f1f1ee;
   --color-surface: #fafaf9;
   --color-mist: #e5e3e0;
-  /* Paper's mist is a pressed tile, a step darker; as a hover it reads as a
-     scorch on the sheet and swallows the token tiles. A thin ink wash
-     instead, over whatever sheet is under it. */
-  --color-hover: color-mix(in srgb, var(--color-foreground) 4%, transparent);
+  /* A hover catches the light: any darkening, mist or ink, reads as a scorch
+     on paper. The white sheet, where white can't show, takes a faint warm
+     ink instead (below). */
+  --color-hover: rgba(255, 255, 255, 0.5);
   --color-line: #dcdad6;
   --color-foreground: #1a1a19;
   --color-primary-fill: #1a1a19;
-  --color-primary-disabled: #8d8b87;
-  --color-primary-disabled-text: #c7c5c1;
+  /* Disabled is pressed into the paper, with nothing to push: a grey slab reads as burnt. */
+  --color-primary-disabled: var(--color-mist);
+  --color-primary-disabled-text: var(--color-faint);
   --color-muted: #696764;
   --color-faint: #979591;
   /* Pending activity is written in pencil and inks in once it settles. */
@@ -841,32 +842,6 @@ select,
  */
 
 /*
- * Something in flight that isn't settled yet (a pending transfer's note, a
- * collectible's image) breathes between 0.7 and full opacity. Every pulsing
- * element shares one duration and starts on mount, so they stay in phase.
- */
-@keyframes gleam-cached-pulse {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.gleam-cached-pulse {
-  animation: gleam-cached-pulse 1.6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gleam-cached-pulse {
-    animation: none;
-    opacity: 0.7;
-  }
-}
-
-/*
  * The top loading bar: a soft window of light travelling along a full-width
  * beam, so each colour sits where it does on the home beam and the theme's
  * own beam set (light, dark, paper) carries over. Reduced motion shows the
@@ -1139,6 +1114,114 @@ select,
   pointer-events: none;
 }
 
+[data-theme="paper"] :is(.gleam-paper-sheet, .bg-surface) {
+  --color-hover: color-mix(in srgb, #5a4630 3%, transparent);
+}
+
+/*
+ * The home header lies in daylight from above: the paper lightens toward
+ * the top and dims a shade toward the sheet, which covers the rest. Light
+ * only reads against a little shade. It rises from the screen's top edge
+ * rather than starting there, so a phone's status-bar strip, which can't
+ * take it, meets it without a seam.
+ */
+[data-theme="paper"] .gleam-paper-daylight {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.7) 80px,
+    rgba(255, 255, 255, 0) 340px,
+    rgba(38, 35, 30, 0.045) 640px
+  ),
+  /* The desk's grain: coarser and a touch darker than the sheet's, so the sheet reads as lying on it. */
+  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.14  0 0 0 0 0.11  0 0 0 0.1 0'/></filter><rect width='100%' height='100%' filter='url(%23d)'/></svg>");
+  background-repeat: no-repeat, repeat;
+}
+
+/*
+ * A control with a shape (a card, an outlined button, a chip) turns to
+ * glass under the pointer: frost, a sheen and a lit top edge over its own
+ * fill. A row without a shape takes `--color-hover`, and its chevron inks
+ * in. In a layer so a position utility on the control still wins. Send and
+ * Receive are glass already, with their own pane in `::before`.
+ */
+@layer components {
+  [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile) {
+    position: relative;
+    isolation: isolate;
+  }
+
+  [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile)::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    background:
+      var(--gleam-frost),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18) 75%);
+    transition: opacity 150ms;
+    pointer-events: none;
+  }
+
+  @media (hover: hover) {
+    [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile):hover:not(:disabled) {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile):hover:not(:disabled)::before {
+      opacity: 1;
+    }
+
+    [data-theme="paper"] :is(button, a, label):hover .gleam-chevron {
+      color: var(--color-foreground);
+    }
+  }
+
+  [data-theme="paper"] .gleam-chevron {
+    transition: color 150ms;
+  }
+}
+
+/*
+ * Send and Receive are clear panes lying flat on the header: no frame and
+ * no shadow, only a lit top edge, a faint frost and a sheen that never
+ * fades out, since a pane that darkens toward its foot reads as raised. Unlayered, so it wins over the tile's mist fill utilities.
+ */
+[data-theme="paper"] .gleam-tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-foreground) 2.5%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="paper"] .gleam-tile::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    var(--gleam-frost),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.12) 75%);
+  pointer-events: none;
+}
+
+[data-theme="paper"] .gleam-tile:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-foreground) 2.5%, rgba(255, 255, 255, 0.3));
+}
+
+[data-theme="paper"] .gleam-tile:disabled {
+  background: color-mix(in srgb, var(--color-foreground) 1.5%, transparent);
+  box-shadow: none;
+}
+
+[data-theme="paper"] .gleam-tile:disabled::before {
+  content: none;
+}
+
 /*
  * Read-only glass is set into the page rather than laid on it: it runs
  * the full width, lights only its free edge and fades out where it
@@ -1210,6 +1293,22 @@ select,
  */
 [data-theme="paper"] .gleam-paper-grain {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.14  0 0 0 0 0.12  0 0 0 0.07 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
+}
+
+/*
+ * A bottom sheet (vaul) rises in 300ms and drops away in 220ms; vaul's own
+ * 500ms both ways lingers. `forwards` holds it off screen until Radix
+ * unmounts it on `animationend`. A drag keeps vaul's own release timing.
+ */
+[data-vaul-drawer][data-state="open"],
+[data-vaul-overlay][data-state="open"] {
+  animation-duration: 300ms;
+}
+
+[data-vaul-drawer][data-state="closed"],
+[data-vaul-overlay][data-state="closed"] {
+  animation-duration: 220ms;
+  animation-fill-mode: forwards;
 }
 
 /* A sheet is laid down: it settles into place with no bounce. */

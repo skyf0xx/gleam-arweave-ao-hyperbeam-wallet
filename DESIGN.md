@@ -270,7 +270,48 @@ Each level is a token in `packages/ui/src/tokens/theme.css` (`text-caption` … 
 
 ## Motion
 
-Motion reinforces the brand's sense of responsiveness and care. Every animation respects `prefers-reduced-motion`.
+Motion has to tell the person something the finished screen can't. Not
+animating is the default, and a good one.
+
+### Why something moves
+
+1. **Direct manipulation.** What is under the finger follows the finger.
+   Missing, the app feels broken rather than plain.
+2. **Continuity.** Something goes from one place to another and the eye
+   has to follow it: a sheet rising, the token list docking.
+3. **Status over time.** Something the person is waiting on is happening:
+   a load, a pending send.
+4. **An earned moment.** Rare and deliberate: the Founding beam drawing
+   in, a Points unlock.
+
+Polish, a premium feel, entrance animations, staggered lists, hover lifts
+and loops that ask for attention are not reasons.
+
+### Rules
+
+- **Still by default.** A tab switch, a toggle or a changed value just
+  changes.
+- **Follow the finger 1:1.** On release, carry on from the release
+  velocity, not a fixed duration. At an end, resist (rubber-band) rather
+  than stop dead.
+- **No bounce, no overshoot.** Paper settles. Ease out
+  (`cubic-bezier(0.2, 0.7, 0.2, 1)`).
+- **Short.** About 150ms for colour and opacity, 200–300ms for a move,
+  never over 400ms but for an earned moment. Leaving is faster than
+  arriving.
+- **Interruptible.** Motion never blocks a tap, and a new gesture takes
+  over mid-flight.
+- **One at a time.** Motions run in sequence, not on top of each other.
+- **Only `transform` and `opacity`** animate.
+- **Loops are status only** and stop when the wait ends. Loading data
+  has one look, the sweep (`gleam-shimmer` on a shape, `gleam-loading-sweep`
+  on a beam). Only an action the person started, in its button, spins.
+  Nothing pulses.
+- **Approval and review stay still.** Nothing moves where a person checks
+  what they are about to sign. Amounts and addresses never roll, count or
+  slide in.
+- **Reduced motion** turns every move across the screen into a fade or
+  nothing. What the finger drags still follows it.
 
 ### Key Animations
 

@@ -27,7 +27,7 @@ describe("TokenRow cached", () => {
     const { rerender } = render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached />);
     for (const text of ["1.5", "$3.00"]) {
       expect(screen.getByText(text).className).not.toContain("opacity-70");
-      expect(screen.getByText(text).className).not.toContain("gleam-cached-pulse");
+      expect(screen.getByText(text).className).not.toContain("gleam-shimmer");
     }
     rerender(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" loading cached />);
     expect(screen.getByText("1.5").className).toContain("opacity-50");

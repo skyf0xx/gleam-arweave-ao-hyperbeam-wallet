@@ -344,6 +344,7 @@ describe("SendView compose summary", () => {
     fireEvent.click(screen.getByRole("button", { name: "Token details" }));
 
     expect(screen.getByText("Decimals")).toBeTruthy();
+    expect(screen.queryByText("Your balance")).toBeNull();
     expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe(
       `https://lunar.arweave.net/#/explorer/${AO_TOKEN.processId}`,
     );
@@ -363,14 +364,14 @@ describe("SendView compose summary", () => {
     expect((screen.getByRole("button", { name: "Review" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("shows AR's info without a process, linking to the network's transactions", () => {
+  it("shows AR's info without a process or an explorer link", () => {
     renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     fireEvent.click(screen.getByRole("button", { name: "Token details" }));
 
     expect(screen.getByText("Arweave")).toBeTruthy();
     expect(screen.queryByText("Process")).toBeNull();
-    expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe("https://lunar.arweave.net/#/transactions/");
+    expect(screen.queryByRole("link", { name: /View on explorer/ })).toBeNull();
   });
 
   it("draws AR's and AO's logos on the details screen, though their balance rows carry none", () => {

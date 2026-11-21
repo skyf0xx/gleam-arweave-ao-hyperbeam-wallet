@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { explorerUrlFor, isWatchWalletMethod, type ActivityEntry, type Collectible, type CollectibleRef, type DisplayCurrency, type PendingAmounts, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import {
@@ -182,7 +182,7 @@ function withPendingNote(amount: string, note: string | null): ReactNode {
   if (note === null) return amount;
   return (
     <>
-      {amount} · <span className="font-medium text-foreground gleam-cached-pulse">{note}</span>
+      {amount} · <span className="font-medium text-foreground">{note}</span>
     </>
   );
 }
@@ -437,6 +437,12 @@ const HEADER_FADE_DURATION_MS = 300;
  */
 const LIST_DOCK_TOP_PX = 64;
 
+/** The undock slide: a little quicker than the dock, since leaving is faster than arriving. */
+const LIST_UNDOCK_DURATION_MS = 200;
+
+/** How far a pull past the docked list's top travels before the header comes back. */
+const LIST_UNDOCK_PULL_PX = 48;
+
 export function MainScreenView({
   runtime,
   wallet,
@@ -675,6 +681,68 @@ export function MainScreenView({
   }, [headerCollapsed]);
 
   /**
+   * Undocking drops the section back into flow, below the header. It starts
+   * where it was pinned and slides down to that place, uncovering the
+   * header as it fades back in, rather than jumping there.
+   */
+  const wasDockedRef = useRef(false);
+  useLayoutEffect(() => {
+    const was = wasDockedRef.current;
+    wasDockedRef.current = listDocked;
+    const section = listSectionRef.current;
+    if (!was || listDocked || !section) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const from = LIST_DOCK_TOP_PX - section.getBoundingClientRect().top;
+    if (from >= 0) return;
+    section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
+      duration: LIST_UNDOCK_DURATION_MS,
+      easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+    });
+  }, [listDocked]);
+
+  /**
+   * Docked, the list scrolls on its own, while the header waits on the
+   * window, which sits a whole header's height down behind it. A pull past
+   * the list's top would otherwise scroll that hidden window with nothing
+   * moving on screen (and a trackpad gesture stays latched to the list, so
+   * the first one does nothing at all). So the pull jumps the window home
+   * instead, and the header comes straight back.
+   */
+  useEffect(() => {
+    const section = listSectionRef.current;
+    if (!listDocked || !section) return;
+    let wheelPull = 0;
+    let touchStartY: number | null = null;
+    const undock = () => window.scrollTo({ top: 0, behavior: "auto" });
+    const onWheel = (event: WheelEvent) => {
+      if (section.scrollTop > 0 || event.deltaY >= 0) {
+        wheelPull = 0;
+        return;
+      }
+      wheelPull -= event.deltaY;
+      if (wheelPull >= LIST_UNDOCK_PULL_PX) undock();
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      touchStartY = section.scrollTop <= 0 && event.touches.length === 1 ? event.touches[0]!.clientY : null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (touchStartY === null || section.scrollTop > 0) return;
+      if (event.touches[0]!.clientY - touchStartY >= LIST_UNDOCK_PULL_PX) {
+        touchStartY = null;
+        undock();
+      }
+    };
+    section.addEventListener("wheel", onWheel, { passive: true });
+    section.addEventListener("touchstart", onTouchStart, { passive: true });
+    section.addEventListener("touchmove", onTouchMove, { passive: true });
+    return () => {
+      section.removeEventListener("wheel", onWheel);
+      section.removeEventListener("touchstart", onTouchStart);
+      section.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [listDocked]);
+
+  /**
    * Back at the top, the home screen shows Tokens again, with the hidden
    * tokens disclosure collapsed. Only an expand after a collapse counts, so
    * a remount on a tab the caller restored (returning from a detail screen)
@@ -749,10 +817,13 @@ export function MainScreenView({
   );
 
   return (
-    <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
+    <div ref={rootRef} className="gleam-paper-daylight flex min-h-full flex-col overflow-x-clip">
       <LoadingBar active={homeFetching} failed={homeFailed} />
 
-      <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
+      {/* At the top, paper's light shows through the bar; once the list scrolls under it, the bar is solid. */}
+      <div
+        className={`sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0 ${headerCollapsed ? "" : "paper:bg-transparent"}`}
+      >
         {headerCollapsed ? (
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
@@ -1114,7 +1185,7 @@ export function MainScreenView({
                       <span className="text-label font-semibold text-foreground">{t("mainScreen.addToken")}</span>
                       <span className="text-caption text-muted">{t("mainScreen.addTokenHint")}</span>
                     </span>
-                    <span aria-hidden="true" className="flex-shrink-0 text-faint">
+                    <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
                       <ChevronRightIcon />
                     </span>
                   </button>

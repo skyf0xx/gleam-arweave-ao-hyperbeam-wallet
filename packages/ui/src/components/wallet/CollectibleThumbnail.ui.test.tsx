@@ -68,9 +68,9 @@ describe("CollectibleThumbnail", () => {
   it("stops pulsing once the video's first frame loads", () => {
     const { container } = render(<CollectibleThumbnail name="Clip" videoUrl="https://arweave.net/vid" />);
     const tile = screen.getByTestId("collectible-tile");
-    expect(tile.className).toContain("gleam-cached-pulse");
+    expect(tile.className).toContain("gleam-shimmer");
     fireEvent.loadedData(container.querySelector("video")!);
-    expect(tile.className).not.toContain("gleam-cached-pulse");
+    expect(tile.className).not.toContain("gleam-shimmer");
   });
 
   it("labels the plain tile when given a kind", () => {
@@ -101,9 +101,9 @@ describe("CollectibleThumbnail", () => {
   it("pulses until the image loads", () => {
     render(<CollectibleThumbnail name="Frog" imageUrl="https://arweave.net/abc" />);
     const tile = screen.getByTestId("collectible-tile");
-    expect(tile.className).toContain("gleam-cached-pulse");
+    expect(tile.className).toContain("gleam-shimmer");
     fireEvent.load(screen.getByAltText("Frog"));
-    expect(tile.className).not.toContain("gleam-cached-pulse");
+    expect(tile.className).not.toContain("gleam-shimmer");
   });
 
   it("keeps pulsing and retries a failed load before showing the file icon", () => {
@@ -113,13 +113,13 @@ describe("CollectibleThumbnail", () => {
       for (const delay of [1500, 4000, 10_000]) {
         fireEvent.error(screen.getByAltText("Frog"));
         expect(screen.queryByTestId("collectible-placeholder")).toBeNull();
-        expect(screen.getByTestId("collectible-tile").className).toContain("gleam-cached-pulse");
+        expect(screen.getByTestId("collectible-tile").className).toContain("gleam-shimmer");
         act(() => vi.advanceTimersByTime(delay));
       }
       fireEvent.error(screen.getByAltText("Frog"));
       expect(screen.queryByAltText("Frog")).toBeNull();
       expect(screen.getByTestId("collectible-placeholder")).toBeTruthy();
-      expect(screen.getByTestId("collectible-tile").className).not.toContain("gleam-cached-pulse");
+      expect(screen.getByTestId("collectible-tile").className).not.toContain("gleam-shimmer");
     } finally {
       vi.useRealTimers();
     }
@@ -131,7 +131,7 @@ describe("CollectibleThumbnail", () => {
     expect(screen.queryByAltText("Frog")).toBeNull();
     act(() => void window.dispatchEvent(new Event("online")));
     fireEvent.load(screen.getByAltText("Frog"));
-    expect(screen.getByTestId("collectible-tile").className).not.toContain("gleam-cached-pulse");
+    expect(screen.getByTestId("collectible-tile").className).not.toContain("gleam-shimmer");
   });
 });
 

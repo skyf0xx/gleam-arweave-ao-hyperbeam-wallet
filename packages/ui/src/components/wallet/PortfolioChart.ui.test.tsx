@@ -51,7 +51,7 @@ describe("PortfolioChart cached", () => {
   it("renders restored figures at full strength", () => {
     const { container } = render(<PortfolioChart {...BASE} cached />);
     expect(figures(container).className).not.toContain("opacity-70");
-    expect(figures(container).className).not.toContain("gleam-cached-pulse");
+    expect(figures(container).className).not.toContain("gleam-shimmer");
     expect(figures(container).className).not.toContain("gleam-fresh");
   });
 
