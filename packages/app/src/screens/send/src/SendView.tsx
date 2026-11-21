@@ -656,11 +656,6 @@ function ComposeStep({
     Number.isFinite(amountNumber)
       ? formatCurrencyValue(amountNumber * price, currency)
       : undefined;
-  const balanceNumber = rawMaxAtomic === undefined ? Number.NaN : Number(formatAtomicAsDisplay(rawMaxAtomic, denomination, denomination));
-  const balanceValue =
-    price !== undefined && currency !== undefined && currency !== ticker && balanceDisplay !== undefined && Number.isFinite(balanceNumber)
-      ? formatCurrencyValue(balanceNumber * price, currency)
-      : undefined;
   const feeAtomic = feeQuote.data?.fee ?? null;
   const feeFiat = feeFiatText(feeAtomic, {
     currency,
@@ -679,8 +674,6 @@ function ComposeStep({
         <div className="px-6 py-5 phone:px-5">
           <TokenInfoPanel
             token={token}
-            balanceDisplay={balanceDisplay}
-            balanceValue={balanceValue}
             priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
             chart={
               currency !== undefined && currency !== ticker && hasPriceHistory(token?.processId ?? null) ? (
