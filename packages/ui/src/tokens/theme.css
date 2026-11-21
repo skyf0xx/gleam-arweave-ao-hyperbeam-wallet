@@ -1119,26 +1119,6 @@ select,
 }
 
 /*
- * The home header lies in daylight from above: the paper lightens toward
- * the top and dims a shade toward the sheet, which covers the rest. Light
- * only reads against a little shade. It rises from the screen's top edge
- * rather than starting there, so a phone's status-bar strip, which can't
- * take it, meets it without a seam.
- */
-[data-theme="paper"] .gleam-paper-daylight {
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.7) 80px,
-    rgba(255, 255, 255, 0) 340px,
-    rgba(38, 35, 30, 0.045) 640px
-  ),
-  /* The desk's grain: coarser and a touch darker than the sheet's, so the sheet reads as lying on it. */
-  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='d'><feTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.14  0 0 0 0 0.11  0 0 0 0.1 0'/></filter><rect width='100%' height='100%' filter='url(%23d)'/></svg>");
-  background-repeat: no-repeat, repeat;
-}
-
-/*
  * A control with a shape (a card, an outlined button, a chip) turns to
  * glass under the pointer: frost, a sheen and a lit top edge over its own
  * fill. A row without a shape takes `--color-hover`, and its chevron inks
@@ -1182,44 +1162,6 @@ select,
   [data-theme="paper"] .gleam-chevron {
     transition: color 150ms;
   }
-}
-
-/*
- * Send and Receive are clear panes lying flat on the header: no frame and
- * no shadow, only a lit top edge, a faint frost and a sheen that never
- * fades out, since a pane that darkens toward its foot reads as raised. Unlayered, so it wins over the tile's mist fill utilities.
- */
-[data-theme="paper"] .gleam-tile {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--color-foreground) 2.5%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-[data-theme="paper"] .gleam-tile::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    var(--gleam-frost),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.12) 75%);
-  pointer-events: none;
-}
-
-[data-theme="paper"] .gleam-tile:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-foreground) 2.5%, rgba(255, 255, 255, 0.3));
-}
-
-[data-theme="paper"] .gleam-tile:disabled {
-  background: color-mix(in srgb, var(--color-foreground) 1.5%, transparent);
-  box-shadow: none;
-}
-
-[data-theme="paper"] .gleam-tile:disabled::before {
-  content: none;
 }
 
 /*
