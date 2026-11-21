@@ -140,13 +140,12 @@ describe("BrowserView start screen", () => {
     expect(within(dapps).getAllByRole("button").map((row) => row.textContent)).toEqual([
       "ao.arweave.net",
       "bazar.arweave.net",
-      // No bundled icon, so its tile leads with its letter.
-      "Iiwashere.ar.io",
+      "iwashere.ar.io",
       "www.permatell.xyz",
     ]);
-    // ao and bazar are single-colour, so they take the theme's colour as a mask; permatell stays an image.
+    // ao and bazar are single-colour, so they take the theme's colour as a mask; iwashere and permatell stay images.
     expect(dapps.querySelectorAll("[data-mono-icon]")).toHaveLength(2);
-    expect(dapps.querySelectorAll("img")).toHaveLength(1);
+    expect(dapps.querySelectorAll("img")).toHaveLength(2);
     const saved = screen.getByRole("region", { name: "Saved" });
     expect(saved.querySelector("img")?.getAttribute("src")).toBe(PNG);
     // A recent site has no stored icon, so it keeps its letter.

@@ -1,5 +1,6 @@
 import aoIcon from "../icons/ao.svg?url";
 import bazarIcon from "../icons/bazar.svg?url";
+import iwashereIcon from "../icons/iwashere.svg?url";
 import permatellIcon from "../icons/permatell.svg?url";
 
 /**
@@ -9,6 +10,7 @@ import permatellIcon from "../icons/permatell.svg?url";
 export const BUILT_IN_ICONS: Readonly<Record<string, string>> = {
   "https://ao.arweave.net/": aoIcon,
   "https://bazar.arweave.net/": bazarIcon,
+  "https://iwashere.ar.io/": iwashereIcon,
   "https://www.permatell.xyz/": permatellIcon,
 };
 
