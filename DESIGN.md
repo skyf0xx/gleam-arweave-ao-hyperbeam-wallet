@@ -172,12 +172,12 @@ Silica is a light theme of frosted glass under a soft sky. It shares dark's laye
 There are three materials, and each means one thing.
 
 1. **Sky** is the ground. It is a still wash of sky blue and mint behind every wallet screen, strongest at the top right, and gone by the foot of the screen.
-2. **Frost** is what you touch: the token sheet, Send and Receive, the header's round buttons, the token cards. It is translucent white with a lit top edge and a soft, wide shadow (`.gleam-frost`, `.gleam-frost-sheet`). Cards and outlined buttons elsewhere are a thinner frost with a faint ring and no lift (`.gleam-hover-frost`).
+2. **Frost** is what you touch: the token sheet, Send and Receive, the header's round buttons. It is translucent white with a lit top edge and a soft, wide shadow (`.gleam-frost`, `.gleam-frost-sheet`). Cards and outlined buttons elsewhere are a thinner frost with a faint ring and no lift (`.gleam-hover-frost`).
 3. **Lens** marks who: a full address or a wallet a person must recognise. It is clear glass: a faint blue tint, a lit rim and a sheen under the text, with the sky showing through. Frost is white and lifted; a lens is tinted and flat, with no beam on its edge.
 
 Frost rules:
 
-- **What you hold is a card, what happened is a line.** Tokens are frost cards. Activity is a flat list: a card for each row of a long log is heavy.
+- **Lists are flat.** Tokens and activity are rows on the sheet with no card, and a pointer gives a row a 4% slate wash.
 - **Frost never sits on frost of its own kind.** A card sits on the sheet, and the sheet sits on the sky. That is the whole stack.
 - **Blur only where content passes behind**: the header, the sticky tabs and a phone's pinned footer (`.gleam-frost-bar`). The sky is already soft, so elsewhere translucency looks the same as blur and costs nothing.
 - **Solid when asked.** With reduced transparency, or without `backdrop-filter`, frost is solid white and bars are the background colour.
@@ -194,7 +194,7 @@ Before styling something new, ask in order:
 
 1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the wallet a site connects to, the active wallet in the switcher. It goes under a lens.
 2. **Is it a selected setting or view?** It is raised frost, an underline for tabs, or a flat light fill for a chart period.
-3. **Is it something held, or an action on the home screen?** It is frost.
+3. **Is it an action on the home screen?** It is frost.
 
 Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without.
 
