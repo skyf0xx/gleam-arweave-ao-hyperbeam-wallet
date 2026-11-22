@@ -29,6 +29,7 @@ packages/app/src/screens/activity/src/useOtherWallets.ts A screen outside the ke
 packages/app/src/screens/contacts/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/contacts/src/ContactsView.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useTokenPrices.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useUndockPull.ts A home screen gesture; touches no data.
 packages/app/src/screens/backup/index.tsx Route entry; mounts backup/src, which is listed.
 packages/app/src/screens/onboarding/index.tsx Route entry; mounts onboarding/src, which is listed.
 packages/app/src/screens/points/src/JoinNote.tsx A screen outside the key, signing and approval paths.
@@ -172,6 +173,7 @@ packages/app/src/screens/main-screen/src/MainScreenNotice.tsx A screen outside t
 packages/app/src/screens/main-screen/src/useNotice.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/notice.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/usePortfolioHistory.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useTabSwipe.ts A home screen gesture; touches no data.
 packages/app/src/screens/main-screen/src/useNetworkSettings.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/activity/src/useCollectibles.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/activity/src/useSendCollectible.ts Background send call plus local cache cleanup; the transfer is built and checked by the listed background handlers.

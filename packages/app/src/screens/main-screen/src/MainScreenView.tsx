@@ -34,6 +34,8 @@ import { CollectiblesGallery } from "../../collectibles/index.tsx";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
+import { PANEL_GAP_PX, useTabSwipe } from "./useTabSwipe";
+import { useUndockPull } from "./useUndockPull";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useContacts } from "../../activity/src/useContacts";
 import { ActivityDetailSheet, type ActivityDetail } from "./ActivityDetailSheet";
@@ -94,7 +96,9 @@ import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
  * network & peers, dark mode, and so on) — this component doesn't render
  * an inline settings menu or read/write theme preference itself.
  */
-export type MainScreenTab = "tokens" | "collectibles" | "activity";
+const TABS = ["tokens", "collectibles", "activity"] as const;
+
+export type MainScreenTab = (typeof TABS)[number];
 
 /** A section tab: a chip in light, an underlined label in dark so it can't be mistaken for the chart's range chips. */
 function tabClassName(active: boolean): string {
@@ -441,9 +445,6 @@ const LIST_DOCK_TOP_PX = 64;
 /** The undock slide: a little quicker than the dock, since leaving is faster than arriving. */
 const LIST_UNDOCK_DURATION_MS = 200;
 
-/** How far a pull past the docked list's top travels before the header comes back. */
-const LIST_UNDOCK_PULL_PX = 48;
-
 export function MainScreenView({
   runtime,
   wallet,
@@ -513,6 +514,8 @@ export function MainScreenView({
   };
   const collapseRafRef = useRef<number | null>(null);
   const listSectionRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const panelTrackRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
@@ -690,6 +693,12 @@ export function MainScreenView({
    * where it was pinned and slides down to that place, uncovering the
    * header as it fades back in, rather than jumping there.
    */
+  const pulledBy = useUndockPull({
+    docked: listDocked,
+    section: listSectionRef,
+    header: headerRef,
+    onUndock: () => window.scrollTo({ top: 0, behavior: "auto" }),
+  });
   const wasDockedRef = useRef(false);
   useLayoutEffect(() => {
     const was = wasDockedRef.current;
@@ -697,55 +706,13 @@ export function MainScreenView({
     const section = listSectionRef.current;
     if (!was || listDocked || !section) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const from = LIST_DOCK_TOP_PX - section.getBoundingClientRect().top;
+    const from = LIST_DOCK_TOP_PX + pulledBy.current - section.getBoundingClientRect().top;
     if (from >= 0) return;
     section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
       duration: LIST_UNDOCK_DURATION_MS,
       easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
     });
-  }, [listDocked]);
-
-  /**
-   * Docked, the list scrolls on its own, while the header waits on the
-   * window, which sits a whole header's height down behind it. A pull past
-   * the list's top would otherwise scroll that hidden window with nothing
-   * moving on screen (and a trackpad gesture stays latched to the list, so
-   * the first one does nothing at all). So the pull jumps the window home
-   * instead, and the header comes straight back.
-   */
-  useEffect(() => {
-    const section = listSectionRef.current;
-    if (!listDocked || !section) return;
-    let wheelPull = 0;
-    let touchStartY: number | null = null;
-    const undock = () => window.scrollTo({ top: 0, behavior: "auto" });
-    const onWheel = (event: WheelEvent) => {
-      if (section.scrollTop > 0 || event.deltaY >= 0) {
-        wheelPull = 0;
-        return;
-      }
-      wheelPull -= event.deltaY;
-      if (wheelPull >= LIST_UNDOCK_PULL_PX) undock();
-    };
-    const onTouchStart = (event: TouchEvent) => {
-      touchStartY = section.scrollTop <= 0 && event.touches.length === 1 ? event.touches[0]!.clientY : null;
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      if (touchStartY === null || section.scrollTop > 0) return;
-      if (event.touches[0]!.clientY - touchStartY >= LIST_UNDOCK_PULL_PX) {
-        touchStartY = null;
-        undock();
-      }
-    };
-    section.addEventListener("wheel", onWheel, { passive: true });
-    section.addEventListener("touchstart", onTouchStart, { passive: true });
-    section.addEventListener("touchmove", onTouchMove, { passive: true });
-    return () => {
-      section.removeEventListener("wheel", onWheel);
-      section.removeEventListener("touchstart", onTouchStart);
-      section.removeEventListener("touchmove", onTouchMove);
-    };
-  }, [listDocked]);
+  }, [listDocked, pulledBy]);
 
   /**
    * Back at the top, the home screen shows Tokens again, with the hidden
@@ -789,12 +756,31 @@ export function MainScreenView({
     window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
   };
 
-  const selectTab = (tab: MainScreenTab) => {
+  const showTab = (tab: MainScreenTab) => {
     setActiveTab(tab);
     if (tab === "collectibles") setCollectiblesOpened(true);
     onTabChange?.(tab);
+  };
+
+  const selectTab = (tab: MainScreenTab) => {
+    showTab(tab);
     scrollListToDockedTop();
   };
+
+  const peek = useTabSwipe({
+    target: rootRef,
+    track: panelTrackRef,
+    scroller: listSectionRef,
+    active: TABS.indexOf(activeTab),
+    count: TABS.length,
+    docked: listDocked,
+    onPeek: (index) => {
+      if (TABS[index] === "collectibles") setCollectiblesOpened(true);
+    },
+    onSelect: (index) => showTab(TABS[index]!),
+    onOpen: scrollListToDockedTop,
+  });
+  const peekTab = peek ? TABS[peek.index] : undefined;
 
   const toggleHiddenExpanded = () => {
     setHiddenExpanded((prev) => !prev);
@@ -825,7 +811,7 @@ export function MainScreenView({
     <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
       <LoadingBar active={homeFetching} failed={homeFailed} />
 
-      <div className="gleam-frost-bar sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
+      <div ref={headerRef} className="gleam-frost-bar sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
         {headerCollapsed ? (
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
@@ -994,6 +980,7 @@ export function MainScreenView({
       >
         <div
           role="tablist"
+          data-drawer-handle
           aria-label={t("mainScreen.tabsLabel")}
           className="gleam-frost-bar sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-1 phone:-mx-2.5 phone:pb-1 phone:pt-1 layered:gap-5 layered:bg-surface layered:px-3.5 phone:layered:mx-0 phone:layered:px-0"
         >
@@ -1026,307 +1013,325 @@ export function MainScreenView({
           </button>
         </div>
 
-        {activeTab === "tokens" ? (
-          <div className="min-h-60 phone:min-h-0 silica:pt-1.5">
-            {loading && !hasLoadedOnce ? (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
-            ) : (
-              (() => {
-                const rows: ListedTokenRow[] = [
-                  ...defaultTokenRows.map(({ send, ...row }) => ({
-                    key: row.key,
-                    label: row.name,
-                    defaultHidden: false,
-                    node: (
-                      <TokenRow
-                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: tokenLogos ? row.logoUrl : undefined }}
-                        name={row.name}
-                        amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
-                        value={
-                          row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
-                        }
-                        // `amount @ price` would give the hidden holding away.
-                        unitPrice={masked || simpleRows ? undefined : row.unitPrice}
-                        change={simpleRows ? undefined : row.change}
-                        loading={loading}
-                        cached={tokensCached}
-                        onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
-                        className="border-b-0"
-                      />
-                    ),
-                  })),
-                  {
-                    key: "gleam-points",
-                    label: "Gleam Points",
-                    defaultHidden: false,
-                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} showLogo={tokenLogos} className="border-b-0" />,
-                  },
-                  ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
-                    const discovered = token.source === "discovered";
-                    const amountNumber =
-                      token.available === false ? 0 : Number(formatAtomicAsDisplay(token.quantity, token.denomination, token.denomination));
-                    const value = discovered || token.available === false ? undefined : valueFor(tokenPrices, currency, token.processId, amountNumber);
-                    return {
-                      key: token.processId,
-                      label: displayTicker(token.ticker),
-                      processId: token.processId,
-                      // Anyone can send a token, so one the user didn't add starts hidden.
-                      defaultHidden: discovered,
-                      node: (
-                        <TokenRow
-                          glyph={{
-                            label: token.ticker.slice(0, 2).toUpperCase(),
-                            tone: 2,
-                            logoUrl: shownTokenLogo(token, rowVisibility, tokenLogos),
-                          }}
-                          name={displayTicker(token.ticker)}
-                          amount={
-                            token.available === false
-                              ? unavailableBalanceLabel(t)
-                              : withPendingNote(
-                                  masked ? HIDDEN_AMOUNT : formatAtomicCompact(token.quantity, token.denomination),
-                                  pendingNote(t, token.pending, token.denomination, masked),
-                                )
-                          }
-                          value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
-                          unitPrice={masked || simpleRows || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
-                          change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
-                          loading={loading}
-                          cached={tokensCached}
-                          onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
-                          className="border-b-0"
-                        />
-                      ),
-                    };
-                  }),
-                ].sort((a, b) => a.label.localeCompare(b.label, locale, { sensitivity: "base" }));
-                const hiddenRows = rows.filter(isRowHidden);
-                const renderRow = (row: ListedTokenRow) => {
-                  const hidden = isRowHidden(row);
-                  const { processId } = row;
-                  if (processId !== undefined && confirmingIgnore === processId) {
-                    return (
-                      <div key={row.key} className="flex flex-col gap-2 px-3.5 py-3 phone:px-0">
-                        <p className="text-caption leading-relaxed text-muted">
-                          {t("mainScreen.ignoreConfirm", { label: row.label })}
-                        </p>
-                        {ignoreFailed ? (
-                          <p role="alert" className="text-caption text-warning">
-                            {t("mainScreen.ignoreFailed")}
-                          </p>
-                        ) : null}
-                        <div className="flex justify-end gap-3 text-caption font-semibold">
-                          <button
-                            type="button"
-                            onClick={() => setConfirmingIgnore(null)}
-                            className="text-muted hover:text-foreground"
-                          >
-                            {t("mainScreen.cancel")}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={ignoring}
-                            onClick={() => void ignoreToken(processId)}
-                            className="text-warning disabled:opacity-60"
-                          >
-                            {ignoring ? t("mainScreen.ignoring") : t("mainScreen.ignore")}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-                  const actionClassName =
-                    "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
-                  return (
-                    <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative silica:mb-2">
-                      {row.node}
-                      {hiddenExpanded ? (
-                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5">
-                          {hidden && processId !== undefined ? (
-                            <button
-                              type="button"
-                              aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
-                              onClick={() => {
-                                setIgnoreFailed(false);
-                                setConfirmingIgnore(processId);
-                              }}
-                              className={actionClassName}
-                            >
-                              {t("mainScreen.ignore")}
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            aria-label={t(hidden ? "mainScreen.showLabel" : "mainScreen.hideLabel", { label: row.label })}
-                            onClick={() => toggleRowHidden(row)}
-                            className={actionClassName}
-                          >
-                            {hidden ? t("mainScreen.show") : t("mainScreen.hide")}
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                };
-                const addTokenRow = hiddenExpanded ? (
-                  <button
-                    type="button"
-                    onClick={onAddToken}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-left hover:bg-hover phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:gap-3 phone:px-3 phone:py-3.5 phone:active:bg-hover"
-                  >
-                    <span aria-hidden="true" className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-line bg-background text-foreground">
-                      <PlusIcon />
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-px">
-                      <span className="text-label font-semibold text-foreground">{t("mainScreen.addToken")}</span>
-                      <span className="text-caption text-muted">{t("mainScreen.addTokenHint")}</span>
-                    </span>
-                    <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
-                      <ChevronRightIcon />
-                    </span>
-                  </button>
-                ) : null;
-                return (
-                  <>
-                    {rows.filter((row) => !isRowHidden(row)).map(renderRow)}
-                    {hiddenRows.length > 0 ? (
-                      <>
-                        <button
-                          type="button"
-                          aria-expanded={hiddenExpanded}
-                          onClick={toggleHiddenExpanded}
-                          className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground phone:min-h-11 phone:px-0"
-                        >
-                          <span>{t("mainScreen.hiddenCount", { count: hiddenRows.length })}</span>
-                          <ChevronIcon open={hiddenExpanded} />
-                        </button>
-                        {hiddenExpanded ? hiddenRows.map(renderRow) : null}
-                        {addTokenRow}
-                      </>
-                    ) : listDocked || hiddenExpanded ? (
-                      // With nothing hidden there's no accordion to open, so this is the way into Show/Hide.
-                      <>
-                        {addTokenRow}
-                        <button
-                          type="button"
-                          onClick={() => setHiddenExpanded((prev) => !prev)}
-                          className={`px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label ${hiddenExpanded ? "ml-auto block w-fit" : ""}`}
-                        >
-                          {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
-                        </button>
-                      </>
-                    ) : null}
-                  </>
-                );
-              })()
-            )}
-          </div>
-        ) : activeTab === "collectibles" ? (
-          <div
-            className={`min-h-60 pt-3.5 phone:min-h-0 phone:pt-1 ${collectiblesFresh ? "gleam-fresh" : ""}`}
-          >
-            <CollectiblesGallery items={collectiblesQuery.data} loading={waiting(collectiblesQuery)} onOpen={onOpenCollectible} />
-          </div>
-        ) : (
-          <>
-            <div
-              className={`min-h-60 phone:min-h-0 ${activityFresh ? "gleam-fresh" : ""}`}
-            >
-              {loading && !hasLoadedOnce ? (
-                <>
-                  <SkeletonRow />
-                  <SkeletonRow />
-                </>
-              ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
-                <EmptyState message={t("mainScreen.noActivity")} />
-              ) : (
-                activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => {
-                  const title =
-                      entry.swap
-                        ? t("mainScreen.swapOrder", { asset: swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances) })
-                        : entry.type === "upload" && !entry.collectible
-                        ? uploadTitle(t, entry)
-                        : activityTitle(
-                            t,
-                            entry.type,
-                            entry.collectible ? collectibleLabel(t, entry.collectible) : (nameFor(entry.address) ?? truncateAddress(entry.address, 6)),
-                            Boolean(entry.collectible),
+        {/* Clips the panel waiting beside the active one, at the sheet's own edges so rows can still bleed into the gutter. */}
+        <div className="phone:-mx-5 phone:overflow-x-clip phone:px-5">
+          <div ref={panelTrackRef} className="relative">
+            {TABS.filter((tab) => tab === activeTab || tab === peekTab).map((tab) => (
+              <div
+                key={tab}
+                inert={tab !== activeTab}
+                className={tab === activeTab ? undefined : "absolute inset-x-0"}
+                style={
+                  tab === activeTab || !peek
+                    ? undefined
+                    : { top: peek.top, transform: `translateX(calc(${Math.sign(TABS.indexOf(tab) - TABS.indexOf(activeTab))} * (100% + ${PANEL_GAP_PX}px)))` }
+                }
+              >
+              {tab === "tokens" ? (
+                <div className="min-h-60 phone:min-h-0 silica:pt-1.5">
+                  {loading && !hasLoadedOnce ? (
+                    <>
+                      <SkeletonRow />
+                      <SkeletonRow />
+                    </>
+                  ) : (
+                    (() => {
+                      const rows: ListedTokenRow[] = [
+                        ...defaultTokenRows.map(({ send, ...row }) => ({
+                          key: row.key,
+                          label: row.name,
+                          defaultHidden: false,
+                          node: (
+                            <TokenRow
+                              glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: tokenLogos ? row.logoUrl : undefined }}
+                              name={row.name}
+                              amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
+                              value={
+                                row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
+                              }
+                              // `amount @ price` would give the hidden holding away.
+                              unitPrice={masked || simpleRows ? undefined : row.unitPrice}
+                              change={simpleRows ? undefined : row.change}
+                              loading={loading}
+                              cached={tokensCached}
+                              onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
+                              className="border-b-0"
+                            />
+                          ),
+                        })),
+                        {
+                          key: "gleam-points",
+                          label: "Gleam Points",
+                          defaultHidden: false,
+                          node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} showLogo={tokenLogos} className="border-b-0" />,
+                        },
+                        ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
+                          const discovered = token.source === "discovered";
+                          const amountNumber =
+                            token.available === false ? 0 : Number(formatAtomicAsDisplay(token.quantity, token.denomination, token.denomination));
+                          const value = discovered || token.available === false ? undefined : valueFor(tokenPrices, currency, token.processId, amountNumber);
+                          return {
+                            key: token.processId,
+                            label: displayTicker(token.ticker),
+                            processId: token.processId,
+                            // Anyone can send a token, so one the user didn't add starts hidden.
+                            defaultHidden: discovered,
+                            node: (
+                              <TokenRow
+                                glyph={{
+                                  label: token.ticker.slice(0, 2).toUpperCase(),
+                                  tone: 2,
+                                  logoUrl: shownTokenLogo(token, rowVisibility, tokenLogos),
+                                }}
+                                name={displayTicker(token.ticker)}
+                                amount={
+                                  token.available === false
+                                    ? unavailableBalanceLabel(t)
+                                    : withPendingNote(
+                                        masked ? HIDDEN_AMOUNT : formatAtomicCompact(token.quantity, token.denomination),
+                                        pendingNote(t, token.pending, token.denomination, masked),
+                                      )
+                                }
+                                value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
+                                unitPrice={masked || simpleRows || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
+                                change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
+                                loading={loading}
+                                cached={tokensCached}
+                                onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
+                                className="border-b-0"
+                              />
+                            ),
+                          };
+                        }),
+                      ].sort((a, b) => a.label.localeCompare(b.label, locale, { sensitivity: "base" }));
+                      const hiddenRows = rows.filter(isRowHidden);
+                      const renderRow = (row: ListedTokenRow) => {
+                        const hidden = isRowHidden(row);
+                        const { processId } = row;
+                        if (processId !== undefined && confirmingIgnore === processId) {
+                          return (
+                            <div key={row.key} className="flex flex-col gap-2 px-3.5 py-3 phone:px-0">
+                              <p className="text-caption leading-relaxed text-muted">
+                                {t("mainScreen.ignoreConfirm", { label: row.label })}
+                              </p>
+                              {ignoreFailed ? (
+                                <p role="alert" className="text-caption text-warning">
+                                  {t("mainScreen.ignoreFailed")}
+                                </p>
+                              ) : null}
+                              <div className="flex justify-end gap-3 text-caption font-semibold">
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmingIgnore(null)}
+                                  className="text-muted hover:text-foreground"
+                                >
+                                  {t("mainScreen.cancel")}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={ignoring}
+                                  onClick={() => void ignoreToken(processId)}
+                                  className="text-warning disabled:opacity-60"
+                                >
+                                  {ignoring ? t("mainScreen.ignoring") : t("mainScreen.ignore")}
+                                </button>
+                              </div>
+                            </div>
                           );
-                  const subtitle =
-                      entry.swap && entry.status === "confirmed"
-                        ? entry.timestamp > 0
-                          ? t("mainScreen.orderPlacedAt", { time: relativeTime(t, entry.timestamp) })
-                          : t("mainScreen.orderPlaced")
-                        : entry.unverified
-                        ? entry.timestamp > 0
-                          ? t("mainScreen.unverifiedTransferAt", { time: relativeTime(t, entry.timestamp) })
-                          : t("mainScreen.unverifiedTransfer")
-                        : entry.status === "pending"
-                        ? t("mainScreen.pendingConfirmation")
-                        : entry.status === "failed"
-                          ? entry.error
-                            ? t("mainScreen.failedWithError", { error: entry.error })
-                            : t("mainScreen.failed")
-                          : relativeTime(t, entry.timestamp);
-                  const amountLabel = entry.amount
-                    ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
-                    : entry.dataSize
-                      ? formatDataSize(entry.dataSize, locale)
-                      : undefined;
-                  const token = sendableToken(entry);
-                  return (
-                  <ActivityRow
-                    key={entry.txId}
-                    activityType={entry.swap ? "swap" : entry.type}
-                    title={title}
-                    subtitle={subtitle}
-                    amountLabel={amountLabel}
-                    outcomeUnknown={Boolean(entry.swap)}
-                    amountTone={entry.type === "send" && entry.status !== "failed" ? "negative" : entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
-                    collectible={
-                      entry.collectible
-                        ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
-                        : undefined
-                    }
-                    pending={entry.status === "pending"}
-                    onClick={() =>
-                      setDetail({
-                        entry,
-                        title,
-                        subtitle,
-                        amountLabel,
-                        name: nameFor(entry.address),
-                        onSendTo: token === undefined || !onSendTo ? undefined : () => onSendTo(entry.address, token),
-                      })
-                    }
-                  />
-                  );
-                })
-              )}
-            </div>
-            {activityQuery.data && activityQuery.data.entries.length > 0 ? (
-              <div className="pt-2.5 text-center phone:pt-1">
-                <button
-                  type="button"
-                  onClick={() => openInExplorer(wallet.address)}
-                  className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
+                        }
+                        const actionClassName =
+                          "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
+                        return (
+                          <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative silica:mb-2">
+                            {row.node}
+                            {hiddenExpanded ? (
+                              <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5">
+                                {hidden && processId !== undefined ? (
+                                  <button
+                                    type="button"
+                                    aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
+                                    onClick={() => {
+                                      setIgnoreFailed(false);
+                                      setConfirmingIgnore(processId);
+                                    }}
+                                    className={actionClassName}
+                                  >
+                                    {t("mainScreen.ignore")}
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  aria-label={t(hidden ? "mainScreen.showLabel" : "mainScreen.hideLabel", { label: row.label })}
+                                  onClick={() => toggleRowHidden(row)}
+                                  className={actionClassName}
+                                >
+                                  {hidden ? t("mainScreen.show") : t("mainScreen.hide")}
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      };
+                      const addTokenRow = hiddenExpanded ? (
+                        <button
+                          type="button"
+                          onClick={onAddToken}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-left hover:bg-hover phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:gap-3 phone:px-3 phone:py-3.5 phone:active:bg-hover"
+                        >
+                          <span aria-hidden="true" className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-line bg-background text-foreground">
+                            <PlusIcon />
+                          </span>
+                          <span className="flex min-w-0 flex-1 flex-col gap-px">
+                            <span className="text-label font-semibold text-foreground">{t("mainScreen.addToken")}</span>
+                            <span className="text-caption text-muted">{t("mainScreen.addTokenHint")}</span>
+                          </span>
+                          <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
+                            <ChevronRightIcon />
+                          </span>
+                        </button>
+                      ) : null;
+                      return (
+                        <>
+                          {rows.filter((row) => !isRowHidden(row)).map(renderRow)}
+                          {hiddenRows.length > 0 ? (
+                            <>
+                              <button
+                                type="button"
+                                aria-expanded={hiddenExpanded}
+                                onClick={toggleHiddenExpanded}
+                                className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground phone:min-h-11 phone:px-0"
+                              >
+                                <span>{t("mainScreen.hiddenCount", { count: hiddenRows.length })}</span>
+                                <ChevronIcon open={hiddenExpanded} />
+                              </button>
+                              {hiddenExpanded ? hiddenRows.map(renderRow) : null}
+                              {addTokenRow}
+                            </>
+                          ) : listDocked || hiddenExpanded ? (
+                            // With nothing hidden there's no accordion to open, so this is the way into Show/Hide.
+                            <>
+                              {addTokenRow}
+                              <button
+                                type="button"
+                                onClick={() => setHiddenExpanded((prev) => !prev)}
+                                className={`px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label ${hiddenExpanded ? "ml-auto block w-fit" : ""}`}
+                              >
+                                {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
+                              </button>
+                            </>
+                          ) : null}
+                        </>
+                      );
+                    })()
+                  )}
+                </div>
+              ) : tab === "collectibles" ? (
+                <div
+                  className={`min-h-60 pt-3.5 phone:min-h-0 phone:pt-1 ${collectiblesFresh ? "gleam-fresh" : ""}`}
                 >
-                  {t("mainScreen.viewAll")}
-                </button>
+                  <CollectiblesGallery items={collectiblesQuery.data} loading={waiting(collectiblesQuery)} onOpen={onOpenCollectible} />
+                </div>
+              ) : (
+                <>
+                  <div
+                    className={`min-h-60 phone:min-h-0 ${activityFresh ? "gleam-fresh" : ""}`}
+                  >
+                    {loading && !hasLoadedOnce ? (
+                      <>
+                        <SkeletonRow />
+                        <SkeletonRow />
+                      </>
+                    ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
+                      <EmptyState message={t("mainScreen.noActivity")} />
+                    ) : (
+                      activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => {
+                        const title =
+                            entry.swap
+                              ? t("mainScreen.swapOrder", { asset: swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances) })
+                              : entry.type === "upload" && !entry.collectible
+                              ? uploadTitle(t, entry)
+                              : activityTitle(
+                                  t,
+                                  entry.type,
+                                  entry.collectible ? collectibleLabel(t, entry.collectible) : (nameFor(entry.address) ?? truncateAddress(entry.address, 6)),
+                                  Boolean(entry.collectible),
+                                );
+                        const subtitle =
+                            entry.swap && entry.status === "confirmed"
+                              ? entry.timestamp > 0
+                                ? t("mainScreen.orderPlacedAt", { time: relativeTime(t, entry.timestamp) })
+                                : t("mainScreen.orderPlaced")
+                              : entry.unverified
+                              ? entry.timestamp > 0
+                                ? t("mainScreen.unverifiedTransferAt", { time: relativeTime(t, entry.timestamp) })
+                                : t("mainScreen.unverifiedTransfer")
+                              : entry.status === "pending"
+                              ? t("mainScreen.pendingConfirmation")
+                              : entry.status === "failed"
+                                ? entry.error
+                                  ? t("mainScreen.failedWithError", { error: entry.error })
+                                  : t("mainScreen.failed")
+                                : relativeTime(t, entry.timestamp);
+                        const amountLabel = entry.amount
+                          ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
+                          : entry.dataSize
+                            ? formatDataSize(entry.dataSize, locale)
+                            : undefined;
+                        const token = sendableToken(entry);
+                        return (
+                        <ActivityRow
+                          key={entry.txId}
+                          activityType={entry.swap ? "swap" : entry.type}
+                          title={title}
+                          subtitle={subtitle}
+                          amountLabel={amountLabel}
+                          outcomeUnknown={Boolean(entry.swap)}
+                          amountTone={entry.type === "send" && entry.status !== "failed" ? "negative" : entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
+                          collectible={
+                            entry.collectible
+                              ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
+                              : undefined
+                          }
+                          pending={entry.status === "pending"}
+                          onClick={() =>
+                            setDetail({
+                              entry,
+                              title,
+                              subtitle,
+                              amountLabel,
+                              name: nameFor(entry.address),
+                              onSendTo: token === undefined || !onSendTo ? undefined : () => onSendTo(entry.address, token),
+                            })
+                          }
+                        />
+                        );
+                      })
+                    )}
+                  </div>
+                  {activityQuery.data && activityQuery.data.entries.length > 0 ? (
+                    <div className="pt-2.5 text-center phone:pt-1">
+                      <button
+                        type="button"
+                        onClick={() => openInExplorer(wallet.address)}
+                        className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
+                      >
+                        {t("mainScreen.viewAll")}
+                      </button>
+                    </div>
+                  ) : null}
+                  <ActivityDetailSheet
+                    runtime={runtime}
+                    detail={detail}
+                    onClose={() => setDetail(null)}
+                    onViewInExplorer={openInExplorer}
+                    container={sheetContainer}
+                  />
+                </>
+              )}
               </div>
-            ) : null}
-            <ActivityDetailSheet
-              runtime={runtime}
-              detail={detail}
-              onClose={() => setDetail(null)}
-              onViewInExplorer={openInExplorer}
-              container={sheetContainer}
-            />
-          </>
-        )}
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
