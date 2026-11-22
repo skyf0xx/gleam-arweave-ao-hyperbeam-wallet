@@ -4,7 +4,6 @@ import { isValidNetworkSettings } from "../models/network";
 import { isPasskeyEnrollment } from "../models/passkey";
 import { readSecurityPhrase } from "../models/security-phrase";
 import { isLockSettings } from "../models/session";
-import { isThemeSettings } from "../models/theme";
 import { isValidWallet, type VaultEnvelopeV2, type Wallet } from "../models/wallet";
 import { base64ToBytes, bytesToBase64 } from "../vault/base64";
 
@@ -121,6 +120,15 @@ function isTokenId(value: unknown): boolean {
 }
 
 /**
+ * Any named theme, since a theme comes and goes between releases and an
+ * unknown one must not refuse the wallets beside it. Reading the setting
+ * checks the name and falls back to the default.
+ */
+function isThemeRecord(value: unknown): boolean {
+  return value !== null && typeof value === "object" && typeof (value as Record<string, unknown>).theme === "string";
+}
+
+/**
  * Everything a backup carries: the vault as its owner knows it. Nothing
  * bound to a device or a site is here: no dApp grants (a new device
  * approves each site again), sessions, caches or dismissals.
@@ -131,7 +139,7 @@ const RULES: Readonly<Record<string, BackupRule>> = {
   [CONTACTS_BACKUP_KEY]: { list: true, ok: isValidContact },
   "local:networkSettings": { list: false, ok: isValidNetworkSettings },
   "local:displaySettings": { list: false, ok: isDisplaySettings },
-  "local:themeSettings": { list: false, ok: isThemeSettings },
+  "local:themeSettings": { list: false, ok: isThemeRecord },
   "local:lockSettings": { list: false, ok: isLockSettings },
   "local:securityPhrase": { list: false, ok: (value) => readSecurityPhrase(value) !== null },
   "local:passkey": { list: false, ok: isPasskeyEnrollment },
