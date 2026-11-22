@@ -101,12 +101,13 @@ describe("Collectibles tab", () => {
     expect(await screen.findByText(/No collectibles yet/)).toBeTruthy();
   });
 
-  it("marks a failed discovery on the top bar, with no retry button", async () => {
+  it("shows no error, empty state or retry button when discovery fails", async () => {
     const runtime = runtimeWith(async () => {
       throw new Error("down");
     });
     renderMain(runtime, { initialTab: "collectibles" });
-    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    await waitFor(() => expect(document.querySelectorAll(".gleam-shimmer").length).toBeGreaterThan(0));
+    expect(screen.queryByText(/No collectibles yet/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
