@@ -1313,7 +1313,7 @@ function TokenPickerStep({
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label={t("send.selectToken")}>
       <ScreenHeader title={t("send.selectToken")} onBack={onBack} />
-      <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
+      <div className="flex flex-1 flex-col px-1 py-2 phone:px-5 silica:gap-2 silica:px-5">
         {errorMessage ? (
           <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
             {errorMessage}
