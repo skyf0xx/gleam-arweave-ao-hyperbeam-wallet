@@ -81,12 +81,15 @@ export function ToggleRow({
   description,
   checked,
   disabled,
+  compact = false,
   onToggle,
 }: {
   title: string;
   description?: string;
   checked: boolean;
   disabled: boolean;
+  /** A setting that belongs to the row above it sits close under it. */
+  compact?: boolean;
   onToggle: () => void;
 }) {
   const id = useId();
@@ -99,7 +102,7 @@ export function ToggleRow({
       aria-describedby={description ? `${id}-description` : undefined}
       disabled={disabled}
       onClick={onToggle}
-      className="flex w-full items-center justify-between gap-3 py-3.5 text-left disabled:opacity-60"
+      className={cn("flex w-full items-center justify-between gap-3 text-left disabled:opacity-60", compact ? "pb-3.5 pt-1" : "py-3.5")}
     >
       <span className="flex min-w-0 flex-col gap-0.5">
         <span id={`${id}-title`} className="text-label font-semibold text-foreground">

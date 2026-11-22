@@ -123,7 +123,7 @@ export function SettingsHomeView({
           {theme.theme === "silica" ? (
             <ToggleRow
               title={t("settingsHome.weather")}
-              description={t("settingsHome.weatherHint")}
+              compact
               checked={theme.weather}
               disabled={theme.saving}
               onToggle={() => void theme.toggleWeather()}
