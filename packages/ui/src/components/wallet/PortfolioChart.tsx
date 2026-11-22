@@ -142,7 +142,7 @@ export function rangeTabClass(selected: boolean): string {
   return cn(
     "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
     selected
-      ? "gleam-frost-chip bg-mist text-foreground"
+      ? "bg-mist text-foreground silica:bg-[#f9fbfd]"
       : "text-muted hover:text-foreground layered:text-faint",
   );
 }
