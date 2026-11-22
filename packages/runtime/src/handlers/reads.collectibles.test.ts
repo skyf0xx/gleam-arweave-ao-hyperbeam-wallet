@@ -145,7 +145,9 @@ describe("ReadsHandler: getCollectibles", () => {
     const fn = stubNetwork();
     const reads = new ReadsHandler(createFakeStorage());
     await Promise.all([reads.getCollectibles({ address: ADDRESS }), reads.getCollectibles({ address: ADDRESS })]);
-    const balanceReads = fn.mock.calls.filter(([u]) => String(u).includes("/now/as/balance")).length;
-    expect(balanceReads).toBe(1);
+    const balanceReads = fn.mock.calls.filter(([u]) => String(u).includes("/now/as/balance"));
+    expect(balanceReads.length).toBeGreaterThan(0);
+    // Hosts at the same slot are asked together, each once per discovery.
+    expect(new Set(balanceReads.map(([u]) => String(u))).size).toBe(balanceReads.length);
   });
 });

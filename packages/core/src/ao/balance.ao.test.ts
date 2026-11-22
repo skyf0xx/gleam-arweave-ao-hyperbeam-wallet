@@ -137,6 +137,36 @@ describe("readTokenBalance", () => {
     expect(calls.filter((url) => url.includes("/now/as/balance"))).toEqual([`${NEO}/${PID}~process@1.0/now/as/balance?as=execution&balance=${ADDRESS}`]);
   });
 
+  it("asks hosts at the same slot together, so one that hangs on the balance holds nothing up", async () => {
+    const aborted: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/slot/current")) return new Response("3");
+      if (url.startsWith(NEO)) return new Response("42");
+      return new Promise<Response>((_, reject) =>
+        init?.signal?.addEventListener("abort", () => {
+          aborted.push(new URL(url).origin);
+          reject(new DOMException("aborted", "AbortError"));
+        }),
+      );
+    }) as typeof fetch;
+    const started = Date.now();
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("42");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(aborted).toContain(GATEWAY);
+  });
+
+  it("never lets a faster host with a lower slot win", async () => {
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const ahead = url.startsWith(GATEWAY);
+      if (url.endsWith("/slot/current")) return new Response(ahead ? "4" : "3");
+      if (ahead) await new Promise((resolve) => setTimeout(resolve, 50));
+      return new Response(ahead ? "2" : "1");
+    }) as typeof fetch;
+    await expect(readTokenBalance({ ...l1, fetchImpl })).resolves.toBe("2");
+  });
+
   it("stops waiting for a host that hangs on its slot", async () => {
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

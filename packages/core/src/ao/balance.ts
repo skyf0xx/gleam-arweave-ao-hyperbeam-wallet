@@ -170,8 +170,8 @@ export async function readTokenBalance(options: ReadTokenBalanceOptions): Promis
  * The balance of an `arweave-scheduler@1.0` process, from its `now/as/balance`
  * path. Tries the gateway's HyperBEAM node, then `l1NodeUrls`, then
  * the peer; legacy-AO peers such as state.forward.computer answer 403 or 500
- * for these processes. The first number wins, asking first whichever host
- * has scheduled the most messages for the process: each node picks up L1
+ * for these processes. The first number wins, asking first the hosts that
+ * have scheduled the most messages for the process, together: each node picks up L1
  * transfers on its own, and one that hasn't yet answers the old balance
  * with a 200. arweave.net has lagged a transfer by many blocks.
  *
@@ -192,28 +192,52 @@ export async function readL1Balance(
   label?: string,
   l1NodeUrls: readonly string[] = L1_TOKEN_NODE_URLS,
 ): Promise<string> {
-  const hosts = await furthestAheadFirst(
+  const groups = await furthestAheadFirst(
     processId,
     [...new Set([gatewayUrl, ...l1NodeUrls, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlash))],
     fetchImpl,
   );
   const failures: string[] = [];
-  for (const host of hosts) {
-    try {
-      const url = `${host}/${processId}~process@1.0/now/as/balance?as=execution&balance=${address}`;
-      const response = await fetchImpl(url, { signal: AbortSignal.timeout(COMPUTE_TIMEOUT_MS) });
-      if (!response.ok) {
-        failures.push(`${hostOf(host)} (HTTP ${response.status})`);
-        continue;
-      }
-      const quantity = (await response.text()).trim();
-      if (/^\d+$/.test(quantity)) return quantity;
-      failures.push(`${hostOf(host)} (unreadable answer)`);
-    } catch (error) {
-      failures.push(`${hostOf(host)} (${shortReason(error)})`);
-    }
+  for (const hosts of groups) {
+    const answer = await firstL1Answer(processId, address, hosts, fetchImpl);
+    if ("quantity" in answer) return answer.quantity;
+    failures.push(...answer.failures);
   }
   throw balanceReadError(label, failures);
+}
+
+/** The first number any of `hosts` answers, all asked at once, so one that hangs costs nothing while another answers. */
+async function firstL1Answer(
+  processId: string,
+  address: string,
+  hosts: string[],
+  fetchImpl: typeof fetch,
+): Promise<{ quantity: string } | { failures: string[] }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("timed out", "TimeoutError")), COMPUTE_TIMEOUT_MS);
+  const failures: string[] = [];
+  const ask = async (host: string, index: number): Promise<string> => {
+    let failure: string;
+    try {
+      const url = `${host}/${processId}~process@1.0/now/as/balance?as=execution&balance=${address}`;
+      const response = await fetchImpl(url, { signal: controller.signal });
+      const quantity = response.ok ? (await response.text()).trim() : "";
+      if (/^\d+$/.test(quantity)) return quantity;
+      failure = response.ok ? "unreadable answer" : `HTTP ${response.status}`;
+    } catch (error) {
+      failure = shortReason(error);
+    }
+    failures[index] = `${hostOf(host)} (${failure})`;
+    throw new Error(failures[index]);
+  };
+  try {
+    return { quantity: await Promise.any(hosts.map(ask)) };
+  } catch {
+    return { failures };
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+  }
 }
 
 /**
@@ -223,11 +247,11 @@ export async function readL1Balance(
 const SLOT_TIMEOUT_MS = 1_500;
 
 /**
- * `hosts` ordered by the slot each has reached for `processId`, highest
- * first. A host that gives no slot in time keeps its place after those
- * that do, so with no slots at all the order is unchanged.
+ * `hosts` grouped by the slot each has reached for `processId`, highest
+ * first. A host that gives no slot in time goes in a group of its own after
+ * those that do: how far it has got is unknown, so it never races another.
  */
-async function furthestAheadFirst(processId: string, hosts: string[], fetchImpl: typeof fetch): Promise<string[]> {
+async function furthestAheadFirst(processId: string, hosts: string[], fetchImpl: typeof fetch): Promise<string[][]> {
   const slots = await Promise.all(
     hosts.map(async (host) => {
       try {
@@ -239,10 +263,11 @@ async function furthestAheadFirst(processId: string, hosts: string[], fetchImpl:
       }
     }),
   );
-  return hosts
-    .map((host, index) => ({ host, slot: slots[index]!, index }))
-    .sort((a, b) => (a.slot === b.slot ? a.index - b.index : a.slot > b.slot ? -1 : 1))
-    .map(({ host }) => host);
+  const known = [...new Set(slots.filter((slot) => slot >= 0n))].sort((a, b) => (a > b ? -1 : 1));
+  return [
+    ...known.map((slot) => hosts.filter((_, index) => slots[index] === slot)),
+    ...hosts.filter((_, index) => slots[index]! < 0n).map((host) => [host]),
+  ];
 }
 
 function balanceReadError(label: string | undefined, failures: string[]): Error {
