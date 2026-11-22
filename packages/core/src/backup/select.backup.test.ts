@@ -50,7 +50,7 @@ describe("readBackupData", () => {
     expect(isValidBackupData(data)).toBe(true);
   });
 
-  it("keeps a theme an older release stored as paper", async () => {
+  it("keeps a stored paper theme", async () => {
     const data = await readBackupData(memoryStorage({ ...INCLUDED, "local:themeSettings": { theme: "paper" } }));
     expect(data["local:themeSettings"]).toEqual({ theme: "paper" });
   });

@@ -1224,7 +1224,7 @@ describe("WalletLifecycleHandler: setThemePreference", () => {
     await expect(handler.setThemePreference({ theme: "silica", weather: "rain" as never })).rejects.toThrow(/invalid theme preference/i);
   });
 
-  it("reads a theme stored as paper as silica", async () => {
+  it("reads a stored paper theme as silica", async () => {
     const storage = createFakeStorage();
     await storage.set("local:themeSettings", { theme: "paper" });
     const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
