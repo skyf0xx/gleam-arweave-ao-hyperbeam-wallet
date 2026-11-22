@@ -32,12 +32,12 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
 
         <QrCode value={wallet.address} />
 
-        {/* On paper, glass is laid from the address down to the foot of the screen; the QR stays on the paper. */}
-        <div className="gleam-paper-glass-down flex flex-1 flex-col items-center gap-5 self-stretch paper:-mx-6 paper:-mb-6 paper:px-6 paper:pb-6 paper:pt-5 phone:paper:-mx-5 phone:paper:px-5">
+        {/* In silica, a lens runs from the address down to the foot of the screen; the QR stays off it. */}
+        <div className="gleam-lens-down flex flex-1 flex-col items-center gap-5 self-stretch silica:-mx-6 silica:-mb-6 silica:px-6 silica:pb-6 silica:pt-5 phone:silica:-mx-5 phone:silica:px-5">
           <div className="flex w-full flex-col gap-2">
             <span className="text-center text-label font-semibold text-muted">{watchOnly ? t("receive.watchedAddress") : t("receive.yourAddress")}</span>
             <AddressDisplay
-              onGlass
+              onLens
               address={wallet.address}
               emphasisPick={emphasisPick}
               onCopy={() => void navigator.clipboard?.writeText(wallet.address)}

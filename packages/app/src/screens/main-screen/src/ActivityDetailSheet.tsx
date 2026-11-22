@@ -92,12 +92,12 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
       <div className="flex flex-col items-center gap-1 text-center">
         {detail.amountLabel ? <p className="gleam-figure text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p> : null}
         {isUpload ? <p className="text-label text-muted">{detail.title}</p> : null}
-        {/* Paper names the outcome in a word under the figure; light and dark carry it in the footer alone. */}
-        {status ? <p className={`hidden text-label paper:block ${status.tone}`}>{t(status.key)}</p> : null}
+        {/* Silica names the outcome in a word under the figure; light and dark carry it in the footer alone. */}
+        {status ? <p className={`hidden text-label silica:block ${status.tone}`}>{t(status.key)}</p> : null}
       </div>
 
-      {/* In paper the address is glass: a read-only pane hanging from "From" over everything that uses it. */}
-      <div className="gleam-paper-glass-down flex flex-col gap-6 paper:-mx-6 paper:px-6 paper:pb-8 paper:pt-5 phone:paper:-mx-5 phone:paper:px-5">
+      {/* In silica the address is under a lens hanging from "From" over everything that uses it. */}
+      <div className="gleam-lens-down flex flex-col gap-6 silica:-mx-6 silica:px-6 silica:pb-8 silica:pt-5 phone:silica:-mx-5 phone:silica:px-5">
         <div className="flex flex-col gap-2">
           {isUpload ? null : (
             // Actions on the address sit on the right, in line with its copy button.
@@ -113,7 +113,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
               ) : null}
             </div>
           )}
-          <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} onGlass />
+          <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} onLens />
         </div>
 
         {naming ? (
@@ -159,7 +159,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
   );
 }
 
-/** The outcome named under the figure in paper; a pending entry or a swap order has none. */
+/** The outcome named under the figure in silica; a pending entry or a swap order has none. */
 function statusWord(entry: ActivityEntry): { key: "mainScreen.verbSent" | "mainScreen.verbReceived" | "mainScreen.verbUploaded" | "mainScreen.failed"; tone: string } | null {
   if (entry.status === "failed") return { key: "mainScreen.failed", tone: "text-warning" };
   if (entry.status !== "confirmed") return null;

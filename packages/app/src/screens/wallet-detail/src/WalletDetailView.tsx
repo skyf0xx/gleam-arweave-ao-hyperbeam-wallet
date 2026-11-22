@@ -206,7 +206,7 @@ export function WalletDetailView({
       <ScreenHeader title={t("walletDetail.title")} onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-7 phone:pt-4">
-        <div className="gleam-paper-glass-up group flex items-center gap-3.5 phone:items-start paper:-mx-6 paper:-mt-7 paper:px-6 paper:pb-5 paper:pt-7 phone:paper:-mx-5 phone:paper:-mt-4 phone:paper:px-5 phone:paper:pt-4">
+        <div className="gleam-lens-up group flex items-center gap-3.5 phone:items-start silica:-mx-6 silica:-mt-7 silica:px-6 silica:pb-5 silica:pt-7 phone:silica:-mx-5 phone:silica:-mt-4 phone:silica:px-5 phone:silica:pt-4">
           <AccountAvatar svgMarkup={avatarSvg} label={t("walletDetail.avatarOf", { name: wallet.name })} size={44} />
           {/* The name is edited in the field below, so this block shows only the address. */}
           <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -246,7 +246,7 @@ export function WalletDetailView({
             type="button"
             onClick={() => setStep({ kind: "export-password", submitting: false })}
             aria-describedby="keyfile-backup-status"
-            className="flex w-full items-center gap-2.5 gleam-hover-glass rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05] paper:hover:bg-foreground/[0.03]"
+            className="flex w-full items-center gap-2.5 gleam-hover-frost rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05] silica:hover:bg-foreground/[0.03]"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-label font-semibold text-foreground">{t("walletDetail.backUpKeyfile")}</span>

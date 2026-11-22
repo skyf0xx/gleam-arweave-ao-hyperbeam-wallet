@@ -58,8 +58,8 @@ export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: A
           ) : null}
         </div>
 
-        {/* On paper, one pane of glass holds both addresses and what adding the token means. */}
-        <div className="gleam-paper-glass-down flex flex-col gap-5 paper:-mx-6 paper:px-6 paper:pb-6 paper:pt-4 phone:paper:-mx-5 phone:paper:px-5">
+        {/* In silica, one lens holds both addresses and what adding the token means. */}
+        <div className="gleam-lens-down flex flex-col gap-5 silica:-mx-6 silica:px-6 silica:pb-6 silica:pt-4 phone:silica:-mx-5 phone:silica:px-5">
           <div className="flex flex-col gap-1.5">
             <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.processId")}</span>
             <MemorableAddress

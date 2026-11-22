@@ -23,8 +23,8 @@ export interface AddressDisplayProps {
   copiedDurationMs?: number;
   /** Accessible names and hints; English unless the caller passes its own. */
   labels?: AddressDisplayLabels;
-  /** Sits on a pane of paper's glass: there it drops its own edge and fill, so the pane holds it. */
-  onGlass?: boolean;
+  /** Sits under one of silica's lenses: there it drops its own edge and fill, so the lens holds it. */
+  onLens?: boolean;
   className?: string;
 }
 
@@ -39,7 +39,7 @@ export function AddressDisplay({
   onCopy,
   copiedDurationMs = 2000,
   labels: labelsProp,
-  onGlass = false,
+  onLens = false,
   className,
 }: AddressDisplayProps) {
   const contextLabels = useUiLabels();
@@ -103,8 +103,8 @@ export function AddressDisplay({
         aria-label={copied ? labels.copied : labels.copy(address)}
         className={cn(
           "flex w-full select-none items-center justify-center gap-3 rounded-lg border border-line bg-foreground/[0.03] px-4 py-3 transition-colors [-webkit-touch-callout:none] hover:bg-foreground/[0.05] focus:outline-none focus-visible:border-foreground",
-          !onGlass && "gleam-hover-glass paper:hover:bg-foreground/[0.03]",
-          onGlass && "paper:border-transparent paper:bg-transparent paper:hover:bg-hover paper:focus-visible:border-foreground",
+          !onLens && "gleam-hover-frost",
+          onLens && "silica:border-transparent silica:bg-transparent silica:hover:bg-hover silica:focus-visible:border-foreground",
         )}
       >
         <MemorableAddress address={address} emphasisPick={emphasisPick} className="justify-center" />

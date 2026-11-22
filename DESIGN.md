@@ -154,51 +154,70 @@ Dark mode has its own rules. It is not the light theme inverted.
 - **Commit actions are bright.** Send and Receive are equal level-2 tiles on the main screen. The bright primary fill is kept for the button that commits.
 - **Two kinds of tab.** Section tabs (Tokens, Collectibles, Activity) are underlined labels. The chart's range picker uses chips.
 
-Layout rules that tokens can't carry use Tailwind's `layered:` variant, which matches dark and paper, or `dark:` for a rule only dark needs.
+Layout rules that tokens can't carry use Tailwind's `layered:` variant, which matches dark and silica, or `dark:` for a rule only dark needs.
 
-**Paper**
+**Silica**
 
-Paper is a light theme on a grey paper with a little warmth, with glass where a person checks who. People see it as **Silica**; the code, the stored setting and this file call it paper. It shares dark's layered layout: the token sheet, underlined section tabs, tile actions and the neutral chart.
+Silica is a light theme of frosted glass under a soft sky. It shares dark's layered layout: the token sheet, underlined section tabs, tile actions and a chart line with no shading.
 
-| Token | Paper | Level |
+| Token | Silica | Level |
 |---|---|---|
-| **Background** | `#f1f1ee` | 0: the paper |
-| **Surface** | `#fafaf9` | 1: a lighter sheet laid on it |
-| **Mist** | `#e5e3e0` | 2: tiles and chips, pressed in a step darker |
-| **Foreground**, **Primary fill** | `#1a1a19` | Warm ink |
-| **Muted** | `#696764` | |
-| **Faint** | `#979591` | |
-| **Pencil** | `#8b8985` | Pending activity |
+| **Background** | `#f3f6fa` | 0: the sky's base |
+| **Surface** | `#ffffff` | 1: menus and dialogs, always opaque |
+| **Mist** | `#e8edf4` | Tracks, notices and logo plates |
+| **Foreground**, **Primary fill** | `#0f172a` | Slate ink |
+| **Muted** | `#52607a` | |
+| **Faint** | `#6b7990` | |
 
-- **Weight contrast.** The headline figure is extra bold, set tight and pressed into the paper (`.gleam-figure`). Secondary amounts and prices are light.
-- **Pencil, then ink.** A pending activity row is written in pencil and inks in when it settles.
-- **Activity detail.** The figure is pressed into the sheet's paper with its outcome in a word beneath it, and the counterparty's address hangs under a read-only glass pane that covers what uses it.
-- **Material.** The token sheet lifts off the paper with a soft edge, and settles in once.
-- **Barely any texture.** The header paper is flat colour. The token sheet has a grain you only notice up close; anything stronger, or ruled lines, competes with the rows.
-- **Light on paper.** The beam is light lying flat on the paper, not ink: clear spectral stops mixed about a third of the way toward the paper, with no glow, and 2px rather than 3px, so it sits in the pressed header. Warning, gains and losses are a step deeper than light's so they hold on the paper.
-- **The beam's colour catches** only where an edge faces the beam: the sheet's top edge while undocked, and the commit buttons (primary and destructive) with a hairline inside the top and a faint sheen. Tiles and chips stay pressed in.
-- **Bare chart lines.** The portfolio and token charts draw the line alone, with no shading under it, its gain or loss colour mixed a quarter of the way toward the paper.
+There are three materials, and each means one thing.
 
-**Glass marks who, pressing marks a setting**
+1. **Sky** is the ground. It is a still wash of sky blue and mint behind every wallet screen, strongest at the top right, and gone by the foot of the screen.
+2. **Frost** is what you touch: the token sheet, Send and Receive, the selected chart period, the header's round buttons, the token cards. It is translucent white with a lit top edge and a soft, wide shadow (`.gleam-frost`, `.gleam-frost-sheet`). Cards and outlined buttons elsewhere are a thinner frost with a faint ring and no lift (`.gleam-hover-frost`).
+3. **Lens** marks who: a full address or a wallet a person must recognise. It is clear glass: a faint blue tint, a lit rim and a sheen under the text, with the sky showing through. Frost is white and lifted; a lens is tinted and flat, with no beam on its edge.
 
-On paper, glass is kept for identity: an address a person checks before trusting it, or the wallet they hold. A choice about how something is shown is pressed in, never glass. Kept that narrow, glass stays a signal: "this is the one, look closely".
+Frost rules:
+
+- **What you hold is a card, what happened is a line.** Tokens are frost cards. Activity is a flat list: a card for each row of a long log is heavy.
+- **Frost never sits on frost of its own kind.** A card sits on the sheet, and the sheet sits on the sky. That is the whole stack.
+- **Blur only where content passes behind**: the header, the sticky tabs and a phone's pinned footer (`.gleam-frost-bar`). The sky is already soft, so elsewhere translucency looks the same as blur and costs nothing.
+- **Solid when asked.** With reduced transparency, or without `backdrop-filter`, frost is solid white and bars are the background colour.
+- **Selected is raised.** A chart period or a theme is lifted on white frost. Section tabs stay underlined.
+- **Pointer.** A row on the sky brightens. On a white surface it takes a 4% slate wash.
+- **Pending is fogged.** A pending activity row is drawn in **Muted** with an outlined icon, and clears when it settles.
+- **The beam never changes with the weather.** It is identity, so the same five colours stay in the same order.
+
+Contrast holds on the darkest part of every sky: amounts, names and addresses 7:1, secondary text and %-changes 4.5:1.
+
+**The lens marks who**
 
 Before styling something new, ask in order:
 
-1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the wallet a site connects to, the active wallet in the switcher. It goes under glass.
-2. **Is it a selected setting or view?** A chart period, a tab, a theme, a language, a currency. It is pressed in: mist, a step darker, or an underline for tabs. Not glass, even though it is "selected".
-3. **Is it under the pointer or a finger?** It takes `bg-hover`: mist in light and dark, a 4% ink wash on paper, rounded and reaching past the row's text. On glass it brightens instead, a 35% white sheen, since an ink wash there darkens the pane into a second one. Never glass, and never paper's mist, which reads as a scorch on the sheet.
+1. **Is it a full address or a wallet the person must recognise?** A send's recipient, the wallet's own address on Receive and wallet detail, the addresses in an approval or on a hardware-signing screen, a name's new target, the wallet a site connects to, the active wallet in the switcher. It goes under a lens.
+2. **Is it a selected setting or view?** It is raised frost, or an underline for tabs.
+3. **Is it something held, or an action on the home screen?** It is frost.
 
-Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without glass.
+Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go without.
 
-- **A pane you can change is a card.** Changing the recipient, switching wallets: a rounded pane laid on the paper with a light rim and a slight lift (`.gleam-paper-glass`). Copying changes nothing, so an address you can only copy is read-only.
-- **A read-only pane is set into the page.** It runs the full width, curves only its open edge (14px, a little less than the token sheet), lights that edge and fades out where it continues. It hangs down from its subject (`.gleam-paper-glass-down`) or rises to it from under the header (`.gleam-paper-glass-up`).
-- **It covers what depends on the address.** On a transfer review the pane runs from the recipient through the token, fee and balance after; the sender stays on the paper. On Receive the pane runs from "Your address" to the foot of the screen; the QR stays on the paper, and the copy card drops its own edge and fill so it doesn't read as a second pane. A pane follows the screen's own reading order: don't reorder a screen to keep a row off the glass.
-- **One pane per screen, never on another surface.** Related addresses share one pane. In a list of wallets, only the active one is under glass, and a dot in the Active label's green on its avatar finds it at a glance. No glass on mist cards, notices or Details.
-- **Grey and a hard edge read as glass.** The pane is tinted a step darker than the paper, with a crisp lit edge whose thickness shows inside it, and only a faint blur for lift. A white fill with the sheet's soft shadow reads as paper; a dark line outside the lit edge, above a darker pane, reads as a groove.
-- **Text stays sharp.** The sheen lies under the text, not over it, so an address keeps its full contrast.
+- **A lens you can change is a card.** Changing the recipient, switching wallets: a rounded pane (`.gleam-lens`). It brightens under the pointer. Copying changes nothing, so an address you can only copy is read-only.
+- **A read-only lens is set into the page.** It runs the full width, lights and curves only its open edge and fades out where it continues. It hangs down from its subject (`.gleam-lens-down`) or rises to it from under the header (`.gleam-lens-up`).
+- **It covers what depends on the address.** On a transfer review it runs from the recipient through the token, fee and balance after. The sender stays off it. On Receive it runs from "Your address" to the foot of the screen, and the QR stays off it. A lens follows the screen's own reading order: don't reorder a screen to keep a row off it.
+- **One lens per screen, never on frost.** Related addresses share one. In a list of wallets only the active one is under it, and a dot in the Active label's green on its avatar finds it at a glance.
 
-The paper-only touches use the `paper:` variant and the `.gleam-*` paper classes in `theme.css`.
+**Weather**
+
+Weather is a switch under the theme, shown only for Silica and off until it is turned on. It moves the sky with the wallet's own change over the chart period on screen.
+
+| | Clear | Sunlight | Mist |
+|---|---|---|---|
+| **When** | Weather off, no history, or a change under 0.05% | Up | Down |
+| **Sky** | Sky blue and mint | Dawn gold top right, spring mint at left | Slate top right, a breath of rose, lavender at left |
+
+- **Light, not a verdict.** Only the sky moves. Text, frost, the beam and the layout are the same in all three, and the %-change still says what happened.
+- **Home and Settings only.** Home has the figure that explains the sky, and Settings shows what the switch does. Every other screen is clear.
+- **Never where someone checks.** Approvals, reviews and the passkey window have no weather: a market mood must not colour a decision to sign.
+- **It crosses over once.** The skies are stacked and cross-fade by opacity in 400ms when the period or the market changes. Nothing drifts, rains or loops. With reduced motion it just changes.
+
+The silica-only touches use the `silica:` variant and the `.gleam-*` classes at the end of `theme.css`.
 
 ### Semantic Colors
 
@@ -294,7 +313,7 @@ and loops that ask for attention are not reasons.
 - **Follow the finger 1:1.** On release, carry on from the release
   velocity, not a fixed duration. At an end, resist (rubber-band) rather
   than stop dead.
-- **No bounce, no overshoot.** Paper settles. Ease out
+- **No bounce, no overshoot.** Ease out
   (`cubic-bezier(0.2, 0.7, 0.2, 1)`).
 - **Short.** About 150ms for colour and opacity, 200–300ms for a move,
   never over 400ms but for an earned moment. Leaving is faster than

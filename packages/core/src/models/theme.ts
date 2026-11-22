@@ -2,7 +2,7 @@
  * The user-controlled theme preference. No "system/auto" option; light is
  * the default for a wallet with no stored preference yet.
  */
-export const THEME_PREFERENCES = ["light", "dark", "paper"] as const;
+export const THEME_PREFERENCES = ["light", "dark", "silica"] as const;
 
 export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 
@@ -18,12 +18,15 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
  */
 export interface ThemeSettings {
   theme: ThemePreference;
+  /** Silica's sky follows the portfolio. Absent is off; kept while another theme is on. */
+  weather?: boolean;
 }
 
 export function isThemeSettings(value: unknown): value is ThemeSettings {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
   return (
-    value !== null &&
-    typeof value === "object" &&
-    THEME_PREFERENCES.includes((value as Record<string, unknown>).theme as ThemePreference)
+    THEME_PREFERENCES.includes(record.theme as ThemePreference) &&
+    (record.weather === undefined || typeof record.weather === "boolean")
   );
 }

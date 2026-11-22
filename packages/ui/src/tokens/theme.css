@@ -41,7 +41,7 @@
   --color-background: #ffffff;
   --color-surface: #ffffff;
   --color-mist: #f5f5f5;
-  /* A row or control under the pointer or a finger. Mist, except on paper. */
+  /* A row or control under the pointer or a finger. Mist, except in silica. */
   --color-hover: var(--color-mist);
   --color-line: #e5e5e5;
   --color-foreground: #111111;
@@ -52,8 +52,6 @@
   --color-primary-disabled-text: #c4c4c4;
   --color-muted: #737373;
   --color-faint: #a3a3a3;
-  /* Pending activity's text; only paper draws it apart from muted. */
-  --color-pencil: #737373;
 
   /* Shimmer loading-state base — a touch darker than --color-mist so a placeholder still reads against a white background. */
   --color-shimmer-base: #f0f0f0;
@@ -204,7 +202,6 @@
   --color-primary-disabled-text: #6b6b73;
   --color-muted: #a0a0a8;
   --color-faint: #6b6b73;
-  --color-pencil: #a0a0a8;
 
   --color-shimmer-base: #1f1f22;
 
@@ -230,61 +227,50 @@
 }
 
 /*
- * Paper — a light theme on a grey paper with a little warmth. It takes
- * dark's layered layout (the `layered:` variant below): elevation is a
- * lighter sheet laid on the paper, tiles and chips are pressed a step
- * darker, and the chart is neutral. Text is a warm ink, and the greys
- * lean the same way so they don't look dirty on the paper.
- * - The beam is light falling flat on the paper, not ink and not a raised
- *   bar: clear spectral stops mixed about a third of the way toward the
- *   paper, with no glow, so it sits in the pressed header.
- * - Charts are a bare line with no shading under it, its gain or loss
- *   colour softened the same way as the beam.
- * - Warning, gains and losses are deeper too, to keep contrast on the
- *   darker ground.
+ * Silica — a light theme of frosted glass under a soft sky. It takes
+ * dark's layered layout (the `layered:` variant below). The background is
+ * the sky's base, so it stays a plain colour anywhere the sky isn't drawn
+ * (approvals, the passkey window). Surface stays opaque: menus and dialogs
+ * sit on content, where translucent white would not read.
+ * - Muted, gains and losses hold 4.5:1 on the darkest part of every sky.
+ * - The beam is the light set with less glare. It never follows the weather.
  */
-[data-theme="paper"] {
-  --color-canvas: #e8e7e4;
-  --color-background: #f1f1ee;
-  --color-surface: #fafaf9;
-  --color-mist: #e5e3e0;
-  /* A hover catches the light: any darkening, mist or ink, reads as a scorch
-     on paper. The white sheet, where white can't show, takes a faint warm
-     ink instead (below). */
-  --color-hover: rgba(255, 255, 255, 0.5);
-  --color-line: #dcdad6;
-  --color-foreground: #1a1a19;
-  --color-primary-fill: #1a1a19;
-  /* Disabled is pressed into the paper, with nothing to push: a grey slab reads as burnt. */
+[data-theme="silica"] {
+  --color-canvas: #e9eef5;
+  --color-background: #f3f6fa;
+  --color-surface: #ffffff;
+  --color-mist: #e8edf4;
+  /* On the sky a hover brightens. White surfaces, where white can't show, take a slate wash instead (below). */
+  --color-hover: rgba(255, 255, 255, 0.6);
+  --color-line: #d9e1eb;
+  --color-foreground: #0f172a;
+  --color-primary-fill: #0f172a;
   --color-primary-disabled: var(--color-mist);
   --color-primary-disabled-text: var(--color-faint);
-  --color-muted: #696764;
-  --color-faint: #979591;
-  /* Pending activity is written in pencil and inks in once it settles. */
-  --color-pencil: #8b8985;
+  --color-muted: #52607a;
+  --color-faint: #6b7990;
 
-  --color-shimmer-base: #e8e6e3;
+  --color-shimmer-base: #e6ecf3;
 
-  --color-beam-red: #f0716a;
-  --color-beam-purple: #a967ef;
-  --color-beam-sky: #86cee7;
-  --color-beam-yellow: #f4dd71;
-  --color-beam-green: #6dd979;
+  --color-beam-red: #f2706f;
+  --color-beam-purple: #b57bee;
+  --color-beam-sky: #62bcea;
+  --color-beam-yellow: #efcb45;
+  --color-beam-green: #41cc80;
 
   --color-chart-up: var(--color-foreground);
   --color-chart-down: var(--color-foreground);
-  /* Paper charts draw the line only, in ink mixed a quarter of the way toward the paper. */
-  --color-chart-line-up: color-mix(in srgb, var(--color-positive) 75%, var(--color-background));
-  --color-chart-line-down: color-mix(in srgb, var(--color-negative) 75%, var(--color-background));
+  --color-chart-line-up: #10a574;
+  --color-chart-line-down: #e0605c;
 
-  --color-warning: #c42a1f;
+  --color-warning: #c4271f;
   --color-warning-fill: #c93a3f;
-  --color-warning-surface: #f9ece8;
-  --color-warning-border: #efcfc8;
-  --color-positive: #2e7a3c;
-  --color-negative: #b3362b;
-  --color-caution: #b23c0a;
-  --color-caution-surface: #f7ece0;
+  --color-warning-surface: #fdeeee;
+  --color-warning-border: #f6cfcf;
+  --color-positive: #046a44;
+  --color-negative: #b52424;
+  --color-caution: #b03a08;
+  --color-caution-surface: #fdf1e3;
 }
 
 /*
@@ -369,11 +355,11 @@ body:has([data-layout="popup"]) {
 /* `dark:` styles a utility only under `data-theme="dark"`, for the few dark rules a token can't carry (layout, not colour). */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* `layered:` is the layout dark and paper share: the token sheet, underlined section tabs, tile actions and the neutral chart. */
-@custom-variant layered (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="paper"], [data-theme="paper"] *));
+/* `layered:` is the layout dark and silica share: the token sheet, underlined section tabs, tile actions and the neutral chart. */
+@custom-variant layered (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="silica"], [data-theme="silica"] *));
 
-/* `paper:` is for the paper-only touches: letterpress figures, pencil and receipts. */
-@custom-variant paper (&:where([data-theme="paper"], [data-theme="paper"] *));
+/* `silica:` is for the silica-only touches a token or a `.gleam-*` class can't carry. */
+@custom-variant silica (&:where([data-theme="silica"], [data-theme="silica"] *));
 
 /*
  * The shell must set `viewport-fit=cover` for `env(safe-area-inset-*)` to
@@ -556,11 +542,6 @@ select,
     var(--color-beam-yellow) 60% 80%,
     var(--color-beam-green) 80% 100%
   );
-}
-
-/* Paper's beam is a thinner line, so it lies in the header rather than on it. */
-[data-theme="paper"] .gleam-beam-divider {
-  height: 2px;
 }
 
 /*
@@ -844,7 +825,7 @@ select,
 /*
  * The top loading bar: a soft window of light travelling along a full-width
  * beam, so each colour sits where it does on the home beam and the theme's
- * own beam set (light, dark, paper) carries over. Reduced motion shows the
+ * own beam set (light, dark, silica) carries over. Reduced motion shows the
  * whole beam, dimmed.
  */
 @keyframes gleam-loading-sweep {
@@ -1021,223 +1002,6 @@ select,
 }
 
 /*
- * Paper's material: a stack of sheets on a desk. These classes do nothing
- * in light or dark.
- *
- * The token sheet lifts off the paper with a tight, warm edge. A wider
- * shadow gets clipped into a box by the screen above it.
- */
-[data-theme="paper"] .gleam-paper-sheet {
-  box-shadow:
-    0 -1px 2px rgba(38, 35, 30, 0.05),
-    0 -4px 10px rgba(38, 35, 30, 0.04);
-}
-
-/*
- * The commit buttons, primary and destructive, are polished solids, not
- * flat ink: a hairline of light inside the top edge and a faint sheen
- * fading down from it. Send and Receive stay flat: they are pressed into
- * the paper, though Send keeps the primary fill's class under its tile.
- * In a layer so a shadow utility on one button still wins.
- */
-@layer components {
-  [data-theme="paper"] :is(.bg-primary-fill, .bg-warning-fill):not(:disabled, .gleam-tile) {
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.07), transparent 55%);
-  }
-}
-
-/*
- * Undocked, the sheet's top edge faces the beam and catches it: a
- * hairline of light along the top, brightest in the middle, with a
- * faint spectral tint where it fades out. The corners stay unlit.
- */
-[data-theme="paper"] .gleam-paper-edge {
-  position: relative;
-}
-
-[data-theme="paper"] .gleam-paper-edge::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  inset-inline: 18px;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--color-beam-purple) 22%, #fff) 18%,
-    #fff 38% 62%,
-    color-mix(in srgb, var(--color-beam-sky) 22%, #fff) 82%,
-    transparent
-  );
-  pointer-events: none;
-}
-
-/*
- * A thin pane of lightly frosted glass laid over a card: a lit top edge,
- * a faint light rim, and a sheen falling straight down that never fades
- * out, so no corner of the card is left bare.
- */
-[data-theme="paper"] {
-  --gleam-frost: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
-/*
- * Glass catches light, so a hover on it brightens. Paper's ink wash would
- * darken the pane and read as a second, pressed-in pane inside it.
- */
-[data-theme="paper"] :is(.gleam-paper-glass, .gleam-paper-glass-down, .gleam-paper-glass-up) {
-  --color-hover: rgba(255, 255, 255, 0.35);
-}
-
-[data-theme="paper"] .gleam-paper-glass {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.36),
-    inset 0 -1px 0 rgba(38, 35, 30, 0.04),
-    0 1px 2px rgba(38, 35, 30, 0.04);
-}
-
-[data-theme="paper"] .gleam-paper-glass::before {
-  content: "";
-  position: absolute;
-  /* Under the text but over the fill: the address keeps its full contrast. */
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    var(--gleam-frost),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12) 70%);
-  pointer-events: none;
-}
-
-[data-theme="paper"] :is(.gleam-paper-sheet, .bg-surface) {
-  --color-hover: color-mix(in srgb, #5a4630 3%, transparent);
-}
-
-/*
- * A control with a shape (a card, an outlined button, a chip) turns to
- * glass under the pointer: frost, a sheen and a lit top edge over its own
- * fill. A row without a shape takes `--color-hover`, and its chevron inks
- * in. In a layer so a position utility on the control still wins. Send and
- * Receive are glass already, with their own pane in `::before`.
- */
-@layer components {
-  [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile) {
-    position: relative;
-    isolation: isolate;
-  }
-
-  [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile)::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    inset: 0;
-    border-radius: inherit;
-    opacity: 0;
-    background:
-      var(--gleam-frost),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18) 75%);
-    transition: opacity 150ms;
-    pointer-events: none;
-  }
-
-  @media (hover: hover) {
-    [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile):hover:not(:disabled) {
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    }
-
-    [data-theme="paper"] .gleam-hover-glass:not(.gleam-tile):hover:not(:disabled)::before {
-      opacity: 1;
-    }
-
-    [data-theme="paper"] :is(button, a, label):hover .gleam-chevron {
-      color: var(--color-foreground);
-    }
-  }
-
-  [data-theme="paper"] .gleam-chevron {
-    transition: color 150ms;
-  }
-}
-
-/*
- * Read-only glass is set into the page rather than laid on it: it runs
- * the full width, lights only its free edge and fades out where it
- * continues. The free edge curves like the token sheet's, a little less. `-down` hangs from a lit top edge; `-up` rises to a lit
- * bottom edge from under the header. A card you can change keeps the
- * rounded pane above.
- */
-[data-theme="paper"] :is(.gleam-paper-glass-down, .gleam-paper-glass-up) {
-  --gleam-glass-tint: color-mix(in srgb, var(--color-foreground) 3%, transparent);
-  position: relative;
-  isolation: isolate;
-}
-
-[data-theme="paper"] .gleam-paper-glass-down {
-  border-radius: 14px 14px 0 0;
-}
-
-[data-theme="paper"] .gleam-paper-glass-up {
-  border-radius: 0 0 14px 14px;
-}
-
-[data-theme="paper"] :is(.gleam-paper-glass-down, .gleam-paper-glass-up)::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    var(--gleam-frost),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12) 70%);
-  pointer-events: none;
-}
-
-/*
- * Hanging down, the pane keeps glass's grey tint and hard edge, but the
- * edge's thickness shows inside it, as a dark line under the lit one, and
- * only a faint blur lifts it. A crisp dark line above the edge reads as a
- * groove; a white fill and the sheet's full shadow read as paper.
- */
-[data-theme="paper"] .gleam-paper-glass-down {
-  background: linear-gradient(180deg, var(--gleam-glass-tint) 45%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 2px 0 rgba(38, 35, 30, 0.04),
-    0 -1px 2px rgba(38, 35, 30, 0.025),
-    0 -4px 10px rgba(38, 35, 30, 0.018);
-}
-
-[data-theme="paper"] .gleam-paper-glass-down::before {
-  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent);
-  mask-image: linear-gradient(180deg, #000 45%, transparent);
-}
-
-[data-theme="paper"] .gleam-paper-glass-up {
-  background: linear-gradient(0deg, var(--gleam-glass-tint) 55%, transparent);
-  box-shadow:
-    inset 0 -1px 0 rgba(255, 255, 255, 0.85),
-    0 1px 0 rgba(38, 35, 30, 0.05);
-}
-
-[data-theme="paper"] .gleam-paper-glass-up::before {
-  -webkit-mask-image: linear-gradient(0deg, #000 55%, transparent);
-  mask-image: linear-gradient(0deg, #000 55%, transparent);
-}
-
-/*
- * The sheet's paper has a barely-there grain, laid over its own colour.
- * Its sticky tabs carry the same grain so they don't show as a clean band.
- */
-[data-theme="paper"] .gleam-paper-grain {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.14  0 0 0 0 0.12  0 0 0 0.07 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
-}
-
-/*
  * A bottom sheet (vaul) rises in 300ms and drops away in 220ms; vaul's own
  * 500ms both ways lingers. `forwards` holds it off screen until Radix
  * unmounts it on `animationend`. A drag keeps vaul's own release timing.
@@ -1253,68 +1017,339 @@ select,
   animation-fill-mode: forwards;
 }
 
-/* A sheet is laid down: it settles into place with no bounce. */
-@keyframes gleam-paper-settle {
-  from {
-    transform: translateY(14px);
-    opacity: 0.4;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
+/*
+ * Silica's materials: sky, frost and lens. These classes do nothing in
+ * light or dark.
+ *
+ * The sky is fixed behind every screen, under the root's own stacking
+ * context. Three skies are stacked and cross-faded, since a gradient can't
+ * animate and opacity can. Their sizes are in px from the top, so the
+ * wash sits behind the figure and chart and is gone by the foot of a tall
+ * side panel.
+ */
+.gleam-sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-[data-theme="paper"] .gleam-paper-settle {
-  animation: gleam-paper-settle 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+/* The side panel and phone cap their direct children's width; the sky fills the window. */
+[data-layout] > .gleam-sky {
+  max-width: none;
+}
+
+.gleam-sky > * {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 400ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.gleam-sky[data-market="flat"] > .gleam-sky-flat,
+.gleam-sky[data-market="up"] > .gleam-sky-up,
+.gleam-sky[data-market="down"] > .gleam-sky-down {
+  opacity: 1;
+}
+
+.gleam-sky-flat {
+  background:
+    radial-gradient(ellipse 62% 250px at 94% 130px, rgba(205, 245, 226, 0.6), transparent),
+    radial-gradient(ellipse 70% 260px at 2% 360px, rgba(207, 229, 253, 0.6), transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent 420px);
+}
+
+.gleam-sky-up {
+  background:
+    radial-gradient(ellipse 80% 300px at 92% 70px, rgba(254, 240, 178, 0.75), transparent),
+    radial-gradient(ellipse 75% 280px at 6% 220px, rgba(178, 244, 209, 0.62), transparent),
+    radial-gradient(ellipse 60% 200px at 88% 400px, rgba(207, 229, 253, 0.5), transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6), transparent 420px);
+}
+
+.gleam-sky-down {
+  background:
+    radial-gradient(ellipse 85% 280px at 92% 50px, rgba(203, 213, 227, 0.68), transparent),
+    radial-gradient(ellipse 60% 200px at 42% 215px, rgba(254, 214, 221, 0.6), transparent),
+    radial-gradient(ellipse 75% 250px at 0% 370px, rgba(216, 218, 254, 0.62), transparent),
+    linear-gradient(180deg, rgba(233, 238, 246, 0.8), transparent 520px);
 }
 
 /*
- * The screen's one large figure, pressed into the paper: extra bold, set
- * tight, with a light edge under it. Unlayered, so it wins over the
- * figure's own weight and tracking utilities.
+ * Frost: translucent white, a lit top edge and a soft, wide shadow. It
+ * doesn't blur, because the sky behind it is already soft.
  */
-[data-theme="paper"] .gleam-figure {
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: #292724;
-  text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.95),
-    0 -1px 0 rgba(38, 35, 30, 0.07);
+[data-theme="silica"] {
+  --frost-fill: rgba(255, 255, 255, 0.68);
+  --frost-fill-hover: rgba(255, 255, 255, 0.92);
+  --frost-sheet: rgba(255, 255, 255, 0.74);
+  --frost-bar: transparent;
+  --frost-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 1px 2px rgba(30, 50, 90, 0.04),
+    0 8px 20px -6px rgba(30, 50, 90, 0.08);
+}
+
+[data-theme="silica"] .gleam-frost {
+  border-radius: 18px;
+  border-color: transparent;
+  background: var(--frost-fill);
+  box-shadow: var(--frost-shadow);
+}
+
+/* A disabled action is thinner glass with no lift. */
+[data-theme="silica"] .gleam-frost:disabled {
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+}
+
+/* The token sheet: undocked, its lit top edge and soft shadow lift it off the sky. */
+[data-theme="silica"] .gleam-frost-sheet {
+  border-radius: 24px 24px 0 0;
+  background: var(--frost-sheet);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 -10px 30px -12px rgba(30, 50, 90, 0.1);
+}
+
+/* What you hold is a card; the sheet's other rows stay flat. */
+[data-theme="silica"] .gleam-token-card {
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: 14px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(30, 50, 90, 0.03),
+    0 5px 16px -5px rgba(30, 50, 90, 0.09);
+}
+
+/* The selected one of a few views or values is raised. */
+[data-theme="silica"] .gleam-frost-chip {
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(30, 50, 90, 0.05),
+    0 3px 8px -2px rgba(30, 50, 90, 0.09);
+}
+
+/* The home header's buttons: the circle is drawn inside the tap target, which is larger on a phone. */
+[data-theme="silica"] .gleam-frost-round {
+  position: relative;
+  isolation: isolate;
+  border-radius: 9999px;
+  background: none;
+  color: var(--color-foreground);
+}
+
+[data-theme="silica"] .gleam-frost-round::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--frost-fill);
+  box-shadow: var(--frost-shadow);
+}
+
+[data-theme="silica"] .gleam-round-buttons {
+  gap: 8px;
+}
+
+[data-layout="phone"][data-theme="silica"] .gleam-frost-round::before {
+  inset: 3px;
+}
+
+[data-layout="phone"][data-theme="silica"] .gleam-round-buttons {
+  gap: 2px;
+  margin-right: -3px;
 }
 
 /*
- * Pending activity is written in pencil: graphite text with a soft edge
- * and a hand-drawn circle round its icon. Once it settles the row inks in.
+ * A bar that content passes behind. At rest it shows the sky untouched,
+ * since a blur of something already soft changes nothing; content
+ * scrolling under it fogs.
  */
-[data-theme="paper"] .gleam-pencil-row :is(.gleam-pencil, .gleam-pencil *) {
-  transition:
-    color 0.9s ease,
-    text-shadow 0.9s ease,
-    background-color 0.9s ease,
-    box-shadow 0.9s ease;
+[data-theme="silica"] .gleam-frost-bar,
+[data-layout="phone"][data-theme="silica"] .gleam-footer:not(.gleam-footer-flow),
+[data-layout="phone"][data-theme="silica"]::before {
+  background: var(--frost-bar);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
 }
 
-[data-theme="paper"] .gleam-pencil-row[data-pending] :is(.gleam-pencil, .gleam-pencil *) {
-  color: var(--color-pencil);
-  text-shadow:
-    0 0 0.7px var(--color-pencil),
-    0.3px 0.2px 0 rgba(139, 137, 133, 0.35);
+/* Any other control with a shape (a card, an outlined button) is thin frost; its faint ring holds it on white. */
+[data-theme="silica"] .gleam-hover-frost:not(.gleam-frost) {
+  border-color: transparent;
+  background: var(--frost-fill) padding-box;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-foreground) 7%, transparent);
 }
 
-[data-theme="paper"] .gleam-pencil-row[data-pending] .gleam-pencil-icon {
+[data-theme="silica"] .gleam-hover-frost:not(.gleam-frost):focus-visible {
+  border-color: var(--color-foreground);
+}
+
+@media (hover: hover) {
+  [data-theme="silica"] .gleam-hover-frost:not(.gleam-frost):hover:not(:disabled),
+  [data-theme="silica"] .gleam-frost:hover:not(:disabled) {
+    background: var(--frost-fill-hover);
+  }
+
+  [data-theme="silica"] .gleam-hover-frost:not(.gleam-frost):hover:not(:disabled) {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--color-foreground) 7%, transparent),
+      0 2px 8px -2px rgba(30, 50, 90, 0.1);
+  }
+
+  [data-theme="silica"] .gleam-frost-round:hover::before {
+    background: var(--frost-fill-hover);
+  }
+
+  [data-theme="silica"] button.gleam-token-card:hover {
+    background: color-mix(in srgb, var(--color-foreground) 3%, #fff);
+  }
+
+  [data-theme="silica"] :is(button, a, label):hover .gleam-chevron {
+    color: var(--color-foreground);
+  }
+}
+
+[data-layout="phone"][data-theme="silica"] button.gleam-token-card:active {
+  background: color-mix(in srgb, var(--color-foreground) 3%, #fff);
+}
+
+[data-theme="silica"] .gleam-chevron {
+  transition: color 150ms;
+}
+
+[data-theme="silica"] :is(.gleam-frost-sheet, .bg-surface) {
+  --color-hover: color-mix(in srgb, var(--color-foreground) 4%, transparent);
+}
+
+/*
+ * The commit buttons, primary and destructive, are polished solids: a
+ * hairline of light inside the top edge and a faint sheen fading down.
+ * In a layer so a shadow utility on one button still wins.
+ */
+@layer components {
+  [data-theme="silica"] :is(.bg-primary-fill, .bg-warning-fill):not(:disabled, .gleam-tile) {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent 55%);
+  }
+}
+
+/*
+ * The lens marks who: clear glass with a faint blue tint, a lit rim and a
+ * sheen under the text, the sky showing through. One you can change is a
+ * rounded card. A read-only one is set into the page: it lights and curves
+ * only its open edge and fades out where it continues.
+ */
+[data-theme="silica"] {
+  --lens-tint: rgba(70, 105, 175, 0.07);
+  --lens-sheen: rgba(255, 255, 255, 0.55);
+  --lens-sheen-low: rgba(255, 255, 255, 0.3);
+  --lens-solid: transparent;
+}
+
+[data-theme="silica"] :is(.gleam-lens, .gleam-lens-down, .gleam-lens-up) {
+  position: relative;
+  /* Glass catches light, so a hover brightens it rather than darkening into a second pane. */
+  --color-hover: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="silica"] .gleam-lens {
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, var(--lens-sheen), var(--lens-sheen-low) 75%),
+    linear-gradient(var(--lens-tint), var(--lens-tint)),
+    var(--lens-solid);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(30, 50, 90, 0.05),
+    0 1px 2px rgba(30, 50, 90, 0.06);
+}
+
+@media (hover: hover) {
+  [data-theme="silica"] button.gleam-lens:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+[data-theme="silica"] .gleam-lens-down {
+  border-radius: 16px 16px 0 0;
+  background:
+    linear-gradient(180deg, var(--lens-sheen), var(--lens-sheen-low) 55%, transparent),
+    linear-gradient(180deg, var(--lens-tint) 55%, transparent),
+    var(--lens-solid);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 -1px 2px rgba(30, 50, 90, 0.05);
+}
+
+[data-theme="silica"] .gleam-lens-up {
+  border-radius: 0 0 16px 16px;
+  background:
+    linear-gradient(0deg, var(--lens-sheen), var(--lens-sheen-low) 55%, transparent),
+    linear-gradient(0deg, var(--lens-tint) 55%, transparent),
+    var(--lens-solid);
+  box-shadow:
+    inset 0 -1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 2px rgba(30, 50, 90, 0.05);
+}
+
+/* The screen's one large figure: heavy and set tight. Unlayered, so it wins over the figure's own utilities. */
+[data-theme="silica"] .gleam-figure {
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+/* Pending activity is fogged, with an outlined icon, and clears once it settles. */
+[data-theme="silica"] .gleam-pending-row :is(.gleam-pending-ink, .gleam-pending-ink *) {
+  transition: color 300ms ease-out;
+}
+
+[data-theme="silica"] .gleam-pending-row[data-pending] :is(.gleam-pending-ink, .gleam-pending-ink *) {
+  color: var(--color-muted);
+}
+
+[data-theme="silica"] .gleam-pending-row[data-pending] .gleam-pending-icon {
   background: transparent;
-  color: var(--color-pencil);
-  box-shadow: inset 0 0 0 1.2px var(--color-pencil);
-  border-radius: 48% 52% 50% 46% / 52% 47% 53% 48%;
+  box-shadow: inset 0 0 0 1px var(--color-faint);
+}
+
+/* Solid where translucency isn't wanted or a bar can't blur. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-theme="silica"] {
+    --frost-fill: #fff;
+    --frost-sheet: #fff;
+    --frost-bar: var(--color-background);
+    --lens-solid: #fff;
+  }
+
+  [data-theme="silica"] .gleam-frost-sheet .gleam-frost-bar {
+    background: #fff;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="silica"] {
+    --frost-bar: var(--color-background);
+  }
+
+  [data-theme="silica"] .gleam-frost-sheet {
+    background: #fff;
+  }
+
+  [data-theme="silica"] .gleam-frost-sheet .gleam-frost-bar {
+    background: #fff;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="paper"] .gleam-paper-settle {
-    animation: none;
-  }
-
-  [data-theme="paper"] .gleam-pencil-row :is(.gleam-pencil, .gleam-pencil *) {
+  .gleam-sky > *,
+  [data-theme="silica"] .gleam-pending-row :is(.gleam-pending-ink, .gleam-pending-ink *) {
     transition: none;
   }
 }

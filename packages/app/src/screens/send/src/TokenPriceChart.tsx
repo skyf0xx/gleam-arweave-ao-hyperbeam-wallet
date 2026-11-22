@@ -108,7 +108,7 @@ export function TokenPriceChart({
         )}
       >
         <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" width="100%" height="100%" aria-hidden>
-          <polygon className="paper:hidden" points={`0,${CHART_HEIGHT} ${linePath} ${CHART_WIDTH},${CHART_HEIGHT}`} fill={lineColor} opacity={0.12} stroke="none" />
+          <polygon className="silica:hidden" points={`0,${CHART_HEIGHT} ${linePath} ${CHART_WIDTH},${CHART_HEIGHT}`} fill={lineColor} opacity={0.12} stroke="none" />
           <polyline
             points={linePath}
             fill="none"

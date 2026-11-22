@@ -702,20 +702,46 @@ describe("MainScreenView hidden token rows", () => {
     });
     const home = () => scrollTo.mock.calls.filter(([options]) => (options as ScrollToOptions)?.top === 0).length;
 
-    fireEvent.wheel(section, { deltaY: -30 });
+    fireEvent.wheel(section, { deltaY: -20 });
     expect(home()).toBe(0);
-    fireEvent.wheel(section, { deltaY: -30 });
+    fireEvent.wheel(section, { deltaY: -20 });
     expect(home()).toBe(1);
 
-    fireEvent.touchStart(section, { touches: [{ clientY: 100 }] });
-    fireEvent.touchMove(section, { touches: [{ clientY: 130 }] });
+    const at = (clientY: number, clientX = 50) => ({ touches: [{ clientX, clientY }] });
+    fireEvent.touchStart(section, at(100));
+    fireEvent.touchMove(section, at(120));
     expect(home()).toBe(1);
-    fireEvent.touchMove(section, { touches: [{ clientY: 160 }] });
+    expect(section.style.translate).toBe("0px 20px");
+    fireEvent.touchMove(section, at(130));
+    expect(home()).toBe(2);
+    expect(section.style.translate).toBe("");
+
+    // Sideways is a tab swipe, not a pull.
+    fireEvent.touchStart(section, at(100));
+    fireEvent.touchMove(section, at(110, 90));
+    fireEvent.touchMove(section, at(160, 90));
     expect(home()).toBe(2);
 
     section.scrollTop = 50;
     fireEvent.wheel(section, { deltaY: -100 });
     expect(home()).toBe(2);
+
+    // A scroll that reaches the top carries on into a pull, over a longer distance.
+    fireEvent.touchStart(section, at(100));
+    fireEvent.touchMove(section, at(140));
+    section.scrollTop = 0;
+    fireEvent.touchMove(section, at(150));
+    fireEvent.touchMove(section, at(190));
+    expect(home()).toBe(2);
+    fireEvent.touchMove(section, at(200));
+    expect(home()).toBe(3);
+
+    // The tab row is a handle wherever the list is scrolled to.
+    section.scrollTop = 50;
+    const handle = screen.getByRole("tablist", { name: "Tokens, collectibles and activity" });
+    fireEvent.touchStart(handle, at(100));
+    fireEvent.touchMove(handle, at(130));
+    expect(home()).toBe(4);
     scrollTo.mockRestore();
   });
 

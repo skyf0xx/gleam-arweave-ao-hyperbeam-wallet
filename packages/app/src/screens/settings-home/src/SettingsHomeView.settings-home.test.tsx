@@ -143,7 +143,7 @@ describe("SettingsHomeView", () => {
     const setTheme = vi.fn();
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ThemeContext.Provider value={{ theme: "dark", setTheme }}>
+        <ThemeContext.Provider value={{ theme: "dark", setTheme, weather: false, setWeather: vi.fn(), reportMarket: vi.fn() }}>
           <SettingsHomeView
             runtime={fakeRuntime({ send: successfulSend({ theme: "dark" }) })}
             onBack={vi.fn()}
@@ -161,6 +161,26 @@ describe("SettingsHomeView", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(setTheme).toHaveBeenCalledWith("light");
     await waitFor(() => expect((screen.getByRole("radio", { name: "Light" }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("offers weather only under silica, and saves it with the theme", async () => {
+    const send = successfulSend();
+    renderSettingsHome({ runtime: fakeRuntime({ send }) });
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Weather" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Silica" }));
+    const weather = () => screen.getByRole("menuitemcheckbox", { name: "Weather" }) as HTMLButtonElement;
+    expect(weather().getAttribute("aria-checked")).toBe("false");
+    await waitFor(() => expect(weather().disabled).toBe(false));
+    fireEvent.click(weather());
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "silica", weather: true } }));
+    expect(weather().getAttribute("aria-checked")).toBe("true");
+
+    await waitFor(() => expect((screen.getByRole("radio", { name: "Dark" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "dark", weather: true } }));
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Weather" })).toBeNull();
   });
 
   it("puts the theme back if saving it fails", async () => {
