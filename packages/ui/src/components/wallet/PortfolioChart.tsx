@@ -136,6 +136,8 @@ const SCOPE_FLASH_MS = 2500;
 /** Enough to keep the trend's shape without packing several points into each pixel, which reads as a thick, jagged line. */
 const SPARKLINE_POINTS = 32;
 const CHART_POINTS = 90;
+/** The lowest point sits this far up the chart's 40 units, so the shading shows beneath it. */
+const CHART_BOTTOM_INSET = 8;
 
 /** A chart's range tab, shared by every chart so the pickers can't drift apart. */
 export function rangeTabClass(selected: boolean): string {
@@ -195,7 +197,7 @@ export function PortfolioChart({
   const isEmpty = currentValue === 0 && points.every((point) => point.value === 0);
   // A wallet holding nothing over this range has no change to show, so the % and range tabs give way to the placeholder.
   const showsHistory = loading || !isEmpty;
-  const coords = chartCoordinates(downsample(points, compact ? SPARKLINE_POINTS : CHART_POINTS));
+  const coords = chartCoordinates(downsample(points, compact ? SPARKLINE_POINTS : CHART_POINTS), compact ? undefined : CHART_BOTTOM_INSET);
   const linePoints = toPolyline(coords);
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const smoothPath = toSmoothPath(coords);
@@ -300,7 +302,8 @@ export function PortfolioChart({
         <EmptyLine />
       ) : (
         // The dot is positioned against this box, so padding on the chart area insets both together.
-        <div className="relative h-full w-full">
+        // Light's shading ends on the box's edge, so rounding the box's bottom corners rounds the shading.
+        <div className="relative h-full w-full overflow-hidden rounded-b-[5px] layered:overflow-visible layered:rounded-none">
         <svg
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           preserveAspectRatio="none"
