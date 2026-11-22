@@ -30,11 +30,3 @@ export function isThemeSettings(value: unknown): value is ThemeSettings {
     (record.weather === undefined || typeof record.weather === "boolean")
   );
 }
-
-/** A stored record, or `null` when it is malformed. A stored `paper` is read as silica, so those people keep their theme. */
-export function readThemeSettings(value: unknown): ThemeSettings | null {
-  const record = value !== null && typeof value === "object" ? (value as Record<string, unknown>) : null;
-  const upgraded = record?.theme === "paper" ? { ...record, theme: "silica" } : value;
-  if (!isThemeSettings(upgraded)) return null;
-  return { theme: upgraded.theme, ...(upgraded.weather ? { weather: true } : {}) };
-}

@@ -83,7 +83,7 @@ export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl } from "./site-lin
 export type { SitePage } from "./site-links";
 export { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_CANARY_PROCESS_ID, L1_TOKEN_NODE_URLS, POINTS_API_URL, bundlerUrlOf, explorerUrlFor, isValidNetworkSettings } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
-export { THEME_PREFERENCES, isThemeSettings, readThemeSettings } from "./theme";
+export { THEME_PREFERENCES, isThemeSettings } from "./theme";
 export type { DisplayCurrency, DisplaySettings, FiatCurrency, HeaderStyle, HeadlineBalance, TokenCurrency, TokenRowDetail } from "./display";
 export {
   FIAT_CURRENCIES,

@@ -1223,13 +1223,6 @@ describe("WalletLifecycleHandler: setThemePreference", () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await expect(handler.setThemePreference({ theme: "silica", weather: "rain" as never })).rejects.toThrow(/invalid theme preference/i);
   });
-
-  it("reads a stored paper theme as silica", async () => {
-    const storage = createFakeStorage();
-    await storage.set("local:themeSettings", { theme: "paper" });
-    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
-    expect(await handler.getThemePreference()).toEqual({ theme: "silica" });
-  });
 });
 
 describe("WalletLifecycleHandler: getState (untrusted-storage revalidation)", () => {

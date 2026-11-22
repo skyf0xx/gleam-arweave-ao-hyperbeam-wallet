@@ -10,7 +10,6 @@ import {
   isKeylessWalletMethod,
   isLockSettings,
   isThemeSettings,
-  readThemeSettings,
   isValidArweaveAddress,
   isValidHardwareDevice,
   isValidWallet,
@@ -164,7 +163,9 @@ async function loadLockSettings(storage: StoragePort): Promise<LockSettings> {
 }
 
 async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
-  return readThemeSettings(await storage.get<unknown>(THEME_SETTINGS_KEY)) ?? DEFAULT_THEME_SETTINGS;
+  const raw = await storage.get<unknown>(THEME_SETTINGS_KEY);
+  if (isThemeSettings(raw)) return { theme: raw.theme, ...(raw.weather ? { weather: true } : {}) };
+  return DEFAULT_THEME_SETTINGS;
 }
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
