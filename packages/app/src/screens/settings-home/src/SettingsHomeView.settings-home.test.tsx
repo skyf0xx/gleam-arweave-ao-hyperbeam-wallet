@@ -167,10 +167,10 @@ describe("SettingsHomeView", () => {
     const send = successfulSend();
     renderSettingsHome({ runtime: fakeRuntime({ send }) });
     await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
-    expect(screen.queryByRole("menuitemcheckbox", { name: "Weather" })).toBeNull();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Match colours to market sentiment" })).toBeNull();
 
     fireEvent.click(screen.getByRole("radio", { name: "Silica" }));
-    const weather = () => screen.getByRole("menuitemcheckbox", { name: "Weather" }) as HTMLButtonElement;
+    const weather = () => screen.getByRole("menuitemcheckbox", { name: "Match colours to market sentiment" }) as HTMLButtonElement;
     expect(weather().getAttribute("aria-checked")).toBe("false");
     await waitFor(() => expect(weather().disabled).toBe(false));
     fireEvent.click(weather());
@@ -180,7 +180,7 @@ describe("SettingsHomeView", () => {
     await waitFor(() => expect((screen.getByRole("radio", { name: "Dark" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
     await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "dark", weather: true } }));
-    expect(screen.queryByRole("menuitemcheckbox", { name: "Weather" })).toBeNull();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Match colours to market sentiment" })).toBeNull();
   });
 
   it("puts the theme back if saving it fails", async () => {

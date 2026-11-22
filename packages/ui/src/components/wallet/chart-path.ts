@@ -12,9 +12,10 @@ const CHART_INSET_Y = 3;
 /**
  * Places a series in a `0..CHART_WIDTH x 0..CHART_HEIGHT` box, flat-lining
  * a single-point or zero-range series at the vertical midpoint rather than
- * dividing by zero.
+ * dividing by zero. `bottomInset` raises the lowest point further off the
+ * baseline, which leaves room for the shading under it.
  */
-export function chartCoordinates(points: readonly ChartPoint[]): { x: number; y: number }[] {
+export function chartCoordinates(points: readonly ChartPoint[], bottomInset = CHART_INSET_Y): { x: number; y: number }[] {
   if (points.length === 0) return [];
   if (points.length === 1) {
     return [
@@ -31,7 +32,7 @@ export function chartCoordinates(points: readonly ChartPoint[]): { x: number; y:
 
   return points.map((point) => ({
     x: ((point.timestamp - minTimestamp) / timeRange) * CHART_WIDTH,
-    y: CHART_HEIGHT - CHART_INSET_Y - ((point.value - minValue) / valueRange) * (CHART_HEIGHT - 2 * CHART_INSET_Y),
+    y: CHART_HEIGHT - bottomInset - ((point.value - minValue) / valueRange) * (CHART_HEIGHT - CHART_INSET_Y - bottomInset),
   }));
 }
 

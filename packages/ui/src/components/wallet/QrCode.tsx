@@ -13,7 +13,8 @@ export interface QrCodeProps {
 
 // Mirrors theme.css's --color-foreground/--color-background/--color-beam-purple; qr-code-styling paints its own SVG outside Tailwind's pipeline, so these can't be read live from CSS custom properties.
 const QR_FOREGROUND = "#111111";
-const QR_BACKGROUND = "#ffffff";
+// Clear, so the plate's own fill shows through and can follow the theme.
+const QR_BACKGROUND = "transparent";
 const QR_ACCENT = "#8b12ff";
 
 const LOGO_SRC = "/icon/128.png";
@@ -101,7 +102,7 @@ export function QrCode({ value, size = 176, label, className }: QrCodeProps) {
   return (
     // The cut lands on the plate's padding, clear of the code, which is drawn with no margin of its own.
     <div className={cn("gleam-crystal-cut inline-flex", className)}>
-      <div className="inline-flex items-center justify-center bg-background p-3 silica:bg-surface">
+      <div className="inline-flex items-center justify-center bg-white p-3 dark:bg-[#d9d9dd]">
         <div
           ref={containerRef}
           role="img"

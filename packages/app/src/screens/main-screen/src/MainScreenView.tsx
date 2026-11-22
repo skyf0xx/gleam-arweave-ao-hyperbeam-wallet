@@ -1018,7 +1018,7 @@ export function MainScreenView({
                 }
               >
               {tab === "tokens" ? (
-                <div className="min-h-60 phone:min-h-0 silica:pt-1.5">
+                <div className="min-h-60 phone:min-h-0">
                   {loading && !hasLoadedOnce ? (
                     <>
                       <SkeletonRow />
@@ -1132,7 +1132,7 @@ export function MainScreenView({
                         const actionClassName =
                           "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
                         return (
-                          <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative silica:mb-2">
+                          <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative">
                             {row.node}
                             {hiddenExpanded ? (
                               <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5">

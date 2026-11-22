@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
-/** Movement needed before the gesture's direction is judged. */
-const DIRECTION_SLOP_PX = 8;
+/** Movement needed before the gesture's direction is judged. A thumb on a scrolling list rarely moves level, so a swipe needs only to lean sideways (`dx` over 0.9 × `dy`). */
+const DIRECTION_SLOP_PX = 6;
 /** A start this close to the side is the system's own back swipe. */
 const SCREEN_EDGE_PX = 20;
 /** Past either end the panel resists rather than stopping dead. */
 const END_RESISTANCE = 0.25;
 /** A slow drag changes tab past this share of the width; a flick needs only the speed. */
-const COMMIT_SHARE = 0.3;
-const FLICK_PX_PER_MS = 0.4;
+const COMMIT_SHARE = 0.15;
+const FLICK_PX_PER_MS = 0.2;
 /** On the home view nothing tracks the finger, so a swipe has to be a clear one. */
-const OPEN_PX = 48;
+const OPEN_PX = 32;
 const SETTLE_MS = 200;
 const DOCK_MS = 220;
 
@@ -174,7 +174,7 @@ export function useTabSwipe(options: TabSwipeOptions): PeekedPanel | null {
       const dy = touch.clientY - startY;
       if (phase === "undecided") {
         if (Math.max(Math.abs(dx), Math.abs(dy)) < DIRECTION_SLOP_PX) return;
-        if (Math.abs(dx) <= Math.abs(dy) * 1.2 || scrollsSideways(event.target, element, dx < 0)) {
+        if (Math.abs(dx) <= Math.abs(dy) * 0.9 || scrollsSideways(event.target, element, dx < 0)) {
           phase = "idle";
           return;
         }
