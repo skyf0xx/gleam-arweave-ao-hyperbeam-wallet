@@ -50,6 +50,11 @@ describe("readBackupData", () => {
     expect(isValidBackupData(data)).toBe(true);
   });
 
+  it("keeps a theme an older release stored as paper", async () => {
+    const data = await readBackupData(memoryStorage({ ...INCLUDED, "local:themeSettings": { theme: "paper" } }));
+    expect(data["local:themeSettings"]).toEqual({ theme: "paper" });
+  });
+
   it("leaves out tokens added for a wallet that is gone, and an active wallet that is", async () => {
     const data = await readBackupData(
       memoryStorage({ ...INCLUDED, "local:activeWalletId": "gone", [watchedTokensBackupKey(address("z"))]: [address("t")] }),

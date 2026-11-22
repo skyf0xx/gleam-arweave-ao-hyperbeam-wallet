@@ -115,12 +115,14 @@ describe("ProtocolMap", () => {
     }>();
   });
 
-  it("getThemePreference/setThemePreference are exactly light, dark or paper, never a system/auto value", () => {
+  it("getThemePreference/setThemePreference are exactly light, dark or silica, never a system/auto value, with an optional weather switch", () => {
     expectTypeOf<ReturnType<ProtocolMap["getThemePreference"]>>().toEqualTypeOf<{
-      theme: "light" | "dark" | "paper";
+      theme: "light" | "dark" | "silica";
+      weather?: boolean;
     }>();
     expectTypeOf<Parameters<ProtocolMap["setThemePreference"]>[0]>().toEqualTypeOf<{
-      theme: "light" | "dark" | "paper";
+      theme: "light" | "dark" | "silica";
+      weather?: boolean;
     }>();
   });
 

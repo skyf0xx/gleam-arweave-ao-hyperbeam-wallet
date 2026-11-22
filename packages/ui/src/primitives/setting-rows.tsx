@@ -78,25 +78,39 @@ export function SelectRow<T extends string>({
 
 export function ToggleRow({
   title,
+  description,
   checked,
   disabled,
   onToggle,
 }: {
   title: string;
+  description?: string;
   checked: boolean;
   disabled: boolean;
   onToggle: () => void;
 }) {
+  const id = useId();
   return (
     <button
       type="button"
       role="menuitemcheckbox"
       aria-checked={checked}
+      aria-labelledby={`${id}-title`}
+      aria-describedby={description ? `${id}-description` : undefined}
       disabled={disabled}
       onClick={onToggle}
-      className="flex w-full items-center justify-between py-3.5 text-left disabled:opacity-60"
+      className="flex w-full items-center justify-between gap-3 py-3.5 text-left disabled:opacity-60"
     >
-      <span className="text-label font-semibold text-foreground">{title}</span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span id={`${id}-title`} className="text-label font-semibold text-foreground">
+          {title}
+        </span>
+        {description ? (
+          <span id={`${id}-description`} className="text-caption text-muted">
+            {description}
+          </span>
+        ) : null}
+      </span>
       <span
         aria-hidden="true"
         className={cn(
@@ -150,7 +164,7 @@ export function SegmentedRow<T extends string>({
               }}
               className={cn(
                 "rounded-md px-3 py-1 text-caption font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground disabled:cursor-default",
-                selected ? "bg-background text-foreground shadow-sm" : "text-muted hover:enabled:text-foreground",
+                selected ? "gleam-frost-chip bg-background text-foreground shadow-sm" : "text-muted hover:enabled:text-foreground",
               )}
             >
               {option.label}

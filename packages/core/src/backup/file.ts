@@ -4,7 +4,7 @@ import { isValidNetworkSettings } from "../models/network";
 import { isPasskeyEnrollment } from "../models/passkey";
 import { readSecurityPhrase } from "../models/security-phrase";
 import { isLockSettings } from "../models/session";
-import { isThemeSettings } from "../models/theme";
+import { readThemeSettings } from "../models/theme";
 import { isValidWallet, type VaultEnvelopeV2, type Wallet } from "../models/wallet";
 import { base64ToBytes, bytesToBase64 } from "../vault/base64";
 
@@ -131,7 +131,7 @@ const RULES: Readonly<Record<string, BackupRule>> = {
   [CONTACTS_BACKUP_KEY]: { list: true, ok: isValidContact },
   "local:networkSettings": { list: false, ok: isValidNetworkSettings },
   "local:displaySettings": { list: false, ok: isDisplaySettings },
-  "local:themeSettings": { list: false, ok: isThemeSettings },
+  "local:themeSettings": { list: false, ok: (value) => readThemeSettings(value) !== null },
   "local:lockSettings": { list: false, ok: isLockSettings },
   "local:securityPhrase": { list: false, ok: (value) => readSecurityPhrase(value) !== null },
   "local:passkey": { list: false, ok: isPasskeyEnrollment },

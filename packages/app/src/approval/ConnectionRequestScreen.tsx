@@ -92,8 +92,8 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
           <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
         </div>
 
-        {/* On paper, glass is laid from the wallet the site will see down through what it may do with it. */}
-        <div className="gleam-paper-glass-down flex flex-col gap-5 paper:-mx-5 paper:px-5 paper:pb-5 paper:pt-4">
+        {/* In silica, a lens runs from the wallet the site will see down through what it may do with it. */}
+        <div className="gleam-lens-down flex flex-col gap-5 silica:-mx-5 silica:px-5 silica:pb-5 silica:pt-4">
           {wallet ? (
             <div className="flex flex-col gap-1.5">
               <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.connectingAs")}</span>

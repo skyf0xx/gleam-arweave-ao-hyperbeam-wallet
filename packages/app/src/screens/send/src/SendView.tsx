@@ -771,7 +771,7 @@ function ComposeStep({
                 type="button"
                 onClick={onOpenTokenPicker}
                 aria-haspopup="dialog"
-                className="gleam-hover-glass flex flex-shrink-0 items-center gap-1.5 rounded-[7px] border border-line bg-mist py-1.5 pl-1.5 pr-2.5 text-label font-bold text-foreground hover:bg-line paper:hover:bg-mist phone:hit-target"
+                className="gleam-hover-frost flex flex-shrink-0 items-center gap-1.5 rounded-[7px] border border-line bg-mist py-1.5 pl-1.5 pr-2.5 text-label font-bold text-foreground hover:bg-line silica:hover:bg-mist phone:hit-target"
               >
                 <TokenGlyph
                   label={ticker.slice(0, 2).toUpperCase()}

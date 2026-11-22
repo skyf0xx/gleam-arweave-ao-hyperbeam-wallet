@@ -27,6 +27,7 @@ import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinsto
 import { useAddressIdentity } from "../../../address-identity";
 import { useLocale, useT, type TFunction } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
+import { marketOf, useSharedTheme } from "../../../theme";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGallery } from "../../collectibles/index.tsx";
@@ -471,8 +472,6 @@ export function MainScreenView({
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [listDocked, setListDocked] = useState(false);
-  // Paper's sheet settles in once per mount; dropping the class after keeps an undock from replaying it.
-  const [sheetSettled, setSheetSettled] = useState(false);
   const [hiddenExpanded, setHiddenExpanded] = useState(initialTokenEditing);
   // Tagged with its address so a wallet switch reads that wallet's choices without an effect.
   const [storedVisibility, setStoredVisibility] = useState(() => ({
@@ -617,6 +616,12 @@ export function MainScreenView({
   const chartFirst = chartSeries[0]?.value ?? 0;
   const chartLast = chartSeries[chartSeries.length - 1]?.value ?? 0;
   const chartChange = !history ? 0 : extraValue > 0 && chartSeries.length > 1 && chartFirst > 0 ? chartLast / chartFirst - 1 : history.change;
+  const reportMarket = useSharedTheme()?.reportMarket;
+  // A period still loading keeps the sky it had, so switching doesn't clear it in between.
+  const market = portfolioHistoryQuery.isPending ? undefined : marketOf(portfolioHasSeries ? chartChange : 0);
+  useEffect(() => {
+    if (market !== undefined) reportMarket?.(market);
+  }, [market, reportMarket]);
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 
@@ -820,7 +825,7 @@ export function MainScreenView({
     <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
       <LoadingBar active={homeFetching} failed={homeFailed} />
 
-      <div className="sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
+      <div className="gleam-frost-bar sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
         {headerCollapsed ? (
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
@@ -876,13 +881,13 @@ export function MainScreenView({
           </button>
         ) : null}
 
-        <div className="flex flex-shrink-0 items-center phone:-mr-3">
+        <div className="gleam-round-buttons flex flex-shrink-0 items-center phone:-mr-3">
           {onOpenBrowser ? (
             <button
               type="button"
               aria-label={t("mainScreen.browser")}
               onClick={onOpenBrowser}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11 gleam-frost-round"
             >
               <GlobeIcon />
             </button>
@@ -891,7 +896,7 @@ export function MainScreenView({
             type="button"
             aria-label={t("mainScreen.settings")}
             onClick={onOpenSettings}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11 gleam-frost-round"
           >
             <SettingsIcon />
           </button>
@@ -983,17 +988,14 @@ export function MainScreenView({
         className={`px-6 pb-6 phone:px-5 phone:pb-4 phone:[@media(max-height:700px)]:pb-2 ${
           listDocked
             ? "gleam-dock-in fixed inset-x-0 bottom-0 top-[calc(4rem+var(--inset-top))] z-20 mx-auto max-w-[var(--content-max)] overflow-y-auto bg-background"
-            : "gleam-paper-edge min-h-[calc(100dvh-4rem)]"
-        } layered:rounded-t-[20px] layered:bg-surface layered:pt-2 gleam-paper-sheet gleam-paper-grain ${listDocked || sheetSettled ? "" : "gleam-paper-settle"}`}
+            : "min-h-[calc(100dvh-4rem)]"
+        } layered:rounded-t-[20px] layered:bg-surface layered:pt-2 gleam-frost-sheet`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
-        onAnimationEnd={(event) => {
-          if (event.target === event.currentTarget) setSheetSettled(true);
-        }}
       >
         <div
           role="tablist"
           aria-label={t("mainScreen.tabsLabel")}
-          className="gleam-paper-grain sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-1 phone:-mx-2.5 phone:pb-1 phone:pt-1 layered:gap-5 layered:bg-surface layered:px-3.5 phone:layered:mx-0 phone:layered:px-0"
+          className="gleam-frost-bar sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-1 phone:-mx-2.5 phone:pb-1 phone:pt-1 layered:gap-5 layered:bg-surface layered:px-3.5 phone:layered:mx-0 phone:layered:px-0"
         >
           <button
             type="button"
@@ -1025,7 +1027,7 @@ export function MainScreenView({
         </div>
 
         {activeTab === "tokens" ? (
-          <div className="min-h-60 phone:min-h-0">
+          <div className="min-h-60 phone:min-h-0 silica:pt-1.5">
             {loading && !hasLoadedOnce ? (
               <>
                 <SkeletonRow />
@@ -1139,10 +1141,10 @@ export function MainScreenView({
                   const actionClassName =
                     "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
                   return (
-                    <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative">
+                    <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative silica:mb-2">
                       {row.node}
                       {hiddenExpanded ? (
-                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100">
+                        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5">
                           {hidden && processId !== undefined ? (
                             <button
                               type="button"

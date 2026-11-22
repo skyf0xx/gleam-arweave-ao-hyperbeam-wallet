@@ -178,12 +178,12 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   return (
     // The row bleeds 8px past the list edge so the hover fill has room
     // around its content while text stays aligned with the header. A green
-    // fill and label mark the active row; grey is hover. On paper the active
-    // row is under glass instead, lifted where hover is pressed in. Copy
+    // fill and label mark the active row; grey is hover. In silica the active
+    // row is under a lens instead. Copy
     // floats beside the chevron instead of taking a column, so the address
     // keeps the full width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "gleam-paper-glass bg-positive/[0.06] paper:bg-foreground/[0.03]" : "hover:bg-hover"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "gleam-lens bg-positive/[0.06]" : "hover:bg-hover"}`}
     >
       <button
         type="button"
@@ -222,7 +222,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         onClick={copy}
         aria-label={copied ? t("walletSwitcher.addressCopied", { name: wallet.name }) : t("walletSwitcher.copyAddressOf", { name: wallet.name })}
         title={copied ? t("walletSwitcher.copied") : t("walletSwitcher.copyAddress")}
-        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background ${active ? "paper:hover:bg-hover" : ""} focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
+        className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background ${active ? "silica:hover:bg-hover" : ""} focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
         {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
       </button>
@@ -230,7 +230,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         type="button"
         aria-label={t("walletSwitcher.manage", { name: wallet.name })}
         onClick={onManage}
-        className={`flex h-7 w-5 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11 ${active ? "paper:hover:bg-hover" : ""}`}
+        className={`flex h-7 w-5 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11 ${active ? "silica:hover:bg-hover" : ""}`}
       >
         <ChevronRightIcon />
       </button>

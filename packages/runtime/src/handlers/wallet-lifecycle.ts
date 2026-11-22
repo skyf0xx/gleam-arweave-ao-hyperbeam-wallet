@@ -5,12 +5,12 @@ import {
   capabilitiesFor,
   defaultDisplaySettings,
   AUTO_LOCK_TIMEOUTS,
-  THEME_PREFERENCES,
   isDisplaySettings,
   isHardwareWalletMethod,
   isKeylessWalletMethod,
   isLockSettings,
   isThemeSettings,
+  readThemeSettings,
   isValidArweaveAddress,
   isValidHardwareDevice,
   isValidWallet,
@@ -164,9 +164,7 @@ async function loadLockSettings(storage: StoragePort): Promise<LockSettings> {
 }
 
 async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
-  const raw = await storage.get<unknown>(THEME_SETTINGS_KEY);
-  if (isThemeSettings(raw)) return { theme: raw.theme };
-  return DEFAULT_THEME_SETTINGS;
+  return readThemeSettings(await storage.get<unknown>(THEME_SETTINGS_KEY)) ?? DEFAULT_THEME_SETTINGS;
 }
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
@@ -1128,10 +1126,10 @@ export class WalletLifecycleHandler {
    * the theme value, unlike `setLockSettings`'s session-timeout sync.
    */
   async setThemePreference(req: ThemeSettings): Promise<void> {
-    if (!THEME_PREFERENCES.includes(req.theme)) {
-      throw new Error(dappError(`Invalid theme preference "${req.theme}".`));
+    if (!isThemeSettings(req)) {
+      throw new Error(dappError(`Invalid theme preference "${String((req as Partial<ThemeSettings>).theme)}".`));
     }
-    await this.storage.set(THEME_SETTINGS_KEY, req);
+    await this.storage.set(THEME_SETTINGS_KEY, { theme: req.theme, ...(req.weather ? { weather: true } : {}) });
   }
 
   async getDisplaySettings(): Promise<DisplaySettings> {

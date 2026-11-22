@@ -15,12 +15,12 @@ export interface SendReceiveActionsProps {
 }
 
 /**
- * Dark and paper make Send and Receive equal raised tiles, keeping the bright
+ * Dark and silica make Send and Receive equal raised tiles (frost in silica), keeping the bright
  * primary fill for the actions that commit (Confirm, Approve, Unlock). A
  * disabled tile keeps half the fill and fades its icon, so it doesn't read as
  * pressable beside the enabled one.
  */
-const LAYERED_TILE = "gleam-tile layered:rounded-xl layered:border-transparent layered:bg-mist layered:text-foreground layered:hover:bg-line layered:hover:opacity-100 layered:disabled:bg-mist/50 layered:disabled:text-faint layered:[&>svg]:text-muted layered:disabled:[&>svg]:text-faint";
+const LAYERED_TILE = "gleam-tile gleam-frost layered:rounded-xl layered:border-transparent layered:bg-mist layered:text-foreground layered:hover:bg-line layered:hover:opacity-100 layered:disabled:bg-mist/50 layered:disabled:text-faint layered:[&>svg]:text-muted layered:disabled:[&>svg]:text-faint";
 const STACKED_CLASS = "h-14 flex-col gap-1 py-2 text-label phone:h-16 phone:gap-1.5 phone:[@media(max-height:700px)]:h-14";
 const COMPACT_CLASS = "h-12 gap-2 text-label phone:h-14";
 

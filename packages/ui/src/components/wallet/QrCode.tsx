@@ -101,7 +101,7 @@ export function QrCode({ value, size = 176, label, className }: QrCodeProps) {
   return (
     // The cut lands on the plate's padding, clear of the code, which is drawn with no margin of its own.
     <div className={cn("gleam-crystal-cut inline-flex", className)}>
-      <div className="inline-flex items-center justify-center bg-background p-3">
+      <div className="inline-flex items-center justify-center bg-background p-3 silica:bg-surface">
         <div
           ref={containerRef}
           role="img"

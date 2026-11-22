@@ -3,7 +3,7 @@ import { usePlatform } from "../../../app-platform/context";
 import type { AutoLockTimeout, Grant, LockSettings, NetworkSettings, RuntimePort, ThemePreference } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow } from "@gleam/ui/src/primitives/option-list.tsx";
-import { SegmentedRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
+import { SegmentedRow, ToggleRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useDisplaySettings } from "../../../display-settings";
 import { AboutBuild } from "./AboutBuild";
 import { useTheme } from "./useTheme";
@@ -115,11 +115,20 @@ export function SettingsHomeView({
             options={[
               { value: "light", label: t("settingsHome.themeLight") },
               { value: "dark", label: t("settingsHome.themeDark") },
-              { value: "paper", label: t("settingsHome.themePaper") },
+              { value: "silica", label: t("settingsHome.themeSilica") },
             ]}
             disabled={theme.saving}
             onChange={(next) => void theme.select(next)}
           />
+          {theme.theme === "silica" ? (
+            <ToggleRow
+              title={t("settingsHome.weather")}
+              description={t("settingsHome.weatherHint")}
+              checked={theme.weather}
+              disabled={theme.saving}
+              onToggle={() => void theme.toggleWeather()}
+            />
+          ) : null}
           {onOpenLockSettings ? (
             <OptionRow
               title={t("settingsHome.security")}

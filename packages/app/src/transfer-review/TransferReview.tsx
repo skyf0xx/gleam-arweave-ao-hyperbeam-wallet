@@ -140,8 +140,8 @@ export function TransferReview({
         <>
           <Hero transfer={first} context={context} />
           {from ? <FromParty from={from} /> : null}
-          {/* On paper, glass is laid from the recipient down through the summary. */}
-          <div className="gleam-paper-glass-down paper:pt-3.5 paper:pb-6">
+          {/* In silica, a lens runs from the recipient down through the summary. */}
+          <div className="gleam-lens-down silica:pt-3.5 silica:pb-6">
             <ToParty to={first.recipient} toName={toName ?? null} diffAgainst={lookalikeOf ?? undefined} />
             {warning}
             <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
@@ -211,8 +211,8 @@ export function NameTargetReview({
           <path d="M6 1v25M1.5 21.5 6 26l4.5-4.5" />
         </svg>
       </div>
-      {/* On paper, glass is laid from the new target down through the summary. */}
-      <div className="gleam-paper-glass-down paper:pb-6 paper:pt-4">
+      {/* In silica, a lens runs from the new target down through the summary. */}
+      <div className="gleam-lens-down silica:pb-6 silica:pt-4">
         <div className={`flex flex-col items-center gap-1 pb-8 text-center ${GUTTER}`}>
           <span className="text-label text-muted">{t("collectibles.pointsTo")}</span>
           <span dir="ltr" className="max-w-full break-all font-mono text-body leading-relaxed text-foreground">

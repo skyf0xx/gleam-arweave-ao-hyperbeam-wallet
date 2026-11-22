@@ -60,8 +60,8 @@ import { useUiLabels, useUiLocale } from "../../labels";
  * value, not a class name.
  *
  * Dark also smooths the line and fades the area out toward the bottom.
- * Paper does the same but
- * drops the area and softens the line (`--color-chart-line-up`/`-down`).
+ * Silica does the same but
+ * drops the area and colours the line (`--color-chart-line-up`/`-down`).
  * These are `layered:` classes so light renders as before.
  */
 export interface PortfolioChartPoint {
@@ -142,8 +142,7 @@ export function rangeTabClass(selected: boolean): string {
   return cn(
     "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
     selected
-      ? // Paper's mist matches the Send/Receive tiles; a lighter wash keeps the range a quiet part of the chart.
-        "bg-mist text-foreground paper:bg-foreground/[0.035]"
+      ? "gleam-frost-chip bg-mist text-foreground"
       : "text-muted hover:text-foreground layered:text-faint",
   );
 }
@@ -319,7 +318,7 @@ export function PortfolioChart({
                 </linearGradient>
               </defs>
               <polygon className="layered:hidden" points={areaPoints} fill={`url(#${fillId})`} stroke="none" />
-              <path className="hidden layered:inline paper:hidden" d={smoothArea} fill={`url(#${fillId})`} stroke="none" />
+              <path className="hidden layered:inline silica:hidden" d={smoothArea} fill={`url(#${fillId})`} stroke="none" />
             </>
           )}
           <polyline

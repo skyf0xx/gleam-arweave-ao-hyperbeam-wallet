@@ -8,9 +8,8 @@ import { CollectibleThumbnail } from "./CollectibleThumbnail";
  * addresses are acceptable here (a low-stakes, glanceable list); full
  * addresses belong on the detail screen and confirmation screens only.
  *
- * In paper, a pending row is written in pencil and inks in once it
- * settles (`.gleam-pencil-row` in theme.css), and the amount is set in
- * mono like a ledger column.
+ * In silica, a pending row is fogged and clears once it settles
+ * (`.gleam-pending-row` in theme.css).
  *
  * `activityType` is a locally declared string union, not an import of
  * `@gleam/core`'s `ActivityType` — `packages/ui` has no `@gleam/core`
@@ -67,7 +66,7 @@ export function ActivityRow({
       onClick={onClick}
       data-pending={pending || undefined}
       className={cn(
-        "gleam-pencil-row flex w-full flex-col gap-2 rounded-lg px-3.5 py-3 text-left phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:px-3 phone:py-3.5",
+        "gleam-pending-row flex w-full flex-col gap-2 rounded-lg px-3.5 py-3 text-left phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:px-3 phone:py-3.5",
         onClick && "cursor-pointer hover:bg-hover phone:active:bg-hover",
         className,
       )}
@@ -76,15 +75,15 @@ export function ActivityRow({
         <div
           aria-hidden="true"
           className={cn(
-            "gleam-pencil gleam-pencil-icon flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full bg-mist",
+            "gleam-pending-ink gleam-pending-icon flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full bg-mist",
             ICON_TONE_CLASSES[activityType],
           )}
         >
           <ActivityIcon type={activityType} />
         </div>
-        <div className="gleam-pencil flex min-w-0 flex-1 flex-col gap-px">
+        <div className="gleam-pending-ink flex min-w-0 flex-1 flex-col gap-px">
           <div className="truncate text-label font-semibold text-foreground">{title}</div>
-          <div className="text-caption text-muted paper:font-light">{subtitle}</div>
+          <div className="text-caption text-muted">{subtitle}</div>
         </div>
         {collectible ? (
           <CollectibleThumbnail
@@ -97,7 +96,7 @@ export function ActivityRow({
         ) : outcomeUnknown ? (
           <span aria-hidden="true" className="mr-1 h-3 w-3 flex-shrink-0 rounded-full border-[1.5px] border-muted" />
         ) : amountLabel === undefined ? null : (
-          <div className="gleam-pencil flex-shrink-0 text-label font-normal tabular-nums text-foreground paper:font-mono paper:text-caption paper:font-medium">
+          <div className="gleam-pending-ink flex-shrink-0 text-label font-normal tabular-nums text-foreground">
             <span className={amountTone === "positive" ? "text-positive" : amountTone === "negative" ? "text-negative" : undefined}>
               {amountLabel}
             </span>

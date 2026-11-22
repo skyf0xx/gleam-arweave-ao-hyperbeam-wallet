@@ -30,7 +30,7 @@ export function ScreenHeader({ title, center, onBack, busy = false, end, subtitl
   const labels = useUiLabels();
   useBackHandler(onBack ? (busy ? ignoreBack : onBack) : null);
   return (
-    <div className={cn("flex items-center gap-2.5 border-b border-line px-4 py-3.5 phone:sticky phone:top-[var(--safe-top)] phone:z-30 phone:gap-1 phone:border-b-0 phone:bg-background phone:px-2 phone:py-1", className)}>
+    <div className={cn("gleam-frost-bar flex items-center gap-2.5 border-b border-line silica:border-transparent px-4 py-3.5 phone:sticky phone:top-[var(--safe-top)] phone:z-30 phone:gap-1 phone:border-b-0 phone:bg-background phone:px-2 phone:py-1", className)}>
       {onBack ? (
         <button
           type="button"
