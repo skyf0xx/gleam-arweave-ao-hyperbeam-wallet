@@ -124,11 +124,13 @@ describe("MainScreenView navigation (settings-screens-gap)", () => {
     expect(onOpenSettings).toHaveBeenCalled();
   });
 
-  it("marks a failed load on the top bar instead of a banner", async () => {
+  it("keeps a failed background load off the top bar", async () => {
     const send = vi.fn().mockRejectedValue(new Error("unreachable"));
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getPortfolioHistory" })));
+    await act(async () => {});
+    expect(document.querySelector(".gleam-loading-sweep")).toBeNull();
     expect(screen.queryByText(/couldn't reach the network/i)).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
@@ -397,7 +399,8 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
     }) as RuntimePort["send"];
     const { container } = renderMainScreen({ runtime: fakeRuntime({ send }) });
 
-    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getPortfolioHistory" })));
+    await act(async () => {});
     expect(container.querySelector(".gleam-shimmer")).toBeTruthy();
     expect(screen.getByTestId("figure-placeholder")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
@@ -1491,22 +1494,26 @@ describe("MainScreenView pull to refresh", () => {
     );
   });
 
-  it("marks the top bar when the refresh fails", async () => {
+  it("shows the top bar only while the pulled refresh runs, even when it fails", async () => {
     document.body.dataset.layout = "phone";
-    let failing = false;
+    let fail: ((reason: Error) => void) | undefined;
+    let pulled = false;
     const ok = successfulSend();
     const send = vi.fn(async (message: { type: string }) => {
-      if (failing && message.type === "getBalance") throw new Error("offline");
+      if (pulled && message.type === "getBalance") return new Promise((_, reject) => (fail = reject));
       return (ok as (m: unknown) => Promise<unknown>)(message);
     }) as RuntimePort["send"];
     const { container } = renderMainScreen({ runtime: fakeRuntime({ send }) });
     await waitFor(() => expect(screen.getByText("+20.00%")).toBeTruthy());
-    expect(screen.queryByRole("status", { name: /couldn't reach the network/i })).toBeNull();
+    expect(screen.queryByRole("status", { name: "Refreshing" })).toBeNull();
 
-    failing = true;
+    pulled = true;
     pullDown(container.firstElementChild!);
+    expect(await screen.findByRole("status", { name: "Refreshing" })).toBeTruthy();
 
-    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
+    await waitFor(() => expect(fail).toBeDefined());
+    await act(async () => fail!(new Error("offline")));
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Refreshing" })).toBeNull());
   });
 });
 
@@ -1558,7 +1565,7 @@ describe("MainScreenView cached-to-live", () => {
     const { resolveBalance } = setup(true);
     expect(amountCell("1.5").className).not.toContain("gleam-shimmer");
     expect(amountCell("1.5").className).not.toContain("opacity-70");
-    expect(screen.getByRole("status", { name: "Refreshing" })).toBeTruthy();
+    expect(screen.queryByRole("status", { name: "Refreshing" })).toBeNull();
     await act(async () => {
       resolveBalance("2500000000000");
     });
@@ -1570,7 +1577,6 @@ describe("MainScreenView cached-to-live", () => {
     await act(async () => {
       rejectBalance(new Error("offline"));
     });
-    expect(await screen.findByRole("status", { name: /couldn't reach the network/i })).toBeTruthy();
     expect(amountCell("1.5").className).not.toContain("opacity-70");
     expect(amountCell("1.5").className).not.toContain("gleam-fresh");
   });

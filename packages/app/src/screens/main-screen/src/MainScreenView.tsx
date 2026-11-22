@@ -70,7 +70,7 @@ import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
  * %-change badge, and period label together from one query response,
  * never a stale combination. A failed read, or an empty `series` (both
  * price sources unavailable), keeps the last series on screen, or the
- * shimmer when there is none, while `LoadingBar` shows the retry.
+ * shimmer when there is none. Only a pull to refresh shows `LoadingBar`.
  *
  * Display settings (`useDisplaySettings`): values are priced in the
  * chosen currency, the large figure is the total or the AR/AO balance,
@@ -598,16 +598,6 @@ export function MainScreenView({
   // The total waits for every input, so it ticks once instead of once per query.
   const chartCached = tokensCached || restoredCache(portfolioHistoryQuery, openedAt);
   const portfolioHasSeries = (portfolioHistoryQuery.data?.series.length ?? 0) > 0;
-  /**
-   * The bar shows a read the screen is waiting on: replacing restored data,
-   * filling an empty slot, or retrying a failure. A routine poll of data
-   * already fresh on this screen stays silent.
-   */
-  const awaited = (query: { isFetching: boolean; isError: boolean; data: unknown; dataUpdatedAt: number }) =>
-    query.isFetching && (query.data === undefined || query.isError || restoredCache(query, openedAt));
-  const homeQueries = [balancesQuery, activityQuery, tokenPricesQuery, portfolioHistoryQuery, ...(collectiblesOpened ? [collectiblesQuery] : [])];
-  const homeFetching = pullState.refreshing || homeQueries.some(awaited);
-  const homeFailed = homeQueries.some((query) => query.isError) || (portfolioHistoryQuery.isSuccess && !portfolioHasSeries);
   // Only the open wallet's tokens are known here, so the all-wallets total is left as the chart has it.
   const history = portfolioHistoryQuery.data;
   const extraValue =
@@ -809,7 +799,7 @@ export function MainScreenView({
 
   return (
     <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
-      <LoadingBar active={homeFetching} failed={homeFailed} />
+      <LoadingBar active={pullState.refreshing} />
 
       <div ref={headerRef} className="gleam-frost-bar sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
         {headerCollapsed ? (

@@ -155,7 +155,7 @@ describe("CollectibleThumbnail image cache", () => {
     const { entries, storage } = fakeCaches();
     vi.stubGlobal("caches", storage);
     vi.stubGlobal("fetch", respond("image/png"));
-    render(<CollectibleThumbnail name="Frog" imageUrl={`https://arweave.net/${TX}`} />);
+    render(<CollectibleThumbnail name="Frog" imageUrl={`https://arweave.net/raw/${TX}`} />);
     await waitFor(() => expect(screen.getByAltText("Frog").getAttribute("src")).toBe("blob:nft-1"));
     expect([...entries.keys()]).toEqual([`https://collectible-image.invalid/${TX}`]);
 
@@ -163,7 +163,7 @@ describe("CollectibleThumbnail image cache", () => {
     resetCollectibleImageCacheForTests();
     const fetchImpl = respond("image/png");
     vi.stubGlobal("fetch", fetchImpl);
-    render(<CollectibleThumbnail name="Frog" imageUrl={`https://arweave.net/${TX}`} />);
+    render(<CollectibleThumbnail name="Frog" imageUrl={`https://arweave.net/raw/${TX}`} />);
     await waitFor(() => expect(screen.getByAltText("Frog").getAttribute("src")).toBe("blob:nft-2"));
     expect(fetchImpl).not.toHaveBeenCalled();
   });

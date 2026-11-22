@@ -36,7 +36,6 @@ import {
   parsePriceSnapshots,
   readBestAsk,
   recordPriceSample,
-  type HistoricalPricePoint,
 } from "@gleam/core/src/pricing/index.ts";
 import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, isFiatCurrency, isValidNetworkSettings } from "@gleam/core";
 import { updateStored } from "../storage-update";
@@ -814,27 +813,26 @@ export class ReadsHandler {
     ]);
     const sends = log.filter((entry) => entry.type === "send" && entry.status !== "failed" && entry.amount !== null && !entry.collectible && recent(entry));
     const transportOf = new Map<string, TokenTransport | undefined>();
-    await Promise.all(
-      [...new Set(sends.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
+    const [listedReceipts] = await Promise.all([
+      this.receiptsForListedTokens(req.address, receipts, settings),
+      ...[...new Set(sends.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
         transportOf.set(id, (await this.tryTokenMetadata(id, settings))?.transport);
       }),
-    );
+    ]);
     const l1Sends = sends.filter((entry) => entry.token && transportOf.get(entry.token) === "l1");
     const otherSends = sends.filter((entry) => !l1Sends.includes(entry) && entry.status === "pending");
     // An unmined receipt has a timestamp of 0.
-    const incoming = (await this.receiptsForListedTokens(req.address, receipts, settings)).filter(
-      (entry) => entry.timestamp === 0 || recent(entry),
-    );
+    const incoming = listedReceipts.filter((entry) => entry.timestamp === 0 || recent(entry));
 
     const l1Entries = [...l1Sends, ...incoming];
-    const heights = await queryBlockHeights(
-      l1Entries.map((entry) => entry.txId),
-      settings.gatewayUrl,
-    ).catch(() => new Map<string, number>());
     const swapHeights = new Map<string, number>();
     const l1NodeUrls = await readL1NodeUrls(this.storage);
-    await Promise.all(
-      [...new Set(l1Entries.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
+    const [heights] = await Promise.all([
+      queryBlockHeights(
+        l1Entries.map((entry) => entry.txId),
+        settings.gatewayUrl,
+      ).catch(() => new Map<string, number>()),
+      ...[...new Set(l1Entries.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
         for (const node of l1NodeUrls) {
           try {
             swapHeights.set(id, await readTokenSwapHeight(id, node));
@@ -844,7 +842,7 @@ export class ReadsHandler {
           }
         }
       }),
-    );
+    ]);
     const notApplied = (entry: ActivityEntry) => {
       const height = heights.get(entry.txId);
       const swapHeight = swapHeights.get(entry.token ?? "");
@@ -1237,29 +1235,18 @@ export class ReadsHandler {
     if (addresses.length === 0) return empty;
 
     const settings = await this.loadNetworkSettings();
-    const arBalancesWinston = await Promise.all(addresses.map((address) => getArBalance(address, settings.gatewayUrl)));
-    const arBalanceWinston = arBalancesWinston.reduce((sum, winston) => sum + BigInt(winston), 0n);
-    const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
-
-    const arPriceSeries = AR_TOKEN.priceSource
-      ? await getHistoricalUsdPrices(AR_TOKEN.priceSource, req.range, this.pricesApiUrl)
-      : [];
-
-    if (arPriceSeries.length === 0) return empty;
-
-    const arPriceAt = buildPriceAtFromSeries(arPriceSeries);
-    const tokens = [{ balance: arBalance, priceAt: arPriceAt }];
-    const spotSources = [AR_TOKEN.priceSource];
-    let aoPriceSeries: HistoricalPricePoint[] | null = null;
-    const loadAoPriceSeries = async () =>
-      (aoPriceSeries ??= AO_TOKEN.priceSource ? await getHistoricalUsdPrices(AO_TOKEN.priceSource, req.range, this.pricesApiUrl) : []);
-
-    if (AO_TOKEN.priceSource) {
+    const historyOf = (source: typeof AR_TOKEN.priceSource) =>
+      source ? getHistoricalUsdPrices(source, req.range, this.pricesApiUrl) : Promise.resolve([]);
+    const spotOf = (source: typeof AR_TOKEN.priceSource) => (source ? getUsdPrice(source, this.pricesApiUrl) : Promise.resolve(null));
+    const [arBalancesWinston, arPriceSeries, aoPriceSeries, aoQuantities, arSpot, aoSpot, fxRate] = await Promise.all([
+      Promise.all(addresses.map((address) => getArBalance(address, settings.gatewayUrl))),
+      historyOf(AR_TOKEN.priceSource),
+      historyOf(AO_TOKEN.priceSource),
       // A failed read leaves that wallet's AO out rather than failing the
       // whole chart whenever a peer hiccups — there's no way to tell whether
       // the wallet even holds AO.
-      const aoQuantities = await Promise.all(
-        addresses.map(async (address) => {
+      Promise.all(
+        (AO_TOKEN.priceSource ? addresses : []).map(async (address) => {
           try {
             const quantity = await this.readBalance(settings, {
               processId: DEFAULT_AO_PROCESS_ID,
@@ -1271,46 +1258,47 @@ export class ReadsHandler {
             return null;
           }
         }),
-      );
-      const readQuantities = aoQuantities.filter((quantity): quantity is number => quantity !== null);
+      ),
+      spotOf(AR_TOKEN.priceSource),
+      spotOf(AO_TOKEN.priceSource),
+      isFiatCurrency(currency) ? getUsdFxRate(currency, this.pricesApiUrl) : Promise.resolve(null),
+    ]);
 
-      if (readQuantities.length > 0) {
-        const aoQuantity = readQuantities.reduce((sum, quantity) => sum + quantity, 0);
-        const series = await loadAoPriceSeries();
-        if (series.length > 0) {
-          tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(series) });
-          spotSources.push(AO_TOKEN.priceSource);
-        } else if (aoQuantity > 0) {
-          // A held AO balance with no price series would silently drop out of
-          // the total, so an AO-only portfolio would chart as $0. Reported as
-          // a failed range instead, like AR's own empty-series case.
-          return empty;
-        }
+    if (arPriceSeries.length === 0) return empty;
+
+    const arBalanceWinston = arBalancesWinston.reduce((sum, winston) => sum + BigInt(winston), 0n);
+    const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
+    const arPriceAt = buildPriceAtFromSeries(arPriceSeries);
+    const tokens = [{ balance: arBalance, priceAt: arPriceAt, spot: arSpot }];
+    const readQuantities = aoQuantities.filter((quantity): quantity is number => quantity !== null);
+    if (readQuantities.length > 0) {
+      const aoQuantity = readQuantities.reduce((sum, quantity) => sum + quantity, 0);
+      if (aoPriceSeries.length > 0) {
+        tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries), spot: aoSpot });
+      } else if (aoQuantity > 0) {
+        // A held AO balance with no price series would silently drop out of
+        // the total, so an AO-only portfolio would chart as $0. Reported as
+        // a failed range instead, like AR's own empty-series case.
+        return empty;
       }
     }
 
     // The last historical point lags the spot price the token rows use, so
     // the headline total would drift from the rows' sum. The final point is
     // re-priced at spot, falling back to the series price when spot is down.
-    const spotPrices = await Promise.all(
-      spotSources.map((source) => (source ? getUsdPrice(source, this.pricesApiUrl) : Promise.resolve(null))),
-    );
     const lastTimestamp = arPriceSeries[arPriceSeries.length - 1]?.timestamp ?? 0;
-    const spotUsdValue = tokens.reduce((sum, token, i) => sum + token.balance * (spotPrices[i] ?? token.priceAt(lastTimestamp)), 0);
-    const spotUnitUsd = (ticker: "AR" | "AO", fallback: number) =>
-      spotPrices[spotSources.indexOf(ticker === "AR" ? AR_TOKEN.priceSource : AO_TOKEN.priceSource)] ?? fallback;
+    const spotUsdValue = tokens.reduce((sum, token) => sum + token.balance * (token.spot ?? token.priceAt(lastTimestamp)), 0);
+    const spotUnitUsd = (ticker: "AR" | "AO", fallback: number) => (ticker === "AR" ? arSpot : aoSpot) ?? fallback;
 
     let unitPriceAt: (timestamp: number) => number;
     if (currency === "AR") {
       unitPriceAt = arPriceAt;
     } else if (currency === "AO") {
-      const series = await loadAoPriceSeries();
-      if (series.length === 0) return empty;
-      unitPriceAt = buildPriceAtFromSeries(series);
+      if (aoPriceSeries.length === 0) return empty;
+      unitPriceAt = buildPriceAtFromSeries(aoPriceSeries);
     } else {
-      const rate = await getUsdFxRate(currency, this.pricesApiUrl);
-      if (rate === null) return empty;
-      unitPriceAt = () => 1 / rate;
+      if (fxRate === null) return empty;
+      unitPriceAt = () => 1 / fxRate;
     }
 
     const series = arPriceSeries.map((point, index) => {

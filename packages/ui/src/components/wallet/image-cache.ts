@@ -26,7 +26,8 @@ function complete(bytes: ArrayBuffer, contentLength: string | null): boolean {
   return Number.isNaN(declared) || declared === bytes.byteLength;
 }
 
-const TX_ID_PATH = /^\/([A-Za-z0-9_-]{43})$/;
+/** `/raw/<id>` is where collectible media loads from (`core/ao/collectibles.ts`). */
+const TX_ID_PATH = /^\/(?:raw\/)?([A-Za-z0-9_-]{43})$/;
 
 function txIdOf(url: string): string | null {
   try {
