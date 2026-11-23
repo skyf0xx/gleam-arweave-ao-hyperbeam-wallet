@@ -15,17 +15,21 @@ set -uo pipefail
 
 tag="${1:-}"
 shell="${2:-}"
-if ! [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || ! [[ "$shell" =~ ^(android|ios|extension)$ ]]; then
+usage() {
   echo "usage: $0 v<major>.<minor>.<patch> android|ios|extension" >&2
   exit 2
-fi
+}
+[[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || usage
+# Read before the next [[ =~ ]], which overwrites BASH_REMATCH.
 version="${BASH_REMATCH[1]}"
+[[ "$shell" =~ ^(android|ios|extension)$ ]] || usage
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 branch="chore/latest-$shell-$version"
 
 git -C "$repo_root" fetch --quiet origin master || exit 1
 work="$(mktemp -d)"
-trap 'git -C "$repo_root" worktree remove --force "$work" >/dev/null 2>&1; rm -rf "$work"' EXIT
+# The branch lives on origin once pushed; a local copy would only block a rerun.
+trap 'git -C "$repo_root" worktree remove --force "$work" >/dev/null 2>&1; rm -rf "$work"; git -C "$repo_root" branch -D "$branch" >/dev/null 2>&1' EXIT
 git -C "$repo_root" worktree add --quiet -b "$branch" "$work" origin/master || exit 1
 
 # A plain JSON edit; no npm code runs here.
@@ -40,7 +44,7 @@ LATEST_FILE="$work/apps/site/latest.json" LATEST_SHELL="$shell" LATEST_VERSION="
   };
   const current = latest[process.env.LATEST_SHELL];
   if (typeof current === "string" && !older(current, process.env.LATEST_VERSION)) {
-    console.error(`latest.json already has ${process.env.LATEST_SHELL} ${current}`);
+    console.log(`== latest.json already has ${process.env.LATEST_SHELL} ${current}; nothing to announce ==`);
     process.exit(3);
   }
   latest[process.env.LATEST_SHELL] = process.env.LATEST_VERSION;
