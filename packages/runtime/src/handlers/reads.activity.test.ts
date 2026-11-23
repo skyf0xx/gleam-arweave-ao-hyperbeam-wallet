@@ -608,6 +608,17 @@ describe("ReadsHandler: token decimals across gateways", () => {
     expect(await storage.get(`local:tokenMetadata:${processId}`)).toBeNull();
   });
 
+  it("leaves the decimals unknown and uncached when no other gateway answers", async () => {
+    const { storage, handler } = await setup({ "arweave.net": "12" });
+    const lying = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url: string) =>
+      url.includes("/graphql") && !url.includes("arweave.net") ? new Response(null, { status: 500 }) : lying(url),
+    ) as unknown as typeof fetch;
+    const preview = await handler.previewWatchedToken({ address: "addr1", processId });
+    expect(preview.available).toBe(false);
+    expect(await storage.get(`local:tokenMetadata:${processId}`)).toBeNull();
+  });
+
   it("keeps and caches the decimals the gateways agree on", async () => {
     const { storage, handler } = await setup({});
     const preview = await handler.previewWatchedToken({ address: "addr1", processId });

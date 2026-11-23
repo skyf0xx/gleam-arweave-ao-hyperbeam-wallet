@@ -120,7 +120,8 @@ export function crossCheckGatewayUrls(gatewayUrl: string): string[] {
  * `agreed`: at least one other gateway answered, and every one that did
  * gave the same decimals. `disagreed`: one gave other decimals, so they
  * come back `null` and the amount shows unscaled. `unconfirmed`: no other
- * gateway answered.
+ * gateway answered, so the decimals come back `null` too: one gateway's
+ * word alone is what the check exists to refuse.
  */
 export type TokenMetadataCheck = "agreed" | "disagreed" | "unconfirmed";
 
@@ -145,7 +146,8 @@ export async function queryCheckedTokenMetadata(
   if (answers.some((other) => other.denomination !== metadata.denomination)) {
     return { metadata: { ...metadata, denomination: null }, check: "disagreed" };
   }
-  return { metadata, check: answers.length > 0 ? "agreed" : "unconfirmed" };
+  if (answers.length === 0) return { metadata: { ...metadata, denomination: null }, check: "unconfirmed" };
+  return { metadata, check: "agreed" };
 }
 
 /** `arweave-scheduler@1.0` is the one scheduler that takes messages as L1 transactions. */
