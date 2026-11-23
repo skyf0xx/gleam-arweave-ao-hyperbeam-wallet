@@ -426,9 +426,10 @@ html:has([data-layout="phone"]) {
 
 /*
  * iOS zooms the page on focusing a field set under 16px. The headline
- * amount field is already larger, so the `text-h*` sizes are left alone.
+ * amount field is already larger, so the `text-h*` and `text-display*`
+ * sizes are left alone.
  */
-[data-layout="phone"] :is(input, select, textarea):not([class*="text-h"]) {
+[data-layout="phone"] :is(input, select, textarea):not([class*="text-h"], [class*="text-display"]) {
   font-size: 16px;
 }
 
