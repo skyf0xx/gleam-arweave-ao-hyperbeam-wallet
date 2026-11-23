@@ -23,6 +23,7 @@ import { formatCurrencyValue, formatPercent, HIDDEN_AMOUNT } from "@gleam/ui/src
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
+import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "./formatWinston";
 import { useAddressIdentity } from "../../../address-identity";
 import { useLocale, useT, type TFunction } from "../../../i18n";
@@ -509,27 +510,39 @@ export function MainScreenView({
     writeRowVisibility(wallet.address, rows);
   };
   const queryClient = useQueryClient();
-  const [confirmingIgnore, setConfirmingIgnore] = useState<string | null>(null);
-  const [ignoring, setIgnoring] = useState(false);
+  // A set, so several rows can wait on their confirm at once.
+  const [confirmingIgnore, setConfirmingIgnore] = useState<ReadonlySet<string>>(() => new Set());
   const [ignoreFailed, setIgnoreFailed] = useState(false);
+  const setConfirming = (processId: string, on: boolean) =>
+    setConfirmingIgnore((current) => {
+      const next = new Set(current);
+      if (on) next.add(processId);
+      else next.delete(processId);
+      return next;
+    });
   const ignoreToken = async (processId: string) => {
-    setIgnoring(true);
     setIgnoreFailed(false);
+    setConfirming(processId, false);
+    const balancesKey = walletQueryKeys.balances(wallet.address);
+    // The row goes now: waiting on a full balance read (every token process, then discovery) took seconds.
+    // A read already in flight started before the write, so it would bring the token back.
+    await queryClient.cancelQueries({ queryKey: balancesKey });
+    queryClient.setQueryData<WalletBalances>(balancesKey, (data) =>
+      data ? { ...data, tokenBalances: data.tokenBalances.filter((token) => token.processId !== processId) } : data,
+    );
     try {
       await runtime.send<{ address: string; processId: string }, void>({
         type: "removeWatchedToken",
         payload: { address: wallet.address, processId },
       });
-      // Dropped so a token added back by id isn't still filed under Hidden.
-      const rows: RowVisibility = Object.fromEntries(Object.entries(rowVisibility).filter(([key]) => key !== processId));
+      // Dropped so a token added back by id isn't still filed under Hidden. Read fresh: another ignore may have landed meanwhile.
+      const stored = readRowVisibility(wallet.address);
+      const rows: RowVisibility = Object.fromEntries(Object.entries(stored).filter(([key]) => key !== processId));
       setStoredVisibility({ address: wallet.address, rows });
       writeRowVisibility(wallet.address, rows);
-      setConfirmingIgnore(null);
-      await queryClient.invalidateQueries({ queryKey: walletQueryKeys.balances(wallet.address) });
     } catch {
       setIgnoreFailed(true);
-    } finally {
-      setIgnoring(false);
+      void queryClient.invalidateQueries({ queryKey: balancesKey });
     }
   };
   const collapseRafRef = useRef<number | null>(null);
@@ -831,7 +844,7 @@ export function MainScreenView({
   };
 
   useBackHandler(
-    confirmingIgnore !== null ? () => setConfirmingIgnore(null) : headerCollapsed ? returnHome : null,
+    confirmingIgnore.size > 0 ? () => setConfirmingIgnore(new Set()) : headerCollapsed ? returnHome : null,
   );
 
   return (
@@ -1144,65 +1157,63 @@ export function MainScreenView({
                       const renderRow = (row: ListedTokenRow) => {
                         const hidden = isRowHidden(row);
                         const { processId } = row;
-                        if (processId !== undefined && confirmingIgnore === processId) {
-                          return (
-                            <div key={row.key} className="flex flex-col gap-2 px-3.5 py-3 phone:px-0">
-                              <p className="text-caption leading-relaxed text-muted">
-                                {t("mainScreen.ignoreConfirm", { label: row.label })}
-                              </p>
-                              {ignoreFailed ? (
-                                <p role="alert" className="text-caption text-warning">
-                                  {t("mainScreen.ignoreFailed")}
-                                </p>
-                              ) : null}
-                              <div className="flex justify-end gap-3 text-caption font-semibold">
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmingIgnore(null)}
-                                  className="text-muted hover:text-foreground"
-                                >
-                                  {t("mainScreen.cancel")}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={ignoring}
-                                  onClick={() => void ignoreToken(processId)}
-                                  className="text-warning disabled:opacity-60"
-                                >
-                                  {ignoring ? t("mainScreen.ignoring") : t("mainScreen.ignore")}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
+                        const confirming = processId !== undefined && confirmingIgnore.has(processId);
                         const actionClassName =
                           "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
                         return (
                           <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative">
                             {row.node}
                             {hiddenExpanded ? (
-                              <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5">
-                                {hidden && processId !== undefined ? (
-                                  <button
-                                    type="button"
-                                    aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
-                                    onClick={() => {
-                                      setIgnoreFailed(false);
-                                      setConfirmingIgnore(processId);
-                                    }}
-                                    className={actionClassName}
-                                  >
-                                    {t("mainScreen.ignore")}
-                                  </button>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  aria-label={t(hidden ? "mainScreen.showLabel" : "mainScreen.hideLabel", { label: row.label })}
-                                  onClick={() => toggleRowHidden(row)}
-                                  className={actionClassName}
-                                >
-                                  {hidden ? t("mainScreen.show") : t("mainScreen.hide")}
-                                </button>
+                              <div
+                                className={cn(
+                                  "absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5",
+                                  confirming && "opacity-100",
+                                )}
+                              >
+                                {confirming ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      aria-label={t("mainScreen.cancelIgnoreLabel", { label: row.label })}
+                                      onClick={() => setConfirming(processId, false)}
+                                      className={actionClassName}
+                                    >
+                                      {t("mainScreen.cancel")}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
+                                      onClick={() => void ignoreToken(processId)}
+                                      className={cn(actionClassName, "text-warning hover:text-warning")}
+                                    >
+                                      {t("mainScreen.ignore")}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    {hidden && processId !== undefined ? (
+                                      <button
+                                        type="button"
+                                        aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
+                                        onClick={() => {
+                                          setIgnoreFailed(false);
+                                          setConfirming(processId, true);
+                                        }}
+                                        className={actionClassName}
+                                      >
+                                        {t("mainScreen.ignore")}
+                                      </button>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      aria-label={t(hidden ? "mainScreen.showLabel" : "mainScreen.hideLabel", { label: row.label })}
+                                      onClick={() => toggleRowHidden(row)}
+                                      className={actionClassName}
+                                    >
+                                      {hidden ? t("mainScreen.show") : t("mainScreen.hide")}
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             ) : null}
                           </div>
@@ -1240,6 +1251,13 @@ export function MainScreenView({
                                 <span>{t("mainScreen.hiddenCount", { count: hiddenRows.length })}</span>
                                 <ChevronIcon open={hiddenExpanded} />
                               </button>
+                              {hiddenExpanded && ignoreFailed ? (
+                                <p role="alert" className="px-3.5 pb-2 text-caption text-warning phone:px-0">
+                                  {t("mainScreen.ignoreFailed")}
+                                </p>
+                              ) : hiddenExpanded && confirmingIgnore.size > 0 ? (
+                                <p className="px-3.5 pb-2 text-caption text-muted phone:px-0">{t("mainScreen.ignoreHint")}</p>
+                              ) : null}
                               {hiddenExpanded ? hiddenRows.map(renderRow) : null}
                               {addTokenRow}
                             </>

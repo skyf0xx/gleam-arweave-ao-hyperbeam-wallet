@@ -773,12 +773,13 @@ describe("MainScreenView hidden token rows", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Hidden (1)" }));
     fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
 
-    expect(screen.getByText(/Ignore FREE\? It won.t show anywhere in Gleam/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText(/Ignored tokens leave Gleam/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel ignoring FREE" }));
+    expect(screen.queryByText(/Ignored tokens leave Gleam/)).toBeNull();
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "removeWatchedToken" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ignore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
 
     await waitFor(() => expect(screen.queryByText("FREE")).toBeNull());
     expect(send).toHaveBeenCalledWith({
@@ -786,6 +787,52 @@ describe("MainScreenView hidden token rows", () => {
       payload: { address: WALLET.address, processId: DISCOVERED.processId },
     });
     expect(screen.queryByRole("button", { name: /^Hidden/ })).toBeNull();
+  });
+
+  it("drops an ignored row without waiting for balances to reload, and keeps several confirms open", async () => {
+    const OTHER: TokenBalance = { ...DISCOVERED, processId: "processSPAM2", ticker: "SCAM" };
+    const base = successfulSend();
+    let balanceReads = 0;
+    const send = vi.fn(async (message: { type: string; payload?: unknown }) => {
+      if (message.type === "getTokenBalances") {
+        balanceReads += 1;
+        // Only the first read answers; a reload after ignoring never does.
+        return balanceReads === 1 ? [DISCOVERED, OTHER] : new Promise<never>(() => {});
+      }
+      if (message.type === "removeWatchedToken") return undefined;
+      return base(message as never);
+    }) as RuntimePort["send"];
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden (2)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore SCAM" }));
+    expect(screen.getByRole("button", { name: "Cancel ignoring FREE" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancel ignoring SCAM" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
+    await waitFor(() => expect(screen.queryByText("FREE")).toBeNull());
+    expect(screen.getByRole("button", { name: "Cancel ignoring SCAM" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ignore SCAM" }));
+    await waitFor(() => expect(screen.queryByText("SCAM")).toBeNull());
+  });
+
+  it("brings an ignored row back with an error when the write fails", async () => {
+    const base = successfulSend();
+    const send = vi.fn(async (message: { type: string; payload?: unknown }) => {
+      if (message.type === "getTokenBalances") return [DISCOVERED];
+      if (message.type === "removeWatchedToken") throw new Error("storage");
+      return base(message as never);
+    }) as RuntimePort["send"];
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ignore FREE" }));
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(await screen.findByText("FREE")).toBeTruthy();
   });
 
   it("offers no Ignore on a hidden default row", async () => {
