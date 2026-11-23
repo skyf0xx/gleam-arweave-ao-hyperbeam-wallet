@@ -992,12 +992,36 @@ select,
   }
 }
 
+/* A long, soft settle (ease-out quint): it leaves at the speed of the scroll that set it off and eases into place. */
 .gleam-dock-in {
-  animation: gleam-dock-in var(--dock-duration, 220ms) ease-out;
+  animation: gleam-dock-in var(--dock-duration, 320ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * The tab bar's blur would be redrawn on every frame of a slide, which is
+ * what makes one stutter on a phone. Nothing scrolls under the bar while
+ * the sheet moves, so it goes without until the sheet settles.
+ */
+@keyframes gleam-unblur {
+  from,
+  to {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.gleam-dock-in .gleam-frost-bar {
+  animation: gleam-unblur var(--dock-duration, 320ms);
+}
+
+[data-sliding] .gleam-frost-bar {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gleam-dock-in {
+  .gleam-dock-in,
+  .gleam-dock-in .gleam-frost-bar {
     animation: none;
   }
 }

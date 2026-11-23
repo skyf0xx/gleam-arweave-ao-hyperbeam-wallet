@@ -34,7 +34,7 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { PANEL_GAP_PX, useTabSwipe } from "./useTabSwipe";
-import { useUndockPull } from "./useUndockPull";
+import { SHEET_EASING, useUndockPull } from "./useUndockPull";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useContacts } from "../../activity/src/useContacts";
 import { ActivityDetailSheet, type ActivityDetail } from "./ActivityDetailSheet";
@@ -441,8 +441,8 @@ const HEADER_FADE_DURATION_MS = 300;
  */
 const LIST_DOCK_TOP_PX = 64;
 
-/** The undock slide: a little quicker than the dock, since leaving is faster than arriving. */
-const LIST_UNDOCK_DURATION_MS = 200;
+/** The undock slide: a little quicker than the dock (320ms in theme.css), since leaving is faster than arriving. */
+const LIST_UNDOCK_DURATION_MS = 280;
 
 export function MainScreenView({
   runtime,
@@ -691,10 +691,15 @@ export function MainScreenView({
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const from = LIST_DOCK_TOP_PX + pulledBy.current - section.getBoundingClientRect().top;
     if (from >= 0) return;
-    section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
+    const slide = section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
       duration: LIST_UNDOCK_DURATION_MS,
-      easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+      easing: SHEET_EASING,
     });
+    if (!slide) return;
+    section.dataset.sliding = "";
+    const settled = () => delete section.dataset.sliding;
+    slide.onfinish = settled;
+    slide.oncancel = settled;
   }, [listDocked, pulledBy]);
 
   /**
