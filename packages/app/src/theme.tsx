@@ -1,24 +1,9 @@
 import { createContext, useContext } from "react";
 import type { ThemePreference } from "@gleam/core";
 
-/** Which way the portfolio went over the chart period on screen; `flat` covers none, unknown and too small to show. */
-export type Market = "up" | "down" | "flat";
-
-/** Under 0.05% the figure reads 0.0%, and the sky shouldn't flip on less than the figure shows. */
-const FLAT_CHANGE = 0.0005;
-
-export function marketOf(change: number): Market {
-  if (!(Math.abs(change) >= FLAT_CHANGE)) return "flat";
-  return change > 0 ? "up" : "down";
-}
-
 export interface ThemeContextValue {
   theme: ThemePreference;
   setTheme: (theme: ThemePreference) => void;
-  weather: boolean;
-  setWeather: (weather: boolean) => void;
-  /** The main screen says which way the portfolio went; `App` draws the sky, which outlives that screen. */
-  reportMarket: (market: Market) => void;
 }
 
 /**
@@ -43,13 +28,7 @@ export function applyDocumentTheme(theme: ThemePreference) {
   else document.documentElement.removeAttribute("data-theme");
 }
 
-/** Silica's sky, behind every screen. The three skies are stacked so a change is an opacity cross-fade (theme.css). */
-export function Sky({ market }: { market: Market }) {
-  return (
-    <div aria-hidden="true" data-testid="sky" data-market={market} className="gleam-sky">
-      <div className="gleam-sky-flat" />
-      <div className="gleam-sky-up" />
-      <div className="gleam-sky-down" />
-    </div>
-  );
+/** Silica's sky, behind every screen (theme.css). */
+export function Sky() {
+  return <div aria-hidden="true" data-testid="sky" className="gleam-sky" />;
 }

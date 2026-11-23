@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import type { RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
 import { applyDocumentTheme, useSharedTheme } from "../../../theme";
 
-/** The stored theme and its weather switch, changed at once on screen and put back if saving fails. */
+/** The stored theme, changed at once on screen and put back if saving fails. */
 export function useTheme(runtime: RuntimePort) {
   const shared = useSharedTheme();
-  const [local, setLocal] = useState<{ theme: ThemePreference; weather: boolean }>({ theme: "light", weather: false });
+  const [local, setLocal] = useState<ThemePreference>("light");
   const [saving, setSaving] = useState(false);
-  const { theme, weather } = shared ?? local;
+  const theme = shared?.theme ?? local;
 
   useEffect(() => {
     if (shared) return;
@@ -15,7 +15,7 @@ export function useTheme(runtime: RuntimePort) {
     runtime
       .send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined })
       .then((settings) => {
-        if (!cancelled) setLocal({ theme: settings.theme, weather: settings.weather === true });
+        if (!cancelled) setLocal(settings.theme);
       })
       .catch(() => undefined);
     return () => {
@@ -23,37 +23,27 @@ export function useTheme(runtime: RuntimePort) {
     };
   }, [runtime, shared]);
 
-  const show = (next: { theme: ThemePreference; weather: boolean }) => {
-    if (shared) {
-      shared.setTheme(next.theme);
-      shared.setWeather(next.weather);
-    } else setLocal(next);
-    applyDocumentTheme(next.theme);
-  };
-
-  const save = async (next: { theme: ThemePreference; weather: boolean }) => {
-    const previous = { theme, weather };
-    show(next);
-    setSaving(true);
-    try {
-      await runtime.send<ThemeSettings, void>({
-        type: "setThemePreference",
-        payload: { theme: next.theme, ...(next.weather ? { weather: true } : {}) },
-      });
-    } catch {
-      show(previous);
-    } finally {
-      setSaving(false);
-    }
+  const show = (next: ThemePreference) => {
+    if (shared) shared.setTheme(next);
+    else setLocal(next);
+    applyDocumentTheme(next);
   };
 
   return {
     theme,
-    weather,
     saving,
     select: async (next: ThemePreference) => {
-      if (next !== theme) await save({ theme: next, weather });
+      if (next === theme) return;
+      const previous = theme;
+      show(next);
+      setSaving(true);
+      try {
+        await runtime.send<ThemeSettings, void>({ type: "setThemePreference", payload: { theme: next } });
+      } catch {
+        show(previous);
+      } finally {
+        setSaving(false);
+      }
     },
-    toggleWeather: () => save({ theme, weather: !weather }),
   };
 }

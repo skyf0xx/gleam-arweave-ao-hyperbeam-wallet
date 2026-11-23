@@ -17,18 +17,15 @@ export interface MemorableAddressProps {
   diffAgainst?: string;
   /** `positive` marks the differences on the known side of a lookalike pair, so only the suspect address is red. */
   diffTone?: "warning" | "positive";
-  /** Six chunks a row where seven don't fit, so an address beside a label still takes two rows. */
-  sixWhereNarrow?: boolean;
   className?: string;
 }
 
 /**
- * A full address as a block of 4-character chunks laid out on a grid:
- * two rows (7 · 4) where the space fits seven chunks, three (4 · 4 · 3)
- * where it doesn't. The columns are fixed and the chunks never wrap on
- * their own, so on a given screen the block keeps one shape for every
- * address, the emphasised chunks always sit in the same places and the
- * user learns where to look. They are set on a quiet fill in full contrast; the rest
+ * A full address as a block of 4-character chunks laid out on a grid of
+ * two rows (7 · 4) on every screen. Where seven chunks don't fit, the type
+ * shrinks rather than the block wrapping, so every address keeps one shape,
+ * the emphasised chunks always sit in the same places and the user learns
+ * where to look. They are set on a quiet fill in full contrast; the rest
  * are muted. The avatar carries the colour, so the address stays
  * monochrome. A copied selection is the raw address text: the gaps are
  * padding, never characters.
@@ -41,7 +38,6 @@ export function MemorableAddress({
   trailing,
   diffAgainst,
   diffTone = "warning",
-  sixWhereNarrow = false,
   className,
 }: MemorableAddressProps) {
   const confirm = tone === "confirm";
@@ -64,16 +60,16 @@ export function MemorableAddress({
           <AccountAvatar svgMarkup={avatarSvg} label="" size={confirm ? 36 : 28} />
         </span>
       ) : null}
-      {/* Seven chunks with their padding are 32.9ch, or 31.5ch with the phone's tighter padding; `ch` here is the address's own font, so the switch follows the type size. */}
-      {/* eslint-disable-next-line gleam/type-scale -- 12.5px fits seven chunks on one line at confirm width; the grid below depends on it. */}
+      {/* eslint-disable-next-line gleam/type-scale -- 12.5px fits seven chunks on one line at confirm width. */}
       <span className={cn("@container flex min-w-0 flex-1 font-mono [justify-content:inherit]", confirm ? "text-[12.5px]" : "text-label")}>
         <span
           translate="no"
           className={cn(
-            "grid min-w-0 grid-cols-[repeat(4,max-content)] text-left leading-[1.75]",
-            // Six chunks are 28.2ch, or 27ch with the phone's padding.
-            sixWhereNarrow && "gap-y-[3px] @[28.2ch]:grid-cols-[repeat(6,max-content)] phone:@[27.1ch]:grid-cols-[repeat(6,max-content)]",
-            "@[33ch]:grid-cols-[repeat(7,max-content)] phone:@[31.6ch]:grid-cols-[repeat(7,max-content)]",
+            // The row gap keeps one row's emphasis fill from touching the next row's.
+            "grid min-w-0 grid-cols-[repeat(7,max-content)] gap-y-[3px] text-left leading-[1.75]",
+            // Seven chunks with their padding are 32.9ch, or 31.6ch with the phone's tighter padding: 19.8em and 19em of a
+            // monospace face. Where the container is narrower, the type shrinks to fit rather than adding a third row.
+            "text-[length:min(1em,calc(100cqw/19.8))] phone:text-[length:min(1em,calc(100cqw/19))]",
           )}
         >
           {chunks.map((chunk) => (
