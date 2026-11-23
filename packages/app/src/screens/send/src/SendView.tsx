@@ -765,7 +765,7 @@ function ComposeStep({
                   onChange({ amountDisplay: sanitizeAmountInput(event.target.value) });
                 }}
                 onBlur={onBlurAmount}
-                className="min-w-0 flex-1 border-none bg-transparent text-display-sm font-semibold tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
+                className="min-w-0 flex-1 border-none bg-transparent text-display-sm font-semibold dark:font-medium tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
               />
               <button
                 type="button"

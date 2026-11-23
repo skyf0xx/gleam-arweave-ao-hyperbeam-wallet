@@ -23,14 +23,18 @@ describe("TokenRow amount", () => {
 });
 
 describe("TokenRow cached", () => {
-  it("renders restored figures at full strength, and dims only while loading", () => {
-    const { rerender } = render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached />);
+  it("renders restored figures at full strength and never dims them", () => {
+    render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" cached />);
     for (const text of ["1.5", "$3.00"]) {
-      expect(screen.getByText(text).className).not.toContain("opacity-70");
+      expect(screen.getByText(text).className).not.toMatch(/opacity-/);
       expect(screen.getByText(text).className).not.toContain("gleam-shimmer");
     }
-    rerender(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="1.5" value="$3.00" loading cached />);
-    expect(screen.getByText("1.5").className).toContain("opacity-50");
+  });
+
+  it("shimmers figures that have never been read instead of showing the stand-in", () => {
+    render(<TokenRow glyph={{ label: "AR" }} name="Arweave" amount="0" value="$0.00" change={0.1} loading />);
+    expect(screen.getAllByTestId("figure-placeholder")).toHaveLength(2);
+    expect(screen.queryByText(/%/)).toBeNull();
   });
 
   it("settles once the data is fresh", () => {

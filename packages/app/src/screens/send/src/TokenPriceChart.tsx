@@ -3,7 +3,6 @@ import { priceSourceForProcessId, type DisplayCurrency, type PortfolioHistoryRan
 import { buildLinePath, chartCoordinates, CHART_HEIGHT, CHART_WIDTH, downsample, type ChartPoint } from "@gleam/ui/src/components/wallet/chart-path.ts";
 import { formatCurrencyValue, formatPercent } from "@gleam/ui/src/format/currency.ts";
 import { rangeTabClass } from "@gleam/ui/src/components/wallet/index.ts";
-import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { useLocale, useT } from "../../../i18n";
 import { useTokenPriceHistory } from "./useTokenPriceHistory";
 
@@ -102,10 +101,7 @@ export function TokenPriceChart({
         onPointerLeave={() => setActive(null)}
         onBlur={() => setActive(null)}
         onKeyDown={step}
-        className={cn(
-          "relative h-24 w-full touch-pan-y rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground",
-          query.isPlaceholderData && "opacity-50",
-        )}
+        className="relative h-24 w-full touch-pan-y rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
       >
         <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" width="100%" height="100%" aria-hidden>
           <polygon className="silica:hidden" points={`0,${CHART_HEIGHT} ${linePath} ${CHART_WIDTH},${CHART_HEIGHT}`} fill={lineColor} opacity={0.12} stroke="none" />

@@ -775,6 +775,7 @@ export function createRuntime(platform: Platform): Runtime {
     getPointsSeatsSeen: () => points.getSeatsSeen(),
     markPointsSeatsSeen: (data) => points.markSeatsSeen(data),
     getAnnouncements: () => announcements.fetchAnnouncements(),
+    getAvailableUpdate: () => announcements.fetchAvailableUpdate(),
     getScanStats: () => scans.stats(),
     getDismissedAnnouncements: () => announcements.getDismissed(),
     dismissAnnouncement: (data) => announcements.dismiss(data),

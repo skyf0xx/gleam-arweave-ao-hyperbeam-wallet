@@ -361,6 +361,12 @@ export interface ProtocolMap {
    */
   getAnnouncements(): Announcement[];
   /**
+   * The newer release this install should move to, from the site's
+   * `latest.json`; null when it is current, its shell isn't listed, or the
+   * file can't be read.
+   */
+  getAvailableUpdate(): string | null;
+  /**
    * The running release's community scan count and paid places left, from
    * the points API; null when they can't be read.
    */

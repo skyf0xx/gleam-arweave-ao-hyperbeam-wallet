@@ -27,7 +27,7 @@ export function BalanceDisplay({ amountLabel, subLabel, loading = false, classNa
   return (
     <div className={cn("flex flex-col gap-0.5", className)}>
       <div className="flex items-baseline gap-2.5">
-        <span className="gleam-figure text-display font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+        <span className="gleam-figure text-display font-semibold dark:font-medium tracking-[-0.02em] tabular-nums text-foreground">
           {amountLabel}
         </span>
       </div>

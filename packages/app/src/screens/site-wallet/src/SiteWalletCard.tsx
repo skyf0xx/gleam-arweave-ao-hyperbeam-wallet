@@ -108,7 +108,7 @@ export function SiteIcon({
           src={favIconUrl}
           alt=""
           referrerPolicy="no-referrer"
-          className={sizes.image}
+          className={cn(sizes.image, "dark:opacity-90")}
           onError={() => setFailed(true)}
         />
       </div>

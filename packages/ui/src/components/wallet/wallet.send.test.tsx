@@ -62,20 +62,6 @@ describe("TokenRow", () => {
     expect(short.parentElement?.getAttribute("title")).toBe("1,234 points");
     expect(screen.getByText("1,234 points").className).toContain("sr-only");
   });
-
-  it("keeps the existing value visible (dimmed, not hidden) while loading", () => {
-    render(
-      <TokenRow
-        glyph={{ label: "AR", tone: 1 }}
-        name="Arweave"
-        amount="128.4204"
-        value="$1,438.09"
-        loading
-      />,
-    );
-    expect(screen.getByText("128.4204")).toBeTruthy();
-    expect(screen.getByText("$1,438.09")).toBeTruthy();
-  });
 });
 
 describe("ActivityRow", () => {

@@ -181,47 +181,50 @@
  * - Elevation is lightness. Background is the lowest level, surface one
  *   step up (the token sheet), mist the next (tiles, chips, plates) and
  *   line the highest (hover on a mist tile). Borders stay rare.
+ * - Dark grey, not near-black, and off-white text (about 13:1): pure
+ *   white on black blooms in a dark room.
  * - Text has four steps: foreground, muted, faint, then disabled.
  * - No colour fill larger than a figure. The chart is neutral; the
  *   %-change alone says which way it went.
- * - The beam has its own dark set: the same hues with less glare, so it
- *   sits on near-black instead of burning through it. Beam-purple is not
+ * - The beam, gains and losses have their own dark set: the same hues,
+ *   less saturated, so they sit on the dark instead of burning through it. Beam-purple is not
  *   text-safe here.
  */
 [data-theme="dark"] {
-  --color-canvas: #0d0d0f;
-  --color-background: #0d0d0f;
-  --color-surface: #161618;
-  --color-mist: #1f1f22;
+  --color-canvas: #141417;
+  --color-background: #141417;
+  --color-surface: #1c1c1f;
+  --color-mist: #25252a;
   /* Restated so it resolves against dark's mist where the theme is set below the root. */
   --color-hover: var(--color-mist);
-  --color-line: #2a2a2e;
-  --color-foreground: #ededef;
+  --color-line: #303036;
+  --color-foreground: #dcdce1;
   --color-primary-fill: #d4d4d8;
-  --color-primary-disabled: #1f1f22;
-  --color-primary-disabled-text: #6b6b73;
+  --color-primary-disabled: #25252a;
+  --color-primary-disabled-text: #75757d;
   --color-muted: #a0a0a8;
-  --color-faint: #6b6b73;
+  --color-faint: #75757d;
 
-  --color-shimmer-base: #1f1f22;
+  --color-shimmer-base: #25252a;
 
-  --color-beam-red: #e5484d;
-  --color-beam-purple: #9d5bd2;
-  --color-beam-sky: #5bb3d9;
-  --color-beam-yellow: #e3c14d;
-  --color-beam-green: #46c25a;
+  --color-beam-red: #d9575b;
+  --color-beam-purple: #9a68c8;
+  --color-beam-sky: #66aed0;
+  --color-beam-yellow: #d6bb5c;
+  --color-beam-green: #55b866;
 
   --color-chart-up: var(--color-foreground);
   --color-chart-down: var(--color-foreground);
-  --chart-fill-top: 0.1;
+  /* A white veil over this much area outshines the tiles; at 5% the top of the fill sits at surface level. */
+  --chart-fill-top: 0.05;
   --chart-fill-end: 0;
 
   --color-warning: #f87171;
   --color-warning-fill: #c93a3f;
   --color-warning-surface: #2a1515;
   --color-warning-border: #4a2020;
-  --color-positive: #4cd98a;
-  --color-negative: #ff8a85;
+  --color-positive: #5cc98d;
+  --color-negative: #f08f8a;
   --color-caution: #fb923c;
   --color-caution-surface: #2a1c0f;
 }
@@ -810,8 +813,8 @@ select,
  * same `[data-theme="dark"]` attribute mechanic used for every other
  * dark override in this file (see the block above for why this is a
  * plain override, not a nested `@theme`). The light gradient's `white`
- * mix targets are swapped for a dark-appropriate near-black tone
- * (`#2a2a2a`, matching `--color-line`'s dark value) so the sky/purple
+ * mix targets are swapped for `--color-line`, one step above the
+ * shimmer base, so the sky/purple
  * tints read as a subtle lightening of the dark canvas rather than the
  * light gradient's pale highlight pasted unchanged onto a dark surface.
  */
@@ -819,9 +822,9 @@ select,
   background: linear-gradient(
     110deg,
     var(--color-shimmer-base) 44%,
-    color-mix(in srgb, var(--color-beam-sky) 9%, #2a2a2a) 49%,
-    color-mix(in srgb, var(--color-beam-purple) 9%, #2a2a2a) 50%,
-    color-mix(in srgb, var(--color-beam-sky) 7%, #2a2a2a) 51%,
+    color-mix(in srgb, var(--color-beam-sky) 9%, var(--color-line)) 49%,
+    color-mix(in srgb, var(--color-beam-purple) 9%, var(--color-line)) 50%,
+    color-mix(in srgb, var(--color-beam-sky) 7%, var(--color-line)) 51%,
     var(--color-shimmer-base) 56%
   );
 }

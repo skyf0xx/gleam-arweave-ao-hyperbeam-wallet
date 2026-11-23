@@ -40,4 +40,10 @@ describe("pickNotice", () => {
     expect(pickNotice({ ...none, review, announcements: [A, B] })).toEqual({ kind: "announcement", announcement: B });
     expect(pickNotice({ ...none, review, seatsLeft: 3, seatsSeen: 2 })).toEqual({ kind: "invites" });
   });
+  it("ranks an update below a critical announcement and above the review prompt, until its version is dismissed", () => {
+    const moment = { kind: "send" } as unknown as NonNullable<Parameters<typeof pickNotice>[0]["review"]>;
+    expect(pickNotice({ ...none, update: "1.54.0", announcements: [B] })).toEqual({ kind: "announcement", announcement: B });
+    expect(pickNotice({ ...none, update: "1.54.0", announcements: [A], review: moment })).toEqual({ kind: "update", version: "1.54.0" });
+    expect(pickNotice({ ...none, update: "1.54.0", dismissed: ["update-1.54.0"], announcements: [A] })).toEqual({ kind: "announcement", announcement: A });
+  });
 });

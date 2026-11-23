@@ -6,7 +6,9 @@
 #   apps/mobile/scripts/release-app.sh v1.31.0 android        --kdbx <path>   Play internal track
 #   apps/mobile/scripts/release-app.sh v1.31.0 android-bundle --kdbx <path>   signed AAB only
 #   apps/mobile/scripts/release-app.sh v1.31.0 android-apk    --kdbx <path>   signed APK, attached to
-#                                                                            the GitHub Release as gleam.apk
+#                                                                            the GitHub Release as gleam.apk,
+#                                                                            then announced to APK installs
+#                                                                            (scripts/publish-latest.sh)
 #
 # Add --allow-unverified-bundle to skip the comparison with the manifest's
 # mobileBundleSha256 (a tag whose manifest has none). It asks for a typed
@@ -264,6 +266,8 @@ if [ "$target" = android-apk ]; then
   gh release edit "$tag" --notes "$notes
 
 Android APK \`gleam.apk\` SHA-256: \`$apk_sha\`" > /dev/null || exit 1
+  # Only now is there an APK to download, so only now are installs told.
+  "$repo_root/scripts/publish-latest.sh" "$tag" android || exit 1
 fi
 
 # pack-release.sh runs first in the same chain and its "Wrote" line scrolls

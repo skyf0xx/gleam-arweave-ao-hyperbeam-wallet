@@ -30,7 +30,7 @@ export function RequestHeader({ origin, requestType, icon }: { origin: string; r
         </div>
       ) : icon && !iconFailed ? (
         <div aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-mist">
-          <img src={icon} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={() => setIconFailed(true)} />
+          <img src={icon} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover dark:opacity-90" onError={() => setIconFailed(true)} />
         </div>
       ) : (
         <div aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-mist text-body font-semibold text-muted">

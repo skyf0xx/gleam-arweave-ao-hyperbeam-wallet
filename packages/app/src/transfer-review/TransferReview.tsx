@@ -315,7 +315,7 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
       ) : (
         <div className="flex max-w-full flex-col items-center gap-1">
           <div className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2">
-            <span className="text-display-lg font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground [overflow-wrap:anywhere]">
+            <span className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground [overflow-wrap:anywhere]">
               {amountText(transfer)}
             </span>
             <span className="text-h3 font-semibold text-muted"><UntrustedText text={unitText(transfer, t)} /></span>
@@ -341,7 +341,7 @@ function BatchHero({ request, context }: { request: TransferRequest; context: Tr
   if (total === undefined) return <div className="pt-6" />;
   return (
     <div className={`flex flex-col items-center gap-1 pb-7 pt-8 text-center ${GUTTER}`}>
-      <span className="text-display-lg font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">{total}</span>
+      <span className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">{total}</span>
       <span className="text-body text-muted">{t("transferReview.totalValue")}</span>
     </div>
   );
