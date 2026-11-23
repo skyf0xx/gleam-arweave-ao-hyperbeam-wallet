@@ -655,7 +655,10 @@ export function createRuntime(platform: Platform): Runtime {
       if (result.unlockedWalletIds.length > 0) void platform.lockIndicator.setLocked(false);
       return result;
     },
-    removePasskey: () => passkey.removePasskey(),
+    removePasskey: async () => {
+      await requireUnlocked();
+      return passkey.removePasskey();
+    },
     resetAllWallets: async () => {
       // Grants go first, here and when deleteWallet removes the last wallet: a
       // removal that fails part-way must not leave a dApp connected to nothing.

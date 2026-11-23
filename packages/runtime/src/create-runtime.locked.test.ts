@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
-import type { WalletSummary } from "@gleam/core";
+import { bytesToBase64Url, type WalletSummary } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { createRuntime } from "./create-runtime";
 import { createInMemoryPlatform } from "../testing/index";
@@ -40,6 +40,19 @@ describe("a screen left open after the vault locks", () => {
     await expect(
       runtime.dispatch("useGleamOnSite", { origin: "https://example.com", permissions: ["ACCESS_ADDRESS"] }, EXTENSION),
     ).rejects.toThrow(LOCKED);
+  });
+
+  it("can't remove the passkey", async () => {
+    const { runtime } = await lockedRuntime();
+    await runtime.dispatch("unlockWallet", { password: "correct horse" }, EXTENSION);
+    await runtime.dispatch(
+      "enrollPasskey",
+      { password: "correct horse", credentialId: "cred-1", prfSalt: "salt", prfOutput: bytesToBase64Url(new Uint8Array(32).fill(3)) },
+      EXTENSION,
+    );
+    await runtime.dispatch("lockWallet", undefined, EXTENSION);
+    await expect(runtime.dispatch("removePasskey", undefined, EXTENSION)).rejects.toThrow(LOCKED);
+    await expect(runtime.dispatch("getPasskeyStatus", undefined, EXTENSION)).resolves.toMatchObject({ enrolled: true });
   });
 
   it("still changes the timeout while unlocked", async () => {
