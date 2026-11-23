@@ -293,6 +293,16 @@ body:has([data-layout="popup"]) {
   width: 400px;
 }
 
+/*
+ * The home list docks exactly where the page ends, so a fling meets the
+ * end of the document; macOS's rubber band would then bounce the whole
+ * page, the sticky top bar with it.
+ */
+html:has([data-layout="popup"]),
+html:has([data-layout="sidepanel"]) {
+  overscroll-behavior: none;
+}
+
 [data-layout="popup"] {
   width: 400px;
   min-height: 600px;
