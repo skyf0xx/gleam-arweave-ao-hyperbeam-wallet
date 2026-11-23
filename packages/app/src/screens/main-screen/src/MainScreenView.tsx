@@ -516,6 +516,7 @@ export function MainScreenView({
   const headerRef = useRef<HTMLDivElement>(null);
   const panelTrackRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
+  const listDockedRef = useRef(false);
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
   // A collectible received since the list was fetched: refetch it, once per activity read.
@@ -634,7 +635,16 @@ export function MainScreenView({
       if (collapseRafRef.current !== null) return;
       collapseRafRef.current = requestAnimationFrame(() => {
         collapseRafRef.current = null;
-        setHeaderCollapsed(window.scrollY > HEADER_COLLAPSE_THRESHOLD_PX);
+        const collapsed = window.scrollY > HEADER_COLLAPSE_THRESHOLD_PX;
+        setHeaderCollapsed(collapsed);
+        // A scroll that carries the list up to its docked place docks it there and then, rather than letting it
+        // run on under the header and drop back down once the fade is over.
+        const top = listSectionRef.current?.getBoundingClientRect().top;
+        if (collapsed && !listDockedRef.current && top !== undefined && top <= LIST_DOCK_TOP_PX) {
+          listDockOffsetRef.current = 0;
+          listDockedRef.current = true;
+          setListDocked(true);
+        }
       });
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -660,12 +670,16 @@ export function MainScreenView({
    */
   useEffect(() => {
     if (!headerCollapsed) {
+      listDockedRef.current = false;
       setListDocked(false);
       return;
     }
     const timer = window.setTimeout(() => {
+      if (listDockedRef.current) return;
       const rect = listSectionRef.current?.getBoundingClientRect();
-      listDockOffsetRef.current = rect ? rect.top - LIST_DOCK_TOP_PX : 0;
+      // The slide only ever rises to its place: one that starts above it would come down and read as a bounce.
+      listDockOffsetRef.current = rect ? Math.max(0, rect.top - LIST_DOCK_TOP_PX) : 0;
+      listDockedRef.current = true;
       setListDocked(true);
     }, HEADER_FADE_DURATION_MS);
     return () => window.clearTimeout(timer);
