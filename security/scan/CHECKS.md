@@ -124,6 +124,10 @@ Some of the classes here are adapted from Cloudflare's
 `packages/runtime/src/handlers/provider-params.ts`.
 
 - Each method's caller tier, and whether it can open an approval.
+- Compare sibling methods (the sign variants, the send variants, the
+  ones that reveal keys): does each have the same tier, schema strictness
+  and approval as the rest? A method copied from another often drops a
+  check.
 - Does any method's zod schema accept something its handler doesn't
   expect: extra keys, a wider type, a value the handler then trusts?
 - Can any method that signs or reveals something run without an
