@@ -314,6 +314,10 @@ and loops that ask for attention are not reasons.
   The top loading bar shows only for a pull to refresh; background reads
   stay silent.
   Nothing pulses.
+- **Cached figures show as-is.** A value read before shows at full
+  strength until the fresh one replaces it, then settles once
+  (`gleam-fresh`). Figures never dim while they refresh. A figure never
+  read shimmers in its place (`FigurePlaceholder`), never a stand-in 0.
 - **Approval and review stay still.** Nothing moves where a person checks
   what they are about to sign. Amounts and addresses never roll, count or
   slide in.

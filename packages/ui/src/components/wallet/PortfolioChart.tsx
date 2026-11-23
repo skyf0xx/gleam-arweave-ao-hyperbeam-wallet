@@ -5,6 +5,7 @@ import { currencyStep, formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, 
 import { animatedNumberTintStyle, useAnimatedNumber, type AnimatedNumberTrend } from "../../primitives/animated-number";
 import { cn } from "../../primitives/cn";
 import { useFreshAfterCache } from "../../primitives/loading-bar";
+import { FigurePlaceholder } from "./FigurePlaceholder";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
 import { buildLinePath, CHART_HEIGHT, CHART_WIDTH, chartCoordinates, downsample, toPolyline, toSmoothPath } from "./chart-path";
 import { useUiLabels, useUiLocale } from "../../labels";
@@ -47,9 +48,9 @@ import { useUiLabels, useUiLocale } from "../../labels";
  * figures takes over the chart's scope toggle. Neither is marked beyond a
  * pointer cursor; they're there for people who go looking.
  *
- * `loading` has nothing to show yet, so the chart shimmers. `refreshing`
- * has a cached figure on screen while it's read again: the figures dim
- * lightly if that takes over a moment, and the total ticks once to the new figure.
+ * `loading` has nothing to show yet, so the chart and figures shimmer.
+ * `cached` shows restored figures at full strength while they are read
+ * again; they settle once when fresh ones land. Figures never dim.
  *
  * Color rule: the %-change uses `--color-positive`/`--color-negative`,
  * never `--color-beam-red`/`--color-beam-green` (identity-only). The line
@@ -273,7 +274,7 @@ export function PortfolioChart({
   );
 
   const figures = (
-    <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", fresh && "gleam-fresh")}>
+    <div className={cn("flex min-w-0 flex-col gap-0.5", fresh && "gleam-fresh")}>
       <div className="flex items-baseline gap-2.5">
         <Headline parts={headlineParts} trend={headlineTrend} masked={masked} onToggle={onToggleMasked} placeholder={loading && headline === undefined} />
         {headline === undefined && showsHistory ? changeNote : null}
@@ -281,7 +282,7 @@ export function PortfolioChart({
       {headline !== undefined ? (
         <div className="flex items-baseline gap-2.5">
           <span className="text-label tabular-nums text-muted" style={animatedNumberTintStyle(masked ? null : total.trend)}>
-            {loading ? <FigurePlaceholder text={totalLabel} /> : totalLabel}
+            {loading ? <FigurePlaceholder>{totalLabel}</FigurePlaceholder> : totalLabel}
           </span>
           {showsHistory ? changeNote : null}
         </div>
@@ -405,19 +406,6 @@ export function PortfolioChart({
 
 const HEADLINE_CLASS = "gleam-figure text-display font-semibold tracking-[-0.02em] tabular-nums text-foreground";
 
-/**
- * Stands in for a total that has never loaded: a shimmer the size of the
- * stand-in text, so no made-up $0 shows and nothing shifts when the figure lands.
- */
-function FigurePlaceholder({ text }: { text: string }) {
-  return (
-    <span data-testid="figure-placeholder" className="relative inline-block">
-      <span className="invisible">{text}</span>
-      <span aria-hidden="true" className="gleam-shimmer absolute inset-x-0 inset-y-[0.15em] rounded-md" />
-    </span>
-  );
-}
-
 /** The large figure; a button that hides or shows balances when `onToggle` is set. */
 function Headline({ parts, trend, masked, onToggle, placeholder = false }: { parts: CurrencyValueParts; trend: AnimatedNumberTrend | null; masked: boolean; onToggle?: () => void; placeholder?: boolean }) {
   const labels = useUiLabels();
@@ -425,7 +413,7 @@ function Headline({ parts, trend, masked, onToggle, placeholder = false }: { par
   if (placeholder) {
     return (
       <span className={HEADLINE_CLASS}>
-        <FigurePlaceholder text={parts.unit ? `${parts.amount} ${parts.unit}` : parts.amount} />
+        <FigurePlaceholder>{parts.unit ? `${parts.amount} ${parts.unit}` : parts.amount}</FigurePlaceholder>
       </span>
     );
   }

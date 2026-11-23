@@ -1089,7 +1089,7 @@ export function MainScreenView({
                               // `amount @ price` would give the hidden holding away.
                               unitPrice={masked || simpleRows ? undefined : row.unitPrice}
                               change={simpleRows ? undefined : row.change}
-                              loading={loading}
+                              loading={waiting(balancesQuery)}
                               cached={tokensCached}
                               onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
                               className="border-b-0"
@@ -1132,7 +1132,6 @@ export function MainScreenView({
                                 value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
                                 unitPrice={masked || simpleRows || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
                                 change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
-                                loading={loading}
                                 cached={tokensCached}
                                 onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
                                 className="border-b-0"

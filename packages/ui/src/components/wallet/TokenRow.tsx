@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "../../primitives/cn";
 import { useFreshAfterCache } from "../../primitives/loading-bar";
 import { formatPercent } from "../../format/currency";
+import { FigurePlaceholder } from "./FigurePlaceholder";
 import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
 
 /**
@@ -20,12 +21,10 @@ import { TokenGlyph, type TokenGlyphProps } from "./TokenGlyph";
  * Left column is name over holding amount; right column is the
  * holding's value in the display currency.
  *
- * `loading` is for a background refresh of an already-rendered row (e.g.
- * a cached balance being read again) — it dims the existing figures in
- * place rather than tearing the row down to a shimmer skeleton, so a
- * value that's already on screen never disappears. First-ever load is
- * still the caller swapping in `SkeletonRow` instead of mounting
- * `TokenRow` at all.
+ * Figures never dim. A cached figure shows at full strength while it is
+ * read again (`cached`) and settles once when the fresh one lands.
+ * `loading` means the figure has never been read: the amount and value
+ * shimmer in place of their stand-ins, so no made-up 0 shows.
  */
 export interface TokenRowProps {
   glyph: Pick<TokenGlyphProps, "label" | "tone" | "logoUrl">;
@@ -47,6 +46,7 @@ export interface TokenRowProps {
   unitPrice?: string;
   /** Fractional 24-hour price move, under `value`. Left out when unknown, never shown as 0%. */
   change?: number;
+  /** Nothing read yet: the figures shimmer in place of `amount` and `value`. */
   loading?: boolean;
   /** Shows restored data that fresh data hasn't replaced yet. It renders as-is; the figures settle once when this goes false. */
   cached?: boolean;
@@ -79,8 +79,10 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPri
       {icon ?? <TokenGlyph {...glyph} />}
       <div className="flex min-w-0 flex-1 flex-col gap-px">
         <div className="truncate text-label font-semibold text-foreground">{name}</div>
-        <div className={cn("text-caption tabular-nums text-muted transition-opacity duration-500 ease-out", loading && "opacity-50", fresh && !loading && "gleam-fresh")} title={amountFull}>
-          {amountFull ? (
+        <div className={cn("text-caption tabular-nums text-muted", fresh && !loading && "gleam-fresh")} title={loading ? undefined : amountFull}>
+          {loading ? (
+            <FigurePlaceholder>{amount}</FigurePlaceholder>
+          ) : amountFull ? (
             <>
               <span aria-hidden="true" className="phone:hidden">
                 {amount}
@@ -98,9 +100,9 @@ export function TokenRow({ glyph, icon, name, amount, amountFull, value, unitPri
         </div>
       </div>
       {value ? (
-        <div className={cn("shrink-0 text-right text-label font-semibold tabular-nums text-foreground", "transition-opacity duration-500 ease-out", loading && "opacity-50", fresh && !loading && "gleam-fresh", "phone:group-data-editing:invisible")}>
-          {value}
-          {change === undefined ? null : <ChangeLine change={change} />}
+        <div className={cn("shrink-0 text-right text-label font-semibold tabular-nums text-foreground", fresh && !loading && "gleam-fresh", "phone:group-data-editing:invisible")}>
+          {loading ? <FigurePlaceholder>{value}</FigurePlaceholder> : value}
+          {change === undefined || loading ? null : <ChangeLine change={change} />}
         </div>
       ) : null}
     </Component>
