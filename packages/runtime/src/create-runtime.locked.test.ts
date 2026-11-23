@@ -55,6 +55,22 @@ describe("a screen left open after the vault locks", () => {
     await expect(runtime.dispatch("getPasskeyStatus", undefined, EXTENSION)).resolves.toMatchObject({ enrolled: true });
   });
 
+  it("can't change the security phrase", async () => {
+    const { runtime } = await lockedRuntime();
+    await expect(runtime.dispatch("setSecurityPhrase", { word: "attacker" }, EXTENSION)).rejects.toThrow(LOCKED);
+  });
+
+  it("can't switch wallets", async () => {
+    const runtime = createRuntime(createInMemoryPlatform());
+    const first = (await runtime.dispatch("createWallet", { name: "A", password: "correct horse" }, EXTENSION)) as WalletSummary;
+    const second = (await runtime.dispatch("createWallet", { name: "B", password: "correct horse" }, EXTENSION)) as WalletSummary;
+    await runtime.dispatch("switchWallet", { walletId: first.id }, EXTENSION);
+    await runtime.dispatch("lockWallet", undefined, EXTENSION);
+    await expect(runtime.dispatch("switchWallet", { walletId: second.id }, EXTENSION)).rejects.toThrow(LOCKED);
+    const state = (await runtime.dispatch("getState", { recordActivity: false }, EXTENSION)) as { activeWalletId: string };
+    expect(state.activeWalletId).toBe(first.id);
+  });
+
   it("still changes the timeout while unlocked", async () => {
     const runtime = createRuntime(createInMemoryPlatform());
     await runtime.dispatch("createWallet", { name: "A", password: "correct horse" }, EXTENSION);

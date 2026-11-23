@@ -616,6 +616,7 @@ export function createRuntime(platform: Platform): Runtime {
     },
     renameWallet: (data) => lifecycle.renameWallet(data),
     switchWallet: async (data) => {
+      await requireUnlocked();
       await lifecycle.switchWallet(data);
       await activeWalletChanged(data.walletId);
     },
@@ -726,7 +727,10 @@ export function createRuntime(platform: Platform): Runtime {
     getDisplaySettings: () => lifecycle.getDisplaySettings(),
     setDisplaySettings: (data) => lifecycle.setDisplaySettings(data),
     getSecurityPhrase: () => securityPhrase.get(),
-    setSecurityPhrase: (data) => securityPhrase.set(data),
+    setSecurityPhrase: async (data) => {
+      await requireUnlocked();
+      return securityPhrase.set(data);
+    },
     revokeGrant: async (data) => {
       await approval.revokeGrant(data);
       void announceAccessEnded(data.origin);
