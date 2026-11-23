@@ -15,10 +15,10 @@ export const BUILT_IN_ICONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Single-colour icons whose SVG picks black or white from the device's
- * colour scheme, which an `<img>` follows even when the app's theme
- * differs. They are drawn as a mask in the theme's foreground instead.
+ * Single-colour icons, drawn as a mask in the theme's foreground: an
+ * `<img>` follows the device's colour scheme even when the app's theme
+ * differs.
  */
-const MONO_ICONS: ReadonlySet<string> = new Set([aoIcon, bazarIcon]);
+const MONO_ICONS: ReadonlySet<string> = new Set([aoIcon, bazarIcon, iwashereIcon]);
 
 export const isMonoIcon = (src: string): boolean => MONO_ICONS.has(src);
