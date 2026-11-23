@@ -3,7 +3,7 @@ import { usePlatform } from "../../../app-platform/context";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
-import { sitePageUrl } from "@gleam/core";
+import { SITE_URL, sitePageUrl } from "@gleam/core";
 import { useT } from "../../../i18n";
 import { useNotice } from "./useNotice";
 
@@ -35,6 +35,13 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
     );
   } else if (notice.kind === "review") {
     body = <ReviewPrompt onAnswer={dismiss} className={bodyClass} />;
+  } else if (notice.kind === "update") {
+    // The download page picks the build for the device it's opened on.
+    body = (
+      <a href={new URL("download", SITE_URL).toString()} target="_blank" rel="noreferrer" className={bodyClass}>
+        <NoticeContent title={t("mainScreen.updateTitle", { version: notice.version })} text={t("mainScreen.updateText")} />
+      </a>
+    );
   } else {
     const { title, text, url } = notice.announcement;
     const content = <NoticeContent title={title} text={text} critical={critical} />;

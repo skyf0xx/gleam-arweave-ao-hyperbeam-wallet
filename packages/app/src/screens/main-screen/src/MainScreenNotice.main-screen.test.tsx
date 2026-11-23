@@ -25,6 +25,7 @@ interface Setup {
   announcements?: unknown;
   dismissed?: string[];
   review?: ReviewMoment | null;
+  update?: string | null;
 }
 
 function setup(options: Setup = {}, platformOverrides: FakeAppPlatformOverrides = {}) {
@@ -49,6 +50,8 @@ function setup(options: Setup = {}, platformOverrides: FakeAppPlatformOverrides 
         return undefined;
       case "getReviewPrompt":
         return options.review ?? null;
+      case "getAvailableUpdate":
+        return options.update ?? null;
       case "finishReviewPrompt":
         return undefined;
       default:
@@ -126,6 +129,23 @@ describe("MainScreenNotice", () => {
     const notice = await screen.findByRole("alert");
     expect(notice.className).toContain("bg-warning-surface");
     expect(notice.querySelector("svg")).not.toBeNull();
+  });
+
+  it("offers a newer release with a link to the download page, and dismisses that version only", async () => {
+    const { send } = setup({ update: "1.54.0", announcements: [INFO] });
+    const link = await screen.findByRole("link", { name: /Gleam 1\.54\.0 is out/ });
+    expect(link.getAttribute("href")).toBe("https://gleamwallet.app/download");
+    expect(screen.queryByText(INFO.text)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "dismissAnnouncement", payload: { id: "update-1.54.0" } }));
+    expect(await screen.findByText(INFO.text)).toBeTruthy();
+  });
+
+  it("puts a critical announcement before an update", async () => {
+    setup({ update: "1.54.0", announcements: [CRITICAL] });
+    expect(await screen.findByText(CRITICAL.text)).toBeTruthy();
+    expect(screen.queryByText(/is out/)).toBeNull();
   });
 
   it("skips dismissed announcements and persists a new dismissal", async () => {

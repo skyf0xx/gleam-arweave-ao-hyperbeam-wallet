@@ -380,6 +380,7 @@ export const BACKGROUND_MESSAGES = {
   getPointsSeatsSeen: EXTENSION,
   markPointsSeatsSeen: EXTENSION,
   getAnnouncements: EXTENSION,
+  getAvailableUpdate: EXTENSION,
   getScanStats: EXTENSION,
   getDismissedAnnouncements: EXTENSION,
   dismissAnnouncement: EXTENSION,

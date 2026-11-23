@@ -3,6 +3,8 @@ import { SITE_URL } from "@gleam/core/src/models/site-origin.ts";
 import { updateStored } from "../storage-update";
 
 export const ANNOUNCEMENTS_URL = new URL("announcements.json", SITE_URL).toString();
+/** The newest release per shell that doesn't update itself, as `{ "android": "1.54.0" }`. */
+export const LATEST_URL = new URL("latest.json", SITE_URL).toString();
 /** Ids of announcements the user has dismissed, as `string[]`. */
 export const ANNOUNCEMENTS_DISMISSED_KEY = "local:announcements:dismissed";
 
@@ -95,11 +97,25 @@ export function parseAnnouncements(raw: unknown, target: AnnouncementTarget): An
   return out;
 }
 
+/**
+ * The newer version this install should move to, or null. Only a shell
+ * the file names gets one, so Chrome and TestFlight, which update on their
+ * own, stay quiet by being left out of it.
+ */
+export function availableUpdate(raw: unknown, target: AnnouncementTarget): string | null {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw) || target.shell === "web") return null;
+  const latest = (raw as Record<string, unknown>)[target.shell];
+  const bound = parseVersion(latest);
+  const current = parseVersion(target.version);
+  return bound !== null && current !== null && isBelow(current, bound) ? (latest as string) : null;
+}
+
 export interface AnnouncementsHandlerDeps {
   storage: StoragePort;
   /** Read per fetch, not at startup, when the shell may not be ready to say. */
   target: () => AnnouncementTarget;
   url?: string;
+  latestUrl?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -126,6 +142,20 @@ export class AnnouncementsHandler {
       return parseAnnouncements(await response.json(), this.deps.target());
     } catch {
       return [];
+    }
+  }
+
+  /** Same plain GET as the announcements; any failure reads as "no update". */
+  async fetchAvailableUpdate(): Promise<string | null> {
+    try {
+      const response = await this.fetchImpl(this.deps.latestUrl ?? LATEST_URL, {
+        credentials: "omit",
+        cache: "no-cache",
+      });
+      if (!response.ok) return null;
+      return availableUpdate(await response.json(), this.deps.target());
+    } catch {
+      return null;
     }
   }
 

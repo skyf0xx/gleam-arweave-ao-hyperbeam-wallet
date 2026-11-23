@@ -7,7 +7,7 @@ import {
   usePointsScores,
   usePointsSeatsSeen,
 } from "../../points/src/usePoints";
-import { pickNotice, type Notice } from "./notice";
+import { pickNotice, updateNoticeId, type Notice } from "./notice";
 
 const ANNOUNCEMENTS_STALE_MS = 60 * 60_000;
 /** When this popup opened: a review moment from this visit waits for the next one. */
@@ -16,6 +16,7 @@ const reviewKey = ["reviewPrompt"] as const;
 
 const announcementKeys = {
   list: () => ["announcements", "list"] as const,
+  update: () => ["announcements", "update"] as const,
   dismissed: () => ["announcements", "dismissed"] as const,
 };
 
@@ -42,6 +43,12 @@ export function useNotice(runtime: RuntimePort, wallet: WalletSummary): UseNotic
   const announcements = useQuery({
     queryKey: announcementKeys.list(),
     queryFn: () => runtime.send<undefined, Announcement[]>({ type: "getAnnouncements", payload: undefined }),
+    staleTime: ANNOUNCEMENTS_STALE_MS,
+    retry: false,
+  });
+  const update = useQuery({
+    queryKey: announcementKeys.update(),
+    queryFn: () => runtime.send<undefined, string | null>({ type: "getAvailableUpdate", payload: undefined }),
     staleTime: ANNOUNCEMENTS_STALE_MS,
     retry: false,
   });
@@ -75,11 +82,13 @@ export function useNotice(runtime: RuntimePort, wallet: WalletSummary): UseNotic
     announcements: dismissed.isPending ? [] : (announcements.data ?? []),
     dismissed: dismissed.data ?? [],
     review: review.data ?? null,
+    update: dismissed.isPending ? null : (update.data ?? null),
   });
 
   const dismiss = () => {
     if (notice?.kind === "invites" && seatsLeft !== null) markSeats.mutate({ walletId: wallet.id, seats: seatsLeft });
     else if (notice?.kind === "announcement") dismissAnnouncement.mutate(notice.announcement.id);
+    else if (notice?.kind === "update") dismissAnnouncement.mutate(updateNoticeId(notice.version));
     else if (notice?.kind === "review") finishReview.mutate();
   };
 

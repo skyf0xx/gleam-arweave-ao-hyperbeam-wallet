@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StoragePort } from "@gleam/core";
-import { ANNOUNCEMENTS_DISMISSED_KEY, AnnouncementsHandler, parseAnnouncements, type AnnouncementTarget } from "./announcements";
+import { ANNOUNCEMENTS_DISMISSED_KEY, AnnouncementsHandler, availableUpdate, parseAnnouncements, type AnnouncementTarget } from "./announcements";
 
 function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort & { store: Map<string, unknown> } {
   const store = new Map(Object.entries(initial));
@@ -140,5 +140,38 @@ describe("AnnouncementsHandler", () => {
   it("ignores a corrupt stored value", async () => {
     const handler = new AnnouncementsHandler({ target: () => TARGET, storage: createFakeStorage({ [ANNOUNCEMENTS_DISMISSED_KEY]: "oops" }) });
     expect(await handler.getDismissed()).toEqual([]);
+  });
+});
+
+describe("availableUpdate", () => {
+  const android = (version: string): AnnouncementTarget => ({ shell: "android", version });
+
+  it("names a newer release for the install's own shell", () => {
+    expect(availableUpdate({ android: "1.54.0" }, android("1.53.3"))).toBe("1.54.0");
+    expect(availableUpdate({ android: "2.0.0" }, android("1.99.99"))).toBe("2.0.0");
+  });
+
+  it("stays quiet when current, ahead, unlisted or unreadable", () => {
+    expect(availableUpdate({ android: "1.54.0" }, android("1.54.0"))).toBeNull();
+    expect(availableUpdate({ android: "1.54.0" }, android("1.55.0"))).toBeNull();
+    expect(availableUpdate({ android: "1.54.0" }, { shell: "extension", version: "1.0.0" })).toBeNull();
+    expect(availableUpdate({ android: "1.54.0" }, { shell: "web", version: "1.0.0" })).toBeNull();
+    expect(availableUpdate({ android: "1.54" }, android("1.0.0"))).toBeNull();
+    expect(availableUpdate({ android: "1.54.0" }, android("dev"))).toBeNull();
+    expect(availableUpdate([], android("1.0.0"))).toBeNull();
+    expect(availableUpdate(null, android("1.0.0"))).toBeNull();
+  });
+
+  it("reads the site file with a credential-free GET, and any failure is no update", async () => {
+    const storage = createFakeStorage();
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ android: "1.54.0" })));
+    const handler = new AnnouncementsHandler({ storage, target: () => android("1.53.3"), latestUrl: "https://site.example/latest.json", fetchImpl });
+    expect(await handler.fetchAvailableUpdate()).toBe("1.54.0");
+    expect(fetchImpl).toHaveBeenCalledWith("https://site.example/latest.json", expect.objectContaining({ credentials: "omit" }));
+
+    const failing = new AnnouncementsHandler({ storage, target: () => android("1.53.3"), fetchImpl: vi.fn(async () => new Response("", { status: 404 })) });
+    expect(await failing.fetchAvailableUpdate()).toBeNull();
+    const offline = new AnnouncementsHandler({ storage, target: () => android("1.53.3"), fetchImpl: vi.fn(async () => { throw new Error("offline"); }) });
+    expect(await offline.fetchAvailableUpdate()).toBeNull();
   });
 });
