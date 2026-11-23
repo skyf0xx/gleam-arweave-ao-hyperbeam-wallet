@@ -24,6 +24,10 @@ finished scan to the wallet so the user can sign it.
   the community security scans.
 - **`announcements.json`**: the notices that appear on the wallet's main
   screen.
+- **`latest.json`**: the newest release per shell that doesn't update
+  itself (`{ "android": "1.54.0" }`). An older install shows an update
+  notice. `scripts/publish-latest.sh` sets it once the build is
+  downloadable.
 - **`img/`, `fonts/`, `*.css`**: images, fonts and styles.
 
 ## Location

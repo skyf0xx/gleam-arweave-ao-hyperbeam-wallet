@@ -194,8 +194,12 @@ tests check Gleam's ANS-104 bytes against it.
   title?, text, url?, platforms?, below? }]`. They go live when the site
   deploys, and popups pick them up within an hour. `platforms` (any of
   `extension`, `android`, `ios`) and `below` (`x.y.z`) limit an entry to
-  those shells on older versions, which is how an APK update notice is
-  sent. Dismissals are stored by `id`, so a changed
+  those shells on older versions. Update notices need no entry:
+  `apps/site/latest.json` names the newest release per shell that
+  doesn't update itself (`{ "android": "1.54.0" }`), an older install
+  shows "Gleam x.y.z is out", and `release-app.sh android-apk` sets it
+  through `scripts/publish-latest.sh` after uploading the APK. Chrome and
+  TestFlight update on their own, so they stay out of it. Dismissals are stored by `id`, so a changed
   notice needs a new `id`. A `url` must be https on the Gleam site or
   `x.com` (`handlers/announcements.ts`), or the entry is dropped.
 - **Comments** explain the non-obvious *why*. Don't narrate the change
