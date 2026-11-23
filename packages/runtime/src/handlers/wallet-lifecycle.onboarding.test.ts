@@ -1211,17 +1211,17 @@ describe("WalletLifecycleHandler: setThemePreference", () => {
     expect(await second.getThemePreference()).toEqual({ theme: "dark" });
   });
 
-  it("stores silica and its weather switch, and keeps the switch while another theme is on", async () => {
+  it("stores silica", async () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
     await handler.setThemePreference({ theme: "silica" });
     expect(await handler.getThemePreference()).toEqual({ theme: "silica" });
-    await handler.setThemePreference({ theme: "dark", weather: true });
-    expect(await handler.getThemePreference()).toEqual({ theme: "dark", weather: true });
   });
 
-  it("rejects a weather value that isn't a boolean", async () => {
-    const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
-    await expect(handler.setThemePreference({ theme: "silica", weather: "rain" as never })).rejects.toThrow(/invalid theme preference/i);
+  it("keeps the theme from a record an older version stored with a weather flag, and drops the flag", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:themeSettings", { theme: "silica", weather: true });
+    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
+    expect(await handler.getThemePreference()).toEqual({ theme: "silica" });
   });
 });
 

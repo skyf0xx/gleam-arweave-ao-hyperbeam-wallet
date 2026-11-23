@@ -27,7 +27,6 @@ import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinsto
 import { useAddressIdentity } from "../../../address-identity";
 import { useLocale, useT, type TFunction } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
-import { marketOf, useSharedTheme } from "../../../theme";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGallery } from "../../collectibles/index.tsx";
@@ -35,7 +34,7 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { PANEL_GAP_PX, useTabSwipe } from "./useTabSwipe";
-import { useUndockPull } from "./useUndockPull";
+import { SHEET_EASING, useUndockPull } from "./useUndockPull";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useContacts } from "../../activity/src/useContacts";
 import { ActivityDetailSheet, type ActivityDetail } from "./ActivityDetailSheet";
@@ -442,8 +441,27 @@ const HEADER_FADE_DURATION_MS = 300;
  */
 const LIST_DOCK_TOP_PX = 64;
 
-/** The undock slide: a little quicker than the dock, since leaving is faster than arriving. */
-const LIST_UNDOCK_DURATION_MS = 200;
+/** The undock slide: a little quicker than the dock (320ms in theme.css), since leaving is faster than arriving. */
+const LIST_UNDOCK_DURATION_MS = 280;
+
+/**
+ * One of the home header's two states. Shown, it sits in the row; hidden, it is lifted out to the row's left edge
+ * (or across it, with `inset`), faded and unreachable. Opacity and a 4px rise run as transitions, so a swap is a
+ * cross-fade with the same small lift whatever the scroll did.
+ */
+function headerLayer(shown: boolean, inFlow: string, inset?: string) {
+  const place = inset ?? "left-5";
+  return {
+    "aria-hidden": shown ? undefined : true,
+    inert: !shown,
+    className: [
+      "items-center transition-[opacity,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+      inset ? `absolute top-4 bottom-2.5 flex justify-center phone:inset-y-0 ${place}` : shown ? inFlow : `absolute top-4 bottom-2.5 phone:inset-y-0 ${place} ${inFlow}`,
+      // `starting:` fades in a layer that mounts already shown.
+      shown ? "opacity-100 starting:translate-y-1 starting:opacity-0" : "pointer-events-none translate-y-1 opacity-0",
+    ].join(" "),
+  };
+}
 
 export function MainScreenView({
   runtime,
@@ -473,6 +491,8 @@ export function MainScreenView({
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [listDocked, setListDocked] = useState(false);
+  /** The top bar's summary stays mounted while it fades out, then leaves so its figures aren't on the page twice. */
+  const [summaryLingers, setSummaryLingers] = useState(false);
   const [hiddenExpanded, setHiddenExpanded] = useState(initialTokenEditing);
   // Tagged with its address so a wallet switch reads that wallet's choices without an effect.
   const [storedVisibility, setStoredVisibility] = useState(() => ({
@@ -517,6 +537,9 @@ export function MainScreenView({
   const headerRef = useRef<HTMLDivElement>(null);
   const panelTrackRef = useRef<HTMLDivElement>(null);
   const listDockOffsetRef = useRef(0);
+  const listDockedRef = useRef(false);
+  /** Where the docked list's top sits in the viewport: under the pinned row, which a phone moves down by its status bar. */
+  const dockTop = () => (headerRef.current?.getBoundingClientRect().top ?? 0) + LIST_DOCK_TOP_PX;
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
   // A collectible received since the list was fetched: refetch it, once per activity read.
@@ -609,12 +632,6 @@ export function MainScreenView({
   const chartFirst = chartSeries[0]?.value ?? 0;
   const chartLast = chartSeries[chartSeries.length - 1]?.value ?? 0;
   const chartChange = !history ? 0 : extraValue > 0 && chartSeries.length > 1 && chartFirst > 0 ? chartLast / chartFirst - 1 : history.change;
-  const reportMarket = useSharedTheme()?.reportMarket;
-  // A period still loading keeps the sky it had, so switching doesn't clear it in between.
-  const market = portfolioHistoryQuery.isPending ? undefined : marketOf(portfolioHasSeries ? chartChange : 0);
-  useEffect(() => {
-    if (market !== undefined) reportMarket?.(market);
-  }, [market, reportMarket]);
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 
@@ -641,7 +658,16 @@ export function MainScreenView({
       if (collapseRafRef.current !== null) return;
       collapseRafRef.current = requestAnimationFrame(() => {
         collapseRafRef.current = null;
-        setHeaderCollapsed(window.scrollY > HEADER_COLLAPSE_THRESHOLD_PX);
+        const collapsed = window.scrollY > HEADER_COLLAPSE_THRESHOLD_PX;
+        setHeaderCollapsed(collapsed);
+        // A scroll that carries the list up to its docked place docks it there and then, rather than letting it
+        // run on under the header and drop back down once the fade is over.
+        const top = listSectionRef.current?.getBoundingClientRect().top;
+        if (collapsed && !listDockedRef.current && top !== undefined && top <= dockTop() + 0.5) {
+          listDockOffsetRef.current = 0;
+          listDockedRef.current = true;
+          setListDocked(true);
+        }
       });
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -667,12 +693,16 @@ export function MainScreenView({
    */
   useEffect(() => {
     if (!headerCollapsed) {
+      listDockedRef.current = false;
       setListDocked(false);
       return;
     }
     const timer = window.setTimeout(() => {
+      if (listDockedRef.current) return;
       const rect = listSectionRef.current?.getBoundingClientRect();
-      listDockOffsetRef.current = rect ? rect.top - LIST_DOCK_TOP_PX : 0;
+      // The slide only ever rises to its place: one that starts above it would come down and read as a bounce.
+      listDockOffsetRef.current = rect ? Math.max(0, rect.top - dockTop()) : 0;
+      listDockedRef.current = true;
       setListDocked(true);
     }, HEADER_FADE_DURATION_MS);
     return () => window.clearTimeout(timer);
@@ -696,12 +726,17 @@ export function MainScreenView({
     const section = listSectionRef.current;
     if (!was || listDocked || !section) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const from = LIST_DOCK_TOP_PX + pulledBy.current - section.getBoundingClientRect().top;
+    const from = dockTop() + pulledBy.current - section.getBoundingClientRect().top;
     if (from >= 0) return;
-    section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
+    const slide = section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
       duration: LIST_UNDOCK_DURATION_MS,
-      easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+      easing: SHEET_EASING,
     });
+    if (!slide) return;
+    section.dataset.sliding = "";
+    const settled = () => delete section.dataset.sliding;
+    slide.onfinish = settled;
+    slide.oncancel = settled;
   }, [listDocked, pulledBy]);
 
   /**
@@ -714,10 +749,12 @@ export function MainScreenView({
   useEffect(() => {
     if (headerCollapsed) {
       wasCollapsedRef.current = true;
+      setSummaryLingers(true);
       return;
     }
     if (!wasCollapsedRef.current) return;
     wasCollapsedRef.current = false;
+    window.setTimeout(() => setSummaryLingers(false), HEADER_FADE_DURATION_MS);
     setActiveTab("tokens");
     setHiddenExpanded(false);
     onTabChange?.("tokens");
@@ -742,7 +779,7 @@ export function MainScreenView({
       section.scrollTo?.({ top: 0, behavior });
       return;
     }
-    const top = window.scrollY + section.getBoundingClientRect().top - LIST_DOCK_TOP_PX;
+    const top = window.scrollY + section.getBoundingClientRect().top - dockTop();
     window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
   };
 
@@ -801,9 +838,13 @@ export function MainScreenView({
     <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
       <LoadingBar active={pullState.refreshing} />
 
-      <div ref={headerRef} className="gleam-frost-bar sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
-        {headerCollapsed ? (
-          // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
+      <div ref={headerRef} className="gleam-frost-bar relative sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
+        {/*
+          The two header states are both drawn and cross-fade. The one showing sits in the row; the one leaving is
+          lifted out of it at the same place, so it fades out where it was while the other fades in.
+        */}
+        <span {...headerLayer(headerCollapsed, "flex flex-shrink-0")}>
+          {/* h-9 matches the account pill's height so the row, and the list docked under it, don't shift. */}
           <button
             type="button"
             aria-label={t("mainScreen.back")}
@@ -812,8 +853,9 @@ export function MainScreenView({
           >
             <BackIcon />
           </button>
-        ) : (
-          // The copy button can't nest inside the pill's button, so the wrapper carries the shared hover background.
+        </span>
+        <span {...headerLayer(!headerCollapsed, "flex min-w-0 max-w-[calc(100%-6rem)]")}>
+          {/* The copy button can't nest inside the pill's button, so the wrapper carries the shared hover background. */}
           <div className="group -ml-3 flex min-w-0 items-center rounded-lg pr-1 hover:bg-hover phone:ml-0 phone:pr-0">
             <button
               type="button"
@@ -838,23 +880,26 @@ export function MainScreenView({
               {addressCopied ? <CheckIcon /> : <CopyIcon />}
             </button>
           </div>
-        )}
+        </span>
 
-        {headerCollapsed && history && portfolioHasSeries ? (
-          // The range tabs fade out with the chart, so the range rides along to say what the change covers.
-          <button
-            type="button"
-            onClick={returnHome}
-            className="flex min-w-0 flex-1 items-baseline justify-center gap-1.5 text-label tabular-nums text-muted phone:min-h-11 phone:items-center"
-          >
-            <span className="truncate font-semibold text-foreground">
-              {masked ? HIDDEN_AMOUNT : formatCurrencyValue(history.currentValue + extraValue, currency ?? "USD", locale)}
-            </span>{" "}
-            <span className="font-semibold" style={{ color: chartChange >= 0 ? "var(--color-positive)" : "var(--color-negative)" }}>
-              {formatPercent(chartChange, locale)}
-            </span>{" "}
-            <span>{selectedRange}</span>
-          </button>
+        {(headerCollapsed || summaryLingers) && history && portfolioHasSeries ? (
+          // Centred on the header, clear of the buttons either side, so it never moves as the states trade places.
+          <span {...headerLayer(headerCollapsed, "", onOpenBrowser ? "inset-x-24" : "inset-x-14")}>
+            {/* The range tabs fade out with the chart, so the range rides along to say what the change covers. */}
+            <button
+              type="button"
+              onClick={returnHome}
+              className="flex min-w-0 flex-1 items-baseline justify-center gap-1.5 text-label tabular-nums text-muted phone:min-h-11 phone:items-center"
+            >
+              <span className="truncate font-semibold text-foreground">
+                {masked ? HIDDEN_AMOUNT : formatCurrencyValue(history.currentValue + extraValue, currency ?? "USD", locale)}
+              </span>{" "}
+              <span className="font-semibold" style={{ color: chartChange >= 0 ? "var(--color-positive)" : "var(--color-negative)" }}>
+                {formatPercent(chartChange, locale)}
+              </span>{" "}
+              <span>{selectedRange}</span>
+            </button>
+          </span>
         ) : null}
 
         <div className="gleam-round-buttons flex flex-shrink-0 items-center phone:-mr-3">
@@ -954,9 +999,9 @@ export function MainScreenView({
         already was and animate down to 0 instead of snapping. Docked, it
         runs to the popup's bottom edge and scrolls internally — a fixed
         box can't be moved by window scroll, so without that a list longer
-        than the popup would be cut off. The undocked min-height keeps the
-        page tall enough for a swipe or a tab click to scroll the section all
-        the way up to its docked position even when the list is short.
+        than the popup would be cut off. Undocked, it is exactly the docked
+        height, so the page scrolls the section precisely up to its docked
+        position and no further, however short or long the list.
       */}
       {listDocked ? <div style={{ height: listSectionRef.current?.offsetHeight }} /> : null}
       <div
@@ -964,7 +1009,9 @@ export function MainScreenView({
         className={`px-6 pb-6 phone:px-5 phone:pb-4 phone:[@media(max-height:700px)]:pb-2 ${
           listDocked
             ? "gleam-dock-in fixed inset-x-0 bottom-0 top-[calc(4rem+var(--inset-top))] z-20 mx-auto max-w-[var(--content-max)] overflow-y-auto bg-background"
-            : "min-h-[calc(100dvh-4rem)]"
+            : // Exactly the docked height, with its overflow clipped: the page then ends where the list docks, so a
+              // fling of any speed stops it right there instead of carrying it past and snapping it back.
+              "h-[calc(100dvh-4rem-var(--inset-top)-var(--safe-bottom))] overflow-y-clip"
         } layered:rounded-t-[20px] layered:bg-surface layered:pt-2 gleam-frost-sheet`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
       >

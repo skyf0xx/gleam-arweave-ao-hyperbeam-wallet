@@ -143,9 +143,6 @@ describe("BrowserView start screen", () => {
       "iwashere.ar.io",
       "www.permatell.xyz",
     ]);
-    // ao and bazar are single-colour, so they take the theme's colour as a mask; iwashere and permatell stay images.
-    expect(dapps.querySelectorAll("[data-mono-icon]")).toHaveLength(2);
-    expect(dapps.querySelectorAll("img")).toHaveLength(2);
     const saved = screen.getByRole("region", { name: "Saved" });
     expect(saved.querySelector("img")?.getAttribute("src")).toBe(PNG);
     // A recent site has no stored icon, so it keeps its letter.

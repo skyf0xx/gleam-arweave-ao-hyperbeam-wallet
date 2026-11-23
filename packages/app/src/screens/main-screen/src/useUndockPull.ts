@@ -9,7 +9,10 @@ const FLICK_PX_PER_MS = 0.5;
 /** Movement needed before the gesture's direction is judged. */
 const DIRECTION_SLOP_PX = 8;
 const WHEEL_PULL_PX = 32;
-const RETURN_MS = 150;
+const RETURN_MS = 220;
+
+/** Ease-out quint, shared by every slide of the sheet so they move alike. */
+export const SHEET_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export interface UndockPullOptions {
   docked: boolean;
@@ -62,7 +65,7 @@ export function useUndockPull({ docked, section: sectionRef, header: headerRef, 
     const release = () => {
       active = false;
       if (pull > 0 && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-        section.animate?.([{ translate: `0 ${pull}px` }, { translate: "0 0" }], { duration: RETURN_MS, easing: "ease-out" });
+        section.animate?.([{ translate: `0 ${pull}px` }, { translate: "0 0" }], { duration: RETURN_MS, easing: SHEET_EASING });
       }
       follow(0);
     };

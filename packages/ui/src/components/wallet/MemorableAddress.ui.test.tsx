@@ -19,13 +19,13 @@ describe("MemorableAddress", () => {
     expect(emphasized).toEqual(["weY8", "hGV3", "n8gz", "uFk"]);
   });
 
-  it("renders every chunk flat in one grid, 7 columns where they fit and 4 otherwise", () => {
+  it("renders every chunk flat in one grid, always 7 columns", () => {
     const { container } = render(<MemorableAddress address={ADDRESS} emphasisPick={null} />);
     const grid = screen.getByText(addressText(ADDRESS));
     expect(grid.children).toHaveLength(11);
     expect(Array.from(grid.children).map((chunk) => chunk.textContent).join("")).toBe(ADDRESS);
-    expect(grid.className).toContain("@[33ch]:grid-cols-[repeat(7,max-content)]");
-    expect(grid.className).toContain("grid-cols-[repeat(4,max-content)]");
+    expect(grid.className).toContain("grid-cols-[repeat(7,max-content)]");
+    expect(grid.className).not.toContain("repeat(4,");
     expect(grid.parentElement!.className).toContain("@container");
     expect(grid.className).not.toContain("flex-wrap");
     expect(container.querySelector(".flex-wrap")).toBeNull();

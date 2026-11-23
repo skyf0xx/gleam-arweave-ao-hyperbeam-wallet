@@ -18,15 +18,10 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
  */
 export interface ThemeSettings {
   theme: ThemePreference;
-  /** Silica's sky follows the portfolio. Absent is off; kept while another theme is on. */
-  weather?: boolean;
 }
 
 export function isThemeSettings(value: unknown): value is ThemeSettings {
   if (value === null || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
-  return (
-    THEME_PREFERENCES.includes(record.theme as ThemePreference) &&
-    (record.weather === undefined || typeof record.weather === "boolean")
-  );
+  return THEME_PREFERENCES.includes(record.theme as ThemePreference);
 }

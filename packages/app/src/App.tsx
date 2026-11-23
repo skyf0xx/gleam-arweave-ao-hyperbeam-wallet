@@ -39,7 +39,7 @@ import { QueryCachePersistence } from "./query-cache/persistence";
 import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
 import { sitePageUrl } from "@gleam/core";
 import { errorText } from "./i18n/errors";
-import { applyDocumentTheme, Sky, ThemeContext, themeAttribute, type Market } from "./theme";
+import { applyDocumentTheme, Sky, ThemeContext, themeAttribute } from "./theme";
 import { releasePointerFocusOnBlur } from "./pointer-focus";
 
 /**
@@ -154,8 +154,6 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   const [homeTab, setHomeTab] = useState<MainScreenTab>("tokens");
   const [initError, setInitError] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
-  const [weather, setWeather] = useState(false);
-  const [market, setMarket] = useState<Market>("flat");
   const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
   const [backStack] = useState(createBackStack);
   const [layoutRoot, setLayoutRoot] = useState<HTMLDivElement | null>(null);
@@ -218,19 +216,16 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     // attribute the last toggle left, and `[data-theme="dark"]` matches any
     // ancestor, so reset it from the stored preference rather than trust it.
     let stored: ThemeSettings["theme"] = "light";
-    let storedWeather = false;
     try {
       const settings = await runtime.send<void, ThemeSettings>({
         type: "getThemePreference",
         payload: undefined,
       });
       stored = settings.theme;
-      storedWeather = settings.weather === true;
     } catch {
       // Falls back to light.
     }
     setTheme(stored);
-    setWeather(storedWeather);
     applyDocumentTheme(stored);
   };
 
@@ -301,7 +296,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     [identityKey, runtime],
   );
 
-  const themeContext = useMemo(() => ({ theme, setTheme, weather, setWeather, reportMarket: setMarket }), [theme, weather]);
+  const themeContext = useMemo(() => ({ theme, setTheme }), [theme]);
 
   let content: ReactNode;
 
@@ -547,10 +542,6 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     );
   }
 
-  // Home has the figure that explains the sky, and Settings shows what the switch does. A screen
-  // where someone checks or signs something stays clear.
-  const showsWeather = weather && view === "main-screen" && (subView.kind === "home" || subView.kind === "settings-home");
-
   return (
     <QueryClientProvider client={queryClient}>
       <BackStackContext.Provider value={backStack}>
@@ -562,7 +553,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
           data-theme={themeAttribute(theme)}
           className="min-h-full bg-background text-foreground silica:isolate"
         >
-          {theme === "silica" ? <Sky market={showsWeather ? market : "flat"} /> : null}
+          {theme === "silica" ? <Sky /> : null}
           {view === "main-screen" && wallet && !initError ? (
             <QueryCachePersistence
               key={wallet.id}

@@ -56,8 +56,9 @@ function scrollsSideways(from: EventTarget | null, until: HTMLElement, towardsNe
 
 /**
  * Swiping between the home screen's tabs, on the phone layout only. Docked,
- * the panels follow the finger and settle from where it let go. Undocked,
- * a swipe opens the list and then slides to the next tab, one after the other.
+ * the panels follow the finger and settle from where it let go, anywhere on
+ * screen. Undocked, only a swipe that starts on the list counts: it opens
+ * the list and then slides to the next tab, one after the other.
  */
 export function useTabSwipe(options: TabSwipeOptions): PeekedPanel | null {
   const { target, track, scroller, active, docked } = options;
@@ -164,7 +165,9 @@ export function useTabSwipe(options: TabSwipeOptions): PeekedPanel | null {
       x = 0;
       peeked = null;
       const atEdge = startX < SCREEN_EDGE_PX || startX > window.innerWidth - SCREEN_EDGE_PX;
-      phase = atEdge ? "idle" : "undecided";
+      // Undocked, the figure and chart above the list are home's own, so only the list takes a swipe.
+      const outsideList = !latest.current.docked && !(event.target instanceof Node && scroller.current?.contains(event.target));
+      phase = atEdge || outsideList ? "idle" : "undecided";
     };
 
     const onMove = (event: TouchEvent) => {
