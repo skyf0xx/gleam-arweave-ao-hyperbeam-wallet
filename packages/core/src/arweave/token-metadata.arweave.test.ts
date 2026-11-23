@@ -204,10 +204,10 @@ describe("queryCheckedTokenMetadata", () => {
     expect((await queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl)).check).toBe("agreed");
   });
 
-  it("is unconfirmed when no other gateway answers", async () => {
+  it("drops the decimals when no other gateway answers", async () => {
     const fetchImpl = gatewaysFetch({ "arweave.net": "6", "ar-io.dev": null, "permagate.io": null });
     const result = await queryCheckedTokenMetadata(PROCESS_ID, "https://arweave.net", CHECKS, fetchImpl);
-    expect(result).toMatchObject({ check: "unconfirmed", metadata: { denomination: 6 } });
+    expect(result).toMatchObject({ check: "unconfirmed", metadata: { denomination: null } });
   });
 
   it("throws when the user's own gateway fails, as queryTokenMetadata does", async () => {

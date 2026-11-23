@@ -597,13 +597,13 @@ function needsGrant(entry: PendingApprovalRecord): boolean {
 /**
  * A dApp's signing request signs with the wallet that was active when it
  * was made, and its approval shows no account, so it must not outlive that
- * wallet being active. Connect and addToken don't sign, a scan attestation
- * shows and unlocks its own wallet, and Gleam's own requests name theirs.
+ * wallet being active. A connect approval names the wallet it connects, so
+ * it goes too. addToken doesn't sign, a scan attestation shows and unlocks
+ * its own wallet, and Gleam's own requests name theirs.
  */
 function signsForActiveWallet(entry: PendingApprovalRecord): boolean {
   const kind = entry.request.kind;
   return (
-    kind !== "connect" &&
     kind !== "addToken" &&
     kind !== "scanAttestation" &&
     entry.request.origin !== WALLET_APPROVAL_ORIGIN

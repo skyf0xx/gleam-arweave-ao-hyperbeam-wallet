@@ -564,6 +564,21 @@ describe("createRuntime", () => {
       );
     });
 
+    it("drops a connect approval when the user switches wallets before granting it", async () => {
+      const { runtime, platform, second } = await setupTwoWallets();
+      const present = vi.spyOn(platform.approvalPresenter, "present");
+
+      const pending = runtime.dispatch("providerCall", { method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } }, CONTENT_SCRIPT);
+      (pending as Promise<unknown>).catch(() => {});
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      await runtime.dispatch("switchWallet", { walletId: second.id }, EXTENSION);
+
+      await expect(pending).rejects.toThrow();
+      await expect(
+        runtime.dispatch("providerCall", { method: "getActiveAddress", params: undefined }, CONTENT_SCRIPT),
+      ).rejects.toThrow();
+    });
+
     it("never sends a watch wallet's address on add, switch or removal fallback", async () => {
       const { runtime, storage, first, second, platform } = await setupTwoWallets();
       await storage.set("local:grants", [grantFor(first.id, ["ACCESS_ADDRESS", "ACCESS_ALL_ADDRESSES"])]);

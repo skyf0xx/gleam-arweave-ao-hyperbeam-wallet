@@ -105,9 +105,10 @@ export async function readCarrierState(processId: string, hosts: readonly string
 /**
  * Whether the namespace maps `label` to `processId`. A gateway resolving
  * `/<namespace>/<label>` answers with the entry's tags, and the last step
- * of its `hashpath` header is the process the path resolved to. Only a
- * positive answer counts: a host that can't resolve the path proves
- * nothing, so the next one is asked.
+ * of its `hashpath` header is the process the path resolved to. Two hosts
+ * must resolve it to the same process, so one lying gateway can't put a
+ * name on a carrier the namespace doesn't give it. A host that can't
+ * resolve the path proves nothing, so the next one is asked.
  */
 export async function isNamespaceEntry(
   label: string,
@@ -116,11 +117,12 @@ export async function isNamespaceEntry(
   fetchImpl: typeof fetch,
 ): Promise<boolean> {
   if (!NAME_LABEL.test(label) || !PROCESS_ID.test(processId)) return false;
+  let confirmations = 0;
   for (const host of hosts) {
     try {
       const response = await fetchImpl(`${trimTrailingSlashes(host)}/${PERMAWEB_NAMESPACE_ID}/${label}`, { method: "HEAD" });
       if (!response.ok) continue;
-      if (hashpathTarget(response.headers.get("hashpath")) === processId) return true;
+      if (hashpathTarget(response.headers.get("hashpath")) === processId && ++confirmations >= 2) return true;
     } catch {
       // Ask the next host.
     }

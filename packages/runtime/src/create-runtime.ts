@@ -616,6 +616,7 @@ export function createRuntime(platform: Platform): Runtime {
     },
     renameWallet: (data) => lifecycle.renameWallet(data),
     switchWallet: async (data) => {
+      await requireUnlocked();
       await lifecycle.switchWallet(data);
       await activeWalletChanged(data.walletId);
     },
@@ -655,7 +656,10 @@ export function createRuntime(platform: Platform): Runtime {
       if (result.unlockedWalletIds.length > 0) void platform.lockIndicator.setLocked(false);
       return result;
     },
-    removePasskey: () => passkey.removePasskey(),
+    removePasskey: async () => {
+      await requireUnlocked();
+      return passkey.removePasskey();
+    },
     resetAllWallets: async () => {
       // Grants go first, here and when deleteWallet removes the last wallet: a
       // removal that fails part-way must not leave a dApp connected to nothing.
@@ -723,7 +727,10 @@ export function createRuntime(platform: Platform): Runtime {
     getDisplaySettings: () => lifecycle.getDisplaySettings(),
     setDisplaySettings: (data) => lifecycle.setDisplaySettings(data),
     getSecurityPhrase: () => securityPhrase.get(),
-    setSecurityPhrase: (data) => securityPhrase.set(data),
+    setSecurityPhrase: async (data) => {
+      await requireUnlocked();
+      return securityPhrase.set(data);
+    },
     revokeGrant: async (data) => {
       await approval.revokeGrant(data);
       void announceAccessEnded(data.origin);
