@@ -72,7 +72,8 @@ function stubFetch(world: World) {
 }
 
 const discover = (world: World) =>
-  discoverCollectibles({ address: WALLET, gatewayUrl: GATEWAY, peerUrl: PEER, l1NodeUrls: [], fetchImpl: stubFetch(world) });
+  // A second namespace host, since a label needs two hosts to agree on it.
+  discoverCollectibles({ address: WALLET, gatewayUrl: GATEWAY, peerUrl: PEER, l1NodeUrls: ["https://node.test"], fetchImpl: stubFetch(world) });
 
 describe("discoverCollectibles: Permaweb Names", () => {
   it("lists a held name the namespace confirms, as @label with its target", async () => {

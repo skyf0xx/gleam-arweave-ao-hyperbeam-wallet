@@ -125,10 +125,24 @@ describe("isNamespaceEntry", () => {
     return { impl, calls };
   };
 
-  it("confirms the entry from the hashpath's last step", async () => {
-    const { impl, calls } = answering({ "https://gw.test": new Response(null, { headers: { hashpath: LIVE_HASHPATH } }) });
-    await expect(isNamespaceEntry("zy", CARRIER, ["https://gw.test"], impl)).resolves.toBe(true);
-    expect(calls).toEqual([{ url: `https://gw.test/${PERMAWEB_NAMESPACE_ID}/zy`, method: "HEAD" }]);
+  it("confirms the entry when two hosts resolve it to the same process", async () => {
+    const { impl, calls } = answering({
+      "https://gw.test": new Response(null, { headers: { hashpath: LIVE_HASHPATH } }),
+      "https://node.test": new Response(null, { headers: { hashpath: LIVE_HASHPATH } }),
+    });
+    await expect(isNamespaceEntry("zy", CARRIER, ["https://gw.test", "https://node.test"], impl)).resolves.toBe(true);
+    expect(calls).toEqual([
+      { url: `https://gw.test/${PERMAWEB_NAMESPACE_ID}/zy`, method: "HEAD" },
+      { url: `https://node.test/${PERMAWEB_NAMESPACE_ID}/zy`, method: "HEAD" },
+    ]);
+  });
+
+  it("does not bind a label on one host's word alone", async () => {
+    const { impl } = answering({
+      "https://gw.test": new Response(null, { headers: { hashpath: LIVE_HASHPATH } }),
+      "https://node.test": new Response(null, { status: 404 }),
+    });
+    await expect(isNamespaceEntry("zy", CARRIER, ["https://gw.test", "https://node.test"], impl)).resolves.toBe(false);
   });
 
   it("refuses an entry that resolves to another process", async () => {
@@ -140,8 +154,11 @@ describe("isNamespaceEntry", () => {
     const { impl } = answering({
       "https://a.test": new Response(null, { status: 404 }),
       "https://c.test": new Response(null, { headers: { hashpath: LIVE_HASHPATH } }),
+      "https://d.test": new Response(null, { headers: { hashpath: LIVE_HASHPATH } }),
     });
-    await expect(isNamespaceEntry("zy", CARRIER, ["https://a.test", "https://b.test", "https://c.test"], impl)).resolves.toBe(true);
+    await expect(
+      isNamespaceEntry("zy", CARRIER, ["https://a.test", "https://b.test", "https://c.test", "https://d.test"], impl),
+    ).resolves.toBe(true);
   });
 
   it("never asks about a label or id it wouldn't accept", async () => {
