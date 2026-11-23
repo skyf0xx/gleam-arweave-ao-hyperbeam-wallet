@@ -110,7 +110,7 @@
   --color-chart-up: var(--color-positive);
   --color-chart-down: var(--color-negative);
   --chart-fill-top: 0.12;
-  --chart-fill-end: 0.12;
+  --chart-fill-end: 0.11;
   /* The price line's gain and loss colour, for the portfolio and token charts; the %-change keeps the full-strength pair. */
   --color-chart-line-up: var(--color-positive);
   --color-chart-line-down: var(--color-negative);
