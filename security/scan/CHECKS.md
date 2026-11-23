@@ -90,6 +90,10 @@ Some of the classes here are adapted from Cloudflare's
 - For batch methods, is there a count cap, or a total-size cap that
   bounds the batch, and does the approval preview show the item count
   and every item, so one transfer can't hide among many?
+- Is every signature bound to one purpose? For each thing Gleam signs
+  (ANS-104 items, points attestations, `signMessage`-style payloads), do
+  the signed bytes say what they are for, or could a signature made for
+  one be accepted as another?
 
 ### Crypto (tiers 1 and 2)
 
