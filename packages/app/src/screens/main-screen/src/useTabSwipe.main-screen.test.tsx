@@ -17,7 +17,8 @@ function Harness({ layout = "phone", docked = true, initial = 0, onOpen = () => 
   return (
     <div data-layout={layout}>
       <div ref={target} data-testid="target">
-        <div ref={scroller}>
+        <div data-testid="header" />
+        <div ref={scroller} data-testid="list">
           <div
             ref={(element) => {
               track.current = element;
@@ -97,14 +98,24 @@ describe("useTabSwipe", () => {
     vi.useFakeTimers();
     const onOpen = vi.fn();
     const { rerender } = render(<Harness docked={false} onOpen={onOpen} />);
-    swipe(180, { from: 100 });
+    swipe(180, { from: 100, on: "list" });
     expect(onOpen).not.toHaveBeenCalled();
-    swipe(-180);
+    swipe(-180, { on: "list" });
     expect(onOpen).toHaveBeenCalledTimes(1);
     expect(active()).toBe("0");
     rerender(<Harness docked onOpen={onOpen} />);
     expect(active()).toBe("0");
     act(() => void vi.advanceTimersByTime(300));
+    expect(active()).toBe("1");
+  });
+
+  it("undocked, ignores a swipe above the list; docked, takes one anywhere", () => {
+    const onOpen = vi.fn();
+    const { rerender } = render(<Harness docked={false} onOpen={onOpen} />);
+    swipe(-180, { on: "header" });
+    expect(onOpen).not.toHaveBeenCalled();
+    rerender(<Harness docked onOpen={onOpen} />);
+    swipe(-180, { on: "header" });
     expect(active()).toBe("1");
   });
 });
