@@ -90,6 +90,10 @@ Some of the classes here are adapted from Cloudflare's
 - For batch methods, is there a count cap, or a total-size cap that
   bounds the batch, and does the approval preview show the item count
   and every item, so one transfer can't hide among many?
+- Is every signature bound to one purpose? For each thing Gleam signs
+  (ANS-104 items, points attestations, `signMessage`-style payloads), do
+  the signed bytes say what they are for, or could a signature made for
+  one be accepted as another?
 
 ### Crypto (tiers 1 and 2)
 
@@ -120,6 +124,10 @@ Some of the classes here are adapted from Cloudflare's
 `packages/runtime/src/handlers/provider-params.ts`.
 
 - Each method's caller tier, and whether it can open an approval.
+- Compare sibling methods (the sign variants, the send variants, the
+  ones that reveal keys): does each have the same tier, schema strictness
+  and approval as the rest? A method copied from another often drops a
+  check.
 - Does any method's zod schema accept something its handler doesn't
   expect: extra keys, a wider type, a value the handler then trusts?
 - Can any method that signs or reveals something run without an
