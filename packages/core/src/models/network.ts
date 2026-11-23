@@ -71,6 +71,7 @@ export const COMMUNITY_HYPERBEAM_PEER_URLS: readonly string[] = [
   "https://public-hb.tylerw.ai",
   "https://rng-hb.tylerw.ai",
   "https://hyperbeam.paralithmarkets.com",
+  "https://hyperbeam.lldex.com:8443",
 ];
 
 /**
