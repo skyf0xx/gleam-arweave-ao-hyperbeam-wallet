@@ -298,7 +298,7 @@ function Standing({
       <Beam className="mb-2 w-10" />
       {rank !== null ? (
         <>
-          <p className="text-display-lg font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">
+          <p className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">
             {t("points.rank", { rank })}
           </p>
           {/* After the rank in reading order, drawn on the beam's row. */}
@@ -335,7 +335,7 @@ function Standing({
       ) : (
         <p className="flex items-baseline gap-2 text-foreground">
           <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
-          <span aria-hidden="true" className="text-display-lg font-semibold leading-[1.1] tracking-[-0.03em]">
+          <span aria-hidden="true" className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em]">
             {totalText}
           </span>
           <span aria-hidden="true" className="text-body text-muted">

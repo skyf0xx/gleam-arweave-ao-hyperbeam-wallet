@@ -338,7 +338,7 @@ export function SiteAvatar({ host, icon }: { host: string; icon?: string }) {
   if (icon && !failed) {
     return (
       <span aria-hidden="true" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-mist">
-        <img src={icon} alt="" className="h-6 w-6 object-contain" onError={() => setFailed(true)} />
+        <img src={icon} alt="" className="h-6 w-6 object-contain dark:opacity-90" onError={() => setFailed(true)} />
       </span>
     );
   }

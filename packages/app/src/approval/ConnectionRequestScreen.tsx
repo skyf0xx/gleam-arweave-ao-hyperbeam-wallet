@@ -76,7 +76,7 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
             <img
               src={logoUrl}
               alt=""
-              className="h-12 w-12 rounded-lg border border-line object-cover"
+              className="h-12 w-12 rounded-lg border border-line object-cover dark:opacity-90"
               // A dApp-supplied URL that fails to load falls back to the
               // origin-derived letter tile rather than a broken image icon.
               onError={() => setLogoFailed(true)}

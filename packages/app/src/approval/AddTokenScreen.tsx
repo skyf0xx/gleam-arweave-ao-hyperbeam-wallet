@@ -48,7 +48,7 @@ export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: A
 
       <div className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-6 phone:px-5">
         <div className="flex flex-col items-center gap-1 py-1 text-center">
-          <span className="text-display-sm font-semibold tracking-[-0.02em] text-foreground">
+          <span className="text-display-sm font-semibold dark:font-medium tracking-[-0.02em] text-foreground">
             {preview.ticker !== null ? <UntrustedText text={preview.ticker} /> : t("approval.unknownToken")}
           </span>
           {preview.name !== null ? (

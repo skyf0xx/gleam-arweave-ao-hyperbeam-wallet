@@ -139,16 +139,17 @@ Dark mode has its own rules. It is not the light theme inverted.
 
 | Token | Dark | Level |
 |---|---|---|
-| **Background**, **Canvas** | `#0d0d0f` | 0: the window, header, balance and chart |
-| **Surface** | `#161618` | 1: the token sheet, cards |
-| **Mist** | `#1f1f22` | 2: tiles, active chips, row hover, logo plates |
-| **Line** | `#2a2a2e` | 3: hover on a level-2 tile, the rare divider |
-| **Foreground** | `#ededef` | Balance, names, fiat values |
+| **Background**, **Canvas** | `#141417` | 0: the window, header, balance and chart |
+| **Surface** | `#1c1c1f` | 1: the token sheet, cards |
+| **Mist** | `#25252a` | 2: tiles, active chips, row hover, logo plates |
+| **Line** | `#303036` | 3: hover on a level-2 tile, the rare divider |
+| **Foreground** | `#dcdce1` | Balance, names, fiat values |
 | **Muted** | `#a0a0a8` | Amounts, the wallet name, secondary text |
-| **Faint** | `#6b6b73` | Addresses, captions, inactive tabs and chips |
+| **Faint** | `#75757d` | Addresses, captions, inactive tabs and chips |
 | **Primary fill** | `#d4d4d8` | Buttons that commit: Confirm, Approve, Unlock |
 
-- **Elevation is lightness.** Shadows don't show on near-black, so each level up is a step lighter. Separate with a level change or spacing, not a border.
+- **Soft contrast.** A dark grey ground and off-white text, about 13:1. Near-white on near-black blooms in a dark room. Accents are less saturated than in light. Large figures drop one weight (`dark:font-medium`), since light text on dark reads heavier, and logos and site icons sit at 90% opacity (`dark:opacity-90`).
+- **Elevation is lightness.** Shadows don't show on a dark ground, so each level up is a step lighter. Separate with a level change or spacing, not a border.
 - **One bright item per row.** The balance is the only display weight. A row's name and value are foreground; everything else drops back.
 - **No colour fill larger than a figure.** The portfolio chart is neutral (a smoothed foreground line, a fill that fades out, a dot on the current value). Only the %-change says which way it went.
 - **Commit actions are bright.** Send and Receive are equal level-2 tiles on the main screen. The bright primary fill is kept for the button that commits.
@@ -215,8 +216,8 @@ Red marks errors and the Irreversible risk tier only, never a status default or 
 | **Warning fill** | `#c93a3f` | `#c93a3f` | Behind white text (destructive button), 5:1 |
 | **Warning surface** | `#fff5f5` | `#2a1515` | Critical notice background |
 | **Caution** | `#c2410c` | `#fb923c` | Worth reading, not a danger |
-| **Positive** | `#16a34a` | `#4cd98a` | Confirmed amounts, gains |
-| **Negative** | `#dc2626` | `#ff8a85` | Losses in the %-change |
+| **Positive** | `#16a34a` | `#5cc98d` | Confirmed amounts, gains |
+| **Negative** | `#dc2626` | `#f08f8a` | Losses in the %-change |
 
 Beam red is identity only, never a warning. In dark mode, warning uses its own softer red.
 
@@ -224,7 +225,7 @@ Beam red is identity only, never a warning. In dark mode, warning uses its own s
 
 The five-stop beam is Gleam's signature visual element. It appears as a gradient divider, in loading states, and occasionally as accent highlights. Each segment has its own meaning within the context, but together they form a cohesive identity.
 
-The beam has two sets. Dark mode uses its own: the same hues with less glare, so the beam sits on near-black instead of burning through it. Every beam, divider and beam-coloured accent reads the `--color-beam-*` tokens, so each theme gets its own set automatically.
+The beam has two sets. Dark mode uses its own: the same hues with less glare, so the beam sits on the dark ground instead of burning through it. Every beam, divider and beam-coloured accent reads the `--color-beam-*` tokens, so each theme gets its own set automatically.
 
 | Segment | Light | Dark |
 |---|---|---|

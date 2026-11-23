@@ -48,5 +48,5 @@ export function PointsTokenRow({ runtime, wallet, onOpen, showLogo = true, class
 
 /** Same footprint as `TokenGlyph`, holding the Gleam mark instead of a ticker. */
 function PointsIcon() {
-  return <img src={GLEAM_POINTS_ICON_URL} alt="" aria-hidden="true" className="h-[30px] w-[30px] flex-shrink-0 object-contain" />;
+  return <img src={GLEAM_POINTS_ICON_URL} alt="" aria-hidden="true" className="h-[30px] w-[30px] flex-shrink-0 object-contain dark:opacity-90" />;
 }
