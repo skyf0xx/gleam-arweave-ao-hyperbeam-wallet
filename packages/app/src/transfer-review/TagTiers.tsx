@@ -109,7 +109,7 @@ function AddressRow({ labels, address, note }: { labels: ReactNode[]; address: s
         ))}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <MemorableAddress address={address} emphasisPick={emphasisPick} sixWhereNarrow />
+        <MemorableAddress address={address} emphasisPick={emphasisPick} />
         {note ? <span className="text-caption text-muted">{note}</span> : null}
       </div>
     </div>
