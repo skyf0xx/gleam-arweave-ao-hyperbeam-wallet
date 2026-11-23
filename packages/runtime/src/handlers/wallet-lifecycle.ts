@@ -164,7 +164,7 @@ async function loadLockSettings(storage: StoragePort): Promise<LockSettings> {
 
 async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
   const raw = await storage.get<unknown>(THEME_SETTINGS_KEY);
-  if (isThemeSettings(raw)) return { theme: raw.theme, ...(raw.weather ? { weather: true } : {}) };
+  if (isThemeSettings(raw)) return { theme: raw.theme };
   return DEFAULT_THEME_SETTINGS;
 }
 
@@ -1130,7 +1130,7 @@ export class WalletLifecycleHandler {
     if (!isThemeSettings(req)) {
       throw new Error(dappError(`Invalid theme preference "${String((req as Partial<ThemeSettings>).theme)}".`));
     }
-    await this.storage.set(THEME_SETTINGS_KEY, { theme: req.theme, ...(req.weather ? { weather: true } : {}) });
+    await this.storage.set(THEME_SETTINGS_KEY, { theme: req.theme });
   }
 
   async getDisplaySettings(): Promise<DisplaySettings> {

@@ -184,7 +184,7 @@ Frost rules:
 - **Selected is raised.** A theme is lifted on white frost. Section tabs stay underlined, and a chart period is a flat fill a shade lighter than the sky (`#f9fbfd`), with no shadow: the figure above it is the bright item.
 - **Pointer.** A row on the sky brightens. On a white surface it takes a 4% slate wash.
 - **Pending is fogged.** A pending activity row is drawn in **Muted** with an outlined icon, and clears when it settles.
-- **The beam never changes with the weather.** It is identity, so the same five colours stay in the same order.
+- **The beam never changes.** It is identity, so the same five colours stay in the same order.
 
 Contrast holds on the darkest part of every sky: amounts, names and addresses 7:1, secondary text and %-changes 4.5:1.
 
@@ -202,20 +202,6 @@ Short addresses (`weY8…4uFk`), the rest of an address list and tag rows go wit
 - **A read-only lens is set into the page.** It runs the full width, lights and curves only its open edge and fades out where it continues. It hangs down from its subject (`.gleam-lens-down`) or rises to it from under the header (`.gleam-lens-up`).
 - **It covers what depends on the address.** On a transfer review it runs from the recipient through the token, fee and balance after. The sender stays off it. On Receive it runs from "Your address" to the foot of the screen, and the QR stays off it. A lens follows the screen's own reading order: don't reorder a screen to keep a row off it.
 - **One lens per screen, never on frost.** Related addresses share one. In a list of wallets only the active one is under it, and a dot in the Active label's green on its avatar finds it at a glance.
-
-**Weather**
-
-Weather is a switch under the theme, shown only for Silica and off until it is turned on. It moves the sky with the wallet's own change over the chart period on screen.
-
-| | Clear | Sunlight | Mist |
-|---|---|---|---|
-| **When** | Weather off, no history, or a change under 0.05% | Up | Down |
-| **Sky** | Sky blue and mint | Dawn gold top right, spring mint at left | Slate top right, a breath of rose, lavender at left |
-
-- **Light, not a verdict.** Only the sky moves. Text, frost, the beam and the layout are the same in all three, and the %-change still says what happened.
-- **Home and Settings only.** Home has the figure that explains the sky, and Settings shows what the switch does. Every other screen is clear.
-- **Never where someone checks.** Approvals, reviews and the passkey window have no weather: a market mood must not colour a decision to sign.
-- **It crosses over once.** The skies are stacked and cross-fade by opacity in 400ms when the period or the market changes. Nothing drifts, rains or loops. With reduced motion it just changes.
 
 The silica-only touches use the `silica:` variant and the `.gleam-*` classes at the end of `theme.css`.
 

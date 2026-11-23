@@ -115,14 +115,12 @@ describe("ProtocolMap", () => {
     }>();
   });
 
-  it("getThemePreference/setThemePreference are exactly light, dark or silica, never a system/auto value, with an optional weather switch", () => {
+  it("getThemePreference/setThemePreference are exactly light, dark or silica, never a system/auto value", () => {
     expectTypeOf<ReturnType<ProtocolMap["getThemePreference"]>>().toEqualTypeOf<{
       theme: "light" | "dark" | "silica";
-      weather?: boolean;
     }>();
     expectTypeOf<Parameters<ProtocolMap["setThemePreference"]>[0]>().toEqualTypeOf<{
       theme: "light" | "dark" | "silica";
-      weather?: boolean;
     }>();
   });
 

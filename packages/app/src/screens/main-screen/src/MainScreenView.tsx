@@ -27,7 +27,6 @@ import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinsto
 import { useAddressIdentity } from "../../../address-identity";
 import { useLocale, useT, type TFunction } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
-import { marketOf, useSharedTheme } from "../../../theme";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGallery } from "../../collectibles/index.tsx";
@@ -609,12 +608,6 @@ export function MainScreenView({
   const chartFirst = chartSeries[0]?.value ?? 0;
   const chartLast = chartSeries[chartSeries.length - 1]?.value ?? 0;
   const chartChange = !history ? 0 : extraValue > 0 && chartSeries.length > 1 && chartFirst > 0 ? chartLast / chartFirst - 1 : history.change;
-  const reportMarket = useSharedTheme()?.reportMarket;
-  // A period still loading keeps the sky it had, so switching doesn't clear it in between.
-  const market = portfolioHistoryQuery.isPending ? undefined : marketOf(portfolioHasSeries ? chartChange : 0);
-  useEffect(() => {
-    if (market !== undefined) reportMarket?.(market);
-  }, [market, reportMarket]);
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 

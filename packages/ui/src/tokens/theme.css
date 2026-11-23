@@ -233,7 +233,7 @@
  * (approvals, the passkey window). Surface stays opaque: menus and dialogs
  * sit on content, where translucent white would not read.
  * - Muted, gains and losses hold 4.5:1 on the darkest part of every sky.
- * - The beam is the light set with less glare. It never follows the weather.
+ * - The beam is the light set with less glare.
  */
 [data-theme="silica"] {
   --color-canvas: #e9eef5;
@@ -1023,10 +1023,8 @@ select,
  * light or dark.
  *
  * The sky is fixed behind every screen, under the root's own stacking
- * context. Three skies are stacked and cross-faded, since a gradient can't
- * animate and opacity can. Their sizes are in px from the top, so the
- * wash sits behind the figure and chart and is gone by the foot of a tall
- * side panel.
+ * context. Its sizes are in px from the top, so the wash sits behind the
+ * figure and chart and is gone by the foot of a tall side panel.
  */
 .gleam-sky {
   position: fixed;
@@ -1034,47 +1032,15 @@ select,
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-}
-
-/* The side panel and phone cap their direct children's width; the sky fills the window. */
-[data-layout] > .gleam-sky {
-  max-width: none;
-}
-
-.gleam-sky > * {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 400ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-.gleam-sky[data-market="flat"] > .gleam-sky-flat,
-.gleam-sky[data-market="up"] > .gleam-sky-up,
-.gleam-sky[data-market="down"] > .gleam-sky-down {
-  opacity: 1;
-}
-
-.gleam-sky-flat {
   background:
     radial-gradient(ellipse 62% 250px at 94% 130px, rgba(205, 245, 226, 0.6), transparent),
     radial-gradient(ellipse 70% 260px at 2% 360px, rgba(207, 229, 253, 0.6), transparent),
     linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent 420px);
 }
 
-.gleam-sky-up {
-  background:
-    radial-gradient(ellipse 80% 300px at 92% 70px, rgba(254, 240, 178, 0.75), transparent),
-    radial-gradient(ellipse 75% 280px at 6% 220px, rgba(178, 244, 209, 0.62), transparent),
-    radial-gradient(ellipse 60% 200px at 88% 400px, rgba(207, 229, 253, 0.5), transparent),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.6), transparent 420px);
-}
-
-.gleam-sky-down {
-  background:
-    radial-gradient(ellipse 85% 280px at 92% 50px, rgba(203, 213, 227, 0.68), transparent),
-    radial-gradient(ellipse 60% 200px at 42% 215px, rgba(254, 214, 221, 0.6), transparent),
-    radial-gradient(ellipse 75% 250px at 0% 370px, rgba(216, 218, 254, 0.62), transparent),
-    linear-gradient(180deg, rgba(233, 238, 246, 0.8), transparent 520px);
+/* The side panel and phone cap their direct children's width; the sky fills the window. */
+[data-layout] > .gleam-sky {
+  max-width: none;
 }
 
 /*
@@ -1347,7 +1313,6 @@ select,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gleam-sky > *,
   [data-theme="silica"] .gleam-pending-row :is(.gleam-pending-ink, .gleam-pending-ink *) {
     transition: none;
   }
