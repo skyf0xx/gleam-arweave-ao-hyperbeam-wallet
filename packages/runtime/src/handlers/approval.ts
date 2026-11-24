@@ -375,6 +375,8 @@ export interface PointsDeviceProof {
 export interface WalletTransferRequest extends SubmitTransferRequest {
   tokenDenomination?: number | null;
   tokenTicker?: string | null;
+  /** See `SigningApprovalPreview.tokenImpersonating`. */
+  tokenImpersonating?: boolean;
 }
 
 /** The subset of `ReadsHandler` an approved `addToken` request writes through. */
@@ -1727,6 +1729,7 @@ export class ApprovalHandler {
       tokenDenomination: req.tokenDenomination ?? null,
       tokenTicker: req.tokenTicker ?? null,
       collectible: req.collectible ?? null,
+      ...(req.tokenImpersonating ? { tokenImpersonating: true } : {}),
       payload: new Uint8Array(),
       tags: [],
     });

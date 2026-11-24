@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type RecipientAssessment, type RuntimePort, type TokenBalance, type TokenPrice, type TransferFeeQuote, type WalletSummary } from "@gleam/core";
+import { capabilityRefusal, explorerUrlFor, impersonatesRegisteredToken, isHardwareWalletMethod, isRegisteredProcessId, type ActivityPage, type Contact, type DisplayCurrency, type RecipientAssessment, type RuntimePort, type TokenBalance, type TokenPrice, type TransferFeeQuote, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ContactsView } from "../../contacts/index.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -1178,6 +1178,12 @@ function ReviewStep({
         recipient: step.recipient,
         part: { tags: [], decodedData: null, payloadHash: null },
         index: 0,
+        // As a dApp's transfer is flagged: a watched token may predate the add-time refusal.
+        ...(token !== null &&
+        !isRegisteredProcessId(token.processId) &&
+        impersonatesRegisteredToken({ ticker: token.ticker, name: token.name })
+          ? { impersonating: true as const }
+          : {}),
       },
     ],
     others: [],

@@ -387,9 +387,9 @@ export function createRuntime(platform: Platform): Runtime {
   async function resolveTokenDenominationAndTicker(
     address: string,
     processId: string,
-  ): Promise<{ tokenDenomination: number | null; tokenTicker: string | null }> {
-    const { tokenDenomination, tokenTicker } = await resolveTokenPreview(address, processId);
-    return { tokenDenomination, tokenTicker };
+  ): Promise<{ tokenDenomination: number | null; tokenTicker: string | null; tokenImpersonating?: true }> {
+    const { tokenDenomination, tokenTicker, impersonating } = await resolveTokenPreview(address, processId);
+    return { tokenDenomination, tokenTicker, ...(impersonating ? { tokenImpersonating: true as const } : {}) };
   }
 
   /**
