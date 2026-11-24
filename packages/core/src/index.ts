@@ -32,6 +32,8 @@ export {
   AR_TOKEN,
   AO_TOKEN,
   priceSourceForProcessId,
+  impersonatesRegisteredToken,
+  isRegisteredProcessId,
   type RegisteredToken,
   type TokenPriceSource,
   type TokenPrice,

@@ -395,7 +395,7 @@ describe("provider token list methods, end to end", () => {
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => "1000000" };
+      return new Response(JSON.stringify("1000000"));
     }) as unknown as typeof fetch;
   });
 

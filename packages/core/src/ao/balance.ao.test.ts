@@ -1,12 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { getTokenBalance, readTokenBalance } from "./balance";
 
-function fakeFetch(body: unknown, ok = true, status = 200): typeof fetch {
-  return vi.fn(async () => ({
-    ok,
-    status,
-    json: async () => body,
-  })) as unknown as typeof fetch;
+function fakeFetch(body: unknown, status = 200): typeof fetch {
+  return vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
 }
 
 const PROCESS_ID = "proc123";
@@ -22,6 +18,11 @@ describe("getTokenBalance", () => {
       `${PEER}/${PROCESS_ID}~process@1.0/compute/balances/${ADDRESS}`,
       { signal: expect.any(AbortSignal) },
     );
+  });
+
+  it("refuses an oversized balance reply without buffering it", async () => {
+    const fetchImpl = vi.fn(async () => new Response(`"${"9".repeat(100_000)}"`)) as unknown as typeof fetch;
+    await expect(getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl)).rejects.toThrow();
   });
 
   it("parses a bare numeric-string balance response", async () => {
@@ -72,7 +73,7 @@ describe("getTokenBalance", () => {
   });
 
   it("reads a 404 (an address the token never credited) as a zero balance", async () => {
-    const fetchImpl = fakeFetch(null, false, 404);
+    const fetchImpl = fakeFetch(null, 404);
     const result = await getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl);
 
     expect(result.quantity).toBe("0");
@@ -80,7 +81,7 @@ describe("getTokenBalance", () => {
   });
 
   it("throws on a non-2xx response (peer down)", async () => {
-    const fetchImpl = fakeFetch(null, false, 502);
+    const fetchImpl = fakeFetch(null, 502);
     await expect(getTokenBalance(PROCESS_ID, ADDRESS, PEER, fetchImpl)).rejects.toThrow(
       /HTTP 502/,
     );

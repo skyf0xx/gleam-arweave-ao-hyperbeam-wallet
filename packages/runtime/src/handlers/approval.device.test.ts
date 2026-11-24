@@ -711,6 +711,25 @@ describe("Transfers from a hardware wallet sign in the approval window", () => {
     ]);
   });
 
+  it("a popup token send keeps the impersonation flag on its preview", async () => {
+    const pending = handler.requestWalletTransfer({
+      walletId: HW_ID,
+      token: PROCESS_ID,
+      recipient: RECIPIENT,
+      amount: "10",
+      fee: "0",
+      tokenDenomination: 12,
+      tokenTicker: "AO",
+      tokenImpersonating: true,
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
+    const view = await handler.getApproval({ requestId });
+    expect(view.preview).toMatchObject({ kind: "transfer", token: PROCESS_ID, tokenTicker: "AO", tokenImpersonating: true });
+    await handler.resolveApproval({ requestId, approved: false });
+  });
+
   it("a popup collectible send has the device sign the L1 transfer to the asset and logs the collectible", async () => {
     const calls = mockNetwork();
     const network = globalThis.fetch;

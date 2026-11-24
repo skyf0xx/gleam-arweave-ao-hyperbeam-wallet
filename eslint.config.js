@@ -332,6 +332,7 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/.claude/worktrees/**",
       ".stryker-tmp/**",
+      ".gleam-scan/**",
       "reports/**",
       // Generated native projects; `cap sync` copies the built bundle into them.
       "apps/mobile/ios/**",

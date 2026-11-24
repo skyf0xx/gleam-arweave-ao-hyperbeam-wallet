@@ -319,6 +319,20 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   });
 });
 
+describe("SendView impersonating tokens", () => {
+  it("warns on the review when a watched token copies AO's ticker", async () => {
+    const impostor: TokenBalance = { ...AO_TOKEN, processId: "I".repeat(43), ticker: "AO", name: "AO", denomination: 12 };
+    const send = routedSend({ getTokenBalances: () => [impostor], estimateTransfer: () => ({ fee: null }) });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: impostor, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+
+    await waitFor(() => expect(screen.getByText("This token copies a known token's name or ticker.")).toBeTruthy());
+  });
+});
+
 describe("SendView compose summary", () => {
   it("shows the sending wallet's balance next to its name", async () => {
     const send = routedSend({ getBalance: () => "2500000000000" });
