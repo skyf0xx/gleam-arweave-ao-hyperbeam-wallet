@@ -1,4 +1,5 @@
 import { L1_CANARY_PROCESS_ID } from "../models/network";
+import { readCappedText } from "./capped-body";
 
 export interface DiscoverHyperBeamPeersOptions {
   gatewayUrl: string;
@@ -112,37 +113,8 @@ function withTimeout(signal: AbortSignal | undefined, timeoutMs: number): AbortS
 // allocate unbounded memory in the worker.
 const PROBE_RESPONSE_MAX_BYTES = 4096;
 
-/**
- * The response body as text, or null when it runs past
- * `PROBE_RESPONSE_MAX_BYTES`. Reads the stream in chunks and cancels it as
- * soon as the cap is passed, so an oversized body is never buffered; a
- * `Content-Length` over the cap is refused without reading at all.
- */
-async function readCappedText(response: Response): Promise<string | null> {
-  const declared = response.headers.get("content-length");
-  if (declared !== null && Number(declared) > PROBE_RESPONSE_MAX_BYTES) return null;
-  const body = response.body;
-  if (body === null) return "";
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > PROBE_RESPONSE_MAX_BYTES) {
-        await reader.cancel().catch(() => {});
-        return null;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const decoder = new TextDecoder();
-  return chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join("") + decoder.decode();
-}
+// A page is at most 100 location records, each a few tags.
+const LOCATION_PAGE_MAX_BYTES = 1024 * 1024;
 
 async function readLocationRecords(
   gatewayUrl: string,
@@ -163,7 +135,9 @@ async function readLocationRecords(
         signal: withTimeout(signal, timeoutMs),
       });
       if (!response.ok) break;
-      const body = (await response.json()) as LocationPage;
+      const text = await readCappedText(response, LOCATION_PAGE_MAX_BYTES);
+      if (text === null) break;
+      const body = JSON.parse(text) as LocationPage;
       const edges = body.data?.transactions?.edges ?? [];
       for (const edge of edges) nodes.push(edge.node);
       if (!body.data?.transactions?.pageInfo?.hasNextPage || edges.length === 0) break;
@@ -186,7 +160,7 @@ async function answersAsNode(
       signal: withTimeout(signal, timeoutMs),
     });
     if (response.status !== 200) return false;
-    const text = await readCappedText(response);
+    const text = await readCappedText(response, PROBE_RESPONSE_MAX_BYTES);
     return text !== null && text.trim().length > 0;
   } catch {
     return false;
@@ -281,7 +255,7 @@ export async function findL1TokenNodes({
         const response = await fetchImpl(`${urls[index]}/${L1_CANARY_PROCESS_ID}~process@1.0/slot/current`, {
           signal: withTimeout(signal, timeoutMs),
         });
-        const text = response.ok ? await readCappedText(response) : null;
+        const text = response.ok ? await readCappedText(response, PROBE_RESPONSE_MAX_BYTES) : null;
         serves[index] = text !== null && /^\d+$/.test(text.trim());
       } catch {
         serves[index] = false;

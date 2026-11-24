@@ -4,6 +4,7 @@ import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
+import { readCappedText } from "./capped-body";
 
 /** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
 const COMPUTE_TIMEOUT_MS = 8_000;
@@ -25,6 +26,12 @@ export async function getTokenBalance(
   return (await queryBalance(processId, address, peerUrl, fetchImpl)) ?? parseBalanceResponse("0", processId, address);
 }
 
+// A balance reply is one number, or a small object carrying it. A peer
+// that sends more isn't answering, and reading it all would let any peer
+// allocate unbounded memory in the worker.
+const BALANCE_RESPONSE_MAX_BYTES = 64 * 1024;
+const NUMBER_RESPONSE_MAX_BYTES = 4096;
+
 /** `null` for a 404. */
 async function queryBalance(
   processId: string,
@@ -43,8 +50,8 @@ async function queryBalance(
     );
   }
 
-  const body = await response.json();
-  return parseBalanceResponse(body, processId, address);
+  const text = await readCappedText(response, BALANCE_RESPONSE_MAX_BYTES);
+  return parseBalanceResponse(text === null ? null : JSON.parse(text), processId, address);
 }
 
 /**
@@ -221,7 +228,7 @@ async function firstL1Answer(
     try {
       const url = `${host}/${processId}~process@1.0/now/as/balance?as=execution&balance=${address}`;
       const response = await fetchImpl(url, { signal: controller.signal });
-      const quantity = response.ok ? (await response.text()).trim() : "";
+      const quantity = response.ok ? ((await readCappedText(response, NUMBER_RESPONSE_MAX_BYTES)) ?? "").trim() : "";
       if (/^\d+$/.test(quantity)) return quantity;
       failure = response.ok ? "unreadable answer" : `HTTP ${response.status}`;
     } catch (error) {
@@ -256,7 +263,7 @@ async function furthestAheadFirst(processId: string, hosts: string[], fetchImpl:
     hosts.map(async (host) => {
       try {
         const response = await fetchImpl(`${host}/${processId}~process@1.0/slot/current`, { signal: AbortSignal.timeout(SLOT_TIMEOUT_MS) });
-        const text = response.ok ? (await response.text()).trim() : "";
+        const text = response.ok ? ((await readCappedText(response, NUMBER_RESPONSE_MAX_BYTES)) ?? "").trim() : "";
         return /^\d+$/.test(text) ? BigInt(text) : -1n;
       } catch {
         return -1n;

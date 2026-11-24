@@ -115,6 +115,7 @@
 3 packages/runtime/src/handlers/announcements.ts
 3 packages/runtime/src/handlers/site-wallet.ts
 3 packages/core/src/ao/peer-discovery.ts
+3 packages/core/src/ao/capped-body.ts
 3 packages/core/src/ao/peer-failover.ts
 3 packages/runtime/src/peers.ts
 3 packages/core/src/models/network.ts

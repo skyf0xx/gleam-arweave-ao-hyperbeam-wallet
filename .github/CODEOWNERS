@@ -110,6 +110,7 @@
 /packages/runtime/src/handlers/announcements.ts                      @skyf0xx
 /packages/runtime/src/handlers/site-wallet.ts                         @skyf0xx
 /packages/core/src/ao/peer-discovery.ts                                 @skyf0xx
+/packages/core/src/ao/capped-body.ts                                    @skyf0xx
 /packages/core/src/ao/peer-failover.ts                                  @skyf0xx
 /packages/runtime/src/peers.ts                                         @skyf0xx
 /packages/core/src/models/network.ts                                   @skyf0xx
