@@ -40,3 +40,18 @@ export interface StoragePort {
    */
   watch<T>(key: string, cb: (value: T | null) => void): () => void;
 }
+
+/**
+ * Throws when a `setMany` batch breaks the rules `StoragePort.setMany`
+ * states: keys from more than one area, or a null or undefined value.
+ * Each key must already be a valid `local:` or `session:` key.
+ */
+export function assertSetManyEntries(entries: Record<string, unknown>): void {
+  const keys = Object.keys(entries);
+  const areas = new Set(keys.map((key) => key.slice(0, key.indexOf(":"))));
+  if (areas.size > 1) throw new Error(`setMany keys must share one storage area, got ${[...areas].join(", ")}.`);
+  const nullish = keys.find((key) => entries[key] == null);
+  if (nullish !== undefined) {
+    throw new Error(`setMany value for "${nullish}" is null or undefined; use remove to delete a key.`);
+  }
+}
