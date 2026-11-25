@@ -11,8 +11,8 @@ import { RequestHeader } from "../transfer-review/RequestHeader";
 import { ArmingLabel } from "./ArmingLabel";
 import { NameTargetReview, ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromPreview, type TransferContext } from "../transfer-review/model";
-import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
-import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { Field, FieldLabel } from "../transfer-review/FieldLabel";
 import { ApprovalActions } from "./ApprovalActions";
 
@@ -232,18 +232,18 @@ export function SigningApprovalScreen({
 }
 
 function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: string; value: string }) {
+  const { copied, copy } = useCopy(value);
   return (
     <Field label={label}>
       <div className="flex items-start gap-2 rounded-md border border-line bg-background p-3">
         <span className="flex-1 break-all font-mono text-caption leading-relaxed text-foreground">{value}</span>
-        <button
-          type="button"
-          aria-label={copyLabel}
-          onClick={() => void copyToClipboard(value)}
+        <CopyButton
+          copied={copied}
+          onCopy={copy}
+          label={copyLabel}
+          title={copyLabel}
           className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-muted"
-        >
-          <CopyIcon />
-        </button>
+        />
       </div>
     </Field>
   );

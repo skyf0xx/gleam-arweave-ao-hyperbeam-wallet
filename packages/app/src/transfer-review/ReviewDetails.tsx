@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useT } from "../i18n";
 import { UntrustedText } from "../approval/UntrustedText";
 import { SignedDataText } from "../approval/SignedDataText";
-import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
-import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { GUTTER } from "./review-parts";
 import {
   groupDigits,
@@ -131,6 +131,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function PayloadHash({ value }: { value: string }) {
   const t = useT();
+  const { copied, copy } = useCopy(value);
   return (
     <div className="flex flex-col gap-1">
       <span className="text-label text-muted">{t("transferReview.payloadHash")}</span>
@@ -138,14 +139,13 @@ function PayloadHash({ value }: { value: string }) {
         <span dir="ltr" className="flex-1 break-all font-mono text-caption leading-relaxed text-foreground">
           {value}
         </span>
-        <button
-          type="button"
-          aria-label={t("transferReview.copyPayloadHash")}
-          onClick={() => void copyToClipboard(value)}
+        <CopyButton
+          copied={copied}
+          onCopy={copy}
+          label={t("transferReview.copyPayloadHash")}
+          title={t("transferReview.copyPayloadHash")}
           className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-background hover:text-muted phone:hit-target"
-        >
-          <CopyIcon />
-        </button>
+        />
       </div>
     </div>
   );
