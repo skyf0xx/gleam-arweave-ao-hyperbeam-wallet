@@ -8,6 +8,7 @@ import {
   type ChallengeFunction,
   type ScanAreaId,
 } from "@gleam/core/src/scan/index.ts";
+import { z } from "zod";
 import type { Queryable } from "../db";
 import { GithubUnavailableError, type GithubClient } from "./github";
 import { areaSummaries, byLeastCovered, canChallenge, functionKey, functionLooks } from "./areas";
@@ -28,12 +29,12 @@ export interface IssuedChallenge {
   expiresAt: string;
 }
 
-/** `GET /scan/challenge`'s query: the area to scan, or null to let the server pick. */
-export function parseChallengeQuery(query: { area?: string }): { area: ScanAreaId | null } | ScanFailure {
-  if (query.area === undefined) return { area: null };
-  if (isScanAreaId(query.area)) return { area: query.area };
-  return failure(400, "malformed_request", "area", `area must be one of ${SCAN_AREAS.map((area) => area.id).join(", ")}.`);
-}
+const AREA_ERROR = `area must be one of ${SCAN_AREAS.map((area) => area.id).join(", ")}.`;
+
+/** `GET /scan/challenge`'s query: the area to scan, or none to let the server pick. */
+export const challengeQuery = z.object({
+  area: z.custom<ScanAreaId>((value) => typeof value === "string" && isScanAreaId(value), { error: AREA_ERROR }).optional(),
+});
 
 /**
  * Draws a challenge from one area's functions, the first of them from those

@@ -498,26 +498,34 @@ export interface ListQuery {
 
 const CURSOR = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)_([0-9a-f]{64})$/;
 
-export function parseListQuery(query: { release?: string; cursor?: string; limit?: string }): ListQuery | ScanFailure {
-  const bad = (path: string, message: string) => failure(400, "malformed_request", path, message);
-  if (query.release !== undefined && !isRelease(query.release)) {
-    return bad("release", "release must be a version like 1.4.0 (no leading v).");
+const RELEASE_ERROR = "release must be a version like 1.4.0 (no leading v).";
+const LIMIT_ERROR = `limit must be a whole number from 1 to ${MAX_PAGE_SIZE}.`;
+const CURSOR_ERROR = "cursor isn't one this server issued; use the nextCursor from the previous page.";
+
+const releaseVersion = z.string({ error: RELEASE_ERROR }).refine(isRelease, { error: RELEASE_ERROR });
+
+const pageLimit = z
+  .string({ error: LIMIT_ERROR })
+  .regex(/^\d+$/, { error: LIMIT_ERROR })
+  .transform(Number)
+  .refine((limit) => limit >= 1, { error: LIMIT_ERROR })
+  .transform((limit) => Math.min(limit, MAX_PAGE_SIZE));
+
+const pageCursor = z.string({ error: CURSOR_ERROR }).transform((cursor, ctx) => {
+  const match = CURSOR.exec(Buffer.from(cursor, "base64url").toString("utf8"));
+  const valid = match && !Number.isNaN(Date.parse(match[1]!)) && new Date(match[1]!).toISOString() === match[1];
+  if (!match || !valid) {
+    ctx.addIssue({ code: "custom", message: CURSOR_ERROR });
+    return z.NEVER;
   }
-  let limit = DEFAULT_PAGE_SIZE;
-  if (query.limit !== undefined) {
-    limit = Number(query.limit);
-    if (!/^\d+$/.test(query.limit) || limit < 1) return bad("limit", `limit must be a whole number from 1 to ${MAX_PAGE_SIZE}.`);
-    limit = Math.min(limit, MAX_PAGE_SIZE);
-  }
-  let cursor: ListQuery["cursor"] = null;
-  if (query.cursor !== undefined) {
-    const match = CURSOR.exec(Buffer.from(query.cursor, "base64url").toString("utf8"));
-    const valid = match && !Number.isNaN(Date.parse(match[1]!)) && new Date(match[1]!).toISOString() === match[1];
-    if (!match || !valid) return bad("cursor", "cursor isn't one this server issued; use the nextCursor from the previous page.");
-    cursor = { createdAt: match[1]!, id: match[2]! };
-  }
-  return { release: query.release ?? null, cursor, limit };
-}
+  return { createdAt: match[1]!, id: match[2]! };
+});
+
+export const listQuery = z
+  .object({ release: releaseVersion.optional(), limit: pageLimit.optional(), cursor: pageCursor.optional() })
+  .transform((query): ListQuery => ({ release: query.release ?? null, cursor: query.cursor ?? null, limit: query.limit ?? DEFAULT_PAGE_SIZE }));
+
+export const countQuery = z.object({ release: releaseVersion });
 
 export interface AttestationListing {
   release: string;
@@ -575,14 +583,11 @@ export interface AttestationListing {
 export async function countAttestations(
   db: Queryable,
   github: GithubClient,
-  query: { release?: string },
+  release: string,
 ): Promise<{ ok: true; release: string; total: number; paidPlacesLeft: number; paidScans: number } | ScanFailure> {
-  if (query.release === undefined || !isRelease(query.release)) {
-    return failure(400, "malformed_request", "release", "release must be a version like 1.4.0 (no leading v).");
-  }
   try {
-    const [total, places] = await Promise.all([attestationTotal(db, query.release), paidPlaces(db, github, query.release)]);
-    return { ok: true, release: query.release, total, paidPlacesLeft: places.left, paidScans: places.taken };
+    const [total, places] = await Promise.all([attestationTotal(db, release), paidPlaces(db, github, release)]);
+    return { ok: true, release, total, paidPlacesLeft: places.left, paidScans: places.taken };
   } catch (error) {
     if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
     throw error;

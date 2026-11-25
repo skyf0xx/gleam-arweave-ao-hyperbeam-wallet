@@ -1,5 +1,6 @@
 import { isFiatCurrency, type FiatCurrency } from "@gleam/core/src/models/display.ts";
 import { DEFAULT_TOKEN_REGISTRY, type HistoricalPricePoint, type HistoricalRange } from "@gleam/core/src/pricing/index.ts";
+import { z } from "zod";
 import type { PriceStore } from "./price-store";
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
@@ -48,21 +49,21 @@ export function isKnownPriceId(id: string): boolean {
 }
 
 /** Ids come from a fixed registry, so unknown ones are refused rather than relayed upstream. */
-export function parseSpotQuery(query: Record<string, string | undefined>): string[] | null {
-  const ids = [...new Set((query.ids ?? "").split(","))];
-  if (ids.length === 0 || ids.length > PAPRIKA_ID_BY_GECKO_ID.size) return null;
-  return ids.every(isKnownPriceId) ? ids : null;
-}
+const priceId = z.string().refine(isKnownPriceId);
 
-export function parseHistoryQuery(query: Record<string, string | undefined>): { id: string; range: HistoricalRange } | null {
-  const { id, range } = query;
-  if (!id || !isKnownPriceId(id)) return null;
-  return HISTORICAL_RANGES.includes(range as HistoricalRange) ? { id, range: range as HistoricalRange } : null;
-}
+export const spotQuery = z.object({
+  ids: z
+    .string()
+    .transform((ids) => [...new Set(ids.split(","))])
+    .refine((ids) => ids.length <= PAPRIKA_ID_BY_GECKO_ID.size && ids.every(isKnownPriceId)),
+});
 
-export function parseFxQuery(query: Record<string, string | undefined>): FiatCurrency | null {
-  return isFiatCurrency(query.currency) ? query.currency : null;
-}
+export const historyQuery = z.object({
+  id: priceId,
+  range: z.custom<HistoricalRange>((value) => HISTORICAL_RANGES.includes(value as HistoricalRange)),
+});
+
+export const fxQuery = z.object({ currency: z.custom<FiatCurrency>(isFiatCurrency) });
 
 interface Entry {
   value: unknown;

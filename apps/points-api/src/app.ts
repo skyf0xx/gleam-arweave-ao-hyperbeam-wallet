@@ -12,7 +12,8 @@ import {
   countAttestations,
   listAttestations,
   checkRequest,
-  parseListQuery,
+  countQuery,
+  listQuery,
   scanRewardBasis,
   submitAttestation,
   submitRequest,
@@ -24,13 +25,13 @@ import { authenticateDevice, deviceSignedRequest, recordHeartbeat } from "./wall
 import { checkInviteCode, inviteCheckRequest, redeemInviteCode, redeemRequest } from "./wallets/invite";
 import { randomInviteCode } from "./wallets/invite-code";
 import { leave, leaveRequest } from "./wallets/leave";
-import { createPriceService, parseFxQuery, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices/prices";
+import { createPriceService, fxQuery, historyQuery, spotQuery, type PriceService } from "./prices/prices";
 import { RateLimiter } from "./rate-limit";
 import { register, registerRequest } from "./wallets/register";
 import type { AreaSummary } from "./scans/areas";
-import { issueChallenge, parseChallengeQuery } from "./scans/challenge";
-import type { ScanFailure } from "./scans/errors";
-import { listAreas, scanNext } from "./scans/rounds";
+import { challengeQuery, issueChallenge } from "./scans/challenge";
+import { failure, type ScanFailure } from "./scans/errors";
+import { listAreas, nextQuery, scanNext } from "./scans/rounds";
 import { scoresForDevice } from "./points/score";
 
 const MOBILE_ORIGINS = new Set(["https://localhost", "capacitor://localhost"]);
@@ -157,21 +158,17 @@ export function createApp(deps: AppDeps): Hono {
 
   // Proxies CoinGecko/CoinPaprika for users whose network blocks them. Only
   // registry ids are accepted, so this can't be used to relay arbitrary lookups.
-  app.get("/prices", limit(pricesByIp), async (c) => {
-    const ids = parseSpotQuery(c.req.query());
-    if (!ids) return c.json({ error: "Unknown or missing price ids." }, 400);
-    return c.json({ prices: await prices.spot(ids) });
+  app.get("/prices", limit(pricesByIp), queryOf(spotQuery, "Unknown or missing price ids."), async (c) => {
+    return c.json({ prices: await prices.spot(c.req.valid("query").ids) });
   });
 
-  app.get("/prices/history", limit(pricesByIp), async (c) => {
-    const query = parseHistoryQuery(c.req.query());
-    if (!query) return c.json({ error: "Unknown price id or range." }, 400);
+  app.get("/prices/history", limit(pricesByIp), queryOf(historyQuery, "Unknown price id or range."), async (c) => {
+    const query = c.req.valid("query");
     return c.json({ series: await prices.history(query.id, query.range) });
   });
 
-  app.get("/prices/fx", limit(pricesByIp), async (c) => {
-    const currency = parseFxQuery(c.req.query());
-    if (!currency) return c.json({ error: "Unknown or missing currency." }, 400);
+  app.get("/prices/fx", limit(pricesByIp), queryOf(fxQuery, "Unknown or missing currency."), async (c) => {
+    const { currency } = c.req.valid("query");
     return c.json({ currency, rate: await prices.fx(currency) });
   });
 
@@ -223,10 +220,8 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(await scoresForDevice(deps.db, auth.deviceId, pointsPhase, now()));
   });
 
-  app.get("/scan/challenge", scanLimit(challengeByIp), async (c) => {
-    const query = parseChallengeQuery(c.req.query());
-    if ("ok" in query) return scanFailure(c, query);
-    const outcome = await issueChallenge(deps.db, github, now(), query.area);
+  app.get("/scan/challenge", scanLimit(challengeByIp), scanQuery(challengeQuery), async (c) => {
+    const outcome = await issueChallenge(deps.db, github, now(), c.req.valid("query").area ?? null);
     return outcome.ok ? c.json(outcome.challenge) : scanFailure(c, outcome);
   });
 
@@ -241,8 +236,8 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(body);
   });
 
-  app.get("/scan/next", scanLimit(nextByIp), async (c) => {
-    const outcome = await scanNext(deps.db, github, c.req.query(), now());
+  app.get("/scan/next", scanLimit(nextByIp), scanQuery(nextQuery), async (c) => {
+    const outcome = await scanNext(deps.db, github, c.req.valid("query").attestation, now());
     return outcome.ok ? c.json(outcome.body) : scanFailure(c, outcome);
   });
 
@@ -274,17 +269,15 @@ export function createApp(deps: AppDeps): Hono {
     return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
   });
 
-  app.get("/attestations/count", scanLimit(attestationsListByIp), async (c) => {
-    const outcome = await countAttestations(deps.db, github, c.req.query());
+  app.get("/attestations/count", scanLimit(attestationsListByIp), scanQuery(countQuery), async (c) => {
+    const outcome = await countAttestations(deps.db, github, c.req.valid("query").release);
     if (!outcome.ok) return scanFailure(c, outcome);
     c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json({ release: outcome.release, total: outcome.total, paidPlacesLeft: outcome.paidPlacesLeft, paidScans: outcome.paidScans });
   });
 
-  app.get("/attestations", scanLimit(attestationsListByIp), async (c) => {
-    const query = parseListQuery(c.req.query());
-    if ("ok" in query) return scanFailure(c, query);
-    const outcome = await listAttestations(deps.db, github, attestationListings, query);
+  app.get("/attestations", scanLimit(attestationsListByIp), scanQuery(listQuery), async (c) => {
+    const outcome = await listAttestations(deps.db, github, attestationListings, c.req.valid("query"));
     if (!outcome.ok) return scanFailure(c, outcome);
     c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json(outcome.listing);
@@ -305,11 +298,11 @@ function ttlCache<T>(ttlMs: number, nowMs: () => number) {
   };
 }
 
-function scanFailure(c: Context, failure: ScanFailure) {
-  if (failure.retryAfterSeconds) c.header("Retry-After", String(failure.retryAfterSeconds));
+function scanFailure(c: Context, outcome: ScanFailure) {
+  if (outcome.retryAfterSeconds) c.header("Retry-After", String(outcome.retryAfterSeconds));
   return c.json(
-    { error: failure.error, code: failure.code, ...(failure.issues.length > 0 ? { issues: failure.issues } : {}) },
-    failure.status,
+    { error: outcome.error, code: outcome.code, ...(outcome.issues.length > 0 ? { issues: outcome.issues } : {}) },
+    outcome.status,
   );
 }
 
@@ -335,6 +328,21 @@ const MALFORMED_JSON = "Malformed JSON in request body";
 function jsonBody<S extends z.ZodType>(schema: S, error = "Malformed request.") {
   return zValidator("json", schema, (result, c) => {
     if (!result.success) return c.json({ error }, 400);
+  });
+}
+
+function queryOf<S extends z.ZodType>(schema: S, error: string) {
+  return zValidator("query", schema, (result, c) => {
+    if (!result.success) return c.json({ error }, 400);
+  });
+}
+
+/** Answers with the first problem, so a scan agent reads which parameter to fix. */
+function scanQuery<S extends z.ZodType>(schema: S) {
+  return zValidator("query", schema, (result, c) => {
+    if (result.success) return;
+    const issue = result.error.issues[0]!;
+    return scanFailure(c, failure(400, "malformed_request", issue.path.join(".") || "$", issue.message));
   });
 }
 

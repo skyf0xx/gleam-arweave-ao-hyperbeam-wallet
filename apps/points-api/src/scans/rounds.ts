@@ -1,5 +1,6 @@
 import { isAttestationId, isScanAreaId, roundReward, type ScanAreaId } from "@gleam/core/src/scan/index.ts";
 import { scanReward, walletRoundsDone } from "./attestations";
+import { z } from "zod";
 import type { Queryable } from "../db";
 import { GithubUnavailableError, type GithubClient } from "./github";
 import { areaSummaries, areasLeft, walletAreas, type AreaSummary } from "./areas";
@@ -40,21 +41,24 @@ export interface ScanNext {
   suggested: ScanAreaId | null;
 }
 
+const ATTESTATION_ERROR = "attestation must be an attestation id: 64 lowercase hex characters.";
+
+export const nextQuery = z.object({
+  attestation: z.string({ error: ATTESTATION_ERROR }).refine(isAttestationId, { error: ATTESTATION_ERROR }),
+});
+
 /** What the wallet that signed `attestation` earned, and what its next round on that release would. */
 export async function scanNext(
   db: Queryable,
   github: GithubClient,
-  query: { attestation?: string },
+  attestation: string,
   now: Date,
 ): Promise<{ ok: true; body: ScanNext } | ScanFailure> {
-  if (query.attestation === undefined || !isAttestationId(query.attestation)) {
-    return failure(400, "malformed_request", "attestation", "attestation must be an attestation id: 64 lowercase hex characters.");
-  }
   const { rows } = await db.query<{ release: string; address: string; area: string | null; round: number | null; points: string }>(
     `SELECT a.release, a.address, a.area, a.round,
             coalesce((SELECT sum(amount_atomic) FROM scan_points WHERE attestation_id = a.id AND kind = 'scan'), 0)::text AS points
        FROM attestations a WHERE a.id = $1 AND a.voided_at IS NULL`,
-    [query.attestation],
+    [attestation],
   );
   const row = rows[0];
   if (!row) {
