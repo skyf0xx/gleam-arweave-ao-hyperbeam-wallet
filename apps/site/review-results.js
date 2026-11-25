@@ -1,28 +1,28 @@
-/* global AbortController, URL */
+/* global AbortSignal, URL */
 // review-results.html. Everything from the points API (labels, reports,
 // function names) is untrusted text: nodes are built with textContent, never markup.
-import { areaLabel, coverageSummary, fetchListing, idFromHash, placesOf, releaseFromSearch, roundLabel, unusedModels } from "./scan-lib.js";
+import {
+  $,
+  areaLabel,
+  coverageSummary,
+  el,
+  fetchListing,
+  idFromHash,
+  placesOf,
+  releaseFromSearch,
+  renderAreaRows,
+  roundLabel,
+  unusedModels,
+} from "./scan-lib.js";
 
-const $ = (selector) => document.querySelector(selector);
 const PAGES_UP_FRONT = 5;
 const LISTING_TIMEOUT_MS = 8000;
 const RESULTS = new Set(["pass", "scanned"]);
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
 const state = { release: null, listing: null, attestations: [], nextCursor: null, loading: false };
 
 async function loadPage(cursor) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), LISTING_TIMEOUT_MS);
-  const result = await fetchListing(window.fetch.bind(window), { release: state.release, cursor, signal: controller.signal });
-  window.clearTimeout(timer);
-  return result;
+  return fetchListing(window.fetch.bind(window), { release: state.release, cursor, signal: AbortSignal.timeout(LISTING_TIMEOUT_MS) });
 }
 
 function failure(message) {
@@ -79,24 +79,7 @@ function renderAreas(rows) {
   const table = $("[data-areas]");
   table.hidden = rows === null;
   if (rows === null) return;
-  const tbody = $("[data-areas-rows]");
-  tbody.textContent = "";
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    const label = el("th", "", row.label);
-    label.scope = "row";
-    tr.appendChild(label);
-    const examined = el("td", "areas-examined");
-    examined.appendChild(el("span", "", `${row.examined} of ${row.total}`));
-    const bar = el("span", "areas-bar");
-    bar.setAttribute("aria-hidden", "true");
-    const fill = el("span");
-    fill.style.width = `${(row.share * 100).toFixed(1)}%`;
-    bar.appendChild(fill);
-    examined.appendChild(bar);
-    tr.appendChild(examined);
-    tbody.appendChild(tr);
-  }
+  renderAreaRows($("[data-areas-rows]"), rows, false);
 }
 
 // A small arrow-out-of-box glyph: no icon font, just an inline SVG path.

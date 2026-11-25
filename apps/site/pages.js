@@ -184,13 +184,10 @@
 
   function callPointsApi(path, body) {
     if (!window.fetch) return Promise.resolve(null);
-    var controller = window.AbortController
-      ? new window.AbortController()
-      : null;
-    var timer = setTimeout(function () {
-      if (controller) controller.abort();
-    }, 5000);
-    var init = controller ? { signal: controller.signal } : {};
+    var init =
+      window.AbortSignal && window.AbortSignal.timeout
+        ? { signal: window.AbortSignal.timeout(5000) }
+        : {};
     if (body) {
       init.method = "POST";
       init.headers = { "Content-Type": "application/json" };
@@ -203,10 +200,6 @@
       })
       .catch(function () {
         return null;
-      })
-      .then(function (result) {
-        clearTimeout(timer);
-        return result;
       });
   }
 
@@ -436,17 +429,7 @@
   // Only count a visit the extension opened (it always passes ?v=), so
   // someone landing here from a search or a shared link isn't an install.
   // sessionStorage stops a reload from counting twice.
-  if (event && version) {
-    window.addEventListener("load", function () {
-      try {
-        if (sessionStorage.getItem(event)) return;
-        sessionStorage.setItem(event, "1");
-      } catch {
-        // Storage blocked: count it anyway.
-      }
-      if (window.umami) window.umami.track(event, { version: version });
-    });
-  }
+  if (event && version) trackOnce(event, { version: version });
 
   var form = document.querySelector("form[data-web3forms]");
   if (!form) return;

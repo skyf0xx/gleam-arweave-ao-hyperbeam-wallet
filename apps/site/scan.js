@@ -1,11 +1,13 @@
-/* global AbortController */
+/* global AbortSignal */
 // scan.html. Everything from the points API is untrusted text: nodes are
 // built with textContent, never markup.
 import {
+  $,
   AGENT_LINE,
   areaRows,
   bountyTiers,
   coverageSummary,
+  el,
   fetchAreas,
   fetchCount,
   fetchListing,
@@ -13,19 +15,12 @@ import {
   formatPoints,
   nextScanReward,
   placesOf,
+  renderAreaRows,
   resultsHref,
   roundStepPercent,
 } from "./scan-lib.js";
 
-const $ = (selector) => document.querySelector(selector);
 const TIMEOUT_MS = 8000;
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
 
 // --- The line to paste ------------------------------------------------------
 
@@ -76,12 +71,8 @@ function setUpCopy() {
 
 // --- Live figures -----------------------------------------------------------
 
-async function withTimeout(load) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), TIMEOUT_MS);
-  const result = await load(controller.signal);
-  window.clearTimeout(timer);
-  return result;
+function withTimeout(load) {
+  return load(AbortSignal.timeout(TIMEOUT_MS));
 }
 
 // The severity rows are static so the shares read without the server; a known pool adds what each pays today.
@@ -149,25 +140,7 @@ function renderRoundStep(rewards) {
 function renderAreas(body) {
   const rows = areaRows(body.areas);
   if (!rows) return;
-  const tbody = $("[data-areas-rows]");
-  tbody.textContent = "";
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    const label = el("th", "", row.label);
-    label.scope = "row";
-    tr.appendChild(label);
-    const examined = el("td", "areas-examined");
-    examined.appendChild(el("span", "", `${row.examined} of ${row.total}`));
-    const bar = el("span", "areas-bar");
-    bar.setAttribute("aria-hidden", "true");
-    const fill = el("span");
-    fill.style.width = `${(row.share * 100).toFixed(1)}%`;
-    bar.appendChild(fill);
-    examined.appendChild(bar);
-    tr.appendChild(examined);
-    tr.appendChild(el("td", "num", String(row.scans)));
-    tbody.appendChild(tr);
-  }
+  renderAreaRows($("[data-areas-rows]"), rows, true);
   $("[data-areas-title]").textContent = `Coverage of v${body.release} by area`;
   $("[data-areas]").hidden = false;
 }

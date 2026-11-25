@@ -1,6 +1,7 @@
 /* global atob, TextDecoder */
-// Logic shared by scan.html, review-results.html and attest.html, kept free of the DOM so Vitest can
-// run it (scripts/site-scan.site.test.ts). Everything that comes from the
+// Logic shared by scan.html, review-results.html and attest.html. Nothing
+// touches the DOM at import time (`$`, `el` and `renderAreaRows` do only when
+// called), so Vitest can run it (scripts/site-scan.site.test.ts). Everything that comes from the
 // network or the link is data: callers render it with textContent only.
 
 export const STORE_EXTENSION_ID = "einabcphdmlicabnjllaaallnebfkmki";
@@ -345,6 +346,39 @@ export function formatPoints(atomic) {
   const fraction = padded.slice(-12, -10).replace(/0+$/, "");
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return fraction ? `${grouped}.${fraction}` : grouped;
+}
+
+// --- DOM helpers for the three pages ---------------------------------------
+
+export const $ = (selector) => document.querySelector(selector);
+
+export function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+/** Fills an area coverage table's body from `areaRows`; `withScans` adds each area's scan count. */
+export function renderAreaRows(tbody, rows, withScans) {
+  tbody.textContent = "";
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const label = el("th", "", row.label);
+    label.scope = "row";
+    tr.appendChild(label);
+    const examined = el("td", "areas-examined");
+    examined.appendChild(el("span", "", `${row.examined} of ${row.total}`));
+    const bar = el("span", "areas-bar");
+    bar.setAttribute("aria-hidden", "true");
+    const fill = el("span");
+    fill.style.width = `${(row.share * 100).toFixed(1)}%`;
+    bar.appendChild(fill);
+    examined.appendChild(bar);
+    tr.appendChild(examined);
+    if (withScans) tr.appendChild(el("td", "num", String(row.scans)));
+    tbody.appendChild(tr);
+  }
 }
 
 // --- scan.html and review-results.html: the points API -----------------------

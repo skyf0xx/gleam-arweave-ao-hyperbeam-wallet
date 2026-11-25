@@ -6,9 +6,11 @@
 import {
   STORE_URL,
   appAttestHref,
+  $,
   checkGleam,
   decodeAttestationLink,
   describeOutcome,
+  el,
   formatPoints,
   isFinal,
   resultsHref,
@@ -16,15 +18,6 @@ import {
   sendAttestation,
   sumPoints,
 } from "./scan-lib.js";
-
-const $ = (selector) => document.querySelector(selector);
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
 
 const link = decodeAttestationLink(location.hash);
 const result = $("[data-result]");
