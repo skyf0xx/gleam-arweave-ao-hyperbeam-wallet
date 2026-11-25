@@ -11,17 +11,21 @@ export const OPENED_WALLET_STATE_QUERY_KEY = [...WALLET_STATE_QUERY_KEY, "opened
  * auto-lock. `recordActivity` is for a screen the user just opened, whose
  * first read counts as using the wallet.
  */
-export function walletStateQuery(runtime: RuntimePort, recordActivity = false) {
-  return recordActivity
-    ? {
-        queryKey: OPENED_WALLET_STATE_QUERY_KEY,
-        queryFn: () => runtime.send<void, WalletState>({ type: "getState", payload: undefined }),
-      }
-    : {
-        queryKey: WALLET_STATE_QUERY_KEY,
-        queryFn: () =>
-          runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } }),
-      };
+export function walletStateQuery(
+  runtime: RuntimePort,
+  recordActivity = false,
+): { queryKey: readonly string[]; queryFn: () => Promise<WalletState> } {
+  if (recordActivity) {
+    return {
+      queryKey: OPENED_WALLET_STATE_QUERY_KEY,
+      queryFn: () => runtime.send<void, WalletState>({ type: "getState", payload: undefined }),
+    };
+  }
+  return {
+    queryKey: WALLET_STATE_QUERY_KEY,
+    queryFn: () =>
+      runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } }),
+  };
 }
 
 export function useWalletState(
