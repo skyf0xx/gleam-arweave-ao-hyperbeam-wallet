@@ -4,6 +4,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { zValidator } from "@hono/zod-validator";
 import type { z } from "zod";
 import {
@@ -102,6 +103,11 @@ export function createApp(deps: AppDeps): Hono {
       if (!limiter.allow(clientIp(c), now().getTime())) return tooManyRequests(c);
       await next();
     });
+  // Marks only the success answers cacheable, so an error is never shared.
+  const sharedCache = createMiddleware(async (c, next) => {
+    await next();
+    if (c.res.ok) c.header("Cache-Control", SHARED_CACHE_CONTROL);
+  });
   const scanLimit = (limiter: RateLimiter) =>
     createMiddleware(async (c, next) => {
       if (!limiter.allow(clientIp(c), now().getTime())) return scanRateLimited(c, limiter, now().getTime());
@@ -146,13 +152,12 @@ export function createApp(deps: AppDeps): Hono {
 
   // Read by static pages on other origins.
   app.use("/stats", cors({ origin: "*" }));
-  app.get("/stats", limit(statsByIp), async (c) => {
+  app.get("/stats", limit(statsByIp), sharedCache, async (c) => {
     const foundingMembers =
       statsCache.get() ??
       statsCache.set(
         await queryNumber(deps.db, "SELECT count(founding_number)::text AS count FROM wallets", [], "count"),
       );
-    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json({ foundingMembers });
   });
 
@@ -182,7 +187,7 @@ export function createApp(deps: AppDeps): Hono {
     const request = c.req.valid("json");
 
     const outcome = await redeemInviteCode(deps.db, request, now(), pointsPhase);
-    return outcome.ok ? c.json({ result: outcome.result, kind: outcome.kind }) : c.json({ error: outcome.error }, outcome.status);
+    return outcome.ok ? c.json({ result: outcome.result, kind: outcome.kind }) : refusal(c, outcome);
   });
 
   app.post("/register", limit(registerByIp), jsonBody(registerRequest), async (c) => {
@@ -191,7 +196,7 @@ export function createApp(deps: AppDeps): Hono {
     const outcome = await register(deps.db, request, now(), newInviteCode, pointsPhase);
     if (outcome.ok) return c.json(outcome.result);
     if (outcome.status === 403) return c.json({ error: outcome.error, code: outcome.code }, 403);
-    return c.json({ error: outcome.error }, outcome.status);
+    return refusal(c, outcome);
   });
 
   app.post("/heartbeat", limit(heartbeatByIp), jsonBody(deviceSignedRequest), async (c) => {
@@ -199,7 +204,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!heartbeatByDevice.allow(request.deviceId, now().getTime())) return tooManyRequests(c);
 
     const auth = await authenticateDevice(deps.db, "heartbeat", request, now());
-    if (!auth.ok) return c.json({ error: auth.error }, auth.status);
+    if (!auth.ok) return refusal(c, auth);
     await recordHeartbeat(deps.db, auth.deviceId, now());
     return c.json({ ok: true });
   });
@@ -208,7 +213,7 @@ export function createApp(deps: AppDeps): Hono {
     const request = c.req.valid("json");
 
     const outcome = await leave(deps.db, request, now());
-    return outcome.ok ? c.json({ ok: true }) : c.json({ error: outcome.error }, outcome.status);
+    return outcome.ok ? c.json({ ok: true }) : refusal(c, outcome);
   });
 
   app.post("/me", limit(scoreByIp), jsonBody(deviceSignedRequest), async (c) => {
@@ -216,7 +221,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!scoreByDevice.allow(request.deviceId, now().getTime())) return tooManyRequests(c);
 
     const auth = await authenticateDevice(deps.db, "me", request, now());
-    if (!auth.ok) return c.json({ error: auth.error }, auth.status);
+    if (!auth.ok) return refusal(c, auth);
     return c.json(await scoresForDevice(deps.db, auth.deviceId, pointsPhase, now()));
   });
 
@@ -225,14 +230,13 @@ export function createApp(deps: AppDeps): Hono {
     return outcome.ok ? c.json(outcome.challenge) : scanFailure(c, outcome);
   });
 
-  app.get("/scan/areas", scanLimit(areasByIp), async (c) => {
+  app.get("/scan/areas", scanLimit(areasByIp), sharedCache, async (c) => {
     let body = areasCache.get();
     if (!body) {
       const outcome = await listAreas(deps.db, github);
       if (!outcome.ok) return scanFailure(c, outcome);
       body = areasCache.set(outcome.body);
     }
-    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json(body);
   });
 
@@ -241,7 +245,7 @@ export function createApp(deps: AppDeps): Hono {
     return outcome.ok ? c.json(outcome.body) : scanFailure(c, outcome);
   });
 
-  app.get("/scan/rewards", scanLimit(rewardsByIp), async (c) => {
+  app.get("/scan/rewards", scanLimit(rewardsByIp), sharedCache, async (c) => {
     let body = rewardsCache.get();
     if (!body) {
       const [basis, pool] = await Promise.all([scanRewardBasis(deps.db, now()), poolBalance(deps.db)]);
@@ -253,7 +257,6 @@ export function createApp(deps: AppDeps): Hono {
         roundStepPercent: ROUND_STEP_PERCENT,
       });
     }
-    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json(body);
   });
 
@@ -269,17 +272,15 @@ export function createApp(deps: AppDeps): Hono {
     return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
   });
 
-  app.get("/attestations/count", scanLimit(attestationsListByIp), scanQuery(countQuery), async (c) => {
+  app.get("/attestations/count", scanLimit(attestationsListByIp), sharedCache, scanQuery(countQuery), async (c) => {
     const outcome = await countAttestations(deps.db, github, c.req.valid("query").release);
     if (!outcome.ok) return scanFailure(c, outcome);
-    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json({ release: outcome.release, total: outcome.total, paidPlacesLeft: outcome.paidPlacesLeft, paidScans: outcome.paidScans });
   });
 
-  app.get("/attestations", scanLimit(attestationsListByIp), scanQuery(listQuery), async (c) => {
+  app.get("/attestations", scanLimit(attestationsListByIp), sharedCache, scanQuery(listQuery), async (c) => {
     const outcome = await listAttestations(deps.db, github, attestationListings, c.req.valid("query"));
     if (!outcome.ok) return scanFailure(c, outcome);
-    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json(outcome.listing);
   });
 
@@ -296,6 +297,10 @@ function ttlCache<T>(ttlMs: number, nowMs: () => number) {
       return value;
     },
   };
+}
+
+function refusal(c: Context, outcome: { error: string; status: ContentfulStatusCode }) {
+  return c.json({ error: outcome.error }, outcome.status);
 }
 
 function scanFailure(c: Context, outcome: ScanFailure) {
