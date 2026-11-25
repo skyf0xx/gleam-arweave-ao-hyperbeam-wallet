@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { parseArgs } from "node:util";
 import { POINTS_API_URL } from "../../packages/core/src/models/network.ts";
 import { SITE_URL } from "../../packages/core/src/models/site-origin.ts";
 import { runFile } from "./file.ts";
@@ -24,15 +25,10 @@ export function renderJson(outcome: Outcome): string {
 }
 
 export async function main(argv: string[], deps: Deps, io: { out: (text: string) => void; tty: boolean }): Promise<number> {
-  const json = argv.includes("--json");
-  let area: string | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--area") area = argv[++i] ?? "";
-    else if (arg.startsWith("--area=")) area = arg.slice("--area=".length);
-    else if (!arg.startsWith("--")) positional.push(arg);
-  }
+  const { values, positionals: positional } = parseArgs({ args: argv, options: { area: { type: "string" }, json: { type: "boolean" } }, allowPositionals: true, strict: false });
+  const json = values.json === true;
+  // A bare `--area` names no area: the commands report it, so it stays an empty string.
+  const area = values.area === undefined ? undefined : typeof values.area === "string" ? values.area : "";
   const command = COMMANDS.find((c) => c === positional[0]);
   let outcome: Outcome;
   if (command === undefined) {
