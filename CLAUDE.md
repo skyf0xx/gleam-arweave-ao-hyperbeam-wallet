@@ -209,6 +209,31 @@ tests check Gleam's ANS-104 bytes against it.
   confirmed it. When a code change makes either one wrong, propose the
   fix and wait.
 
+## Writing code
+
+- **Use what the repo has.** Before writing a helper, search for one.
+  Before hand-writing a parser, guard, retry loop or form, use the
+  package's dependencies: zod for any input from outside, react-query
+  for server state, the `ui` primitives for UI. When nothing in the repo
+  fits a general problem (a parser, a validator, date math), propose a
+  library to the developer before writing one; a new dependency is their
+  call. Hand-written code is the default only where a fence limits
+  imports (`core/signer`).
+- **Extract on the third copy.** Two similar blocks are fine. A change
+  that would add the third copy of a block or a repeated line (a guard,
+  a wrapper, a form) extracts it first. Code that only looks alike
+  stays apart: two error shapes for two readers are two shapes.
+- **Refactor what you touch.** When the code a change touches or calls
+  is hard to change (copies, hand-written parsing, a helper in the wrong
+  place), fix it on the same branch, in its own `refactor(<scope>): …`
+  commit ahead of the change that needs it. A refactor changes no
+  behaviour, UX or copy: the tests pass with edits only to imports and
+  call sites. Keep it to the files the change touches or calls; a wider
+  one goes in `todo.md`.
+- **Surface files.** A refactor of a `security/surface.txt` path costs
+  the next release an audit like any other change there, so make one in
+  passing only when the change already edits that file.
+
 ## Build and check
 
 ```bash
@@ -222,6 +247,7 @@ pnpm vitest run [path-fragment]            # tests
 pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan, tsconfig.scripts.json
 pnpm eslint --max-warnings=0 <files>
 pnpm deps:check                            # the import fences, on resolved files
+pnpm dup                                   # copied blocks across the repo (jscpd); not a gate
 ```
 
 The pre-commit hook (lefthook) runs eslint and gitleaks on staged files,
@@ -238,7 +264,8 @@ extension wiring, it also needs a manual check in Chrome (load
 ## Workflow
 
 Make one Conventional Commit per change (`fix(ao): …`,
-`feat(activity): …`), group related commits on one branch, open one PR
+`feat(activity): …`), with any `refactor:` commits a change needs ahead
+of it, group related commits on one branch, open one PR
 for the branch, and merge it with a merge commit once CI is green
 (`gh pr merge <n> --merge`; the ruleset refuses squash and rebase
 merges). `master` accepts only signed commits through a PR with passing
