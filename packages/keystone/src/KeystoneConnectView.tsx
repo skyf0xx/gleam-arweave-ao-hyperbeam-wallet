@@ -5,6 +5,7 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { CameraDeniedNotice, type CameraDeniedHelp } from "./CameraDeniedNotice";
 import { decodeKeystoneAccount, KEYSTONE_ACCOUNT_UR_TYPE, type KeystoneAccount } from "./decode-account";
 import { QrScanner, type QrScannerProps, type ScannerError } from "./QrScanner";
+import { ScanProgress } from "./ScanProgress";
 import { errorText as defaultErrorText } from "@gleam/app/src/i18n/errors.ts";
 import { useT, type MessageKey } from "@gleam/app/src/i18n/index.tsx";
 
@@ -115,16 +116,7 @@ function ScanStep({
         onError={onError}
       />
       <div className="flex flex-col gap-1.5">
-        <div
-          role="progressbar"
-          aria-label={t("extension.scanProgress")}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="h-1 w-full overflow-hidden rounded-full bg-mist"
-        >
-          <div className="h-full bg-foreground transition-[width]" style={{ width: `${percent}%` }} />
-        </div>
+        <ScanProgress percent={percent} />
         <p className="text-caption text-muted">
           {percent > 0 ? t("extension.scanning", { percent }) : t("extension.waitingForQr")}
         </p>
