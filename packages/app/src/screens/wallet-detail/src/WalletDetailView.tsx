@@ -366,7 +366,6 @@ function ExportPasswordStep({
 }) {
   const t = useT();
   const [password, setPassword] = useState("");
-  const [capsLockOn, setCapsLockOn] = useState(false);
 
   const [clearedFor, setClearedFor] = useState<string | undefined>(undefined);
   if (submitting && clearedFor !== undefined) setClearedFor(undefined);
@@ -404,8 +403,6 @@ function ExportPasswordStep({
           value={password}
           disabled={submitting}
           onChange={(event) => setPassword(event.target.value)}
-          onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-          capsLockOn={capsLockOn}
           errorMessage={serverError}
         />
 

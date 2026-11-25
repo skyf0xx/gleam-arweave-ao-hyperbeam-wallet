@@ -26,7 +26,6 @@ export interface RestoreBackupProps {
 export function RestoreBackup({ account, onBack, onSubmit, onUsePasskey, passkeyBusy = false, submitting = false, serverError }: RestoreBackupProps) {
   const t = useT();
   const [password, setPassword] = useState("");
-  const [capsLockOn, setCapsLockOn] = useState(false);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -51,8 +50,6 @@ export function RestoreBackup({ account, onBack, onSubmit, onUsePasskey, passkey
           value={password}
           disabled={submitting}
           onChange={(event) => setPassword(event.target.value)}
-          onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-          capsLockOn={capsLockOn}
           errorMessage={serverError}
         />
 

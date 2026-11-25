@@ -88,7 +88,6 @@ export function UnlockScreen({
   const locked = unlocking || (quick?.busy ?? false);
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
-  const [capsLockOn, setCapsLockOn] = useState(false);
   const phraseWord = securityPhrase?.word;
   const phraseIcon = useMemo(() => (phraseWord ? securityPhraseIconSvg(phraseWord) : undefined), [phraseWord]);
 
@@ -159,8 +158,6 @@ export function UnlockScreen({
             value={password}
             disabled={locked}
             onChange={(event) => setPassword(event.target.value)}
-            onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-            capsLockOn={capsLockOn}
             errorMessage={errorMessage}
           />
 

@@ -27,7 +27,6 @@ export function VaultPassword({
 }: VaultPasswordProps) {
   const t = useT();
   const [password, setPassword] = useState("");
-  const [capsLockOn, setCapsLockOn] = useState(false);
 
   // Clear the field once a new rejection arrives, adjusting state during
   // render rather than in an effect (react-hooks/set-state-in-effect).
@@ -64,8 +63,6 @@ export function VaultPassword({
           value={password}
           disabled={submitting}
           onChange={(event) => setPassword(event.target.value)}
-          onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-          capsLockOn={capsLockOn}
           errorMessage={serverError}
         />
 
