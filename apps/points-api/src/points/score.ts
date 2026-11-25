@@ -1,50 +1,14 @@
+import type { PointsRecentEntry, PointsScores, PointsWalletScore } from "@gleam/core/src/models/points.ts";
 import type { Queryable } from "../db";
 import { MEMBER_SEAT_BALANCE_SQL, memberSeatsLeft } from "../wallets/invite";
 
-export interface WalletScore {
-  address: string;
-  inviteCode: string;
-  referred: boolean;
-  refereeCount: number;
-  /** Holding, referral and scan points together. */
-  totalAtomic: string;
-  /** Points from scans and accepted findings, already in `totalAtomic`. */
-  scanPointsAtomic: string;
-  /** The latest snapshot's credit, which the extension projects forward from. */
-  lastDay: { holdingAtomic: string; refereeBonusAtomic: string; founderBonusAtomic: string; referrerBonusAtomic: string } | null;
-  /** "Top N%" among wallets with any points; null until the wallet has some. */
-  topPercent: number | null;
-  /** 1-based place among wallets with points, ties sharing a place; null until the wallet has some. Private: never listed. */
-  rank: number | null;
-  /** Atomic points that would put the wallet strictly above the next wallet up; null for the leader or an unranked wallet. */
-  pointsToNextRankAtomic: string | null;
-  /** Null for wallets that registered after Phase 1. */
-  foundingNumber: number | null;
-  /** Backfilled before Phase 1: gets the referee bonus without a code. */
-  originalFounder: boolean;
-  /** Installs the wallet's code can still let in; null when seats aren't limited (Phase 2). */
-  seatsLeft: number | null;
-  /** Credits and friends joining in the last `RECENT_WINDOW_MS`, newest first. */
-  recent: RecentEntry[];
-}
-
-/**
- * One line of a wallet's recent history. A daily credit is split by source
- * and dated when its snapshot completed, since that's when it reached the
- * total. `friendJoined` carries no amount.
- */
-export type RecentEntry =
-  | { kind: "holding" | "invited" | "founder" | "invites"; amountAtomic: string; at: string }
-  | { kind: "scan"; amountAtomic: string; at: string; release: string }
-  | { kind: "finding"; amountAtomic: string; at: string; release: string; ref: string | null }
-  | { kind: "friendJoined"; at: string };
+/** The wire shape with the fields older servers lacked always sent. */
+export type WalletScore = Required<PointsWalletScore>;
 
 /** Covers the start of "yesterday" in any time zone, so the client can group by its own day. */
 export const RECENT_WINDOW_MS = 2 * 86_400_000;
 
-export interface DeviceScores {
-  /** When the latest daily snapshot completed; null before the first one. */
-  settledAt: string | null;
+export interface DeviceScores extends PointsScores {
   wallets: WalletScore[];
 }
 
@@ -138,8 +102,8 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
   };
 }
 
-async function recentForWallets(db: Queryable, addresses: string[], since: Date): Promise<Map<string, RecentEntry[]>> {
-  const byAddress = new Map<string, RecentEntry[]>(addresses.map((address) => [address, []]));
+async function recentForWallets(db: Queryable, addresses: string[], since: Date): Promise<Map<string, PointsRecentEntry[]>> {
+  const byAddress = new Map<string, PointsRecentEntry[]>(addresses.map((address) => [address, []]));
   if (addresses.length === 0) return byAddress;
 
   const [daily, scans, friends] = await Promise.all([
@@ -162,7 +126,7 @@ async function recentForWallets(db: Queryable, addresses: string[], since: Date)
     ),
   ]);
 
-  const push = (address: string, entry: RecentEntry) => byAddress.get(address)?.push(entry);
+  const push = (address: string, entry: PointsRecentEntry) => byAddress.get(address)?.push(entry);
   for (const row of daily.rows) {
     const at = row.at.toISOString();
     const parts = [
