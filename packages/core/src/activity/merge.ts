@@ -1,4 +1,5 @@
 import type { ActivityEntry, ActivityPage } from "../models/activity";
+import { tagValue } from "../models/tag";
 
 /**
  * Combines the local action log (append-only, optimistic entries written
@@ -87,8 +88,8 @@ function withFailedAoTransferDetection(entry: ActivityEntry): ActivityEntry {
   );
   if (!isAoProtocol) return entry;
 
-  const errorTag = entry.tags.find((tag) => tag.name.toLowerCase() === "error");
-  if (!errorTag) return entry;
+  const error = tagValue(entry.tags, "error", { anyCase: true });
+  if (error === undefined) return entry;
 
-  return { ...entry, status: "failed", error: errorTag.value };
+  return { ...entry, status: "failed", error };
 }

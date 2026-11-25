@@ -1,4 +1,5 @@
 import type { CollectibleRef } from "./collectible";
+import type { Tag } from "./tag";
 
 export type ActivityType = "send" | "receive" | "upload";
 export type ActivityStatus = "pending" | "confirmed" | "failed";
@@ -22,7 +23,7 @@ export interface ActivityEntry {
   amount: string | null;
   /** An upload's data size in bytes, as a decimal integer string, when the gateway reported it. */
   dataSize?: string;
-  tags: Array<{ name: string; value: string }>;
+  tags: Tag[];
   timestamp: number;
   /**
    * Same convention as `TransferDraft.token`: `null`/omitted denotes the

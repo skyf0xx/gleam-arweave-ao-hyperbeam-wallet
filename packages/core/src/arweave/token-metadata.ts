@@ -2,20 +2,16 @@ import { classifyAsset } from "../ao/asset-scan";
 import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
 import { isArweaveId } from "../models/arweave-id";
+import { tagValue, type Tag } from "../models/tag";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
  * by `ids` rather than `owners`/`recipients`.
  */
-interface GraphQLTag {
-  name: string;
-  value: string;
-}
-
 interface GraphQLTransactionsByIdResponse {
   data?: {
     transactions?: {
-      edges: Array<{ node: { id: string; tags: GraphQLTag[] } }>;
+      edges: Array<{ node: { id: string; tags: Tag[] } }>;
     };
   };
   errors?: Array<{ message: string }>;
@@ -151,16 +147,15 @@ export async function queryCheckedTokenMetadata(
 }
 
 /** `arweave-scheduler@1.0` is the one scheduler that takes messages as L1 transactions. */
-export function transportFromTags(tags: GraphQLTag[]): TokenTransport {
-  const scheduler = tags.find((tag) => tag.name.toLowerCase() === "scheduler-device")?.value;
+export function transportFromTags(tags: Tag[]): TokenTransport {
+  const scheduler = tagValue(tags, "scheduler-device", { anyCase: true });
   return scheduler === "arweave-scheduler@1.0" ? "l1" : "mu";
 }
 
-export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): TokenMetadata {
-  const tagValue = (name: string): string | null =>
-    tags.find((tag) => tag.name.toLowerCase() === name)?.value ?? null;
+export function tokenMetadataFromTags(processId: string, tags: Tag[]): TokenMetadata {
+  const read = (name: string): string | null => tagValue(tags, name, { anyCase: true }) ?? null;
 
-  const rawDenomination = tagValue("denomination");
+  const rawDenomination = read("denomination");
   // Two digits, like a legacy token's Info: anyone can tag a token, and 10 ** 2e9 throws while it renders.
   const denomination =
     rawDenomination !== null && /^\d{1,2}$/.test(rawDenomination) ? Number(rawDenomination) : null;
@@ -170,11 +165,11 @@ export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): To
     transport: transportFromTags(tags),
     assetClass: classifyAsset(tags),
     denomination,
-    ticker: tagValue("ticker"),
-    name: tagValue("name"),
-    description: tagValue("description"),
-    logo: tagValue("logo"),
-    totalSupply: tagValue("total-supply"),
+    ticker: read("ticker"),
+    name: read("name"),
+    description: read("description"),
+    logo: read("logo"),
+    totalSupply: read("total-supply"),
   };
 }
 

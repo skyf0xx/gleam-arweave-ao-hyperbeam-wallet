@@ -3,22 +3,18 @@ import { COLLECTIBLE_TRANSFER_QUANTITY } from "../ao/collectible-transfer";
 import { L1_ACTIVATION_WINSTON } from "../ao/l1-transfer";
 import { userErrorMessage } from "../models/user-errors";
 import { isArweaveId } from "../models/arweave-id";
+import { tagValue, type Tag } from "../models/tag";
 
 /**
  * Minimal shape of the gateway's GraphQL transaction connection response
  * this client actually reads — not the full arweave-graphql schema.
  */
-interface GraphQLTag {
-  name: string;
-  value: string;
-}
-
 interface GraphQLTransactionNode {
   id: string;
   owner: { address: string };
   recipient: string | null;
   quantity: { winston: string };
-  tags: GraphQLTag[];
+  tags: Tag[];
   data?: { size: string } | null;
   block: { timestamp: number } | null;
 }
@@ -167,8 +163,8 @@ export async function queryActivityTransactions(
   return [...byId.values()];
 }
 
-function isAoMessage(tags: GraphQLTag[]): boolean {
-  return tagValue(tags, "Data-Protocol")?.toLowerCase() === "ao";
+function isAoMessage(tags: Tag[]): boolean {
+  return tagValue(tags, "Data-Protocol", { anyCase: true })?.toLowerCase() === "ao";
 }
 
 function toActivityEntry(node: GraphQLTransactionNode, address: string): ActivityEntry {
@@ -210,8 +206,8 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
  * action and a transaction-id `order-id`. Both are the signer's own tags, so this says
  * what the wallet asked for, not that anything was bought.
  */
-function isSwapOrder(tags: GraphQLTag[]): boolean {
-  const exact = (name: string) => tags.find((tag) => tag.name === name)?.value;
+function isSwapOrder(tags: Tag[]): boolean {
+  const exact = (name: string) => tagValue(tags, name);
   return exact("action") === "register-interest" && isArweaveId(exact("order-id") ?? "");
 }
 
@@ -222,10 +218,10 @@ function isSwapOrder(tags: GraphQLTag[]): boolean {
  * allowed. Only says a transfer was asked for; the token process alone
  * decides whether it moved.
  */
-function l1TokenTransferOf(node: { quantity?: { winston: string }; tags: GraphQLTag[] }): { recipient: string; quantity: string } | null {
+function l1TokenTransferOf(node: { quantity?: { winston: string }; tags: Tag[] }): { recipient: string; quantity: string } | null {
   const value = node.quantity?.winston || "0";
   if (value !== "0" && value !== L1_ACTIVATION_WINSTON) return null;
-  const exact = (name: string) => node.tags.find((tag) => tag.name === name)?.value;
+  const exact = (name: string) => tagValue(node.tags, name);
   const recipient = exact("recipient");
   const quantity = exact("quantity");
   if (exact("action") !== "transfer" || quantity === undefined || !/^[1-9]\d*$/.test(quantity)) return null;
@@ -239,7 +235,7 @@ function l1TokenTransferOf(node: { quantity?: { winston: string }; tags: GraphQL
  * from its spawn tags.
  */
 function toL1TransferEntry(
-  node: { id: string; tags: GraphQLTag[]; block: { timestamp: number } | null },
+  node: { id: string; tags: Tag[]; block: { timestamp: number } | null },
   type: "send",
   counterparty: string,
   quantity: string,
@@ -344,7 +340,7 @@ interface GraphQLAoTransferNode {
   id: string;
   owner: { address: string };
   recipient: string | null;
-  tags: GraphQLTag[];
+  tags: Tag[];
   block: { timestamp: number } | null;
 }
 
@@ -355,10 +351,6 @@ interface GraphQLAoTransferResponse {
     };
   };
   errors?: Array<{ message: string }>;
-}
-
-function tagValue(tags: GraphQLTag[], name: string): string | null {
-  return tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase())?.value ?? null;
 }
 
 const AO_TRANSFER_FIELDS = `
@@ -457,8 +449,8 @@ function toAoSendEntry(node: GraphQLAoTransferNode): ActivityEntry {
     // Reached the AO process, whether or not its handler accepted it;
     // failed-transfer detection is merge.ts's concern, not this parser's.
     status: "confirmed",
-    address: tagValue(node.tags, "Recipient") ?? "",
-    amount: tagValue(node.tags, "Quantity") ?? "0",
+    address: tagValue(node.tags, "Recipient", { anyCase: true }) ?? "",
+    amount: tagValue(node.tags, "Quantity", { anyCase: true }) ?? "0",
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
     token: node.recipient,
@@ -466,7 +458,7 @@ function toAoSendEntry(node: GraphQLAoTransferNode): ActivityEntry {
 }
 
 function toAoReceiveEntry(node: GraphQLAoTransferNode): ActivityEntry | null {
-  const token = tagValue(node.tags, "From-Process");
+  const token = tagValue(node.tags, "From-Process", { anyCase: true });
   if (!token) return null;
   return {
     txId: node.id,
@@ -474,8 +466,8 @@ function toAoReceiveEntry(node: GraphQLAoTransferNode): ActivityEntry | null {
     // A Credit-Notice exists only once the token process has executed the
     // transfer.
     status: "confirmed",
-    address: tagValue(node.tags, "Sender") ?? "",
-    amount: tagValue(node.tags, "Quantity") ?? "0",
+    address: tagValue(node.tags, "Sender", { anyCase: true }) ?? "",
+    amount: tagValue(node.tags, "Quantity", { anyCase: true }) ?? "0",
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
     token,

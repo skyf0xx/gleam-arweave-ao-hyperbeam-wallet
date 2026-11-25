@@ -2,6 +2,7 @@ import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { trimTrailingSlashes } from "../models/network";
 import { isPlainRecord } from "../models/guards";
+import { tagValue, type Tag } from "../models/tag";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -12,8 +13,6 @@ import { isPlainRecord } from "../models/guards";
  * every process outside its allowlist).
  */
 const DRY_RUN_TIMEOUT_MS = 15_000;
-
-type Tag = { name: string; value: string };
 
 export interface LegacyTokenInfo {
   name: string | null;
@@ -78,7 +77,7 @@ export async function readLegacyTokenBalance(
   for (const message of replyMessages(body)) {
     const fromData = atomic(message.data);
     if (fromData !== null) return fromData;
-    const fromTag = atomic(message.tags.find((tag) => tag.name === "Balance")?.value);
+    const fromTag = atomic(tagValue(message.tags, "Balance"));
     if (fromTag !== null) return fromTag;
   }
   throw new Error(userErrorMessage("tokenNoBalanceReply"));
@@ -96,7 +95,7 @@ export async function readLegacyTokenInfo(
 ): Promise<LegacyTokenInfo> {
   const body = await dryRun(processId, [{ name: "Action", value: "Info" }], cuUrl, fetchImpl);
   for (const { tags } of replyMessages(body)) {
-    const value = (name: string) => tags.find((tag) => tag.name.toLowerCase() === name)?.value?.trim() || null;
+    const value = (name: string) => tagValue(tags, name, { anyCase: true })?.trim() || null;
     const ticker = value("ticker");
     const name = value("name");
     if (ticker === null && name === null) continue;

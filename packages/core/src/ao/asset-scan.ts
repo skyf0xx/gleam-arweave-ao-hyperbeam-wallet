@@ -1,16 +1,11 @@
 import { postGraphQLWithFailover } from "../arweave/graphql";
 import { ARWEAVE_ID } from "../models/arweave-id";
 import { mapLimit } from "../models/concurrency";
-import { tagMap } from "../models/tag";
+import { tagMap, type Tag } from "../models/tag";
 
 export { mapLimit } from "../models/concurrency";
 export { withRequestTimeout } from "../models/http";
-export { tagMap } from "../models/tag";
-
-export interface Tag {
-  name: string;
-  value: string;
-}
+export { tagMap, type Tag } from "../models/tag";
 
 export interface ScanNode {
   id: string;

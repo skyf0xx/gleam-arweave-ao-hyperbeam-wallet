@@ -1,6 +1,7 @@
 import { L1_CANARY_PROCESS_ID } from "../models/network";
 import { readCappedText } from "./capped-body";
 import { mapLimit } from "../models/concurrency";
+import type { Tag } from "../models/tag";
 
 export interface DiscoverHyperBeamPeersOptions {
   gatewayUrl: string;
@@ -19,7 +20,7 @@ interface LocationNode {
   id: string;
   owner?: { address?: string } | null;
   block?: { timestamp?: number } | null;
-  tags?: { name: string; value: string }[] | null;
+  tags?: Tag[] | null;
 }
 
 interface LocationPage {
