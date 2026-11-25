@@ -265,7 +265,9 @@
 /scripts/surface-check.mjs                                                 @skyf0xx
 /apps/extension/build-plugins.ts                                           @skyf0xx
 /scripts/check-bundles.mjs                                                 @skyf0xx
+/scripts/bundle-allowlists.mjs                                             @skyf0xx
 /eslint.config.js                                                         @skyf0xx
+/eslint-rules/                                                             @skyf0xx
 /vitest.config.ts                                                         @skyf0xx
 /vitest.setup.ts                                                           @skyf0xx
 /playwright.config.ts                                                      @skyf0xx

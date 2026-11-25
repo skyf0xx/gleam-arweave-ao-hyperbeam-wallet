@@ -268,7 +268,9 @@
 5 scripts/surface-check.mjs
 5 apps/extension/build-plugins.ts
 5 scripts/check-bundles.mjs
+5 scripts/bundle-allowlists.mjs
 5 eslint.config.js
+5 eslint-rules/
 5 vitest.config.ts
 5 vitest.setup.ts
 5 playwright.config.ts

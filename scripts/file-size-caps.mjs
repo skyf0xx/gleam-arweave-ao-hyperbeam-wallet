@@ -10,7 +10,7 @@ export const FILE_SIZE_CAPS = {
   // Classic scripts shared through window; splitting waits on moving the site to ES modules (todo.md).
   "apps/site/gleam.js": 1716,
   "apps/site/program.js": 713,
-  "eslint.config.js": 583,
+  "eslint.config.js": 404,
   // One view over one native page; every effect reads the same page state.
   "packages/app/src/screens/browser/src/BrowserView.tsx": 416,
   "packages/runtime/src/create-runtime.ts": 415,
@@ -18,5 +18,4 @@ export const FILE_SIZE_CAPS = {
   "packages/runtime/src/handlers/approval.ts": 981,
   // What is left handles key material, which stays in the one file the signer fence allows.
   "packages/runtime/src/handlers/wallet-lifecycle.ts": 566,
-  "scripts/check-bundles.mjs": 434,
 };
