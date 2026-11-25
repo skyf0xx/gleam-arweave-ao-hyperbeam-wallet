@@ -16,6 +16,7 @@ import type { ApprovalShown, AttestationCheck } from "@gleam/messaging/src/proto
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { securityPhraseIconSvg } from "../security-phrase-icon";
+import { loadSecurityPhrase } from "../security-phrase";
 import {
   AddressIdentityProvider,
   loadAddressIdentityKey,
@@ -197,13 +198,9 @@ function ApprovalRootContent({
     [identityKey, runtime],
   );
 
-  const loadSecurityPhrase = async (runtime: RuntimePort) => {
-    try {
-      const phrase = await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined });
-      setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
-    } catch {
-      setSecurityPhrase(null);
-    }
+  const applySecurityPhrase = async (runtime: RuntimePort) => {
+    const phrase = await loadSecurityPhrase(runtime);
+    setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
   };
 
   const applyTheme = (runtime: RuntimePort) => applyStoredTheme(runtime, setTheme);
@@ -259,7 +256,7 @@ function ApprovalRootContent({
         await Promise.all([
           load(runtime, requestId),
           applyTheme(runtime),
-          loadSecurityPhrase(runtime),
+          applySecurityPhrase(runtime),
           loadAddressIdentityKey(runtime).then(setIdentityKey),
         ]);
       } catch (error) {

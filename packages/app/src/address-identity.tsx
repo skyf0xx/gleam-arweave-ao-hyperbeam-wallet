@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
-import { addressEmphasisPick, readSecurityPhrase, type RuntimePort } from "@gleam/core";
+import { addressEmphasisPick, type RuntimePort } from "@gleam/core";
+import { fetchSecurityPhrase } from "./security-phrase";
 import { generateAccountAvatarSvg } from "./account-avatar";
 
 /** What the user's security phrase decides about how addresses look. */
@@ -20,7 +21,7 @@ export const NO_ADDRESS_IDENTITY_KEY: AddressIdentityKey = { securityPhraseWord:
 /** Never rejects: without a readable phrase, addresses use the unsalted defaults. */
 export async function loadAddressIdentityKey(runtime: RuntimePort): Promise<AddressIdentityKey> {
   try {
-    const phrase = readSecurityPhrase(await runtime.send<void, unknown>({ type: "getSecurityPhrase", payload: undefined }));
+    const phrase = await fetchSecurityPhrase(runtime);
     const securityPhraseWord = phrase?.word ?? null;
     return { securityPhraseWord, emphasisPick: await addressEmphasisPick(securityPhraseWord) };
   } catch {

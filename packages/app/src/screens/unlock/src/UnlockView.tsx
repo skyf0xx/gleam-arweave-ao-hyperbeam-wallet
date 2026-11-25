@@ -11,6 +11,7 @@ import {
 import { usePlatform } from "../../../app-platform/context";
 import { ForgotPassword } from "./ForgotPassword";
 import { PasskeyError } from "../../../passkey/webauthn";
+import { loadSecurityPhrase } from "../../../security-phrase";
 import { unlockWithPasskey } from "./passkey-unlock";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { t } from "../../../i18n";
@@ -104,7 +105,7 @@ export function UnlockView({
 
   useEffect(() => {
     let cancelled = false;
-    void readSecurityPhrase(runtime).then((phrase) => {
+    void loadSecurityPhrase(runtime).then((phrase) => {
       if (!cancelled) setSecurityPhrase(phrase);
     });
     if (capabilities.biometrics) {
@@ -220,15 +221,6 @@ export function UnlockView({
       }
     />
   );
-}
-
-/** Null when none is set or it can't be read. */
-async function readSecurityPhrase(runtime: RuntimePort): Promise<SecurityPhrase | null> {
-  try {
-    return (await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined })) ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /** Null unless a password is stored and the device can release it now. */

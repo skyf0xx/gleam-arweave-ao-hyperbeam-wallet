@@ -4,6 +4,7 @@ import { SecurityPhraseMark, SecurityPhrasePicker } from "@gleam/ui/src/componen
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
+import { loadSecurityPhrase } from "../../../security-phrase";
 import { useAddressIdentity } from "../../../address-identity";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
@@ -24,15 +25,9 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
 
   useEffect(() => {
     let cancelled = false;
-    runtime
-      .send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined })
-      .then(
-        (phrase) => readSecurityPhrase(phrase),
-        () => null,
-      )
-      .then((phrase) => {
-        if (!cancelled) setState({ kind: "showing", phrase });
-      });
+    void loadSecurityPhrase(runtime).then((phrase) => {
+      if (!cancelled) setState({ kind: "showing", phrase });
+    });
     return () => {
       cancelled = true;
     };

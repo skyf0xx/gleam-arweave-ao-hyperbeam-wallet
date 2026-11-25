@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { HardwareWalletMethod, RuntimePort, SecurityPhrase, WalletSummary } from "@gleam/core";
+import type { HardwareWalletMethod, RuntimePort, WalletSummary } from "@gleam/core";
 import {
   downloadKeyfile,
   keyfileDownloadError,
@@ -24,6 +24,7 @@ import { SecurityPhraseStep } from "./SecurityPhraseStep";
 import { t as translate, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { PasskeyError, passkeysAvailable, readAnyPasskeyPrf } from "../../../passkey/webauthn";
+import { fetchSecurityPhrase } from "../../../security-phrase";
 
 /**
  * Onboarding view module (`screens/onboarding/`) — a folder, not
@@ -240,7 +241,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
   // finishes; it can be set later in Lock & unlock.
   const finish = (wallet: WalletSummary) => {
     if (askVaultPassword) return proceed(wallet);
-    runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined }).then(
+    fetchSecurityPhrase(runtime).then(
       (phrase) => (phrase ? proceed(wallet) : setStep({ kind: "security-phrase", wallet })),
       () => proceed(wallet),
     );
