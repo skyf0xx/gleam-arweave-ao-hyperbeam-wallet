@@ -1,9 +1,7 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
 import "@gleam/app/src/app.css";
 import { runtimePort } from "@/src/adapters/runtime";
-import { PlatformProvider } from "@gleam/app/src/app-platform/context.tsx";
 import { createExtensionAppPlatform } from "@/src/adapters/app-platform";
+import { mountRoot } from "@/src/mount-root";
 import { PasskeyRoot } from "./src/PasskeyRoot";
 import { returnToPopup } from "./src/return-to-popup";
 
@@ -16,16 +14,11 @@ const params = new URLSearchParams(location.search);
 const mode = params.get("mode") === "setup" ? "setup" : "unlock";
 const returnWindowId = Number.parseInt(params.get("return") ?? "", 10);
 
-const platform = createExtensionAppPlatform("window");
-
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <PlatformProvider platform={platform}>
-      <PasskeyRoot
-        mode={mode}
-        runtime={runtimePort}
-        onFinish={(reopenPopup) => void returnToPopup(reopenPopup && Number.isFinite(returnWindowId) ? returnWindowId : null)}
-      />
-    </PlatformProvider>
-  </React.StrictMode>,
+mountRoot(
+  <PasskeyRoot
+    mode={mode}
+    runtime={runtimePort}
+    onFinish={(reopenPopup) => void returnToPopup(reopenPopup && Number.isFinite(returnWindowId) ? returnWindowId : null)}
+  />,
+  createExtensionAppPlatform("window"),
 );

@@ -1,10 +1,8 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
 import "@gleam/app/src/app.css";
-import { PlatformProvider } from "@gleam/app/src/app-platform/context.tsx";
 import { createExtensionAppPlatform } from "@/src/adapters/app-platform";
 import { ApprovalRoot } from "@gleam/app/src/approval/ApprovalRoot.tsx";
 import { DEVICE_SIGN_PANELS } from "@/src/hardware/panels";
+import { mountRoot } from "@/src/mount-root";
 
 /**
  * The approval window's own real WXT entrypoint (`approval.html`) — a
@@ -18,12 +16,4 @@ import { DEVICE_SIGN_PANELS } from "@/src/hardware/panels";
  */
 const requestId = new URLSearchParams(location.search).get("requestId")?.trim() ?? null;
 
-const platform = createExtensionAppPlatform("window", { signPanels: DEVICE_SIGN_PANELS });
-
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <PlatformProvider platform={platform}>
-      <ApprovalRoot requestId={requestId} />
-    </PlatformProvider>
-  </React.StrictMode>,
-);
+mountRoot(<ApprovalRoot requestId={requestId} />, createExtensionAppPlatform("window", { signPanels: DEVICE_SIGN_PANELS }));
