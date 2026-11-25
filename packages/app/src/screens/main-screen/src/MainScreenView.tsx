@@ -17,7 +17,7 @@ import { useListDock } from "./useListDock";
 import { useOtherWallets } from "../../activity";
 import { useContacts } from "../../activity";
 import { useOrderbookPrices, useTokenPrices } from "./useTokenPrices";
-import { MainScreenNotice } from "./MainScreenNotice";
+import { MainScreenNotice, type MainScreenNoticeProps } from "./MainScreenNotice";
 import { useCollectiblesCatchUp } from "./useCollectiblesCatchUp";
 import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/index.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
@@ -107,6 +107,7 @@ export interface MainScreenViewProps {
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
   onOpenPoints: () => void;
+  onOpenInvites: MainScreenNoticeProps["onOpenInvites"];
   /** Opens the dApp browser. Omitted where the host has none, which hides its button. */
   onOpenBrowser?: () => void;
   /** Opens the permissions screen for a site that was using another wallet. */
@@ -131,6 +132,7 @@ export function MainScreenView({
   onOpenWalletSwitcher,
   onOpenSettings,
   onOpenPoints,
+  onOpenInvites,
   onOpenBrowser,
   onUseGleamOnSite,
   onOpenCollectible,
@@ -313,7 +315,7 @@ export function MainScreenView({
       <PullToRefreshIndicator {...pullState} pull={pullState.refreshing ? 0 : pullState.pull} refreshing={false} />
 
       <SiteWalletCard runtime={runtime} onUseGleam={onUseGleamOnSite} />
-      <MainScreenNotice runtime={runtime} wallet={wallet} onOpenPoints={onOpenPoints} />
+      <MainScreenNotice runtime={runtime} wallet={wallet} onOpenInvites={onOpenInvites} />
 
       {/*
         Fades the chart block toward invisible on scroll. Its

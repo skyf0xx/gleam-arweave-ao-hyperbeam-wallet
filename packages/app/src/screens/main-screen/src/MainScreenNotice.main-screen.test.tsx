@@ -22,22 +22,39 @@ interface Setup {
   member?: boolean;
   seatsLeft?: number | null;
   seatsSeen?: number;
+  /** A second member wallet's server count and seen count. */
+  other?: { seatsLeft: number; seatsSeen: number };
   announcements?: unknown;
   dismissed?: string[];
   review?: ReviewMoment | null;
   update?: string | null;
 }
 
+const OTHER_ADDRESS = "weyAbCdEfGhIjKlMnOpQrStUvWxYz0123456789xdy";
+
 function setup(options: Setup = {}, platformOverrides: FakeAppPlatformOverrides = {}) {
   const dismissed = [...(options.dismissed ?? [])];
   const send = vi.fn(async ({ type, payload }: { type: string; payload?: { id?: string } }) => {
     switch (type) {
       case "getPointsMemberships":
-        return options.member === false ? {} : { w1: { address: "addr-1", inviteCode: "C", referred: false, joinedAt: 0 } };
+        return {
+          ...(options.member === false ? {} : { w1: { address: "addr-1", inviteCode: "C", referred: false, joinedAt: 0 } }),
+          ...(options.other ? { w2: { address: OTHER_ADDRESS, inviteCode: "D", referred: false, joinedAt: 0 } } : {}),
+        };
       case "getPointsScores":
-        return { wallets: [{ address: "addr-1", seatsLeft: options.seatsLeft ?? null }] };
+        return {
+          wallets: [
+            { address: "addr-1", seatsLeft: options.seatsLeft ?? null },
+            ...(options.other ? [{ address: OTHER_ADDRESS, seatsLeft: options.other.seatsLeft }] : []),
+          ],
+        };
+      case "getState":
+        return { wallets: [WALLET, { ...WALLET, id: "w2", address: OTHER_ADDRESS, name: "Savings" }], activeWalletId: "w1", session: null };
       case "getPointsSeatsSeen":
-        return options.seatsSeen === undefined ? {} : { w1: options.seatsSeen };
+        return {
+          ...(options.seatsSeen === undefined ? {} : { w1: options.seatsSeen }),
+          ...(options.other ? { w2: options.other.seatsSeen } : {}),
+        };
       case "markPointsSeatsSeen":
         return undefined;
       case "getAnnouncements":
@@ -59,15 +76,15 @@ function setup(options: Setup = {}, platformOverrides: FakeAppPlatformOverrides 
     }
   });
   const runtime: RuntimePort = { send: send as RuntimePort["send"], onMessage: vi.fn(() => () => {}) };
-  const onOpenPoints = vi.fn();
+  const onOpenInvites = vi.fn();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <MainScreenNotice runtime={runtime} wallet={WALLET} onOpenPoints={onOpenPoints} />
+      <MainScreenNotice runtime={runtime} wallet={WALLET} onOpenInvites={onOpenInvites} />
     </QueryClientProvider>,
     fakeAppPlatform(platformOverrides),
   );
-  return { send, onOpenPoints, view };
+  return { send, onOpenInvites, view };
 }
 
 const INFO: Announcement = {
@@ -87,14 +104,26 @@ describe("MainScreenNotice", () => {
   });
 
   it("shows the invite notice, opens Points on tap and marks seats seen on dismiss", async () => {
-    const { send, onOpenPoints } = setup({ seatsLeft: 3, seatsSeen: 2 });
+    const { send, onOpenInvites } = setup({ seatsLeft: 3, seatsSeen: 2 });
 
     fireEvent.click(await screen.findByRole("button", { name: /You have new invites/ }));
-    expect(onOpenPoints).toHaveBeenCalled();
+    expect(onOpenInvites).toHaveBeenCalledWith("w1");
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({ type: "markPointsSeatsSeen", payload: { walletId: "w1", seats: 3 } }),
+    );
+  });
+
+  it("shows another wallet's new invites with its name, opens them for that wallet and marks its seats seen", async () => {
+    const { send, onOpenInvites } = setup({ seatsLeft: 3, seatsSeen: 3, other: { seatsLeft: 2, seatsSeen: 1 } });
+
+    fireEvent.click(await screen.findByRole("button", { name: /New invites for Savings/ }));
+    expect(onOpenInvites).toHaveBeenCalledWith("w2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "markPointsSeatsSeen", payload: { walletId: "w2", seats: 2 } }),
     );
   });
 

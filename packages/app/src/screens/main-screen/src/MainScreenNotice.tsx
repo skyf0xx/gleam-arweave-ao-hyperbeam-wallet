@@ -3,15 +3,18 @@ import { usePlatform } from "../../../app-platform/context";
 import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { SITE_URL, sitePageUrl } from "@gleam/core";
 import { useT } from "../../../i18n";
 import { useNotice } from "./useNotice";
+import { useOtherWallets } from "../../activity";
 import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
 
 export interface MainScreenNoticeProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
-  onOpenPoints: () => void;
+  /** Opens Points for `walletId`, switching to it first when it isn't the active wallet. */
+  onOpenInvites: (walletId: string) => void;
 }
 
 /**
@@ -19,9 +22,10 @@ export interface MainScreenNoticeProps {
  * when there is none. Warning red marks a `critical` announcement only;
  * the beam is identity and never a severity signal.
  */
-export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNoticeProps) {
+export function MainScreenNotice({ runtime, wallet, onOpenInvites }: MainScreenNoticeProps) {
   const t = useT();
   const { notice, dismiss } = useNotice(runtime, wallet);
+  const otherWallets = useOtherWallets(runtime, wallet.id);
   if (notice === null) return null;
 
   const critical = notice.kind === "announcement" && notice.announcement.level === "critical";
@@ -29,9 +33,13 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
 
   let body: ReactNode;
   if (notice.kind === "invites") {
+    const { walletId, address } = notice.invites;
+    // The address stands in until the wallet list loads.
+    const name = otherWallets.data?.find((other) => other.id === walletId)?.name ?? truncateAddress(address);
+    const title = walletId === wallet.id ? t("mainScreen.invitesTitle") : t("mainScreen.invitesTitleFor", { name });
     body = (
-      <button type="button" className={bodyClass} onClick={onOpenPoints}>
-        <NoticeContent title={t("mainScreen.invitesTitle")} text={t("mainScreen.invitesText")} />
+      <button type="button" className={bodyClass} onClick={() => onOpenInvites(walletId)}>
+        <NoticeContent title={title} text={t("mainScreen.invitesText")} />
       </button>
     );
   } else if (notice.kind === "review") {

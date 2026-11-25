@@ -60,6 +60,7 @@ function renderMain(runtime: RuntimePort, props: Partial<Parameters<typeof MainS
         onOpenWalletSwitcher={vi.fn()}
         onOpenSettings={vi.fn()}
         onOpenPoints={vi.fn()}
+        onOpenInvites={vi.fn()}
         onUseGleamOnSite={vi.fn()}
         onOpenCollectible={vi.fn()}
         onAddToken={vi.fn()}

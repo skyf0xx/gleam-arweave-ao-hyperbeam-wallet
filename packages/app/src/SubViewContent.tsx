@@ -6,7 +6,7 @@ import { MainScreenView, type MainScreenTab } from "./screens/main-screen/index.
 import { useNetworkSettings } from "./screens/main-screen/src/useNetworkSettings";
 import { SendCollectibleView, SendView } from "./screens/send/index.tsx";
 import { ReceiveView } from "./screens/receive/index.tsx";
-import { WalletSwitcherView } from "./screens/wallet-switcher/index.tsx";
+import { useSwitchWallet, WalletSwitcherView } from "./screens/wallet-switcher/index.tsx";
 import { WalletDetailView } from "./screens/wallet-detail/index.tsx";
 import { LockSettingsView } from "./screens/lock-settings/index.tsx";
 import { BackupView } from "./screens/backup/index.tsx";
@@ -58,6 +58,15 @@ export function SubViewContent({
 }: SubViewContentProps) {
   const platform = usePlatform();
   const t = useT();
+  const switchWallet = useSwitchWallet(runtime);
+  // Points is per wallet, so another wallet's invites are shared from that wallet.
+  const openInvites = async (walletId: string) => {
+    if (walletId !== wallet.id) {
+      await switchWallet.mutateAsync(walletId);
+      await refresh(runtime);
+    }
+    setSubView({ kind: "points" });
+  };
   if (subView.kind === "send") {
     return (
       <SendView
@@ -259,6 +268,7 @@ export function SubViewContent({
             onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
             onOpenSettings={() => setSubView({ kind: "settings-home" })}
             onOpenPoints={() => setSubView({ kind: "points" })}
+            onOpenInvites={(walletId) => void openInvites(walletId)}
             onOpenBrowser={platform.capabilities.dappBrowser ? () => setSubView({ kind: "browser" }) : undefined}
             onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
             onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
