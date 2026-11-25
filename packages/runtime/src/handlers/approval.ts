@@ -411,6 +411,12 @@ export type CreateApprovalInput =
   | ({ origin: string; walletId: string } & SigningRequestInput)
   | ({ origin: string; walletId: string } & AddTokenRequestInput);
 
+type WalletApprovalInput = CreateApprovalInput extends infer U
+  ? U extends unknown
+    ? Omit<U, "origin" | "payload" | "tags"> & { payload?: Uint8Array }
+    : never
+  : never;
+
 /**
  * `result`, `signingInput` and `device.payloads` hold bytes (payloads, AES
  * IVs, signatures), and `chrome.storage` serializes a `Uint8Array` as a
@@ -1703,9 +1709,8 @@ export class ApprovalHandler {
    * Resolves to `submitTransfer`'s `{ txId }` once the transfer is posted.
    */
   async requestWalletTransfer(req: WalletTransferRequest): Promise<{ txId: string }> {
-    const result = await this.requestApproval({
+    return this.requestWalletApproval<{ txId: string }>({
       kind: "transfer",
-      origin: WALLET_APPROVAL_ORIGIN,
       walletId: req.walletId,
       recipient: req.recipient,
       amount: req.amount,
@@ -1715,10 +1720,7 @@ export class ApprovalHandler {
       tokenTicker: req.tokenTicker ?? null,
       collectible: req.collectible ?? null,
       ...(req.tokenImpersonating ? { tokenImpersonating: true } : {}),
-      payload: new Uint8Array(),
-      tags: [],
     });
-    return result as { txId: string };
   }
 
   /**
@@ -1727,16 +1729,12 @@ export class ApprovalHandler {
    * posted `set`'s `{ txId }`.
    */
   async requestNameTarget(req: NameTargetRequest): Promise<{ txId: string }> {
-    const result = await this.requestApproval({
+    return this.requestWalletApproval<{ txId: string }>({
       kind: "setNameTarget",
-      origin: WALLET_APPROVAL_ORIGIN,
       walletId: req.walletId,
       fee: req.fee,
       nameTarget: { carrier: req.carrier, label: req.label, target: req.target },
-      payload: new Uint8Array(),
-      tags: [],
     });
-    return result as { txId: string };
   }
 
   /**
@@ -1745,14 +1743,22 @@ export class ApprovalHandler {
    * once the device's signature has verified against the wallet's key.
    */
   async requestPointsProof(req: { walletId: string; message: string }): Promise<PointsDeviceProof> {
-    const result = await this.requestApproval({
+    return this.requestWalletApproval<PointsDeviceProof>({
       kind: "pointsProof",
-      origin: WALLET_APPROVAL_ORIGIN,
       walletId: req.walletId,
       payload: new TextEncoder().encode(req.message),
-      tags: [],
     });
-    return result as PointsDeviceProof;
+  }
+
+  /** An approval the wallet itself asks for, with Gleam as the origin and no dApp payload or tags. */
+  private async requestWalletApproval<T>(input: WalletApprovalInput): Promise<T> {
+    const result = await this.requestApproval({
+      ...input,
+      origin: WALLET_APPROVAL_ORIGIN,
+      payload: input.payload ?? new Uint8Array(),
+      tags: [],
+    } as CreateApprovalInput);
+    return result as T;
   }
 
   /**

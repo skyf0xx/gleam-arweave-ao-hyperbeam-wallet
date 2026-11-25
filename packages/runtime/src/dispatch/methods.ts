@@ -270,6 +270,8 @@ export const PAGE_METHODS = {
   }),
 } as const satisfies Record<ProviderMethod, PageMethodSpec>;
 
+export type ReportOtherWalletParams = z.output<(typeof BACKGROUND_MESSAGES)["reportOtherWallet"]["params"]>;
+
 export type PageParams<M extends ProviderMethod> = z.output<(typeof PAGE_METHODS)[M]["params"]>;
 
 const EXTENSION: ExtensionMethodSpec = { tier: "extension" };

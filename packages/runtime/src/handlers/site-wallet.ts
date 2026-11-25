@@ -7,6 +7,7 @@ import {
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import { isPermissionType, stringList } from "../guards";
+import type { ReportOtherWalletParams } from "../dispatch/methods";
 
 /**
  * One `SeenOtherWallet` per tab, so tabs reporting at once never overwrite
@@ -135,12 +136,7 @@ export class SiteWalletHandler {
   }
 
   /** A use stays recorded across reloads of the same origin, and clears on navigating elsewhere. */
-  async report(
-    tabId: number,
-    origin: string,
-    req: { walletName: unknown; used: unknown; permissions?: unknown },
-  ): Promise<void> {
-    if (typeof req.walletName !== "string" || typeof req.used !== "boolean") return;
+  async report(tabId: number, origin: string, req: ReportOtherWalletParams): Promise<void> {
     const { walletName, used } = req;
     const permissions = knownPermissions(req.permissions);
     const now = this.now();
