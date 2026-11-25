@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { hostnameOf } from "../hostname";
 import { useT, type MessageKey } from "../i18n";
 import { LocalizedRoot } from "../i18n/LocalizedRoot";
@@ -172,9 +173,13 @@ function tokensOf(request: ApprovalRequest): Array<string | null> {
 }
 
 export function ApprovalRoot(props: ApprovalRootProps) {
+  // A short-lived window: a failed read shows its error rather than retrying behind it.
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return (
     <LocalizedRoot>
-      <ApprovalRootContent {...props} />
+      <QueryClientProvider client={queryClient}>
+        <ApprovalRootContent {...props} />
+      </QueryClientProvider>
     </LocalizedRoot>
   );
 }

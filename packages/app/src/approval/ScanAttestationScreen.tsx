@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
@@ -46,12 +45,7 @@ export interface ScanAttestationScreenProps {
 }
 
 export function ScanAttestationScreen(props: ScanAttestationScreenProps) {
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ScanAttestationFlow {...props} />
-    </QueryClientProvider>
-  );
+  return <ScanAttestationFlow {...props} />;
 }
 
 type Membership =
