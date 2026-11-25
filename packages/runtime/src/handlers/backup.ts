@@ -292,8 +292,12 @@ export class BackupHandler {
     return unlocked;
   }
 
+  // Counts raw records, not valid wallets: a record today's guard rejects
+  // (damaged, or from a newer release) may still hold a key, and a restore
+  // would overwrite it.
   private async vaultIsEmpty(): Promise<boolean> {
-    return (await loadWallets(this.storage)).length === 0;
+    const wallets = await this.storage.get<unknown>(WALLETS_KEY);
+    return !(Array.isArray(wallets) && wallets.length > 0);
   }
 
   private requireCloud(): CloudFilePort {
