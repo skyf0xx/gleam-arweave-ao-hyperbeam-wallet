@@ -130,13 +130,14 @@ async function readLocationRecords(
       if (!response.ok) break;
       const text = await readCappedText(response, LOCATION_PAGE_MAX_BYTES);
       if (text === null) break;
-      const page = locationPageSchema.safeParse(JSON.parse(text));
-      if (!page.success) break;
-      const body = page.data;
-      const edges = body.data?.transactions?.edges ?? [];
+      const parsed = locationPageSchema.safeParse(JSON.parse(text));
+      if (!parsed.success) break;
+      const edges = parsed.data.data?.transactions?.edges ?? [];
       for (const edge of edges) nodes.push(edge.node);
-      if (!body.data?.transactions?.pageInfo?.hasNextPage || edges.length === 0) break;
-      after = edges[edges.length - 1]!.cursor;
+      // Without a cursor the next request would read the first page again.
+      const cursor = edges[edges.length - 1]?.cursor;
+      if (!parsed.data.data?.transactions?.pageInfo?.hasNextPage || cursor === undefined) break;
+      after = cursor;
     } catch {
       break;
     }
