@@ -14,7 +14,7 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
-import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
+import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import { BackupSection } from "./BackupSection";
@@ -143,24 +143,13 @@ export function LockSettingsView({
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10 phone:pb-8">
-          <button
-            type="button"
+          <IconRow
+            icon={<LockIcon />}
+            title={locking ? t("lockSettings.locking") : t("lockSettings.lockNow")}
+            description={t("lockSettings.lockNowHint")}
             disabled={locking}
             onClick={() => void handleLockNow()}
-            className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
-          >
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-              <LockIcon />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-label font-semibold text-foreground">
-                {locking ? t("lockSettings.locking") : t("lockSettings.lockNow")}
-              </span>
-              <span className="text-caption text-muted">
-                {t("lockSettings.lockNowHint")}
-              </span>
-            </span>
-          </button>
+          />
         </div>
 
         {biometrics ? <BiometricSection runtime={runtime} biometrics={biometrics} /> : null}
@@ -328,41 +317,28 @@ function PasskeySection({
       {passkey.kind === "loading" ? (
         <SkeletonRow />
       ) : passkey.status.enrolled ? (
-        <div className="flex items-center gap-3 py-3.5">
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <PasskeyIcon />
-          </span>
-          <span className="min-w-0 flex-1 text-label font-semibold text-foreground">
-            {t("lockSettings.passkeyOn")}
-          </span>
-          <button
-            type="button"
-            disabled={passkey.busy}
-            onClick={() => void handleRemove()}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
-          >
-            {passkey.busy ? t("lockSettings.removing") : t("lockSettings.remove")}
-          </button>
-        </div>
+        <IconRow
+          icon={<PasskeyIcon />}
+          title={t("lockSettings.passkeyOn")}
+          trailing={
+            <button
+              type="button"
+              disabled={passkey.busy}
+              onClick={() => void handleRemove()}
+              className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
+            >
+              {passkey.busy ? t("lockSettings.removing") : t("lockSettings.remove")}
+            </button>
+          }
+        />
       ) : supported ? (
-        <button
-          type="button"
+        <IconRow
+          icon={<PasskeyIcon />}
+          title={t("lockSettings.passkeySetUp")}
+          description={t("lockSettings.passkeySetUpHint")}
           disabled={passkey.busy}
           onClick={() => void handleSetUp()}
-          className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
-        >
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <PasskeyIcon />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">
-              {t("lockSettings.passkeySetUp")}
-            </span>
-            <span className="text-caption text-muted">
-              {t("lockSettings.passkeySetUpHint")}
-            </span>
-          </span>
-        </button>
+        />
       ) : (
         <p className="py-3.5 text-caption text-muted">
           {t("lockSettings.passkeyUnavailable")}

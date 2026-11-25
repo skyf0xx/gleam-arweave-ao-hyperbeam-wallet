@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { BackupProvider, BackupStatus, RuntimePort } from "@gleam/core";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
-import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
+import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
 import { backupDriveName, backupSummary } from "../../backup/src/BackupView";
 
@@ -34,22 +34,20 @@ export function BackupSection({ runtime, provider, onOpen }: { runtime: RuntimeP
       {status === null ? (
         <SkeletonRow />
       ) : (
-        <button type="button" onClick={onOpen} className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover">
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <CloudIcon />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">{backupDriveName(provider)}</span>
-            <span className={status.problem ? "text-caption font-semibold text-warning" : "text-caption text-muted"}>
-              {current ? `${t("backup.lastBackup")} · ${summary}` : summary}
+        <IconRow
+          icon={<CloudIcon />}
+          title={backupDriveName(provider)}
+          description={current ? `${t("backup.lastBackup")} · ${summary}` : summary}
+          descriptionTone={status.problem ? "warning" : "muted"}
+          onClick={onOpen}
+          trailing={
+            <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </span>
-          </span>
-          <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </button>
+          }
+        />
       )}
     </div>
   );
