@@ -1,8 +1,9 @@
 // @ts-check
 /**
- * Files past MAX_LINES when the limit came in, capped at their size then.
- * A cap may only come down: split the file (CLAUDE.md § One reason to
- * change per file) and lower or drop its entry in the same commit.
+ * Files past MAX_LINES, each capped with the reason it stays whole.
+ * Prefer a split along a real seam (CLAUDE.md § One reason to change per
+ * file), lowering or dropping the entry in the same commit. A file that is
+ * one thing may raise its cap, with the reason updated beside it.
  */
 export const MAX_LINES = 400;
 /** @type {Record<string, number>} */

@@ -240,12 +240,16 @@ tests check Gleam's ANS-104 bytes against it.
   reads on its own; pieces that would pass half the file's state back
   and forth stay together. A large file that is one thing (a catalog, a
   method table, one parser) stays whole.
-- **File size ratchet.** ESLint's `max-lines` is 400 code lines.
-  Files already over it have a cap at their current size in
-  `scripts/file-size-caps.mjs`: a capped file may shrink but never grow, so a
-  change that would grow one extracts something first, and a split
-  lowers or removes the cap in the same commit. Raise a cap only for a
-  file that is one thing, with the reason beside it.
+- **File size ratchet.** ESLint's `max-lines` is 400 code lines. It
+  is a prompt to look for a seam, not a target: maintainable code wins
+  over the number. A file over it has a cap in
+  `scripts/file-size-caps.mjs` with the reason beside it. Before a change
+  grows a capped file, look for a split along a real seam (§ One reason
+  to change per file), and lower or drop the cap in the same commit as
+  the split. When the file is one thing, or a fence keeps it together,
+  raise the cap with its reason instead. Never squeeze a file under the
+  limit by packing lines or by splitting it where the pieces would pass
+  half its state back and forth.
 - **A module's `index.ts` is its public interface.** Import a module
   through its `index.ts`, not a file inside it, and keep what it doesn't
   export private. No barrel that only re-exports other barrels, and no
