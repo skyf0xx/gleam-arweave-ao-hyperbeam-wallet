@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   bytesToBase64Url,
   INVITE_REQUIRED_MESSAGE,
@@ -37,6 +38,28 @@ import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { dappError } from "../dapp-error";
+
+/** What a refusal from the points API carries: its `error` sentence and `code`. Anything else in the body, or a body that isn't an object, reads as none. */
+const errorBodySchema = z.object({ error: z.unknown().optional(), code: z.unknown().optional() }).nullable().catch(null);
+
+const joinReplySchema = z.object({ address: z.string(), inviteCode: z.string(), referred: z.boolean() });
+
+const attestReplySchema = z.object({
+  ok: z.literal(true),
+  attestationId: z.string(),
+  points: z.string().regex(/^\d+$/),
+  paid: z.boolean(),
+  paidPlacesLeft: z.number(),
+  unpaidReason: z.enum(["places_taken", "no_snapshot"]).nullish().catch(null),
+});
+
+const redeemReplySchema = z.object({
+  result: z.enum(["ok", "full", "unknown"]),
+  kind: z.enum(["member", "drop"]).optional().catch(undefined),
+});
+
+/** A scores reply is checked for its `wallets` list only; the rest passes through as the server sent it. */
+const scoresReplySchema = z.looseObject({ wallets: z.array(z.unknown()) });
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -165,14 +188,9 @@ export class PointsHandler {
     });
     const proof = await this.proveOwnership(req.walletId, JOIN, () => message);
     const response = await this.postJson("/register", { ...proofBody(proof), devicePublicKey: device.publicKey });
-    const body = (await response.json().catch(() => null)) as {
-      address?: unknown;
-      inviteCode?: unknown;
-      referred?: unknown;
-      error?: unknown;
-      code?: unknown;
-    } | null;
+    const raw: unknown = await response.json().catch(() => null);
     if (!response.ok) {
+      const body = errorBodySchema.parse(raw);
       if (body?.code === "invite_required") {
         // A stored "ok" unlock would make the gate's redeem return early
         // without a code the server accepts.
@@ -182,9 +200,11 @@ export class PointsHandler {
       }
       throw new Error(userErrorMessage("pointsJoinFailed", { reason: serverReason(body, response.status) }));
     }
-    if (body?.address !== proof.address || typeof body.inviteCode !== "string" || typeof body.referred !== "boolean") {
+    const joined = joinReplySchema.safeParse(raw);
+    if (!joined.success || joined.data.address !== proof.address) {
       throw new Error(userErrorMessage("pointsUnexpectedResponse"));
     }
+    const body = joined.data;
 
     const membership: PointsMembership = {
       address: proof.address,
@@ -257,16 +277,16 @@ export class PointsHandler {
    */
   async checkAttestation(attestation: ParsedAttestation, address?: string): Promise<AttestationCheck> {
     let response: Response;
-    let body: Record<string, unknown> | null;
+    let raw: unknown;
     try {
       response = await this.postJson("/attestations/check", address ? { attestation, address } : { attestation }, {
         signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
       });
-      body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+      raw = await response.json().catch(() => null);
     } catch {
       return failureOf(attestFailure("offline", attestation.release));
     }
-    if (!response.ok) return failureOf(serverAttestFailure(response.status, body, attestation.release));
+    if (!response.ok) return failureOf(serverAttestFailure(response.status, errorBodySchema.parse(raw), attestation.release));
     return { ok: true };
   }
 
@@ -277,32 +297,24 @@ export class PointsHandler {
       throw new Error(userErrorMessage("attestationSignedMismatch"));
     }
     let response: Response;
-    let body: Record<string, unknown> | null;
+    let raw: unknown;
     try {
       // The approval window and the site's reply both wait on the timeout.
       response = await this.postJson("/attestations", { attestation, ...proofBody(proof) }, { signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS) });
-      body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+      raw = await response.json().catch(() => null);
     } catch {
       return attestFailure("offline", attestation.release);
     }
-    if (!response.ok) return serverAttestFailure(response.status, body, attestation.release);
-    const { points, paid, paidPlacesLeft, unpaidReason } = body ?? {};
-    if (
-      body?.ok !== true ||
-      body.attestationId !== id ||
-      typeof points !== "string" ||
-      !/^\d+$/.test(points) ||
-      typeof paid !== "boolean" ||
-      typeof paidPlacesLeft !== "number"
-    ) {
-      return attestFailure("offline", attestation.release);
-    }
+    if (!response.ok) return serverAttestFailure(response.status, errorBodySchema.parse(raw), attestation.release);
+    const reply = attestReplySchema.safeParse(raw);
+    if (!reply.success || reply.data.attestationId !== id) return attestFailure("offline", attestation.release);
+    const { points, paid, paidPlacesLeft, unpaidReason } = reply.data;
     return {
       ok: true,
       attestationId: id,
       points,
       paid,
-      unpaidReason: unpaidReason === "places_taken" || unpaidReason === "no_snapshot" ? unpaidReason : null,
+      unpaidReason: unpaidReason ?? null,
       paidPlacesLeft,
     };
   }
@@ -392,10 +404,9 @@ export class PointsHandler {
         devicePublicKey: device.publicKey,
       });
       if (!response.ok) return { result: "offline" };
-      const body = (await response.json().catch(() => null)) as { result?: unknown; kind?: unknown } | null;
-      const result = body?.result;
-      if (result !== "ok" && result !== "full" && result !== "unknown") return { result: "offline" };
-      return { result, kind: body?.kind === "member" || body?.kind === "drop" ? body.kind : undefined };
+      const reply = redeemReplySchema.safeParse(await response.json().catch(() => null));
+      if (!reply.success) return { result: "offline" };
+      return { result: reply.data.result, kind: reply.data.kind };
     } catch {
       return { result: "offline" };
     }
@@ -413,7 +424,7 @@ export class PointsHandler {
     const proof = await this.proveOwnership(req.walletId, LEAVE, (address) => buildLeaveMessage(address, issuedAt));
     const response = await this.postJson("/leave", proofBody(proof));
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+      const body = errorBodySchema.parse(await response.json().catch(() => null));
       throw new Error(userErrorMessage("pointsLeaveFailed", { reason: serverReason(body, response.status) }));
     }
 
@@ -445,8 +456,9 @@ export class PointsHandler {
       return null;
     }
     if (!response.ok) throw new Error(userErrorMessage("pointsLoadFailed", { status: response.status }));
-    const body = (await response.json()) as PointsScores;
-    if (!Array.isArray(body?.wallets)) throw new Error(userErrorMessage("pointsUnexpectedResponse"));
+    const raw: unknown = await response.json();
+    if (!scoresReplySchema.safeParse(raw).success) throw new Error(userErrorMessage("pointsUnexpectedResponse"));
+    const body = raw as PointsScores;
     await this.syncSeats(body).catch((error: unknown) => console.error("Gleam Points seat check failed:", error));
     return body;
   }
