@@ -7,18 +7,8 @@ import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { zValidator } from "@hono/zod-validator";
 import type { z } from "zod";
-import {
-  AttestationListCache,
-  checkAttestation,
-  countAttestations,
-  listAttestations,
-  checkRequest,
-  countQuery,
-  listQuery,
-  scanRewardBasis,
-  submitAttestation,
-  submitRequest,
-} from "./scans/attestations";
+import { checkAttestation, checkRequest, scanRewardBasis, submitAttestation, submitRequest } from "./scans/attestations";
+import { AttestationListCache, countAttestations, countQuery, listAttestations, listQuery } from "./scans/attestation-listing";
 import { poolBalance } from "./scans/bounty";
 import { queryNumber, type Db } from "./db";
 import { createGithubClient, type GithubClient } from "./scans/github";

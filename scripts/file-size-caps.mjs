@@ -16,7 +16,6 @@ export const FILE_SIZE_CAPS = {
   "packages/runtime/src/handlers/approval.ts": 981,
   // What is left handles key material, which stays in the one file the signer fence allows.
   "packages/runtime/src/handlers/wallet-lifecycle.ts": 566,
-  "apps/points-api/src/scans/attestations.ts": 586,
   "apps/site/scan-lib.js": 427,
   "scripts/check-bundles.mjs": 434,
 };
