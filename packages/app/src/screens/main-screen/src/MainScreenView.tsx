@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { isWatchWalletMethod, type Collectible, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
 import { LoadingBar, PullToRefreshIndicator, useFreshAfterCache, usePullToRefresh } from "@gleam/ui";
 import { PortfolioChart, SendReceiveActions } from "@gleam/ui/src/components/wallet/index.ts";
@@ -12,7 +11,6 @@ import { useActivity } from "../../activity";
 import { useCollectibles } from "../../activity";
 import { CollectiblesGallery } from "../../collectibles/index.tsx";
 import { useBalances } from "../../activity";
-import { walletQueryKeys } from "../../activity";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { PANEL_GAP_PX, useTabSwipe } from "./useTabSwipe";
 import { useListDock } from "./useListDock";
@@ -20,6 +18,7 @@ import { useOtherWallets } from "../../activity";
 import { useContacts } from "../../activity";
 import { useOrderbookPrices, useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
+import { useCollectiblesCatchUp } from "./useCollectiblesCatchUp";
 import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/index.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { ActivityPanel } from "./ActivityPanel";
@@ -164,23 +163,10 @@ export function MainScreenView({
   });
   const controls = useTokenRowControls(runtime, wallet.address);
   const { confirmingIgnore, setConfirmingIgnore } = controls;
-  const queryClient = useQueryClient();
   const panelTrackRef = useRef<HTMLDivElement>(null);
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
-  // A collectible received since the list was fetched: refetch it, once per activity read.
-  const collectiblesRefetchedFor = useRef(0);
-  useEffect(() => {
-    const listed = collectiblesQuery.data;
-    if (!listed || collectiblesRefetchedFor.current === activityQuery.dataUpdatedAt) return;
-    const ids = new Set(listed.map((collectible) => collectible.id));
-    const missing = activityQuery.data?.entries.some(
-      (entry) => entry.type === "receive" && entry.collectible && !ids.has(entry.collectible.id),
-    );
-    if (!missing) return;
-    collectiblesRefetchedFor.current = activityQuery.dataUpdatedAt;
-    void queryClient.invalidateQueries({ queryKey: walletQueryKeys.collectibles(wallet.address) });
-  }, [activityQuery.data, activityQuery.dataUpdatedAt, collectiblesQuery.data, queryClient, wallet.address]);
+  useCollectiblesCatchUp(wallet.address, collectiblesQuery.data, activityQuery.data, activityQuery.dataUpdatedAt);
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
   const headerStyle = displaySettings?.header ?? "full";
