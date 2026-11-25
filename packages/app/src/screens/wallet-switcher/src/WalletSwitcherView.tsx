@@ -8,7 +8,7 @@ import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useWalletState, WALLET_STATE_QUERY_KEY } from "../../activity/src/useWalletState";
+import { OPENED_WALLET_STATE_QUERY_KEY, useWalletState, WALLET_STATE_QUERY_KEY } from "../../activity/src/useWalletState";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 // The label sits inside the name's truncating span, so a narrow row cuts
@@ -58,6 +58,7 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
   const queryClient = useQueryClient();
   // Shown at once, so the remount that follows a switch doesn't flash a skeleton.
   const walletsQuery = useWalletState(runtime, {
+    recordActivity: true,
     ...(initialWallets?.length
       ? { placeholderData: { wallets: initialWallets, activeWalletId: initialActiveWalletId, session: null } }
       : {}),
@@ -75,7 +76,9 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
     if (walletId === activeWalletId) return;
     switchMutation.mutate(walletId, {
       onSuccess: () => {
-        queryClient.setQueryData<WalletState>(WALLET_STATE_QUERY_KEY, (state) => (state ? { ...state, activeWalletId: walletId } : state));
+        for (const key of [WALLET_STATE_QUERY_KEY, OPENED_WALLET_STATE_QUERY_KEY]) {
+          queryClient.setQueryData<WalletState>(key, (state) => (state ? { ...state, activeWalletId: walletId } : state));
+        }
         onSwitched(walletId);
       },
       onError: (caught) => setSwitchError(errorText(caught)),
