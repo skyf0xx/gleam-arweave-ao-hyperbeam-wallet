@@ -1,31 +1,13 @@
-import pg from "pg";
-import { dbFromPool } from "../src/db";
-import { DEFAULT_SITE_URL, createDropCode, formatDropCode, parseDropCodeArgs } from "../src/wallets/drop-codes";
+import { createDropCode, DEFAULT_SITE_URL, formatDropCode, parseDropCodeArgs, type DropCodeOptions } from "../src/wallets/drop-codes";
+import { runScript } from "./cli";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  console.error("DATABASE_URL is required.");
-  process.exit(1);
-}
-
-let options;
-try {
-  options = parseDropCodeArgs(process.argv.slice(2).filter((arg) => arg !== "--"));
-} catch (error) {
-  console.error(error instanceof Error ? error.message : error);
-  console.error('Usage: drop-code --label "<text>" (--seats <n> | --unlimited) [--prefix <A-Z>] [--until <ISO date>]');
-  process.exit(1);
-}
-
-const pool = new pg.Pool({ connectionString: databaseUrl });
-try {
-  console.log(
-    formatDropCode(
-      await createDropCode(dbFromPool(pool), options),
-      options.until,
-      process.env.SITE_URL ?? DEFAULT_SITE_URL,
-    ),
-  );
-} finally {
-  await pool.end();
-}
+let options: DropCodeOptions;
+await runScript(
+  'Usage: drop-code --label "<text>" (--seats <n> | --unlimited) [--prefix <A-Z>] [--until <ISO date>]',
+  (argv) => {
+    options = parseDropCodeArgs(argv);
+  },
+  async (db) => {
+    console.log(formatDropCode(await createDropCode(db, options), options.until, process.env.SITE_URL ?? DEFAULT_SITE_URL));
+  },
+);

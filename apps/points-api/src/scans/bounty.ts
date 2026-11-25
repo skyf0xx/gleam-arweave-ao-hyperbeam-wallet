@@ -116,6 +116,13 @@ export function parseDockArgs(argv: string[]): DockOptions {
 /** Asks a yes/no question; the CLI wraps readline, tests pass a stub. */
 export type Confirm = (question: string) => Promise<boolean>;
 
+/** Asks `question` unless `yes`; says so and returns false when the answer is no. */
+export async function confirmOrCancel(yes: boolean, confirm: Confirm, print: (line: string) => void, question: string): Promise<boolean> {
+  if (yes || (await confirm(question))) return true;
+  print("Cancelled. Nothing was written.");
+  return false;
+}
+
 interface AttestationRow {
   id: string;
   address: string;
@@ -189,8 +196,7 @@ export async function awardFinding(
   print(`Attestation:   release ${attestation.release}, model ${attestation.model ?? "unknown"}`);
   print(`Ref:           ${options.ref}`);
 
-  if (!options.yes && !(await confirm(`Pay ${formatPoints(amount)} points to ${attestation.address}? [y/N] `))) {
-    print("Cancelled. Nothing was written.");
+  if (!(await confirmOrCancel(options.yes, confirm, print, `Pay ${formatPoints(amount)} points to ${attestation.address}? [y/N] `))) {
     return { paid: false, amount };
   }
 
@@ -241,8 +247,7 @@ export async function voidAttestation(
   print(`Finding points kept:  ${withAtomic(finding)} (an accepted finding was real work, so it stays)`);
   print("Its paid place is freed. GET /attestations may show it for up to 60 seconds.");
 
-  if (!options.yes && !(await confirm(`Void this attestation and remove ${formatPoints(scan)} points? [y/N] `))) {
-    print("Cancelled. Nothing was written.");
+  if (!(await confirmOrCancel(options.yes, confirm, print, `Void this attestation and remove ${formatPoints(scan)} points? [y/N] `))) {
     return { voided: false, removed: 0n };
   }
 
@@ -283,8 +288,7 @@ export async function dockAttestation(
   print(`Ref:           ${options.ref}`);
   print(`Scan points removed:  ${withAtomic(amount)}`);
 
-  if (!options.yes && !(await confirm(`Dock ${formatPoints(amount)} points from ${attestation.address}? [y/N] `))) {
-    print("Cancelled. Nothing was written.");
+  if (!(await confirmOrCancel(options.yes, confirm, print, `Dock ${formatPoints(amount)} points from ${attestation.address}? [y/N] `))) {
     return { docked: false, removed: 0n };
   }
 
