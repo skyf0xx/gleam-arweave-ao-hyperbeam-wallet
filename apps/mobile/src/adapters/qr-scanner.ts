@@ -5,6 +5,7 @@ import type {
 } from "@capacitor/barcode-scanner";
 import type { QrScannerPort } from "@gleam/app/src/app-platform/types.ts";
 import { QrScanError } from "@gleam/app/src/app-platform/qr-scanner.ts";
+import { pluginErrorCode } from "./plugin-error";
 
 /**
  * Every call into the barcode plugin. Its own full-screen scanner asks for
@@ -44,7 +45,7 @@ export function createQrScanner(): QrScannerPort {
         });
         return result.ScanResult;
       } catch (error) {
-        const code = (error as { code?: unknown } | null)?.code;
+        const code = pluginErrorCode(error);
         if (code === CANCELLED) return null;
         if (code === CAMERA_DENIED) {
           throw new QrScanError("permission-denied", "Camera access is off for Gleam.");

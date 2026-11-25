@@ -1,6 +1,6 @@
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
-import type { FileDownloadResult } from "@gleam/core";
+import { bytesToBase64, type FileDownloadResult } from "@gleam/core";
 import { serveOnce } from "./comlink-guard";
 import { SAVER_REQUEST, type FileSaver } from "./download-channel";
 
@@ -26,12 +26,6 @@ const live = new Set<string>();
 // sheet without choosing a target (SharePlugin.swift, SharePlugin.java).
 const SHARE_CANCELLED = "Share canceled";
 
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}
-
 /**
  * Writes the file to the app's cache (never backed up), shares it, and
  * deletes it once the sheet closes. The file sits in its own folder so the
@@ -47,7 +41,7 @@ export function createFileSaver(plugins: SaverPlugins): FileSaver {
       try {
         const { uri } = await plugins.writeFile({
           path: `${folder}/${filename.replace(/[\\/]/g, "_")}`,
-          data: toBase64(bytes),
+          data: bytesToBase64(bytes),
           directory,
           recursive: true,
         });
