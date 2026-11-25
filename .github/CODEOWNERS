@@ -110,6 +110,7 @@
 /packages/runtime/src/vault-lock.ts                                        @skyf0xx
 /packages/runtime/src/first-run-network.ts                                 @skyf0xx
 /packages/runtime/src/handlers/provider.ts                                 @skyf0xx
+/packages/runtime/src/handlers/approval-grants.ts                          @skyf0xx
 /packages/runtime/src/dispatch/site.ts                                     @skyf0xx
 /packages/core/src/models/site-origin.ts                                   @skyf0xx
 /apps/extension/entrypoints/content/                                       @skyf0xx

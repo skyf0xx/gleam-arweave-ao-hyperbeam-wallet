@@ -9,8 +9,8 @@ export const MAX_LINES = 400;
 export const FILE_SIZE_CAPS = {
   // One view over one native page; every effect reads the same page state.
   "packages/app/src/screens/browser/src/BrowserView.tsx": 416,
-  // One state machine over the pending approvals; the grant methods could move out (todo.md).
-  "packages/runtime/src/handlers/approval.ts": 981,
+  // One state machine over the pending approvals.
+  "packages/runtime/src/handlers/approval.ts": 917,
   // What is left handles key material, which stays in the one file the signer fence allows.
   "packages/runtime/src/handlers/wallet-lifecycle.ts": 537,
 };

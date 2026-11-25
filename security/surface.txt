@@ -115,6 +115,7 @@
 3 packages/runtime/src/vault-lock.ts
 3 packages/runtime/src/first-run-network.ts
 3 packages/runtime/src/handlers/provider.ts
+3 packages/runtime/src/handlers/approval-grants.ts
 3 packages/runtime/src/dispatch/site.ts
 3 packages/core/src/models/site-origin.ts
 3 apps/extension/entrypoints/content/

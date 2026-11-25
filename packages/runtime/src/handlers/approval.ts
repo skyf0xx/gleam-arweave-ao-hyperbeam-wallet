@@ -12,7 +12,6 @@ import {
   finishDispatch,
   finishSignTransaction,
   isHardwareWalletMethod,
-  WATCH_ONLY_CONNECT_REFUSAL,
   prepareDataItem,
   prepareDataItems,
   prepareDispatch,
@@ -25,7 +24,6 @@ import {
   type ApprovalPresenterPort,
   type ApprovalPreview,
   type ApprovalRequest,
-  type ConnectApprovalPreview,
   type Grant,
   type HardwareDevice,
   type HardwareWalletMethod,
@@ -49,8 +47,8 @@ import type { SubmitTransferRequest } from "./transfer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { safeSiteIconUrl } from "./site-wallet";
 import { dappError } from "../dapp-error";
-import { dataItemOf, summarize, transactionOf, UNSAFE_TEXT } from "./prepared-check";
-import { isPermissionType } from "../guards";
+import { dataItemOf, summarize, transactionOf } from "./prepared-check";
+import { GrantStore } from "./approval-grants";
 import {
   ApprovalDeclinedError,
   type AddTokenRequestInput,
@@ -66,11 +64,9 @@ import {
   type WalletTransferRequest,
 } from "./approval-types";
 import {
-  activeGrant,
   DEVICE_GRACE_MS,
   DEVICE_SIGNED_KINDS,
   DISCONNECTED_OUTCOME,
-  GRANTS_KEY,
   needsGrant,
   PENDING_APPROVALS_KEY,
   RESOLVING_RECHECK_MS,
@@ -79,7 +75,6 @@ import {
   signsForActiveWallet,
   SITE_DISCONNECTED,
   TIMED_OUT,
-  validGrants,
   validPending,
   WALLET_SWITCHED,
   type ApprovalOutcome,
@@ -189,6 +184,8 @@ export class ApprovalHandler {
   /** Set while a scan attestation is being opened or awaited, so two can't race past the pending check. */
   private attesting = false;
 
+  private readonly grants: GrantStore;
+
   constructor(
     private readonly storage: StoragePort,
     private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod" | "getStoredWallet" | "isVaultLocked">,
@@ -199,24 +196,10 @@ export class ApprovalHandler {
     private readonly tokens?: TokenWatchList,
     private readonly attestations?: ScanAttestationSubmitter,
   ) {
+    this.grants = new GrantStore(storage, keySession, activeWalletId);
     presenter.onDismissed((requestId) => {
       void this.rejectDismissed(requestId);
     });
-  }
-
-  private async loadGrants(): Promise<Grant[]> {
-    return validGrants(await this.storage.get<unknown>(GRANTS_KEY));
-  }
-
-  /** The only way to write grants. `update` sees the current grants and returns the new ones. */
-  private async updateGrants<R>(update: (grants: Grant[]) => { next: Grant[] | null; result: R }): Promise<R> {
-    let result!: R;
-    await updateStored(this.storage, GRANTS_KEY, (raw) => {
-      const outcome = update(validGrants(raw));
-      result = outcome.result;
-      return outcome.next;
-    });
-    return result;
   }
 
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
@@ -262,7 +245,7 @@ export class ApprovalHandler {
    * still waiting in an approval window (`revokeGrant`, `grantLapsed`).
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
-    return activeGrant(await this.loadGrants(), origin);
+    return this.grants.findActive(origin);
   }
 
   /**
@@ -1080,7 +1063,7 @@ export class ApprovalHandler {
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {
     if (entry.request.kind === "connect") {
-      return this.createGrant(entry);
+      return this.grants.createFromConnect(entry);
     }
     if (entry.request.kind === "addToken") {
       return this.addToken(entry);
@@ -1088,64 +1071,12 @@ export class ApprovalHandler {
     return this.performSigning(entry);
   }
 
-  private async createGrant(entry: PendingApprovalRecord): Promise<{ granted: PermissionType[] }> {
-    const preview = entry.request.preview as ConnectApprovalPreview;
-    const name = preview.appInfo?.name ?? null;
-    return this.mergeGrant(entry.request.origin, entry.walletId, preview.requestedPermissions, {
-      icon: entry.siteIcon ?? null,
-      name: name !== null && !UNSAFE_TEXT.test(name) ? name : null,
-    });
-  }
-
   /**
    * Grants `origin` from the popup's "Use Gleam here", where the user
    * picked the permissions themselves, so no approval window opens.
    */
-  async grantSite(req: { origin: string; permissions: PermissionType[]; favIconUrl?: string | null }): Promise<Grant> {
-    const permissions = Array.isArray(req.permissions) ? [...new Set(req.permissions.filter(isPermissionType))] : [];
-    if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
-    await this.mergeGrant(req.origin, null, permissions, { icon: safeSiteIconUrl(req.favIconUrl), name: null });
-    const grant = await this.findActiveGrant(req.origin);
-    if (!grant) throw new Error(dappError(`Couldn't save the grant for "${req.origin}".`));
-    return grant;
-  }
-
-  private async mergeGrant(
-    origin: string,
-    walletId: string | null,
-    requested: readonly PermissionType[],
-    site: { icon: string | null; name: string | null },
-  ): Promise<{ granted: PermissionType[] }> {
-    const grantWalletId = walletId ?? (await this.activeWalletId());
-    if (!grantWalletId) {
-      throw new Error(userErrorMessage("noWalletToConnect"));
-    }
-    if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
-      throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
-    }
-    return this.updateGrants((grants) => {
-      const withoutExisting = grants.filter((grant) => grant.origin !== origin);
-      // A connect from an already-connected origin only asks for what the
-      // grant lacks, so approving it adds to the grant instead of narrowing it.
-      const existing = activeGrant(grants, origin);
-      const permissions = [...(existing?.permissions ?? [])];
-      for (const permission of requested) {
-        if (!permissions.includes(permission)) permissions.push(permission);
-      }
-
-      const grant: Grant = {
-        origin,
-        walletId: grantWalletId,
-        permissions,
-        createdAt: Date.now(),
-        expiresAt: null,
-        budget: null,
-        icon: site.icon ?? existing?.icon ?? null,
-        name: site.name ?? existing?.name ?? null,
-      };
-
-      return { next: [...withoutExisting, grant], result: { granted: grant.permissions } };
-    });
+  grantSite(req: { origin: string; permissions: PermissionType[]; favIconUrl?: string | null }): Promise<Grant> {
+    return this.grants.grantSite(req);
   }
 
   /**
@@ -1307,7 +1238,7 @@ export class ApprovalHandler {
    * origins, which should be told they're disconnected.
    */
   async revokeAllAccess(reason = "The wallet was reset."): Promise<string[]> {
-    const origins = await this.updateGrants((grants) => ({ next: null, result: grants.map((grant) => grant.origin) }));
+    const origins = await this.grants.revokeAll();
     await this.rejectPendingWhere(() => true, reason);
     return origins;
   }
@@ -1346,15 +1277,12 @@ export class ApprovalHandler {
    * is done (`withheldIfLapsed`).
    */
   async revokeGrant(req: { origin: string }): Promise<void> {
-    await this.updateGrants((grants) => ({
-      next: grants.filter((grant) => grant.origin !== req.origin),
-      result: undefined,
-    }));
+    await this.grants.revoke(req.origin);
     await this.rejectPendingWhere((entry) => needsGrant(entry) && entry.request.origin === req.origin, SITE_DISCONNECTED);
   }
 
   /** Read-only list of connected origins, for the `connected-apps` popup view. */
   async getConnectedApps(): Promise<Grant[]> {
-    return this.loadGrants();
+    return this.grants.load();
   }
 }
