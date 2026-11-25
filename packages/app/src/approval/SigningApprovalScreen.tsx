@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { useT, type MessageKey, type TFunction } from "../i18n";
 import { formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
@@ -15,6 +14,7 @@ import { requestTypeText, transferRequestFromPreview, type TransferContext } fro
 import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
 import { Field, FieldLabel } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
 
 /**
  * The highest-stakes screen in the product. A request that moves value
@@ -219,21 +219,13 @@ export function SigningApprovalScreen({
 
         {errorLine}
 
-        <div className="mt-auto flex gap-2.5 pt-1">
-          <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            {t("approval.reject")}
-          </Button>
-          <Button
-            type="button"
-            variant={unreadable ? "destructive" : "primary"}
-            disabled={submitting}
-            aria-busy={submitting}
-            onClick={() => void handleSign()}
-            className="flex-1"
-          >
-            {submitting ? t("approval.signing") : <ArmingLabel>{actionCopy(preview, t)}</ArmingLabel>}
-          </Button>
-        </div>
+        <ApprovalActions
+          onReject={onReject}
+          confirmVariant={unreadable ? "destructive" : "primary"}
+          submitting={submitting}
+          onConfirm={() => void handleSign()}
+          confirmLabel={submitting ? t("approval.signing") : <ArmingLabel>{actionCopy(preview, t)}</ArmingLabel>}
+        />
       </div>
     </div>
   );

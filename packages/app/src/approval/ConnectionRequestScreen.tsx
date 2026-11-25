@@ -2,13 +2,13 @@ import { useState } from "react";
 
 import { hostnameOf } from "../hostname";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { AccountAvatar, MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey } from "../i18n";
 import { UntrustedText } from "./UntrustedText";
 import { ArmingLabel } from "./ArmingLabel";
 import { Field } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
 
 /**
  * Ports `connection-request.html` (6.1): origin identity, "wants to:"
@@ -121,14 +121,12 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
           </div>
         </div>
 
-        <div className="mt-auto flex gap-2.5">
-          <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            {t("approval.reject")}
-          </Button>
-          <Button type="button" variant="primary" onClick={onGrant} className="flex-1">
-            <ArmingLabel>{t("approval.grant")}</ArmingLabel>
-          </Button>
-        </div>
+        <ApprovalActions
+          padTop={false}
+          onReject={onReject}
+          onConfirm={onGrant}
+          confirmLabel={<ArmingLabel>{t("approval.grant")}</ArmingLabel>}
+        />
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ import { useT, type MessageKey } from "../i18n";
 import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
 import { Field } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every
@@ -271,20 +272,13 @@ function AttestationReview({
         </p>
       ) : null}
 
-      <div className="mt-auto flex gap-2.5 pt-1">
-        <Button type="button" variant="secondary" disabled={submitting} onClick={onReject} className="flex-1">
-          {t("approval.reject")}
-        </Button>
-        <Button
-          type="button"
-          disabled={submitting}
-          aria-busy={submitting}
-          onClick={() => void handleSign()}
-          className="flex-1"
-        >
-          {submitting ? t("approval.signing") : <ArmingLabel>{t("approval.sign")}</ArmingLabel>}
-        </Button>
-      </div>
+      <ApprovalActions
+        onReject={onReject}
+        disableRejectWhileSubmitting
+        submitting={submitting}
+        onConfirm={() => void handleSign()}
+        confirmLabel={submitting ? t("approval.signing") : <ArmingLabel>{t("approval.sign")}</ArmingLabel>}
+      />
     </div>
   );
 }

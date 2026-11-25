@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { AddTokenApprovalPreview } from "@gleam/core";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
@@ -9,6 +8,7 @@ import { RequestHeader } from "../transfer-review/RequestHeader";
 import { ArmingLabel } from "./ArmingLabel";
 import { UntrustedText } from "./UntrustedText";
 import { Field } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -88,21 +88,12 @@ export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: A
           </div>
         ) : null}
 
-        <div className="mt-auto flex gap-2.5 pt-1">
-          <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            {t("approval.reject")}
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            disabled={submitting}
-            aria-busy={submitting}
-            onClick={() => void handleAdd()}
-            className="flex-1"
-          >
-            {submitting ? t("approval.adding") : <ArmingLabel>{t("approval.addToken")}</ArmingLabel>}
-          </Button>
-        </div>
+        <ApprovalActions
+          onReject={onReject}
+          submitting={submitting}
+          onConfirm={() => void handleAdd()}
+          confirmLabel={submitting ? t("approval.adding") : <ArmingLabel>{t("approval.addToken")}</ArmingLabel>}
+        />
       </div>
     </div>
   );
