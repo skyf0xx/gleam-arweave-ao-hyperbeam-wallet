@@ -5,19 +5,23 @@
 // own approval window, so rounds are signed one click at a time.
 import {
   STORE_URL,
-  appAttestHref,
   $,
+  el,
+  formatPoints,
+} from "./scan-lib.js";
+import {
+  appAttestHref,
   checkGleam,
   decodeAttestationLink,
   describeOutcome,
-  el,
-  formatPoints,
   isFinal,
-  resultsHref,
   roundSummary,
   sendAttestation,
   sumPoints,
-} from "./scan-lib.js";
+} from "./scan-attest.js";
+import {
+  resultsHref,
+} from "./scan-api.js";
 
 const link = decodeAttestationLink(location.hash);
 const result = $("[data-result]");

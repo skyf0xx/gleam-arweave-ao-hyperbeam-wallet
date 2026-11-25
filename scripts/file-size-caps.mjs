@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Files past MAX_LINES when the limit came in, capped at their size then.
  * A cap may only come down: split the file (CLAUDE.md § One reason to
@@ -6,6 +7,7 @@
 export const MAX_LINES = 400;
 /** @type {Record<string, number>} */
 export const FILE_SIZE_CAPS = {
+  // Classic scripts shared through window; splitting waits on moving the site to ES modules (todo.md).
   "apps/site/gleam.js": 1716,
   "apps/site/program.js": 713,
   "eslint.config.js": 583,
@@ -16,6 +18,5 @@ export const FILE_SIZE_CAPS = {
   "packages/runtime/src/handlers/approval.ts": 981,
   // What is left handles key material, which stays in the one file the signer fence allows.
   "packages/runtime/src/handlers/wallet-lifecycle.ts": 566,
-  "apps/site/scan-lib.js": 427,
   "scripts/check-bundles.mjs": 434,
 };

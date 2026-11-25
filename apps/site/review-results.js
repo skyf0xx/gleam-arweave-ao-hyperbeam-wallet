@@ -6,14 +6,16 @@ import {
   areaLabel,
   coverageSummary,
   el,
-  fetchListing,
   idFromHash,
-  placesOf,
   releaseFromSearch,
   renderAreaRows,
   roundLabel,
   unusedModels,
 } from "./scan-lib.js";
+import {
+  fetchListing,
+  placesOf,
+} from "./scan-api.js";
 
 const PAGES_UP_FRONT = 5;
 const LISTING_TIMEOUT_MS = 8000;

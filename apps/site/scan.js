@@ -5,20 +5,22 @@ import {
   $,
   AGENT_LINE,
   areaRows,
-  bountyTiers,
   coverageSummary,
   el,
+  formatPoints,
+  renderAreaRows,
+  roundStepPercent,
+} from "./scan-lib.js";
+import {
+  bountyTiers,
   fetchAreas,
   fetchCount,
   fetchListing,
   fetchRewards,
-  formatPoints,
   nextScanReward,
   placesOf,
-  renderAreaRows,
   resultsHref,
-  roundStepPercent,
-} from "./scan-lib.js";
+} from "./scan-api.js";
 
 const TIMEOUT_MS = 8000;
 
