@@ -171,6 +171,7 @@ packages/app/src/screens/main-screen/src/ActivityDetailSheet.tsx A screen outsid
 packages/app/src/screens/main-screen/src/MainScreenNotice.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useNotice.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/notice.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useCollectiblesCatchUp.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/usePortfolioHistory.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useTabSwipe.ts A home screen gesture; touches no data.
 packages/app/src/screens/main-screen/src/useNetworkSettings.ts A screen outside the key, signing and approval paths.
@@ -198,6 +199,7 @@ packages/app/src/screens/settings-home/src/useTheme.ts A screen outside the key,
 packages/app/src/screens/wallet-detail/index.tsx Route entry; mounts WalletDetailView, which is listed.
 packages/app/src/screens/wallet-switcher/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/wallet-switcher/src/WalletSwitcherView.tsx Wallet list and switch buttons; switching is the listed wallet-lifecycle handler.
+packages/app/src/screens/wallet-switcher/src/useSwitchWallet.ts Calls switchWallet, the listed wallet-lifecycle handler, and updates the cached state.
 apps/mobile/src/adapters/back-button.ts Android back-button handling; an unused press minimises the app instead of closing it, keeping the unlocked session.
 apps/mobile/src/adapters/qr-scanner.ts Barcode plugin wrapper; scanned text is validated by the listed send form and shown by transfer-review.
 apps/mobile/src/adapters/store-review.ts Store review prompt; the system decides whether anything shows.
