@@ -4,3 +4,8 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 export function withRequestTimeout(fetchImpl: typeof fetch, timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS): typeof fetch {
   return ((input, init) => fetchImpl(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })) as typeof fetch;
 }
+
+/** A 2xx status. */
+export function isSuccessStatus(status: number): boolean {
+  return status >= 200 && status < 300;
+}

@@ -7,6 +7,7 @@ import { signRsaPss, verifyRsaPss } from "./rsa-pss";
 import { userErrorMessage } from "../models/user-errors";
 import { isRecord } from "../models/guards";
 import { sha256 } from "../models/bytes";
+import { isSuccessStatus } from "../models/http";
 
 /**
  * Format-2 Arweave transactions split into build, sign and apply, so a
@@ -238,7 +239,7 @@ export async function broadcastTransaction(
   for (const node of L1_TOKEN_NODE_URLS) {
     try {
       const response = await postTransaction(node, signed);
-      if (response.status >= 200 && response.status < 300) return response;
+      if (isSuccessStatus(response.status)) return response;
     } catch {
       // Try the next node; the gateway's answer is the one worth reporting.
     }

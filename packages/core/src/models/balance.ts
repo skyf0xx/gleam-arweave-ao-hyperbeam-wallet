@@ -60,3 +60,12 @@ export interface TokenBalance {
    */
   logoUrl?: string | null;
 }
+
+/**
+ * `value` as an atomic-integer string: a string matching `pattern` (digits
+ * only by default) or a non-negative safe integer; `null` for anything else.
+ */
+export function atomicString(value: unknown, pattern: RegExp = /^\d+$/): string | null {
+  const text = typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? String(value) : value;
+  return typeof text === "string" && pattern.test(text) ? text : null;
+}

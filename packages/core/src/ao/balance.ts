@@ -1,4 +1,4 @@
-import type { TokenBalance } from "../models/balance";
+import { atomicString, type TokenBalance } from "../models/balance";
 import { L1_TOKEN_NODE_URLS, trimTrailingSlashes } from "../models/network";
 import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
@@ -76,39 +76,23 @@ function parseBalanceResponse(
   processId: string,
   address: string,
 ): TokenBalance {
-  if (typeof body === "string" && /^\d+$/.test(body)) {
+  const bare = atomicString(body);
+  if (bare !== null) {
     return {
       address,
       processId,
       ticker: processId,
       denomination: AO_TOKEN_DENOMINATION,
       name: null,
-      quantity: body,
-    };
-  }
-
-  if (typeof body === "number" && Number.isSafeInteger(body) && body >= 0) {
-    return {
-      address,
-      processId,
-      ticker: processId,
-      denomination: AO_TOKEN_DENOMINATION,
-      name: null,
-      quantity: String(body),
+      quantity: bare,
     };
   }
 
   if (isRecord(body)) {
     const candidate = body;
-    const rawQuantity = candidate.balance ?? candidate.quantity;
-    const quantity =
-      typeof rawQuantity === "string"
-        ? rawQuantity
-        : typeof rawQuantity === "number" && Number.isSafeInteger(rawQuantity) && rawQuantity >= 0
-          ? String(rawQuantity)
-          : undefined;
+    const quantity = atomicString(candidate.balance ?? candidate.quantity);
 
-    if (quantity !== undefined && /^\d+$/.test(quantity)) {
+    if (quantity !== null) {
       return {
         address,
         processId,

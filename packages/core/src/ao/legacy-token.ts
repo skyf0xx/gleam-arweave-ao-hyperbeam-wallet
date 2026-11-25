@@ -3,6 +3,7 @@ import { userErrorMessage } from "../models/user-errors";
 import { trimTrailingSlashes } from "../models/network";
 import { isPlainRecord } from "../models/guards";
 import { tagValue, type Tag } from "../models/tag";
+import { atomicString } from "../models/balance";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -53,9 +54,7 @@ async function dryRun(processId: string, tags: Tag[], cuUrl: string, fetchImpl: 
 }
 
 function atomic(value: unknown): string | null {
-  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
-  if (typeof value === "string" && /^\d+$/.test(value.trim())) return value.trim();
-  return null;
+  return atomicString(typeof value === "string" ? value.trim() : value);
 }
 
 /** The atomic balance `address` holds on legacy token `processId`, from its `Balance` handler's reply. */

@@ -1,6 +1,7 @@
 import { trimTrailingSlashes } from "../models/network";
 import { isPlainRecord, isRecord } from "../models/guards";
 import { isArweaveId } from "../models/arweave-id";
+import { atomicString } from "../models/balance";
 /**
  * Spot price of an AO token from its own swap orderbook, the way Bazar
  * shows "Current unit price": the lowest open ask in the token process's
@@ -77,8 +78,8 @@ function link(value: unknown): string | null {
 }
 
 function atomic(value: unknown): bigint | null {
-  const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value;
-  return typeof text === "string" && UINT.test(text) ? BigInt(text) : null;
+  const text = atomicString(value, UINT);
+  return text === null ? null : BigInt(text);
 }
 
 async function readOrder(

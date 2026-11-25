@@ -1,5 +1,6 @@
 import forge from "node-forge";
 import type { JWKInterface } from "../models/wallet";
+import { bytesToBase64Url } from "../vault/base64";
 
 /**
  * Derives the Arweave RSA-4096 key that Wander and arweave.app derive from
@@ -55,9 +56,7 @@ function bigIntegerToBase64Url(value: forge.jsbn.BigInteger): string {
   let start = 0;
   while (start < signed.length - 1 && signed[start] === 0) start++;
   const bytes = Uint8Array.from(signed.slice(start), (byte) => byte & 0xff);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return bytesToBase64Url(bytes);
 }
 
 /**

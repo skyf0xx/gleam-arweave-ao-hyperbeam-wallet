@@ -9,6 +9,7 @@ import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
 import { userErrorMessage } from "../models/user-errors";
 import { isArweaveId } from "../models/arweave-id";
+import { isSuccessStatus } from "../models/http";
 
 /**
  * Builds an AR transfer from the owner's public key (`prepareTransfer`)
@@ -89,7 +90,7 @@ export async function finishTransfer(
 ): Promise<SubmittedTransfer> {
   const { id, transaction } = await applyTransactionSignature(unsigned, signature, expectedOwner);
   const response = await broadcastTransaction(gatewayUrl, transaction);
-  if (response.status < 200 || response.status >= 300) {
+  if (!isSuccessStatus(response.status)) {
     throw new Error(
       userErrorMessage("transferSubmitFailed", { gateway: gatewayUrl, status: response.status, statusText: response.statusText }),
     );

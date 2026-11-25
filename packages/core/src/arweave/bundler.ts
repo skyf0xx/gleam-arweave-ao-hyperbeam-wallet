@@ -1,5 +1,6 @@
 import { userErrorMessage } from "../models/user-errors";
 import { trimTrailingSlashes } from "../models/network";
+import { isSuccessStatus } from "../models/http";
 
 /**
  * POSTs an already-signed ANS-104 data item's raw bytes to
@@ -16,7 +17,7 @@ export async function postDataItemToBundler(bundlerUrl: string, rawBytes: Uint8A
     body: rawBytes,
   });
 
-  if (response.status < 200 || response.status >= 300) {
+  if (!isSuccessStatus(response.status)) {
     throw new Error(
       userErrorMessage("bundlerSubmitFailed", { bundler: bundlerUrl, status: response.status, statusText: response.statusText }),
     );
