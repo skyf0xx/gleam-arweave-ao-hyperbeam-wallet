@@ -1,56 +1,33 @@
-import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { explorerUrlFor, isWatchWalletMethod, type ActivityEntry, type Collectible, type CollectibleRef, type DisplayCurrency, type PendingAmounts, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
-import {
-  DEFAULT_AO_TOKEN,
-  DEFAULT_AR_TOKEN,
-  LoadingBar,
-  PullToRefreshIndicator,
-  useFreshAfterCache,
-  usePullToRefresh,
-} from "@gleam/ui";
-import {
-  AccountAvatar,
-  ActivityRow,
-  EmptyState,
-  PortfolioChart,
-  SendReceiveActions,
-  SkeletonRow,
-  TokenRow,
-} from "@gleam/ui/src/components/wallet/index.ts";
+import { isWatchWalletMethod, type Collectible, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type WalletSummary } from "@gleam/core";
+import { LoadingBar, PullToRefreshIndicator, useFreshAfterCache, usePullToRefresh } from "@gleam/ui";
+import { PortfolioChart, SendReceiveActions } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue, formatPercent, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
-import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
-import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
-import { cn } from "@gleam/ui/src/primitives/cn.ts";
-import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "./formatWinston";
-import { useAddressIdentity } from "../../../address-identity";
-import { useLocale, useT, type TFunction } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
 import { CollectiblesGallery } from "../../collectibles/index.tsx";
-import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
+import { useBalances } from "../../activity/src/useBalances";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { PANEL_GAP_PX, useTabSwipe } from "./useTabSwipe";
-import { SHEET_EASING, useUndockPull } from "./useUndockPull";
+import { useListDock } from "./useListDock";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useContacts } from "../../activity/src/useContacts";
-import { ActivityDetailSheet, type ActivityDetail } from "./ActivityDetailSheet";
 import { useOrderbookPrices, useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
 import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/index.tsx";
-import { PointsTokenRow } from "../../points/index.tsx";
-import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
-import { readRowVisibility, shownTokenLogo, writeRowVisibility, type RowVisibility } from "../../../token-visibility";
-import { relativeTime } from "../../../relative-time";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
-import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
-import { BackIcon } from "@gleam/ui/src/primitives/icons.tsx";
-import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ActivityPanel } from "./ActivityPanel";
+import { HomeHeader } from "./HomeHeader";
+import { readPortfolioRange, readPortfolioScope, writePortfolioRange, writePortfolioScope } from "./portfolioPrefs";
+import { buildDefaultTokenRows, orderbookHoldingsValue, pricedTokenIds, restoredCache, unavailableBalanceLabel, waiting } from "./tokenRows";
+import { TokensPanel } from "./TokensPanel";
+import { useTokenRowControls } from "./useTokenRowControls";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -144,329 +121,6 @@ export interface MainScreenViewProps {
   initialTab?: MainScreenTab;
   onTabChange?: (tab: MainScreenTab) => void;
 }
-
-/**
- * A default (AR/AO) row carries enough to render a `TokenRow` and to be
- * clicked into the send flow: `"ar"` opens it for AR, a `TokenBalance`
- * for that AO token, and `null` leaves the row unclickable (an AO balance
- * that isn't loaded or couldn't be read).
- */
-interface DefaultTokenRow {
-  key: string;
-  ticker: string;
-  name: string;
-  logoUrl: string;
-  amount: string;
-  pending?: PendingAmounts;
-  /** `amount` in display units, only for drawing a tick between two figures; `undefined` when there's no figure. */
-  amountNumber: number | undefined;
-  value: { text: string; number: number } | undefined;
-  /** The price of one token, unless the display currency is that token or there's no holding to multiply. */
-  unitPrice: string | undefined;
-  change: number | undefined;
-  send: "ar" | TokenBalance | null;
-}
-
-/**
- * Shown in place of a formatted amount for a `TokenBalance` whose
- * `available` is `false` (`handlers/reads.ts`: a failed HyperBEAM read, or
- * a non-AO token whose denomination couldn't be confirmed) — never a
- * guessed quantity, which for a wrong denomination could be off by orders
- * of magnitude.
- */
-// Compared by value below, so it is resolved at render time in the language in use.
-const unavailableBalanceLabel = (t: TFunction): string => t("mainScreen.unavailable");
-
-/** `0.2 sending`, `+0.5 arriving`, or both. With balances hidden the amounts go, and the words stay. */
-function pendingNote(t: TFunction, pending: PendingAmounts | undefined, denomination: number, masked: boolean): string | null {
-  if (!pending) return null;
-  const notes: string[] = [];
-  if (pending.outgoing !== "0") notes.push(masked ? t("mainScreen.sending") : t("mainScreen.sendingAmount", { amount: formatAtomicCompact(pending.outgoing, denomination) }));
-  if (pending.incoming !== "0") notes.push(masked ? t("mainScreen.arriving") : t("mainScreen.arrivingAmount", { amount: formatAtomicCompact(pending.incoming, denomination) }));
-  return notes.length > 0 ? notes.join(t("mainScreen.noteSeparator")) : null;
-}
-
-function withPendingNote(amount: string, note: string | null): ReactNode {
-  if (note === null) return amount;
-  return (
-    <>
-      {amount} · <span className="font-medium text-foreground">{note}</span>
-    </>
-  );
-}
-
-// The rest of the history is one click away through "View all".
-const ACTIVITY_PREVIEW_LIMIT = 6;
-
-/**
- * Looks up a token's price (by AO `processId`, or `null` for AR) from
- * `useTokenPrices()`'s cache and formats `amount * price` in the display
- * currency — `undefined` when the price isn't loaded yet or couldn't be
- * computed (`TokenPrice.price === null`, per that query's own HONESTY
- * contract), so `TokenRow` renders no value line rather than a fabricated
- * `$0.00`.
- */
-function valueFor(
-  prices: TokenPrice[] | undefined,
-  currency: DisplayCurrency | undefined,
-  processId: string | null,
-  amount: number,
-): { text: string; number: number } | undefined {
-  const price = prices?.find((entry) => entry.processId === processId)?.price;
-  if (typeof price !== "number" || !currency) return undefined;
-  const number = amount * price;
-  return { text: formatCurrencyValue(number, currency), number };
-}
-
-function unitPriceFor(
-  prices: TokenPrice[] | undefined,
-  currency: DisplayCurrency | undefined,
-  processId: string | null,
-  ticker: string,
-  amount: number,
-): string | undefined {
-  const price = prices?.find((entry) => entry.processId === processId)?.price;
-  if (typeof price !== "number" || !currency || currency === ticker || amount === 0) return undefined;
-  return formatCurrencyValue(price, currency);
-}
-
-function changeFor(prices: TokenPrice[] | undefined, processId: string | null): number | undefined {
-  return prices?.find((entry) => entry.processId === processId)?.change24h ?? undefined;
-}
-
-/** No data yet and either a first read in flight or a failed one waiting on its retry, so nothing is shown as zero. */
-function waiting(query: { isLoading: boolean; isError: boolean; data: unknown }): boolean {
-  return query.isLoading || (query.isError && query.data === undefined);
-}
-
-/**
- * Whether a query still shows data from before this screen opened.
- * Keyed on the data, not the status: a refetch that fails (status error) keeps the old data, and it stays old.
- */
-function restoredCache(query: { data: unknown; dataUpdatedAt: number }, openedAt: number): boolean {
-  return query.data !== undefined && query.dataUpdatedAt < openedAt;
-}
-
-/**
- * Builds the AR/AO default rows always shown at the top of the Tokens tab.
- * Reads straight off `useBalances()`'s cache: `undefined`
- * `data` (not yet loaded) or no matching `TokenBalance` entry both fall
- * back to `DEFAULT_TOKENS`' own `"0"` constant, never `null`/`undefined`.
- */
-function buildDefaultTokenRows(
-  t: TFunction,
-  data: WalletBalances | undefined,
-  prices: TokenPrice[] | undefined,
-  currency: DisplayCurrency | undefined,
-): DefaultTokenRow[] {
-  const aoBalance = data?.tokenBalances.find((token) => token.processId === DEFAULT_AO_TOKEN.processId);
-  const aoAvailable = aoBalance !== undefined && aoBalance.available !== false;
-  const arAmount = data?.arBalance !== undefined ? Number(formatWinstonAsAr(data.arBalance, 12)) : 0;
-  const aoAmount = aoAvailable ? Number(formatAtomicAsDisplay(aoBalance.quantity, aoBalance.denomination, aoBalance.denomination)) : 0;
-
-  return [
-    {
-      key: "default-ar",
-      ticker: DEFAULT_AR_TOKEN.ticker,
-      name: DEFAULT_AR_TOKEN.name,
-      logoUrl: DEFAULT_AR_TOKEN.logoUrl,
-      amount: data?.arBalance !== undefined ? formatAtomicCompact(data.arBalance, 12) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
-      pending: data?.arPending,
-      amountNumber: data?.arBalance !== undefined ? arAmount : undefined,
-      value: data?.arBalance !== undefined ? valueFor(prices, currency, null, arAmount) : undefined,
-      unitPrice: data?.arBalance !== undefined ? unitPriceFor(prices, currency, null, DEFAULT_AR_TOKEN.ticker, arAmount) : undefined,
-      change: data?.arBalance !== undefined ? changeFor(prices, null) : undefined,
-      send: "ar",
-    },
-    {
-      key: "default-ao",
-      ticker: DEFAULT_AO_TOKEN.ticker,
-      name: DEFAULT_AO_TOKEN.name,
-      logoUrl: DEFAULT_AO_TOKEN.logoUrl,
-      amount: aoAvailable
-        ? formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
-        : aoBalance
-          ? unavailableBalanceLabel(t)
-          : DEFAULT_AO_TOKEN.defaultDisplayAmount,
-      pending: aoAvailable ? aoBalance.pending : undefined,
-      amountNumber: aoAvailable ? aoAmount : undefined,
-      value: aoAvailable ? valueFor(prices, currency, DEFAULT_AO_TOKEN.processId, aoAmount) : undefined,
-      unitPrice: aoAvailable ? unitPriceFor(prices, currency, DEFAULT_AO_TOKEN.processId, DEFAULT_AO_TOKEN.ticker, aoAmount) : undefined,
-      change: aoAvailable ? changeFor(prices, DEFAULT_AO_TOKEN.processId) : undefined,
-      send: aoAvailable ? (aoBalance ?? null) : null,
-    },
-  ];
-}
-
-/**
- * The non-default watched tokens rendered below the AR/AO rows — every
- * `TokenBalance` whose `processId` isn't the AO default. These have no
- * entry in `DEFAULT_TOKEN_REGISTRY`, so they carry a price only when
- * `useOrderbookPrices` found one; otherwise `valueFor` resolves
- * `undefined` and the row shows no value line.
- */
-function nonDefaultTokenBalances(data: WalletBalances | undefined): TokenBalance[] {
-  return (data?.tokenBalances ?? []).filter((token) => token.processId !== DEFAULT_AO_TOKEN.processId);
-}
-
-/**
- * The tokens worth asking an orderbook about: ones the user added, whose
- * balance resolved. A discovered token's name and logo are the sender's
- * claim, so its price would be too.
- */
-function pricedTokenIds(data: WalletBalances | undefined): string[] {
-  return nonDefaultTokenBalances(data)
-    .filter((token) => token.source !== "discovered" && token.available !== false)
-    .map((token) => token.processId)
-    .sort();
-}
-
-/**
- * What the priced orderbook tokens are worth now. The chart's history only
- * covers AR and AO, so without this the total reads lower than the rows
- * under it.
- */
-function orderbookHoldingsValue(data: WalletBalances | undefined, prices: TokenPrice[] | undefined, currency: DisplayCurrency | undefined): number {
-  return nonDefaultTokenBalances(data)
-    .filter((token) => token.source !== "discovered" && token.available !== false)
-    .reduce((sum, token) => {
-      const amount = Number(formatAtomicAsDisplay(token.quantity, token.denomination, token.denomination));
-      return sum + (valueFor(prices, currency, token.processId, amount)?.number ?? 0);
-    }, 0);
-}
-
-/**
- * `ActivityEntry` carries only the AO token's processId, not its
- * denomination, so an AO entry's amount is scaled using the matching
- * live balance instead. Falls back to the raw atomic amount and a
- * shortened processId when no matching balance is loaded, rather than
- * mislabeling the entry as AR.
- *
- * A `match` whose `available` is `false` (`handlers/reads.ts`: failed
- * HyperBEAM read, or unconfirmed non-AO denomination) is treated the same
- * as no match — its `denomination` can't be trusted to scale
- * `entry.amount`, which would otherwise show the same guessed-by-orders-
- * of-magnitude number the "unavailable" state exists to prevent. Its
- * `ticker` is still used when resolved (not just an echoed process id),
- * since identity can be known even when the balance isn't.
- */
-function formatActivityAmount(entry: { amount: string | null; token?: string | null }, tokenBalances: TokenBalance[] | undefined): string {
-  if (entry.amount === null) return "—";
-  if (!entry.token) return `${formatAtomicCompact(entry.amount, 12)} AR`;
-
-  const match = tokenBalances?.find((token) => token.processId === entry.token);
-  if (match && match.available !== false) {
-    return `${formatAtomicCompact(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
-  }
-
-  const ticker = match && match.ticker !== entry.token ? match.ticker : entry.token;
-  return `${entry.amount} ${displayTicker(ticker)}`;
-}
-
-/**
- * A swap order names the asset by its ticker when the user added it, else
- * by a shortened process id: a discovered token's ticker is its own claim.
- */
-function swapAssetLabel(processId: string, tokenBalances: TokenBalance[] | undefined): string {
-  const match = tokenBalances?.find((token) => token.processId === processId);
-  return match && match.source !== "discovered" && match.ticker !== processId ? displayTicker(match.ticker) : truncateAddress(processId, 6);
-}
-
-/** A gateway-only entry knows just the asset's process id. */
-function collectibleLabel(t: TFunction, collectible: CollectibleRef): string {
-  return collectible.name ?? t("mainScreen.collectible");
-}
-
-// A per-device view preference, so plain localStorage; it can throw or be empty in some contexts.
-const PORTFOLIO_SCOPE_STORAGE_KEY = "gleam:portfolioScope";
-
-function readPortfolioScope(): PortfolioScope {
-  try {
-    return window.localStorage.getItem(PORTFOLIO_SCOPE_STORAGE_KEY) === "all" ? "all" : "wallet";
-  } catch {
-    return "wallet";
-  }
-}
-
-function writePortfolioScope(scope: PortfolioScope): void {
-  try {
-    window.localStorage.setItem(PORTFOLIO_SCOPE_STORAGE_KEY, scope);
-  } catch {
-    // Not persisting only means the next open starts on this wallet.
-  }
-}
-
-const PORTFOLIO_RANGE_STORAGE_KEY = "gleam:portfolioRange";
-const PORTFOLIO_RANGES: readonly PortfolioHistoryRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
-
-function readPortfolioRange(): PortfolioHistoryRange {
-  try {
-    const stored = window.localStorage.getItem(PORTFOLIO_RANGE_STORAGE_KEY);
-    return PORTFOLIO_RANGES.find((range) => range === stored) ?? "7D";
-  } catch {
-    return "7D";
-  }
-}
-
-function writePortfolioRange(range: PortfolioHistoryRange): void {
-  try {
-    window.localStorage.setItem(PORTFOLIO_RANGE_STORAGE_KEY, range);
-  } catch {
-    // Not persisting only means the next open starts on 7D.
-  }
-}
-
-interface ListedTokenRow {
-  key: string;
-  label: string;
-  defaultHidden: boolean;
-  /** Set only on a token that Manage tokens can add back by id, so only those can be ignored. */
-  processId?: string;
-  node: ReactNode;
-}
-
-/** Scroll distance (px) past which the header collapses to its compact form. */
-const HEADER_COLLAPSE_THRESHOLD_PX = 24;
-
-/**
- * Header fade duration (ms) — also drives how long the tokens/activity
- * section waits before it detaches and floats to the top, so the two
- * motions read as sequential (fade, then float) rather than overlapping.
- * Kept as one constant so the JS delay and the CSS `duration-300` on the
- * header's opacity transition can't drift out of sync.
- */
-const HEADER_FADE_DURATION_MS = 300;
-
-/**
- * Resting `top` (px) for the docked tokens/activity section — matches the
- * pinned account-pill/settings row's rendered height (`top-16` below),
- * kept as one constant so the Tailwind class and the slide-in offset math
- * can't drift out of sync.
- */
-const LIST_DOCK_TOP_PX = 64;
-
-/** The undock slide: a little quicker than the dock (320ms in theme.css), since leaving is faster than arriving. */
-const LIST_UNDOCK_DURATION_MS = 280;
-
-/**
- * One of the home header's two states. Shown, it sits in the row; hidden, it is lifted out to the row's left edge
- * (or across it, with `inset`), faded and unreachable. Opacity and a 4px rise run as transitions, so a swap is a
- * cross-fade with the same small lift whatever the scroll did.
- */
-function headerLayer(shown: boolean, inFlow: string, inset?: string) {
-  const place = inset ?? "left-5";
-  return {
-    "aria-hidden": shown ? undefined : true,
-    inert: !shown,
-    className: [
-      "items-center transition-[opacity,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-      inset ? `absolute top-4 bottom-2.5 flex justify-center phone:inset-y-0 ${place}` : shown ? inFlow : `absolute top-4 bottom-2.5 phone:inset-y-0 ${place} ${inFlow}`,
-      // `starting:` fades in a layer that mounts already shown.
-      shown ? "opacity-100 starting:translate-y-1 starting:opacity-0" : "pointer-events-none translate-y-1 opacity-0",
-    ].join(" "),
-  };
-}
-
 export function MainScreenView({
   runtime,
   wallet,
@@ -493,69 +147,25 @@ export function MainScreenView({
   // Discovery is slow, so it starts on first open rather than with the main screen.
   const [collectiblesOpened, setCollectiblesOpened] = useState(initialTab === "collectibles");
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
-  const [listDocked, setListDocked] = useState(false);
-  /** The top bar's summary stays mounted while it fades out, then leaves so its figures aren't on the page twice. */
-  const [summaryLingers, setSummaryLingers] = useState(false);
   const [hiddenExpanded, setHiddenExpanded] = useState(initialTokenEditing);
-  // Tagged with its address so a wallet switch reads that wallet's choices without an effect.
-  const [storedVisibility, setStoredVisibility] = useState(() => ({
-    address: wallet.address,
-    rows: readRowVisibility(wallet.address),
-  }));
-  const rowVisibility =
-    storedVisibility.address === wallet.address ? storedVisibility.rows : readRowVisibility(wallet.address);
-  const isRowHidden = (row: ListedTokenRow) =>
-    rowVisibility[row.key] === "hidden" || (rowVisibility[row.key] !== "shown" && row.defaultHidden);
-  const toggleRowHidden = (row: ListedTokenRow) => {
-    const rows: RowVisibility = { ...rowVisibility, [row.key]: isRowHidden(row) ? "shown" : "hidden" };
-    setStoredVisibility({ address: wallet.address, rows });
-    writeRowVisibility(wallet.address, rows);
-  };
+  const {
+    headerCollapsed,
+    listDocked,
+    summaryLingers,
+    listSectionRef,
+    headerRef,
+    listDockOffsetRef,
+    scrollListToDockedTop,
+    returnHome,
+  } = useListDock(() => {
+    setActiveTab("tokens");
+    setHiddenExpanded(false);
+    onTabChange?.("tokens");
+  });
+  const controls = useTokenRowControls(runtime, wallet.address);
+  const { confirmingIgnore, setConfirmingIgnore } = controls;
   const queryClient = useQueryClient();
-  // A set, so several rows can wait on their confirm at once.
-  const [confirmingIgnore, setConfirmingIgnore] = useState<ReadonlySet<string>>(() => new Set());
-  const [ignoreFailed, setIgnoreFailed] = useState(false);
-  const setConfirming = (processId: string, on: boolean) =>
-    setConfirmingIgnore((current) => {
-      const next = new Set(current);
-      if (on) next.add(processId);
-      else next.delete(processId);
-      return next;
-    });
-  const ignoreToken = async (processId: string) => {
-    setIgnoreFailed(false);
-    setConfirming(processId, false);
-    const balancesKey = walletQueryKeys.balances(wallet.address);
-    // The row goes now: waiting on a full balance read (every token process, then discovery) took seconds.
-    // A read already in flight started before the write, so it would bring the token back.
-    await queryClient.cancelQueries({ queryKey: balancesKey });
-    queryClient.setQueryData<WalletBalances>(balancesKey, (data) =>
-      data ? { ...data, tokenBalances: data.tokenBalances.filter((token) => token.processId !== processId) } : data,
-    );
-    try {
-      await runtime.send<{ address: string; processId: string }, void>({
-        type: "removeWatchedToken",
-        payload: { address: wallet.address, processId },
-      });
-      // Dropped so a token added back by id isn't still filed under Hidden. Read fresh: another ignore may have landed meanwhile.
-      const stored = readRowVisibility(wallet.address);
-      const rows: RowVisibility = Object.fromEntries(Object.entries(stored).filter(([key]) => key !== processId));
-      setStoredVisibility({ address: wallet.address, rows });
-      writeRowVisibility(wallet.address, rows);
-    } catch {
-      setIgnoreFailed(true);
-      void queryClient.invalidateQueries({ queryKey: balancesKey });
-    }
-  };
-  const collapseRafRef = useRef<number | null>(null);
-  const listSectionRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
   const panelTrackRef = useRef<HTMLDivElement>(null);
-  const listDockOffsetRef = useRef(0);
-  const listDockedRef = useRef(false);
-  /** Where the docked list's top sits in the viewport: under the pinned row, which a phone moves down by its status bar. */
-  const dockTop = () => (headerRef.current?.getBoundingClientRect().top ?? 0) + LIST_DOCK_TOP_PX;
   const balancesQuery = useBalances(runtime, wallet.address);
   const activityQuery = useActivity(runtime, wallet.address);
   // A collectible received since the list was fetched: refetch it, once per activity read.
@@ -595,14 +205,6 @@ export function MainScreenView({
   const nameFor = (address: string): string | undefined =>
     contactsQuery.data?.find((contact) => contact.address === address)?.name ??
     otherWalletsQuery.data?.find((other) => other.address === address)?.name;
-  const [detail, setDetail] = useState<ActivityDetail | null>(null);
-  // A send is offered only for AR or a token whose balance (and so denomination) is loaded.
-  const sendableToken = (entry: ActivityEntry): TokenBalance | null | undefined => {
-    if (entry.collectible || entry.swap || entry.type === "upload") return undefined;
-    if (!entry.token) return null;
-    const match = balancesQuery.data?.tokenBalances.find((token) => token.processId === entry.token);
-    return match && match.available !== false ? match : undefined;
-  };
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
   // With a single wallet "all" equals "wallet"; resolving it here keeps one cache entry and no toggle.
   const portfolioScope: PortfolioScope = hasOtherWallets ? preferredScope : "wallet";
@@ -651,153 +253,6 @@ export function MainScreenView({
   const headlineRow =
     displaySettings?.headline === "AR" ? defaultTokenRows[0] : displaySettings?.headline === "AO" ? defaultTokenRows[1] : undefined;
 
-  const identity = useAddressIdentity();
-  const avatarSvg = identity.avatarSvg(wallet.address);
-  const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
-
-  /**
-   * Chrome renders the popup as one continuously-growing box past its
-   * 600px ceiling (see theme.css's `[data-layout="popup"]` comment) —
-   * there's no inner scroll container, so `window.scrollY` is the only
-   * scroll position that exists here. Fades the header (chart,
-   * actions) once scrolled down past it, and un-fades on scrolling back up
-   * to the top rather than on scroll direction generally — matching the
-   * reference apps this is feature-matched against, where the compact
-   * header state tracks "am I still at the top", not "did the last
-   * gesture go up or down". The boolean flip itself is deferred to a
-   * `requestAnimationFrame` (via a ref, not state) so a burst of scroll
-   * events triggers at most one state update per frame instead of one per
-   * event.
-   */
-  useEffect(() => {
-    const handleScroll = () => {
-      if (collapseRafRef.current !== null) return;
-      collapseRafRef.current = requestAnimationFrame(() => {
-        collapseRafRef.current = null;
-        const collapsed = window.scrollY > HEADER_COLLAPSE_THRESHOLD_PX;
-        setHeaderCollapsed(collapsed);
-        // A scroll that carries the list up to its docked place docks it there and then, rather than letting it
-        // run on under the header and drop back down once the fade is over.
-        const top = listSectionRef.current?.getBoundingClientRect().top;
-        if (collapsed && !listDockedRef.current && top !== undefined && top <= dockTop() + 0.5) {
-          listDockOffsetRef.current = 0;
-          listDockedRef.current = true;
-          setListDocked(true);
-        }
-      });
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (collapseRafRef.current !== null) cancelAnimationFrame(collapseRafRef.current);
-    };
-  }, []);
-
-  /**
-   * Once the header has fully faded out, the tokens/activity section
-   * detaches from document flow (`position: fixed`) and slides up to sit
-   * flush under the account-pill/settings row — "floating" over the
-   * now-invisible header rather than the header itself shrinking. Docking
-   * is deferred until the fade transition ends (`HEADER_FADE_DURATION_MS`)
-   * so the two motions read as sequential instead of overlapping, and
-   * un-docks immediately on scrolling back up so the section returns to
-   * flow before the header starts fading back in. The measured offset is
-   * relative to the docked resting position (`LIST_DOCK_TOP_PX`, where
-   * `top` lands once fixed), not the viewport top, so the slide covers
-   * exactly the remaining distance instead of overshooting by however
-   * tall the pinned header row is.
-   */
-  useEffect(() => {
-    if (!headerCollapsed) {
-      listDockedRef.current = false;
-      setListDocked(false);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      if (listDockedRef.current) return;
-      const rect = listSectionRef.current?.getBoundingClientRect();
-      // The slide only ever rises to its place: one that starts above it would come down and read as a bounce.
-      listDockOffsetRef.current = rect ? Math.max(0, rect.top - dockTop()) : 0;
-      listDockedRef.current = true;
-      setListDocked(true);
-    }, HEADER_FADE_DURATION_MS);
-    return () => window.clearTimeout(timer);
-  }, [headerCollapsed]);
-
-  /**
-   * Undocking drops the section back into flow, below the header. It starts
-   * where it was pinned and slides down to that place, uncovering the
-   * header as it fades back in, rather than jumping there.
-   */
-  const pulledBy = useUndockPull({
-    docked: listDocked,
-    section: listSectionRef,
-    header: headerRef,
-    onUndock: () => window.scrollTo({ top: 0, behavior: "auto" }),
-  });
-  const wasDockedRef = useRef(false);
-  useLayoutEffect(() => {
-    const was = wasDockedRef.current;
-    wasDockedRef.current = listDocked;
-    const section = listSectionRef.current;
-    if (!was || listDocked || !section) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const from = dockTop() + pulledBy.current - section.getBoundingClientRect().top;
-    if (from >= 0) return;
-    const slide = section.animate?.([{ transform: `translateY(${from}px)` }, { transform: "none" }], {
-      duration: LIST_UNDOCK_DURATION_MS,
-      easing: SHEET_EASING,
-    });
-    if (!slide) return;
-    section.dataset.sliding = "";
-    const settled = () => delete section.dataset.sliding;
-    slide.onfinish = settled;
-    slide.oncancel = settled;
-  }, [listDocked, pulledBy]);
-
-  /**
-   * Back at the top, the home screen shows Tokens again, with the hidden
-   * tokens disclosure collapsed. Only an expand after a collapse counts, so
-   * a remount on a tab the caller restored (returning from a detail screen)
-   * keeps that tab.
-   */
-  const wasCollapsedRef = useRef(false);
-  useEffect(() => {
-    if (headerCollapsed) {
-      wasCollapsedRef.current = true;
-      setSummaryLingers(true);
-      return;
-    }
-    if (!wasCollapsedRef.current) return;
-    wasCollapsedRef.current = false;
-    window.setTimeout(() => setSummaryLingers(false), HEADER_FADE_DURATION_MS);
-    setActiveTab("tokens");
-    setHiddenExpanded(false);
-    onTabChange?.("tokens");
-    // onTabChange is deliberately left out: only the collapse flip should reset the tab.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [headerCollapsed]);
-
-  /**
-   * Scrolls the window until the list section reaches its docked position,
-   * so the header fades, the section docks, and the whole list has the
-   * popup to itself. Once docked, the section scrolls on its own, so this
-   * just brings that inner list back to its top. Shared by tab switches and
-   * by expanding the hidden-tokens disclosure, which both want the list in
-   * full view rather than scrolled to wherever the click happened.
-   */
-  const scrollListToDockedTop = (instant = false) => {
-    const section = listSectionRef.current;
-    if (!section) return;
-    const behavior: ScrollBehavior =
-      instant || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-    if (listDocked) {
-      section.scrollTo?.({ top: 0, behavior });
-      return;
-    }
-    const top = window.scrollY + section.getBoundingClientRect().top - dockTop();
-    window.scrollTo({ top: Math.max(top, HEADER_COLLAPSE_THRESHOLD_PX + 1), behavior });
-  };
 
   const showTab = (tab: MainScreenTab) => {
     setActiveTab(tab);
@@ -839,106 +294,34 @@ export function MainScreenView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Scrolling to the top un-collapses the header, which un-docks the list and fades the chart back in. */
-  const returnHome = () => {
-    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-    listSectionRef.current?.scrollTo?.({ top: 0 });
-    window.scrollTo({ top: 0, behavior });
-  };
-
   useBackHandler(
     confirmingIgnore.size > 0 ? () => setConfirmingIgnore(new Set()) : headerCollapsed ? returnHome : null,
   );
+
+  const summary =
+    (headerCollapsed || summaryLingers) && history && portfolioHasSeries
+      ? {
+          value: masked ? HIDDEN_AMOUNT : formatCurrencyValue(history.currentValue + extraValue, currency ?? "USD", locale),
+          percent: formatPercent(chartChange, locale),
+          change: chartChange,
+          range: selectedRange,
+        }
+      : null;
 
   return (
     <div ref={rootRef} className="flex min-h-full flex-col overflow-x-clip">
       <LoadingBar active={pullState.refreshing} />
 
-      <div ref={headerRef} className="gleam-frost-bar relative sticky top-[var(--inset-top)] z-30 flex items-center justify-between gap-2.5 bg-background px-5 pb-2.5 pt-4 phone:h-16 phone:py-0">
-        {/*
-          The two header states are both drawn and cross-fade. The one showing sits in the row; the one leaving is
-          lifted out of it at the same place, so it fades out where it was while the other fades in.
-        */}
-        <span {...headerLayer(headerCollapsed, "flex flex-shrink-0")}>
-          {/* h-9 matches the account pill's height so the row, and the list docked under it, don't shift. */}
-          <button
-            type="button"
-            aria-label={t("mainScreen.back")}
-            onClick={returnHome}
-            className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:-ml-3 phone:h-11 phone:w-11"
-          >
-            <BackIcon />
-          </button>
-        </span>
-        <span {...headerLayer(!headerCollapsed, "flex min-w-0 max-w-[calc(100%-6rem)]")}>
-          {/* The copy button can't nest inside the pill's button, so the wrapper carries the shared hover background. */}
-          <div className="group -ml-3 flex min-w-0 items-center rounded-lg pr-1 hover:bg-hover phone:ml-0 phone:pr-0">
-            <button
-              type="button"
-              onClick={onOpenWalletSwitcher}
-              aria-haspopup="dialog"
-              aria-label={t("mainScreen.accountDetails", { name: wallet.name, address: wallet.address })}
-              className="flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-1 phone:min-h-11 phone:gap-2.5"
-            >
-              <AccountAvatar svgMarkup={avatarSvg} label={t("mainScreen.avatarOf", { name: wallet.name })} size={24} />
-              <span className="truncate text-label layered:text-muted">{wallet.name}</span>
-              <span className="truncate font-mono text-label text-faint">
-                {truncateAddress(wallet.address, 6)}
-              </span>
-            </button>
-            <CopyButton
-              copied={addressCopied}
-              onCopy={copyAddress}
-              label={addressCopied ? t("mainScreen.addressCopied") : t("mainScreen.copyAddress")}
-              title={addressCopied ? t("mainScreen.copied") : t("mainScreen.copyAddress")}
-              reveal
-              tone="muted"
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target"
-            />
-          </div>
-        </span>
-
-        {(headerCollapsed || summaryLingers) && history && portfolioHasSeries ? (
-          // Centred on the header, clear of the buttons either side, so it never moves as the states trade places.
-          <span {...headerLayer(headerCollapsed, "", onOpenBrowser ? "inset-x-24" : "inset-x-14")}>
-            {/* The range tabs fade out with the chart, so the range rides along to say what the change covers. */}
-            <button
-              type="button"
-              onClick={returnHome}
-              className="flex min-w-0 flex-1 items-baseline justify-center gap-1.5 text-label tabular-nums text-muted phone:min-h-11 phone:items-center"
-            >
-              <span className="truncate font-semibold text-foreground">
-                {masked ? HIDDEN_AMOUNT : formatCurrencyValue(history.currentValue + extraValue, currency ?? "USD", locale)}
-              </span>{" "}
-              <span className="font-semibold" style={{ color: chartChange >= 0 ? "var(--color-positive)" : "var(--color-negative)" }}>
-                {formatPercent(chartChange, locale)}
-              </span>{" "}
-              <span>{selectedRange}</span>
-            </button>
-          </span>
-        ) : null}
-
-        <div className="gleam-round-buttons flex flex-shrink-0 items-center phone:-mr-3">
-          {onOpenBrowser ? (
-            <button
-              type="button"
-              aria-label={t("mainScreen.browser")}
-              onClick={onOpenBrowser}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11 gleam-frost-round"
-            >
-              <GlobeIcon />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            aria-label={t("mainScreen.settings")}
-            onClick={onOpenSettings}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-foreground phone:h-11 phone:w-11 gleam-frost-round"
-          >
-            <SettingsIcon />
-          </button>
-        </div>
-      </div>
+      <HomeHeader
+        wallet={wallet}
+        headerRef={headerRef}
+        collapsed={headerCollapsed}
+        summary={summary}
+        returnHome={returnHome}
+        onOpenWalletSwitcher={onOpenWalletSwitcher}
+        onOpenSettings={onOpenSettings}
+        onOpenBrowser={onOpenBrowser}
+      />
 
       {/* Once released, the pull hands over to the top bar instead of holding a second spinner. */}
       <PullToRefreshIndicator {...pullState} pull={pullState.refreshing ? 0 : pullState.pull} refreshing={false} />
@@ -1081,207 +464,30 @@ export function MainScreenView({
                 }
               >
               {tab === "tokens" ? (
-                <div className="min-h-60 phone:min-h-0">
-                  {loading && !hasLoadedOnce ? (
-                    <>
-                      <SkeletonRow />
-                      <SkeletonRow />
-                    </>
-                  ) : (
-                    (() => {
-                      const rows: ListedTokenRow[] = [
-                        ...defaultTokenRows.map(({ send, ...row }) => ({
-                          key: row.key,
-                          label: row.name,
-                          defaultHidden: false,
-                          node: (
-                            <TokenRow
-                              glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: tokenLogos ? row.logoUrl : undefined }}
-                              name={row.name}
-                              amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
-                              value={
-                                row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
-                              }
-                              // `amount @ price` would give the hidden holding away.
-                              unitPrice={masked || simpleRows ? undefined : row.unitPrice}
-                              change={simpleRows ? undefined : row.change}
-                              loading={waiting(balancesQuery)}
-                              cached={tokensCached}
-                              onClick={send === null || watchOnly ? undefined : send === "ar" ? onSend : () => onSendToken(send)}
-                              className="border-b-0"
-                            />
-                          ),
-                        })),
-                        {
-                          key: "gleam-points",
-                          label: "Gleam Points",
-                          defaultHidden: false,
-                          node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} showLogo={tokenLogos} className="border-b-0" />,
-                        },
-                        ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
-                          const discovered = token.source === "discovered";
-                          const amountNumber =
-                            token.available === false ? 0 : Number(formatAtomicAsDisplay(token.quantity, token.denomination, token.denomination));
-                          const value = discovered || token.available === false ? undefined : valueFor(tokenPrices, currency, token.processId, amountNumber);
-                          return {
-                            key: token.processId,
-                            label: displayTicker(token.ticker),
-                            processId: token.processId,
-                            // Anyone can send a token, so one the user didn't add starts hidden.
-                            defaultHidden: discovered,
-                            node: (
-                              <TokenRow
-                                glyph={{
-                                  label: token.ticker.slice(0, 2).toUpperCase(),
-                                  tone: 2,
-                                  logoUrl: shownTokenLogo(token, rowVisibility, tokenLogos),
-                                }}
-                                name={displayTicker(token.ticker)}
-                                amount={
-                                  token.available === false
-                                    ? unavailableBalanceLabel(t)
-                                    : withPendingNote(
-                                        masked ? HIDDEN_AMOUNT : formatAtomicCompact(token.quantity, token.denomination),
-                                        pendingNote(t, token.pending, token.denomination, masked),
-                                      )
-                                }
-                                value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
-                                unitPrice={masked || simpleRows || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
-                                change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
-                                cached={tokensCached}
-                                onClick={token.available === false || watchOnly ? undefined : () => onSendToken(token)}
-                                className="border-b-0"
-                              />
-                            ),
-                          };
-                        }),
-                      ].sort((a, b) => a.label.localeCompare(b.label, locale, { sensitivity: "base" }));
-                      const hiddenRows = rows.filter(isRowHidden);
-                      const renderRow = (row: ListedTokenRow) => {
-                        const hidden = isRowHidden(row);
-                        const { processId } = row;
-                        const confirming = processId !== undefined && confirmingIgnore.has(processId);
-                        const actionClassName =
-                          "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
-                        return (
-                          <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative">
-                            {row.node}
-                            {hiddenExpanded ? (
-                              <div
-                                className={cn(
-                                  "absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100 phone:silica:right-3.5",
-                                  confirming && "opacity-100",
-                                )}
-                              >
-                                {confirming ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      aria-label={t("mainScreen.cancelIgnoreLabel", { label: row.label })}
-                                      onClick={() => setConfirming(processId, false)}
-                                      className={actionClassName}
-                                    >
-                                      {t("mainScreen.cancel")}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
-                                      onClick={() => void ignoreToken(processId)}
-                                      className={cn(actionClassName, "text-warning hover:text-warning")}
-                                    >
-                                      {t("mainScreen.ignore")}
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    {hidden && processId !== undefined ? (
-                                      <button
-                                        type="button"
-                                        aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
-                                        onClick={() => {
-                                          setIgnoreFailed(false);
-                                          setConfirming(processId, true);
-                                        }}
-                                        className={actionClassName}
-                                      >
-                                        {t("mainScreen.ignore")}
-                                      </button>
-                                    ) : null}
-                                    <button
-                                      type="button"
-                                      aria-label={t(hidden ? "mainScreen.showLabel" : "mainScreen.hideLabel", { label: row.label })}
-                                      onClick={() => toggleRowHidden(row)}
-                                      className={actionClassName}
-                                    >
-                                      {hidden ? t("mainScreen.show") : t("mainScreen.hide")}
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      };
-                      const addTokenRow = hiddenExpanded ? (
-                        <button
-                          type="button"
-                          onClick={onAddToken}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-3 text-left hover:bg-hover phone:-mx-3 phone:w-[calc(100%+1.5rem)] phone:gap-3 phone:px-3 phone:py-3.5 phone:active:bg-hover"
-                        >
-                          <span aria-hidden="true" className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-line bg-background text-foreground">
-                            <PlusIcon />
-                          </span>
-                          <span className="flex min-w-0 flex-1 flex-col gap-px">
-                            <span className="text-label font-semibold text-foreground">{t("mainScreen.addToken")}</span>
-                            <span className="text-caption text-muted">{t("mainScreen.addTokenHint")}</span>
-                          </span>
-                          <span aria-hidden="true" className="gleam-chevron flex-shrink-0 text-faint">
-                            <ChevronRightIcon />
-                          </span>
-                        </button>
-                      ) : null;
-                      return (
-                        <>
-                          {rows.filter((row) => !isRowHidden(row)).map(renderRow)}
-                          {hiddenRows.length > 0 ? (
-                            <>
-                              <button
-                                type="button"
-                                aria-expanded={hiddenExpanded}
-                                onClick={toggleHiddenExpanded}
-                                className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground phone:min-h-11 phone:px-0"
-                              >
-                                <span>{t("mainScreen.hiddenCount", { count: hiddenRows.length })}</span>
-                                <ChevronIcon open={hiddenExpanded} />
-                              </button>
-                              {hiddenExpanded && ignoreFailed ? (
-                                <InlineError className="px-3.5 pb-2 phone:px-0">
-                                  {t("mainScreen.ignoreFailed")}
-                                </InlineError>
-                              ) : hiddenExpanded && confirmingIgnore.size > 0 ? (
-                                <p className="px-3.5 pb-2 text-caption text-muted phone:px-0">{t("mainScreen.ignoreHint")}</p>
-                              ) : null}
-                              {hiddenExpanded ? hiddenRows.map(renderRow) : null}
-                              {addTokenRow}
-                            </>
-                          ) : listDocked || hiddenExpanded ? (
-                            // With nothing hidden there's no accordion to open, so this is the way into Show/Hide.
-                            <>
-                              {addTokenRow}
-                              <button
-                                type="button"
-                                onClick={() => setHiddenExpanded((prev) => !prev)}
-                                className={`px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label ${hiddenExpanded ? "ml-auto block w-fit" : ""}`}
-                              >
-                                {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
-                              </button>
-                            </>
-                          ) : null}
-                        </>
-                      );
-                    })()
-                  )}
-                </div>
+                <TokensPanel
+                  runtime={runtime}
+                  wallet={wallet}
+                  showSkeleton={loading && !hasLoadedOnce}
+                  balances={balancesQuery.data}
+                  balancesWaiting={waiting(balancesQuery)}
+                  defaultTokenRows={defaultTokenRows}
+                  tokenPrices={tokenPrices}
+                  currency={currency}
+                  masked={masked}
+                  simpleRows={simpleRows}
+                  tokenLogos={tokenLogos}
+                  watchOnly={watchOnly}
+                  tokensCached={tokensCached}
+                  controls={controls}
+                  hiddenExpanded={hiddenExpanded}
+                  setHiddenExpanded={setHiddenExpanded}
+                  toggleHiddenExpanded={toggleHiddenExpanded}
+                  listDocked={listDocked}
+                  onSend={onSend}
+                  onSendToken={onSendToken}
+                  onOpenPoints={onOpenPoints}
+                  onAddToken={onAddToken}
+                />
               ) : tab === "collectibles" ? (
                 <div
                   className={`min-h-60 pt-3.5 phone:min-h-0 phone:pt-1 ${collectiblesFresh ? "gleam-fresh" : ""}`}
@@ -1289,103 +495,17 @@ export function MainScreenView({
                   <CollectiblesGallery items={collectiblesQuery.data} loading={waiting(collectiblesQuery)} onOpen={onOpenCollectible} />
                 </div>
               ) : (
-                <>
-                  <div
-                    className={`min-h-60 phone:min-h-0 ${activityFresh ? "gleam-fresh" : ""}`}
-                  >
-                    {loading && !hasLoadedOnce ? (
-                      <>
-                        <SkeletonRow />
-                        <SkeletonRow />
-                      </>
-                    ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
-                      <EmptyState message={t("mainScreen.noActivity")} />
-                    ) : (
-                      activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => {
-                        const title =
-                            entry.swap
-                              ? t("mainScreen.swapOrder", { asset: swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances) })
-                              : entry.type === "upload" && !entry.collectible
-                              ? uploadTitle(t, entry)
-                              : activityTitle(
-                                  t,
-                                  entry.type,
-                                  entry.collectible ? collectibleLabel(t, entry.collectible) : (nameFor(entry.address) ?? truncateAddress(entry.address, 6)),
-                                  Boolean(entry.collectible),
-                                );
-                        const subtitle =
-                            entry.swap && entry.status === "confirmed"
-                              ? entry.timestamp > 0
-                                ? t("mainScreen.orderPlacedAt", { time: relativeTime(t, entry.timestamp) })
-                                : t("mainScreen.orderPlaced")
-                              : entry.unverified
-                              ? entry.timestamp > 0
-                                ? t("mainScreen.unverifiedTransferAt", { time: relativeTime(t, entry.timestamp) })
-                                : t("mainScreen.unverifiedTransfer")
-                              : entry.status === "pending"
-                              ? t("mainScreen.pendingConfirmation")
-                              : entry.status === "failed"
-                                ? entry.error
-                                  ? t("mainScreen.failedWithError", { error: entry.error })
-                                  : t("mainScreen.failed")
-                                : relativeTime(t, entry.timestamp);
-                        const amountLabel = entry.amount
-                          ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
-                          : entry.dataSize
-                            ? formatDataSize(entry.dataSize, locale)
-                            : undefined;
-                        const token = sendableToken(entry);
-                        return (
-                        <ActivityRow
-                          key={entry.txId}
-                          activityType={entry.swap ? "swap" : entry.type}
-                          title={title}
-                          subtitle={subtitle}
-                          amountLabel={amountLabel}
-                          outcomeUnknown={Boolean(entry.swap)}
-                          amountTone={entry.type === "send" && entry.status !== "failed" ? "negative" : entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
-                          collectible={
-                            entry.collectible
-                              ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
-                              : undefined
-                          }
-                          pending={entry.status === "pending"}
-                          onClick={() =>
-                            setDetail({
-                              entry,
-                              title,
-                              subtitle,
-                              amountLabel,
-                              name: nameFor(entry.address),
-                              onSendTo: token === undefined || !onSendTo ? undefined : () => onSendTo(entry.address, token),
-                            })
-                          }
-                        />
-                        );
-                      })
-                    )}
-                  </div>
-                  {activityQuery.data && activityQuery.data.entries.length > 0 ? (
-                    <div className="pt-2.5 text-center phone:pt-1">
-                      <Button
-                        variant="link"
-                        size="bare"
-                        type="button"
-                        onClick={() => openInExplorer(wallet.address)}
-                        className="phone:min-h-11 phone:px-4"
-                      >
-                        {t("mainScreen.viewAll")}
-                      </Button>
-                    </div>
-                  ) : null}
-                  <ActivityDetailSheet
-                    runtime={runtime}
-                    detail={detail}
-                    onClose={() => setDetail(null)}
-                    onViewInExplorer={openInExplorer}
-                    container={sheetContainer}
-                  />
-                </>
+                <ActivityPanel
+                  runtime={runtime}
+                  wallet={wallet}
+                  showSkeleton={loading && !hasLoadedOnce}
+                  fresh={activityFresh}
+                  activity={activityQuery.data}
+                  tokenBalances={balancesQuery.data?.tokenBalances}
+                  nameFor={nameFor}
+                  sheetContainer={sheetContainer}
+                  onSendTo={onSendTo}
+                />
               )}
               </div>
             ))}
@@ -1393,94 +513,5 @@ export function MainScreenView({
         </div>
       </div>
     </div>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** Opens lunar.arweave.net's block explorer in a new tab, for the wallet ("View all") or one entry's tx id (its detail sheet). */
-function openInExplorer(path: string): void {
-  window.open(explorerUrlFor(path), "_blank", "noopener,noreferrer");
-}
-
-// A collectible is the thing moved, not the counterparty, so it keeps the "Sent · Beam #1" form.
-function activityTitle(t: TFunction, type: "send" | "receive" | "upload", target: string, isCollectible: boolean): string {
-  if (isCollectible) return t("mainScreen.activityTitle", { verb: activityVerb(t, type), target });
-  if (type === "send") return t("mainScreen.activitySentTo", { target });
-  if (type === "receive") return t("mainScreen.activityReceivedFrom", { target });
-  return t("mainScreen.activityTitle", { verb: activityVerb(t, type), target });
-}
-
-const DATA_SIZE_UNITS = ["byte", "kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
-
-function formatDataSize(bytes: string, locale: string): string {
-  let value = Number(bytes);
-  let unit = 0;
-  while (value >= 1000 && unit < DATA_SIZE_UNITS.length - 1) {
-    value /= 1000;
-    unit += 1;
-  }
-  return new Intl.NumberFormat(locale, {
-    style: "unit",
-    unit: DATA_SIZE_UNITS[unit],
-    // CLDR's short form of "byte" is "byte" for every count in English; the long form plurals it.
-    unitDisplay: unit === 0 ? "long" : "short",
-    maximumFractionDigits: unit === 0 ? 0 : 1,
-  }).format(value);
-}
-
-// The upload's owner is this wallet, so its address says nothing; the content type says what went up.
-function uploadTitle(t: TFunction, entry: ActivityEntry): string {
-  const contentType = entry.tags.find((tag) => tag.name.toLowerCase() === "content-type")?.value.trim();
-  return t("mainScreen.activityTitle", { verb: t("mainScreen.verbUploaded"), target: contentType || truncateAddress(entry.txId, 6) });
-}
-
-function activityVerb(t: TFunction, type: "send" | "receive" | "upload"): string {
-  if (type === "send") return t("mainScreen.verbSent");
-  if (type === "receive") return t("mainScreen.verbReceived");
-  return t("mainScreen.verbUploaded");
-}
-
-function PlusIcon() {
-  return (
-    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m9 6 6 6-6 6" />
-    </svg>
   );
 }
