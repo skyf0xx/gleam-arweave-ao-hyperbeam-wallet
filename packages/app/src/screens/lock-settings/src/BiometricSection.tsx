@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import type { RuntimePort } from "@gleam/core";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import type { BiometricAvailability, BiometricUnlockPort } from "../../../app-platform/types";
 import { BiometricError, biometryLabel, biometryTitle } from "../../../biometrics/biometrics";
 import { BiometricIcon, Spinner } from "../../unlock/src/UnlockScreen";
 import { useT, type MessageKey } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 type Notice = { text: string; tone: "muted" | "error" };
 
@@ -147,21 +147,18 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
             onChange={(event) => setPassword(event.target.value)}
             errorMessage={state.passwordError}
           />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => {
-                setPassword("");
-                setState({ ...state, setUp: false, passwordError: undefined, notice: undefined });
-              }}
-              className="flex-1"
-            >
-              {t("lockSettings.cancel")}
-            </Button>
-            <Button type="submit" disabled={busy || password.length === 0} aria-busy={busy} className="flex-1">
-              {state.phase === "checking" ? (
+          <ButtonPair
+            cancelLabel={t("lockSettings.cancel")}
+            onCancel={() => {
+              setPassword("");
+              setState({ ...state, setUp: false, passwordError: undefined, notice: undefined });
+            }}
+            cancelDisabled={busy}
+            confirmType="submit"
+            confirmDisabled={busy || password.length === 0}
+            confirmBusy={busy}
+            confirmLabel={
+              state.phase === "checking" ? (
                 t("lockSettings.checking")
               ) : state.phase === "enrolling" ? (
                 // The full text would wrap on a phone; screen readers still get it.
@@ -172,9 +169,9 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
                 </>
               ) : (
                 t("lockSettings.turnOn")
-              )}
-            </Button>
-          </div>
+              )
+            }
+          />
         </form>
       ) : (
         <IconRow

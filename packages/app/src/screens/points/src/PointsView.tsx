@@ -36,6 +36,7 @@ import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { errorText } from "../../../i18n/errors";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -548,27 +549,15 @@ function LeaveControl({
       {leave.error instanceof Error ? (
         <p className="text-caption text-warning">{errorText(leave.error)}</p>
       ) : null}
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="flex-1"
-          onClick={() => setConfirming(false)}
-        >
-          {t("points.cancel")}
-        </Button>
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          className="flex-1"
-          disabled={leave.isPending}
-          onClick={() => leave.mutate({ walletId: wallet.id })}
-        >
-          {leave.isPending ? t("points.leaving") : t("points.leaveConfirm")}
-        </Button>
-      </div>
+      <ButtonPair
+        size="sm"
+        cancelLabel={t("points.cancel")}
+        onCancel={() => setConfirming(false)}
+        confirmLabel={leave.isPending ? t("points.leaving") : t("points.leaveConfirm")}
+        confirmVariant="destructive"
+        confirmDisabled={leave.isPending}
+        onConfirm={() => leave.mutate({ walletId: wallet.id })}
+      />
       {leave.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
     </div>
   );

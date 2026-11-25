@@ -9,6 +9,7 @@ import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { relativeTime } from "../../../relative-time";
+import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 /** The account's own name, which is never translated. */
 export function backupAccountName(provider: BackupProvider): string {
@@ -179,14 +180,15 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
                   <p className="text-body text-foreground">{t("backup.stopConfirm")}</p>
                   <p className="text-caption text-muted">{t("backup.stillIn", { drive })}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(null)} className="flex-1">
-                    {t("backup.cancel")}
-                  </Button>
-                  <Button type="button" disabled={busy} aria-busy={busy} onClick={() => void leave("stopping")} className="flex-1">
-                    {t("backup.stopSyncing")}
-                  </Button>
-                </div>
+                <ButtonPair
+                  cancelLabel={t("backup.cancel")}
+                  onCancel={() => setConfirming(null)}
+                  cancelDisabled={busy}
+                  confirmLabel={t("backup.stopSyncing")}
+                  onConfirm={() => void leave("stopping")}
+                  confirmDisabled={busy}
+                  confirmBusy={busy}
+                />
                 <Button
                   type="button"
                   variant="ghost"
@@ -203,14 +205,16 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
                   <p className="text-body text-foreground">{t("backup.deleteConfirm", { drive })}</p>
                   <p className="text-caption text-muted">{t("backup.everyDevice")}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(null)} className="flex-1">
-                    {t("backup.cancel")}
-                  </Button>
-                  <Button type="button" variant="destructive" disabled={busy} aria-busy={busy} onClick={() => void leave("deleting")} className="flex-1">
-                    {phase === "deleting" ? t("backup.deleting") : t("backup.deleteBackup")}
-                  </Button>
-                </div>
+                <ButtonPair
+                  cancelLabel={t("backup.cancel")}
+                  onCancel={() => setConfirming(null)}
+                  cancelDisabled={busy}
+                  confirmLabel={phase === "deleting" ? t("backup.deleting") : t("backup.deleteBackup")}
+                  confirmVariant="destructive"
+                  onConfirm={() => void leave("deleting")}
+                  confirmDisabled={busy}
+                  confirmBusy={busy}
+                />
               </div>
             ) : (
               <div className="mt-auto flex flex-col gap-2.5">

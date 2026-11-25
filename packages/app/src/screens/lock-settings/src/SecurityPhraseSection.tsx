@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { readSecurityPhrase, suggestSecurityPhrase, type RuntimePort, type SecurityPhrase } from "@gleam/core";
 import { SecurityPhraseMark, SecurityPhrasePicker } from "@gleam/ui/src/components/security-phrase/index.ts";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
@@ -9,6 +8,7 @@ import { loadSecurityPhrase } from "../../../security-phrase";
 import { useAddressIdentity } from "../../../address-identity";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 type SectionState =
   | { kind: "loading" }
@@ -73,20 +73,14 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
             disabled={state.saving}
             errorMessage={state.error ?? (readSecurityPhrase(state.draft) ? undefined : t("lockSettings.phraseInvalid"))}
           />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={state.saving}
-              onClick={() => setState({ kind: "showing", phrase: state.phrase })}
-              className="flex-1"
-            >
-              {t("lockSettings.cancel")}
-            </Button>
-            <Button type="submit" disabled={state.saving || !readSecurityPhrase(state.draft)} className="flex-1">
-              {state.saving ? t("lockSettings.saving") : t("lockSettings.save")}
-            </Button>
-          </div>
+          <ButtonPair
+            cancelLabel={t("lockSettings.cancel")}
+            onCancel={() => setState({ kind: "showing", phrase: state.phrase })}
+            cancelDisabled={state.saving}
+            confirmLabel={state.saving ? t("lockSettings.saving") : t("lockSettings.save")}
+            confirmType="submit"
+            confirmDisabled={state.saving || !readSecurityPhrase(state.draft)}
+          />
         </form>
       ) : state.phrase && icon ? (
         <div className="flex items-center gap-3 pt-3.5">
