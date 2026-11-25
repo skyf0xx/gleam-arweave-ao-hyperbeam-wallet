@@ -6,7 +6,7 @@
  * for anything a signature depends on.
  */
 import type { TokenPriceSource } from "./token-sources";
-import { PRICES_TIMEOUT_MS } from "./timeout";
+import { readPriceJson } from "./price-json";
 
 export type PriceSource = Pick<TokenPriceSource, "coinGeckoId">;
 
@@ -16,14 +16,10 @@ export async function getUsdPrice(
   apiUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<number | null> {
-  try {
-    const response = await fetchImpl(`${apiUrl}/prices?ids=${encodeURIComponent(source.coinGeckoId)}`, { signal: AbortSignal.timeout(PRICES_TIMEOUT_MS) });
-    if (!response.ok) return null;
-
-    const body = (await response.json()) as { prices?: Record<string, unknown> } | null;
-    const usd = body?.prices?.[source.coinGeckoId];
-    return typeof usd === "number" ? usd : null;
-  } catch {
-    return null;
-  }
+  const body = await readPriceJson<{ prices?: Record<string, unknown> }>(
+    `${apiUrl}/prices?ids=${encodeURIComponent(source.coinGeckoId)}`,
+    fetchImpl,
+  );
+  const usd = body?.prices?.[source.coinGeckoId];
+  return typeof usd === "number" ? usd : null;
 }

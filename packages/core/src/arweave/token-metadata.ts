@@ -4,6 +4,7 @@ import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
 import { isArweaveId } from "../models/arweave-id";
 import { tagValue, type Tag } from "../models/tag";
 import { trimTrailingSlashes } from "../models/network";
+import { postGraphQL } from "./graphql";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
@@ -17,7 +18,6 @@ interface GraphQLTransactionsByIdResponse {
   };
   errors?: Array<{ message: string }>;
 }
-
 
 /**
  * Where to load a token's logo from: the `logo` tag is an Arweave
@@ -65,28 +65,16 @@ export async function queryTokenMetadata(
     }
   `;
 
-  const url = `${trimTrailingSlashes(gatewayUrl)}/graphql`;
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, variables: { ids: [processId] } }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Gateway GraphQL metadata query for process "${processId}" failed (HTTP ${response.status}).`,
-    );
-  }
-
-  const body = (await response.json()) as GraphQLTransactionsByIdResponse;
-
-  if (body.errors && body.errors.length > 0) {
-    throw new Error(
-      `Gateway GraphQL metadata query for process "${processId}" returned errors: ${body.errors
-        .map((error) => error.message)
-        .join("; ")}`,
-    );
-  }
+  const body = await postGraphQL<GraphQLTransactionsByIdResponse>(
+    trimTrailingSlashes(gatewayUrl),
+    query,
+    { ids: [processId] },
+    fetchImpl,
+    (_gateway, detail, kind) =>
+      kind === "http"
+        ? `Gateway GraphQL metadata query for process "${processId}" failed (${detail}).`
+        : `Gateway GraphQL metadata query for process "${processId}" returned errors: ${detail}`,
+  );
 
   // Only the process's own spawn transaction describes it: another
   // transaction's tags would give it another token's scale and ticker.

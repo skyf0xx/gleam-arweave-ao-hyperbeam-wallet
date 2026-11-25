@@ -1,7 +1,7 @@
 import { L1_CANARY_PROCESS_ID, trimTrailingSlashes } from "../models/network";
 
 export { trimTrailingSlashes as stripTrailingSlashes } from "../models/network";
-import { readCappedText } from "./capped-body";
+import { readCappedDigits, readCappedText } from "./capped-body";
 import { mapLimit } from "../models/concurrency";
 import type { Tag } from "../models/tag";
 
@@ -246,8 +246,7 @@ export async function findL1TokenNodes({
         const response = await fetchImpl(`${url}/${L1_CANARY_PROCESS_ID}~process@1.0/slot/current`, {
           signal: withTimeout(signal, timeoutMs),
         });
-        const text = response.ok ? await readCappedText(response, PROBE_RESPONSE_MAX_BYTES) : null;
-        return text !== null && /^\d+$/.test(text.trim());
+        return response.ok && (await readCappedDigits(response, PROBE_RESPONSE_MAX_BYTES)) !== null;
       } catch {
         return false;
       }

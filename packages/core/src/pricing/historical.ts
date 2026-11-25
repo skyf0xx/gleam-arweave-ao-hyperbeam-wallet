@@ -5,7 +5,7 @@
  * The server owns the CoinGecko→CoinPaprika fallback and the caching.
  */
 import type { TokenPriceSource } from "./token-sources";
-import { PRICES_TIMEOUT_MS } from "./timeout";
+import { readPriceJson } from "./price-json";
 
 export type HistoricalRange = "24H" | "7D" | "1M" | "1Y" | "ALL";
 
@@ -27,22 +27,17 @@ export async function getHistoricalUsdPrices(
   apiUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<HistoricalPricePoint[]> {
-  try {
-    const url = `${apiUrl}/prices/history?id=${encodeURIComponent(source.coinGeckoId)}&range=${range}`;
-    const response = await fetchImpl(url, { signal: AbortSignal.timeout(PRICES_TIMEOUT_MS) });
-    if (!response.ok) return [];
-
-    const body = (await response.json()) as { series?: unknown } | null;
-    if (!Array.isArray(body?.series)) return [];
-    return body.series
-      .filter(
-        (point): point is HistoricalPricePoint =>
-          typeof point?.timestamp === "number" && typeof point?.usd === "number",
-      )
-      .sort((a, b) => a.timestamp - b.timestamp);
-  } catch {
-    return [];
-  }
+  const body = await readPriceJson<{ series?: unknown }>(
+    `${apiUrl}/prices/history?id=${encodeURIComponent(source.coinGeckoId)}&range=${range}`,
+    fetchImpl,
+  );
+  if (!Array.isArray(body?.series)) return [];
+  return body.series
+    .filter(
+      (point): point is HistoricalPricePoint =>
+        typeof point?.timestamp === "number" && typeof point?.usd === "number",
+    )
+    .sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /** First-to-last move of a series as a fraction, or `null` when it can't show one. */

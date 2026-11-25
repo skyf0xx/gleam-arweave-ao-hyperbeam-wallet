@@ -48,6 +48,41 @@ function gatewayCandidates(primaryGatewayUrl: string): string[] {
 }
 
 /**
+ * Posts `query`/`variables` to `{gatewayUrl}/graphql` and returns the parsed
+ * response. A non-2xx status or GraphQL `errors` throw the text
+ * `describeFailure` gives for them; a failed fetch throws as it is.
+ */
+export async function postGraphQL<T>(
+  gatewayUrl: string,
+  query: string,
+  variables: Record<string, unknown>,
+  fetchImpl: typeof fetch,
+  describeFailure: (gatewayUrl: string, detail: string, kind: "http" | "graphql") => string,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await fetchImpl(`${gatewayUrl}/graphql`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+    ...(signal ? { signal } : {}),
+  });
+
+  if (!response.ok) {
+    throw new Error(describeFailure(gatewayUrl, `HTTP ${response.status}`, "http"));
+  }
+
+  const body = (await response.json()) as { errors?: Array<{ message: string }> } & T;
+
+  if (body.errors && body.errors.length > 0) {
+    throw new Error(
+      describeFailure(gatewayUrl, body.errors.map((error) => error.message).join("; "), "graphql"),
+    );
+  }
+
+  return body;
+}
+
+/**
  * Posts `query`/`variables` to `{gateway}/graphql` for each candidate
  * gateway in order (primary first, then `FALLBACK_GATEWAYS`), returning
  * the first successful parsed response. Throws only if every candidate
@@ -65,33 +100,29 @@ export async function postGraphQLWithFailover<T>(
 
   for (const gatewayUrl of candidates) {
     try {
-      const url = `${gatewayUrl}/graphql`;
-      const response = await fetchImpl(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query, variables }),
-        signal: AbortSignal.timeout(GRAPHQL_TIMEOUT_MS),
-      });
-
-      if (!response.ok) {
-        throw new Error(describeFailure(gatewayUrl, `HTTP ${response.status}`));
-      }
-
-      const body = (await response.json()) as { errors?: Array<{ message: string }> } & T;
-
-      if (body.errors && body.errors.length > 0) {
-        throw new Error(
-          describeFailure(gatewayUrl, body.errors.map((error) => error.message).join("; ")),
-        );
-      }
-
-      return body;
+      return await postGraphQL<T>(
+        gatewayUrl,
+        query,
+        variables,
+        fetchImpl,
+        describeFailure,
+        AbortSignal.timeout(GRAPHQL_TIMEOUT_MS),
+      );
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
     }
   }
 
   throw lastError ?? new Error(userErrorMessage("gatewayAllFailed"));
+}
+
+/** The fields every activity entry takes from its transaction, whatever it turns out to be. */
+function entryBase(node: { id: string; tags: Tag[]; block: { timestamp: number } | null }) {
+  return {
+    txId: node.id,
+    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
+    timestamp: node.block ? node.block.timestamp * 1000 : 0,
+  };
 }
 
 const TRANSACTION_FIELDS = `
@@ -176,20 +207,18 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
   const type = isUpload ? "upload" : sent ? "send" : "receive";
   if (sent && node.recipient && isSwapOrder(node.tags)) {
     return {
-      txId: node.id,
+      ...entryBase(node),
       type: "send",
       status: node.block ? "confirmed" : "pending",
       address: node.recipient,
       amount: null,
-      tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-      timestamp: node.block ? node.block.timestamp * 1000 : 0,
       swap: { process: node.recipient },
     };
   }
   const l1Transfer = sent && node.recipient ? l1TokenTransferOf(node) : null;
   if (l1Transfer !== null && node.recipient) return toL1TransferEntry(node, "send", l1Transfer.recipient, l1Transfer.quantity, node.recipient);
   return {
-    txId: node.id,
+    ...entryBase(node),
     type,
     // No block yet means accepted but not mined (or its bundle not yet
     // mined). Arweave has no failure state after a block includes it.
@@ -197,8 +226,6 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
     address: isUpload ? address : sent ? (node.recipient ?? "") : node.owner.address,
     amount: isUpload ? null : node.quantity.winston,
     ...(isUpload && node.data?.size && /^\d+$/.test(node.data.size) ? { dataSize: node.data.size } : {}),
-    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-    timestamp: node.block ? node.block.timestamp * 1000 : 0,
   };
 }
 
@@ -243,12 +270,10 @@ function toL1TransferEntry(
   processId: string,
 ): ActivityEntry {
   const base = {
-    txId: node.id,
+    ...entryBase(node),
     type,
     status: node.block ? ("confirmed" as const) : ("pending" as const),
     address: counterparty,
-    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-    timestamp: node.block ? node.block.timestamp * 1000 : 0,
   };
   return quantity === COLLECTIBLE_TRANSFER_QUANTITY
     ? { ...base, amount: null, collectible: { id: processId } }
@@ -292,13 +317,11 @@ export async function queryL1TokenReceipts(
     const transfer = l1TokenTransferOf(node);
     if (transfer === null || transfer.recipient !== address) continue;
     byId.set(node.id, {
-      txId: node.id,
+      ...entryBase(node),
       type: "receive",
       status: node.block ? "confirmed" : "pending",
       address: node.owner.address,
       amount: transfer.quantity,
-      tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-      timestamp: node.block ? node.block.timestamp * 1000 : 0,
       token: node.recipient,
       unverified: true,
     });
@@ -445,15 +468,13 @@ export async function queryAoTransferActivity(
 
 function toAoSendEntry(node: GraphQLAoTransferNode): ActivityEntry {
   return {
-    txId: node.id,
+    ...entryBase(node),
     type: "send",
     // Reached the AO process, whether or not its handler accepted it;
     // failed-transfer detection is merge.ts's concern, not this parser's.
     status: "confirmed",
     address: tagValue(node.tags, "Recipient", { anyCase: true }) ?? "",
     amount: tagValue(node.tags, "Quantity", { anyCase: true }) ?? "0",
-    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-    timestamp: node.block ? node.block.timestamp * 1000 : 0,
     token: node.recipient,
   };
 }
@@ -462,15 +483,13 @@ function toAoReceiveEntry(node: GraphQLAoTransferNode): ActivityEntry | null {
   const token = tagValue(node.tags, "From-Process", { anyCase: true });
   if (!token) return null;
   return {
-    txId: node.id,
+    ...entryBase(node),
     type: "receive",
     // A Credit-Notice exists only once the token process has executed the
     // transfer.
     status: "confirmed",
     address: tagValue(node.tags, "Sender", { anyCase: true }) ?? "",
     amount: tagValue(node.tags, "Quantity", { anyCase: true }) ?? "0",
-    tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
-    timestamp: node.block ? node.block.timestamp * 1000 : 0,
     token,
   };
 }
