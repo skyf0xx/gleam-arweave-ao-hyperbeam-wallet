@@ -1,5 +1,6 @@
 import { trimTrailingSlashes } from "../models/network";
-import { PROCESS_ID, tagMap, type Tag } from "./asset-scan";
+import { ARWEAVE_ID } from "../models/arweave-id";
+import { tagMap, type Tag } from "../models/tag";
 import { isPlainRecord } from "../models/guards";
 
 /**
@@ -72,7 +73,7 @@ export function readCarrierHolding(state: unknown, address: string): CarrierHold
 
 function carrierTarget(value: unknown): string | undefined {
   const target = isPlainRecord(value) ? value.target : value;
-  return typeof target === "string" && PROCESS_ID.test(target) ? target : undefined;
+  return typeof target === "string" && ARWEAVE_ID.test(target) ? target : undefined;
 }
 
 /**
@@ -113,7 +114,7 @@ export async function isNamespaceEntry(
   hosts: readonly string[],
   fetchImpl: typeof fetch,
 ): Promise<boolean> {
-  if (!NAME_LABEL.test(label) || !PROCESS_ID.test(processId)) return false;
+  if (!NAME_LABEL.test(label) || !ARWEAVE_ID.test(processId)) return false;
   let confirmations = 0;
   for (const host of hosts) {
     try {
@@ -132,5 +133,5 @@ export function hashpathTarget(hashpath: string | null): string | undefined {
   if (!hashpath) return undefined;
   const last = hashpath.slice(hashpath.lastIndexOf("/") + 1);
   const id = last.slice(last.lastIndexOf(".") + 1).replace(/^ao:/, "");
-  return PROCESS_ID.test(id) ? id : undefined;
+  return ARWEAVE_ID.test(id) ? id : undefined;
 }

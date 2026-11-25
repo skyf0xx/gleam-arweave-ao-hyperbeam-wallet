@@ -1,7 +1,8 @@
 import { AO_MU_SIGNERS } from "../arweave/graphql";
 import { tokenMetadataFromTags } from "../arweave/token-metadata";
 import type { TokenMetadata } from "../models/token-metadata";
-import { createAssetScanner, withRequestTimeout } from "./asset-scan";
+import { withRequestTimeout } from "../models/http";
+import { createAssetScanner } from "./asset-scan";
 import { userErrorMessage } from "../models/user-errors";
 
 export interface DiscoverTokensOptions {

@@ -2,6 +2,7 @@ import { userErrorMessage } from "../models/user-errors";
 import type { CloudFilePort } from "../ports/cloud-file";
 import { MAX_BACKUP_FILE_BYTES } from "./file";
 import { isRecord } from "../models/guards";
+import { concatBytes } from "../models/bytes";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -147,9 +148,6 @@ function multipart(bytes: Bytes): { headers: Record<string, string>; body: Bytes
       `--${boundary}\r\ncontent-type: application/octet-stream\r\n\r\n`,
   );
   const tail = encoder.encode(`\r\n--${boundary}--`);
-  const body = new Uint8Array(head.length + bytes.length + tail.length);
-  body.set(head);
-  body.set(bytes, head.length);
-  body.set(tail, head.length + bytes.length);
+  const body = concatBytes(head, bytes, tail);
   return { headers: { "content-type": `multipart/related; boundary=${boundary}` }, body };
 }

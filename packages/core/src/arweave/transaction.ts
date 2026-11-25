@@ -3,9 +3,10 @@ import { L1_TOKEN_NODE_URLS } from "../models/network";
 import type { Tag } from "../models/tag";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { clientForGateway } from "./client";
-import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
+import { signRsaPss, verifyRsaPss } from "./rsa-pss";
 import { userErrorMessage } from "../models/user-errors";
 import { isRecord } from "../models/guards";
+import { sha256 } from "../models/bytes";
 
 /**
  * Format-2 Arweave transactions split into build, sign and apply, so a

@@ -1,4 +1,5 @@
 import { BIP39_ENGLISH } from "./bip39-wordlist";
+import { sha256 } from "../models/bytes";
 
 /**
  * BIP-39 recovery phrases, English wordlist only, as Wander and
@@ -83,7 +84,7 @@ export async function checkMnemonic(words: readonly string[]): Promise<MnemonicC
   const entropy = new Uint8Array(entropyBytes);
   for (let i = 0; i < entropyBytes * 8; i++) entropy[i >> 3]! |= bits[i]! << (7 - (i & 7));
 
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", entropy));
+  const digest = await sha256(entropy);
   entropy.fill(0);
   let matches = true;
   for (let i = 0; i < checksumBits; i++) {

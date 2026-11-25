@@ -1,5 +1,6 @@
 import { L1_CANARY_PROCESS_ID } from "../models/network";
 import { readCappedText } from "./capped-body";
+import { mapLimit } from "../models/concurrency";
 
 export interface DiscoverHyperBeamPeersOptions {
   gatewayUrl: string;
@@ -208,16 +209,12 @@ export async function discoverHyperBeamPeers({
       if (candidates.length >= maxProbes) break;
     }
 
-    const alive = new Array<boolean>(candidates.length).fill(false);
-    let next = 0;
-    const worker = async () => {
-      while (next < candidates.length) {
-        if (signal?.aborted) return;
-        const index = next++;
-        alive[index] = await answersAsNode(candidates[index]!, fetchImpl, timeoutMs, signal);
-      }
-    };
-    await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+    const alive = await mapLimit(
+      candidates,
+      Math.max(1, concurrency),
+      (candidate) => answersAsNode(candidate, fetchImpl, timeoutMs, signal),
+      signal,
+    );
     return candidates.filter((_, index) => alive[index]);
   } catch {
     return [];
@@ -245,23 +242,21 @@ export async function findL1TokenNodes({
   timeoutMs = 8000,
 }: FindL1TokenNodesOptions): Promise<string[]> {
   const urls = [...new Set(candidates.map(stripTrailingSlashes))];
-  const serves = new Array<boolean>(urls.length).fill(false);
-  let next = 0;
-  const worker = async () => {
-    while (next < urls.length) {
-      if (signal?.aborted) return;
-      const index = next++;
+  const serves = await mapLimit(
+    urls,
+    Math.max(1, concurrency),
+    async (url) => {
       try {
-        const response = await fetchImpl(`${urls[index]}/${L1_CANARY_PROCESS_ID}~process@1.0/slot/current`, {
+        const response = await fetchImpl(`${url}/${L1_CANARY_PROCESS_ID}~process@1.0/slot/current`, {
           signal: withTimeout(signal, timeoutMs),
         });
         const text = response.ok ? await readCappedText(response, PROBE_RESPONSE_MAX_BYTES) : null;
-        serves[index] = text !== null && /^\d+$/.test(text.trim());
+        return text !== null && /^\d+$/.test(text.trim());
       } catch {
-        serves[index] = false;
+        return false;
       }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+    },
+    signal,
+  );
   return urls.filter((_, index) => serves[index]);
 }

@@ -1,8 +1,9 @@
 import type { Signer } from "../vault/signer";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
-import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
+import { signRsaPss, verifyRsaPss } from "./rsa-pss";
 import { userErrorMessage } from "../models/user-errors";
 import { isArweaveId } from "../models/arweave-id";
+import { concatBytes, sha256 } from "../models/bytes";
 
 /**
  * ANS-104 data items with signature type 1 (Arweave RSA-PSS 4096), built
@@ -54,16 +55,6 @@ const MAX_TAG_BYTES = 4096;
 
 const encoder = new TextEncoder();
 
-function concat(...parts: Uint8Array[]): Bytes {
-  const out = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.byteLength;
-  }
-  return out;
-}
-
 /** Unsigned little-endian integer of `width` bytes, as ANS-104's header fields are encoded. */
 function littleEndian(value: number, width: number): Bytes {
   const out = new Uint8Array(width);
@@ -112,7 +103,7 @@ function encodeTags(tags: DataItemTag[]): Bytes {
     }
   }
   parts.push(new Uint8Array(avroLong(0)));
-  return concat(...parts);
+  return concatBytes(...parts);
 }
 
 async function sha384(data: Bytes): Promise<Bytes> {
@@ -123,8 +114,8 @@ async function sha384(data: Bytes): Promise<Bytes> {
 async function deepHash(chunks: Bytes[]): Promise<Bytes> {
   let accumulator = await sha384(encoder.encode(`list${chunks.length}`));
   for (const chunk of chunks) {
-    const blobHash = await sha384(concat(await sha384(encoder.encode(`blob${chunk.byteLength}`)), await sha384(chunk)));
-    accumulator = await sha384(concat(accumulator, blobHash));
+    const blobHash = await sha384(concatBytes(await sha384(encoder.encode(`blob${chunk.byteLength}`)), await sha384(chunk)));
+    accumulator = await sha384(concatBytes(accumulator, blobHash));
   }
   return accumulator;
 }
@@ -165,12 +156,12 @@ export function buildUnsignedDataItem(ownerB64Url: string, fields: DataItemField
   const anchor = anchorBytes(fields.anchor);
   const tags = fields.tags ?? [];
   const tagBytes = encodeTags(tags);
-  return concat(
+  return concatBytes(
     littleEndian(SIGNATURE_TYPE, 2),
     new Uint8Array(SIGNATURE_LENGTH),
     owner,
-    target ? concat(new Uint8Array([1]), target) : new Uint8Array([0]),
-    anchor ? concat(new Uint8Array([1]), anchor) : new Uint8Array([0]),
+    target ? concatBytes(new Uint8Array([1]), target) : new Uint8Array([0]),
+    anchor ? concatBytes(new Uint8Array([1]), anchor) : new Uint8Array([0]),
     littleEndian(tags.length, 8),
     littleEndian(tagBytes.byteLength, 8),
     tagBytes,

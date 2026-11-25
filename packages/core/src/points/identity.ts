@@ -1,6 +1,7 @@
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { isRecord } from "../models/guards";
 import { isArweaveId } from "../models/arweave-id";
+import { sha256 } from "../models/bytes";
 
 export interface DevicePublicJwk {
   kty: "EC";
@@ -17,8 +18,7 @@ export interface DevicePublicJwk {
  */
 export async function deviceKeyThumbprint(jwk: DevicePublicJwk): Promise<string> {
   const canonical = JSON.stringify({ crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y });
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-  return bytesToBase64Url(new Uint8Array(digest));
+  return bytesToBase64Url(await sha256(new TextEncoder().encode(canonical)));
 }
 
 export { addressFromOwner } from "../keys/address";

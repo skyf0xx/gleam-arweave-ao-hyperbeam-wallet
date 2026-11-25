@@ -1,9 +1,13 @@
 import { collectibleKind, type Collectible } from "../models/collectible";
-import { classifyAsset, createAssetScanner, mapLimit, PROCESS_ID, tagMap, withRequestTimeout, type Tag } from "./asset-scan";
+import { classifyAsset, createAssetScanner, type Tag } from "./asset-scan";
 import { readL1Balance } from "./balance";
 import { userErrorMessage } from "../models/user-errors";
 import { L1_TOKEN_NODE_URLS, trimTrailingSlashes } from "../models/network";
 import { isNamespaceEntry, nameCarrierLabel, readCarrierHolding, readCarrierState, type CarrierHolding } from "./names";
+import { ARWEAVE_ID } from "../models/arweave-id";
+import { mapLimit } from "../models/concurrency";
+import { withRequestTimeout } from "../models/http";
+import { tagMap } from "../models/tag";
 
 export { classifyAsset } from "./asset-scan";
 export type { AssetClass } from "./asset-scan";
@@ -130,7 +134,7 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
   const collectionIds = new Set<string>();
   for (const id of held) {
     const collection = clean(tagMap(descriptors.get(id) ?? [])["base-collection"], 128);
-    if (PROCESS_ID.test(collection)) collectionIds.add(collection);
+    if (ARWEAVE_ID.test(collection)) collectionIds.add(collection);
   }
   let collectionTags = new Map<string, Tag[]>();
   if (collectionIds.size > 0) {
@@ -165,7 +169,7 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
     const kind = collectibleKind(contentType);
     const description = clean(t.description, 1000);
     const collection = clean(t["base-collection"], 128);
-    const collectionId = PROCESS_ID.test(collection) ? collection : undefined;
+    const collectionId = ARWEAVE_ID.test(collection) ? collection : undefined;
     const collectionName = collectionId
       ? clean(tagMap(collectionTags.get(collectionId) ?? []).name, 128) || shortenId(collectionId)
       : undefined;

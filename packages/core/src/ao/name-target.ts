@@ -3,7 +3,7 @@ import type { ArweaveTransactionJson } from "../arweave/transaction";
 import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
 import { userErrorMessage } from "../models/user-errors";
-import { withRequestTimeout } from "./asset-scan";
+import { withRequestTimeout } from "../models/http";
 import { readCarrierHolding, readCarrierState } from "./names";
 import { isArweaveId } from "../models/arweave-id";
 

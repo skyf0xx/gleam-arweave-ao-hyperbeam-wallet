@@ -2,6 +2,7 @@ import type { ArweaveTransactionJson } from "../../arweave/transaction";
 import { base64UrlToBytes } from "../../vault/base64";
 import { LedgerError } from "./errors";
 import { userErrorMessage } from "../../models/user-errors";
+import { concatBytes } from "../../models/bytes";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -9,16 +10,6 @@ type Bytes = Uint8Array<ArrayBuffer>;
 export const LEDGER_CHUNK_SIZE = 200;
 
 const encoder = new TextEncoder();
-
-export function concatBytes(...parts: Uint8Array[]): Bytes {
-  const out = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.byteLength;
-  }
-  return out;
-}
 
 function u16(value: number, field: string): Bytes {
   if (!Number.isInteger(value) || value < 0 || value > 0xffff) {

@@ -1,14 +1,16 @@
 import { readDataItemFields, dataItemSignatureData, type DataItemTag } from "../../arweave/data-item";
-import { sha256, verifyRsaPss } from "../../arweave/rsa-pss";
+import { verifyRsaPss } from "../../arweave/rsa-pss";
 import { transactionSignatureData, type ArweaveTransactionJson } from "../../arweave/transaction";
 import { base64UrlToBytes, bytesToBase64Url } from "../../vault/base64";
 import type { UnsignedPayload } from "../../vault/signing";
 import { LedgerError, SW_OK, statusWordError } from "./errors";
-import { concatBytes, encodeTransactionForLedger, ledgerChunks } from "./serialize";
+import { encodeTransactionForLedger, ledgerChunks } from "./serialize";
 import type { LedgerTransport } from "./transport";
 import { USER_ERRORS, userErrorMessage } from "../../models/user-errors";
 import { isArweaveId } from "../../models/arweave-id";
 import { errorMessage } from "../../models/error-message";
+import { concatBytes } from "../../models/bytes";
+import { addressFromOwner } from "../../keys/address";
 
 /**
  * The Arweave Ledger app's APDU protocol (Zondax's `app-arweave`, spec in
@@ -179,7 +181,7 @@ export class LedgerArweaveClient {
   async getAccount({ verify = false }: { verify?: boolean } = {}): Promise<LedgerAccount> {
     const address = await this.getAddress({ verify });
     const publicKey = await this.getPublicKey();
-    if (bytesToBase64Url(await sha256(publicKey)) !== address) {
+    if ((await addressFromOwner(bytesToBase64Url(publicKey))) !== address) {
       throw new LedgerError("identity-mismatch", userErrorMessage("ledgerAddressMismatch"));
     }
     return { address, owner: bytesToBase64Url(publicKey), publicKey };
