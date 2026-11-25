@@ -1,3 +1,5 @@
+import { isPlainRecord, isRecord } from "../models/guards";
+
 /**
  * A token priced from its own orderbook has no 24h change from any
  * provider, so the device keeps its own USD price samples per process id
@@ -21,19 +23,12 @@ export interface PriceSnapshot {
 export type PriceSnapshots = Record<string, PriceSnapshot[]>;
 
 function isSnapshot(value: unknown): value is PriceSnapshot {
-  const candidate = value as PriceSnapshot | null;
-  return (
-    typeof candidate === "object" &&
-    candidate !== null &&
-    Number.isFinite(candidate.at) &&
-    Number.isFinite(candidate.usd) &&
-    candidate.usd > 0
-  );
+  return isRecord(value) && Number.isFinite(value.at) && Number.isFinite(value.usd) && (value.usd as number) > 0;
 }
 
 /** Stored data is untrusted: anything malformed is dropped, not repaired. */
 export function parsePriceSnapshots(raw: unknown): PriceSnapshots {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  if (!isPlainRecord(raw)) return {};
   const parsed: PriceSnapshots = {};
   for (const [processId, list] of Object.entries(raw)) {
     if (Array.isArray(list)) parsed[processId] = list.filter(isSnapshot);

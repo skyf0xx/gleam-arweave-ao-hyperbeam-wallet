@@ -62,6 +62,7 @@ export type {
   AoTokenTransferResult,
 } from "./transfer";
 export type { Tag } from "./tag";
+export { isPlainRecord, isRecord } from "./guards";
 export type {
   AddTokenApprovalPreview,
   ApprovalKind,

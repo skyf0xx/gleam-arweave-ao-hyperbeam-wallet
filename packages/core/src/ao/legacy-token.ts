@@ -1,6 +1,7 @@
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { trimTrailingSlashes } from "../models/network";
+import { isPlainRecord } from "../models/guards";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -21,18 +22,14 @@ export interface LegacyTokenInfo {
   logo: string | null;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function replyMessages(body: unknown): Array<{ data: unknown; tags: Tag[] }> {
-  if (!isRecord(body)) return [];
+  if (!isPlainRecord(body)) return [];
   const messages = body.Messages ?? body.messages;
   if (!Array.isArray(messages)) return [];
-  return messages.filter(isRecord).map((message) => {
+  return messages.filter(isPlainRecord).map((message) => {
     const rawTags = message.Tags ?? message.tags;
     const tags = Array.isArray(rawTags)
-      ? rawTags.filter((tag): tag is Tag => isRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
+      ? rawTags.filter((tag): tag is Tag => isPlainRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
       : [];
     return { data: message.Data ?? message.data, tags };
   });

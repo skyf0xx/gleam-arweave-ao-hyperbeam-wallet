@@ -1,6 +1,7 @@
 import { userErrorMessage } from "../models/user-errors";
 import type { CloudFilePort } from "../ports/cloud-file";
 import { MAX_BACKUP_FILE_BYTES } from "./file";
+import { isRecord } from "../models/guards";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -37,8 +38,8 @@ interface DriveFile {
 }
 
 function isDriveFile(value: unknown): value is DriveFile {
-  if (value === null || typeof value !== "object") return false;
-  const { id, modifiedTime, size } = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const { id, modifiedTime, size } = value;
   return typeof id === "string" && id.length > 0 && typeof modifiedTime === "string" && (size === undefined || typeof size === "string");
 }
 

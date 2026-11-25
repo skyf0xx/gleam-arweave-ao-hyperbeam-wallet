@@ -1,3 +1,5 @@
+import { isRecord } from "../models/guards";
+
 /**
  * Confirms a URL is actually an Arweave gateway rather than merely
  * reachable. `GET <url>/info` is the standard gateway/node info route
@@ -15,8 +17,8 @@ export async function isArweaveGateway(
     const response = await fetchImpl(`${url}/info`, { method: "GET" });
     if (!response.ok) return false;
     const body: unknown = await response.json();
-    if (body === null || typeof body !== "object") return false;
-    const network = (body as Record<string, unknown>).network;
+    if (!isRecord(body)) return false;
+    const network = body.network;
     return typeof network === "string" && network.startsWith("arweave");
   } catch {
     return false;

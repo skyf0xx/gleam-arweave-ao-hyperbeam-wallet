@@ -5,6 +5,7 @@ import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { readCappedText } from "./capped-body";
+import { isRecord } from "../models/guards";
 
 /** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
 const COMPUTE_TIMEOUT_MS = 8_000;
@@ -96,8 +97,8 @@ function parseBalanceResponse(
     };
   }
 
-  if (body !== null && typeof body === "object") {
-    const candidate = body as Record<string, unknown>;
+  if (isRecord(body)) {
+    const candidate = body;
     const rawQuantity = candidate.balance ?? candidate.quantity;
     const quantity =
       typeof rawQuantity === "string"

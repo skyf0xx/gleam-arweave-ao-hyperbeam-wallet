@@ -1,4 +1,5 @@
 import { trimTrailingSlashes } from "../models/network";
+import { isPlainRecord } from "../models/guards";
 /**
  * Resolves what happened to an AO `Transfer` message after the Messenger
  * Unit accepted it, by reading the process's evaluated result from the
@@ -53,16 +54,12 @@ export async function getTransferOutcome(
 
 type Tag = { name: string; value: string };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /**
  * The result's top-level `Error` (a handler that threw), or the `Error`
  * tag of a `Transfer-Error` reply among its outgoing `Messages`.
  */
 function findTransferError(body: unknown): string | null {
-  if (!isRecord(body)) return null;
+  if (!isPlainRecord(body)) return null;
 
   const topLevel = body.Error ?? body.error;
   if (topLevel) return typeof topLevel === "string" ? topLevel : JSON.stringify(topLevel);
@@ -71,10 +68,10 @@ function findTransferError(body: unknown): string | null {
   if (!Array.isArray(messages)) return null;
 
   for (const message of messages) {
-    if (!isRecord(message)) continue;
+    if (!isPlainRecord(message)) continue;
     const rawTags = message.Tags ?? message.tags;
     const tags = Array.isArray(rawTags)
-      ? rawTags.filter((tag): tag is Tag => isRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
+      ? rawTags.filter((tag): tag is Tag => isPlainRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
       : [];
     const tagValue = (name: string) => tags.find((tag) => tag.name === name)?.value ?? null;
 

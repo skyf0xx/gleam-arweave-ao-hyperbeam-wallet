@@ -1,4 +1,5 @@
 import { trimTrailingSlashes } from "../models/network";
+import { isPlainRecord, isRecord } from "../models/guards";
 /**
  * Spot price of an AO token from its own swap orderbook, the way Bazar
  * shows "Current unit price": the lowest open ask in the token process's
@@ -65,8 +66,8 @@ async function readMessage(url: string, fetchImpl: typeof fetch, signal: AbortSi
   const response = await fetchImpl(url, { signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json()) as unknown;
-  if (typeof body !== "object" || body === null || Array.isArray(body)) throw new Error("Unexpected message body.");
-  return body as Record<string, unknown>;
+  if (!isPlainRecord(body)) throw new Error("Unexpected message body.");
+  return body;
 }
 
 function link(value: unknown): string | null {
@@ -89,8 +90,8 @@ async function readOrder(
 ): Promise<Order | null> {
   const id = link(value);
   const message = id ? await readMessage(`${base}/${id}~message@1.0`, fetchImpl, signal) : value;
-  if (typeof message !== "object" || message === null) return null;
-  const fields = message as Record<string, unknown>;
+  if (!isRecord(message)) return null;
+  const fields = message;
   const asking = atomic(fields.asking);
   const quantity = atomic(fields.quantity);
   // The key and the order's own id must agree, or the entry is not the order it claims to be.
@@ -133,8 +134,8 @@ export async function readBestAsk(processId: string, nodeUrl: string, fetchImpl:
     const ordersId = link(state.orders);
     const table = ordersId
       ? await readMessage(`${base}/${ordersId}~message@1.0`, fetchImpl, signal)
-      : typeof state.orders === "object" && state.orders !== null
-        ? (state.orders as Record<string, unknown>)
+      : isRecord(state.orders)
+        ? state.orders
         : null;
     if (!table) return null;
 

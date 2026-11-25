@@ -1,3 +1,5 @@
+import { isRecord } from "./guards";
+
 /**
  * Fiat currencies a balance can be shown in, by ISO 4217 code. Every one
  * is in CoinGecko's `exchange_rates`, which the points API's FX lookup
@@ -98,8 +100,8 @@ const CURRENCY_BY_REGION: Record<string, FiatCurrency> = {
   NO: "NOK", ID: "IDR", PH: "PHP", VN: "VND", UA: "UAH", RU: "RUB",
 };
 export function isDisplaySettings(value: unknown): value is DisplaySettings {
-  if (value === null || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const record = value;
   return (
     isDisplayCurrency(record.currency) &&
     isHeaderStyle(record.header) &&

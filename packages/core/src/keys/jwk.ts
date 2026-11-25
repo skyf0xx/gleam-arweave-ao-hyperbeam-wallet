@@ -2,6 +2,7 @@ import { addressFromOwner } from "./address";
 import type { JWKInterface } from "../models/wallet";
 import { userErrorMessage } from "../models/user-errors";
 import { base64UrlToBytes } from "../vault/base64";
+import { isPlainRecord } from "../models/guards";
 
 const REQUIRED_JWK_FIELDS = ["kty", "e", "n", "d", "p", "q", "dp", "dq", "qi"] as const;
 
@@ -38,11 +39,11 @@ export type JWKValidationResult =
  * rejection reason rather than a generic error.
  */
 export function validateJWKShape(input: unknown): JWKValidationResult {
-  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+  if (!isPlainRecord(input)) {
     return { valid: false, reason: userErrorMessage("keyfileInvalid") };
   }
 
-  const candidate = input as Record<string, unknown>;
+  const candidate = input;
 
   for (const field of REQUIRED_JWK_FIELDS) {
     if (!(field in candidate)) {

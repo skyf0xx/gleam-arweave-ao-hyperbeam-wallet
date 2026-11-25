@@ -1,4 +1,5 @@
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
+import { isRecord } from "../models/guards";
 
 export interface DevicePublicJwk {
   kty: "EC";
@@ -25,8 +26,8 @@ const COORDINATE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 /** Shape check for a device public key arriving over the wire. */
 export function isDevicePublicJwk(value: unknown): value is DevicePublicJwk {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   return (
     candidate.kty === "EC" &&
     candidate.crv === "P-256" &&

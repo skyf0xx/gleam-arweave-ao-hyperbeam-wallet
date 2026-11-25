@@ -1,5 +1,6 @@
 import { trimTrailingSlashes } from "../models/network";
 import { PROCESS_ID, tagMap, type Tag } from "./asset-scan";
+import { isPlainRecord } from "../models/guards";
 
 /**
  * Permaweb Names: a name is a `carrier@1.0` process (a supply-1 asset on
@@ -45,26 +46,22 @@ function sameAccount(key: unknown, address: string): boolean {
   return typeof key === "string" && key.length >= 43 && foldAccount(key) === foldAccount(address);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 function isOne(value: unknown): boolean {
   return value === 1 || value === "1";
 }
 
 /** What `address` has of the carrier whose `/now` state this is, or null when it has nothing. */
 export function readCarrierHolding(state: unknown, address: string): CarrierHolding | null {
-  if (!isRecord(state) || state["execution-device"] !== "carrier@1.0") return null;
+  if (!isPlainRecord(state) || state["execution-device"] !== "carrier@1.0") return null;
   const target = carrierTarget(state.value);
   const withTarget = target === undefined ? {} : { target };
-  const balances = isRecord(state.balances) ? state.balances : {};
+  const balances = isPlainRecord(state.balances) ? state.balances : {};
   const held = Object.entries(balances).some(([key, quantity]) => sameAccount(key, address) && isOne(quantity));
   if (held) return { status: "held", ...withTarget };
-  const orders = isRecord(state.orders) ? Object.values(state.orders) : [];
+  const orders = isPlainRecord(state.orders) ? Object.values(state.orders) : [];
   const listed = orders.some(
     (order) =>
-      isRecord(order) &&
+      isPlainRecord(order) &&
       sameAccount(order.creator, address) &&
       isOne(order.quantity) &&
       typeof order.status === "string" &&
@@ -74,7 +71,7 @@ export function readCarrierHolding(state: unknown, address: string): CarrierHold
 }
 
 function carrierTarget(value: unknown): string | undefined {
-  const target = isRecord(value) ? value.target : value;
+  const target = isPlainRecord(value) ? value.target : value;
   return typeof target === "string" && PROCESS_ID.test(target) ? target : undefined;
 }
 
@@ -93,7 +90,7 @@ export async function readCarrierState(processId: string, hosts: readonly string
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const state: unknown = await response.json();
-      if (isRecord(state)) return state;
+      if (isPlainRecord(state)) return state;
       throw new Error("unreadable state");
     } catch (error) {
       lastError = error;

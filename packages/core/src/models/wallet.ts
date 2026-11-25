@@ -1,3 +1,5 @@
+import { isRecord } from "./guards";
+
 export type { JWKInterface } from "arweave/web/lib/wallet";
 
 /**
@@ -78,8 +80,8 @@ function isOptionalString(value: unknown): boolean {
 }
 
 export function isValidHardwareDevice(value: unknown): value is HardwareDevice {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   if (candidate.kind === "keystone") {
     return typeof candidate.xfp === "string" && KEYSTONE_XFP_PATTERN.test(candidate.xfp);
   }
@@ -99,8 +101,8 @@ export function isValidHardwareDevice(value: unknown): value is HardwareDevice {
  * malformed one is dropped rather than trusted.
  */
 export function isValidWallet(value: unknown): value is Wallet {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   return (
     typeof candidate.id === "string" &&
     candidate.id.length > 0 &&
@@ -116,7 +118,7 @@ export function isValidWallet(value: unknown): value is Wallet {
     typeof candidate.createdAt === "number" &&
     typeof candidate.updatedAt === "number" &&
     (candidate.encryptedKeyfile === null ||
-      (typeof candidate.encryptedKeyfile === "object" && candidate.encryptedKeyfile !== null)) &&
+      isRecord(candidate.encryptedKeyfile)) &&
     // Records stored before this field existed lack it; they read as never confirmed.
     (candidate.backupConfirmedAt === undefined ||
       candidate.backupConfirmedAt === null ||
