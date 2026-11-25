@@ -10,7 +10,7 @@ import type {
 } from "@gleam/core";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
 import { estimatePoints, ownDailyRate, rawBalance } from "@gleam/core/src/points/index.ts";
-import { balancesQuery, type WalletBalances } from "../../activity/src/useBalances";
+import { balancesQuery, type WalletBalances } from "../../activity";
 
 export const pointsQueryKeys = {
   memberships: () => ["points", "memberships"] as const,

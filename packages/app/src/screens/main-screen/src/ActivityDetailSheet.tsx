@@ -8,7 +8,7 @@ import { AddressDisplay } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
-import { useSaveContact } from "../../activity/src/useContacts";
+import { useSaveContact } from "../../activity";
 
 export interface ActivityDetail {
   entry: ActivityEntry;

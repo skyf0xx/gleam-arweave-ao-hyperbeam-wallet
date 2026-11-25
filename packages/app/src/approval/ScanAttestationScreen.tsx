@@ -22,7 +22,7 @@ import { RequestHeader } from "../transfer-review/RequestHeader";
 import { Field } from "../transfer-review/FieldLabel";
 import { ApprovalActions } from "./ApprovalActions";
 import { usePointsMemberships } from "../screens/points/src/usePoints";
-import { useWalletState } from "../screens/activity/src/useWalletState";
+import { useWalletState } from "../screens/activity";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every

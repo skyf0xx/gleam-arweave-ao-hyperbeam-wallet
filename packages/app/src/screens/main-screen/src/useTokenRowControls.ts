@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort } from "@gleam/core";
 import { readRowVisibility, writeRowVisibility, type RowVisibility } from "../../../token-visibility";
-import { walletQueryKeys } from "../../activity/src/queryKeys";
-import type { WalletBalances } from "../../activity/src/useBalances";
+import { walletQueryKeys } from "../../activity";
+import type { WalletBalances } from "../../activity";
 import type { ListedTokenRow } from "./tokenRows";
 
 /** Which token rows are hidden, and the in-place ignore flow (confirm, then remove the watched token). */

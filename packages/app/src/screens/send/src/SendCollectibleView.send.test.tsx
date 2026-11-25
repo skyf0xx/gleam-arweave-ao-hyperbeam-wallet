@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Collectible, RecipientAssessment, RuntimePort, TransferFeeQuote, WalletSummary } from "@gleam/core";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
-import { walletQueryKeys } from "../../activity/src/queryKeys";
+import { walletQueryKeys } from "../../activity";
 import { PlatformProvider } from "../../../app-platform/context";
 import { fakeAppPlatform } from "../../../app-platform/testing";
 import { SendCollectibleView } from "./SendCollectibleView";

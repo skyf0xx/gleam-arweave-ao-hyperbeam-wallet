@@ -8,7 +8,7 @@ import { t, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { isTokenHidden, readRowVisibility, sendTokenLogo, shownTokenLogo } from "../../../token-visibility";
 import { displayTicker, formatAtomicCompact } from "../../main-screen/src/formatWinston";
-import type { WalletBalances } from "../../activity/src/useBalances";
+import type { WalletBalances } from "../../activity";
 import { SkeletonPickerRow } from "./SkeletonPickerRow";
 
 /**

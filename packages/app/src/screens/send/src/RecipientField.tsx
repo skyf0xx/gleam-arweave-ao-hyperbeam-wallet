@@ -7,7 +7,7 @@ import { useAddressIdentity } from "../../../address-identity";
 import { useT } from "../../../i18n";
 import { usePlatform } from "../../../app-platform/context";
 import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
-import { AddressRow } from "../../activity/src/AddressRow";
+import { AddressRow } from "../../activity";
 import type { NamedAddress } from "./namedAddresses";
 import { recipientSchema } from "./sendFormSchema";
 

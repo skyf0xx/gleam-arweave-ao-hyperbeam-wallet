@@ -8,7 +8,7 @@ import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact } from "./formatWinston";
 import { useLocale, useT } from "../../../i18n";
 import { shownTokenLogo } from "../../../token-visibility";
-import type { WalletBalances } from "../../activity/src/useBalances";
+import type { WalletBalances } from "../../activity";
 import { PointsTokenRow } from "../../points/index.tsx";
 import { ChevronRightIcon, PlusIcon } from "./homeIcons";
 import {

@@ -8,7 +8,7 @@ import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { OPENED_WALLET_STATE_QUERY_KEY, useWalletState, WALLET_STATE_QUERY_KEY } from "../../activity/src/useWalletState";
+import { OPENED_WALLET_STATE_QUERY_KEY, useWalletState, WALLET_STATE_QUERY_KEY } from "../../activity";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 // The label sits inside the name's truncating span, so a narrow row cuts

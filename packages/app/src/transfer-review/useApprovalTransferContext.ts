@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { DisplayCurrency, DisplaySettings, RuntimePort, TokenPrice } from "@gleam/core";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
 import { DISPLAY_SETTINGS_QUERY_KEY } from "../display-settings";
-import { balancesQuery } from "../screens/activity/src/useBalances";
+import { balancesQuery } from "../screens/activity";
 import { readRowVisibility } from "../token-visibility";
 import type { TransferContext } from "./model";
 

@@ -15,7 +15,7 @@ import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
-import { walletQueryKeys } from "../../activity/src/queryKeys";
+import { walletQueryKeys } from "../../activity";
 import { NameTargetReview, ReviewButtons } from "../../../transfer-review/TransferReview";
 
 export interface NameTargetViewProps {

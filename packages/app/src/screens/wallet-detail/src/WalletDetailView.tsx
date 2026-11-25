@@ -21,7 +21,7 @@ import { errorText } from "../../../i18n/errors";
 import { backupDriveName } from "../../backup/src/BackupView";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 import { useBackupStatus } from "../../backup/src/useBackup";
-import { WALLET_STATE_QUERY_KEY } from "../../activity/src/useWalletState";
+import { WALLET_STATE_QUERY_KEY } from "../../activity";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {

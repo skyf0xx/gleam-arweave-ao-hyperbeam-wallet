@@ -7,7 +7,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT } from "../../../i18n";
 import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
-import { walletQueryKeys } from "../../activity/src/queryKeys";
+import { walletQueryKeys } from "../../activity";
 import { errorText } from "../../../i18n/errors";
 import { InlineInput } from "@gleam/ui/src/primitives/inline-input.tsx";
 

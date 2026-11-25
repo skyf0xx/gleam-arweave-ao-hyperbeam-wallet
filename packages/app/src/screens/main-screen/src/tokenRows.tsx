@@ -4,7 +4,7 @@ import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "./formatWinston";
 import type { TFunction } from "../../../i18n";
-import type { WalletBalances } from "../../activity/src/useBalances";
+import type { WalletBalances } from "../../activity";
 
 /**
  * A default (AR/AO) row carries enough to render a `TokenRow` and to be

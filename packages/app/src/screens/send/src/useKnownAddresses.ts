@@ -1,6 +1,6 @@
 import type { Contact, RuntimePort, WalletSummary } from "@gleam/core";
-import { useContacts, useSaveContact } from "../../activity/src/useContacts";
-import { useOtherWallets } from "../../activity/src/useOtherWallets";
+import { useContacts, useSaveContact } from "../../activity";
+import { useOtherWallets } from "../../activity";
 
 /**
  * The addresses a send already knows: the vault-wide contacts and the

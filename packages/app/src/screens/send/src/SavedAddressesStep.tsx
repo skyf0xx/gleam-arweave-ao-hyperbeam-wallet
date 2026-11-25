@@ -6,8 +6,8 @@ import { EmptyState } from "@gleam/ui/src/components/wallet/index.ts";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
-import { AddressRow } from "../../activity/src/AddressRow";
-import { useActivity } from "../../activity/src/useActivity";
+import { AddressRow } from "../../activity";
+import { useActivity } from "../../activity";
 import { recentSendRecipients } from "./namedAddresses";
 import { SkeletonPickerRow } from "./SkeletonPickerRow";
 
