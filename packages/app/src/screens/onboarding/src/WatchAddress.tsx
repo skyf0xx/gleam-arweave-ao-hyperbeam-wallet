@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { isValidArweaveAddress, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -28,8 +29,15 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
   const [addressError, setAddressError] = useState<string>();
-  const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const addMutation = useMutation({
+    mutationFn: (input: { address: string; name?: string }) =>
+      runtime.send<{ address: string; name?: string }, WalletSummary>({ type: "addWatchWallet", payload: input }),
+    onSuccess: onAdded,
+    onError: (error) => setAddressError(errorText(error)),
+  });
+  // Stays busy after success: the parent leaves this step.
+  const submitting = addMutation.isPending || addMutation.isSuccess;
 
   async function scan() {
     setScanning(true);
@@ -51,25 +59,14 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
     }
   }
 
-  async function submit() {
+  function submit() {
     const trimmed = address.trim();
     if (!isValidArweaveAddress(trimmed)) {
       setAddressError(t("onboarding.invalidAddress"));
       return;
     }
-    setSubmitting(true);
     setAddressError(undefined);
-    try {
-      onAdded(
-        await runtime.send<{ address: string; name?: string }, WalletSummary>({
-          type: "addWatchWallet",
-          payload: { address: trimmed, name: name.trim() || undefined },
-        }),
-      );
-    } catch (error) {
-      setAddressError(errorText(error));
-      setSubmitting(false);
-    }
+    addMutation.mutate({ address: trimmed, name: name.trim() || undefined });
   }
 
   return (
@@ -78,7 +75,7 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
       <StepForm
         onSubmit={(event) => {
           event.preventDefault();
-          if (!submitting) void submit();
+          if (!submitting) submit();
         }}
       >
         <StepIntro title={t("onboarding.watchAddress")} body={t("onboarding.watchBody")} />
