@@ -1,0 +1,22 @@
+{
+  "path": ["packages", "apps", "scripts"],
+  "format": ["typescript", "tsx", "javascript"],
+  "minLines": 6,
+  "minTokens": 60,
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.output/**",
+    "**/.wxt/**",
+    "**/ios/**",
+    "**/android/**",
+    "**/coverage/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/i18n/messages/**",
+    "**/*.min.js",
+    "apps/site/umami.js"
+  ],
+  "reporters": ["console"],
+  "gitignore": true
+}
