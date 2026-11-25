@@ -30,7 +30,7 @@ import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import process from "node:process";
 import { checkVersions, readVersions, writeVersions } from "./app-versions.mjs";
-import { git, runGate } from "./release-gate.mjs";
+import { assertCleanBranch, repoRoot, runGate } from "./release-gate.mjs";
 import { checkWellKnown } from "./well-known.mjs";
 
 const REMOTE = "origin";
@@ -72,14 +72,9 @@ if (key && kdbx) refuse("both a KeePassXC database and a key file given; pass on
 if (!key && !kdbx) refuse("no private key given: pass --kdbx <path> or --key <path>, or set GLEAM_CWS_KDBX or GLEAM_CWS_KEY");
 const signWith = kdbx ? ["--kdbx", kdbx] : ["--key", /** @type {string} */ (key)];
 
-const top = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
-if (!top.ok) refuse("not inside a git repository");
-const root = top.out;
-
-const branch = git(root, ["rev-parse", "--abbrev-ref", "HEAD"]).out;
-if (branch !== BRANCH) refuse(`on "${branch}"; start release:all from ${BRANCH}`);
-const dirty = git(root, ["status", "--porcelain", "--untracked-files=no"]).out;
-if (dirty !== "") refuse("working tree has uncommitted changes");
+const root = repoRoot(process.cwd());
+if (root === null) refuse("not inside a git repository");
+assertCleanBranch(root, BRANCH, `; start release:all from ${BRANCH}`, refuse);
 
 // --- stage 1: bump, commit, PR -------------------------------------------
 

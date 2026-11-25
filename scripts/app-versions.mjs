@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { isMain } from "./is-main.mjs";
 
 const EXTENSION = "apps/extension/package.json";
 const MOBILE = "apps/mobile/package.json";
@@ -99,7 +99,7 @@ export function checkVersions(root, version) {
   if (wrong.length > 0) throw new Error(`versions do not match ${version}: ${wrong.join(", ")}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const [flag, version] = process.argv.slice(2);
   if (flag !== "--check" || !version) {
     process.stderr.write("usage: app-versions.mjs --check <version>\n");

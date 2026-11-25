@@ -18,6 +18,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
+import { isMain } from "./is-main.mjs";
 
 /** Modules the keyring page may load, as repo-relative paths or virtual ids. */
 export const KEYRING_ALLOWED = [
@@ -608,4 +609,4 @@ function main() {
   );
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+if (isMain(import.meta.url)) main();

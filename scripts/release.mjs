@@ -6,12 +6,15 @@
 
 import { execFileSync } from "node:child_process";
 import process from "node:process";
-import { git, printGate, runGate } from "./release-gate.mjs";
+import { assertCleanBranch, git, printGate, repoRoot, runGate } from "./release-gate.mjs";
 
 const BRANCH = "master";
 const REMOTE = "origin";
 
-/** @param {string} reason */
+/**
+ * @param {string} reason
+ * @returns {never}
+ */
 function refuse(reason) {
   process.stderr.write(`release refused: ${reason}\n`);
   process.exit(1);
@@ -19,16 +22,9 @@ function refuse(reason) {
 
 const confirmed = process.argv.slice(2).includes("--yes");
 
-const top = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
-if (!top.ok) refuse("not inside a git repository");
-const root = top.out;
-
-const branch = git(root, ["rev-parse", "--abbrev-ref", "HEAD"]).out;
-if (branch !== BRANCH) refuse(`on "${branch}", releases are tagged from ${BRANCH}`);
-
-// Untracked files can't end up in the tagged commit, so they don't block.
-const dirty = git(root, ["status", "--porcelain", "--untracked-files=no"]).out;
-if (dirty !== "") refuse("working tree has uncommitted changes");
+const root = repoRoot(process.cwd());
+if (root === null) refuse("not inside a git repository");
+assertCleanBranch(root, BRANCH, `, releases are tagged from ${BRANCH}`, refuse);
 
 const fetched = git(root, ["fetch", "--quiet", REMOTE, BRANCH]);
 if (!fetched.ok) refuse(`could not fetch ${REMOTE}/${BRANCH}: ${fetched.out}`);
