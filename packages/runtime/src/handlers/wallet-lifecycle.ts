@@ -42,13 +42,13 @@ import {
   saveDisplaySettings,
   saveThemeSettings,
 } from "./lifecycle-settings";
-import { addHardwareWallet, addWatchWallet } from "./keyless-wallets";
+import { addHardwareWallet, addWatchWallet, confirmWalletBackup, deleteWallet, renameWallet, switchWallet } from "./keyless-wallets";
 import { loadActiveWalletId, saveWallets, toSummary } from "./wallet-records";
 import { hasVaultPassword, keylessWalletIds, loadSession, lockSession, saveSession } from "./wallet-session";
 import { POINTS_STORAGE_KEYS } from "./points";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { ACTIVE_WALLET_ID_KEY, BACKUP_KEY, BACKUP_STATE_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
-import { activityLogKey, loadWallets, requireWallet, updateWallet } from "../stored-data";
+import { activityLogKey, loadWallets } from "../stored-data";
 import { dappError } from "../dapp-error";
 
 /**
@@ -395,56 +395,20 @@ export class WalletLifecycleHandler {
     return addWatchWallet(this.storage, this.keySession, req);
   }
 
-  async deleteWallet(req: { walletId: string }): Promise<void> {
-    return this.keySession.withSessionLock(async () => {
-      const wallets = await loadWallets(this.storage);
-      const remaining = wallets.filter((wallet) => wallet.id !== req.walletId);
-      await saveWallets(this.storage, remaining);
-      try {
-        await this.keySession.removeCachedKey(req.walletId);
-      } finally {
-        await this.finishDeleteWallet(req.walletId, remaining);
-      }
-    });
+  deleteWallet(req: { walletId: string }): Promise<void> {
+    return deleteWallet(this.storage, this.keySession, req);
   }
 
-  private async finishDeleteWallet(walletId: string, remaining: Wallet[]): Promise<void> {
-    const activeWalletId = await loadActiveWalletId(this.storage, remaining);
-    if (activeWalletId === null) {
-      await this.storage.set(ACTIVE_WALLET_ID_KEY, remaining[0]?.id ?? null);
-    }
-
-    const session = await loadSession(this.storage, this.keySession, remaining);
-    if (session !== null && session.unlockedWalletIds.includes(walletId)) {
-      const unlockedWalletIds = session.unlockedWalletIds.filter((id) => id !== walletId);
-      if (unlockedWalletIds.length > 0) {
-        await saveSession(this.storage, { ...session, unlockedWalletIds });
-      } else {
-        await lockSession(this.storage, this.keySession);
-      }
-    }
+  renameWallet(req: { walletId: string; name: string }): Promise<void> {
+    return renameWallet(this.storage, this.keySession, req);
   }
 
-  async renameWallet(req: { walletId: string; name: string }): Promise<void> {
-    return this.keySession.withSessionLock(async () => {
-      await updateWallet(this.storage, req.walletId, { name: req.name, updatedAt: Date.now() });
-    });
+  confirmWalletBackup(req: { walletId: string }): Promise<void> {
+    return confirmWalletBackup(this.storage, this.keySession, req);
   }
 
-  /**
-   * Records that the user confirmed they backed up this wallet's keyfile.
-   * Called by `downloadKeyfile` once the keyfile is saved, never on a
-   * cancelled or failed download.
-   */
-  async confirmWalletBackup(req: { walletId: string }): Promise<void> {
-    return this.keySession.withSessionLock(async () => {
-      await updateWallet(this.storage, req.walletId, { backupConfirmedAt: Date.now() });
-    });
-  }
-
-  async switchWallet(req: { walletId: string }): Promise<void> {
-    requireWallet(await loadWallets(this.storage), req.walletId);
-    await this.storage.set(ACTIVE_WALLET_ID_KEY, req.walletId);
+  switchWallet(req: { walletId: string }): Promise<void> {
+    return switchWallet(this.storage, req);
   }
 
   /**

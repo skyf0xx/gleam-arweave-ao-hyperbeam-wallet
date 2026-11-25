@@ -12,5 +12,5 @@ export const FILE_SIZE_CAPS = {
   // One state machine over the pending approvals; the grant methods could move out (todo.md).
   "packages/runtime/src/handlers/approval.ts": 981,
   // What is left handles key material, which stays in the one file the signer fence allows.
-  "packages/runtime/src/handlers/wallet-lifecycle.ts": 566,
+  "packages/runtime/src/handlers/wallet-lifecycle.ts": 537,
 };

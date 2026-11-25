@@ -13,10 +13,10 @@ import {
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { dappError } from "../dapp-error";
 import { ACTIVE_WALLET_ID_KEY } from "../storage-keys";
-import { loadWallets } from "../stored-data";
+import { loadWallets, requireWallet, updateWallet } from "../stored-data";
 import type { KeySession } from "./key-session";
-import { saveWallets, toSummary } from "./wallet-records";
-import { hasVaultPassword, loadSession } from "./wallet-session";
+import { loadActiveWalletId, saveWallets, toSummary } from "./wallet-records";
+import { hasVaultPassword, loadSession, lockSession, saveSession } from "./wallet-session";
 
 /** An RSA-4096 modulus, the only key size Arweave addresses are made from. */
 const RSA_MODULUS_BYTES = 512;
@@ -147,3 +147,68 @@ export async function addWatchWallet(
   });
 }
 
+
+export async function deleteWallet(storage: StoragePort, keySession: KeySession, req: { walletId: string }): Promise<void> {
+  return keySession.withSessionLock(async () => {
+    const wallets = await loadWallets(storage);
+    const remaining = wallets.filter((wallet) => wallet.id !== req.walletId);
+    await saveWallets(storage, remaining);
+    try {
+      await keySession.removeCachedKey(req.walletId);
+    } finally {
+      await finishDeleteWallet(storage, keySession, req.walletId, remaining);
+    }
+  });
+}
+
+async function finishDeleteWallet(
+  storage: StoragePort,
+  keySession: KeySession,
+  walletId: string,
+  remaining: Wallet[],
+): Promise<void> {
+  const activeWalletId = await loadActiveWalletId(storage, remaining);
+  if (activeWalletId === null) {
+    await storage.set(ACTIVE_WALLET_ID_KEY, remaining[0]?.id ?? null);
+  }
+
+  const session = await loadSession(storage, keySession, remaining);
+  if (session !== null && session.unlockedWalletIds.includes(walletId)) {
+    const unlockedWalletIds = session.unlockedWalletIds.filter((id) => id !== walletId);
+    if (unlockedWalletIds.length > 0) {
+      await saveSession(storage, { ...session, unlockedWalletIds });
+    } else {
+      await lockSession(storage, keySession);
+    }
+  }
+}
+
+export async function renameWallet(
+  storage: StoragePort,
+  keySession: KeySession,
+  req: { walletId: string; name: string },
+): Promise<void> {
+  return keySession.withSessionLock(async () => {
+    await updateWallet(storage, req.walletId, { name: req.name, updatedAt: Date.now() });
+  });
+}
+
+/**
+ * Records that the user confirmed they backed up this wallet's keyfile.
+ * Called by `downloadKeyfile` once the keyfile is saved, never on a
+ * cancelled or failed download.
+ */
+export async function confirmWalletBackup(
+  storage: StoragePort,
+  keySession: KeySession,
+  req: { walletId: string },
+): Promise<void> {
+  return keySession.withSessionLock(async () => {
+    await updateWallet(storage, req.walletId, { backupConfirmedAt: Date.now() });
+  });
+}
+
+export async function switchWallet(storage: StoragePort, req: { walletId: string }): Promise<void> {
+  requireWallet(await loadWallets(storage), req.walletId);
+  await storage.set(ACTIVE_WALLET_ID_KEY, req.walletId);
+}
