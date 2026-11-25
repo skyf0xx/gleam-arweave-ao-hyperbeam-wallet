@@ -1,4 +1,5 @@
 import { CapacitorSQLite, SQLiteConnection, type capSQLiteSet } from "@capacitor-community/sqlite";
+import { retryingOnce } from "@gleam/core/src/models/async.ts";
 import { serveOnce } from "./comlink-guard";
 import { STORE_REQUEST, type SqliteStore } from "./sqlite-channel";
 
@@ -13,18 +14,12 @@ const SCHEMA = "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY NOT NULL, va
 
 /** Opens the database once, on first use, and creates the table if it's missing. */
 export function createSqliteStore(openDb: () => Promise<SqliteDb>): SqliteStore {
-  let ready: Promise<SqliteDb> | undefined;
   // A failed open is tried again on the next call rather than kept.
-  const db = () =>
-    (ready ??= openDb().then(
-      async (opened) => {
-        await opened.execute(SCHEMA, false);
-        return opened;
-      },
-    ).catch((error: unknown) => {
-      ready = undefined;
-      throw error;
-    }));
+  const db = retryingOnce(async () => {
+    const opened = await openDb();
+    await opened.execute(SCHEMA, false);
+    return opened;
+  });
   return {
     async load() {
       const { values = [] } = await (await db()).query("SELECT key, value FROM kv");

@@ -1,4 +1,4 @@
-import { assertSetManyEntries, createSerializer, KeyWatchers, type StoragePort } from "@gleam/core";
+import { assertSetManyEntries, createSerializer, KeyWatchers, retryingOnce, type StoragePort } from "@gleam/core";
 import { requestChannel, type WorkerScope } from "./comlink-guard";
 import { STORE_REQUEST, type SqliteStore, type StoredRow } from "./sqlite-channel";
 
@@ -39,25 +39,14 @@ function parseRow(key: string, json: string): [string, unknown] {
  */
 export class MobileStoragePort implements StoragePort {
   private readonly session = new Map<string, unknown>();
-  private loaded: Promise<Map<string, unknown>> | undefined;
+  /** The `local:` rows, loaded once. A failed load is tried again on the next access. */
+  private readonly local = retryingOnce(async () => new Map((await this.store.load()).map(([key, json]) => parseRow(key, json))));
   private readonly serializeWrites = createSerializer();
   private readonly watchers = new KeyWatchers();
 
   constructor(private readonly store: Pick<SqliteStore, "load" | "write">) {
     // Starts loading at once; a failure surfaces through the next read or write.
     this.local().catch(() => {});
-  }
-
-  /** The `local:` rows, loaded once. A failed load is tried again on the next access. */
-  private local(): Promise<Map<string, unknown>> {
-    this.loaded ??= this.store.load().then(
-      (rows) => new Map(rows.map(([key, json]) => parseRow(key, json))),
-      (error: unknown) => {
-        this.loaded = undefined;
-        throw error;
-      },
-    );
-    return this.loaded;
   }
 
   async get<T>(key: string): Promise<T | null> {

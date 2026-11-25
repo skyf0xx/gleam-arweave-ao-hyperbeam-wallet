@@ -87,6 +87,7 @@ export type {
 export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
 export { SITE_URL, SITE_ORIGIN, DEV_SITE_HOSTS, httpOrigin, isExactHttpOrigin } from "./site-origin";
+export { retryingOnce, singleFlight, type SingleFlight } from "./async";
 export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl } from "./site-links";
 export type { SitePage } from "./site-links";
 export { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_CANARY_PROCESS_ID, L1_TOKEN_NODE_URLS, POINTS_API_URL, bundlerUrlOf, explorerUrlFor, isValidNetworkSettings } from "./network";

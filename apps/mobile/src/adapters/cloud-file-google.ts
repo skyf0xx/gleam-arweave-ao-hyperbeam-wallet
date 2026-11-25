@@ -1,5 +1,6 @@
 import { GoogleDriveAuth, type GoogleDriveAuthPlugin } from "@gleam/cloud-backup";
 import { createGoogleDriveFile, type GoogleAuth } from "@gleam/core/src/backup/google-drive.ts";
+import { singleFlight } from "@gleam/core/src/models/async.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import type { CloudFilePort } from "@gleam/core/src/ports/cloud-file.ts";
 
@@ -23,15 +24,11 @@ export function createAndroidGoogleAuth(plugin: GoogleDriveAuthPlugin = GoogleDr
   }
 
   // One consent screen at a time: callers arriving together want the same answer.
-  let consent: Promise<string | null> | null = null;
+  const consent = singleFlight(() => authorize(true));
 
   return {
     token(interactive) {
-      if (!interactive) return authorize(false);
-      consent ??= authorize(true).finally(() => {
-        consent = null;
-      });
-      return consent;
+      return interactive ? consent() : authorize(false);
     },
 
     async forget(token) {

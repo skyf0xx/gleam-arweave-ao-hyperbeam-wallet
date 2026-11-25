@@ -1,22 +1,15 @@
 import { useEffect, useState } from "react";
 import type { DeviceSignPanel, DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
 import { errorText } from "@gleam/app/src/i18n/errors.ts";
-
-let loading: Promise<DeviceSignPanel> | null = null;
+import { retryingOnce } from "@gleam/core/src/models/async.ts";
 
 /**
  * The Keystone UR stack and its Node polyfills are most of what the
  * approval page would load, and only a Keystone wallet's signing step
  * uses them. `check-bundles.mjs` holds this chunk to its own list.
+ * A failed load isn't kept, so Try again, which remounts the panel, asks again.
  */
-function loadKeystonePanel(): Promise<DeviceSignPanel> {
-  loading ??= import("./keystone").then(({ KeystonePanel }) => KeystonePanel);
-  // A failed load isn't kept, so Try again, which remounts the panel, asks again.
-  loading.catch(() => {
-    loading = null;
-  });
-  return loading;
-}
+const loadKeystonePanel = retryingOnce<DeviceSignPanel>(() => import("./keystone").then(({ KeystonePanel }) => KeystonePanel));
 
 export function LazyKeystonePanel(props: DeviceSignPanelProps) {
   const [Panel, setPanel] = useState<DeviceSignPanel | null>(null);
