@@ -12,6 +12,7 @@ import type {
 } from "@gleam/app/src/app-platform/types.ts";
 import { t } from "@gleam/app/src/i18n/index.tsx";
 import { pluginErrorCode } from "./plugin-error";
+import { errorMessage } from "@gleam/core";
 
 /**
  * Every call into the biometric plugin. The vault password is stored only
@@ -57,7 +58,7 @@ function reasonFor(error: unknown): BiometricErrorReason {
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return errorMessage(error);
 }
 
 async function isSaved(): Promise<boolean> {

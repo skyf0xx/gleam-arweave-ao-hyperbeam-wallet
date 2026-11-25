@@ -179,8 +179,12 @@ export function isChallengeResponse(value: unknown): value is ChallengeResponse 
   );
 }
 
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function jsonParseProblem(file: string, text: string, error: unknown): Problem {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const position = /position (\d+)/.exec(detail);
   let where = "";
   if (position) {

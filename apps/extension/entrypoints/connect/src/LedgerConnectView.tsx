@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  errorMessage,
   LedgerError,
   type LedgerArweaveApp,
   type LedgerTransport,
@@ -57,7 +58,7 @@ interface LedgerDetails {
 }
 
 function addWalletErrorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const duplicate =
     /already in Gleam as (?:the hardware wallet )?"([^"]+)"/.exec(message);
   return duplicate

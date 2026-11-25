@@ -1,4 +1,4 @@
-import type { Deps, Problem } from "./shared.ts";
+import { errorMessage, type Deps, type Problem } from "./shared.ts";
 
 export type ApiResult = { ok: true; body: unknown } | { ok: false; issues: Problem[] };
 
@@ -9,7 +9,7 @@ export async function callApi(deps: Deps, path: string, init: RequestInit | unde
   try {
     response = await deps.fetchImpl(url, init);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = errorMessage(error);
     return {
       ok: false,
       issues: [{ path: "network", message: `Couldn't reach ${deps.apiUrl} (${reason}); check the connection and run \`${rerun}\` again.` }],

@@ -2,6 +2,7 @@ import { mapLimit } from "@gleam/core/src/ao/asset-scan.ts";
 import { computeDailyPoints, type WalletSnapshot } from "@gleam/core/src/points/index.ts";
 import type { BalanceReader } from "./balances";
 import type { Db } from "../db";
+import { errorMessage } from "@gleam/core/src/models/error-message.ts";
 
 export const LIVENESS_WINDOW_MS = 3 * 86_400_000;
 /** Percent of a day's holding points that joins the bounty pool (SCANS.md § Points). */
@@ -143,7 +144,7 @@ async function withRetries<T>(
     try {
       return { ok: true, value: await read() };
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : String(caught);
+      error = errorMessage(caught);
       if (attempt < attempts) await sleep((options.retryDelayMs ?? 5_000) * 2 ** (attempt - 1));
     }
   }

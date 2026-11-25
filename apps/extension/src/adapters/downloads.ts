@@ -1,5 +1,5 @@
 import { browser, type Browser } from "wxt/browser";
-import { bytesToBase64, type DownloadPort, type FileDownloadResult } from "@gleam/core";
+import { errorMessage, bytesToBase64, type DownloadPort, type FileDownloadResult } from "@gleam/core";
 
 type DownloadsApi = Pick<typeof Browser.downloads, "download" | "search" | "erase" | "onChanged">;
 type PermissionsApi = Pick<typeof Browser.permissions, "contains" | "onAdded">;
@@ -89,7 +89,7 @@ export function createDownloadPort(options: DownloadPortOptions = {}): DownloadP
       } catch (error) {
         // Chrome rejects with "Download canceled" when the user dismisses
         // the save dialog before the download is created.
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         return { ok: false, reason: /cancel/i.test(message) ? "cancelled" : "failed" };
       }
       const result = await settled(api, id, filename, settleTimeoutMs);

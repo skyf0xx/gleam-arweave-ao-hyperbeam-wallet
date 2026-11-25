@@ -5,7 +5,7 @@ import { runFile } from "./file.ts";
 import { runFinish } from "./finish.ts";
 import { runNext } from "./next.ts";
 import { runStart } from "./start.ts";
-import { fail, type Deps, type Outcome } from "./shared.ts";
+import { errorMessage, fail, type Deps, type Outcome } from "./shared.ts";
 
 const USAGE = "Usage: pnpm scan start [--area <id>] | pnpm scan finish [--area <id>] | pnpm scan file | pnpm scan next [--json]";
 const COMMANDS = ["start", "finish", "file", "next"] as const;
@@ -49,7 +49,7 @@ export async function main(argv: string[], deps: Deps, io: { out: (text: string)
             ? runFile(deps)
             : runNext(deps));
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = errorMessage(error);
       outcome = fail(command, [{ path: "scan", message: `Unexpected error (${reason}); run the command again, and if it repeats tell the user.` }]);
     }
   }
