@@ -55,6 +55,7 @@ interface ScanRewards {
 
 const HOUR_MS = 3_600_000;
 const STATS_TTL_MS = 60_000;
+const SHARED_CACHE_CONTROL = `public, max-age=${STATS_TTL_MS / 1000}`;
 const ATTESTATION_PATHS = ["/attestations", "/attestations/check"];
 // An attestation carries a report of up to 20,000 characters.
 const ATTESTATION_BODY_LIMIT = 160 * 1024;
@@ -86,9 +87,10 @@ export function createApp(deps: AppDeps): Hono {
   const rewardsByIp = new RateLimiter(600, HOUR_MS);
   const areasByIp = new RateLimiter(600, HOUR_MS);
   const nextByIp = new RateLimiter(120, HOUR_MS);
-  let rewardsCache: { body: ScanRewards; expiresAt: number } | null = null;
-  let areasCache: { body: { release: string; areas: AreaSummary[] }; expiresAt: number } | null = null;
-  let statsCache: { foundingMembers: number; expiresAt: number } | null = null;
+  const nowMs = () => now().getTime();
+  const rewardsCache = ttlCache<ScanRewards>(STATS_TTL_MS, nowMs);
+  const areasCache = ttlCache<{ release: string; areas: AreaSummary[] }>(STATS_TTL_MS, nowMs);
+  const statsCache = ttlCache<number>(STATS_TTL_MS, nowMs);
 
   // Route middleware, so the limit runs before the body is read.
   const limit = (limiter: RateLimiter) =>
@@ -130,12 +132,13 @@ export function createApp(deps: AppDeps): Hono {
   // Read by static pages on other origins.
   app.use("/stats", cors({ origin: "*" }));
   app.get("/stats", limit(statsByIp), async (c) => {
-    if (!statsCache || now().getTime() >= statsCache.expiresAt) {
-      const { rows } = await deps.db.query<{ count: string }>("SELECT count(founding_number)::text AS count FROM wallets");
-      statsCache = { foundingMembers: Number(rows[0]!.count), expiresAt: now().getTime() + STATS_TTL_MS };
-    }
-    c.header("Cache-Control", "public, max-age=60");
-    return c.json({ foundingMembers: statsCache.foundingMembers });
+    const foundingMembers =
+      statsCache.get() ??
+      statsCache.set(
+        Number((await deps.db.query<{ count: string }>("SELECT count(founding_number)::text AS count FROM wallets")).rows[0]!.count),
+      );
+    c.header("Cache-Control", SHARED_CACHE_CONTROL);
+    return c.json({ foundingMembers });
   });
 
   // Proxies CoinGecko/CoinPaprika for users whose network blocks them. Only
@@ -222,13 +225,14 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   app.get("/scan/areas", scanLimit(areasByIp), async (c) => {
-    if (!areasCache || now().getTime() >= areasCache.expiresAt) {
+    let body = areasCache.get();
+    if (!body) {
       const outcome = await listAreas(deps.db, github);
       if (!outcome.ok) return scanFailure(c, outcome);
-      areasCache = { body: outcome.body, expiresAt: now().getTime() + STATS_TTL_MS };
+      body = areasCache.set(outcome.body);
     }
-    c.header("Cache-Control", "public, max-age=60");
-    return c.json(areasCache.body);
+    c.header("Cache-Control", SHARED_CACHE_CONTROL);
+    return c.json(body);
   });
 
   app.get("/scan/next", scanLimit(nextByIp), async (c) => {
@@ -237,21 +241,19 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   app.get("/scan/rewards", scanLimit(rewardsByIp), async (c) => {
-    if (!rewardsCache || now().getTime() >= rewardsCache.expiresAt) {
+    let body = rewardsCache.get();
+    if (!body) {
       const [basis, pool] = await Promise.all([scanRewardBasis(deps.db, now()), poolBalance(deps.db)]);
-      rewardsCache = {
-        body: {
-          day: basis.day,
-          issuedAtomic: basis.issuedAtomic.toString(),
-          scanRewardAtomic: basis.rewardAtomic.toString(),
-          bountyPoolAtomic: pool.toString(),
-          roundStepPercent: ROUND_STEP_PERCENT,
-        },
-        expiresAt: now().getTime() + STATS_TTL_MS,
-      };
+      body = rewardsCache.set({
+        day: basis.day,
+        issuedAtomic: basis.issuedAtomic.toString(),
+        scanRewardAtomic: basis.rewardAtomic.toString(),
+        bountyPoolAtomic: pool.toString(),
+        roundStepPercent: ROUND_STEP_PERCENT,
+      });
     }
-    c.header("Cache-Control", "public, max-age=60");
-    return c.json(rewardsCache.body);
+    c.header("Cache-Control", SHARED_CACHE_CONTROL);
+    return c.json(body);
   });
 
   app.post("/attestations/check", scanLimit(checkByIp), async (c) => {
@@ -271,7 +273,7 @@ export function createApp(deps: AppDeps): Hono {
   app.get("/attestations/count", scanLimit(attestationsListByIp), async (c) => {
     const outcome = await countAttestations(deps.db, github, c.req.query());
     if (!outcome.ok) return scanFailure(c, outcome);
-    c.header("Cache-Control", "public, max-age=60");
+    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json({ release: outcome.release, total: outcome.total, paidPlacesLeft: outcome.paidPlacesLeft, paidScans: outcome.paidScans });
   });
 
@@ -280,11 +282,23 @@ export function createApp(deps: AppDeps): Hono {
     if ("ok" in query) return scanFailure(c, query);
     const outcome = await listAttestations(deps.db, github, attestationListings, query);
     if (!outcome.ok) return scanFailure(c, outcome);
-    c.header("Cache-Control", "public, max-age=60");
+    c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json(outcome.listing);
   });
 
   return app;
+}
+
+/** Holds one value for `ttlMs`; `set` returns the value so a miss reads `get() ?? set(await load())`. */
+function ttlCache<T>(ttlMs: number, nowMs: () => number) {
+  let entry: { value: T; expiresAt: number } | null = null;
+  return {
+    get: (): T | undefined => (entry && nowMs() < entry.expiresAt ? entry.value : undefined),
+    set: (value: T): T => {
+      entry = { value, expiresAt: nowMs() + ttlMs };
+      return value;
+    },
+  };
 }
 
 function scanFailure(c: Context, failure: ScanFailure) {
