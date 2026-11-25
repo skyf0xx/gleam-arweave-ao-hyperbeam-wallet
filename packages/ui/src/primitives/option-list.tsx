@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { CheckIcon } from "./copy-icons";
 
 /**
  * A labelled group of `OptionRow`s, for screens where the user picks one
@@ -84,6 +85,51 @@ export function OptionRow({
           </svg>
         </span>
       )}
+    </button>
+  );
+}
+
+export interface ChoiceRowProps {
+  selected: boolean;
+  onSelect: () => void;
+  disabled?: boolean;
+  /**
+   * One of a `radiogroup` (the default): the check holds its width so rows
+   * line up. Off, the row is a plain button that shows a check only when
+   * selected.
+   */
+  radio?: boolean;
+  /** Replaces the check drawn when selected. */
+  checkIcon?: ReactNode;
+  children: ReactNode;
+}
+
+/** One pick in a list where the chosen row is marked with a check. */
+export function ChoiceRow({ selected, onSelect, disabled, radio = true, checkIcon, children }: ChoiceRowProps) {
+  const check = checkIcon ?? <CheckIcon size={16} />;
+  return (
+    <button
+      type="button"
+      role={radio ? "radio" : undefined}
+      aria-checked={radio ? selected : undefined}
+      disabled={disabled}
+      onClick={onSelect}
+      className={
+        radio
+          ? "-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3 text-left phone:py-3.5 hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+          : "-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-2.5 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
+      }
+    >
+      {children}
+      {radio ? (
+        <span aria-hidden="true" className="w-4 flex-shrink-0 text-foreground">
+          {selected ? check : null}
+        </span>
+      ) : selected ? (
+        <span aria-hidden="true" className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground">
+          {check}
+        </span>
+      ) : null}
     </button>
   );
 }

@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
 import { FIAT_CURRENCIES, TOKEN_CURRENCIES, type DisplayCurrency, type RuntimePort } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
+import { ChoiceRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
 import { SearchField } from "@gleam/ui/src/primitives/search-field.tsx";
 import { useDisplaySettings } from "../../../display-settings";
 import { useLocale, useT } from "../../../i18n";
-import { CheckIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 /**
  * Picks the currency every balance and price is shown in: AO and AR first,
@@ -72,21 +71,11 @@ export function DisplayCurrencyView({ runtime, onBack }: DisplayCurrencyViewProp
   const renderOption = (option: CurrencyOption, symbol: string, shownName: string) => {
     const selected = settings?.currency === option.code;
     return (
-      <button
-        key={option.code}
-        type="button"
-        role="radio"
-        aria-checked={selected}
-        onClick={() => void choose(option.code)}
-        className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3 text-left phone:py-3.5 hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
-      >
+      <ChoiceRow key={option.code} selected={selected} onSelect={() => void choose(option.code)}>
         <span className="w-10 flex-shrink-0 text-label font-semibold text-foreground">{option.code}</span>
         <span className="min-w-0 flex-1 truncate text-label text-muted">{shownName}</span>
         {symbol && symbol !== option.code ? <span className="flex-shrink-0 text-label text-faint">{symbol}</span> : null}
-        <span aria-hidden="true" className="w-4 flex-shrink-0 text-foreground">
-          {selected ? <CheckIcon size={16} /> : null}
-        </span>
-      </button>
+      </ChoiceRow>
     );
   };
 

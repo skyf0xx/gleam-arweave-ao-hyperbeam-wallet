@@ -21,6 +21,7 @@ import { BackupSection } from "./BackupSection";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
 import { useT, type MessageKey } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { ChoiceRow } from "@gleam/ui/src/primitives/option-list.tsx";
 
 const TIMEOUT_OPTIONS = [
   { value: "never", key: "lockSettings.timeoutNever" },
@@ -181,25 +182,18 @@ export function LockSettingsView({
                 const selected =
                   state.settings?.autoLockTimeout === option.value;
                 return (
-                  <button
+                  <ChoiceRow
                     key={option.value}
-                    type="button"
+                    radio={false}
+                    selected={selected}
                     disabled={savingTimeout !== null}
-                    onClick={() => void handleSelectTimeout(option.value)}
-                    className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-2.5 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
+                    onSelect={() => void handleSelectTimeout(option.value)}
+                    checkIcon={<CheckIcon />}
                   >
                     <span className="flex-1 text-label font-semibold text-foreground">
                       {t(option.key)}
                     </span>
-                    {selected ? (
-                      <span
-                        aria-hidden="true"
-                        className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground"
-                      >
-                        <CheckIcon />
-                      </span>
-                    ) : null}
-                  </button>
+                  </ChoiceRow>
                 );
               })
             )}
