@@ -43,6 +43,7 @@ import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
 import { feeText, type RecipientRisk, type TransferContext, type TransferRequest } from "../../../transfer-review/model";
+import { InlineInput } from "@gleam/ui/src/primitives/inline-input.tsx";
 
 /**
  * Compose → review → success, internal step state only (same "no router"
@@ -960,7 +961,7 @@ export function RecipientField({
         />
       ) : (
         <div className="relative">
-          <input
+          <InlineInput
             type="text"
             spellCheck={false}
             aria-label={t("send.recipientAddress")}
@@ -976,7 +977,7 @@ export function RecipientField({
               if (!pickedRef.current) onBlurRecipient();
             }}
             placeholder={t("send.pasteAddress")}
-            className="w-full border-0 border-b border-line bg-transparent px-0 py-3 font-mono text-label leading-relaxed text-foreground focus:outline-none"
+            className="w-full py-3 font-mono leading-relaxed"
           />
           {showDropdown ? (
             <div
@@ -1103,7 +1104,7 @@ function SaveAddressInline({
       </label>
       {expanded ? (
         <div className="flex items-center gap-2">
-          <input
+          <InlineInput
             type="text"
             autoFocus
             value={name}
@@ -1112,7 +1113,7 @@ function SaveAddressInline({
               if (event.key === "Enter") onConfirm();
             }}
             placeholder={t("send.enterAddressName")}
-            className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
+            className="min-w-0 flex-1"
           />
           <button
             type="button"
@@ -1640,7 +1641,7 @@ export function SuccessStep({
         <div className="w-full text-left">
           {showSave ? (
             <div className="flex items-center gap-2">
-              <input
+              <InlineInput
                 type="text"
                 autoFocus
                 value={name}
@@ -1651,7 +1652,7 @@ export function SuccessStep({
                   setSaved(true);
                 }}
                 placeholder={t("send.enterAddressName")}
-                className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
+                className="min-w-0 flex-1"
               />
               <button
                 type="button"

@@ -9,6 +9,7 @@ import { useT } from "../../../i18n";
 import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { errorText } from "../../../i18n/errors";
+import { InlineInput } from "@gleam/ui/src/primitives/inline-input.tsx";
 
 /**
  * Adds a token by its process id, for one the wallet hasn't received yet.
@@ -125,7 +126,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-6 phone:pt-4">
         <div>
           <div className="flex flex-col gap-2 py-3.5">
-            <input
+            <InlineInput
               type="text"
               placeholder={t("manageTokens.placeholder")}
               value={newProcessId}
@@ -143,7 +144,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 const processId = newProcessId.trim();
                 if (processId.length > 0 && !isValidArweaveAddress(processId)) void handlePreview(processId);
               }}
-              className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
+              className="w-full font-mono"
             />
             {addError ? (
               <InlineError as="span">

@@ -13,6 +13,7 @@ import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
 import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
+import { InlineInput } from "@gleam/ui/src/primitives/inline-input.tsx";
 
 /**
  * Settings' Contacts screen — "Address book, part 2" per `todo.md`. A flat
@@ -143,15 +144,15 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
 
       {adding ? (
         <div className="flex flex-col gap-2 px-[18px] py-3 phone:px-5">
-          <input
+          <InlineInput
             type="text"
             autoFocus
             value={newName}
             onChange={(event) => setNewName(event.target.value.slice(0, MAX_NAME_LENGTH))}
             placeholder={t("contacts.name")}
-            className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
+            className="w-full"
           />
-          <input
+          <InlineInput
             type="text"
             value={newAddress}
             onChange={(event) => setNewAddress(event.target.value.trim())}
@@ -159,7 +160,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
               if (event.key === "Enter") handleAdd();
             }}
             placeholder={t("contacts.addressPlaceholder")}
-            className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
+            className="w-full font-mono"
           />
           {addError ? (
             <InlineError as="span">
@@ -207,7 +208,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
           contacts.map((contact) =>
             editingAddress === contact.address ? (
               <div key={contact.address} className="flex items-center gap-2 px-3.5 py-2 phone:px-0">
-                <input
+                <InlineInput
                   type="text"
                   autoFocus
                   value={editingName}
@@ -217,7 +218,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                     if (event.key === "Escape") setEditingAddress(null);
                   }}
                   onBlur={() => commitEdit(contact.address)}
-                  className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
+                  className="min-w-0 flex-1"
                 />
               </div>
             ) : (
