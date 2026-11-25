@@ -1,5 +1,7 @@
-import type { BackupStatus, StoragePort, VaultEnvelopeV2 } from "@gleam/core";
+import { z } from "zod";
+import { isRecord, type BackupStatus, type StoragePort, type VaultEnvelopeV2 } from "@gleam/core";
 import { updateStored } from "../storage-update";
+import { schemaGuard } from "../schema-guard";
 import { BACKUP_KEY, BACKUP_STATE_KEY } from "../storage-keys";
 
 /** `local:backupKey`: which backup this install writes, and its key wrapped under the vault password. */
@@ -18,28 +20,21 @@ export interface BackupState {
   problem: BackupStatus["problem"];
 }
 
-function isStoredBackupKey(value: unknown): value is StoredBackupKey {
-  if (value === null || typeof value !== "object") return false;
-  const { backupId, wrapped } = value as Record<string, unknown>;
-  // `unwrapBackupKey` checks the envelope's fields; a malformed one reads as a failed unlock of the backup.
-  return typeof backupId === "string" && backupId.length > 0 && wrapped !== null && typeof wrapped === "object";
-}
+// `unwrapBackupKey` checks the envelope's fields; a malformed one reads as a failed unlock of the backup.
+const isStoredBackupKey = schemaGuard<StoredBackupKey>(
+  z.object({ backupId: z.string().min(1), wrapped: z.unknown().refine(isRecord) }),
+);
 
-function isTimeOrNull(value: unknown): value is number | null {
-  return value === null || typeof value === "number";
-}
+const timeOrNull = z.number().nullable();
 
-function isBackupState(value: unknown): value is BackupState {
-  if (value === null || typeof value !== "object") return false;
-  const { writer, lastWriteAt, dirtyAt, problem } = value as Record<string, unknown>;
-  return (
-    typeof writer === "string" &&
-    writer.length > 0 &&
-    isTimeOrNull(lastWriteAt) &&
-    isTimeOrNull(dirtyAt) &&
-    (problem === null || problem === "signIn" || problem === "missing" || problem === "otherPassword")
-  );
-}
+const isBackupState = schemaGuard<BackupState>(
+  z.object({
+    writer: z.string().min(1),
+    lastWriteAt: timeOrNull,
+    dirtyAt: timeOrNull,
+    problem: z.enum(["signIn", "missing", "otherPassword"]).nullable(),
+  }),
+);
 
 export async function loadBackupKey(storage: StoragePort): Promise<StoredBackupKey | null> {
   const raw = await storage.get<unknown>(BACKUP_KEY);

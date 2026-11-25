@@ -7,7 +7,6 @@ import {
   matchUserError,
   type Collectible,
   type CollectibleRef,
-  type Contact,
   type RuntimePort,
   type TransferFeeQuote,
   type WalletSummary,
@@ -17,18 +16,22 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { t, useT } from "../../../i18n";
-import { useActivity } from "../../activity/src/useActivity";
-import { useContacts, useSaveContact } from "../../activity/src/useContacts";
-import { useOtherWallets } from "../../activity/src/useOtherWallets";
-import { useSendCollectible } from "../../activity/src/useSendCollectible";
+import { useActivity } from "../../activity";
+import { useSendCollectible } from "../../activity";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
-import { namedSuggestions, NetworkFeeLine, RecipientField, SavedAddressesStep, SuccessStep } from "./SendView";
+import { namedSuggestions } from "./namedAddresses";
+import { NetworkFeeLine } from "./NetworkFeeLine";
+import { RecipientField } from "./RecipientField";
+import { SavedAddressesStep } from "./SavedAddressesStep";
+import { SuccessStep } from "./SuccessStep";
 import { fetchCollectibleFeeQuote, useCollectibleFeeQuote, useRecipientAssessment } from "./useSendQuotes";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
 import type { TransferRequest } from "../../../transfer-review/model";
+import { useKnownAddresses } from "./useKnownAddresses";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
@@ -84,22 +87,17 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
   const t = useT();
   const [step, setStep] = useState<Step>(composeStep());
   const sendMutation = useSendCollectible(runtime, wallet.address);
-  const contactsQuery = useContacts(runtime);
-  const saveContactMutation = useSaveContact(runtime);
-  const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
+  const known = useKnownAddresses(runtime, wallet.id);
+  const { contacts, otherWallets, contactFor, ownWalletFor, saveContactMutation } = known;
   const activityQuery = useActivity(runtime, wallet.address);
-  const contactFor = (address: string): Contact | undefined =>
-    contactsQuery.data?.find((candidate) => candidate.address === address);
-  const ownWalletFor = (address: string): WalletSummary | undefined =>
-    otherWalletsQuery.data?.find((candidate) => candidate.address === address);
   const identity = useAddressIdentity();
   const { emphasisPick } = identity;
   const composeLookalikeOf = useLookalikeOf(
     runtime,
     wallet,
     step.kind === "compose" ? step.recipient : "",
-    contactsQuery.data ?? [],
-    otherWalletsQuery.data ?? [],
+    contacts,
+    otherWallets,
   );
   const queryClient = useQueryClient();
   const ref = refOf(collectible);
@@ -164,7 +162,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             knownName={parsed.success ? (contactFor(parsed.data) ?? ownWalletFor(parsed.data))?.name : undefined}
             emphasisPick={emphasisPick}
             lookalikeOf={composeLookalikeOf}
-            suggestions={namedSuggestions(contactsQuery.data ?? [], otherWalletsQuery.data ?? [], activityQuery.data)}
+            suggestions={namedSuggestions(contacts, otherWallets, activityQuery.data)}
             onChangeRecipient={(recipient) =>
               setStep({ ...step, recipient, recipientError: undefined, error: undefined, showSaveAddress: false, saveAddressName: "" })
             }
@@ -195,9 +193,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           {/* A collectible send has no amount field to carry a failed quote, so the reason shows where the fee would. */}
           {quotedRecipient !== undefined && unsupported === null && !step.error ? (
             feeQuoteQuery.isError ? (
-              <div role="alert" className="text-label leading-snug text-warning">
+              <InlineError size="label" as="div">
                 {errorText(feeQuoteQuery.error)}
-              </div>
+              </InlineError>
             ) : (
               <NetworkFeeLine quote={feeQuoteQuery} />
             )
@@ -210,9 +208,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           ) : null}
 
           {step.error ? (
-            <div role="alert" className="text-label leading-snug text-warning">
+            <InlineError size="label" as="div">
               {step.error}
-            </div>
+            </InlineError>
           ) : null}
 
           <ScreenFooter>
@@ -230,10 +228,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
       <SavedAddressesStep
         runtime={runtime}
         wallet={wallet}
-        contacts={contactsQuery.data ?? []}
-        contactsLoading={contactsQuery.isLoading}
-        otherWallets={otherWalletsQuery.data ?? []}
-        otherWalletsLoading={otherWalletsQuery.isLoading}
+        {...known.listProps}
         onSelect={(recipient) => setStep(composeStep(recipient))}
         onBack={() => setStep(composeStep(step.recipient))}
       />
@@ -317,9 +312,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
         )}
       >
         {step.error ? (
-          <div role="alert" className="text-label leading-snug text-warning">
+          <InlineError size="label" as="div">
             {step.error}
-          </div>
+          </InlineError>
         ) : null}
         {step.submitting && signsOnDevice ? (
           <p role="status" className="text-label leading-snug text-muted">
@@ -335,9 +330,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
       summary={t("send.summary", { amount: collectible.name, recipient: step.recipient })}
       txId={step.txId}
       onDone={onDone}
-      isSaved={contactFor(step.recipient) !== undefined || ownWalletFor(step.recipient) !== undefined}
-      onSaveAddress={(name) => saveContactMutation.mutate({ address: step.recipient, name })}
-      saving={saveContactMutation.isPending}
+      {...known.successSaveProps(step.recipient)}
     />
   );
 }

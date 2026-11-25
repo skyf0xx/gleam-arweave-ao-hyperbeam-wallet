@@ -3,6 +3,8 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
 import reactHooks from "eslint-plugin-react-hooks";
+import { gleam } from "./eslint-rules/index.js";
+import { FILE_SIZE_CAPS, MAX_LINES } from "./scripts/file-size-caps.mjs";
 
 /**
  * Root ESLint flat config (repo-wide lint plus the import-boundary rule
@@ -17,311 +19,30 @@ import reactHooks from "eslint-plugin-react-hooks";
  * `.dependency-cruiser.cjs` (`pnpm deps:check`) checks the same fences on
  * resolved files, which also catches relative climbs and re-exports.
  */
-// Any path into `packages/core/src/signer`: the `@gleam/core/signer`
-// subpath, any path through `src/signer`, or `../signer` anywhere in a
-// relative path (so `../ao/../signer` counts too). `vault/signer.ts` (the
-// `Signer` interface) is `./signer` from inside `vault/` and stays
-// importable. `dirTail` follows the folder name, so an override can let
-// one file through.
-const signerImport = (dirTail = "(/|$)") =>
-  `^@gleam/core/signer(/|$)|(^|/)(\\.\\.|src)/signer${dirTail}|^\\./signer/`;
-const SIGNER_IMPORT = signerImport();
-const SIGNER_IMPORT_MESSAGE =
-  "Only key-session.ts, wallet-lifecycle.ts, backup.ts and the keyring import core/signer. Sign through a `Signer` from `getSigner(walletId)`.";
-
-// `no-restricted-imports` reads only static `import`/`export … from`, so
-// this catches `import("…")` with a literal path against the same regex.
-const noDynamicImport = {
-  meta: {
-    type: "problem",
-    schema: { type: "array", items: { type: "object", properties: { regex: { type: "string" }, message: { type: "string" } } } },
-  },
-  create(context) {
-    const fences = context.options.map(({ regex, message }) => ({ re: new RegExp(regex), message }));
-    return {
-      ImportExpression(node) {
-        const src = node.source;
-        const path =
-          src.type === "Literal" && typeof src.value === "string"
-            ? src.value
-            : src.type === "TemplateLiteral" && src.expressions.length === 0
-              ? src.quasis[0].value.cooked
-              : null;
-        if (path === null) return;
-        for (const { re, message } of fences) {
-          if (re.test(path)) context.report({ node, message: `'${path}' import is restricted. ${message}` });
-        }
-      },
-    };
-  },
-};
-// A `storage.set(K, …)` in a file that also reads `storage.get(K)` is a
-// read-modify-write, whichever function does the read: another write to K
-// between the two is lost. Such a write goes through `updateStored`
-// (`runtime/src/storage-update.ts`), which runs one update per key at a
-// time. A key is named by its constant: `${PREFIX}${id}` by PREFIX,
-// `keyFor(id)` by keyFor, and a local `const key = …` by what it holds. A
-// read through a helper's parameter (`load(key)`) reads every key, and a
-// write through one writes every key. A whole-value write that doesn't
-// depend on the read takes an eslint-disable with the reason.
-const noStorageReadModifyWrite = {
-  meta: { type: "problem", schema: [] },
-  create(context) {
-    const source = context.sourceCode;
-    const gets = [];
-    const sets = [];
-    const isStorage = (node) => {
-      const name = node.type === "MemberExpression" ? node.property.name : node.type === "Identifier" ? node.name : null;
-      return typeof name === "string" && /storage$/i.test(name);
-    };
-    const ANY = "*";
-    const keyOf = (node, seen = new Set()) => {
-      if (node.type === "TemplateLiteral") {
-        const first = node.expressions[0];
-        return first && node.quasis[0].value.raw === "" ? keyOf(first, seen) : source.getText(node);
-      }
-      if (node.type === "CallExpression") return source.getText(node.callee);
-      if (node.type === "Identifier") {
-        if (/^[A-Z][A-Z0-9_]*$/.test(node.name) || seen.has(node.name)) return node.name;
-        seen.add(node.name);
-        let scope = source.getScope(node);
-        while (scope) {
-          const variable = scope.set.get(node.name);
-          if (variable) {
-            const def = variable.defs[0];
-            if (def?.type === "Parameter") return ANY;
-            if (def?.type === "Variable" && def.node.init) return keyOf(def.node.init, seen);
-            return node.name;
-          }
-          scope = scope.upper;
-        }
-        return node.name;
-      }
-      return source.getText(node);
-    };
-    return {
-      CallExpression(node) {
-        const callee = node.callee;
-        if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return;
-        if (!isStorage(callee.object) || node.arguments.length === 0) return;
-        if (callee.property.name === "get") gets.push(keyOf(node.arguments[0]));
-        else if (callee.property.name === "set") sets.push({ key: keyOf(node.arguments[0]), node });
-      },
-      "Program:exit"() {
-        for (const set of sets) {
-          if (gets.includes(set.key) || gets.includes(ANY) || (set.key === ANY && gets.length > 0)) {
-            context.report({
-              node: set.node,
-              message: `${set.key} is written in a file that reads it. Use updateStored (runtime/src/storage-update.ts), which runs one update per key at a time.`,
-            });
-          }
-        }
-      },
-    };
-  },
-};
-// `.dependency-cruiser.cjs` checks the fences on resolved files, and a
-// computed `import()` path can't be resolved, so it would pass unseen.
-const noComputedImport = {
-  meta: { type: "problem", schema: [] },
-  create(context) {
-    return {
-      ImportExpression(node) {
-        const src = node.source;
-        const literal = src.type === "Literal" || (src.type === "TemplateLiteral" && src.expressions.length === 0);
-        if (!literal) {
-          context.report({ node, message: "import() takes a literal path, so the import fences can check it." });
-        }
-      },
-    };
-  },
-};
-// DESIGN.md's type scale is a set of tokens; a raw `text-[13px]` in a class
-// string is a size outside it.
-const RAW_TEXT_SIZE = /(^|[\s:"'`])text-\[\d+(\.\d+)?(px|rem|em)\]/;
-const typeScale = {
-  meta: { type: "problem", schema: [] },
-  create(context) {
-    const check = (node, text) => {
-      if (RAW_TEXT_SIZE.test(text)) {
-        context.report({ node, message: "Use a DESIGN.md type-scale token (text-caption … text-display-lg, text-micro), not a raw size." });
-      }
-    };
-    return {
-      Literal(node) {
-        if (typeof node.value === "string") check(node, ` ${node.value}`);
-      },
-      TemplateElement(node) {
-        check(node, ` ${node.value.cooked ?? ""}`);
-      },
-    };
-  },
-};
-// Strings from a site, a token process, a tag or a device render through
-// `<UntrustedText>` (bidi controls, zero-width characters), never as bare
-// JSX text. Checks JSX children only; an attribute value is a prop for
-// something else to render. The user's own labels are named in OWN_LABELS.
-const UNTRUSTED_ALWAYS = new Set(["ticker", "tokenTicker", "decodedData"]);
-const UNTRUSTED_ON_TAG = new Set(["name", "value", "walletName"]);
-const UNTRUSTED_PATHS = new Set(["appInfo.name", "summary.text"]);
-const OWN_LABELS = new Set(["wallet", "from", "contact"]);
-const untrustedText = {
-  meta: { type: "problem", schema: [] },
-  create(context) {
-    const nameOf = (node) =>
-      node.type === "Identifier" ? node.name : node.type === "MemberExpression" && !node.computed ? node.property.name : null;
-    const untrusted = (expr) => {
-      const node = expr.type === "ChainExpression" ? expr.expression : expr;
-      if (node.type !== "MemberExpression" || node.computed || node.property.type !== "Identifier") return false;
-      const prop = node.property.name;
-      const object = nameOf(node.object);
-      if (object === null || OWN_LABELS.has(object)) return false;
-      if (UNTRUSTED_PATHS.has(`${object}.${prop}`)) return true;
-      if (UNTRUSTED_ALWAYS.has(prop)) return true;
-      return UNTRUSTED_ON_TAG.has(prop) && /tag/i.test(object);
-    };
-    return {
-      JSXExpressionContainer(node) {
-        if (node.parent.type !== "JSXElement" && node.parent.type !== "JSXFragment") return;
-        if (node.expression.type === "JSXEmptyExpression" || !untrusted(node.expression)) return;
-        const wrapped = context.sourceCode
-          .getAncestors(node)
-          .some((a) => a.type === "JSXElement" && a.openingElement.name.type === "JSXIdentifier" && a.openingElement.name.name === "UntrustedText");
-        if (wrapped) return;
-        context.report({
-          node,
-          message: `${context.sourceCode.getText(node.expression)} comes from a site, token or tag. Render it through <UntrustedText>, never as bare JSX text.`,
-        });
-      },
-    };
-  },
-};
-const gleam = {
-  rules: {
-    "untrusted-text": untrustedText,
-    "type-scale": typeScale,
-    "no-dynamic-import": noDynamicImport,
-    "no-computed-import": noComputedImport,
-    "no-storage-read-modify-write": noStorageReadModifyWrite,
-  },
-};
-// `no-restricted-globals` sees a bare `chrome`, not `globalThis.chrome`.
-const NO_GLOBAL_OBJECT_EXTENSION_API = ["globalThis", "self", "window"].flatMap((object) =>
-  ["chrome", "browser"].map((property) => ({
-    object,
-    property,
-    message: "Shell-free packages never touch extension globals. Reach the platform through a port.",
-  })),
-);
-const signerFence = (regex) => ({
-  "no-restricted-imports": ["error", { patterns: [{ regex, message: SIGNER_IMPORT_MESSAGE }] }],
-  "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
-});
-
-// `packages/runtime` runs in any shell (the extension's service worker, a
-// mobile app), so it reaches a platform only through `Platform`. Block the
-// shells' SDKs, both shells, their `@/` and `~/` aliases, and the extension
-// globals. `(^|/)apps/` also catches a relative climb into `apps/`.
-const RUNTIME_IMPORT = "^(wxt|@capacitor|@capacitor-community|@capgo|@webext-core)(/|$)|(^|/)apps/(extension|mobile)(/|$)|^[@~]/";
-const RUNTIME_IMPORT_MESSAGE =
-  "packages/runtime is shell-free: no wxt, Capacitor plugins, @webext-core or apps/*. Take what you need through `Platform`.";
-const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
-  name,
-  message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
-}));
-const runtimeFence = (...extraPatterns) => ({
-  "no-restricted-imports": [
-    "error",
-    { patterns: [...extraPatterns, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
-  ],
-  "no-restricted-globals": ["error", ...RUNTIME_GLOBALS],
-});
-
-// `packages/app` is every screen, and any shell mounts it, so like the
-// runtime it reaches a platform only through `AppPlatform`. The same SDKs,
-// shells, aliases and globals are blocked.
-const APP_IMPORT_MESSAGE =
-  "packages/app is shell-free: no wxt, Capacitor plugins, @webext-core or apps/*. Take what you need through `AppPlatform`.";
-// The hardware-wallet libraries belong to a shell's signing panels, which
-// it hands the app through `AppPlatform.hardwareWallets`. Imported from
-// `packages/app`, they would land in the popup and the phone bundle.
-const HARDWARE_IMPORT = "^@(keystonehq|ngraveio|ledgerhq)(/|$)";
-const HARDWARE_IMPORT_MESSAGE =
-  "packages/app doesn't import hardware-wallet libraries. The shell provides its signing panels through `AppPlatform.hardwareWallets`.";
-const APP_GLOBALS = ["chrome", "browser"].map((name) => ({
-  name,
-  message: "packages/app never touches extension globals. Add a port to `AppPlatform` and let the shell implement it.",
-}));
-const KEYSTONE_IMPORT_MESSAGE =
-  "packages/keystone is shared by both shells: no wxt, Capacitor plugins, @webext-core or apps/*. Take shell-specific copy or behaviour as props.";
-const KEYSTONE_GLOBALS = ["chrome", "browser"].map((name) => ({
-  name,
-  message: "packages/keystone never touches extension globals. Take what differs per shell as props.",
-}));
-
-// `packages/provider` runs in the page's own world, where anything it
-// loads is reachable by the page, and any shell injects it. Beyond the
-// shell fence, it takes no wallet logic: nothing from core, runtime, app
-// or ui, and from messaging only the page wire contract. A relative climb
-// out of the package counts too.
-const PROVIDER_IMPORT =
-  "^@gleam/(core|runtime|app|ui)(/|$)|(^|/)packages/(core|runtime|app|ui|messaging)(/|$)|^(\\.\\./){2,}(core|runtime|app|ui|messaging)(/|$)|^@gleam/messaging(?!/src/page-protocol(\\.ts)?$)";
-const PROVIDER_IMPORT_MESSAGE =
-  "packages/provider is page-world code: no wxt, Capacitor plugins, @webext-core, shell apps, or @gleam/core/runtime/app/ui, and only page-protocol from @gleam/messaging. Reach the wallet through `ProviderTransport`.";
-const PROVIDER_GLOBALS = ["chrome", "browser"].map((name) => ({
-  name,
-  message: "packages/provider never touches extension globals. Reach the wallet through `ProviderTransport`.",
-}));
-
-// Flat config replaces a rule's options wholesale when a later block sets
-// the same rule, so every block that sets `no-restricted-syntax` spreads
-// in the full list it needs rather than adding to an earlier block's.
-//
-// Wallet pages hold unlocked keys, so markup is never parsed into their
-// DOM: render images through <img> and text through React.
-const NO_HTML_INJECTION = [
-  {
-    selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
-    message: "Don't inject HTML. Render SVG through an <img> data URI and text through React.",
-  },
-  {
-    selector:
-      "AssignmentExpression[left.property.name=/^(inner|outer)HTML$/]:not([right.type='Literal'][right.value=''])",
-    message: "Don't assign HTML. Build nodes with textContent or createElement instead.",
-  },
-  {
-    selector: "CallExpression[callee.property.name=/^(insertAdjacentHTML|createContextualFragment)$/]",
-    message: "Don't parse HTML into the page. Build nodes with textContent or createElement instead.",
-  },
-];
-const NO_RAW_KEY = [
-  {
-    selector: "Identifier[name='JWKInterface']",
-    message:
-      "Raw key material stays in key-session.ts and core/signer. Take a `Signer` (or the `owner` string for public-key work) instead.",
-  },
-  {
-    selector: "Identifier[name='getCachedKey']",
-    message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
-  },
-];
-// An error text a person can reach is translated at display, so a handler
-// names its code (`userErrorMessage`) or marks the English as deliberate
-// (`dappError`); a bare literal would reach a zh-CN popup untranslated.
-const NO_LITERAL_ERROR_THROW = [
-  {
-    selector:
-      "ThrowStatement > NewExpression[callee.name='Error'] > :matches(Literal[value=/./], TemplateLiteral).arguments:first-child",
-    message:
-      "Throw `new Error(userErrorMessage(code))` for text a person can reach, or `new Error(dappError(...))` for English by design.",
-  },
-];
-const NO_DYNAMIC_SIGNER_IMPORT = [
-  {
-    selector: "CallExpression[callee.name='require'], ImportExpression",
-    message: "core/signer uses static imports only, so the import fence above can check them.",
-  },
-];
+import {
+  signerImport,
+  SIGNER_IMPORT,
+  SIGNER_IMPORT_MESSAGE,
+  NO_GLOBAL_OBJECT_EXTENSION_API,
+  signerFence,
+  RUNTIME_IMPORT,
+  RUNTIME_IMPORT_MESSAGE,
+  runtimeFence,
+  APP_IMPORT_MESSAGE,
+  HARDWARE_IMPORT,
+  HARDWARE_IMPORT_MESSAGE,
+  APP_GLOBALS,
+  KEYSTONE_IMPORT_MESSAGE,
+  KEYSTONE_GLOBALS,
+  PROVIDER_IMPORT,
+  PROVIDER_IMPORT_MESSAGE,
+  PROVIDER_GLOBALS,
+  NO_HTML_INJECTION,
+  NO_RAW_KEY,
+  NO_LITERAL_ERROR_THROW,
+  NO_DYNAMIC_SIGNER_IMPORT,
+  maxLines,
+} from "./eslint-rules/fences.js";
 
 export default tseslint.config(
   {
@@ -419,7 +140,7 @@ export default tseslint.config(
       "apps/extension/entrypoints/keyring/main.ts",
       "apps/mobile/src/adapters/session-key-store.ts",
       // Points API test fixtures sign with throwaway keys.
-      "apps/points-api/src/test-signers.ts",
+      "apps/points-api/src/testing/test-signers.ts",
       // Gives tests the in-memory `Keyring` in place of the offscreen one.
       "vitest.setup.ts",
       "packages/runtime/testing/**",
@@ -670,4 +391,11 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // One reason to change per file. Tests, catalogs and fixtures are one thing however long they grow.
+    files: ["**/*.{ts,tsx,js,mjs}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/i18n/messages/**", "**/*.fixtures.ts", "**/testing/**"],
+    rules: { "max-lines": maxLines(MAX_LINES) },
+  },
+  ...Object.entries(FILE_SIZE_CAPS).map(([file, max]) => ({ files: [file], rules: { "max-lines": maxLines(max) } })),
 );

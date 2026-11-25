@@ -7,10 +7,13 @@ import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { useT } from "../../../i18n";
-import { AddressRow } from "../../activity/src/AddressRow";
-import { useContacts, useDeleteContact, useSaveContact } from "../../activity/src/useContacts";
+import { AddressRow } from "../../activity";
+import { useContacts, useDeleteContact, useSaveContact } from "../../activity";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
+import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
+import { InlineInput } from "@gleam/ui/src/primitives/inline-input.tsx";
 
 /**
  * Settings' Contacts screen — "Address book, part 2" per `todo.md`. A flat
@@ -141,15 +144,15 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
 
       {adding ? (
         <div className="flex flex-col gap-2 px-[18px] py-3 phone:px-5">
-          <input
+          <InlineInput
             type="text"
             autoFocus
             value={newName}
             onChange={(event) => setNewName(event.target.value.slice(0, MAX_NAME_LENGTH))}
             placeholder={t("contacts.name")}
-            className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
+            className="w-full"
           />
-          <input
+          <InlineInput
             type="text"
             value={newAddress}
             onChange={(event) => setNewAddress(event.target.value.trim())}
@@ -157,12 +160,12 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
               if (event.key === "Enter") handleAdd();
             }}
             placeholder={t("contacts.addressPlaceholder")}
-            className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
+            className="w-full font-mono"
           />
           {addError ? (
-            <span role="alert" className="text-caption text-warning">
+            <InlineError as="span">
               {addError}
-            </span>
+            </InlineError>
           ) : null}
           <div className="flex justify-end gap-3 pt-1">
             <button
@@ -205,7 +208,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
           contacts.map((contact) =>
             editingAddress === contact.address ? (
               <div key={contact.address} className="flex items-center gap-2 px-3.5 py-2 phone:px-0">
-                <input
+                <InlineInput
                   type="text"
                   autoFocus
                   value={editingName}
@@ -215,7 +218,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                     if (event.key === "Escape") setEditingAddress(null);
                   }}
                   onBlur={() => commitEdit(contact.address)}
-                  className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
+                  className="min-w-0 flex-1"
                 />
               </div>
             ) : (
@@ -229,7 +232,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                   onClick={() => handleDelete(contact)}
                   className="mr-2.5 flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-warning"
                 >
-                  <RemoveIcon />
+                  <CloseIcon />
                 </button>
               </div>
             ),
@@ -252,10 +255,3 @@ function PlusIcon() {
   );
 }
 
-function RemoveIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}

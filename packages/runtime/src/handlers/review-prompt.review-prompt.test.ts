@@ -73,12 +73,12 @@ describe("ReviewPromptHandler", () => {
   });
 
   it("asks after a hardware wallet connected before this visit", async () => {
-    const ledger = wallet({ method: "ledger", createdAt: OPENED - 5_000 });
+    const ledger = wallet({ method: "ledger", device: { kind: "ledger" }, createdAt: OPENED - 5_000 });
     expect(await handler({ "local:wallets": [ledger] }).prompt.get({ since: OPENED })).toEqual({
       kind: "hardware",
       device: "Ledger",
     });
-    const justAdded = wallet({ method: "keystone", createdAt: OPENED + 1 });
+    const justAdded = wallet({ method: "keystone", device: { kind: "keystone", xfp: "1a2b3c4d" }, createdAt: OPENED + 1 });
     expect(await handler({ "local:wallets": [justAdded] }).prompt.get({ since: OPENED })).toBeNull();
   });
 

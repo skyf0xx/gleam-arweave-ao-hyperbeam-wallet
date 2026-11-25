@@ -1,8 +1,10 @@
 import { AO_MU_SIGNERS } from "../arweave/graphql";
 import { tokenMetadataFromTags } from "../arweave/token-metadata";
 import type { TokenMetadata } from "../models/token-metadata";
-import { createAssetScanner, withRequestTimeout } from "./asset-scan";
+import { withRequestTimeout } from "../models/http";
+import { createAssetScanner } from "./asset-scan";
 import { userErrorMessage } from "../models/user-errors";
+import { tagValue } from "../models/tag";
 
 export interface DiscoverTokensOptions {
   address: string;
@@ -93,7 +95,7 @@ export async function discoverTokens(options: DiscoverTokensOptions): Promise<To
       // notice no MU signed through.
       (node) =>
         node.owner && AO_MU_SIGNERS.includes(node.owner.address)
-          ? node.tags.find((tag) => tag.name === "From-Process")?.value
+          ? tagValue(node.tags, "From-Process")
           : null,
     ),
   ]);

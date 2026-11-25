@@ -1,4 +1,7 @@
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
+import { isRecord } from "../models/guards";
+import { isArweaveId } from "../models/arweave-id";
+import { sha256 } from "../models/bytes";
 
 export interface DevicePublicJwk {
   kty: "EC";
@@ -15,25 +18,22 @@ export interface DevicePublicJwk {
  */
 export async function deviceKeyThumbprint(jwk: DevicePublicJwk): Promise<string> {
   const canonical = JSON.stringify({ crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y });
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-  return bytesToBase64Url(new Uint8Array(digest));
+  return bytesToBase64Url(await sha256(new TextEncoder().encode(canonical)));
 }
 
 export { addressFromOwner } from "../keys/address";
 
-const COORDINATE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-
 /** Shape check for a device public key arriving over the wire. */
 export function isDevicePublicJwk(value: unknown): value is DevicePublicJwk {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   return (
     candidate.kty === "EC" &&
     candidate.crv === "P-256" &&
     typeof candidate.x === "string" &&
-    COORDINATE_PATTERN.test(candidate.x) &&
+    isArweaveId(candidate.x) &&
     typeof candidate.y === "string" &&
-    COORDINATE_PATTERN.test(candidate.y)
+    isArweaveId(candidate.y)
   );
 }
 

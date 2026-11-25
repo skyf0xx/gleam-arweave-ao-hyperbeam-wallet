@@ -70,6 +70,10 @@ tests check Gleam's ANS-104 bytes against it.
   `server.url` and no live-update plugin (`capacitor.config.mobile.test.ts`).
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway).
+- `apps/site`: gleamwallet.app, plain HTML with no build step. Each page
+  is a folder (`<page>/index.html` beside its own CSS and JS), shared files
+  are in `shared/`, and `vercel.json` rewrites `/<page>.html` to it so
+  public URLs don't change (`apps/site/README.md`).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
   (spec in `SCANS.md`).
 
@@ -209,6 +213,61 @@ tests check Gleam's ANS-104 bytes against it.
   confirmed it. When a code change makes either one wrong, propose the
   fix and wait.
 
+## Writing code
+
+- **Use what the repo has.** Before writing a helper, search for one.
+  Before hand-writing a parser, guard, retry loop or form, use the
+  package's dependencies: zod for any input from outside, react-query
+  for server state, the `ui` primitives for UI. When nothing in the repo
+  fits a general problem (a parser, a validator, date math), propose a
+  library to the developer before writing one; a new dependency is their
+  call. Hand-written code is the default only where a fence limits
+  imports (`core/signer`).
+- **Extract on the third copy.** Two similar blocks are fine. A change
+  that would add the third copy of a block or a repeated line (a guard,
+  a wrapper, a form) extracts it first. Code that only looks alike
+  stays apart: two error shapes for two readers are two shapes.
+- **Build for the callers that exist.** No parameter, option, interface
+  or generic for a caller that isn't in this change. Generalise when the
+  second real caller arrives.
+- **One reason to change per file.** Before adding a new responsibility
+  to a file, put it in its own module. A file needs splitting when you
+  can only describe it with "and", when it needs section-divider
+  comments to navigate, when its test file has `describe` blocks with
+  unrelated setup, when its parts change in separate commits, or when a
+  React view holds independent state machines or stateful
+  subcomponents. Split along those seams, and only where each piece
+  reads on its own; pieces that would pass half the file's state back
+  and forth stay together. A large file that is one thing (a catalog, a
+  method table, one parser) stays whole.
+- **File size ratchet.** ESLint's `max-lines` is 400 code lines. It
+  is a prompt to look for a seam, not a target: maintainable code wins
+  over the number. A file over it has a cap in
+  `scripts/file-size-caps.mjs` with the reason beside it. Before a change
+  grows a capped file, look for a split along a real seam (§ One reason
+  to change per file), and lower or drop the cap in the same commit as
+  the split. When the file is one thing, or a fence keeps it together,
+  raise the cap with its reason instead. Never squeeze a file under the
+  limit by packing lines or by splitting it where the pieces would pass
+  half its state back and forth.
+- **A module's `index.ts` is its public interface.** Import a module
+  through its `index.ts`, not a file inside it, and keep what it doesn't
+  export private. No barrel that only re-exports other barrels, and no
+  `index.ts` in a one-file folder.
+- **Refactor what you touch.** When the code a change touches or calls
+  is hard to change (copies, hand-written parsing, a helper in the wrong
+  place, dead code), fix it on the same branch, in its own
+  `refactor(<scope>): …` commit ahead of the change that needs it.
+  A refactor changes no behaviour, UX or copy: the tests pass with
+  edits only to imports and call sites. Keep it to the files the change
+  touches or calls; a wider one goes in `todo.md`.
+- **A behaviour change comes with a test** that fails without it: a fix
+  with a test that reproduces the bug, a feature with tests of what it
+  promises.
+- **Surface files.** A refactor of a `security/surface.txt` path costs
+  the next release an audit like any other change there, so make one in
+  passing only when the change already edits that file.
+
 ## Build and check
 
 ```bash
@@ -221,7 +280,9 @@ pnpm test:smoke                            # after wxt:build: loads the built ex
 pnpm vitest run [path-fragment]            # tests
 pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan, tsconfig.scripts.json
 pnpm eslint --max-warnings=0 <files>
-pnpm deps:check                            # the import fences, on resolved files
+pnpm deps:check                            # the import fences and import cycles, on resolved files
+pnpm dup                                   # copied blocks across the repo (jscpd); not a gate
+pnpm health                                # before a release: knip (unused files, exports, deps), jscpd, files at their size cap
 ```
 
 The pre-commit hook (lefthook) runs eslint and gitleaks on staged files,
@@ -238,7 +299,8 @@ extension wiring, it also needs a manual check in Chrome (load
 ## Workflow
 
 Make one Conventional Commit per change (`fix(ao): …`,
-`feat(activity): …`), group related commits on one branch, open one PR
+`feat(activity): …`), with any `refactor:` commits a change needs ahead
+of it, group related commits on one branch, open one PR
 for the branch, and merge it with a merge commit once CI is green
 (`gh pr merge <n> --merge`; the ruleset refuses squash and rebase
 merges). `master` accepts only signed commits through a PR with passing

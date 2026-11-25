@@ -10,6 +10,7 @@ import { RequestHeader } from "../transfer-review/RequestHeader";
 import { UntrustedText } from "./UntrustedText";
 import { DeviceBanner, NameTargetReview, ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromDevice, type TransferContext } from "../transfer-review/model";
+import { Field } from "../transfer-review/FieldLabel";
 
 /**
  * Shown once the user has approved a hardware wallet's request: the
@@ -172,10 +173,9 @@ export function AwaitingDeviceView({
       <div className="flex flex-col gap-5 px-6 pt-5 phone:px-5">
         <DeviceBanner text={t("approval.confirmOnDevice", { device: name })} />
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.signingAs")}</span>
+        <Field label={t("approval.signingAs")}>
           <AddressValue address={device.address} />
-        </div>
+        </Field>
 
         {/* In silica, the rows to compare against the device sit under one lens; the signer stays off it. */}
         <div className="gleam-lens-down flex flex-col gap-3 silica:-mx-6 silica:px-6 silica:pb-5 silica:pt-3 phone:silica:-mx-5 phone:silica:px-5">

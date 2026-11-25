@@ -1,4 +1,8 @@
 import { trimTrailingSlashes } from "../models/network";
+import { z } from "zod";
+import { isPlainRecord, isRecord } from "../models/guards";
+import { isArweaveId } from "../models/arweave-id";
+import { atomicStringSchema } from "../models/atomic-schema";
 /**
  * Spot price of an AO token from its own swap orderbook, the way Bazar
  * shows "Current unit price": the lowest open ask in the token process's
@@ -13,7 +17,6 @@ import { trimTrailingSlashes } from "../models/network";
  * real status is read from `/status` for the few orders that matter.
  */
 const STATE_DEVICES = new Set(["carrier@1.0", "name-token@1.0", "token@1.0"]);
-const ADDRESS = /^[A-Za-z0-9_-]{43}$/;
 const UINT = /^(?:0|[1-9]\d*)$/;
 const MAX_DENOMINATION = 255;
 const READ_TIMEOUT_MS = 10_000;
@@ -65,20 +68,23 @@ async function readMessage(url: string, fetchImpl: typeof fetch, signal: AbortSi
   const response = await fetchImpl(url, { signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = (await response.json()) as unknown;
-  if (typeof body !== "object" || body === null || Array.isArray(body)) throw new Error("Unexpected message body.");
-  return body as Record<string, unknown>;
+  if (!isPlainRecord(body)) throw new Error("Unexpected message body.");
+  return body;
 }
 
 function link(value: unknown): string | null {
   if (typeof value !== "string" || !value.startsWith("ao:")) return null;
   const id = value.slice(3);
-  return ADDRESS.test(id) ? id : null;
+  return isArweaveId(id) ? id : null;
 }
 
-function atomic(value: unknown): bigint | null {
-  const text = typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value;
-  return typeof text === "string" && UINT.test(text) ? BigInt(text) : null;
-}
+/** An order message's fields; `order-id` and `status` are checked where they are used. */
+const orderFieldsSchema = z.object({
+  asking: atomicStringSchema(UINT),
+  quantity: atomicStringSchema(UINT),
+  "order-id": z.unknown().optional(),
+  status: z.unknown().optional(),
+});
 
 async function readOrder(
   orderKey: string,
@@ -89,12 +95,14 @@ async function readOrder(
 ): Promise<Order | null> {
   const id = link(value);
   const message = id ? await readMessage(`${base}/${id}~message@1.0`, fetchImpl, signal) : value;
-  if (typeof message !== "object" || message === null) return null;
-  const fields = message as Record<string, unknown>;
-  const asking = atomic(fields.asking);
-  const quantity = atomic(fields.quantity);
+  const parsed = orderFieldsSchema.safeParse(message);
+  if (!parsed.success) return null;
+  const fields = parsed.data;
   // The key and the order's own id must agree, or the entry is not the order it claims to be.
-  if (fields["order-id"] !== orderKey || asking === null || quantity === null || asking < 1n || quantity < 1n) return null;
+  if (fields["order-id"] !== orderKey || fields.asking === null || fields.quantity === null) return null;
+  const asking = BigInt(fields.asking);
+  const quantity = BigInt(fields.quantity);
+  if (asking < 1n || quantity < 1n) return null;
   return { id: id ?? orderKey, asking, quantity, ...(id === null && typeof fields.status === "string" ? { status: fields.status } : {}) };
 }
 
@@ -118,7 +126,7 @@ function winstonPerToken({ asking, quantity }: Order, denomination: number): big
  * The process id comes from the caller's own token list, never from a ticker.
  */
 export async function readBestAsk(processId: string, nodeUrl: string, fetchImpl: typeof fetch = fetch): Promise<BestAsk | null> {
-  if (!ADDRESS.test(processId)) return null;
+  if (!isArweaveId(processId)) return null;
   const base = trimTrailingSlashes(nodeUrl);
   const signal = AbortSignal.timeout(READ_TIMEOUT_MS);
 
@@ -133,12 +141,12 @@ export async function readBestAsk(processId: string, nodeUrl: string, fetchImpl:
     const ordersId = link(state.orders);
     const table = ordersId
       ? await readMessage(`${base}/${ordersId}~message@1.0`, fetchImpl, signal)
-      : typeof state.orders === "object" && state.orders !== null
-        ? (state.orders as Record<string, unknown>)
+      : isRecord(state.orders)
+        ? state.orders
         : null;
     if (!table) return null;
 
-    const entries = Object.entries(table).filter(([key]) => ADDRESS.test(key));
+    const entries = Object.entries(table).filter(([key]) => isArweaveId(key));
     if (entries.length > MAX_ORDERS) return null;
 
     const orders = (await Promise.all(entries.map(([key, value]) => readOrder(key, value, base, fetchImpl, signal).catch(() => null))))

@@ -11,7 +11,22 @@
       "permanent": false
     }
   ],
-  "rewrites": [{ "source": "/download", "destination": "/download.html" }],
+  "rewrites": [
+    { "source": "/download", "destination": "/download/index.html" },
+    { "source": "/download.html", "destination": "/download/index.html" },
+    { "source": "/welcome.html", "destination": "/welcome/index.html" },
+    { "source": "/goodbye.html", "destination": "/goodbye/index.html" },
+    { "source": "/feedback.html", "destination": "/feedback/index.html" },
+    { "source": "/privacy.html", "destination": "/privacy/index.html" },
+    { "source": "/terms.html", "destination": "/terms/index.html" },
+    { "source": "/security.html", "destination": "/security/index.html" },
+    { "source": "/gleam.html", "destination": "/gleam/index.html" },
+    { "source": "/invite.html", "destination": "/invite/index.html" },
+    { "source": "/points.html", "destination": "/points/index.html" },
+    { "source": "/scan.html", "destination": "/scan/index.html" },
+    { "source": "/attest.html", "destination": "/attest/index.html" },
+    { "source": "/review-results.html", "destination": "/review-results/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

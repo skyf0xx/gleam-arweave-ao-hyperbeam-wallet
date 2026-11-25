@@ -1,16 +1,26 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { errorText } from "@gleam/app/src/i18n/errors.ts";
 import { t, useT } from "@gleam/app/src/i18n/index.tsx";
+import { errorMessage } from "@gleam/core";
 
 /** Rewrites the background's refusals into copy for the connect page. */
 export function backgroundErrorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   if (/unlock/i.test(message)) {
     return t("extension.lockedHelp");
   }
   return errorText(error);
+}
+
+/** Calls `onClose` `ms` after `done` turns true, so the tab closes itself once the device is connected. */
+export function useAutoClose(done: boolean, onClose: () => void, ms: number): void {
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(onClose, ms);
+    return () => clearTimeout(timer);
+  }, [done, onClose, ms]);
 }
 
 export function ConnectShell({ title, children }: { title: string; children: ReactNode }) {

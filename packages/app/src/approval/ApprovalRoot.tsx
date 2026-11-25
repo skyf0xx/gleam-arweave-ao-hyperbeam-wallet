@@ -1,20 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { hostnameOf } from "../hostname";
 import { useT, type MessageKey } from "../i18n";
 import { LocalizedRoot } from "../i18n/LocalizedRoot";
-import type {
-  ApprovalRequest,
-  DeviceSigningRequest,
-  RecipientAssessment,
-  RuntimePort,
-  SecurityPhrase,
-  ThemeSettings,
-  WalletState,
-  WalletSummary,
-} from "@gleam/core";
+import type { ApprovalRequest, RuntimePort, SecurityPhrase, ThemeSettings, WalletState } from "@gleam/core";
 import type { ApprovalShown, AttestationCheck } from "@gleam/messaging/src/protocol.ts";
-import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { securityPhraseIconSvg } from "../security-phrase-icon";
+import { loadSecurityPhrase } from "../security-phrase";
 import {
   AddressIdentityProvider,
   loadAddressIdentityKey,
@@ -32,10 +25,11 @@ import { forgetQueryCache } from "../query-cache/sweep";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
-import { applyDocumentTheme, themeAttribute } from "../theme";
+import { applyStoredTheme, themeAttribute } from "../theme";
 import { LoadSignedDataProvider } from "./SignedDataText";
 import { errorText } from "../i18n/errors";
-import { recipientsOf, transferRequestFromPreview } from "../transfer-review/model";
+import { assessRecipientFor, isShown, needsUnlock, tokensOf, type LoadState } from "./approval-load";
+import { CenteredMessage } from "./CenteredMessage";
 import { useApprovalTransferContext } from "../transfer-review/useApprovalTransferContext";
 import { INPUT_ARM_DELAY_MS, useInputArmed } from "./input-arming";
 import { InputArmedContext } from "./ArmingLabel";
@@ -76,111 +70,14 @@ export interface ApprovalRootProps {
   armDelayMs?: number;
 }
 
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "no-wallet"; runtime: RuntimePort; request: ApprovalRequest }
-  | { kind: "locked"; runtime: RuntimePort; request: ApprovalRequest }
-  | {
-      kind: "ready";
-      runtime: RuntimePort;
-      request: ApprovalRequest;
-      assessment: RecipientAssessment | null;
-      wallet: WalletSummary | null;
-    }
-  | {
-      kind: "awaiting-device";
-      runtime: RuntimePort;
-      request: ApprovalRequest;
-      device: DeviceSigningRequest;
-      wallet: WalletSummary | null;
-    }
-  | { kind: "error"; message: string }
-  | { kind: "done"; message: string }
-  | { kind: "attested"; result: SiteAttestResponse }
-  | { kind: "failed"; message: string };
-
-function isShown(value: unknown): value is ApprovalShown {
-  return typeof value === "object" && value !== null && (value as { shown?: unknown }).shown === "scanAttestation";
-}
-
-/**
- * The wallet that must be unlocked: the one a scan attestation was opened
- * for, which stays its signer even if the user switches wallets, or else
- * the wallet the request signs or sends from, pinned when it was made —
- * the active wallet can be a different one by the time the window loads.
- * Unlock opens every wallet that shares the vault password.
- */
-function needsUnlock(state: WalletState, request: ApprovalRequest): boolean {
-  const unlocked = state.session?.unlockedWalletIds ?? [];
-  const walletId =
-    request.preview.kind === "scanAttestation"
-      ? request.preview.walletId
-      : (request.signingWallet?.id ?? state.activeWalletId);
-  if (walletId === null) return unlocked.length === 0;
-  return !unlocked.includes(walletId);
-}
-
-/**
- * Checks every recipient the request pays, a data item's transfer
- * included, and folds them into one: a batch warns if any recipient is
- * new or a lookalike. Best effort: a failed lookup returns `null`, and the
- * screen then warns without naming a reason.
- */
-async function assessRecipientFor(
-  runtime: RuntimePort,
-  request: ApprovalRequest,
-  walletId: string | null,
-): Promise<RecipientAssessment | null> {
-  const preview = request.preview;
-  if (preview.kind === "connect" || preview.kind === "addToken" || preview.kind === "scanAttestation") return null;
-  const transfer = transferRequestFromPreview(preview);
-  if (!transfer || !walletId) return null;
-  try {
-    const recipients = recipientsOf(transfer);
-    const assessments = await Promise.all(
-      recipients.map((recipient) =>
-        runtime.send<{ walletId: string; recipient: string }, RecipientAssessment | undefined>({
-          type: "assessRecipient",
-          payload: { walletId, recipient },
-        }),
-      ),
-    );
-    if (assessments.some((assessment) => !assessment)) return null;
-    const lookalikeIndex = assessments.findIndex((assessment) => assessment!.lookalikeOf);
-    return {
-      firstTime: assessments.some((assessment) => assessment!.firstTime),
-      lookalikeOf: lookalikeIndex >= 0 ? assessments[lookalikeIndex]!.lookalikeOf : null,
-      // The warning names the known address and compares it against the
-      // recipient that was flagged for it, so the fold keeps that recipient
-      // alongside the address it resembles.
-      lookalikeRecipient: lookalikeIndex >= 0 ? recipients[lookalikeIndex]! : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** The tokens a request moves, for the balances and prices its review reads. */
-function tokensOf(request: ApprovalRequest): Array<string | null> {
-  const preview = request.preview;
-  if (preview.kind === "connect" || preview.kind === "addToken" || preview.kind === "scanAttestation") return [];
-  const transfer = transferRequestFromPreview(preview);
-  if (transfer) return transfer.transfers.filter((line) => !line.collectible).map((line) => line.token);
-  return request.device ? [preview.token] : [];
-}
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
-}
-
 export function ApprovalRoot(props: ApprovalRootProps) {
+  // A short-lived window: a failed read shows its error rather than retrying behind it.
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return (
     <LocalizedRoot>
-      <ApprovalRootContent {...props} />
+      <QueryClientProvider client={queryClient}>
+        <ApprovalRootContent {...props} />
+      </QueryClientProvider>
     </LocalizedRoot>
   );
 }
@@ -204,31 +101,12 @@ function ApprovalRootContent({
     [identityKey, runtime],
   );
 
-  const loadSecurityPhrase = async (runtime: RuntimePort) => {
-    try {
-      const phrase = await runtime.send<void, SecurityPhrase | null>({ type: "getSecurityPhrase", payload: undefined });
-      setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
-    } catch {
-      setSecurityPhrase(null);
-    }
+  const applySecurityPhrase = async (runtime: RuntimePort) => {
+    const phrase = await loadSecurityPhrase(runtime);
+    setSecurityPhrase(phrase ? { phrase, icon: securityPhraseIconSvg(phrase.word) } : null);
   };
 
-  const applyTheme = async (runtime: RuntimePort) => {
-    let stored: ThemeSettings["theme"] = "light";
-    try {
-      const settings = await runtime.send<void, ThemeSettings>({
-        type: "getThemePreference",
-        payload: undefined,
-      });
-      stored = settings.theme;
-    } catch {
-      // Light, as `App` falls back.
-    }
-    // The page behind the root is painted too, or a short request shows
-    // the light page under dark text.
-    applyDocumentTheme(stored);
-    setTheme(stored);
-  };
+  const applyTheme = (runtime: RuntimePort) => applyStoredTheme(runtime, setTheme);
 
   const load = async (runtime: RuntimePort, id: string) => {
     try {
@@ -281,7 +159,7 @@ function ApprovalRootContent({
         await Promise.all([
           load(runtime, requestId),
           applyTheme(runtime),
-          loadSecurityPhrase(runtime),
+          applySecurityPhrase(runtime),
           loadAddressIdentityKey(runtime).then(setIdentityKey),
         ]);
       } catch (error) {
@@ -314,7 +192,7 @@ function ApprovalRootContent({
   const armed = useInputArmed(`${state.kind}:${requestId ?? ""}`, armDelayMs);
   const guardClicks = reviewing !== null && !armed;
   const transferContext = useApprovalTransferContext(
-    reviewing?.runtime ?? null,
+    reviewing?.runtime ?? platform.runtime,
     reviewing?.kind === "awaiting-device" ? reviewing.device.address : (reviewing?.wallet?.address ?? null),
     reviewing ? tokensOf(reviewing.request) : [],
   );
@@ -526,20 +404,5 @@ function ApprovalRootContent({
         </div>
       </div>
     </AddressIdentityProvider>
-  );
-}
-
-function CenteredMessage({ text, tone = "muted" }: { text: string; tone?: "muted" | "warning" }) {
-  if (tone === "warning") {
-    return (
-      <div role="alert" className="flex min-h-full items-center justify-center p-6 text-center text-sm text-warning">
-        {text}
-      </div>
-    );
-  }
-  return (
-    <div className="flex min-h-full items-center justify-center p-6 text-center text-sm text-[#737373]">
-      {text}
-    </div>
   );
 }

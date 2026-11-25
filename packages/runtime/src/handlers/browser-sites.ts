@@ -1,6 +1,11 @@
+import { z } from "zod";
+import { isPlainRecord } from "@gleam/core";
 import type { StoragePort } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
+import { stringList } from "../guards";
+import { schemaGuard } from "../schema-guard";
+import { webOrigin } from "./site-wallet";
 
 /**
  * Background-side implementation of the dApp browser's saved and recent
@@ -51,38 +56,22 @@ export interface BrowserSites {
 /** Raster and SVG images only; an `<img>` never runs an SVG's script. */
 const SITE_ICON = /^data:image\/(?:png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
 
-export function isValidSiteIcon(value: unknown): value is string {
-  return typeof value === "string" && value.length <= MAX_SITE_ICON_LENGTH && SITE_ICON.test(value);
-}
+export const isValidSiteIcon = schemaGuard<string>(z.string().max(MAX_SITE_ICON_LENGTH).regex(SITE_ICON));
 
 /** The origin of an http(s) URL, or throws. */
-function webOrigin(url: string): string {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(userErrorMessage("enterWebAddress"));
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error(userErrorMessage("enterWebAddress"));
-  return parsed.origin;
+function requireWebOrigin(url: string): string {
+  const origin = webOrigin(url);
+  if (origin === null) throw new Error(userErrorMessage("enterWebAddress"));
+  return origin;
 }
 
-function origins(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
-}
-
-export function isValidBrowserVisit(value: unknown): value is BrowserVisit {
-  if (typeof value !== "object" || value === null) return false;
-  const visit = value as Record<string, unknown>;
-  return (
-    typeof visit.url === "string" &&
-    visit.url.length <= MAX_HISTORY_URL_LENGTH &&
-    typeof visit.title === "string" &&
-    visit.title.length <= MAX_TITLE_LENGTH &&
-    typeof visit.at === "number" &&
-    Number.isFinite(visit.at)
-  );
-}
+export const isValidBrowserVisit = schemaGuard<BrowserVisit>(
+  z.object({
+    url: z.string().max(MAX_HISTORY_URL_LENGTH),
+    title: z.string().max(MAX_TITLE_LENGTH),
+    at: z.number(),
+  }),
+);
 
 function visits(raw: unknown): BrowserVisit[] {
   return Array.isArray(raw) ? raw.filter(isValidBrowserVisit) : [];
@@ -97,7 +86,7 @@ function cleanTitle(title: unknown, url: string): string {
 }
 
 function icons(raw: unknown): Record<string, string> {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  if (!isPlainRecord(raw)) return {};
   return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => isValidSiteIcon(entry[1])));
 }
 
@@ -108,7 +97,7 @@ export class BrowserSitesHandler {
   ) {}
 
   private async load(key: string): Promise<string[]> {
-    return origins(await this.storage.get<unknown>(key));
+    return stringList(await this.storage.get<unknown>(key));
   }
 
   async listBrowserSites(): Promise<BrowserSites> {
@@ -130,10 +119,10 @@ export class BrowserSitesHandler {
 
   /** An `icon` that isn't a small image data URL is dropped, and the site is saved without one. */
   async saveBrowserSite(req: { url: string; icon?: string }): Promise<void> {
-    const origin = webOrigin(req.url);
+    const origin = requireWebOrigin(req.url);
     await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => [
       origin,
-      ...origins(raw).filter((entry) => entry !== origin),
+      ...stringList(raw).filter((entry) => entry !== origin),
     ]);
     const icon = req.icon;
     if (isValidSiteIcon(icon)) {
@@ -143,7 +132,7 @@ export class BrowserSitesHandler {
 
   async removeBrowserSite(req: { origin: string }): Promise<void> {
     await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => {
-      const saved = origins(raw);
+      const saved = stringList(raw);
       const next = saved.filter((entry) => entry !== req.origin);
       return next.length !== saved.length ? next : undefined;
     });
@@ -160,9 +149,9 @@ export class BrowserSitesHandler {
    * title that arrived late) updates the newest visit instead of adding one.
    */
   async recordRecentSite(req: { url: string; title?: string }): Promise<void> {
-    const origin = webOrigin(req.url);
+    const origin = requireWebOrigin(req.url);
     await updateStored(this.storage, BROWSER_RECENT_SITES_KEY, (raw) =>
-      [origin, ...origins(raw).filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
+      [origin, ...stringList(raw).filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
     );
     if (req.url.length > MAX_HISTORY_URL_LENGTH) return;
     const visit: BrowserVisit = { url: req.url, title: cleanTitle(req.title, req.url), at: this.now() };

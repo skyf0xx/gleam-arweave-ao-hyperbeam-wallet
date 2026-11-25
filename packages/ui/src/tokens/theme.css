@@ -83,7 +83,7 @@
   --color-beam-green: #28f02d;
 
   /*
-   * Gleam Points ink — the site's Points pages (apps/site/program.css) sit
+   * Gleam Points ink — the site's Points pages (apps/site/shared/program.css) sit
    * on this, and the Points screen's standing card matches them. The same
    * in both themes: ink is the program's surface, not a neutral.
    */

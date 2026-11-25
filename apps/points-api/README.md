@@ -16,18 +16,19 @@ shares its points and scan rules with the wallet through `@gleam/core`.
 - **`app.ts`**: the list of HTTP routes, each of which hands its work to
   one of the modules below.
 - **`db.ts`, `migrate.ts`, `migrations/`**: database access and schema.
-- **Wallets**: `register.ts` links a wallet to a device, `leave.ts`
+- **`wallets/`**: `register.ts` links a wallet to a device, `leave.ts`
   removes it, and `heartbeat.ts` records that a device is still in use.
-- **Invites**: `invite.ts` and `drop-codes.ts` control who is allowed to
-  join.
-- **Points**: `snapshot.ts` and `scheduler.ts` record balances and award
-  points once a day, while `score.ts` reports a device's totals and rank.
-- **Scans**: `scan-challenge.ts` issues a challenge the agent can answer
-  only by reading the code, and `attestations.ts` checks and rewards the
-  finished scan.
-- **`github.ts`**: reads Gleam's releases from GitHub for the scans.
-- **`prices.ts`**: a price service the wallet uses to show token prices.
-- **`bounty.ts`, `funnel.ts`**: command-line scripts for the operator.
+  `invite.ts` and `drop-codes.ts` control who is allowed to join.
+- **`points/`**: `snapshot.ts` (run daily by `scheduler.ts`) records
+  balances and awards points, while `score.ts` reports a device's totals
+  and rank.
+- **`scans/`**: `challenge.ts` issues a challenge the agent can answer
+  only by reading the code, `attestations.ts` checks and rewards the
+  finished scan, and `github.ts` reads Gleam's releases from GitHub.
+  `bounty.ts` backs the operator's award, void and dock scripts.
+- **`prices/`**: a price service the wallet uses to show token prices.
+- **`testing/`**: the test database, GitHub stub and test signers.
+- **`../scripts/`**: command-line scripts for the operator.
 
 ## Location
 

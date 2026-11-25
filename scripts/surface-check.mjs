@@ -12,6 +12,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
 import { parseSurface } from "../security/surface.mjs";
+import { isMain } from "./is-main.mjs";
 
 /** @type {Record<number, string>} */
 const TIER_NAMES = {
@@ -86,4 +87,4 @@ function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+if (isMain(import.meta.url)) main();

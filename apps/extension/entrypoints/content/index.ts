@@ -1,11 +1,11 @@
-import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { injectScript } from "wxt/utils/inject-script";
 import {
+  createOtherWalletDedup,
   EVENT,
+  handlePageRequest,
   OTHER_WALLET,
   REQUEST,
-  RESPONSE,
   SITE_MODE,
   SITE_MODE_REQUEST,
   PROVIDER_SURFACE_METHODS,
@@ -13,10 +13,9 @@ import {
   type PageMessageEnvelope,
   type PageOtherWalletEnvelope,
   type PageRequestEnvelope,
-  type PageResponseEnvelope,
   type PageSiteModeEnvelope,
 } from "@gleam/messaging/src/page-protocol.ts";
-import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import { messenger } from "@/src/adapters/runtime";
 
 /**
  * The content-script half of the page ↔ content bridge: `document_start`,
@@ -44,13 +43,13 @@ import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
  * `wxt/utils/*` (pure, side-effect-free at import time) rather than
  * relied on as WXT's unimport-injected globals, which only exist inside
  * WXT's own build/dev pipeline, never under plain Vitest. Separately,
- * `defineExtensionMessaging<ProtocolMap>()` below throws synchronously
- * outside a real extension context (same `@webext-core/messaging`
- * behavior `App.tsx`'s own doc comment documents) — its test file mocks
- * `@webext-core/messaging` before dynamically importing this module, the
- * same pattern `adapters/runtime.unlock.test.ts` already established.
+ * `defineExtensionMessaging<ProtocolMap>()` in `adapters/runtime.ts`
+ * throws synchronously outside a real extension context (same
+ * `@webext-core/messaging` behavior `App.tsx`'s own doc comment
+ * documents) — its test file mocks `@webext-core/messaging` before
+ * dynamically importing this module, the same pattern
+ * `adapters/runtime.unlock.test.ts` already established.
  */
-const messenger = defineExtensionMessaging<ProtocolMap>();
 
 function isPageRequestEnvelope(value: unknown): value is PageRequestEnvelope {
   return (
@@ -78,18 +77,12 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
-async function relay(envelope: PageRequestEnvelope): Promise<void> {
-  const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
-  try {
-    const result = await messenger.sendMessage("providerCall", {
-      method: envelope.method,
-      params: envelope.params,
-    });
-    response.result = result;
-  } catch (error) {
-    response.error = { message: error instanceof Error ? error.message : String(error) };
-  }
-  window.postMessage(response, location.origin);
+function relay(envelope: PageRequestEnvelope): Promise<void> {
+  return handlePageRequest(
+    envelope,
+    (method, params) => messenger.sendMessage("providerCall", { method, params }),
+    (response) => window.postMessage(response, location.origin),
+  );
 }
 
 export function postProviderEvent(event: string, data: unknown): void {
@@ -110,11 +103,9 @@ export default defineContentScript({
     // The provider sends each of these once per page; a page posting them
     // itself gets no further than that.
     let modeAsked = false;
-    let presenceRelayed = false;
-    let useRelayed = false;
     // Permissions can change on a page (connect after getPermissions), so
     // each distinct list goes through once.
-    let permissionsRelayed = "";
+    const relayed = createOtherWalletDedup();
 
     // Listeners go first: the provider reports another wallet while it
     // installs, before injectScript resolves.
@@ -134,15 +125,11 @@ export default defineContentScript({
           () => postSiteMode(false),
         );
       } else if (isOtherWalletEnvelope(data) && data.permissions !== undefined) {
-        const key = data.permissions.join(",");
-        if (key === permissionsRelayed) return;
-        permissionsRelayed = key;
+        if (!relayed.newPermissions(data.permissions)) return;
         messenger
           .sendMessage("reportOtherWallet", { walletName: data.walletName, used: true, permissions: data.permissions })
           .catch(() => undefined);
-      } else if (isOtherWalletEnvelope(data) && !(data.used ? useRelayed : presenceRelayed)) {
-        presenceRelayed = true;
-        if (data.used) useRelayed = true;
+      } else if (isOtherWalletEnvelope(data) && relayed.firstReport(data.used)) {
         messenger
           .sendMessage("reportOtherWallet", { walletName: data.walletName, used: data.used })
           .catch(() => undefined);

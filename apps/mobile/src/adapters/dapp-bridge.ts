@@ -1,21 +1,22 @@
 import type { DappViewMessage, DappViewNavigation, DappViewPlugin, DappViewRect } from "@gleam/dapp-view";
 import {
+  createOtherWalletDedup,
   EVENT,
+  handlePageRequest,
   OTHER_WALLET,
   PROVIDER_SURFACE_METHODS,
   REQUEST,
-  RESPONSE,
   SITE_MODE,
   SITE_MODE_REQUEST,
   type PageEventEnvelope,
   type PageMessageEnvelope,
-  type PageResponseEnvelope,
   type PageSiteModeEnvelope,
 } from "@gleam/messaging/src/page-protocol.ts";
+import { httpOrigin, isExactHttpOrigin } from "@gleam/core/src/models/site-origin.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import type { TabPush, TabsPort } from "@gleam/runtime";
-import { exposeMethods } from "./comlink-guard";
-import { isExactWebOrigin, TABS_REQUEST } from "./dapp-tabs";
+import { serveOnce } from "./comlink-guard";
+import { TABS_REQUEST } from "./dapp-tabs";
 
 /** The runtime worker's entry for page messages (`RuntimeHost.pageCall`). */
 export interface PageRuntime {
@@ -43,15 +44,6 @@ export interface DappBridge {
   subscribe(onChange: () => void): () => void;
 }
 
-function webOrigin(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.origin : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The origin a message may act as, or null when it must be dropped. Only
  * the top frame speaks for the page, matching the extension's
@@ -62,7 +54,7 @@ function webOrigin(url: string): string | null {
  */
 export function attestedOrigin(message: DappViewMessage): string | null {
   if (message.isMainFrame !== true) return null;
-  return isExactWebOrigin(message.origin) ? message.origin : null;
+  return isExactHttpOrigin(message.origin) ? message.origin : null;
 }
 
 function parseEnvelope(data: unknown): PageMessageEnvelope | null {
@@ -107,7 +99,7 @@ export function createDappBridge({
 }): DappBridge & { listening: Promise<void> } {
   let tab: { id: number; url: string } | null = null;
   let lastTabId = 0;
-  const freshRelays = () => ({ modeAsked: false, presence: false, use: false, permissions: "" });
+  const freshRelays = () => ({ modeAsked: false, otherWallet: createOtherWalletDedup() });
   let relayed = freshRelays();
   const subscribers = new Set<() => void>();
   const notify = () => {
@@ -122,7 +114,7 @@ export function createDappBridge({
   };
 
   const webTab = (): { id: number; url: string; origin: string } | null => {
-    const origin = tab ? webOrigin(tab.url) : null;
+    const origin = tab ? httpOrigin(tab.url) : null;
     return tab && origin ? { ...tab, origin } : null;
   };
 
@@ -148,13 +140,11 @@ export function createDappBridge({
       typeof envelope.id === "string" &&
       PROVIDER_SURFACE_METHODS.includes(envelope.method)
     ) {
-      const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
-      try {
-        response.result = await runtime.pageCall("providerCall", { method: envelope.method, params: envelope.params }, origin, tabId);
-      } catch (error) {
-        response.error = { message: error instanceof Error ? error.message : String(error) };
-      }
-      reply(response, origin);
+      await handlePageRequest(
+        envelope,
+        (method, params) => runtime.pageCall("providerCall", { method, params }, origin, tabId),
+        (response) => reply(response, origin),
+      );
     } else if (envelope.type === SITE_MODE_REQUEST) {
       if (relayed.modeAsked) return;
       relayed.modeAsked = true;
@@ -168,13 +158,9 @@ export function createDappBridge({
     } else if (envelope.type === OTHER_WALLET) {
       const { walletName, used, permissions } = envelope;
       if (Array.isArray(permissions)) {
-        const key = permissions.join(",");
-        if (key === relayed.permissions) return;
-        relayed.permissions = key;
-      } else {
-        if (used ? relayed.use : relayed.presence) return;
-        relayed.presence = true;
-        if (used) relayed.use = true;
+        if (!relayed.otherWallet.newPermissions(permissions)) return;
+      } else if (!relayed.otherWallet.firstReport(used)) {
+        return;
       }
       await runtime.pageCall("reportOtherWallet", { walletName, used, permissions }, origin, tabId).catch(() => undefined);
     }
@@ -182,8 +168,8 @@ export function createDappBridge({
 
   function onNavigation({ url }: DappViewNavigation): void {
     if (typeof url !== "string") return;
-    const origin = webOrigin(url);
-    if (tab && origin !== null && webOrigin(tab.url) === origin) {
+    const origin = httpOrigin(url);
+    if (tab && origin !== null && httpOrigin(tab.url) === origin) {
       tab.url = url;
       notify();
     } else {
@@ -258,11 +244,5 @@ export function createDappBridge({
 
 /** Answers the runtime worker's `createWorkerTabs`. */
 export function serveDappTabs(worker: Worker, tabs: TabsPort): void {
-  let served = false;
-  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
-    const data = event.data as { type?: unknown; port?: unknown } | null;
-    if (served || data?.type !== TABS_REQUEST || !(data.port instanceof MessagePort)) return;
-    served = true;
-    exposeMethods(tabs, ["webTabs", "activeTab", "reload", "send"], data.port);
-  });
+  serveOnce(worker, TABS_REQUEST, tabs, ["webTabs", "activeTab", "reload", "send"]);
 }

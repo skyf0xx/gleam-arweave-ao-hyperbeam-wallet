@@ -35,3 +35,9 @@ export async function readCappedText(response: Response, maxBytes: number): Prom
   const decoder = new TextDecoder();
   return chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join("") + decoder.decode();
 }
+
+/** The response body when it is nothing but digits (after trimming) and within `maxBytes`, else `null`. */
+export async function readCappedDigits(response: Response, maxBytes: number): Promise<string | null> {
+  const text = ((await readCappedText(response, maxBytes)) ?? "").trim();
+  return /^\d+$/.test(text) ? text : null;
+}

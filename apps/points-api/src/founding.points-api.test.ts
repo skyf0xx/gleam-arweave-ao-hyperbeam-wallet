@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createApp, type AppDeps } from "./app";
 import { dbFromPglite, type Db } from "./db";
 import { migrate } from "./migrate";
-import { admitInstall, createTestDb } from "./test-db";
+import { admitInstall, createTestDb } from "./testing/test-db";
 import {
   createTestDevice,
   createTestWallet,
@@ -14,7 +14,7 @@ import {
   registerBody,
   type TestDevice,
   type TestWallet,
-} from "./test-signers";
+} from "./testing/test-signers";
 
 const NOW = new Date("2026-10-08T12:00:00Z");
 const NOW_SECONDS = NOW.getTime() / 1000;

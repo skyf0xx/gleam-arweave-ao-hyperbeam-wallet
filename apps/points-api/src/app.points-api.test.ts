@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
-import { createTestDb } from "./test-db";
+import { createTestDb } from "./testing/test-db";
 
 describe("GET /health", () => {
   it("reports ok once the database answers", async () => {
@@ -11,6 +11,27 @@ describe("GET /health", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
+  });
+});
+
+describe("a body that isn't JSON", () => {
+  const post = async (path: string) => {
+    const app = createApp({ db: await createTestDb() });
+    const response = await app.request(path, { method: "POST", headers: { "content-type": "application/json" }, body: "{not json" });
+    return { status: response.status, json: await response.json() };
+  };
+
+  it.each(["/register", "/invite/redeem", "/heartbeat", "/leave", "/me"])("gets the wallet's malformed answer from %s", async (path) => {
+    expect(await post(path)).toEqual({ status: 400, json: { error: "Malformed request." } });
+  });
+
+  it("gets the invite page's answer from /invite/check", async () => {
+    expect(await post("/invite/check")).toEqual({ status: 400, json: { error: "Malformed invite code." } });
+  });
+
+  it.each(["/attestations", "/attestations/check"])("gets malformed_request from %s", async (path) => {
+    const { status, json } = await post(path);
+    expect([status, json.code]).toEqual([400, "malformed_request"]);
   });
 });
 

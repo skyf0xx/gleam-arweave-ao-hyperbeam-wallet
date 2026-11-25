@@ -234,7 +234,7 @@ describe("key-session", () => {
   });
 
   it("getSigner throws HardwareWalletSigningError for a hardware wallet instead of reporting it locked", async () => {
-    store.set("local:wallets", [{ id: "wallet-a", address: "address-a", method: "keystone", publicKey: "wallet-a-n" }]);
+    store.set("local:wallets", [{ id: "wallet-a", address: "address-a", name: "Keystone", method: "keystone", publicKey: "wallet-a-n", createdAt: 0, updatedAt: 0, encryptedKeyfile: null, backupConfirmedAt: null, device: { kind: "keystone", xfp: "1a2b3c4d" } }]);
 
     await expect(getSigner("wallet-a")).rejects.toBeInstanceOf(HardwareWalletSigningError);
   });
@@ -452,13 +452,26 @@ describe("key-session", () => {
     });
 
     it("enforceAutoLock leaves a hardware-only vault's session alone, as loadSession does", async () => {
-      store.set("local:wallets", [{ id: "wallet-h", address: "address-h", method: "keystone", publicKey: "n" }]);
+      store.set("local:wallets", [{ id: "wallet-h", address: "address-h", name: "Keystone", method: "keystone", publicKey: "n", createdAt: 0, updatedAt: 0, encryptedKeyfile: null, backupConfirmedAt: null, device: { kind: "keystone", xfp: "1a2b3c4d" } }]);
       setSession("5min", Date.now(), ["wallet-h"]);
 
       vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
 
       expect(await enforceAutoLock()).toBe(false);
       expect(store.has("session:unlockedSession")).toBe(true);
+    });
+
+    it("enforceAutoLock still locks when a key record the guard rejects sits beside a hardware wallet", async () => {
+      store.set("local:wallets", [
+        { id: "wallet-h", address: "address-h", name: "Keystone", method: "keystone", publicKey: "n", createdAt: 0, updatedAt: 0, encryptedKeyfile: null, backupConfirmedAt: null, device: { kind: "keystone", xfp: "1a2b3c4d" } },
+        { id: "wallet-x", method: "jwk", fromANewerRelease: true },
+      ]);
+      setSession("5min", Date.now(), ["wallet-h"]);
+
+      vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
+
+      expect(await enforceAutoLock()).toBe(true);
+      expect(store.has("session:unlockedSession")).toBe(false);
     });
 
     it("enforceAutoLock drops the keys once the timeout passes, without any key read", async () => {

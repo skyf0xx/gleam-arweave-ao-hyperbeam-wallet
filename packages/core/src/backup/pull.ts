@@ -8,6 +8,7 @@ import {
   type BackupDevice,
   type BackupRemoved,
 } from "./file";
+import { isPlainRecord } from "../models/guards";
 
 /**
  * What a sync adds to this install and what it records as removed here.
@@ -39,7 +40,7 @@ function idsOf(data: BackupData | undefined, key: string): Set<string> {
 /** A device's removals, keeping only well-formed lists: the field is not checked when a body is read. */
 export function removedOf(device: BackupDevice | undefined): BackupRemoved {
   const removed: unknown = device?.removed;
-  if (removed === null || typeof removed !== "object" || Array.isArray(removed)) return {};
+  if (!isPlainRecord(removed)) return {};
   return Object.fromEntries(
     Object.entries(removed).flatMap(([key, ids]) =>
       Array.isArray(ids) ? [[key, ids.filter((id): id is string => typeof id === "string")]] : [],

@@ -5,6 +5,7 @@ import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validateJWKShape } from "@gleam/core/src/keys/jwk.ts";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { StepForm, StepIntro } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
@@ -66,21 +67,13 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("onboarding.importWallet")} onBack={onBack} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
+      <StepForm
         onSubmit={(event) => {
           event.preventDefault();
           if (pendingJWK) onValidJWK(pendingJWK);
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">
-            {t("onboarding.importKeyfileTitle")}
-          </h1>
-          <p className="text-body leading-relaxed text-muted">
-            {t("onboarding.importKeyfileBody")}
-          </p>
-        </div>
+        <StepIntro title={t("onboarding.importKeyfileTitle")} body={t("onboarding.importKeyfileBody")} />
 
         <FileDropzone
           label={t("onboarding.dropKeyfile")}
@@ -112,7 +105,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
             {t("onboarding.continue")}
           </Button>
         </ScreenFooter>
-      </form>
+      </StepForm>
     </div>
   );
 }

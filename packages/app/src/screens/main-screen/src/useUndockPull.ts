@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { bindTouchGesture } from "@gleam/ui/src/primitives/touch-gesture.ts";
 
 /** A pull that starts with the list at its top, or on its handle. */
 const PULL_PX = 28;
@@ -139,21 +140,13 @@ export function useUndockPull({ docked, section: sectionRef, header: headerRef, 
 
     section.addEventListener("wheel", onWheel, { passive: true });
     const touched = header ? [section, header] : [section];
-    for (const element of touched) {
-      element.addEventListener("touchstart", onTouchStart, { passive: true });
-      element.addEventListener("touchmove", onTouchMove, { passive: false });
-      element.addEventListener("touchend", onTouchEnd);
-      element.addEventListener("touchcancel", onTouchEnd);
-    }
+    const unbind = touched.map((element) =>
+      bindTouchGesture(element, { onStart: onTouchStart, onMove: onTouchMove, onEnd: onTouchEnd }),
+    );
     return () => {
       section.removeEventListener("wheel", onWheel);
       section.style.translate = "";
-      for (const element of touched) {
-        element.removeEventListener("touchstart", onTouchStart);
-        element.removeEventListener("touchmove", onTouchMove);
-        element.removeEventListener("touchend", onTouchEnd);
-        element.removeEventListener("touchcancel", onTouchEnd);
-      }
+      for (const stop of unbind) stop();
     };
   }, [docked, sectionRef, headerRef]);
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  LedgerArweaveClient,
+  errorMessage,
   LedgerError,
   type LedgerArweaveApp,
   type LedgerTransport,
@@ -13,13 +13,14 @@ import {
   connectLedger,
   LedgerCancelled,
   ledgerErrorText,
-  waitForLedgerApp,
+  withLedgerClient,
 } from "@/src/hardware/ledger";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import {
   backgroundErrorText,
   ConnectedNotice,
   ConnectShell,
+  useAutoClose,
 } from "./connect-shared";
 import { t, useT } from "@gleam/app/src/i18n/index.tsx";
 
@@ -57,7 +58,7 @@ interface LedgerDetails {
 }
 
 function addWalletErrorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const duplicate =
     /already in Gleam as (?:the hardware wallet )?"([^"]+)"/.exec(message);
   return duplicate
@@ -80,74 +81,60 @@ export function LedgerConnectView({
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  useEffect(() => {
-    if (step.kind !== "done") return;
-    const timer = setTimeout(onClose, autoCloseMs);
-    return () => clearTimeout(timer);
-  }, [step.kind, onClose, autoCloseMs]);
+  useAutoClose(step.kind === "done", onClose, autoCloseMs);
 
   const start = async () => {
     abortRef.current?.abort();
     const abort = new AbortController();
     abortRef.current = abort;
     const { signal } = abort;
-    let transport: (LedgerTransport & { model?: string }) | null = null;
     setStep({ kind: "connecting" });
     try {
-      const opened = await openTransport();
-      transport = opened;
-      // Closing is what interrupts an exchange the user is still confirming on the device.
-      signal.addEventListener(
-        "abort",
-        () => void opened.close().catch(() => undefined),
-        { once: true },
-      );
-      if (signal.aborted) throw new LedgerCancelled();
-      const client = new LedgerArweaveClient(transport);
-
-      const version = await waitForLedgerApp(client, {
+      await withLedgerClient(
+        openTransport,
         signal,
-        pollMs,
-        appTimeoutMs,
-        keyTimeoutMs,
-        onWaiting: (reason) => setStep({ kind: "waiting", reason }),
-        appTimeoutMessage: t("extension.ledgerAppNotFound", { app: "Arweave" }),
-      });
-
-      let app: LedgerArweaveApp | undefined;
-      try {
-        app = (await client.getAppInfo()).app ?? undefined;
-      } catch (e) {
-        if (!(e instanceof LedgerError)) throw e;
-      }
-
-      const address = await client.getAddress();
-      if (signal.aborted) throw new LedgerCancelled();
-      setStep({ kind: "verify", address });
-      const account = await client.getAccount({ verify: true });
-      if (signal.aborted) throw new LedgerCancelled();
-
-      setStep({
-        kind: "name",
-        account: {
-          owner: account.owner,
-          address: account.address,
-          device: {
-            kind: "ledger",
-            ...(transport.model ? { model: transport.model } : {}),
-            appVersion: `${version.major}.${version.minor}.${version.patch}`,
-            ...(app ? { app } : {}),
-          },
+        {
+          pollMs,
+          appTimeoutMs,
+          keyTimeoutMs,
+          onWaiting: (reason) => setStep({ kind: "waiting", reason }),
+          appTimeoutMessage: t("extension.ledgerAppNotFound", { app: "Arweave" }),
         },
-      });
+        async ({ client, version, transport }) => {
+          let app: LedgerArweaveApp | undefined;
+          try {
+            app = (await client.getAppInfo()).app ?? undefined;
+          } catch (e) {
+            if (!(e instanceof LedgerError)) throw e;
+          }
+
+          const address = await client.getAddress();
+          if (signal.aborted) throw new LedgerCancelled();
+          setStep({ kind: "verify", address });
+          const account = await client.getAccount({ verify: true });
+          if (signal.aborted) throw new LedgerCancelled();
+
+          setStep({
+            kind: "name",
+            account: {
+              owner: account.owner,
+              address: account.address,
+              device: {
+                kind: "ledger",
+                ...(transport.model ? { model: transport.model } : {}),
+                appVersion: `${version.major}.${version.minor}.${version.patch}`,
+                ...(app ? { app } : {}),
+              },
+            },
+          });
+        },
+      );
     } catch (e) {
       if (e instanceof LedgerCancelled || signal.aborted) {
         setStep({ kind: "start" });
       } else {
         setStep({ kind: "error", message: ledgerErrorText(e) });
       }
-    } finally {
-      await transport?.close().catch(() => undefined);
     }
   };
 

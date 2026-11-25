@@ -1,0 +1,232 @@
+// @vitest-environment node
+import { describe, expect, it, vi } from "vitest";
+import type { Balances } from "./balances";
+import type { Db } from "../db";
+import { runSnapshot } from "./snapshot";
+import { createTestDb } from "../testing/test-db";
+
+const NOW = new Date("2026-10-08T00:05:00Z");
+const HOURS_AGO = new Date(NOW.getTime() - 2 * 3_600_000);
+const DAYS_AGO = new Date(NOW.getTime() - 4 * 86_400_000);
+
+async function seed(
+  db: Db,
+  wallets: { address: string; heartbeat: Date; referredBy?: string }[],
+): Promise<void> {
+  for (const [i, wallet] of wallets.entries()) {
+    await db.query("INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ($1, '{}', $2)", [
+      `device-${wallet.address}`,
+      wallet.heartbeat,
+    ]);
+    await db.query("INSERT INTO wallets (address, device_id, invite_code, referred_by) VALUES ($1, $2, $3, $4)", [
+      wallet.address,
+      `device-${wallet.address}`,
+      `CODE${i}`,
+      wallet.referredBy ?? null,
+    ]);
+    await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ($1, $2)", [
+      wallet.address,
+      `device-${wallet.address}`,
+    ]);
+  }
+}
+
+function reader(balances: Record<string, Balances>) {
+  return vi.fn(async (address: string) => {
+    const found = balances[address];
+    if (!found) throw new Error(`gateway down for ${address}`);
+    return found;
+  });
+}
+
+async function pointsByAddress(db: Db) {
+  const { rows } = await db.query<{ address: string; holding: string; referee: string; referrer: string }>(
+    `SELECT address, holding_atomic::text AS holding, referee_bonus_atomic::text AS referee,
+            referrer_bonus_atomic::text AS referrer
+       FROM points ORDER BY address`,
+  );
+  return Object.fromEntries(rows.map(({ address, ...rest }) => [address, rest]));
+}
+
+describe("runSnapshot", () => {
+  it("credits live wallets and their referrers for the UTC day", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { address: "alice", heartbeat: HOURS_AGO },
+      { address: "bob", heartbeat: HOURS_AGO, referredBy: "alice" },
+    ]);
+
+    const summary = await runSnapshot(db, NOW, {
+      readBalances: reader({
+        alice: { arAtomic: "1000", aoAtomic: "0" },
+        bob: { arAtomic: "300", aoAtomic: "200" },
+      }),
+    });
+
+    expect(summary).toEqual({ day: "2026-10-08", walletCount: 2, liveCount: 2, failedCount: 0 });
+    expect(await pointsByAddress(db)).toEqual({
+      alice: { holding: "1000", referee: "0", referrer: "50" },
+      bob: { holding: "500", referee: "50", referrer: "0" },
+    });
+  });
+
+  it("stores the founder bonus for original founders only, not Phase 1 joiners", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { address: "founder", heartbeat: HOURS_AGO },
+      { address: "joiner", heartbeat: HOURS_AGO },
+      { address: "referred", heartbeat: HOURS_AGO, referredBy: "joiner" },
+    ]);
+    await db.query("UPDATE wallets SET original_founder = true WHERE address IN ('founder', 'referred')");
+    const balance = { arAtomic: "1000", aoAtomic: "0" };
+
+    await runSnapshot(db, NOW, { readBalances: reader({ founder: balance, joiner: balance, referred: balance }) });
+
+    const { rows } = await db.query<{ address: string; referee: string; founder: string; referrer: string }>(
+      `SELECT address, referee_bonus_atomic::text AS referee, founder_bonus_atomic::text AS founder,
+              referrer_bonus_atomic::text AS referrer
+         FROM points ORDER BY address`,
+    );
+    expect(rows).toEqual([
+      { address: "founder", referee: "0", founder: "100", referrer: "0" },
+      { address: "joiner", referee: "0", founder: "0", referrer: "100" },
+      { address: "referred", referee: "100", founder: "0", referrer: "0" },
+    ]);
+  });
+
+  it("doesn't read balances for wallets whose install went quiet, and credits them nothing", async () => {
+    const db = await createTestDb();
+    await seed(db, [{ address: "gone", heartbeat: DAYS_AGO }]);
+    const readBalances = reader({});
+
+    const summary = await runSnapshot(db, NOW, { readBalances });
+
+    expect(readBalances).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ liveCount: 0, failedCount: 0 });
+    expect(await pointsByAddress(db)).toEqual({});
+    const { rows } = await db.query<{ live: boolean }>("SELECT live FROM snapshots WHERE address = 'gone'");
+    expect(rows[0]?.live).toBe(false);
+  });
+
+  it("counts a wallet live while any of its installs checks in, and reads its balance once", async () => {
+    const db = await createTestDb();
+    await seed(db, [{ address: "phone", heartbeat: DAYS_AGO }]);
+    await db.query("INSERT INTO devices (id, public_key_jwk, last_heartbeat_at) VALUES ('desktop', '{}', $1)", [HOURS_AGO]);
+    await db.query("INSERT INTO wallet_devices (address, device_id) VALUES ('phone', 'desktop')");
+    const readBalances = reader({ phone: { arAtomic: "100", aoAtomic: "0" } });
+
+    const summary = await runSnapshot(db, NOW, { readBalances });
+
+    expect(readBalances).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ liveCount: 1 });
+    expect(await pointsByAddress(db)).toEqual({ phone: { holding: "100", referee: "0", referrer: "0" } });
+  });
+
+  it("retries a failing read, then leaves out a wallet with no earlier read", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { address: "ok", heartbeat: HOURS_AGO },
+      { address: "flaky", heartbeat: HOURS_AGO },
+    ]);
+    const readBalances = reader({ ok: { arAtomic: "1", aoAtomic: "1" } });
+    const log = vi.fn();
+
+    const summary = await runSnapshot(db, NOW, { readBalances, retryDelayMs: 0, log });
+
+    expect(readBalances.mock.calls.filter(([address]) => address === "flaky")).toHaveLength(5);
+    expect(summary).toMatchObject({ walletCount: 2, liveCount: 1, failedCount: 1 });
+    expect(Object.keys(await pointsByAddress(db))).toEqual(["ok"]);
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(/flaky failed \(gateway down for flaky\); left out/));
+  });
+
+  it("credits a wallet whose reads keep failing from its last live read", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { address: "alice", heartbeat: HOURS_AGO },
+      { address: "bob", heartbeat: HOURS_AGO, referredBy: "alice" },
+    ]);
+    await runSnapshot(db, new Date(NOW.getTime() - 2 * 86_400_000), {
+      readBalances: reader({ alice: { arAtomic: "0", aoAtomic: "0" }, bob: { arAtomic: "50", aoAtomic: "0" } }),
+    });
+    await runSnapshot(db, new Date(NOW.getTime() - 86_400_000), {
+      readBalances: reader({ alice: { arAtomic: "0", aoAtomic: "0" }, bob: { arAtomic: "100", aoAtomic: "0" } }),
+    });
+
+    const summary = await runSnapshot(db, NOW, {
+      readBalances: reader({ alice: { arAtomic: "0", aoAtomic: "0" } }),
+      retryDelayMs: 0,
+      log: () => {},
+    });
+
+    expect(summary).toMatchObject({ liveCount: 2, failedCount: 1 });
+    const { rows } = await db.query<{ address: string; holding: string; referee: string; referrer: string }>(
+      `SELECT address, holding_atomic::text AS holding, referee_bonus_atomic::text AS referee,
+              referrer_bonus_atomic::text AS referrer
+         FROM points WHERE day = '2026-10-08' ORDER BY address`,
+    );
+    expect(rows).toEqual([
+      { address: "alice", holding: "0", referee: "0", referrer: "10" },
+      { address: "bob", holding: "100", referee: "10", referrer: "0" },
+    ]);
+  });
+
+  it("runs once per day", async () => {
+    const db = await createTestDb();
+    await seed(db, [{ address: "alice", heartbeat: HOURS_AGO }]);
+    const readBalances = reader({ alice: { arAtomic: "1", aoAtomic: "0" } });
+
+    await runSnapshot(db, NOW, { readBalances });
+    const second = await runSnapshot(db, new Date(NOW.getTime() + 3_600_000), { readBalances });
+
+    expect(second).toBeNull();
+    expect(readBalances).toHaveBeenCalledTimes(1);
+  });
+
+  it("records an empty day when nobody has registered", async () => {
+    const db = await createTestDb();
+
+    expect(await runSnapshot(db, NOW, { readBalances: reader({}) })).toMatchObject({ walletCount: 0 });
+  });
+
+  describe("bounty pool", () => {
+    const poolRows = (db: Db) =>
+      db.query<{ day: string; delta: string; reason: string }>(
+        "SELECT day::text AS day, delta_atomic::text AS delta, reason FROM bounty_pool ORDER BY day",
+      );
+
+    it("grows by 2% of the day's holding points, once per day", async () => {
+      const db = await createTestDb();
+      await seed(db, [
+        { address: "alice", heartbeat: HOURS_AGO },
+        { address: "bob", heartbeat: HOURS_AGO },
+      ]);
+      const readBalances = reader({ alice: { arAtomic: "1000", aoAtomic: "0" }, bob: { arAtomic: "1500", aoAtomic: "0" } });
+
+      await runSnapshot(db, NOW, { readBalances });
+      expect(await runSnapshot(db, NOW, { readBalances })).toBeNull();
+      await runSnapshot(db, new Date(NOW.getTime() + 86_400_000), { readBalances });
+
+      expect((await poolRows(db)).rows).toEqual([
+        { day: "2026-10-08", delta: "50", reason: "daily" },
+        { day: "2026-10-09", delta: "50", reason: "daily" },
+      ]);
+    });
+
+    it("rounds down and adds no row when the delta is 0", async () => {
+      const db = await createTestDb();
+      await seed(db, [{ address: "alice", heartbeat: HOURS_AGO }]);
+      await runSnapshot(db, NOW, { readBalances: reader({ alice: { arAtomic: "10", aoAtomic: "0" } }) });
+      expect((await poolRows(db)).rows).toEqual([]);
+      await runSnapshot(db, new Date(NOW.getTime() + 86_400_000), { readBalances: reader({ alice: { arAtomic: "99", aoAtomic: "0" } }) });
+      expect((await poolRows(db)).rows).toEqual([{ day: "2026-10-09", delta: "1", reason: "daily" }]);
+    });
+
+    it("refuses a second daily row for the same day", async () => {
+      const db = await createTestDb();
+      await db.query("INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ('2026-10-08', 5, 'daily', now())");
+      await expect(
+        db.query("INSERT INTO bounty_pool (day, delta_atomic, reason, created_at) VALUES ('2026-10-08', 5, 'daily', now())"),
+      ).rejects.toThrow();
+    });
+  });
+});

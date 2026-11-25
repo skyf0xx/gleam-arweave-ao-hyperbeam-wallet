@@ -4,8 +4,10 @@ import { isValidNetworkSettings } from "../models/network";
 import { isPasskeyEnrollment } from "../models/passkey";
 import { readSecurityPhrase } from "../models/security-phrase";
 import { isLockSettings } from "../models/session";
+import { isExactHttpOrigin } from "../models/site-origin";
 import { isValidWallet, type VaultEnvelopeV2, type Wallet } from "../models/wallet";
 import { base64ToBytes, bytesToBase64 } from "../vault/base64";
+import { isPlainRecord, isRecord } from "../models/guards";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -105,16 +107,6 @@ interface BackupRule {
   ok(value: unknown): boolean;
 }
 
-function isWebOrigin(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  try {
-    const url = new URL(value);
-    return (url.protocol === "https:" || url.protocol === "http:") && url.origin === value;
-  } catch {
-    return false;
-  }
-}
-
 function isTokenId(value: unknown): boolean {
   return typeof value === "string" && isValidArweaveAddress(value);
 }
@@ -125,7 +117,7 @@ function isTokenId(value: unknown): boolean {
  * checks the name and falls back to the default.
  */
 function isThemeRecord(value: unknown): boolean {
-  return value !== null && typeof value === "object" && typeof (value as Record<string, unknown>).theme === "string";
+  return isRecord(value) && typeof value.theme === "string";
 }
 
 /**
@@ -143,7 +135,7 @@ const RULES: Readonly<Record<string, BackupRule>> = {
   "local:lockSettings": { list: false, ok: isLockSettings },
   "local:securityPhrase": { list: false, ok: (value) => readSecurityPhrase(value) !== null },
   "local:passkey": { list: false, ok: isPasskeyEnrollment },
-  [SAVED_SITES_BACKUP_KEY]: { list: true, ok: isWebOrigin },
+  [SAVED_SITES_BACKUP_KEY]: { list: true, ok: isExactHttpOrigin },
 };
 
 const WATCHED_TOKENS_RULE: BackupRule = { list: true, ok: isTokenId };
@@ -195,7 +187,7 @@ export function walletsOf(data: BackupData): Wallet[] {
  * written (`writeBackupData`), so a newer release's file still restores.
  */
 export function isValidBackupData(value: unknown): value is BackupData {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!isPlainRecord(value)) return false;
   const data = value as BackupData;
   for (const [key, entry] of Object.entries(data)) {
     const rule = ruleFor(key);
@@ -210,8 +202,8 @@ export function isValidBackupData(value: unknown): value is BackupData {
 const ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
 function isBackupStamp(value: unknown): value is BackupStamp {
-  if (value === null || typeof value !== "object") return false;
-  const { v, backupId, updatedAt, writer } = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const { v, backupId, updatedAt, writer } = value;
   return (
     v === BACKUP_FORMAT_VERSION &&
     typeof backupId === "string" &&
@@ -225,8 +217,8 @@ function isBackupStamp(value: unknown): value is BackupStamp {
 }
 
 function isWrappedKey(value: unknown): value is VaultEnvelopeV2 {
-  if (value === null || typeof value !== "object") return false;
-  const key = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const key = value;
   return (
     key.version === 2 &&
     key.algorithm === "AES-GCM" &&
@@ -245,8 +237,8 @@ export function isValidBackupHeader(value: unknown): value is BackupHeader {
 }
 
 function isBackupPasskey(value: unknown): value is BackupPasskey {
-  if (value === null || typeof value !== "object") return false;
-  const { credentialId, prfSalt, iv, ciphertext } = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const { credentialId, prfSalt, iv, ciphertext } = value;
   return [credentialId, prfSalt, iv, ciphertext].every((field) => typeof field === "string" && field.length > 0);
 }
 
@@ -279,15 +271,15 @@ export function backupPasskeysOf(devices: Record<string, BackupDevice>): BackupP
 }
 
 function isBackupDevice(value: unknown): value is BackupDevice {
-  if (value === null || typeof value !== "object") return false;
-  const { updatedAt, data } = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const { updatedAt, data } = value;
   return typeof updatedAt === "number" && Number.isSafeInteger(updatedAt) && isValidBackupData(data);
 }
 
 export function isValidBackupBody(value: unknown): value is BackupBody {
   if (!isBackupStamp(value)) return false;
   const devices = (value as { devices?: unknown }).devices;
-  if (devices === null || typeof devices !== "object" || Array.isArray(devices)) return false;
+  if (!isPlainRecord(devices)) return false;
   const entries = Object.entries(devices);
   return (
     entries.length <= MAX_BACKUP_DEVICES &&

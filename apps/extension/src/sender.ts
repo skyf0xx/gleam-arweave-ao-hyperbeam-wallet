@@ -1,3 +1,4 @@
+import { httpOrigin } from "@gleam/core/src/models/site-origin.ts";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 
 /**
@@ -38,14 +39,8 @@ export function contentScriptOrigin(sender: MessageSenderLike | undefined, exten
   // The content script runs in the top frame only (`allFrames: false`).
   if (sender.frameId !== undefined && sender.frameId !== 0) return null;
 
-  let urlOrigin: string;
-  try {
-    const url = new URL(sender.url);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    urlOrigin = url.origin;
-  } catch {
-    return null;
-  }
+  const urlOrigin = httpOrigin(sender.url);
+  if (urlOrigin === null) return null;
 
   if (sender.origin !== undefined && sender.origin !== urlOrigin) return null;
   return urlOrigin;

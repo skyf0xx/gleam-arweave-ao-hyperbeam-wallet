@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { BUILT_IN_SITES, knownSite, matchSites, pageTrail, parseAddress, siteHost, type KnownSite } from "./address";
 import { BUILT_IN_ICONS, isMonoIcon } from "./built-in-icons";
@@ -221,7 +222,7 @@ function Section({
   return (
     <section aria-label={title} className="flex flex-col">
       <div className="flex items-center justify-between">
-        <h2 className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{title}</h2>
+        <SettingsSectionTitle as="h2">{title}</SettingsSectionTitle>
         {action}
       </div>
       <div className="flex flex-col">{children}</div>

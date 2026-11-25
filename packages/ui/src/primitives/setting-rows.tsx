@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
@@ -176,5 +176,59 @@ export function SegmentedRow<T extends string>({
         })}
       </div>
     </div>
+  );
+}
+
+/** The small uppercase title over a group of settings rows. */
+export function SettingsSectionTitle({ as: Tag = "div", children }: { as?: "div" | "h2"; children: ReactNode }) {
+  return <Tag className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{children}</Tag>;
+}
+
+/**
+ * A settings row led by an icon tile. With `onClick` the whole row is a
+ * button that opens or runs something; without it, the row is static and
+ * `trailing` carries its own control.
+ */
+export function IconRow({
+  icon,
+  title,
+  description,
+  descriptionTone = "muted",
+  trailing,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  descriptionTone?: "muted" | "warning";
+  trailing?: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const content = (
+    <>
+      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">{icon}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-label font-semibold text-foreground">{title}</span>
+        {description ? (
+          <span className={descriptionTone === "warning" ? "text-caption font-semibold text-warning" : "text-caption text-muted"}>
+            {description}
+          </span>
+        ) : null}
+      </span>
+      {trailing}
+    </>
+  );
+  if (!onClick) return <div className="flex items-center gap-3 py-3.5">{content}</div>;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
+    >
+      {content}
+    </button>
   );
 }

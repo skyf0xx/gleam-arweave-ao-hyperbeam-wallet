@@ -130,7 +130,7 @@ export function isTaggedBinary(value: unknown): value is TaggedBinary {
 
 // `instanceof` is avoided on purpose: WebCrypto results, page values and
 // test globals can each come from a different realm.
-function isArrayBuffer(value: unknown): value is ArrayBuffer {
+export function isArrayBuffer(value: unknown): value is ArrayBuffer {
   return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
 }
 
@@ -144,20 +144,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
  * the JSON serialization of extension messaging and `chrome.storage`.
  */
 export function encodeTaggedBinary(value: unknown): unknown {
-  if (isArrayBuffer(value)) {
-    return { __gleamType: "ArrayBuffer", data: Array.from(new Uint8Array(value)) } satisfies TaggedArrayBuffer;
-  }
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return { __gleamType: "Uint8Array", data: Array.from(bytes) } satisfies TaggedUint8Array;
-  }
-  if (Array.isArray(value)) {
-    return value.map(encodeTaggedBinary);
-  }
-  if (isPlainRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, encodeTaggedBinary(entry)]));
-  }
-  return value;
+  return mapBinaryDeep(value, (bytes, kind) => ({ __gleamType: kind, data: Array.from(bytes) }) as TaggedBinary);
 }
 
 /** The inverse of `encodeTaggedBinary`. */
@@ -311,3 +298,65 @@ export type PageMessageEnvelope =
   | PageSiteModeRequestEnvelope
   | PageSiteModeEnvelope
   | PageOtherWalletEnvelope;
+
+/**
+ * Remembers which other-wallet reports have gone by, so each one is sent
+ * once: the first sighting, the first use, and each distinct permission list.
+ */
+export function createOtherWalletDedup() {
+  let presence = false;
+  let use = false;
+  let permissions = "";
+  return {
+    /** True the first time a report with this `used` goes by; a use also counts as a sighting. */
+    firstReport(used: boolean): boolean {
+      if (used ? use : presence) return false;
+      presence = true;
+      if (used) use = true;
+      return true;
+    },
+    /** True when `list` differs from the last one reported. */
+    newPermissions(list: readonly string[]): boolean {
+      const key = list.join(",");
+      if (key === permissions) return false;
+      permissions = key;
+      return true;
+    },
+  };
+}
+
+/**
+ * Answers a page's request: `call` runs it and `reply` carries the response
+ * back. Only the error's message goes to the page.
+ */
+export async function handlePageRequest(
+  envelope: PageRequestEnvelope,
+  call: (method: ProviderSurfaceMethod, params: unknown) => Promise<unknown>,
+  reply: (response: PageResponseEnvelope) => void,
+): Promise<void> {
+  const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
+  try {
+    response.result = await call(envelope.method, envelope.params);
+  } catch (error) {
+    response.error = { message: error instanceof Error ? error.message : String(error) };
+  }
+  reply(response);
+}
+
+/**
+ * Copies `value` with every `ArrayBuffer` and typed-array view replaced by
+ * `encodeLeaf(bytes, kind)`, walking arrays and plain objects. `kind` is
+ * `ArrayBuffer` for a buffer and `Uint8Array` for any view.
+ */
+export function mapBinaryDeep(
+  value: unknown,
+  encodeLeaf: (bytes: Uint8Array, kind: "ArrayBuffer" | "Uint8Array") => unknown,
+): unknown {
+  if (isArrayBuffer(value)) return encodeLeaf(new Uint8Array(value), "ArrayBuffer");
+  if (ArrayBuffer.isView(value)) return encodeLeaf(new Uint8Array(value.buffer, value.byteOffset, value.byteLength), "Uint8Array");
+  if (Array.isArray(value)) return value.map((entry) => mapBinaryDeep(entry, encodeLeaf));
+  if (isPlainRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, mapBinaryDeep(entry, encodeLeaf)]));
+  }
+  return value;
+}

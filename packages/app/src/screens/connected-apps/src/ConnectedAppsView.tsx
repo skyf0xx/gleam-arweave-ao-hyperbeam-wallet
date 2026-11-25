@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { hostnameOf } from "../../../hostname";
 import type { Grant, RuntimePort, WalletSummary } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { SCOPE_COPY } from "../../../approval/ConnectionRequestScreen";
+import { useConnectedApps, useRevokeGrant } from "./useConnectedApps";
 import { SiteIcon } from "../../site-wallet/src/SiteWalletCard";
 
 /**
@@ -20,14 +23,6 @@ export interface ConnectedAppsViewProps {
   highlightOrigin?: string;
   /** Names each grant's wallet when there is more than one to tell apart. */
   wallets?: readonly WalletSummary[];
-}
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
 }
 
 function canRequestPayments(grant: Grant): boolean {
@@ -62,22 +57,9 @@ function orderGrants(grants: readonly Grant[], highlightOrigin: string | undefin
 
 export function ConnectedAppsView({ runtime, onBack, highlightOrigin, wallets = [] }: ConnectedAppsViewProps) {
   const t = useT();
-  const [grants, setGrants] = useState<Grant[] | null>(null);
-  const [error, setError] = useState<string>();
-
-  const load = useCallback(async () => {
-    setError(undefined);
-    try {
-      const result = await runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined });
-      setGrants(result);
-    } catch (loadError) {
-      setError(errorText(loadError));
-    }
-  }, [runtime]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const grantsQuery = useConnectedApps(runtime);
+  const grants = grantsQuery.data ?? null;
+  const error = grantsQuery.isError ? errorText(grantsQuery.error) : undefined;
 
   const walletNameOf = (walletId: string): string | null =>
     wallets.length > 1 ? (wallets.find((wallet) => wallet.id === walletId)?.name ?? null) : null;
@@ -85,7 +67,7 @@ export function ConnectedAppsView({ runtime, onBack, highlightOrigin, wallets = 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("connectedApps.title")} onBack={onBack} />
-      {error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {error ? <NetworkErrorBanner onRetry={() => void grantsQuery.refetch()} retrying={grantsQuery.isFetching} /> : null}
       <div className="flex flex-1 flex-col px-5 py-4">
         {grants === null ? (
           <>
@@ -102,10 +84,7 @@ export function ConnectedAppsView({ runtime, onBack, highlightOrigin, wallets = 
                 grant={grant}
                 highlighted={grant.origin === highlightOrigin}
                 walletName={walletNameOf(grant.walletId)}
-                onRevoke={async () => {
-                  await runtime.send<{ origin: string }, void>({ type: "revokeGrant", payload: { origin: grant.origin } });
-                  await load();
-                }}
+                runtime={runtime}
               />
             ))}
           </div>
@@ -119,34 +98,26 @@ function GrantRow({
   grant,
   highlighted,
   walletName,
-  onRevoke,
+  runtime,
 }: {
   grant: Grant;
   highlighted: boolean;
   walletName: string | null;
-  onRevoke: () => Promise<void>;
+  runtime: RuntimePort;
 }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [revoking, setRevoking] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const revokeGrant = useRevokeGrant(runtime);
+  const revoking = revokeGrant.isPending;
+  const failed = revokeGrant.isError;
   const hostname = hostnameOf(grant.origin);
   const name = grant.name ?? null;
   const caption = [walletName ? t("connectedApps.connectedTo", { wallet: walletName }) : null, expirySummary(grant, t)]
     .filter(Boolean)
     .join(" · ");
 
-  const revoke = async () => {
-    setRevoking(true);
-    setFailed(false);
-    try {
-      await onRevoke();
-    } catch {
-      setFailed(true);
-      setRevoking(false);
-    }
-  };
+  const revoke = () => revokeGrant.mutate(grant.origin);
 
   return (
     <div className={`flex flex-col gap-2.5 py-2.5 ${highlighted ? "-mx-3 rounded-xl bg-mist px-3" : ""}`}>
@@ -192,7 +163,7 @@ function GrantRow({
             disabled={revoking}
             onClick={() => {
               setConfirming(false);
-              setFailed(false);
+              revokeGrant.reset();
             }}
             className="rounded-md px-2 py-1.5 text-label font-semibold text-muted hover:bg-hover disabled:opacity-50"
           >
@@ -201,7 +172,7 @@ function GrantRow({
           <button
             type="button"
             disabled={revoking}
-            onClick={() => void revoke()}
+            onClick={() => revoke()}
             className="rounded-md px-2 py-1.5 text-label font-semibold text-warning hover:bg-hover disabled:opacity-50"
           >
             {t("connectedApps.revoke")}
@@ -209,9 +180,9 @@ function GrantRow({
         </div>
       ) : null}
       {failed ? (
-        <span role="alert" className="ml-12 text-caption text-warning">
+        <InlineError as="span" className="ml-12">
           {t("connectedApps.revokeFailed")}
-        </span>
+        </InlineError>
       ) : null}
     </div>
   );

@@ -1,5 +1,6 @@
 import { parseAttestation, type Attestation, type ParseAttestationResult } from "./attestation";
 import { canonicalJson } from "./canonical";
+import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 
 /**
  * The `attest.html#<payload>` fragment: base64url (no padding) of the UTF-8
@@ -7,9 +8,7 @@ import { canonicalJson } from "./canonical";
  * compression or other framing.
  */
 export function encodeAttestationPayload(attestation: Attestation): string {
-  let binary = "";
-  for (const byte of new TextEncoder().encode(canonicalJson(attestation))) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return bytesToBase64Url(new TextEncoder().encode(canonicalJson(attestation)));
 }
 
 /** Decodes a payload and runs it through `parseAttestation`, so only a valid attestation comes out. */
@@ -17,8 +16,7 @@ export function decodeAttestationPayload(payload: string): ParseAttestationResul
   let value: unknown;
   try {
     if (!/^[A-Za-z0-9_-]+$/.test(payload)) throw new Error("not base64url");
-    const binary = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const bytes = base64UrlToBytes(payload);
     value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
     return {

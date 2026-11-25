@@ -1,5 +1,8 @@
 import { trimTrailingSlashes } from "../models/network";
-import { PROCESS_ID, tagMap, type Tag } from "./asset-scan";
+import { ARWEAVE_ID } from "../models/arweave-id";
+import { z } from "zod";
+import { tagMap, type Tag } from "../models/tag";
+import { isPlainRecord } from "../models/guards";
 
 /**
  * Permaweb Names: a name is a `carrier@1.0` process (a supply-1 asset on
@@ -45,37 +48,45 @@ function sameAccount(key: unknown, address: string): boolean {
   return typeof key === "string" && key.length >= 43 && foldAccount(key) === foldAccount(address);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 function isOne(value: unknown): boolean {
   return value === 1 || value === "1";
 }
 
+const orderSchema = z.object({ creator: z.unknown().optional(), quantity: z.unknown().optional(), status: z.unknown().optional() });
+
+/** A carrier's `/now` state: what is read of `balances` and `orders` when each is an object, and nothing when it isn't. */
+const carrierStateSchema = z.object({
+  "execution-device": z.literal("carrier@1.0"),
+  value: z.unknown().optional(),
+  balances: z.record(z.string(), z.unknown()).catch({}),
+  orders: z.record(z.string(), z.unknown()).catch({}),
+});
+
 /** What `address` has of the carrier whose `/now` state this is, or null when it has nothing. */
 export function readCarrierHolding(state: unknown, address: string): CarrierHolding | null {
-  if (!isRecord(state) || state["execution-device"] !== "carrier@1.0") return null;
-  const target = carrierTarget(state.value);
+  const parsed = carrierStateSchema.safeParse(state);
+  if (!parsed.success) return null;
+  const { value, balances, orders } = parsed.data;
+  const target = carrierTarget(value);
   const withTarget = target === undefined ? {} : { target };
-  const balances = isRecord(state.balances) ? state.balances : {};
   const held = Object.entries(balances).some(([key, quantity]) => sameAccount(key, address) && isOne(quantity));
   if (held) return { status: "held", ...withTarget };
-  const orders = isRecord(state.orders) ? Object.values(state.orders) : [];
-  const listed = orders.some(
-    (order) =>
-      isRecord(order) &&
-      sameAccount(order.creator, address) &&
-      isOne(order.quantity) &&
-      typeof order.status === "string" &&
-      LIVE_ORDER_STATUSES.has(order.status),
-  );
+  const listed = Object.values(orders).some((raw) => {
+    const order = orderSchema.safeParse(raw);
+    return (
+      order.success &&
+      sameAccount(order.data.creator, address) &&
+      isOne(order.data.quantity) &&
+      typeof order.data.status === "string" &&
+      LIVE_ORDER_STATUSES.has(order.data.status)
+    );
+  });
   return listed ? { status: "listed", ...withTarget } : null;
 }
 
 function carrierTarget(value: unknown): string | undefined {
-  const target = isRecord(value) ? value.target : value;
-  return typeof target === "string" && PROCESS_ID.test(target) ? target : undefined;
+  const target = isPlainRecord(value) ? value.target : value;
+  return typeof target === "string" && ARWEAVE_ID.test(target) ? target : undefined;
 }
 
 /**
@@ -93,7 +104,7 @@ export async function readCarrierState(processId: string, hosts: readonly string
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const state: unknown = await response.json();
-      if (isRecord(state)) return state;
+      if (isPlainRecord(state)) return state;
       throw new Error("unreadable state");
     } catch (error) {
       lastError = error;
@@ -116,7 +127,7 @@ export async function isNamespaceEntry(
   hosts: readonly string[],
   fetchImpl: typeof fetch,
 ): Promise<boolean> {
-  if (!NAME_LABEL.test(label) || !PROCESS_ID.test(processId)) return false;
+  if (!NAME_LABEL.test(label) || !ARWEAVE_ID.test(processId)) return false;
   let confirmations = 0;
   for (const host of hosts) {
     try {
@@ -135,5 +146,5 @@ export function hashpathTarget(hashpath: string | null): string | undefined {
   if (!hashpath) return undefined;
   const last = hashpath.slice(hashpath.lastIndexOf("/") + 1);
   const id = last.slice(last.lastIndexOf(".") + 1).replace(/^ao:/, "");
-  return PROCESS_ID.test(id) ? id : undefined;
+  return ARWEAVE_ID.test(id) ? id : undefined;
 }

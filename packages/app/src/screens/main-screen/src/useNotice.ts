@@ -7,7 +7,7 @@ import {
   usePointsScores,
   usePointsSeatsSeen,
 } from "../../points/src/usePoints";
-import { pickNotice, updateNoticeId, type Notice } from "./notice";
+import { findNewInvites, pickNotice, updateNoticeId, type Notice } from "./notice";
 
 const ANNOUNCEMENTS_STALE_MS = 60 * 60_000;
 /** When this popup opened: a review moment from this visit waits for the next one. */
@@ -35,9 +35,9 @@ export function useNotice(runtime: RuntimePort, wallet: WalletSummary): UseNotic
   const queryClient = useQueryClient();
   const { foundingGate } = usePlatform().buildInfo;
   const memberships = usePointsMemberships(runtime, { retry: false });
-  const isMember = memberships.data?.[wallet.id] !== undefined;
-  const scores = usePointsScores(runtime, isMember && foundingGate);
-  const seatsSeen = usePointsSeatsSeen(runtime, isMember && foundingGate);
+  const hasMember = Object.keys(memberships.data ?? {}).length > 0;
+  const scores = usePointsScores(runtime, hasMember && foundingGate);
+  const seatsSeen = usePointsSeatsSeen(runtime, hasMember && foundingGate);
   const markSeats = useMarkSeatsSeen(runtime);
 
   const announcements = useQuery({
@@ -74,11 +74,10 @@ export function useNotice(runtime: RuntimePort, wallet: WalletSummary): UseNotic
     onMutate: () => queryClient.setQueryData(reviewKey, null),
   });
 
-  const seatsLeft = scores.data?.wallets.find((candidate) => candidate.address === wallet.address)?.seatsLeft ?? null;
+  const invites = findNewInvites(wallet.id, memberships.data ?? {}, scores.data, seatsSeen.data);
   // Hold announcements back until the dismissed list loads, so a dismissed one never flashes.
   const notice = pickNotice({
-    seatsLeft,
-    seatsSeen: seatsSeen.data?.[wallet.id],
+    invites,
     announcements: dismissed.isPending ? [] : (announcements.data ?? []),
     dismissed: dismissed.data ?? [],
     review: review.data ?? null,
@@ -86,7 +85,7 @@ export function useNotice(runtime: RuntimePort, wallet: WalletSummary): UseNotic
   });
 
   const dismiss = () => {
-    if (notice?.kind === "invites" && seatsLeft !== null) markSeats.mutate({ walletId: wallet.id, seats: seatsLeft });
+    if (notice?.kind === "invites") markSeats.mutate({ walletId: notice.invites.walletId, seats: notice.invites.seatsLeft });
     else if (notice?.kind === "announcement") dismissAnnouncement.mutate(notice.announcement.id);
     else if (notice?.kind === "update") dismissAnnouncement.mutate(updateNoticeId(notice.version));
     else if (notice?.kind === "review") finishReview.mutate();

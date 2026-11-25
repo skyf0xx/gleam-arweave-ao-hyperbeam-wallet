@@ -1,9 +1,6 @@
 export {
   createInMemoryPlatform,
-  InMemoryApprovalPresenter,
-  InMemoryDownloads,
   InMemoryStorage,
-  InMemoryTabs,
   InMemoryTimer,
   type InMemoryPlatform,
   type TimerSchedule,

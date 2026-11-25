@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlatform } from "../../../app-platform/context";
 import { capabilitiesFor, isHardwareWalletMethod, type BackupStatus, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
@@ -11,14 +12,16 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
-import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordStep, StepColumn } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
-import { useCopy } from "../../points/src/useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
-import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 import { backupDriveName } from "../../backup/src/BackupView";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { useBackupStatus } from "../../backup/src/useBackup";
+import { WALLET_STATE_QUERY_KEY } from "../../activity";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -70,10 +73,7 @@ export interface WalletDetailViewProps {
   requestDownloadPermission?: RequestDownloadsPermission;
 }
 
-type Step =
-  | { kind: "detail" }
-  | { kind: "export-password"; submitting: boolean; serverError?: string }
-  | { kind: "remove-confirm"; removing: boolean; serverError?: string };
+type Step = "detail" | "export-password" | "remove-confirm";
 
 export function WalletDetailView({
   runtime,
@@ -90,113 +90,90 @@ export function WalletDetailView({
   const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
 
   const [name, setName] = useState(wallet.name);
-  const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [backupConfirmedAt, setBackupConfirmedAt] = useState(wallet.backupConfirmedAt);
-  const [step, setStep] = useState<Step>({ kind: "detail" });
+  const [step, setStep] = useState<Step>("detail");
   const [savedAs, setSavedAs] = useState<string | null>(null);
-  const [cloudBackup, setCloudBackup] = useState<string | null>(null);
-
   const cloudProvider = capabilities.cloudBackup;
   const createdAt = wallet.createdAt;
-  useEffect(() => {
-    if (!cloudProvider) return;
-    let cancelled = false;
-    runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }).then(
-      (status) => {
-        if (!cancelled) setCloudBackup(cloudBackupOf(status, { createdAt }));
-      },
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, cloudProvider, createdAt]);
+  const backupQuery = useBackupStatus(runtime, Boolean(cloudProvider));
+  const cloudBackup = backupQuery.data ? cloudBackupOf(backupQuery.data, { createdAt }) : null;
 
   const trimmedName = name.trim();
   const nameChanged = trimmedName.length > 0 && trimmedName !== wallet.name;
 
-  const handleRename = async () => {
+  const queryClient = useQueryClient();
+  const renameMutation = useMutation({
+    mutationFn: (newName: string) =>
+      runtime.send<{ walletId: string; name: string }, void>({ type: "renameWallet", payload: { walletId: wallet.id, name: newName } }),
+    onSuccess: (_result, newName) => {
+      void queryClient.invalidateQueries({ queryKey: WALLET_STATE_QUERY_KEY });
+      onRenamed(newName);
+    },
+    onError: (caught) => setNameError(errorText(caught)),
+  });
+  const savingName = renameMutation.isPending;
+
+  const handleRename = () => {
     if (!nameChanged || savingName) return;
-    setSavingName(true);
     setNameError(null);
-    try {
-      await runtime.send<{ walletId: string; name: string }, void>({
-        type: "renameWallet",
-        payload: { walletId: wallet.id, name: trimmedName },
-      });
-      onRenamed(trimmedName);
-    } catch (error) {
-      setNameError(errorText(error));
-    } finally {
-      setSavingName(false);
-    }
+    renameMutation.mutate(trimmedName);
   };
 
-  const handleExportPassword = async (password: string) => {
-    setStep({ kind: "export-password", submitting: true });
-    try {
-      const result = await downloadKeyfile(runtime, { walletId: wallet.id, password }, requestDownloadPermission ?? downloads.requestPermission);
+  const [exportError, setExportError] = useState<string | undefined>(undefined);
+  const exportMutation = useMutation({
+    mutationFn: (password: string) =>
+      downloadKeyfile(runtime, { walletId: wallet.id, password }, requestDownloadPermission ?? downloads.requestPermission),
+    onSuccess: (result) => {
       if (!result.ok) {
-        setStep({ kind: "export-password", submitting: false, serverError: keyfileDownloadError(result) ?? undefined });
+        setExportError(keyfileDownloadError(result) ?? undefined);
         return;
       }
       // The background has already recorded the backup.
       setSavedAs(result.filename);
       setBackupConfirmedAt((current) => current ?? Date.now());
-      setStep({ kind: "detail" });
-    } catch (error) {
-      setStep({
-        kind: "export-password",
-        submitting: false,
-        serverError: errorText(error),
-      });
-    }
-  };
+      setStep("detail");
+    },
+    onError: (caught) => setExportError(errorText(caught)),
+  });
 
-  const handleRemove = async () => {
-    setStep({ kind: "remove-confirm", removing: true });
-    try {
-      await runtime.send<{ walletId: string }, void>({
-        type: "deleteWallet",
-        payload: { walletId: wallet.id },
-      });
+  const removeMutation = useMutation({
+    mutationFn: () => runtime.send<{ walletId: string }, void>({ type: "deleteWallet", payload: { walletId: wallet.id } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: WALLET_STATE_QUERY_KEY });
       onRemoved();
-    } catch (error) {
-      setStep({
-        kind: "remove-confirm",
-        removing: false,
-        serverError: errorText(error),
-      });
-    }
-  };
+    },
+  });
 
   const hardware = isHardwareWalletMethod(wallet.method);
   const watchOnly = wallet.method === "watch";
   const methodLabel = walletMethodLabel(t, wallet.method);
 
-  if (step.kind === "remove-confirm") {
+  if (step === "remove-confirm") {
     return (
       <RemoveConfirmStep
         walletName={wallet.name}
         hardware={hardware}
         watchOnly={watchOnly}
         backedUp={backupConfirmedAt !== null}
-        onBack={() => setStep({ kind: "detail" })}
-        onConfirm={() => void handleRemove()}
-        removing={step.removing}
-        serverError={step.serverError}
+        onBack={() => setStep("detail")}
+        onConfirm={() => removeMutation.mutate()}
+        removing={removeMutation.isPending || removeMutation.isSuccess}
+        serverError={removeMutation.isError ? errorText(removeMutation.error) : undefined}
       />
     );
   }
 
-  if (step.kind === "export-password") {
+  if (step === "export-password") {
     return (
       <ExportPasswordStep
-        onBack={() => setStep({ kind: "detail" })}
-        onSubmit={(password) => void handleExportPassword(password)}
-        submitting={step.submitting}
-        serverError={step.serverError}
+        onBack={() => setStep("detail")}
+        onSubmit={(password) => {
+          setExportError(undefined);
+          exportMutation.mutate(password);
+        }}
+        submitting={exportMutation.isPending}
+        serverError={exportError}
       />
     );
   }
@@ -213,15 +190,15 @@ export function WalletDetailView({
             {methodLabel ? <span className="text-label text-faint">{methodLabel}</span> : null}
             <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
           </div>
-          <button
-            type="button"
-            onClick={copyAddress}
-            aria-label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
+          <CopyButton
+            copied={addressCopied}
+            onCopy={copyAddress}
+            label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
             title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
-            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-hover focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
-          >
-            {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
-          </button>
+            iconSize={15}
+            reveal
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-hover focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target"
+          />
         </div>
 
         <TextField
@@ -232,7 +209,7 @@ export function WalletDetailView({
             setName(event.target.value);
             setNameError(null);
           }}
-          onBlur={() => void handleRename()}
+          onBlur={handleRename}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.currentTarget.blur();
@@ -244,7 +221,10 @@ export function WalletDetailView({
         {capabilitiesFor(wallet.method).exportKey ? (
           <button
             type="button"
-            onClick={() => setStep({ kind: "export-password", submitting: false })}
+            onClick={() => {
+            setExportError(undefined);
+            setStep("export-password");
+          }}
             aria-describedby="keyfile-backup-status"
             className="flex w-full items-center gap-2.5 gleam-hover-frost rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05] silica:hover:bg-foreground/[0.03]"
           >
@@ -271,7 +251,10 @@ export function WalletDetailView({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => setStep({ kind: "remove-confirm", removing: false })}
+          onClick={() => {
+            removeMutation.reset();
+            setStep("remove-confirm");
+          }}
           className="mt-auto text-warning hover:text-warning"
         >
           {t("walletDetail.removeWallet")}
@@ -312,7 +295,7 @@ function RemoveConfirmStep({
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("walletDetail.removeWallet")} onBack={onBack} busy={removing} />
-      <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0">
+      <StepColumn>
         <p className="text-body leading-relaxed text-muted">
           {t("walletDetail.removeIntroBefore")}
           <span className="font-semibold text-foreground">{walletName}</span>
@@ -348,7 +331,7 @@ function RemoveConfirmStep({
             {removing ? t("walletDetail.removing") : t("walletDetail.confirmRemove")}
           </Button>
         </ScreenFooter>
-      </div>
+      </StepColumn>
     </div>
   );
 }
@@ -365,57 +348,21 @@ function ExportPasswordStep({
   serverError?: string;
 }) {
   const t = useT();
-  const [password, setPassword] = useState("");
-  const [capsLockOn, setCapsLockOn] = useState(false);
-
-  const [clearedFor, setClearedFor] = useState<string | undefined>(undefined);
-  if (submitting && clearedFor !== undefined) setClearedFor(undefined);
-  if (!submitting && serverError && serverError !== clearedFor) {
-    setClearedFor(serverError);
-    setPassword("");
-  }
-
   return (
-    <div className="flex min-h-full flex-col">
-      <ScreenHeader title={t("walletDetail.backUpKeyfile")} onBack={onBack} busy={submitting} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!submitting && password.length > 0) onSubmit(password);
-        }}
-      >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("walletDetail.enterPassword")}</h1>
-          <p className="text-body leading-relaxed text-muted">
-            {t("walletDetail.exportExplain")}
-          </p>
-        </div>
-
-        <RiskNotice>
-          {t("walletDetail.keyfileWarning")}
-        </RiskNotice>
-
-        <PasswordField
-          label={t("walletDetail.password")}
-          placeholder={t("walletDetail.enterPassword")}
-          autoFocus
-          autoComplete="current-password"
-          value={password}
-          disabled={submitting}
-          onChange={(event) => setPassword(event.target.value)}
-          onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-          capsLockOn={capsLockOn}
-          errorMessage={serverError}
-        />
-
-        <ScreenFooter className="mt-8">
-          <Button type="submit" disabled={submitting || password.length === 0}>
-            {submitting ? t("walletDetail.saving") : t("walletDetail.saveKeyfile")}
-          </Button>
-        </ScreenFooter>
-      </form>
-    </div>
+    <PasswordStep
+      headerTitle={t("walletDetail.backUpKeyfile")}
+      heading={t("walletDetail.enterPassword")}
+      body={t("walletDetail.exportExplain")}
+      notice={<RiskNotice>{t("walletDetail.keyfileWarning")}</RiskNotice>}
+      passwordLabel={t("walletDetail.password")}
+      placeholder={t("walletDetail.enterPassword")}
+      submitLabel={t("walletDetail.saveKeyfile")}
+      submittingLabel={t("walletDetail.saving")}
+      onBack={onBack}
+      onSubmit={onSubmit}
+      submitting={submitting}
+      serverError={serverError}
+    />
   );
 }
 

@@ -44,6 +44,7 @@ export type { Announcement } from "./announcement";
 export type { ReviewMoment } from "./review-prompt";
 export { isValidArweaveAddress, isValidContact } from "./contact";
 export type { Winston, Balance, PendingAmounts, PendingTransfer, TokenBalance } from "./balance";
+export { atomicString } from "./balance";
 export type { Collectible, CollectibleKind, CollectibleRef, CollectibleSendDraft, CollectibleSendRequest, NameTargetDraft, NameTargetRequest, PermawebName } from "./collectible";
 export { collectibleKind, collectibleSendRefusal, nameSiteUrl, permawebNameLabel } from "./collectible";
 export type {
@@ -62,6 +63,13 @@ export type {
   AoTokenTransferResult,
 } from "./transfer";
 export type { Tag } from "./tag";
+export { tagValue } from "./tag";
+export { concatBytes, sha256 } from "./bytes";
+export { mapLimit } from "./concurrency";
+export { isSuccessStatus, withRequestTimeout } from "./http";
+export { isPlainRecord, isRecord } from "./guards";
+export { ARWEAVE_ID, isArweaveId } from "./arweave-id";
+export { errorMessage } from "./error-message";
 export type {
   AddTokenApprovalPreview,
   ApprovalKind,
@@ -78,7 +86,8 @@ export type {
 } from "./approval";
 export { WALLET_APPROVAL_ORIGIN } from "./approval";
 export type { HyperBeamPeer, NetworkSettings } from "./network";
-export { SITE_URL, SITE_ORIGIN, DEV_SITE_HOSTS } from "./site-origin";
+export { SITE_URL, SITE_ORIGIN, DEV_SITE_HOSTS, httpOrigin, isExactHttpOrigin } from "./site-origin";
+export { retryingOnce, singleFlight, type SingleFlight } from "./async";
 export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl } from "./site-links";
 export type { SitePage } from "./site-links";
 export { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_CANARY_PROCESS_ID, L1_TOKEN_NODE_URLS, POINTS_API_URL, bundlerUrlOf, explorerUrlFor, isValidNetworkSettings } from "./network";

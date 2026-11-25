@@ -24,10 +24,16 @@
 1 apps/extension/src/adapters/session-key-store.ts
 1 packages/runtime/src/handlers/key-session.ts
 1 packages/runtime/src/handlers/wallet-lifecycle.ts
+1 packages/runtime/src/handlers/wallet-session.ts
+1 packages/runtime/src/handlers/keyless-wallets.ts
+1 packages/runtime/src/handlers/lifecycle-settings.ts
+1 packages/runtime/src/handlers/wallet-records.ts
 1 packages/runtime/src/handlers/passkey.ts
 1 packages/runtime/src/handlers/backup.ts
 1 packages/runtime/src/handlers/backup-state.ts
 1 packages/runtime/src/backup-sync.ts
+1 packages/runtime/src/stored-data.ts
+1 packages/runtime/src/guards.ts
 1 apps/extension/src/passkey/
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
@@ -64,6 +70,10 @@
 1 packages/core/src/models/passkey.ts
 1 packages/core/src/models/backup.ts
 1 packages/app/src/keyfile/
+1 packages/core/src/models/guards.ts
+1 packages/core/src/models/async.ts
+1 packages/core/src/ports/key-watchers.ts
+1 packages/runtime/src/schema-guard.ts
 
 2 packages/core/src/ao/transfer.ts
 2 packages/core/src/arweave/data-item.ts
@@ -76,6 +86,9 @@
 2 packages/keystone/src/
 2 packages/core/src/points/ownership.ts
 2 packages/runtime/src/handlers/points.ts
+2 packages/runtime/src/handlers/points-seen.ts
+2 packages/runtime/src/handlers/points-replies.ts
+2 packages/runtime/src/handlers/points-records.ts
 2 packages/core/src/models/capabilities.ts
 2 apps/extension/src/hardware/keystone/
 2 apps/extension/src/hardware/ledger/
@@ -87,11 +100,23 @@
 2 packages/app/src/screens/send/src/sendFormSchema.ts
 2 packages/app/src/screens/activity/src/validateSendAmount.ts
 2 packages/app/src/screens/activity/src/useSubmitTransfer.ts
+2 packages/app/src/screens/activity/index.ts
 2 packages/core/src/models/signing.ts
+2 packages/core/src/models/arweave-id.ts
+2 packages/core/src/models/bytes.ts
+2 apps/extension/src/hardware/open-connect.ts
 
 3 apps/extension/entrypoints/background/
 3 packages/runtime/src/create-runtime.ts
+3 packages/runtime/src/provider-dispatch.ts
+3 packages/runtime/src/site-dispatch.ts
+3 packages/runtime/src/site-events.ts
+3 packages/runtime/src/request-guards.ts
+3 packages/runtime/src/token-preview.ts
+3 packages/runtime/src/vault-lock.ts
+3 packages/runtime/src/first-run-network.ts
 3 packages/runtime/src/handlers/provider.ts
+3 packages/runtime/src/handlers/approval-grants.ts
 3 packages/runtime/src/dispatch/site.ts
 3 packages/core/src/models/site-origin.ts
 3 apps/extension/entrypoints/content/
@@ -136,8 +161,14 @@
 3 packages/app/src/screens/browser/src/BrowserView.tsx
 3 packages/app/src/screens/browser/src/address.ts
 3 apps/mobile/src/adapters/dapp-browser.ts
+3 packages/core/src/arweave/graphql-schema.ts
 
 4 packages/runtime/src/handlers/approval.ts
+4 packages/runtime/src/handlers/approval-types.ts
+4 packages/runtime/src/handlers/approval-records.ts
+4 packages/runtime/src/handlers/pending-codec.ts
+4 packages/runtime/src/handlers/approval-prepared.ts
+4 packages/runtime/src/handlers/approval-preview.ts
 4 apps/extension/entrypoints/approval/
 4 apps/extension/src/hardware/panels/
 4 packages/app/src/approval/
@@ -153,6 +184,10 @@
 4 apps/extension/src/adapters/windows.ts
 4 packages/core/src/recipients/assess.ts
 4 packages/runtime/src/handlers/reads.ts
+4 packages/runtime/src/handlers/token-reads.ts
+4 packages/runtime/src/handlers/collectibles-reads.ts
+4 packages/runtime/src/handlers/activity-reads.ts
+4 packages/runtime/src/handlers/price-reads.ts
 4 packages/core/src/models/approval.ts
 4 packages/app/src/screens/main-screen/src/formatWinston.ts
 4 packages/ui/src/format/truncate-address.ts
@@ -167,6 +202,8 @@
 4 packages/app/src/account-avatar.ts
 4 packages/ui/src/components/wallet/AccountAvatar.tsx
 4 packages/app/src/screens/receive/src/ReceiveView.tsx
+4 apps/extension/src/popup-window.ts
+4 packages/app/src/hostname.ts
 
 5 packages/app/src/screens/network-peers/
 5 packages/runtime/src/points-invite.ts
@@ -185,6 +222,7 @@
 5 lefthook.yml
 5 .gitleaks.toml
 5 scripts/release-gate.mjs
+5 scripts/is-main.mjs
 5 scripts/release.mjs
 5 scripts/app-versions.mjs
 5 scripts/verify-release.sh
@@ -233,7 +271,9 @@
 5 scripts/surface-check.mjs
 5 apps/extension/build-plugins.ts
 5 scripts/check-bundles.mjs
+5 scripts/bundle-allowlists.mjs
 5 eslint.config.js
+5 eslint-rules/
 5 vitest.config.ts
 5 vitest.setup.ts
 5 playwright.config.ts

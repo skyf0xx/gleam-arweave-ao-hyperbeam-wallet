@@ -1,0 +1,363 @@
+// @vitest-environment node
+import { describe, expect, it } from "vitest";
+import { createApp } from "../app";
+import { createPriceService } from "./prices";
+import { createTestDb } from "../testing/test-db";
+
+type Handler = (url: string) => { status?: number; body?: unknown };
+
+function upstream(handler: Handler) {
+  const calls: string[] = [];
+  const headers: (Record<string, string> | undefined)[] = [];
+  const fetchImpl = (async (input: string, init?: { headers?: Record<string, string> }) => {
+    calls.push(input);
+    headers.push(init?.headers);
+    const { status = 200, body = {} } = handler(input);
+    return { ok: status >= 200 && status < 300, status, json: async () => body };
+  }) as unknown as typeof fetch;
+  return { calls, headers, fetchImpl };
+}
+
+async function setup(handler: Handler, { coinGeckoApiKey = "test-key" }: { coinGeckoApiKey?: string } = {}) {
+  const { calls, headers, fetchImpl } = upstream(handler);
+  let clock = 1_000_000;
+  const prices = createPriceService({ fetchImpl, now: () => clock, ...(coinGeckoApiKey ? { coinGeckoApiKey } : {}) });
+  const app = createApp({ db: await createTestDb(), prices, now: () => new Date(clock) });
+  return { app, calls, headers, advance: (ms: number) => (clock += ms) };
+}
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+
+const gecko: Handler = (url) => {
+  if (url.includes("/simple/price")) return { body: { arweave: { usd: 5 }, "ao-computer": { usd: 2 } } };
+  return { body: { prices: [[2000, 6], [1000, 5]] } };
+};
+
+describe("GET /prices", () => {
+  it("answers every id from one CoinGecko call", async () => {
+    const { app, calls } = await setup(gecko);
+
+    const response = await app.request("/prices?ids=arweave,ao-computer");
+    await app.request("/prices?ids=arweave");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ prices: { arweave: 5, "ao-computer": 2 } });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("/simple/price?ids=arweave,ao-computer");
+  });
+
+  it("sends the CoinGecko key in a header, never in the URL", async () => {
+    const { app, calls, headers } = await setup(gecko);
+
+    await app.request("/prices?ids=arweave");
+
+    expect(headers[0]).toEqual({ "x-cg-demo-api-key": "test-key" });
+    expect(calls[0]).not.toContain("test-key");
+  });
+
+  it("never calls CoinGecko without a key", async () => {
+    const { app, calls } = await setup(
+      (url) => (url.includes("coingecko") ? gecko(url) : { body: { quotes: { USD: { price: 7.5 } } } }),
+      { coinGeckoApiKey: "" },
+    );
+
+    expect(await (await app.request("/prices?ids=arweave")).json()).toEqual({ prices: { arweave: 7.5 } });
+    expect(calls.some((url) => url.includes("coingecko"))).toBe(false);
+  });
+
+  it("asks CoinPaprika only for the ids CoinGecko left out", async () => {
+    const { app, calls } = await setup((url) =>
+      url.includes("coingecko") ? { body: { arweave: { usd: 5 } } } : { body: { quotes: { USD: { price: 2.5 } } } },
+    );
+
+    expect(await (await app.request("/prices?ids=arweave,ao-computer")).json()).toEqual({ prices: { arweave: 5, "ao-computer": 2.5 } });
+    expect(calls.filter((url) => url.includes("coinpaprika"))).toEqual(["https://api.coinpaprika.com/v1/tickers/ao-ao-computer"]);
+  });
+
+  it("falls back to CoinPaprika when CoinGecko fails", async () => {
+    const { app } = await setup((url) =>
+      url.includes("coingecko") ? { status: 429 } : { body: { quotes: { USD: { price: 7.5 } } } },
+    );
+
+    expect(await (await app.request("/prices?ids=arweave")).json()).toEqual({ prices: { arweave: 7.5 } });
+  });
+
+  it("answers null, never 0, when both providers fail", async () => {
+    const { app } = await setup(() => ({ status: 500 }));
+
+    const response = await app.request("/prices?ids=arweave");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ prices: { arweave: null } });
+  });
+
+  it("caches an answer for ten minutes, so repeated clients don't multiply upstream calls", async () => {
+    const { app, calls, advance } = await setup(gecko);
+
+    await app.request("/prices?ids=arweave");
+    advance(9 * MINUTE);
+    await app.request("/prices?ids=arweave");
+    expect(calls).toHaveLength(1);
+
+    advance(2 * MINUTE);
+    await app.request("/prices?ids=arweave");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("shares one upstream call between concurrent requests", async () => {
+    const { app, calls } = await setup(gecko);
+
+    await Promise.all([app.request("/prices?ids=arweave"), app.request("/prices?ids=arweave")]);
+
+    expect(calls).toHaveLength(1);
+  });
+
+  it("remembers a failure for a minute", async () => {
+    let failing = true;
+    const { app, calls, advance } = await setup(() => (failing ? { status: 500 } : { body: { quotes: { USD: { price: 7.5 } } } }));
+
+    await app.request("/prices?ids=arweave");
+    const failedCalls = calls.length;
+    await app.request("/prices?ids=arweave");
+    expect(calls).toHaveLength(failedCalls);
+
+    failing = false;
+    advance(MINUTE + 1);
+    expect(await (await app.request("/prices?ids=arweave")).json()).toEqual({ prices: { arweave: 7.5 } });
+  });
+
+  it("leaves CoinGecko alone for fifteen minutes after it refuses a call", async () => {
+    let geckoStatus = 429;
+    const { app, calls, advance } = await setup((url) =>
+      url.includes("coingecko") ? (geckoStatus === 200 ? gecko(url) : { status: geckoStatus }) : { body: { quotes: { USD: { price: 7.5 } } } },
+    );
+    const geckoCalls = () => calls.filter((url) => url.includes("coingecko")).length;
+
+    await app.request("/prices?ids=arweave");
+    expect(geckoCalls()).toBe(1);
+
+    advance(11 * MINUTE);
+    await app.request("/prices?ids=arweave");
+    await app.request("/prices/history?id=arweave&range=7D");
+    expect(geckoCalls()).toBe(1);
+
+    geckoStatus = 200;
+    advance(5 * MINUTE);
+    expect(await (await app.request("/prices/history?id=arweave&range=1M")).json()).toEqual({
+      series: [
+        { timestamp: 1000, usd: 5 },
+        { timestamp: 2000, usd: 6 },
+      ],
+    });
+    expect(geckoCalls()).toBe(2);
+  });
+
+  it("keeps serving the last good price through a failed refresh", async () => {
+    let failing = false;
+    const { app, advance } = await setup((url) => (failing ? { status: 500 } : gecko(url)));
+
+    await app.request("/prices?ids=arweave");
+    failing = true;
+    advance(11 * MINUTE);
+
+    expect(await (await app.request("/prices?ids=arweave")).json()).toEqual({ prices: { arweave: 5 } });
+  });
+
+  it.each(["", "?ids=", "?ids=bitcoin", "?ids=arweave,bitcoin", "?ids=../etc", "?ids=arweave%26vs_currencies%3Deur"])(
+    "rejects ids it doesn't know (%s) without calling upstream",
+    async (query) => {
+      const { app, calls } = await setup(gecko);
+
+      const response = await app.request(`/prices${query}`);
+
+      expect(response.status).toBe(400);
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it("lets an extension read it and no web page", async () => {
+    const { app } = await setup(gecko);
+    const preflight = (origin: string) =>
+      app.request("/prices", { method: "OPTIONS", headers: { origin, "access-control-request-method": "GET" } });
+
+    expect((await preflight("chrome-extension://abc")).headers.get("access-control-allow-origin")).toBe("chrome-extension://abc");
+    expect((await preflight("https://evil.example")).headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("rate limits a client by IP", async () => {
+    const { app } = await setup(gecko);
+    const headers = { "x-forwarded-for": "203.0.113.9" };
+
+    let last = 200;
+    for (let i = 0; i < 1201; i++) last = (await app.request("/prices?ids=arweave", { headers })).status;
+
+    expect(last).toBe(429);
+  });
+});
+
+describe("GET /prices/history", () => {
+  it("returns a time-ordered series from CoinGecko", async () => {
+    const { app, calls } = await setup(gecko);
+
+    const response = await app.request("/prices/history?id=arweave&range=7D");
+
+    expect(await response.json()).toEqual({
+      series: [
+        { timestamp: 1000, usd: 5 },
+        { timestamp: 2000, usd: 6 },
+      ],
+    });
+    expect(calls[0]).toContain("/coins/arweave/market_chart?vs_currency=usd&days=7");
+  });
+
+  it("caps ALL at 365 days, which the free tiers can serve", async () => {
+    const { app, calls } = await setup(gecko);
+
+    await app.request("/prices/history?id=arweave&range=ALL");
+
+    expect(calls[0]).toContain("days=365");
+  });
+
+  it("answers ALL from 1Y's cached series", async () => {
+    const { app, calls } = await setup(gecko);
+
+    await app.request("/prices/history?id=arweave&range=1Y");
+    await app.request("/prices/history?id=arweave&range=ALL");
+
+    expect(calls).toHaveLength(1);
+  });
+
+  it.each([
+    ["24H", 30 * MINUTE],
+    ["7D", 2 * HOUR],
+    ["1M", 6 * HOUR],
+    ["1Y", 24 * HOUR],
+  ])("caches %s for its own span", async (range, ttl) => {
+    const { app, calls, advance } = await setup(gecko);
+
+    await app.request(`/prices/history?id=arweave&range=${range}`);
+    advance(ttl - 1);
+    await app.request(`/prices/history?id=arweave&range=${range}`);
+    expect(calls).toHaveLength(1);
+
+    advance(2);
+    await app.request(`/prices/history?id=arweave&range=${range}`);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("falls back to CoinPaprika, then to an empty series", async () => {
+    const paprika = await setup((url) =>
+      url.includes("coingecko") ? { status: 500 } : { body: [{ timestamp: "2024-01-01T00:00:00Z", price: 3.5 }] },
+    );
+    expect(await (await paprika.app.request("/prices/history?id=arweave&range=1M")).json()).toEqual({
+      series: [{ timestamp: new Date("2024-01-01T00:00:00Z").getTime(), usd: 3.5 }],
+    });
+    expect(paprika.calls[1]).toContain("/tickers/ar-arweave/historical?start=");
+    expect(paprika.calls[1]).toContain("interval=1d");
+
+    const down = await setup(() => ({ status: 500 }));
+    expect(await (await down.app.request("/prices/history?id=arweave&range=1M")).json()).toEqual({ series: [] });
+  });
+
+  // The free plan refuses hourly data older than 24 hours and daily data
+  // older than 365 days, and 7D at an hourly interval is refused outright.
+  it.each([
+    ["24H", "1h", 1],
+    ["7D", "1d", 7],
+    ["1Y", "1d", 365],
+    ["ALL", "1d", 365],
+  ] as const)("asks CoinPaprika for %s inside its free-plan window", async (range, interval, maxDays) => {
+    const { app, calls } = await setup((url) => (url.includes("coingecko") ? { status: 429 } : { body: [] }));
+
+    await app.request(`/prices/history?id=arweave&range=${range}`);
+
+    const url = new URL(calls[1]!);
+    const start = Date.parse(url.searchParams.get("start")!);
+    expect(url.searchParams.get("interval")).toBe(interval);
+    expect(1_000_000 - start).toBeLessThan(maxDays * 24 * 60 * 60 * 1000);
+  });
+
+  it("caches per id and range", async () => {
+    const { app, calls } = await setup(gecko);
+
+    await app.request("/prices/history?id=arweave&range=7D");
+    await app.request("/prices/history?id=arweave&range=7D");
+    await app.request("/prices/history?id=arweave&range=1M");
+
+    expect(calls).toHaveLength(2);
+  });
+
+  it.each(["", "?id=arweave", "?id=arweave&range=2D", "?id=bitcoin&range=7D", "?range=7D"])(
+    "rejects %s",
+    async (query) => {
+      const { app, calls } = await setup(gecko);
+
+      expect((await app.request(`/prices/history${query}`)).status).toBe(400);
+      expect(calls).toHaveLength(0);
+    },
+  );
+});
+
+describe("GET /prices/fx", () => {
+  const rates: Handler = () => ({ body: { rates: { usd: { value: 100_000 }, eur: { value: 92_000 } } } });
+
+  it("answers units of the currency per US dollar from CoinGecko's BTC quotes", async () => {
+    const { app } = await setup(rates);
+
+    const response = await app.request("/prices/fx?currency=EUR");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ currency: "EUR", rate: 0.92 });
+  });
+
+  it("falls back to CoinPaprika, asking only for the one currency", async () => {
+    const { app, calls } = await setup((url) =>
+      url.includes("coingecko") ? { status: 429 } : { body: { quotes: { USD: { price: 100_000 }, GBP: { price: 79_000 } } } },
+    );
+
+    expect(await (await app.request("/prices/fx?currency=GBP")).json()).toEqual({ currency: "GBP", rate: 0.79 });
+    expect(calls[1]).toContain("/tickers/btc-bitcoin?quotes=USD,GBP");
+  });
+
+  it("answers null when both providers fail", async () => {
+    const { app } = await setup(() => ({ status: 500 }));
+
+    expect(await (await app.request("/prices/fx?currency=EUR")).json()).toEqual({ currency: "EUR", rate: null });
+  });
+
+  it("answers USD without an upstream call", async () => {
+    const { app, calls } = await setup(rates);
+
+    expect(await (await app.request("/prices/fx?currency=USD")).json()).toEqual({ currency: "USD", rate: 1 });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("answers every currency from one CoinGecko call", async () => {
+    const { app, calls } = await setup(() => ({ body: { rates: { usd: { value: 100_000 }, eur: { value: 92_000 }, gbp: { value: 79_000 } } } }));
+
+    expect(await (await app.request("/prices/fx?currency=EUR")).json()).toEqual({ currency: "EUR", rate: 0.92 });
+    expect(await (await app.request("/prices/fx?currency=GBP")).json()).toEqual({ currency: "GBP", rate: 0.79 });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("caches a rate for six hours", async () => {
+    const { app, calls, advance } = await setup(rates);
+
+    await app.request("/prices/fx?currency=EUR");
+    advance(6 * HOUR - MINUTE);
+    await app.request("/prices/fx?currency=EUR");
+    expect(calls).toHaveLength(1);
+
+    advance(2 * MINUTE);
+    await app.request("/prices/fx?currency=EUR");
+    expect(calls).toHaveLength(2);
+  });
+
+  it.each(["", "?currency=eur", "?currency=XYZ", "?currency=AR"])("rejects %s", async (query) => {
+    const { app, calls } = await setup(rates);
+
+    expect((await app.request(`/prices/fx${query}`)).status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+});

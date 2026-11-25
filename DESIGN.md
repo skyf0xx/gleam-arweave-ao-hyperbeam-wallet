@@ -338,7 +338,7 @@ and loops that ask for attention are not reasons.
 
 The Gleam Points pages are the one place where the beam runs at full power.
 They break several rules above on purpose, and the rest of the site stays
-quiet. Shared pieces are in `apps/site/program.css` and `program.js`: ink
+quiet. Shared pieces are in `apps/site/shared/program.css` and `program.js`: ink
 bands, section cuts, the odometer, the ping and the sound toggle. Each page
 adds its own `<page>.css` and `<page>.js`.
 

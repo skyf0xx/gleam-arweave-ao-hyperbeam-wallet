@@ -1,11 +1,12 @@
 import { execFile } from "node:child_process";
+import { parseArgs } from "node:util";
 import { POINTS_API_URL } from "../../packages/core/src/models/network.ts";
 import { SITE_URL } from "../../packages/core/src/models/site-origin.ts";
 import { runFile } from "./file.ts";
 import { runFinish } from "./finish.ts";
 import { runNext } from "./next.ts";
 import { runStart } from "./start.ts";
-import type { Deps, Outcome } from "./shared.ts";
+import { errorMessage, fail, type Deps, type Outcome } from "./shared.ts";
 
 const USAGE = "Usage: pnpm scan start [--area <id>] | pnpm scan finish [--area <id>] | pnpm scan file | pnpm scan next [--json]";
 const COMMANDS = ["start", "finish", "file", "next"] as const;
@@ -24,33 +25,16 @@ export function renderJson(outcome: Outcome): string {
 }
 
 export async function main(argv: string[], deps: Deps, io: { out: (text: string) => void; tty: boolean }): Promise<number> {
-  const json = argv.includes("--json");
-  let area: string | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--area") area = argv[++i] ?? "";
-    else if (arg.startsWith("--area=")) area = arg.slice("--area=".length);
-    else if (!arg.startsWith("--")) positional.push(arg);
-  }
+  const { values, positionals: positional } = parseArgs({ args: argv, options: { area: { type: "string" }, json: { type: "boolean" } }, allowPositionals: true, strict: false });
+  const json = values.json === true;
+  // A bare `--area` names no area: the commands report it, so it stays an empty string.
+  const area = values.area === undefined ? undefined : typeof values.area === "string" ? values.area : "";
   const command = COMMANDS.find((c) => c === positional[0]);
   let outcome: Outcome;
   if (command === undefined) {
-    outcome = {
-      ok: false,
-      command: "finish",
-      lines: [],
-      issues: [{ path: "usage", message: USAGE }],
-      json: {},
-    };
+    outcome = fail("finish", [{ path: "usage", message: USAGE }]);
   } else if (area !== undefined && (command === "file" || command === "next")) {
-    outcome = {
-      ok: false,
-      command,
-      lines: [],
-      issues: [{ path: "area", message: `\`pnpm scan ${command}\` acts on every waiting round; run it without --area.` }],
-      json: {},
-    };
+    outcome = fail(command, [{ path: "area", message: `\`pnpm scan ${command}\` acts on every waiting round; run it without --area.` }]);
   } else {
     try {
       outcome = await (command === "start"
@@ -61,8 +45,8 @@ export async function main(argv: string[], deps: Deps, io: { out: (text: string)
             ? runFile(deps)
             : runNext(deps));
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      outcome = { ok: false, command, lines: [], issues: [{ path: "scan", message: `Unexpected error (${reason}); run the command again, and if it repeats tell the user.` }], json: {} };
+      const reason = errorMessage(error);
+      outcome = fail(command, [{ path: "scan", message: `Unexpected error (${reason}); run the command again, and if it repeats tell the user.` }]);
     }
   }
   io.out(json ? renderJson(outcome) : render(outcome, io.tty && !process.env.NO_COLOR));

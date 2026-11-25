@@ -1,5 +1,6 @@
 import type { Signer } from "./signer";
 import type { EncryptAlgorithm } from "../models/signing";
+import { isPlainRecord } from "../models/guards";
 
 /**
  * `encrypt()`/`decrypt()` provider methods, built as Wander builds them
@@ -35,10 +36,10 @@ function readBuffer(value: unknown, field: string): ArrayBuffer | undefined {
  * missing keys, not `undefined` or `null` values.
  */
 export function normalizeEncryptAlgorithm(value: unknown): EncryptAlgorithm {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+  if (!isPlainRecord(value)) {
     throw new Error('The algorithm must be an object, for example { name: "RSA-OAEP" }.');
   }
-  const raw = value as Record<string, unknown>;
+  const raw = value;
   if (raw.name === "RSA-OAEP") {
     const label = readBuffer(raw.label, "RSA-OAEP label");
     return label ? { name: "RSA-OAEP", label } : { name: "RSA-OAEP" };

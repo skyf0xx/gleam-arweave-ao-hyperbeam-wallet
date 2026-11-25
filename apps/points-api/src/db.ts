@@ -16,6 +16,26 @@ export interface Db extends Queryable {
   withLock<T>(lockId: number, work: () => Promise<T>): Promise<T | null>;
 }
 
+/**
+ * Reads one `::text` column of a query's only row. Postgres returns a
+ * count or sum as a string (bigint and numeric overflow a JS number), so
+ * the SQL casts it and the caller picks the width.
+ */
+async function queryText(db: Queryable, sql: string, params: unknown[], column: string): Promise<string> {
+  const { rows } = await db.query<Record<string, string>>(sql, params);
+  return rows[0]![column]!;
+}
+
+/** A count small enough for a JS number. */
+export async function queryNumber(db: Queryable, sql: string, params: unknown[], column: string): Promise<number> {
+  return Number(await queryText(db, sql, params, column));
+}
+
+/** A sum of atomic amounts. */
+export async function queryBigInt(db: Queryable, sql: string, params: unknown[], column: string): Promise<bigint> {
+  return BigInt(await queryText(db, sql, params, column));
+}
+
 export function dbFromPool(pool: Pool): Db {
   const asQueryable = (client: Pool | PoolClient): Queryable => ({
     query: async <Row>(text: string, params?: unknown[]) => {

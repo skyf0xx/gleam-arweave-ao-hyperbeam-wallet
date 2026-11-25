@@ -1,11 +1,14 @@
 import { useState } from "react";
+
+import { hostnameOf } from "../hostname";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { AccountAvatar, MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey } from "../i18n";
 import { UntrustedText } from "./UntrustedText";
 import { ArmingLabel } from "./ArmingLabel";
+import { Field } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
 
 /**
  * Ports `connection-request.html` (6.1): origin identity, "wants to:"
@@ -40,23 +43,11 @@ export const SCOPE_COPY: Record<PermissionType, { title: MessageKey; detail: Mes
 };
 
 function faviconLetter(origin: string): string {
-  try {
-    return new URL(origin).hostname.charAt(0).toUpperCase();
-  } catch {
-    return origin.charAt(0).toUpperCase();
-  }
+  return hostnameOf(origin).charAt(0).toUpperCase();
 }
 
 /** Stands in for the site's name so the sentence can be translated whole and the name rendered as untrusted text. */
 const NAME_SLOT = "\u0000";
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
-}
 
 export function ConnectionRequestScreen({ origin, preview, wallet = null, onReject, onGrant }: ConnectionRequestScreenProps) {
   const t = useT();
@@ -95,8 +86,7 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
         {/* In silica, a lens runs from the wallet the site will see down through what it may do with it. */}
         <div className="gleam-lens-down flex flex-col gap-5 silica:-mx-5 silica:px-5 silica:pb-5 silica:pt-4">
           {wallet ? (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.connectingAs")}</span>
+            <Field label={t("approval.connectingAs")}>
               <div className="flex items-center gap-3">
                 <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label="" size={32} />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -104,7 +94,7 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
                   <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
                 </div>
               </div>
-            </div>
+            </Field>
           ) : null}
 
           <div className="text-center text-caption font-semibold text-muted">
@@ -131,14 +121,12 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
           </div>
         </div>
 
-        <div className="mt-auto flex gap-2.5">
-          <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            {t("approval.reject")}
-          </Button>
-          <Button type="button" variant="primary" onClick={onGrant} className="flex-1">
-            <ArmingLabel>{t("approval.grant")}</ArmingLabel>
-          </Button>
-        </div>
+        <ApprovalActions
+          padTop={false}
+          onReject={onReject}
+          onConfirm={onGrant}
+          confirmLabel={<ArmingLabel>{t("approval.grant")}</ArmingLabel>}
+        />
       </div>
     </div>
   );

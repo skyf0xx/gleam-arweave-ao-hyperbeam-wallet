@@ -8,19 +8,24 @@ description: Use when asked to cut, ship, tag or publish a Gleam release, or to 
 One signed tag `v<version>` releases the extension and both apps.
 
 Signing keys and store credentials live in a local KeePassXC database, so
-steps 2 and 3 need the maintainer at the terminal. CI holds no signing
+steps 3 and 4 need the maintainer at the terminal. CI holds no signing
 key or store credential.
 
 ## Steps
 
-1. **Peers and audit.** Run `pnpm peers:refresh` and update
+1. **Code health.** Run `pnpm health`. Remove what knip reports as
+   unused, and extract any copied block jscpd finds that is a real
+   third copy (CLAUDE.md § Writing code). Put each capped file you won't
+   split this release in `todo.md`. These fixes land before the audit,
+   so it covers them.
+2. **Peers and audit.** Run `pnpm peers:refresh` and update
    `COMMUNITY_HYPERBEAM_PEER_URLS` (`core/models/network.ts`) from what it
    prints. Installs refresh the list daily on their own; the shipped list
    is what they start from. Then write `security/audits/v<version>.md`
    (`security/audits/TEMPLATE.md`). The gate refuses to tag while any
    security-surface file changed after the audited commit or a
    critical/high finding is open.
-2. **Bump, tag and extension.** `pnpm release:all <major|minor|patch>`
+3. **Bump, tag and extension.** `pnpm release:all <major|minor|patch>`
    sets one version in the extension, the mobile package, iOS and Android
    (`scripts/app-versions.mjs`), adds 1 to both build numbers, and opens
    the bump PR. After the merge it tags, and `release.yml` publishes the
@@ -30,7 +35,7 @@ key or store credential.
    then checks the Release's zip against its manifest, its attestation
    and the receipt the rebuild left, and signs that zip as the `.crx`,
    running no npm code. Without a matching receipt it refuses.
-3. **Apps**, from a clean checkout of the tag:
+4. **Apps**, from a clean checkout of the tag:
    `apps/mobile/scripts/release-app.sh v<version> ios|ios-ipa|android|android-bundle|android-apk`.
    It checks the tag against `origin/master`, rebuilds the web bundle and
    compares it with the manifest before unlocking any credential
@@ -42,7 +47,7 @@ key or store credential.
    `iCloud.app.gleamwallet` → Schema → "Deploy Schema Changes…" to
    Production. TestFlight builds read Production and refuse an
    undeployed record type.
-4. **Stores stay manual:** the Chrome Web Store upload, App Store review,
+5. **Stores stay manual:** the Chrome Web Store upload, App Store review,
    and promoting the Android build.
 
 ## The three signed builds

@@ -5,6 +5,7 @@ import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { StepColumn, StepForm, StepIntro } from "@gleam/ui/src/components/onboarding/index.ts";
 import {
   MNEMONIC_WORD_COUNTS,
   checkMnemonic,
@@ -168,18 +169,20 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
     return (
       <div className="flex min-h-full flex-col">
         <ScreenHeader title={t("onboarding.importWallet")} />
-        <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0">
+        <StepColumn>
           <Beam className="gleam-loading-sweep" />
-          <div className="flex flex-col gap-1.5" role="status" aria-live="polite">
-            <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.phraseDeriving")}</h1>
-            <p className="text-body leading-relaxed text-muted">{t("onboarding.phraseDerivingBody")}</p>
-          </div>
+          <StepIntro
+            role="status"
+            aria-live="polite"
+            title={t("onboarding.phraseDeriving")}
+            body={t("onboarding.phraseDerivingBody")}
+          />
           <ScreenFooter className="mt-auto">
             <Button type="button" variant="secondary" onClick={cancel}>
               {t("onboarding.phraseCancel")}
             </Button>
           </ScreenFooter>
-        </div>
+        </StepColumn>
       </div>
     );
   }
@@ -187,18 +190,14 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("onboarding.importWallet")} onBack={onBack} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
+      <StepForm
         autoComplete="off"
         onSubmit={(event) => {
           event.preventDefault();
           if (filled) void submit();
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.phraseTitle")}</h1>
-          <p className="text-body leading-relaxed text-muted">{t("onboarding.phraseBody")}</p>
-        </div>
+        <StepIntro title={t("onboarding.phraseTitle")} body={t("onboarding.phraseBody")} />
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1" role="group" aria-label={t("onboarding.phraseWordCount")}>
@@ -310,7 +309,7 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
             {t("onboarding.continue")}
           </Button>
         </ScreenFooter>
-      </form>
+      </StepForm>
     </div>
   );
 }

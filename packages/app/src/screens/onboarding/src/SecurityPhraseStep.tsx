@@ -6,6 +6,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { useAddressIdentity } from "../../../address-identity";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { StepForm, StepIntro } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
@@ -29,8 +30,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("onboarding.antiPhishingTitle")} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
+      <StepForm
         onSubmit={(event) => {
           event.preventDefault();
           if (!valid || saving) return;
@@ -47,12 +47,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
             });
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.antiPhishingHeading")}</h1>
-          <p className="text-body leading-relaxed text-muted">
-            {t("onboarding.antiPhishingBody")}
-          </p>
-        </div>
+        <StepIntro title={t("onboarding.antiPhishingHeading")} body={t("onboarding.antiPhishingBody")} />
 
         <SecurityPhrasePicker
           value={phrase}
@@ -67,7 +62,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
             {saving ? t("onboarding.saving") : t("onboarding.continue")}
           </Button>
         </ScreenFooter>
-      </form>
+      </StepForm>
     </div>
   );
 }

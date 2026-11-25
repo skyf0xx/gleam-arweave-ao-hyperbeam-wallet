@@ -1,5 +1,5 @@
-import type { ActivityEntry, ReviewMoment, StoragePort, Wallet } from "@gleam/core";
-import { WALLETS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
+import type { ReviewMoment, StoragePort } from "@gleam/core";
+import { loadActivityLog, loadWallets } from "../stored-data";
 
 /** `true` once the review prompt was answered or dismissed. Per install, not per wallet. */
 export const REVIEW_PROMPT_DONE_KEY = "local:reviewPrompt:done";
@@ -28,14 +28,12 @@ export class ReviewPromptHandler {
 
   async get({ since }: { since: number }): Promise<ReviewMoment | null> {
     if ((await this.deps.storage.get<unknown>(REVIEW_PROMPT_DONE_KEY)) === true) return null;
-    const raw = await this.deps.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(raw) ? (raw as Wallet[]) : [];
+    const wallets = await loadWallets(this.deps.storage);
     if (wallets.length === 0) return null;
 
     const logs = await Promise.all(
       [...new Set(wallets.map((wallet) => wallet.address))].map(async (address) => {
-        const log = await this.deps.storage.get<unknown>(`${ACTIVITY_LOG_KEY_PREFIX}${address}`);
-        return Array.isArray(log) ? (log as ActivityEntry[]) : [];
+        return loadActivityLog(this.deps.storage, address);
       }),
     );
     const landed = logs

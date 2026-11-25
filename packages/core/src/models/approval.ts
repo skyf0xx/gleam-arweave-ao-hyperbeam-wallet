@@ -2,6 +2,7 @@ import type { PermissionType } from "./permission";
 import type { CollectibleRef } from "./collectible";
 import type { HardwareDevice, HardwareWalletMethod } from "./wallet";
 import type { AttestationAnswer, ScanResult } from "../scan/attestation";
+import type { Tag } from "./tag";
 
 export type ApprovalKind =
   | "connect"
@@ -95,7 +96,7 @@ export interface SigningApprovalPreview {
   dataSize?: number;
   /** Set when `decodedData` holds only the start of longer text; `getApprovalData` returns the rest. */
   dataTruncated?: true;
-  tags: Array<{ name: string; value: string }>;
+  tags: Tag[];
   payloadHash: string;
   /**
    * Every item `signDataItem`/`batchSignDataItem` will sign, in order —
@@ -106,7 +107,7 @@ export interface SigningApprovalPreview {
     decodedData: string | null;
     dataSize?: number;
     dataTruncated?: true;
-    tags: Array<{ name: string; value: string }>;
+    tags: Tag[];
     target: string | null;
     payloadHash: string;
     /** Set when the item is an AO `Transfer` message, read from its own target and tags. */
@@ -211,7 +212,7 @@ export type DeviceSigningPayload =
         id: string;
         last_tx: string;
         owner: string;
-        tags: Array<{ name: string; value: string }>;
+        tags: Tag[];
         target: string;
         quantity: string;
         data: string;

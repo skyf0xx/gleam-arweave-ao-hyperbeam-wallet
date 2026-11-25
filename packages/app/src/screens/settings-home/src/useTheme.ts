@@ -1,48 +1,44 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
-import { applyDocumentTheme, useSharedTheme } from "../../../theme";
+import { applyDocumentTheme, loadStoredTheme, useSharedTheme } from "../../../theme";
+
+const THEME_QUERY_KEY = ["themePreference"] as const;
 
 /** The stored theme, changed at once on screen and put back if saving fails. */
 export function useTheme(runtime: RuntimePort) {
   const shared = useSharedTheme();
-  const [local, setLocal] = useState<ThemePreference>("light");
-  const [saving, setSaving] = useState(false);
-  const theme = shared?.theme ?? local;
-
-  useEffect(() => {
-    if (shared) return;
-    let cancelled = false;
-    runtime
-      .send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined })
-      .then((settings) => {
-        if (!cancelled) setLocal(settings.theme);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, shared]);
+  const queryClient = useQueryClient();
+  // A shared theme already holds the stored value; this copy serves a host without one.
+  const local = useQuery({
+    queryKey: THEME_QUERY_KEY,
+    queryFn: () => loadStoredTheme(runtime),
+    enabled: !shared,
+    staleTime: Infinity,
+  });
+  const theme = shared?.theme ?? local.data ?? "light";
 
   const show = (next: ThemePreference) => {
     if (shared) shared.setTheme(next);
-    else setLocal(next);
+    else queryClient.setQueryData(THEME_QUERY_KEY, next);
     applyDocumentTheme(next);
   };
 
+  const save = useMutation({
+    mutationFn: (next: ThemePreference) =>
+      runtime.send<ThemeSettings, void>({ type: "setThemePreference", payload: { theme: next } }),
+  });
+
   return {
     theme,
-    saving,
+    saving: save.isPending,
     select: async (next: ThemePreference) => {
       if (next === theme) return;
       const previous = theme;
       show(next);
-      setSaving(true);
       try {
-        await runtime.send<ThemeSettings, void>({ type: "setThemePreference", payload: { theme: next } });
+        await save.mutateAsync(next);
       } catch {
         show(previous);
-      } finally {
-        setSaving(false);
       }
     },
   };

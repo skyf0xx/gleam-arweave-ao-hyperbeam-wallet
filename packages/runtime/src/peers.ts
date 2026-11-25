@@ -1,7 +1,8 @@
-import { COMMUNITY_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, type NetworkSettings, type StoragePort, type TimerPort } from "@gleam/core";
+import { COMMUNITY_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, isRecord, type NetworkSettings, type StoragePort, type TimerPort } from "@gleam/core";
 import { discoverHyperBeamPeers, findL1TokenNodes, stripTrailingSlashes } from "@gleam/core/src/ao/peer-discovery.ts";
 import { updateStored } from "./storage-update";
 import { NETWORK_SETTINGS_KEY } from "./storage-keys";
+import { stringList } from "./guards";
 
 export const DISCOVERED_PEERS_KEY = "local:discoveredPeers";
 /** Community or discovered peers the user removed in Network & peers; merging skips them. */
@@ -43,13 +44,9 @@ export async function readExtraPeerUrls(storage: StoragePort): Promise<string[]>
 }
 
 /** Community or discovered peers the user has removed. */
-function dismissedPeersOf(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((url): url is string => typeof url === "string") : [];
-}
-
 export async function readDismissedPeers(storage: StoragePort): Promise<string[]> {
   try {
-    return dismissedPeersOf(await storage.get<unknown>(DISMISSED_PEERS_KEY));
+    return stringList(await storage.get<unknown>(DISMISSED_PEERS_KEY));
   } catch {
     return [];
   }
@@ -69,24 +66,27 @@ export async function saveNetworkSettings(storage: StoragePort, next: NetworkSet
   const shown = [...(await readStoredPeerUrls(storage)), ...(await readExtraPeerUrls(storage))];
   const removed = [...new Set(shown)].filter((url) => !kept.has(url));
   if (removed.length > 0) {
-    await updateStored(storage, DISMISSED_PEERS_KEY, (raw) => [...new Set([...dismissedPeersOf(raw), ...removed])]);
+    await updateStored(storage, DISMISSED_PEERS_KEY, (raw) => [...new Set([...stringList(raw), ...removed])]);
   }
   // A whole-value write, queued behind the other updates of this key.
   await updateStored(storage, NETWORK_SETTINGS_KEY, () => next);
 }
 
-async function readStoredPeerUrls(storage: StoragePort): Promise<string[]> {
+/** The stored peers with their URLs trimmed of trailing slashes; whatever isn't a peer record is skipped. */
+async function storedPeers(storage: StoragePort): Promise<Array<{ url: string; enabled: unknown }>> {
   try {
     const raw = await storage.get<{ peers?: unknown }>(NETWORK_SETTINGS_KEY);
     if (!Array.isArray(raw?.peers)) return [];
     return raw.peers.flatMap((peer: unknown) =>
-      typeof peer === "object" && peer !== null && typeof (peer as { url?: unknown }).url === "string"
-        ? [stripTrailingSlashes((peer as { url: string }).url)]
-        : [],
+      isRecord(peer) && typeof peer.url === "string" ? [{ url: stripTrailingSlashes(peer.url), enabled: peer.enabled }] : [],
     );
   } catch {
     return [];
   }
+}
+
+async function readStoredPeerUrls(storage: StoragePort): Promise<string[]> {
+  return (await storedPeers(storage)).map((peer) => peer.url);
 }
 
 function httpsUrls(value: unknown): string[] {
@@ -95,20 +95,7 @@ function httpsUrls(value: unknown): string[] {
 
 /** Peers the user turned off in Network & peers. */
 async function readDisabledPeerUrls(storage: StoragePort): Promise<string[]> {
-  try {
-    const raw = await storage.get<{ peers?: unknown }>(NETWORK_SETTINGS_KEY);
-    if (!Array.isArray(raw?.peers)) return [];
-    return raw.peers.flatMap((peer: unknown) =>
-      typeof peer === "object" &&
-      peer !== null &&
-      typeof (peer as { url?: unknown }).url === "string" &&
-      (peer as { enabled?: unknown }).enabled === false
-        ? [stripTrailingSlashes((peer as { url: string }).url)]
-        : [],
-    );
-  } catch {
-    return [];
-  }
+  return (await storedPeers(storage)).filter((peer) => peer.enabled === false).map((peer) => peer.url);
 }
 
 /**

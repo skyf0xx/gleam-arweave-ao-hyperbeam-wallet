@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { useT, type MessageKey, type TFunction } from "../i18n";
 import { formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
@@ -12,7 +11,10 @@ import { RequestHeader } from "../transfer-review/RequestHeader";
 import { ArmingLabel } from "./ArmingLabel";
 import { NameTargetReview, ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromPreview, type TransferContext } from "../transfer-review/model";
-import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
+import { Field, FieldLabel } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
 
 /**
  * The highest-stakes screen in the product. A request that moves value
@@ -63,15 +65,6 @@ function actionCopy(preview: SigningApprovalPreview, t: TFunction): string {
 
 function formatFee(fee: string): string {
   return `${formatWinstonAsAr(fee, 12)} AR`;
-}
-
-async function copyToClipboard(value: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    // Clipboard access can be denied by the browser — the value is still
-    // fully visible and selectable on screen, so this is a soft failure.
-  }
 }
 
 export function SigningApprovalScreen({
@@ -181,9 +174,9 @@ export function SigningApprovalScreen({
         {preview.items ? (
           <div className="flex flex-col gap-8">
             {preview.items.length > 1 ? (
-              <span className="-mb-4 text-caption font-semibold uppercase tracking-wide text-muted">
+              <FieldLabel className="-mb-4">
                 {t("approval.manyItemsToSign", { count: preview.items.length })}
-              </span>
+              </FieldLabel>
             ) : null}
             {preview.items.map((item, index) => (
               <DataItemCard
@@ -200,8 +193,7 @@ export function SigningApprovalScreen({
             <TagTiers tags={preview.tags} target={preview.recipient} walletAddress={from?.address ?? null} />
 
             {preview.decodedData !== null && preview.decodedData !== "" ? (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
+              <Field label={t("approval.decodedData")}>
                 <SignedDataText
                   text={preview.decodedData}
                   size={preview.dataSize}
@@ -209,12 +201,11 @@ export function SigningApprovalScreen({
                   boxClassName={DATA_BOX}
                   collapsedClassName="max-h-24"
                 />
-              </div>
+              </Field>
             ) : preview.decodedData === null && (preview.dataSize ?? 0) > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.data")}</span>
+              <Field label={t("approval.data")}>
                 <span className="font-mono text-caption text-foreground">{t("approval.bytes", { size: String(preview.dataSize) })}</span>
-              </div>
+              </Field>
             ) : null}
 
 
@@ -228,42 +219,33 @@ export function SigningApprovalScreen({
 
         {errorLine}
 
-        <div className="mt-auto flex gap-2.5 pt-1">
-          <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            {t("approval.reject")}
-          </Button>
-          <Button
-            type="button"
-            variant={unreadable ? "destructive" : "primary"}
-            disabled={submitting}
-            aria-busy={submitting}
-            onClick={() => void handleSign()}
-            className="flex-1"
-          >
-            {submitting ? t("approval.signing") : <ArmingLabel>{actionCopy(preview, t)}</ArmingLabel>}
-          </Button>
-        </div>
+        <ApprovalActions
+          onReject={onReject}
+          confirmVariant={unreadable ? "destructive" : "primary"}
+          submitting={submitting}
+          onConfirm={() => void handleSign()}
+          confirmLabel={submitting ? t("approval.signing") : <ArmingLabel>{actionCopy(preview, t)}</ArmingLabel>}
+        />
       </div>
     </div>
   );
 }
 
 function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: string; value: string }) {
+  const { copied, copy } = useCopy(value);
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-caption font-semibold uppercase tracking-wide text-muted">{label}</span>
+    <Field label={label}>
       <div className="flex items-start gap-2 rounded-md border border-line bg-background p-3">
         <span className="flex-1 break-all font-mono text-caption leading-relaxed text-foreground">{value}</span>
-        <button
-          type="button"
-          aria-label={copyLabel}
-          onClick={() => void copyToClipboard(value)}
+        <CopyButton
+          copied={copied}
+          onCopy={copy}
+          label={copyLabel}
+          title={copyLabel}
           className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-muted"
-        >
-          <CopyIcon />
-        </button>
+        />
       </div>
-    </div>
+    </Field>
   );
 }
 

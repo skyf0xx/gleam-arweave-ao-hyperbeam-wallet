@@ -24,6 +24,7 @@ import {
 import { base64ToBytes } from "./base64";
 import { signMessage, verifyMessage } from "./message-signing";
 import { userErrorMessage } from "../models/user-errors";
+import { isSuccessStatus } from "../models/http";
 
 /**
  * `core/vault`'s share of the provider-signing-crypto surface: the actual
@@ -241,7 +242,7 @@ export async function finishDispatch(
   }
 
   const response = await broadcastTransaction(gatewayUrl, signed.transaction);
-  if (response.status < 200 || response.status >= 300) {
+  if (!isSuccessStatus(response.status)) {
     throw new Error(
       userErrorMessage("dispatchFailed", { gateway: gatewayUrl, status: response.status, statusText: response.statusText }),
     );

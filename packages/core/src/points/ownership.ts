@@ -1,4 +1,4 @@
-import { sha256 } from "../arweave/rsa-pss";
+import { sha256 } from "../models/bytes";
 import { verifyTransactionSignature, type ArweaveTransactionJson } from "../arweave/transaction";
 import { addressFromOwner } from "../keys/address";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";

@@ -283,7 +283,7 @@ describe("TransferHandler: submitTransfer", () => {
   });
 
   it("hands a Ledger AO send to the approval window, where the device signs it", async () => {
-    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", encryptedKeyfile: null }]);
+    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", encryptedKeyfile: null, device: { kind: "ledger" } }]);
     const requestTransfer = vi.fn().mockResolvedValue({ txId: "ao-msg-id-ledger" });
     const handler = new TransferHandler(storage, keySession, { requestTransfer });
     const req = { walletId: WALLET_ID, recipient: "recipientAoAddr", token: AO_PROCESS_ID, amount: "1", fee: null };
@@ -439,8 +439,8 @@ describe("TransferHandler: submitTransfer", () => {
 });
 
 describe("TransferHandler: lookalike recipients", () => {
-  const SENT_TO = "AbcdXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXwxyz";
-  const POISON = "AbcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYwxyz";
+  const SENT_TO = "AbcdXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXwxyz";
+  const POISON = "AbcdYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYwxyz";
   let storage: StoragePort;
   let wallet: Wallet;
 

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { bindTouchGesture } from "@gleam/ui/src/primitives/touch-gesture.ts";
 
 /** Movement needed before the gesture's direction is judged. A thumb on a scrolling list rarely moves level, so a swipe needs only to lean sideways (`dx` over 0.9 × `dy`). */
 const DIRECTION_SLOP_PX = 6;
@@ -234,17 +235,7 @@ export function useTabSwipe(options: TabSwipeOptions): PeekedPanel | null {
       else settle(moved);
     };
 
-    element.addEventListener("touchstart", onStart, { passive: true });
-    // Non-passive so a swipe we own can't also scroll the list.
-    element.addEventListener("touchmove", onMove, { passive: false });
-    element.addEventListener("touchend", onEnd);
-    element.addEventListener("touchcancel", onEnd);
-    return () => {
-      element.removeEventListener("touchstart", onStart);
-      element.removeEventListener("touchmove", onMove);
-      element.removeEventListener("touchend", onEnd);
-      element.removeEventListener("touchcancel", onEnd);
-    };
+    return bindTouchGesture(element, { onStart, onMove, onEnd });
     // Everything else is read through `latest`, so a drag survives a render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, track, scroller]);

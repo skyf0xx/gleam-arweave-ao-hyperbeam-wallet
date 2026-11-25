@@ -3,13 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@webext-core/messaging": "^4.0.1",
     "@gleam/core": "workspace:*"
   },
   "devDependencies": {

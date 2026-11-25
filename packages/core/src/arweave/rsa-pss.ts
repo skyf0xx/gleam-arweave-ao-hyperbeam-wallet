@@ -30,6 +30,4 @@ export async function verifyRsaPss(ownerB64Url: string, message: Bytes, signatur
   }
 }
 
-export async function sha256(data: Bytes): Promise<Bytes> {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
-}
+export { sha256 } from "../models/bytes";

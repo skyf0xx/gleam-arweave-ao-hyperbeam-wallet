@@ -1,6 +1,6 @@
 import type { InviteRedeemResult, InviteUnlock, StoragePort } from "@gleam/core";
 import type { SiteMessage } from "./dispatch/methods";
-import { POINTS_MEMBERSHIPS_KEY } from "./handlers/points";
+import { POINTS_MEMBERSHIPS_KEY, membershipsOf } from "./handlers/points";
 
 export interface InviteRedeemer {
   getInviteUnlock(): Promise<InviteUnlock | null>;
@@ -23,8 +23,7 @@ export async function redeemSiteInvite(
   redeemer: InviteRedeemer,
 ): Promise<{ ok: true; redeem: InviteRedeemResult }> {
 
-  const memberships = await storage.get<Record<string, unknown>>(POINTS_MEMBERSHIPS_KEY);
-  if (memberships && Object.keys(memberships).length > 0) {
+  if (Object.keys(membershipsOf(await storage.get<unknown>(POINTS_MEMBERSHIPS_KEY))).length > 0) {
     return { ok: true, redeem: (await redeemer.getInviteUnlock())?.result ?? "ok" };
   }
 

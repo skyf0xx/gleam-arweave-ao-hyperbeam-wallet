@@ -1,4 +1,5 @@
 import type { WalletSummary } from "./wallet";
+import { isRecord } from "./guards";
 
 /**
  * Auto-lock timeout options. Default is `1hr`. "unlocked" must survive
@@ -28,9 +29,7 @@ export interface LockSettings {
 
 export function isLockSettings(value: unknown): value is LockSettings {
   return (
-    value !== null &&
-    typeof value === "object" &&
-    AUTO_LOCK_TIMEOUTS.includes((value as Record<string, unknown>).autoLockTimeout as AutoLockTimeout)
+    isRecord(value) && AUTO_LOCK_TIMEOUTS.includes(value.autoLockTimeout as AutoLockTimeout)
   );
 }
 

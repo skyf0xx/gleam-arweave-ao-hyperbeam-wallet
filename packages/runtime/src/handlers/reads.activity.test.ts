@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
-import { ReadsHandler, ACTIVITY_PROMOTION_ALARM_NAME, registerActivityPromotionAlarm } from "./reads";
+import { ReadsHandler } from "./reads";
+import { ACTIVITY_PROMOTION_ALARM_NAME, registerActivityPromotionAlarm } from "./activity-reads";
 import { TransferHandler } from "./transfer";
 
 function createFakeStorage(): StoragePort {

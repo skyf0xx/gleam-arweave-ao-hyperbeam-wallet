@@ -1,18 +1,8 @@
 import {
-  addressFromOwner,
-  base64UrlToBytes,
   deriveAddress,
   capabilitiesFor,
-  defaultDisplaySettings,
   AUTO_LOCK_TIMEOUTS,
-  isDisplaySettings,
   isHardwareWalletMethod,
-  isKeylessWalletMethod,
-  isLockSettings,
-  isThemeSettings,
-  isValidArweaveAddress,
-  isValidHardwareDevice,
-  isValidWallet,
   keyfileFilename,
   validateJWKShape,
   validatePassword,
@@ -20,8 +10,6 @@ import {
   type DisplaySettings,
   type DownloadPort,
   type FileDownloadResult,
-  type HardwareDevice,
-  type HardwareWalletMethod,
   type JWKInterface,
   type LockSettings,
   type Session,
@@ -45,10 +33,22 @@ import {
   type EncryptOptions,
   generateJWK,
 } from "@gleam/core/signer";
-import { isSessionExpired, isValidSession, SESSION_KEY, type KeySession } from "./key-session";
+import type { KeySession } from "./key-session";
+import {
+  LOCK_SETTINGS_KEY,
+  loadDisplaySettings,
+  loadLockSettings,
+  loadThemeSettings,
+  saveDisplaySettings,
+  saveThemeSettings,
+} from "./lifecycle-settings";
+import { addHardwareWallet, addWatchWallet, confirmWalletBackup, deleteWallet, renameWallet, switchWallet } from "./keyless-wallets";
+import { loadActiveWalletId, saveWallets, toSummary } from "./wallet-records";
+import { hasVaultPassword, keylessWalletIds, loadSession, lockSession, saveSession } from "./wallet-session";
 import { POINTS_STORAGE_KEYS } from "./points";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { ACTIVE_WALLET_ID_KEY, BACKUP_KEY, BACKUP_STATE_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { activityLogKey, loadWallets } from "../stored-data";
 import { dappError } from "../dapp-error";
 
 /**
@@ -93,193 +93,6 @@ import { dappError } from "../dapp-error";
  * alarm. Every method that reads or changes the session runs under
  * `withSessionLock`, so a lock and an unlock never interleave.
  */
-
-const LOCK_SETTINGS_KEY = "local:lockSettings";
-const THEME_SETTINGS_KEY = "local:themeSettings";
-const DISPLAY_SETTINGS_KEY = "local:displaySettings";
-
-const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "1hr" };
-const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
-
-function toSummary(wallet: Wallet): WalletSummary {
-  return {
-    id: wallet.id,
-    address: wallet.address,
-    name: wallet.name,
-    method: wallet.method,
-    publicKey: wallet.publicKey,
-    createdAt: wallet.createdAt,
-    updatedAt: wallet.updatedAt,
-    backupConfirmedAt: wallet.backupConfirmedAt,
-    ...(wallet.device ? { device: wallet.device } : {}),
-  };
-}
-
-/** An RSA-4096 modulus, the only key size Arweave addresses are made from. */
-const RSA_MODULUS_BYTES = 512;
-const HARDWARE_METHOD_NAME: Record<HardwareWalletMethod, string> = {
-  keystone: "Keystone",
-  ledger: "Ledger",
-};
-
-/** Hardware and watch wallets need no decrypted key, so they are usable whenever Gleam is unlocked. */
-function keylessWalletIds(wallets: Wallet[]): string[] {
-  return wallets.filter((wallet) => isKeylessWalletMethod(wallet.method)).map((wallet) => wallet.id);
-}
-
-/** A vault has a password exactly when some wallet holds a keyfile encrypted under it. */
-function hasVaultPassword(wallets: Wallet[]): boolean {
-  return wallets.some((wallet) => wallet.encryptedKeyfile !== null);
-}
-
-async function loadWallets(storage: StoragePort): Promise<Wallet[]> {
-  const raw = await storage.get<unknown>(WALLETS_KEY);
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(isValidWallet).map((wallet) => ({
-    ...wallet,
-    backupConfirmedAt: wallet.backupConfirmedAt ?? null,
-  }));
-}
-
-async function saveWallets(storage: StoragePort, wallets: Wallet[]): Promise<void> {
-  await storage.set(WALLETS_KEY, wallets);
-}
-
-async function loadActiveWalletId(
-  storage: StoragePort,
-  wallets: Wallet[],
-): Promise<string | null> {
-  const raw = await storage.get<unknown>(ACTIVE_WALLET_ID_KEY);
-  if (typeof raw !== "string") return null;
-  // Range-check against the currently valid wallet set — a stale id
-  // pointing at a deleted/malformed wallet is dropped, not trusted.
-  return wallets.some((wallet) => wallet.id === raw) ? raw : null;
-}
-
-async function loadLockSettings(storage: StoragePort): Promise<LockSettings> {
-  const raw = await storage.get<unknown>(LOCK_SETTINGS_KEY);
-  if (isLockSettings(raw)) return { autoLockTimeout: raw.autoLockTimeout };
-  return DEFAULT_LOCK_SETTINGS;
-}
-
-async function loadThemeSettings(storage: StoragePort): Promise<ThemeSettings> {
-  const raw = await storage.get<unknown>(THEME_SETTINGS_KEY);
-  if (isThemeSettings(raw)) return { theme: raw.theme };
-  return DEFAULT_THEME_SETTINGS;
-}
-
-async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
-  const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
-  // Older records lack `tokenLogos` and `tokenRows`, and carry `compactHeader` (or before it `showChart`) in place
-  // of `header`. Someone who had turned the chart off gets the compact header, the closest thing to it.
-  // `tokenLogos` replaced `showTokenLogos`, which defaulted off and so was stored as false for
-  // nearly everyone; it is ignored so they get logos, the new default.
-  const record = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
-  const upgraded = record
-    ? { tokenLogos: true, tokenRows: "detailed", header: record.compactHeader === true || record.showChart === false ? "compact" : "full", ...record }
-    : raw;
-  if (isDisplaySettings(upgraded)) {
-    return {
-      currency: upgraded.currency,
-      header: upgraded.header,
-      tokenLogos: upgraded.tokenLogos,
-      tokenRows: upgraded.tokenRows,
-      headline: upgraded.headline,
-      balancesHidden: upgraded.balancesHidden,
-    };
-  }
-  return defaultDisplaySettings(globalThis.navigator?.language);
-}
-
-/**
- * Reads back the unlocked session, treating one whose auto-lock timeout
- * has elapsed as no different from an explicit `lockWallet()` — same
- * "stays unlocked until you lock it or this timeout is reached" contract
- * `LockSettingsView` already advertises. Clears the in-memory key cache
- * on the same path so an expired session can never be used to sign even
- * if some caller reached a handler method without going through
- * `getState` first.
- *
- * Hardware and watch wallets have no key to cache, so every one of them
- * is listed whenever the session exists. A vault holding only those has
- * no password to unlock with, so it always has a session and never
- * auto-locks.
- */
-async function loadSession(
-  storage: StoragePort,
-  keySession: KeySession,
-  wallets: Wallet[],
-): Promise<Session | null> {
-  const raw = await storage.get<unknown>(SESSION_KEY);
-  const keylessIds = keylessWalletIds(wallets);
-
-  if (!hasVaultPassword(wallets)) {
-    if (keylessIds.length === 0) return null;
-    if (isValidSession(raw) && sameIds(raw.unlockedWalletIds, keylessIds)) return raw;
-    const now = Date.now();
-    const session: Session = isValidSession(raw)
-      ? { ...raw, unlockedWalletIds: keylessIds }
-      : {
-          unlockedAt: now,
-          lastActivityAt: now,
-          autoLockTimeout: (await loadLockSettings(storage)).autoLockTimeout,
-          unlockedWalletIds: keylessIds,
-        };
-    await saveSession(storage, session);
-    return session;
-  }
-
-  if (!isValidSession(raw)) return null;
-  if (isSessionExpired(raw.lastActivityAt, raw.autoLockTimeout)) {
-    await lockSession(storage, keySession);
-    return null;
-  }
-  // Filter unlockedWalletIds against the current wallet set, same
-  // untrusted-input treatment as activeWalletId.
-  const knownIds = raw.unlockedWalletIds.filter(
-    (id) => wallets.some((wallet) => wallet.id === id) && !keylessIds.includes(id),
-  );
-  // A wallet whose key is gone can't sign, so it is locked whatever the
-  // session record says. Persist the pruned list so getCachedKey and the
-  // UI agree. Hardware and watch wallets alone never keep a
-  // password-protected vault unlocked.
-  const keyPresent = await Promise.all(knownIds.map((id) => keySession.isKeyStored(id)));
-  const keyedIds = knownIds.filter((_, index) => keyPresent[index]);
-  if (keyedIds.length === 0) {
-    await lockSession(storage, keySession);
-    return null;
-  }
-  const validIds = [...keyedIds, ...keylessIds];
-  if (sameIds(raw.unlockedWalletIds, validIds)) return raw;
-  const session = { ...raw, unlockedWalletIds: validIds };
-  await saveSession(storage, session);
-  return session;
-}
-
-/**
- * Ends the session even when wiping the keys fails, then rethrows: every
- * wallet must read as locked, and the caller must still learn the keyring
- * may still hold keys.
- */
-async function lockSession(storage: StoragePort, keySession: KeySession): Promise<void> {
-  try {
-    await keySession.clearKeyCache();
-  } finally {
-    await saveSession(storage, null);
-  }
-}
-
-function sameIds(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((id, index) => b[index] === id);
-}
-
-async function saveSession(storage: StoragePort, session: Session | null): Promise<void> {
-  if (session === null) {
-    await storage.remove(SESSION_KEY);
-    return;
-  }
-  await storage.set(SESSION_KEY, session);
-}
 
 function sameEnvelope(a: VaultEnvelope, b: VaultEnvelope): boolean {
   return a.version === b.version && a.salt === b.salt && a.iv === b.iv && a.ciphertext === b.ciphertext;
@@ -574,185 +387,28 @@ export class WalletLifecycleHandler {
     });
   }
 
-  /**
-   * Adds a wallet whose key lives on a Keystone or Ledger. Only the public
-   * key and device details are stored. No password is asked for, so a
-   * vault that has one must already be unlocked: otherwise this would add
-   * a wallet to a locked Gleam.
-   */
-  async addHardwareWallet(req: {
-    method: HardwareWalletMethod;
-    publicKey: string;
-    device: HardwareDevice;
-    name?: string;
-  }): Promise<WalletSummary> {
-    return this.keySession.withSessionLock(async () => {
-      if (!isHardwareWalletMethod(req.method)) {
-        throw new Error(dappError(`"${String(req.method)}" isn't a hardware wallet type.`));
-      }
-      if (!isValidHardwareDevice(req.device) || req.device.kind !== req.method) {
-        throw new Error(userErrorMessage("deviceDetailsMismatch"));
-      }
-      let modulus: Uint8Array;
-      try {
-        modulus = base64UrlToBytes(req.publicKey);
-      } catch {
-        throw new Error(userErrorMessage("deviceKeyEncoding"));
-      }
-      if (modulus.length !== RSA_MODULUS_BYTES) {
-        throw new Error(
-          userErrorMessage("deviceKeyLength", { size: modulus.length, expected: RSA_MODULUS_BYTES }),
-        );
-      }
-
-      const wallets = await loadWallets(this.storage);
-      if (hasVaultPassword(wallets) && (await loadSession(this.storage, this.keySession, wallets)) === null) {
-        throw new Error(userErrorMessage("unlockBeforeAddingHardware"));
-      }
-
-      const address = await addressFromOwner(req.publicKey);
-      const existing = wallets.find((wallet) => wallet.address === address);
-      if (existing) {
-        throw new Error(userErrorMessage("addressInGleam", { name: existing.name }));
-      }
-
-      const label = HARDWARE_METHOD_NAME[req.method];
-      const sameMethodCount = wallets.filter((wallet) => wallet.method === req.method).length;
-      const name = req.name?.trim() || `${label} ${sameMethodCount + 1}`;
-      const now = Date.now();
-      const wallet: Wallet = {
-        id: crypto.randomUUID(),
-        address,
-        name,
-        method: req.method,
-        publicKey: req.publicKey,
-        createdAt: now,
-        updatedAt: now,
-        encryptedKeyfile: null,
-        backupConfirmedAt: null,
-        device: req.device,
-      };
-
-      wallets.push(wallet);
-      await saveWallets(this.storage, wallets);
-      await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      // loadSession lists every hardware wallet, so this adds the new one to
-      // an unlocked session, or starts one for a vault without a password.
-      await loadSession(this.storage, this.keySession, wallets);
-
-      return toSummary(wallet);
-    });
+  addHardwareWallet(req: Parameters<typeof addHardwareWallet>[2]): Promise<WalletSummary> {
+    return addHardwareWallet(this.storage, this.keySession, req);
   }
 
-  /**
-   * Adds an address to follow, with no key. Like a hardware wallet it asks
-   * for no password, so a vault that has one must already be unlocked.
-   */
-  async addWatchWallet(req: { address: string; name?: string }): Promise<WalletSummary> {
-    return this.keySession.withSessionLock(async () => {
-      const address = req.address.trim();
-      if (!isValidArweaveAddress(address)) {
-        throw new Error(userErrorMessage("invalidWatchAddress"));
-      }
-
-      const wallets = await loadWallets(this.storage);
-      if (hasVaultPassword(wallets) && (await loadSession(this.storage, this.keySession, wallets)) === null) {
-        throw new Error(userErrorMessage("unlockBeforeAddingWallet"));
-      }
-      const existing = wallets.find((wallet) => wallet.address === address);
-      if (existing) {
-        throw new Error(userErrorMessage("addressInGleam", { name: existing.name }));
-      }
-
-      const watchCount = wallets.filter((wallet) => wallet.method === "watch").length;
-      const name = req.name?.trim() || `Watched ${watchCount + 1}`;
-      const now = Date.now();
-      const wallet: Wallet = {
-        id: crypto.randomUUID(),
-        address,
-        name,
-        method: "watch",
-        publicKey: "",
-        createdAt: now,
-        updatedAt: now,
-        encryptedKeyfile: null,
-        backupConfirmedAt: null,
-      };
-
-      wallets.push(wallet);
-      await saveWallets(this.storage, wallets);
-      await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      await loadSession(this.storage, this.keySession, wallets);
-
-      return toSummary(wallet);
-    });
+  addWatchWallet(req: { address: string; name?: string }): Promise<WalletSummary> {
+    return addWatchWallet(this.storage, this.keySession, req);
   }
 
-  async deleteWallet(req: { walletId: string }): Promise<void> {
-    return this.keySession.withSessionLock(async () => {
-      const wallets = await loadWallets(this.storage);
-      const remaining = wallets.filter((wallet) => wallet.id !== req.walletId);
-      await saveWallets(this.storage, remaining);
-      try {
-        await this.keySession.removeCachedKey(req.walletId);
-      } finally {
-        await this.finishDeleteWallet(req.walletId, remaining);
-      }
-    });
+  deleteWallet(req: { walletId: string }): Promise<void> {
+    return deleteWallet(this.storage, this.keySession, req);
   }
 
-  private async finishDeleteWallet(walletId: string, remaining: Wallet[]): Promise<void> {
-    const activeWalletId = await loadActiveWalletId(this.storage, remaining);
-    if (activeWalletId === null) {
-      await this.storage.set(ACTIVE_WALLET_ID_KEY, remaining[0]?.id ?? null);
-    }
-
-    const session = await loadSession(this.storage, this.keySession, remaining);
-    if (session !== null && session.unlockedWalletIds.includes(walletId)) {
-      const unlockedWalletIds = session.unlockedWalletIds.filter((id) => id !== walletId);
-      if (unlockedWalletIds.length > 0) {
-        await saveSession(this.storage, { ...session, unlockedWalletIds });
-      } else {
-        await lockSession(this.storage, this.keySession);
-      }
-    }
+  renameWallet(req: { walletId: string; name: string }): Promise<void> {
+    return renameWallet(this.storage, this.keySession, req);
   }
 
-  async renameWallet(req: { walletId: string; name: string }): Promise<void> {
-    return this.keySession.withSessionLock(async () => {
-      const wallets = await loadWallets(this.storage);
-      const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
-      if (index === -1) {
-        throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
-      }
-      wallets[index] = { ...wallets[index]!, name: req.name, updatedAt: Date.now() };
-      await saveWallets(this.storage, wallets);
-    });
+  confirmWalletBackup(req: { walletId: string }): Promise<void> {
+    return confirmWalletBackup(this.storage, this.keySession, req);
   }
 
-  /**
-   * Records that the user confirmed they backed up this wallet's keyfile.
-   * Called by `downloadKeyfile` once the keyfile is saved, never on a
-   * cancelled or failed download.
-   */
-  async confirmWalletBackup(req: { walletId: string }): Promise<void> {
-    return this.keySession.withSessionLock(async () => {
-      const wallets = await loadWallets(this.storage);
-      const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
-      if (index === -1) {
-        throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
-      }
-      wallets[index] = { ...wallets[index]!, backupConfirmedAt: Date.now() };
-      await saveWallets(this.storage, wallets);
-    });
-  }
-
-  async switchWallet(req: { walletId: string }): Promise<void> {
-    const wallets = await loadWallets(this.storage);
-    if (!wallets.some((wallet) => wallet.id === req.walletId)) {
-      throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
-    }
-    await this.storage.set(ACTIVE_WALLET_ID_KEY, req.walletId);
+  switchWallet(req: { walletId: string }): Promise<void> {
+    return switchWallet(this.storage, req);
   }
 
   /**
@@ -856,7 +512,7 @@ export class WalletLifecycleHandler {
     const wallets = await loadWallets(this.storage);
     await Promise.all(
       wallets.flatMap((wallet) => [
-        this.storage.remove(`${ACTIVITY_LOG_KEY_PREFIX}${wallet.address}`),
+        this.storage.remove(activityLogKey(wallet.address)),
         this.storage.remove(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${wallet.address}`),
       ]),
     );
@@ -1127,10 +783,7 @@ export class WalletLifecycleHandler {
    * the theme value, unlike `setLockSettings`'s session-timeout sync.
    */
   async setThemePreference(req: ThemeSettings): Promise<void> {
-    if (!isThemeSettings(req)) {
-      throw new Error(dappError(`Invalid theme preference "${String((req as Partial<ThemeSettings>).theme)}".`));
-    }
-    await this.storage.set(THEME_SETTINGS_KEY, { theme: req.theme });
+    await saveThemeSettings(this.storage, req);
   }
 
   async getDisplaySettings(): Promise<DisplaySettings> {
@@ -1138,14 +791,6 @@ export class WalletLifecycleHandler {
   }
 
   async setDisplaySettings(req: DisplaySettings): Promise<void> {
-    if (!isDisplaySettings(req)) throw new Error(dappError("Invalid display settings."));
-    await this.storage.set(DISPLAY_SETTINGS_KEY, {
-      currency: req.currency,
-      header: req.header,
-      tokenLogos: req.tokenLogos,
-      tokenRows: req.tokenRows,
-      headline: req.headline,
-      balancesHidden: req.balancesHidden,
-    });
+    await saveDisplaySettings(this.storage, req);
   }
 }

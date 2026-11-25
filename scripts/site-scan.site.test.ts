@@ -12,40 +12,44 @@ import {
   AGENT_LINE,
   DEV_EXTENSION_KEY,
   EXTENSION_ID,
-  MIN_PAID_SCANS_PER_MINOR_RELEASE,
-  MIN_PAID_SCANS_PER_RELEASE,
-  PAID_SCANS_PER_RELEASE,
   ROUND_STEP_PERCENT,
   SCAN_AREAS,
   STORE_EXTENSION_ID,
   areaLabel,
   areaRows,
-  bountyTiers,
   coverageSummary,
   extensionIdFor,
+  formatPoints,
+  idFromHash,
+  releaseFromSearch,
+  roundLabel,
+  roundStepPercent,
+  unusedModels,
+} from "../apps/site/scan/scan-lib.js";
+import {
   appAttestHref,
   decodeAttestationFragment,
   decodeAttestationLink,
   describeOutcome,
-  fetchAreas,
-  fetchCount,
-  fetchListing,
-  fetchRewards,
-  formatPoints,
-  idFromHash,
   isFinal,
-  nextScanReward,
-  placesOf,
-  releaseFromSearch,
-  resultsHref,
-  roundLabel,
-  roundStepPercent,
   roundSummary,
   sendAttestation,
   sumPoints,
   checkGleam,
-  unusedModels,
-} from "../apps/site/scan-lib.js";
+} from "../apps/site/scan/scan-attest.js";
+import {
+  MIN_PAID_SCANS_PER_MINOR_RELEASE,
+  MIN_PAID_SCANS_PER_RELEASE,
+  PAID_SCANS_PER_RELEASE,
+  bountyTiers,
+  fetchAreas,
+  fetchCount,
+  fetchListing,
+  fetchRewards,
+  nextScanReward,
+  placesOf,
+  resultsHref,
+} from "../apps/site/scan/scan-api.js";
 
 /** A decoded round, as `decodeAttestationLink` documents it (the site lib is plain JS). */
 type Round = { ok: true; payload: string; attestation: { report: string } } | { ok: false; payload: string; error: string };
@@ -62,8 +66,8 @@ const attestation = {
 
 describe("site pages", () => {
   it.each(["attest", "scan", "review-results"])("%s.html has every element its script looks up", (name) => {
-    const script = readFileSync(`apps/site/${name}.js`, "utf8");
-    const page = readFileSync(`apps/site/${name}.html`, "utf8");
+    const script = readFileSync(`apps/site/${name}/${name}.js`, "utf8");
+    const page = readFileSync(`apps/site/${name}/index.html`, "utf8");
     const attributes = [...script.matchAll(/\$\("\[(data-[a-z-]+)\]"\)/g)].map(([, attribute]) => attribute!);
     expect(attributes.length).toBeGreaterThan(0);
     // A lookup that misses throws before the page wires up the rest.

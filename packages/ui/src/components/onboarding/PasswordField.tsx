@@ -14,6 +14,7 @@ import { useUiLabels } from "../../labels";
  */
 export interface PasswordFieldProps extends Omit<TextFieldProps, "type" | "label"> {
   label?: string;
+  /** Overrides the hint the field shows from its own Caps Lock detection. */
   capsLockOn?: boolean;
   /** Accessible names and hint text; English unless the caller passes its own. */
   showLabel?: string;
@@ -22,9 +23,10 @@ export interface PasswordFieldProps extends Omit<TextFieldProps, "type" | "label
 }
 
 export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldProps>(
-  ({ label, capsLockOn, showLabel, hideLabel, capsLockLabel, id, className, ...props }, ref) => {
+  ({ label, capsLockOn, showLabel, hideLabel, capsLockLabel, id, className, onKeyUp, ...props }, ref) => {
     const labels = useUiLabels();
     const [revealed, setRevealed] = React.useState(false);
+    const [capsLockDetected, setCapsLockDetected] = React.useState(false);
     const generatedId = React.useId();
     const inputId = id ?? generatedId;
 
@@ -43,6 +45,10 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             // Edge and some Chromium builds draw their own reveal eye beside ours.
             className="pr-10 phone:pr-12 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
             {...props}
+            onKeyUp={(event) => {
+              setCapsLockDetected(event.getModifierState?.("CapsLock") ?? false);
+              onKeyUp?.(event);
+            }}
           />
           <button
             type="button"
@@ -56,7 +62,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             </span>
           </button>
         </div>
-        {capsLockOn ? (
+        {(capsLockOn ?? capsLockDetected) ? (
           <div className="flex items-center gap-1.5 text-caption text-muted">
             <CapsLockIcon />
             <span>{capsLockLabel ?? labels.capsLockOn}</span>

@@ -5,7 +5,6 @@ export { TokenRow, type TokenRowProps } from "./TokenRow";
 export { ActivityRow, type ActivityRowProps, type ActivityRowType } from "./ActivityRow";
 export { AddressDisplay, type AddressDisplayProps } from "./AddressDisplay";
 export { QrCode, type QrCodeProps } from "./QrCode";
-export { BalanceDisplay, type BalanceDisplayProps } from "./BalanceDisplay";
 export { NetworkErrorBanner, type NetworkErrorBannerProps } from "./NetworkErrorBanner";
 export { SkeletonRow } from "./SkeletonRow";
 export { SendReceiveActions, type SendReceiveActionsProps } from "./SendReceiveActions";

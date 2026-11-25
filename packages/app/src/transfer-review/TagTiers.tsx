@@ -4,9 +4,9 @@ import { tierTags, type AppTag } from "@gleam/core/src/ao/tag-tiers.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
 import { UntrustedText } from "../approval/UntrustedText";
-import type { Tag } from "./model";
+import type { Tag } from "@gleam/core";
+import { FieldLabel } from "./FieldLabel";
 
-const SECTION_LABEL = "text-caption font-semibold uppercase tracking-wide text-muted";
 const ROW = "grid grid-cols-[110px_minmax(0,1fr)] items-baseline gap-x-3 text-label leading-snug";
 
 /**
@@ -24,7 +24,7 @@ export function TagTiers({ tags, target, walletAddress }: { tags: readonly Tag[]
     <>
       {tiers.headline ? (
         <div className="flex flex-col gap-1.5 rounded-lg bg-mist p-3">
-          <span className={SECTION_LABEL}><UntrustedText text={tiers.headline.tag.name} /></span>
+          <FieldLabel><UntrustedText text={tiers.headline.tag.name} /></FieldLabel>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <span className="break-all font-mono text-h3 font-semibold text-foreground">
               <UntrustedText text={tiers.headline.tag.value} />
@@ -71,7 +71,7 @@ export function TagTiers({ tags, target, walletAddress }: { tags: readonly Tag[]
 function Section({ label, gap = "gap-2", children }: { label: string; gap?: string; children: ReactNode }) {
   return (
     <div className={`flex flex-col ${gap}`}>
-      <span className={`${SECTION_LABEL} pb-0.5`}>{label}</span>
+      <FieldLabel className="pb-0.5">{label}</FieldLabel>
       {children}
     </div>
   );

@@ -15,7 +15,7 @@ and they never talk to the background themselves.
 - **`primitives/`**: general-purpose components such as `Button`,
   `Card`, `TextField` and `ScreenHeader`.
 - **`components/wallet/`**: components for showing wallet information,
-  such as `TokenRow`, `BalanceDisplay`, `ActivityRow`, `QrCode` and
+  such as `TokenRow`, `ActivityRow`, `QrCode` and
   `RecipientCard`.
 - **`components/onboarding/`**: pieces of the flow for creating or
   importing a wallet, such as the password field and its strength meter.

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithPlatform as render } from "../../../app-platform/testing";
 import type { LockSettings, RuntimePort } from "@gleam/core";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
 import { BiometricError } from "../../../biometrics/biometrics";

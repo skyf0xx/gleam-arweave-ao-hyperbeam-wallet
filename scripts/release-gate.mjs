@@ -6,10 +6,10 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
 import { surfacePaths } from "../security/surface.mjs";
+import { isMain } from "./is-main.mjs";
 
 export const VERSION_FILE = "apps/extension/package.json";
 export const SURFACE_FILE = "security/surface.txt";
@@ -157,6 +157,31 @@ export function git(cwd, args) {
 }
 
 /**
+ * The root of the git repository holding `cwd`, or null outside one.
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+export function repoRoot(cwd) {
+  const top = git(cwd, ["rev-parse", "--show-toplevel"]);
+  return top.ok ? top.out : null;
+}
+
+/**
+ * Calls `refuse` unless `root` is on `branch` with no uncommitted changes to
+ * tracked files. Untracked files can't end up in a tagged commit, so they
+ * don't count.
+ * @param {string} root
+ * @param {string} branch
+ * @param {string} wrongBranchHint what follows `on "<branch>"` in the reason when the branch is wrong
+ * @param {(reason: string) => never} refuse
+ */
+export function assertCleanBranch(root, branch, wrongBranchHint, refuse) {
+  const current = git(root, ["rev-parse", "--abbrev-ref", "HEAD"]).out;
+  if (current !== branch) refuse(`on "${current}"${wrongBranchHint}`);
+  if (git(root, ["status", "--porcelain", "--untracked-files=no"]).out !== "") refuse("working tree has uncommitted changes");
+}
+
+/**
  * @param {string} root
  * @returns {string}
  */
@@ -204,9 +229,8 @@ export function isVersionOnlyChange(root, commit, file) {
  * @returns {GateResult}
  */
 export function runGate({ cwd = process.cwd() } = {}) {
-  const top = git(cwd, ["rev-parse", "--show-toplevel"]);
-  if (!top.ok) return { ok: false, reason: `not a git repository: ${cwd}` };
-  const root = top.out;
+  const root = repoRoot(cwd);
+  if (root === null) return { ok: false, reason: `not a git repository: ${cwd}` };
 
   let version;
   try {
@@ -296,7 +320,7 @@ export function printGate(result) {
   for (const line of result.details ?? []) process.stderr.write(`  ${line}\n`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isMain(import.meta.url)) {
   const result = runGate();
   printGate(result);
   process.exit(result.ok ? 0 : 1);

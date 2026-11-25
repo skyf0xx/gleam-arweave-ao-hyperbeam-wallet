@@ -66,6 +66,6 @@ export function balancesQuery(runtime: RuntimePort, address: string) {
   };
 }
 
-export function useBalances(runtime: RuntimePort, address: string) {
-  return useQuery({ ...balancesQuery(runtime, address), staleTime: HOME_READ_STALE_MS, refetchInterval: BALANCES_POLL_MS });
+export function useBalances(runtime: RuntimePort, address: string, enabled = true) {
+  return useQuery({ ...balancesQuery(runtime, address), enabled, staleTime: HOME_READ_STALE_MS, refetchInterval: BALANCES_POLL_MS });
 }

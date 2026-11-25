@@ -1,6 +1,7 @@
-import { BACKUP_KEYS, isValidWallet, watchedTokensBackupKey, type StoragePort, type TimerPort } from "@gleam/core";
+import { BACKUP_KEYS, watchedTokensBackupKey, type StoragePort, type TimerPort } from "@gleam/core";
 import type { BackupHandler } from "./handlers/backup";
 import { WALLETS_KEY } from "./storage-keys";
+import { parseWallets } from "./stored-data";
 
 export const BACKUP_SYNC_ALARM_NAME = "gleam-backup-sync";
 
@@ -51,7 +52,7 @@ export function registerBackupSync(
   const tokenWatches = new Map<string, () => void>();
   const watchTokens = (wallets: unknown) => {
     const keys = new Set(
-      (Array.isArray(wallets) ? wallets : []).filter(isValidWallet).map((wallet) => watchedTokensBackupKey(wallet.address)),
+      parseWallets(wallets).map((wallet) => watchedTokensBackupKey(wallet.address)),
     );
     for (const [key, unwatch] of tokenWatches) {
       if (keys.has(key)) continue;

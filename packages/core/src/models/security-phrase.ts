@@ -1,3 +1,5 @@
+import { isRecord } from "./guards";
+
 /**
  * A word the user picks, shown with the icon drawn from it on Gleam's
  * unlock and approval screens. A fake Gleam window drawn inside a web
@@ -22,8 +24,8 @@ const SUGGESTED_WORDS = [
 
 /** The phrase in `value` with its word trimmed, or `null` if it isn't a valid one. */
 export function readSecurityPhrase(value: unknown): SecurityPhrase | null {
-  if (value === null || typeof value !== "object") return null;
-  const { word } = value as { word?: unknown };
+  if (!isRecord(value)) return null;
+  const { word } = value;
   if (typeof word !== "string") return null;
   const trimmed = word.trim();
   if (trimmed.length === 0 || trimmed.length > SECURITY_PHRASE_WORD_MAX_LENGTH || !WORD_PATTERN.test(trimmed)) {

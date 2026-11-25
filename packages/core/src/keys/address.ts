@@ -1,4 +1,5 @@
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
+import { sha256 } from "../models/bytes";
 
 /**
  * Arweave address of an RSA public key given as its base64url modulus
@@ -6,6 +7,5 @@ import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
  * a hardware wallet's address can be derived from the public key alone.
  */
 export async function addressFromOwner(publicKeyModulus: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", base64UrlToBytes(publicKeyModulus));
-  return bytesToBase64Url(new Uint8Array(digest));
+  return bytesToBase64Url(await sha256(base64UrlToBytes(publicKeyModulus)));
 }

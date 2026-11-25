@@ -1,0 +1,41 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // An export only its own file uses is harmless; the report is for code nothing reaches.
+  "ignoreExportsUsedInFile": true,
+  "rules": {
+    // Exported prop and result types document a module's interface; they cost nothing at runtime.
+    "types": "off"
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.{ts,mjs}",
+        // The sites are plain HTML pages; these are the scripts their <script> tags load.
+        "apps/site/*.js",
+        "apps/site/{attest/attest,download/download,gleam/gleam,points/points,review-results/review-results,scan/scan}.js",
+        "apps/site/{invite/invite,invite/invite-launch,shared/pages,shared/program}.js",
+        "apps/site-open/*.{js,mjs}"
+      ],
+      // Stryker loads its own API package; the config only names its types.
+      "ignoreDependencies": ["@stryker-mutator/api"]
+    },
+    "apps/extension": {
+      // tailwindcss: loaded by `@import "tailwindcss"` in ui's theme.css, which knip doesn't read.
+      // hash-wasm: named in build-plugins.ts so the keyring chunk keeps it apart from the rest.
+      "ignoreDependencies": ["tailwindcss", "hash-wasm"]
+    },
+    "apps/mobile": {
+      // Run by release.yml and release-app.sh to recompute the bundle hash.
+      "entry": ["scripts/*.mjs"],
+      "ignoreDependencies": ["tailwindcss"]
+    },
+    "packages/keystone": {
+      // The shells' polyfill plugin injects `vite-plugin-node-polyfills/shims/*` imports into keystone's files.
+      "ignoreDependencies": ["vite-plugin-node-polyfills"]
+    },
+    "packages/app": {
+      // react-dom is the peer @testing-library/react resolves from here.
+      "ignoreDependencies": ["tailwindcss", "react-dom", "@types/react-dom"]
+    }
+  }
+}

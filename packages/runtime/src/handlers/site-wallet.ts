@@ -1,5 +1,5 @@
+import { z } from "zod";
 import {
-  PERMISSION_TYPES,
   UNKNOWN_WALLET_NAME,
   type ActiveSite,
   type Grant,
@@ -7,6 +7,8 @@ import {
   type StoragePort,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
+import { permissionTypeSchema, stringList } from "../guards";
+import type { ReportOtherWalletParams } from "../dispatch/methods";
 
 /**
  * One `SeenOtherWallet` per tab, so tabs reporting at once never overwrite
@@ -47,7 +49,8 @@ export interface SiteWalletHandlerDeps {
   now?: () => number;
 }
 
-function webOrigin(url: string | undefined): string | null {
+/** The origin of an http(s) URL, or null. */
+export function webOrigin(url: string | undefined): string | null {
   if (!url) return null;
   try {
     const parsed = new URL(url);
@@ -71,20 +74,19 @@ export function safeSiteIconUrl(raw: unknown): string | null {
   }
 }
 
-function originList(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
-}
+const seenOtherWalletSchema = z.object({ origin: z.string() });
 
 function seenOf(raw: unknown): SeenOtherWallet | null {
-  return raw !== null && typeof raw === "object" && typeof (raw as SeenOtherWallet).origin === "string"
-    ? (raw as SeenOtherWallet)
-    : null;
+  return seenOtherWalletSchema.safeParse(raw).success ? (raw as SeenOtherWallet) : null;
 }
 
+const permissionListSchema = z
+  .array(permissionTypeSchema.nullable().catch(null))
+  .catch([])
+  .transform((known) => [...new Set(known.filter((permission) => permission !== null))]);
+
 function knownPermissions(raw: unknown): PermissionType[] {
-  if (!Array.isArray(raw)) return [];
-  const known = raw.filter((entry): entry is PermissionType => (PERMISSION_TYPES as readonly unknown[]).includes(entry));
-  return [...new Set(known)];
+  return permissionListSchema.parse(raw);
 }
 
 export function displayWalletName(raw: string): string {
@@ -107,7 +109,7 @@ export class SiteWalletHandler {
   }
 
   private async loadOrigins(key: string): Promise<string[]> {
-    return originList(await this.deps.storage.get<unknown>(key));
+    return stringList(await this.deps.storage.get<unknown>(key));
   }
 
   private async usesGleam(origin: string): Promise<{ usesGleam: boolean; grant: Grant | null }> {
@@ -121,7 +123,7 @@ export class SiteWalletHandler {
 
   async setUseGleam(origin: string, useGleam: boolean): Promise<void> {
     await updateStored(this.deps.storage, GLEAM_SITES_KEY, (raw) => {
-      const sites = originList(raw).filter((site) => site !== origin);
+      const sites = stringList(raw).filter((site) => site !== origin);
       return useGleam ? [...sites, origin] : sites;
     });
   }
@@ -138,12 +140,7 @@ export class SiteWalletHandler {
   }
 
   /** A use stays recorded across reloads of the same origin, and clears on navigating elsewhere. */
-  async report(
-    tabId: number,
-    origin: string,
-    req: { walletName: unknown; used: unknown; permissions?: unknown },
-  ): Promise<void> {
-    if (typeof req.walletName !== "string" || typeof req.used !== "boolean") return;
+  async report(tabId: number, origin: string, req: ReportOtherWalletParams): Promise<void> {
     const { walletName, used } = req;
     const permissions = knownPermissions(req.permissions);
     const now = this.now();
@@ -181,7 +178,7 @@ export class SiteWalletHandler {
 
   async dismiss(origin: string): Promise<void> {
     await updateStored(this.deps.storage, SUGGESTIONS_DISMISSED_KEY, (raw) => {
-      const dismissed = originList(raw);
+      const dismissed = stringList(raw);
       return dismissed.includes(origin) ? undefined : [...dismissed, origin];
     });
   }

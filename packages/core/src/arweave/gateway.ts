@@ -1,3 +1,7 @@
+import { z } from "zod";
+
+const gatewayInfoSchema = z.object({ network: z.string().startsWith("arweave") });
+
 /**
  * Confirms a URL is actually an Arweave gateway rather than merely
  * reachable. `GET <url>/info` is the standard gateway/node info route
@@ -14,10 +18,7 @@ export async function isArweaveGateway(
   try {
     const response = await fetchImpl(`${url}/info`, { method: "GET" });
     if (!response.ok) return false;
-    const body: unknown = await response.json();
-    if (body === null || typeof body !== "object") return false;
-    const network = (body as Record<string, unknown>).network;
-    return typeof network === "string" && network.startsWith("arweave");
+    return gatewayInfoSchema.safeParse(await response.json()).success;
   } catch {
     return false;
   }

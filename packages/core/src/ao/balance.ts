@@ -1,10 +1,12 @@
-import type { TokenBalance } from "../models/balance";
-import { L1_TOKEN_NODE_URLS } from "../models/network";
+import { atomicString, type TokenBalance } from "../models/balance";
+import { L1_TOKEN_NODE_URLS, trimTrailingSlashes } from "../models/network";
 import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
-import { readCappedText } from "./capped-body";
+import { readCappedDigits, readCappedText } from "./capped-body";
+import { z } from "zod";
+import { errorMessage } from "../models/error-message";
 
 /** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
 const COMPUTE_TIMEOUT_MS = 8_000;
@@ -39,7 +41,7 @@ async function queryBalance(
   peerUrl: string,
   fetchImpl: typeof fetch,
 ): Promise<TokenBalance | null> {
-  const url = `${trimTrailingSlash(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
+  const url = `${trimTrailingSlashes(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(COMPUTE_TIMEOUT_MS) });
 
   if (response.status === 404) return null;
@@ -69,53 +71,42 @@ async function queryBalance(
  */
 const AO_TOKEN_DENOMINATION = 12;
 
+const balanceObjectSchema = z.object({
+  balance: z.unknown().optional(),
+  quantity: z.unknown().optional(),
+  ticker: z.string().optional().catch(undefined),
+  denomination: z.number().optional().catch(undefined),
+  name: z.string().optional().catch(undefined),
+});
+
 function parseBalanceResponse(
   body: unknown,
   processId: string,
   address: string,
 ): TokenBalance {
-  if (typeof body === "string" && /^\d+$/.test(body)) {
+  const bare = atomicString(body);
+  if (bare !== null) {
     return {
       address,
       processId,
       ticker: processId,
       denomination: AO_TOKEN_DENOMINATION,
       name: null,
-      quantity: body,
+      quantity: bare,
     };
   }
 
-  if (typeof body === "number" && Number.isSafeInteger(body) && body >= 0) {
-    return {
-      address,
-      processId,
-      ticker: processId,
-      denomination: AO_TOKEN_DENOMINATION,
-      name: null,
-      quantity: String(body),
-    };
-  }
+  const candidate = balanceObjectSchema.safeParse(body);
+  if (candidate.success) {
+    const quantity = atomicString(candidate.data.balance ?? candidate.data.quantity);
 
-  if (body !== null && typeof body === "object") {
-    const candidate = body as Record<string, unknown>;
-    const rawQuantity = candidate.balance ?? candidate.quantity;
-    const quantity =
-      typeof rawQuantity === "string"
-        ? rawQuantity
-        : typeof rawQuantity === "number" && Number.isSafeInteger(rawQuantity) && rawQuantity >= 0
-          ? String(rawQuantity)
-          : undefined;
-
-    if (quantity !== undefined && /^\d+$/.test(quantity)) {
+    if (quantity !== null) {
       return {
         address,
         processId,
-        ticker: typeof candidate.ticker === "string" ? candidate.ticker : processId,
-        denomination:
-          typeof candidate.denomination === "number"
-            ? candidate.denomination
-            : AO_TOKEN_DENOMINATION,
-        name: typeof candidate.name === "string" ? candidate.name : null,
+        ticker: candidate.data.ticker ?? processId,
+        denomination: candidate.data.denomination ?? AO_TOKEN_DENOMINATION,
+        name: candidate.data.name ?? null,
         quantity,
       };
     }
@@ -159,7 +150,7 @@ export async function readTokenBalance(options: ReadTokenBalanceOptions): Promis
   const failures: string[] = [];
   if (peerUrl !== null) {
     try {
-      return (await getTokenBalance(processId, address, trimTrailingSlash(peerUrl), fetchImpl)).quantity;
+      return (await getTokenBalance(processId, address, trimTrailingSlashes(peerUrl), fetchImpl)).quantity;
     } catch (error) {
       failures.push(`${hostOf(peerUrl)} (${shortReason(error)})`);
     }
@@ -201,7 +192,7 @@ export async function readL1Balance(
 ): Promise<string> {
   const groups = await furthestAheadFirst(
     processId,
-    [...new Set([gatewayUrl, ...l1NodeUrls, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlash))],
+    [...new Set([gatewayUrl, ...l1NodeUrls, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlashes))],
     fetchImpl,
   );
   const failures: string[] = [];
@@ -228,8 +219,8 @@ async function firstL1Answer(
     try {
       const url = `${host}/${processId}~process@1.0/now/as/balance?as=execution&balance=${address}`;
       const response = await fetchImpl(url, { signal: controller.signal });
-      const quantity = response.ok ? ((await readCappedText(response, NUMBER_RESPONSE_MAX_BYTES)) ?? "").trim() : "";
-      if (/^\d+$/.test(quantity)) return quantity;
+      const quantity = response.ok ? await readCappedDigits(response, NUMBER_RESPONSE_MAX_BYTES) : null;
+      if (quantity !== null) return quantity;
       failure = response.ok ? "unreadable answer" : `HTTP ${response.status}`;
     } catch (error) {
       failure = shortReason(error);
@@ -263,8 +254,8 @@ async function furthestAheadFirst(processId: string, hosts: string[], fetchImpl:
     hosts.map(async (host) => {
       try {
         const response = await fetchImpl(`${host}/${processId}~process@1.0/slot/current`, { signal: AbortSignal.timeout(SLOT_TIMEOUT_MS) });
-        const text = response.ok ? ((await readCappedText(response, NUMBER_RESPONSE_MAX_BYTES)) ?? "").trim() : "";
-        return /^\d+$/.test(text) ? BigInt(text) : -1n;
+        const slot = response.ok ? await readCappedDigits(response, NUMBER_RESPONSE_MAX_BYTES) : null;
+        return slot !== null ? BigInt(slot) : -1n;
       } catch {
         return -1n;
       }
@@ -284,7 +275,7 @@ function balanceReadError(label: string | undefined, failures: string[]): Error 
 }
 
 function shortReason(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const status = /HTTP (\d{3})|answered (\d{3})/.exec(message);
   if (status) return `HTTP ${status[1] ?? status[2]}`;
   if (/timed? ?out|abort/i.test(message)) return "timed out";
@@ -297,8 +288,4 @@ function hostOf(url: string): string {
   } catch {
     return url;
   }
-}
-
-function trimTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
 }

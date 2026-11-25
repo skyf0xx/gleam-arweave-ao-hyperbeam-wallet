@@ -1,5 +1,6 @@
 import { isWatchWalletMethod, type WalletSummary } from "@gleam/core";
 import { AccountAvatar, AddressDisplay, QrCode, WatchOnlyBadge } from "@gleam/ui/src/components/wallet/index.ts";
+import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useT } from "../../../i18n";
@@ -40,7 +41,7 @@ export function ReceiveView({ wallet, onBack }: ReceiveViewProps) {
               onLens
               address={wallet.address}
               emphasisPick={emphasisPick}
-              onCopy={() => void navigator.clipboard?.writeText(wallet.address)}
+              onCopy={() => void copyToClipboard(wallet.address)}
             />
           </div>
 

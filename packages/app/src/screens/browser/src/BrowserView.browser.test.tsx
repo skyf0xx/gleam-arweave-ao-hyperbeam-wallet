@@ -1,8 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { RuntimePort } from "@gleam/core";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
-import { fakeAppPlatform } from "../../../app-platform/testing";
+import { fakeAppPlatform, renderWithPlatform as render } from "../../../app-platform/testing";
 import { PlatformProvider } from "../../../app-platform/context";
 import type { DappBrowserEvent, DappBrowserPort } from "../../../app-platform/types";
 import { BrowserView } from "./BrowserView";
@@ -65,11 +66,13 @@ function mount(options: { dappBrowser?: boolean; browser?: DappBrowserPort; runt
   const stack = createBackStack();
   const props = { onBack: options.onBack ?? vi.fn(), onOpenConnectedApp: vi.fn(), onLocked: vi.fn() };
   render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <PlatformProvider platform={fakeAppPlatform({ dappBrowser: browser, runtime, capabilities: { dappBrowser: options.dappBrowser ?? true } })}>
       <BackStackContext.Provider value={stack}>
         <BrowserView runtime={runtime} initialUrl={options.initialUrl} {...props} />
       </BackStackContext.Provider>
-    </PlatformProvider>,
+    </PlatformProvider>
+    </QueryClientProvider>,
   );
   return { stack, ...props };
 }

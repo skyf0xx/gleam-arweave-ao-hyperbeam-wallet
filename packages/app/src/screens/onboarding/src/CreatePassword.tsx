@@ -1,9 +1,5 @@
 import { useState } from "react";
-import {
-  StepDots,
-  PasswordField,
-  PasswordStrengthMeter,
-} from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordField, PasswordStrengthMeter, StepDots, StepForm, StepIntro } from "@gleam/ui/src/components/onboarding/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validatePassword } from "@gleam/core/src/vault/password-policy.ts";
@@ -62,8 +58,7 @@ export function CreatePassword({
         busy={submitting}
         subtitle={<StepDots total={2} current={1} />}
       />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
+      <StepForm
         onSubmit={(event) => {
           event.preventDefault();
           setTouched(true);
@@ -72,12 +67,7 @@ export function CreatePassword({
           }
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.setPasswordTitle")}</h1>
-          <p className="text-body leading-relaxed text-muted">
-            {t("onboarding.setPasswordBody")}
-          </p>
-        </div>
+        <StepIntro title={t("onboarding.setPasswordTitle")} body={t("onboarding.setPasswordBody")} />
 
         <div className="flex flex-col gap-2">
           <PasswordField
@@ -108,7 +98,7 @@ export function CreatePassword({
             {submitting ? t("onboarding.creating") : t("onboarding.continue")}
           </Button>
         </ScreenFooter>
-      </form>
+      </StepForm>
     </div>
   );
 }

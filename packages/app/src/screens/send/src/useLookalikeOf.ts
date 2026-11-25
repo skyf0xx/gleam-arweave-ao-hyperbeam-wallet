@@ -1,5 +1,5 @@
 import { assessRecipient, type Contact, type RuntimePort, type WalletSummary } from "@gleam/core";
-import { useActivity } from "../../activity/src/useActivity";
+import { useActivity } from "../../activity";
 import { recipientSchema } from "./sendFormSchema";
 
 /**

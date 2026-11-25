@@ -1,5 +1,5 @@
 import { DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core/src/models/network.ts";
-import { DEFAULT_GITHUB_REPO } from "./github";
+import { DEFAULT_GITHUB_REPO } from "./scans/github";
 
 export interface Config {
   databaseUrl: string;

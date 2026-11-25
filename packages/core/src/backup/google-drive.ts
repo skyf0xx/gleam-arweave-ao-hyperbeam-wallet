@@ -1,6 +1,8 @@
+import { z } from "zod";
 import { userErrorMessage } from "../models/user-errors";
 import type { CloudFilePort } from "../ports/cloud-file";
 import { MAX_BACKUP_FILE_BYTES } from "./file";
+import { concatBytes } from "../models/bytes";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -30,17 +32,11 @@ export interface GoogleAuth {
   revoke(): Promise<void>;
 }
 
-interface DriveFile {
-  id: string;
-  modifiedTime: string;
-  size?: string;
-}
+const driveFileSchema = z.object({ id: z.string().min(1), modifiedTime: z.string(), size: z.string().optional() });
 
-function isDriveFile(value: unknown): value is DriveFile {
-  if (value === null || typeof value !== "object") return false;
-  const { id, modifiedTime, size } = value as Record<string, unknown>;
-  return typeof id === "string" && id.length > 0 && typeof modifiedTime === "string" && (size === undefined || typeof size === "string");
-}
+type DriveFile = z.output<typeof driveFileSchema>;
+
+const driveListSchema = z.object({ files: z.array(z.unknown()).optional().catch(undefined) });
 
 function unreachable(): Error {
   return new Error(userErrorMessage("backupUnreachable"));
@@ -86,8 +82,14 @@ export function createGoogleDriveFile(auth: GoogleAuth, fetchImpl: typeof fetch 
     });
     const response = await call(`${FILES_URL}?${query}`);
     if (!response.ok) throw unreachable();
-    const { files } = (await response.json().catch(() => ({}))) as { files?: unknown };
-    return Array.isArray(files) ? files.filter(isDriveFile) : [];
+    const body: unknown = await response.json().catch(() => ({}));
+    const list = driveListSchema.safeParse(body);
+    // A `null` body has no `files` to read, and is no reason to think the folder is empty.
+    if (!list.success && body === null) throw unreachable();
+    return (list.data?.files ?? []).flatMap((file) => {
+      const parsed = driveFileSchema.safeParse(file);
+      return parsed.success ? [parsed.data] : [];
+    });
   }
 
   function fileUrl(id: string, query = ""): string {
@@ -146,9 +148,6 @@ function multipart(bytes: Bytes): { headers: Record<string, string>; body: Bytes
       `--${boundary}\r\ncontent-type: application/octet-stream\r\n\r\n`,
   );
   const tail = encoder.encode(`\r\n--${boundary}--`);
-  const body = new Uint8Array(head.length + bytes.length + tail.length);
-  body.set(head);
-  body.set(bytes, head.length);
-  body.set(tail, head.length + bytes.length);
+  const body = concatBytes(head, bytes, tail);
   return { headers: { "content-type": `multipart/related; boundary=${boundary}` }, body };
 }

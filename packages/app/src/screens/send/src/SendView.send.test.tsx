@@ -6,7 +6,8 @@ import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.te
 import { PlatformProvider } from "../../../app-platform/context";
 import { fakeAppPlatform } from "../../../app-platform/testing";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
-import { namedSuggestions, SendView, type SendViewProps } from "./SendView";
+import { namedSuggestions } from "./namedAddresses";
+import { SendView, type SendViewProps } from "./SendView";
 
 afterEach(() => {
   cleanup();

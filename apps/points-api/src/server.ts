@@ -1,13 +1,13 @@
 import { serve } from "@hono/node-server";
 import pg from "pg";
 import { createApp } from "./app";
-import { createBalanceReader } from "./balances";
+import { createBalanceReader } from "./points/balances";
 import { readConfig } from "./config";
 import { dbFromPool } from "./db";
-import { createGithubClient } from "./github";
+import { createGithubClient } from "./scans/github";
 import { migrate } from "./migrate";
-import { createPgPriceStore } from "./price-store";
-import { createPriceService } from "./prices";
+import { createPgPriceStore } from "./prices/price-store";
+import { createPriceService } from "./prices/prices";
 import { startSnapshotScheduler } from "./scheduler";
 
 const config = readConfig(process.env);

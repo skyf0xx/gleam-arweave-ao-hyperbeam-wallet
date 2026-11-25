@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   BackupProvider,
   AutoLockTimeout,
-  LockSettings,
   PasskeyStatus,
   RuntimePort,
 } from "@gleam/core";
@@ -13,12 +12,16 @@ import {
   SkeletonRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
+import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
+import { useLockNow, useLockSettings, useSetAutoLockTimeout } from "./useLockSettings";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import { BackupSection } from "./BackupSection";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
 import { useT, type MessageKey } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { ChoiceRow } from "@gleam/ui/src/primitives/option-list.tsx";
 
 const TIMEOUT_OPTIONS = [
   { value: "never", key: "lockSettings.timeoutNever" },
@@ -50,12 +53,6 @@ export interface LockSettingsViewProps {
   backup?: { provider: BackupProvider; open: () => void };
 }
 
-interface LoadState {
-  settings: LockSettings | null;
-  loading: boolean;
-  error: string | null;
-}
-
 export function LockSettingsView({
   runtime,
   onBack,
@@ -67,98 +64,46 @@ export function LockSettingsView({
   backup,
 }: LockSettingsViewProps) {
   const t = useT();
-  const [state, setState] = useState<LoadState>({
-    settings: null,
-    loading: true,
-    error: null,
-  });
-  const [locking, setLocking] = useState(false);
-  const [savingTimeout, setSavingTimeout] = useState<AutoLockTimeout | null>(
-    null,
-  );
+  const settingsQuery = useLockSettings(runtime);
+  const settings = settingsQuery.data ?? null;
+  const lockNow = useLockNow(runtime);
+  const setTimeoutMutation = useSetAutoLockTimeout(runtime);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? (settingsQuery.isError ? errorText(settingsQuery.error) : null);
+  const locking = lockNow.isPending || lockNow.isSuccess;
+  const savingTimeout = setTimeoutMutation.isPending ? setTimeoutMutation.variables : null;
 
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const settings = await runtime.send<void, LockSettings>({
-        type: "getLockSettings",
-        payload: undefined,
-      });
-      setState({ settings, loading: false, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: errorText(error),
-      }));
-    }
-  }, [runtime]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleLockNow = async () => {
-    setLocking(true);
-    try {
-      await runtime.send<void, void>({
-        type: "lockWallet",
-        payload: undefined,
-      });
-      onLocked();
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: errorText(error),
-      }));
-      setLocking(false);
-    }
+  const handleLockNow = () => {
+    lockNow.mutate(undefined, {
+      onSuccess: onLocked,
+      onError: (caught) => setActionError(errorText(caught)),
+    });
   };
 
-  const handleSelectTimeout = async (autoLockTimeout: AutoLockTimeout) => {
-    if (state.settings?.autoLockTimeout === autoLockTimeout) return;
-    setSavingTimeout(autoLockTimeout);
-    try {
-      await runtime.send<LockSettings, void>({
-        type: "setLockSettings",
-        payload: { autoLockTimeout },
-      });
-      setState((prev) => ({ ...prev, settings: { autoLockTimeout } }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: errorText(error),
-      }));
-    } finally {
-      setSavingTimeout(null);
-    }
+  const handleSelectTimeout = (autoLockTimeout: AutoLockTimeout) => {
+    if (settings?.autoLockTimeout === autoLockTimeout) return;
+    setTimeoutMutation.mutate(autoLockTimeout, { onError: (caught) => setActionError(errorText(caught)) });
+  };
+
+  const retry = () => {
+    setActionError(null);
+    void settingsQuery.refetch();
   };
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("lockSettings.title")} onBack={onBack} />
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {error ? <NetworkErrorBanner onRetry={retry} retrying={settingsQuery.isFetching} /> : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10 phone:pb-8">
-          <button
-            type="button"
+          <IconRow
+            icon={<LockIcon />}
+            title={locking ? t("lockSettings.locking") : t("lockSettings.lockNow")}
+            description={t("lockSettings.lockNowHint")}
             disabled={locking}
-            onClick={() => void handleLockNow()}
-            className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
-          >
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-              <LockIcon />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-label font-semibold text-foreground">
-                {locking ? t("lockSettings.locking") : t("lockSettings.lockNow")}
-              </span>
-              <span className="text-caption text-muted">
-                {t("lockSettings.lockNowHint")}
-              </span>
-            </span>
-          </button>
+            onClick={() => handleLockNow()}
+          />
         </div>
 
         {biometrics ? <BiometricSection runtime={runtime} biometrics={biometrics} /> : null}
@@ -176,11 +121,11 @@ export function LockSettingsView({
         <SecurityPhraseSection runtime={runtime} />
 
         <div>
-          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <SettingsSectionTitle>
             {t("lockSettings.autoLock")}
-          </div>
+          </SettingsSectionTitle>
           <div>
-            {state.loading ? (
+            {settingsQuery.isPending ? (
               <>
                 <SkeletonRow />
                 <SkeletonRow />
@@ -188,32 +133,25 @@ export function LockSettingsView({
             ) : (
               TIMEOUT_OPTIONS.map((option) => {
                 const selected =
-                  state.settings?.autoLockTimeout === option.value;
+                  settings?.autoLockTimeout === option.value;
                 return (
-                  <button
+                  <ChoiceRow
                     key={option.value}
-                    type="button"
+                    radio={false}
+                    selected={selected}
                     disabled={savingTimeout !== null}
-                    onClick={() => void handleSelectTimeout(option.value)}
-                    className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-2.5 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
+                    onSelect={() => handleSelectTimeout(option.value)}
+                    checkIcon={<CheckIcon />}
                   >
                     <span className="flex-1 text-label font-semibold text-foreground">
                       {t(option.key)}
                     </span>
-                    {selected ? (
-                      <span
-                        aria-hidden="true"
-                        className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-foreground"
-                      >
-                        <CheckIcon />
-                      </span>
-                    ) : null}
-                  </button>
+                  </ChoiceRow>
                 );
               })
             )}
           </div>
-          {state.settings?.autoLockTimeout === "never" ? (
+          {settings?.autoLockTimeout === "never" ? (
             <p
               role="note"
               className="pt-2.5 text-caption leading-relaxed text-warning"
@@ -320,56 +258,43 @@ function PasskeySection({
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+      <SettingsSectionTitle>
         {t("lockSettings.passkey")}
-      </div>
+      </SettingsSectionTitle>
       {passkey.kind === "loading" ? (
         <SkeletonRow />
       ) : passkey.status.enrolled ? (
-        <div className="flex items-center gap-3 py-3.5">
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <PasskeyIcon />
-          </span>
-          <span className="min-w-0 flex-1 text-label font-semibold text-foreground">
-            {t("lockSettings.passkeyOn")}
-          </span>
-          <button
-            type="button"
-            disabled={passkey.busy}
-            onClick={() => void handleRemove()}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
-          >
-            {passkey.busy ? t("lockSettings.removing") : t("lockSettings.remove")}
-          </button>
-        </div>
+        <IconRow
+          icon={<PasskeyIcon />}
+          title={t("lockSettings.passkeyOn")}
+          trailing={
+            <button
+              type="button"
+              disabled={passkey.busy}
+              onClick={() => void handleRemove()}
+              className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
+            >
+              {passkey.busy ? t("lockSettings.removing") : t("lockSettings.remove")}
+            </button>
+          }
+        />
       ) : supported ? (
-        <button
-          type="button"
+        <IconRow
+          icon={<PasskeyIcon />}
+          title={t("lockSettings.passkeySetUp")}
+          description={t("lockSettings.passkeySetUpHint")}
           disabled={passkey.busy}
           onClick={() => void handleSetUp()}
-          className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover disabled:opacity-60"
-        >
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <PasskeyIcon />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">
-              {t("lockSettings.passkeySetUp")}
-            </span>
-            <span className="text-caption text-muted">
-              {t("lockSettings.passkeySetUpHint")}
-            </span>
-          </span>
-        </button>
+        />
       ) : (
         <p className="py-3.5 text-caption text-muted">
           {t("lockSettings.passkeyUnavailable")}
         </p>
       )}
       {passkey.kind === "ready" && passkey.error ? (
-        <p role="alert" className="pt-1 text-caption text-warning">
+        <InlineError className="pt-1">
           {passkey.error}
-        </p>
+        </InlineError>
       ) : null}
     </div>
   );

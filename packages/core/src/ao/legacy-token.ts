@@ -1,6 +1,9 @@
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { trimTrailingSlashes } from "../models/network";
+import { tagValue, type Tag } from "../models/tag";
+import { atomicString } from "../models/balance";
+import { aoReplySchema } from "./reply-schema";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -12,30 +15,11 @@ import { trimTrailingSlashes } from "../models/network";
  */
 const DRY_RUN_TIMEOUT_MS = 15_000;
 
-type Tag = { name: string; value: string };
-
 export interface LegacyTokenInfo {
   name: string | null;
   ticker: string | null;
   denomination: number | null;
   logo: string | null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function replyMessages(body: unknown): Array<{ data: unknown; tags: Tag[] }> {
-  if (!isRecord(body)) return [];
-  const messages = body.Messages ?? body.messages;
-  if (!Array.isArray(messages)) return [];
-  return messages.filter(isRecord).map((message) => {
-    const rawTags = message.Tags ?? message.tags;
-    const tags = Array.isArray(rawTags)
-      ? rawTags.filter((tag): tag is Tag => isRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
-      : [];
-    return { data: message.Data ?? message.data, tags };
-  });
 }
 
 async function dryRun(processId: string, tags: Tag[], cuUrl: string, fetchImpl: typeof fetch): Promise<unknown> {
@@ -57,9 +41,7 @@ async function dryRun(processId: string, tags: Tag[], cuUrl: string, fetchImpl: 
 }
 
 function atomic(value: unknown): string | null {
-  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
-  if (typeof value === "string" && /^\d+$/.test(value.trim())) return value.trim();
-  return null;
+  return atomicString(typeof value === "string" ? value.trim() : value);
 }
 
 /** The atomic balance `address` holds on legacy token `processId`, from its `Balance` handler's reply. */
@@ -78,10 +60,10 @@ export async function readLegacyTokenBalance(
     cuUrl,
     fetchImpl,
   );
-  for (const message of replyMessages(body)) {
+  for (const message of aoReplySchema.parse(body).messages) {
     const fromData = atomic(message.data);
     if (fromData !== null) return fromData;
-    const fromTag = atomic(message.tags.find((tag) => tag.name === "Balance")?.value);
+    const fromTag = atomic(tagValue(message.tags, "Balance"));
     if (fromTag !== null) return fromTag;
   }
   throw new Error(userErrorMessage("tokenNoBalanceReply"));
@@ -98,8 +80,8 @@ export async function readLegacyTokenInfo(
   fetchImpl: typeof fetch = fetch,
 ): Promise<LegacyTokenInfo> {
   const body = await dryRun(processId, [{ name: "Action", value: "Info" }], cuUrl, fetchImpl);
-  for (const { tags } of replyMessages(body)) {
-    const value = (name: string) => tags.find((tag) => tag.name.toLowerCase() === name)?.value?.trim() || null;
+  for (const { tags } of aoReplySchema.parse(body).messages) {
+    const value = (name: string) => tagValue(tags, name, { anyCase: true })?.trim() || null;
     const ticker = value("ticker");
     const name = value("name");
     if (ticker === null && name === null) continue;

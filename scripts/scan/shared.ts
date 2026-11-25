@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { z } from "zod";
 import { isScanAreaId, type ChallengeFunction, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
+import { ATOMIC, scanAreaIdSchema } from "../../packages/core/src/scan/schemas.ts";
 
 export const SCAN_DIR = ".gleam-scan";
 export const ROUNDS_DIR = `${SCAN_DIR}/rounds`;
@@ -78,8 +80,31 @@ export interface Outcome {
   json: Record<string, unknown>;
 }
 
-export function fail(command: Outcome["command"], issues: Problem[]): Outcome {
-  return { ok: false, command, lines: [], issues, json: {} };
+export function fail(command: Outcome["command"], issues: Problem[], lines: string[] = [], json: Record<string, unknown> = {}): Outcome {
+  return { ok: false, command, lines, issues, json };
+}
+
+export { ATOMIC };
+
+/** A type guard that accepts what `schema` accepts and returns the value itself, so a file or reply keeps any field the schema doesn't name. */
+export function guardOf<T>(schema: z.ZodType): (value: unknown) => value is T {
+  return (value): value is T => schema.safeParse(value).success;
+}
+
+/** The problem for an API answer that isn't the shape this checkout expects; `what` reads after "sent". */
+export function shapeProblem(path: string, what: string, rerun: string): Problem {
+  return {
+    path,
+    message: `The points API sent ${what} in an unexpected shape; update this checkout (\`git fetch --tags\`) and run \`${rerun}\` again.`,
+  };
+}
+
+export function parseJsonOrUndefined(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 /** The lines that end a command's output: the header, then the message the agent's turn ends with. */
@@ -110,12 +135,7 @@ export async function writeJson(deps: Deps, file: string, value: unknown): Promi
 
 export async function readJson(deps: Deps, file: string): Promise<unknown> {
   const text = await readText(deps, file);
-  if (text === undefined) return undefined;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  return text === undefined ? undefined : parseJsonOrUndefined(text);
 }
 
 export async function readDeclines(deps: Deps): Promise<number> {
@@ -148,25 +168,23 @@ export async function showAtCommit(deps: Deps, commit: string, file: string): Pr
   }
 }
 
-export function isChallengeResponse(value: unknown): value is ChallengeResponse {
-  if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.challenge === "string" &&
-    typeof v.release === "string" &&
-    typeof v.commit === "string" &&
-    typeof v.expiresAt === "string" &&
-    isScanAreaId(v.area) &&
-    Array.isArray(v.functions) &&
-    v.functions.every((fn) => {
-      const f = fn as Record<string, unknown> | null;
-      return f !== null && typeof f === "object" && typeof f.file === "string" && typeof f.symbol === "string";
-    })
-  );
+export const isChallengeResponse = guardOf<ChallengeResponse>(
+  z.object({
+    challenge: z.string(),
+    release: z.string(),
+    commit: z.string(),
+    expiresAt: z.string(),
+    area: scanAreaIdSchema,
+    functions: z.array(z.object({ file: z.string(), symbol: z.string() })),
+  }),
+);
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function jsonParseProblem(file: string, text: string, error: unknown): Problem {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const position = /position (\d+)/.exec(detail);
   let where = "";
   if (position) {

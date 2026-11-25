@@ -4,7 +4,8 @@ import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { useT } from "../../../i18n";
-import { hostnameOf, siteCardFor } from "./site-card";
+import { siteCardFor } from "./site-card";
+import { hostnameOf } from "../../../hostname";
 import { useActiveSite, useDismissSiteSuggestion, useStopGleamOnSite } from "./useActiveSite";
 
 export interface SiteWalletCardProps {

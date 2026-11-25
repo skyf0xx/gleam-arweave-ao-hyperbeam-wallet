@@ -1,37 +1,13 @@
 import type { z } from "zod";
-import {
-  DEFAULT_BUNDLER_URL,
-  POINTS_API_URL,
-  REFUSED_PROVIDER_METHODS,
-  missingPermissions,
-  isWatchWalletMethod,
-  providerMethodRefusal,
-  type NetworkSettings,
-  type ProviderMethod,
-  type WalletSummary,
-  type Winston,
-  vaultHasPassword,
-  WATCH_ONLY_CONNECT_REFUSAL,
-} from "@gleam/core";
-import { resolveInitialGatewayUrl } from "@gleam/core/src/arweave/first-run-gateway.ts";
-import { impersonatesRegisteredToken, isRegisteredProcessId } from "@gleam/core/src/pricing/index.ts";
-import { estimateL1TransferFee } from "@gleam/core/src/ao/l1-transfer.ts";
-import { isSecureSigningOrigin } from "@gleam/core/src/policy/index.ts";
+import { DEFAULT_BUNDLER_URL, POINTS_API_URL, type WalletSummary } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
-import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
-import {
-  PROVIDER_EVENT,
-  type ConnectEventPayload,
-  type DisconnectEventPayload,
-  type ProviderEventName,
-  type WalletSwitchEventPayload,
-} from "@gleam/messaging/src/page-protocol.ts";
 import { WalletLifecycleHandler } from "./handlers/wallet-lifecycle";
 import { PasskeyHandler } from "./handlers/passkey";
 import { BackupHandler } from "./handlers/backup";
 import { registerBackupSync } from "./backup-sync";
-import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
+import { ReadsHandler } from "./handlers/reads";
+import { registerActivityPromotionAlarm } from "./handlers/activity-reads";
 import { BrowserSitesHandler } from "./handlers/browser-sites";
 import { ContactsHandler } from "./handlers/contacts";
 import { TransferHandler } from "./handlers/transfer";
@@ -41,28 +17,29 @@ import { ReviewPromptHandler } from "./handlers/review-prompt";
 import { ScansHandler } from "./handlers/scans";
 import { SiteWalletHandler } from "./handlers/site-wallet";
 import { SecurityPhraseHandler } from "./handlers/security-phrase";
-import { updateStored } from "./storage-update";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "./handlers/points";
 import { createKeySession } from "./handlers/key-session";
-import { decodeProviderParams, encodeProviderResult } from "./handlers/provider-params";
 import {
   BACKGROUND_MESSAGES,
-  PAGE_METHODS,
   parseParams,
   type BackgroundMessage,
   type ContentScriptMethodSpec,
   type ExtensionMethodSpec,
-  type PageMethodSpec,
 } from "./dispatch/methods";
-import { dispatchSiteMessage } from "./dispatch/site";
-import { redeemSiteInvite } from "./points-invite";
 import { registerPeerDiscoveryAlarm, saveNetworkSettings } from "./peers";
-import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { NETWORK_SETTINGS_KEY } from "./storage-keys";
+import { requireWallet } from "./stored-data";
+import { createProviderHandlers } from "./handlers/provider";
+import { encodeProviderResult } from "./handlers/provider-params";
+import { initializeNetworkSettingsIfMissing } from "./first-run-network";
 import { dappError } from "./dapp-error";
-import { createProviderHandlers, type ApprovalCall, type GrantedCall, type TokenPreview } from "./handlers/provider";
+import { requireWalletId, requireWebOrigin } from "./request-guards";
+import { createProviderDispatch } from "./provider-dispatch";
+import { createSiteDispatch } from "./site-dispatch";
+import { createSiteEvents } from "./site-events";
+import { createTokenPreview } from "./token-preview";
+import { createVaultLock, registerAutoLockAlarm } from "./vault-lock";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -91,51 +68,6 @@ export interface Runtime {
 type ProtocolData<K extends keyof ProtocolMap> = Parameters<ProtocolMap[K]>[0];
 type ProtocolResult<K extends keyof ProtocolMap> = ReturnType<ProtocolMap[K]> | Promise<ReturnType<ProtocolMap[K]>>;
 
-const AUTO_LOCK_ALARM_NAME = "auto-lock";
-
-function requireWebOrigin(origin: unknown): string {
-  if (typeof origin === "string") {
-    try {
-      const url = new URL(origin);
-      if ((url.protocol === "https:" || url.protocol === "http:") && url.origin === origin) return origin;
-    } catch {
-      // Falls through to the error below.
-    }
-  }
-  throw new Error(dappError("Expected a web origin such as https://example.com."));
-}
-
-/**
- * A hung HyperBEAM peer (or gateway metadata lookup) must not delay opening
- * a `transferAoTokens` approval — the user is waiting on a signing prompt,
- * not a balance read. Races `ReadsHandler.previewWatchedToken` against this
- * timeout, resolving to "unresolved" either way rather than ever rejecting.
- */
-const TOKEN_METADATA_LOOKUP_TIMEOUT_MS = 3_000;
-
-/**
- * Longer than the metadata budget: an L1 send with no quote is refused, and a
- * cold token lookup can spend `core/ao/token-state.ts`'s 8s reading a logo.
- */
-const TOKEN_FEE_QUOTE_TIMEOUT_MS = 10_000;
-
-const INSECURE_ORIGIN_ERROR = "Gleam only works with secure (https) sites.";
-
-/**
- * `TransferDraft` types `walletId` as optional. Every real
- * caller (`SendView`) always supplies it, but the wire type
- * itself can't promise that — this guard turns a missing field into a
- * named rejection rather than `undefined` silently reaching the
- * key-session lookup as a wallet id. The request carries no signing
- * material — see `key-session.ts`.
- */
-function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walletId: string } {
-  if (!draft.walletId) {
-    throw new Error(dappError("This action requires a wallet id."));
-  }
-  return draft as T & { walletId: string };
-}
-
 type ContentScriptCaller = Extract<CallerContext, { tier: "contentScript" }>;
 
 type MessageHandlers = {
@@ -143,7 +75,6 @@ type MessageHandlers = {
     ? (data: z.output<S>, caller: ContentScriptCaller) => ProtocolResult<K>
     : (data: ProtocolData<K>) => ProtocolResult<K>;
 };
-
 
 /**
  * Builds every handler over `platform` and returns the dispatcher in front
@@ -234,216 +165,25 @@ export function createRuntime(platform: Platform): Runtime {
   const securityPhrase = new SecurityPhraseHandler(storage);
   const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) => approval.findActiveGrant(origin) });
 
-  // Auto-lock is otherwise only checked when something reads the session;
-  // this tick drops the keys once the timeout passes even if nothing does.
-  platform.timer.every(AUTO_LOCK_ALARM_NAME, 1, () => {
-    enforceAutoLock().catch((error: unknown) => console.error("Auto-lock failed.", error));
-  });
+  registerAutoLockAlarm(platform.timer, enforceAutoLock);
 
-  /**
-   * Finds every open tab whose URL origin matches `origin` exactly, since
-   * nothing about `providerEvent`'s wire shape itself carries an origin
-   * check. A tab query can't express "exact origin, any path" directly, so
-   * this filters every web tab down to an exact
-   * `new URL(tab.url).origin === origin` match by hand.
-   */
-  async function findTabsForOrigin(origin: string): Promise<number[]> {
-    const ids: number[] = [];
-    for (const tab of await tabs.webTabs()) {
-      if (typeof tab.id !== "number" || !tab.url) continue;
-      try {
-        if (new URL(tab.url).origin === origin) ids.push(tab.id);
-      } catch {
-        // Not a parseable URL — never a candidate.
-      }
-    }
-    return ids;
-  }
-
-  /** The favicon of an open tab on `origin`, to keep on its grant. */
-  async function favIconFor(origin: string): Promise<string | null> {
-    try {
-      for (const tab of await tabs.webTabs()) {
-        if (!tab.url || !tab.favIconUrl) continue;
-        try {
-          if (new URL(tab.url).origin === origin) return tab.favIconUrl;
-        } catch {
-          // Not a parseable URL — never a candidate.
-        }
-      }
-    } catch {
-      // A missing icon only means the letter fallback.
-    }
-    return null;
-  }
-
-  /**
-   * Sends a `providerEvent` push to every tab currently showing `origin` —
-   * never a broadcast to every open tab. The push names `origin`, and the
-   * receiving page drops it if it has navigated elsewhere since the tab
-   * query. Each send targets one `tabId`; a
-   * tab with no content script listening (e.g. mid-navigation) simply
-   * rejects that one send, which is swallowed here rather than failing the
-   * caller — a missed push is not itself an error the connect/disconnect/
-   * switchWallet flow should surface.
-   */
-  async function emitProviderEventToOrigin<TName extends ProviderEventName>(
-    origin: string,
-    event: TName,
-    data: TName extends typeof PROVIDER_EVENT.CONNECT
-      ? ConnectEventPayload
-      : TName extends typeof PROVIDER_EVENT.DISCONNECT
-        ? DisconnectEventPayload
-        : WalletSwitchEventPayload,
-  ): Promise<void> {
-    const tabIds = await findTabsForOrigin(origin);
-    await Promise.all(
-      tabIds.map((tabId) =>
-        tabs.send(tabId, "providerEvent", { origin, event, data }).catch(() => undefined),
-      ),
-    );
-  }
-
-  /**
-   * For when the user ends a site's access from Gleam: the dApp hears
-   * `disconnect`, and when another wallet is installed the page's
-   * `window.arweaveWallet` goes back to forwarding to it. A dApp's own
-   * `disconnect()` only does the first part.
-   */
-  async function announceAccessEnded(origin: string): Promise<void> {
-    await siteWallet.setUseGleam(origin, false);
-    await emitProviderEventToOrigin(origin, PROVIDER_EVENT.DISCONNECT, {});
-    await pushSiteWalletMode(origin, false);
-  }
-
-  /**
-   * For when the last wallet goes. Sites with a grant hear `disconnect` as
-   * well; the rest were chosen in the popup and only switch back.
-   */
-  async function announceGleamSitesForgotten(revoked: string[]): Promise<void> {
-    const forgotten = await siteWallet.forgetGleamSites();
-    for (const origin of revoked) void announceAccessEnded(origin);
-    for (const origin of forgotten) {
-      if (!revoked.includes(origin)) void pushSiteWalletMode(origin, false);
-    }
-  }
-
-  async function pushSiteWalletMode(origin: string, useGleam: boolean): Promise<void> {
-    const tabIds = await findTabsForOrigin(origin);
-    await Promise.all(
-      tabIds.map((tabId) => tabs.send(tabId, "siteWalletMode", { origin, useGleam }).catch(() => undefined)),
-    );
-  }
-
-  /** Reloads the active tab when it shows `origin`, so the dApp starts over with the wallet just chosen. */
-  async function reloadActiveTabFor(origin: string): Promise<void> {
-    const tab = await tabs.activeTab();
-    if (typeof tab?.id !== "number" || !tab.url) return;
-    try {
-      if (new URL(tab.url).origin !== origin) return;
-    } catch {
-      return;
-    }
-    await tabs.reload(tab.id).catch(() => undefined);
-  }
-
-  /**
-   * The active address `origin` could read through `getActiveAddress`, or
-   * `null`. Pushed events carry an address only through this, so a page
-   * never hears one the pull path would refuse it.
-   */
-  async function readableActiveAddress(origin: string): Promise<string | null> {
-    if (!isSecureSigningOrigin(origin)) return null;
-    const grant = await approval.findActiveGrant(origin);
-    if (!grant || missingPermissions("getActiveAddress", grant.permissions).length > 0) return null;
-    const state = await lifecycle.getState();
-    const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
-    if (!wallet || isWatchWalletMethod(wallet.method)) return null;
-    return wallet.address;
-  }
-
-  /**
-   * `walletSwitch` for an active-account change. A switch affects the whole
-   * extension, so every origin with a grant is considered, never every
-   * open tab, and each hears only the address it could read.
-   */
-  async function broadcastWalletSwitch(): Promise<void> {
-    const grants = await approval.getConnectedApps();
-    const origins = [...new Set(grants.map((grant) => grant.origin))];
-    await Promise.all(
-      origins.map(async (origin) => {
-        const address = await readableActiveAddress(origin);
-        if (address) await emitProviderEventToOrigin(origin, PROVIDER_EVENT.WALLET_SWITCH, { address });
-      }),
-    );
-  }
+  const {
+    favIconFor,
+    emitProviderEventToOrigin,
+    pushSiteWalletMode,
+    announceAccessEnded,
+    announceGleamSitesForgotten,
+    reloadActiveTabFor,
+    readableActiveAddress,
+    broadcastWalletSwitch,
+  } = createSiteEvents({ tabs, siteWallet, approval, activeWallet });
+  const { resolveTokenDenominationAndTicker, resolveTokenPreview, quoteTokenTransferFee } = createTokenPreview(reads);
 
   async function walletAddress(walletId: string): Promise<string> {
-    const wallet = (await lifecycle.getState()).wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
-    return wallet.address;
+    return requireWallet((await lifecycle.getState()).wallets, walletId).address;
   }
 
-  async function resolveTokenDenominationAndTicker(
-    address: string,
-    processId: string,
-  ): Promise<{ tokenDenomination: number | null; tokenTicker: string | null; tokenImpersonating?: true }> {
-    const { tokenDenomination, tokenTicker, impersonating } = await resolveTokenPreview(address, processId);
-    return { tokenDenomination, tokenTicker, ...(impersonating ? { tokenImpersonating: true as const } : {}) };
-  }
-
-  /**
-   * As `resolveTokenDenominationAndTicker`, whether the process is a
-   * collectible rather than a token, and whether it copies a registered
-   * token's ticker or name.
-   */
-  async function resolveTokenPreview(
-    address: string,
-    processId: string,
-  ): Promise<TokenPreview> {
-    const UNRESOLVED: TokenPreview = { tokenDenomination: null, tokenTicker: null, collectible: false, impersonating: false };
-    const lookup = reads
-      .previewWatchedToken({ address, processId })
-      .then((balance) =>
-        balance.available === false
-          ? UNRESOLVED
-          : {
-              tokenDenomination: balance.denomination,
-              tokenTicker: balance.ticker,
-              collectible: false,
-              // As `addWatchedToken` refuses: a process may name itself anything.
-              impersonating:
-                !isRegisteredProcessId(processId) &&
-                impersonatesRegisteredToken({ ticker: balance.ticker, name: balance.name }),
-            },
-      )
-      .catch((error: unknown) =>
-        error instanceof Error && error.message === userErrorMessage("tokenIsCollectible")
-          ? { ...UNRESOLVED, collectible: true }
-          : UNRESOLVED,
-      );
-    const timeout = new Promise<TokenPreview>((resolve) =>
-      setTimeout(() => resolve(UNRESOLVED), TOKEN_METADATA_LOOKUP_TIMEOUT_MS),
-    );
-    return Promise.race([lookup, timeout]);
-  }
-
-  /**
-   * The AR reward a dApp's token transfer pays, for the preview: `null` for
-   * a token on the MU, which has none. A lookup that fails or hangs also
-   * gives `null`, and an L1 send then refuses for want of an approved fee.
-   */
-  async function quoteTokenTransferFee(processId: string): Promise<Winston | null> {
-    const lookup = (async () => {
-      if ((await reads.tokenTransport({ processId })) !== "l1") return null;
-      const { gatewayUrl } = await reads.getNetworkSettings();
-      return estimateL1TransferFee(gatewayUrl, processId);
-    })().catch(() => null);
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), TOKEN_FEE_QUOTE_TIMEOUT_MS));
-    return Promise.race([lookup, timeout]);
-  }
-
-  const PROVIDER_HANDLERS = createProviderHandlers({
+  const providerHandlers = createProviderHandlers({
     lifecycle,
     reads,
     siteWallet,
@@ -460,101 +200,9 @@ export function createRuntime(platform: Platform): Runtime {
     quoteTokenTransferFee,
   });
 
-  /**
-   * Routes one `window.arweaveWallet` call by its `PAGE_METHODS` entry. The
-   * refusals that don't depend on the origin's grant throw synchronously,
-   * so every site gets the same answer and no window opens.
-   */
-  function dispatchProviderCall(origin: string, method: string, rawParams: unknown): Promise<unknown> {
-    if (Object.hasOwn(REFUSED_PROVIDER_METHODS, method)) {
-      throw new Error(REFUSED_PROVIDER_METHODS[method as keyof typeof REFUSED_PROVIDER_METHODS]);
-    }
-    if (!Object.hasOwn(PAGE_METHODS, method)) {
-      throw new Error(dappError(`Provider method "${method}" is not reachable from a web page.`));
-    }
-    const providerMethod = method as ProviderMethod;
-    // Checked on every call, not only at connect, so a plain-http origin
-    // still holding an older grant can neither sign nor read addresses.
-    // `disconnect` only drops the grant, so such a site may still clear it.
-    if (providerMethod !== "disconnect" && !isSecureSigningOrigin(origin)) {
-      throw new Error(INSECURE_ORIGIN_ERROR);
-    }
-    return runProviderMethod(origin, providerMethod, rawParams);
-  }
+  const dispatchProviderCall = createProviderDispatch({ lifecycle, approval, handlers: providerHandlers });
 
-  async function runProviderMethod(origin: string, method: ProviderMethod, rawParams: unknown): Promise<unknown> {
-    const spec: PageMethodSpec = PAGE_METHODS[method];
-    const handle = PROVIDER_HANDLERS[method] as (
-      params: unknown,
-      call: (GrantedCall | { origin: string }) & Partial<ApprovalCall>,
-    ) => Promise<unknown>;
-    const approvals: Partial<ApprovalCall> = spec.approval
-      ? { requestApproval: (request) => approval.requestApproval(request) }
-      : {};
-    if (!spec.grant) return handle(parseParams(spec.params, decodeProviderParams(rawParams)), { origin, ...approvals });
-
-    const grant = await approval.findActiveGrant(origin);
-    if (!grant) {
-      throw new Error(dappError(`"${origin}" is not connected. Call connect() first.`));
-    }
-    const missing = missingPermissions(method, grant.permissions);
-    if (missing.length > 0) {
-      throw new Error(dappError(`Missing permission(s) for "${method}": ${missing.join(", ")}`));
-    }
-
-    const state = await lifecycle.getState();
-    const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId) ?? null;
-    // Grants follow the active wallet, so a site connected earlier must not
-    // reach a watch wallet's address or sign requests through its grant.
-    if (wallet && isWatchWalletMethod(wallet.method)) throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
-    // Refuse what the active wallet can't do before any approval window
-    // opens, rather than after the user has approved it.
-    const refusal = wallet ? providerMethodRefusal(wallet.method, method) : null;
-    if (refusal) throw new Error(refusal);
-
-    // Decoded only now: a page without a grant could otherwise keep the
-    // worker busy decoding a large payload it is about to be refused.
-    const params = parseParams(spec.params, decodeProviderParams(rawParams));
-    const result = await handle(params, {
-      ...approvals,
-      origin,
-      grant,
-      state,
-      wallet,
-      activeWalletId: () => {
-        if (!wallet) throw new Error(userErrorMessage("noActiveWalletSign"));
-        return wallet.id;
-      },
-    });
-    // A read can wait seconds on the network. A site revoked meanwhile gets
-    // nothing; an approval's result is held back by `withheldIfLapsed`.
-    if (!spec.approval) await requireGrantStill(origin, method);
-    return result;
-  }
-
-  async function requireGrantStill(origin: string, method: ProviderMethod): Promise<void> {
-    const grant = await approval.findActiveGrant(origin);
-    if (!grant || missingPermissions(method, grant.permissions).length > 0) {
-      throw new Error(dappError(`"${origin}" is not connected. Call connect() first.`));
-    }
-  }
-
-  async function lockVault(): Promise<void> {
-    await lifecycle.lockWallet();
-    // A vault of only hardware wallets has no password and stays unlocked.
-    if (vaultHasPassword((await lifecycle.getState()).wallets)) void platform.lockIndicator.setLocked(true);
-  }
-
-  /**
-   * Locks when the computer's screen locks, unless auto-lock is "never".
-   * Only `"locked"` counts: the auto-lock timeout already runs from the last
-   * use of the wallet, which is stricter than the OS's idle state.
-   */
-  async function lockOnScreenLock(state: string): Promise<void> {
-    if (state !== "locked") return;
-    if ((await lifecycle.getLockSettings()).autoLockTimeout === "never") return;
-    await lockVault();
-  }
+  const { lockVault, lockOnScreenLock } = createVaultLock(lifecycle, platform.lockIndicator);
 
   // A new wallet becomes the active one. Connected dApps follow the active
   // wallet, so they hear about it; with no earlier wallet there is nothing
@@ -816,56 +464,12 @@ export function createRuntime(platform: Platform): Runtime {
     return handle(parseParams(spec.params, data), caller);
   }
 
-  /**
-   * First-run gateway fallback: if `local:networkSettings` has never been
-   * written, checks whether `arweave.net` actually answers as a gateway
-   * and, if not, tries `FALLBACK_GATEWAY_URLS` in order
-   * (`resolveInitialGatewayUrl` — pure, given `fetch`). Only ever writes
-   * `NETWORK_SETTINGS_KEY` when it was previously empty, so a user's own
-   * gateway choice is never touched. Errors are swallowed: this must never
-   * block startup, and `reads.ts`'s own `DEFAULT_NETWORK_SETTINGS` fallback
-   * already covers "nothing was ever written" for every other read path.
-   */
-  async function initializeNetworkSettingsIfMissing(): Promise<void> {
-    try {
-      const existing = await storage.get<NetworkSettings>(NETWORK_SETTINGS_KEY);
-      if (existing !== null) return;
-
-      const gatewayUrl = await resolveInitialGatewayUrl();
-      const settings = await reads.getNetworkSettings();
-      // The probe takes a while; settings the user saved meanwhile win.
-      await updateStored(storage, NETWORK_SETTINGS_KEY, (current) =>
-        current === null ? { ...settings, gatewayUrl } : undefined,
-      );
-    } catch {
-      // Never block startup over a first-run gateway probe.
-    }
-  }
-
   async function activeWallet() {
     const state = await lifecycle.getState();
     return state.wallets.find((wallet) => wallet.id === state.activeWalletId) ?? null;
   }
 
-  function dispatchSite(message: unknown, caller: CallerContext | null): Promise<unknown> {
-    return dispatchSiteMessage(message, caller, {
-      "gleam-points:invite": (invite) => redeemSiteInvite(invite, storage, points).catch(() => ({ ok: false })),
-      "gleam-points:attest": (request) =>
-        signSiteAttestation(request, {
-          activeWallet,
-          requestScanAttestation: (req) => approval.requestScanAttestation(req),
-        }).catch((error: unknown): SiteAttestResponse => {
-          console.error("Couldn't handle a scan attestation from the site.", error);
-          return { ok: false, code: "signing_failed", error: "Gleam couldn't open the attestation. Open the link again." };
-        }),
-      "gleam-points:attest-status": () =>
-        siteAttestStatus({
-          activeWallet,
-          isMember: async (walletId) => (await points.getMemberships())[walletId] !== undefined,
-          // The check only labels the page's button; Sign still runs the real one and says what failed.
-        }).catch(() => ({ ok: true })),
-    }, platform.dev);
-  }
+  const dispatchSite = createSiteDispatch({ storage, points, approval, activeWallet, dev: platform.dev });
 
   return {
     dispatch,
@@ -895,7 +499,7 @@ export function createRuntime(platform: Platform): Runtime {
     onInstalled() {
       // Only an install finds `local:networkSettings` empty; after that a
       // written NetworkSettings (default or user-edited) short-circuits it.
-      void initializeNetworkSettingsIfMissing();
+      void initializeNetworkSettingsIfMissing(storage, reads);
     },
   };
 }

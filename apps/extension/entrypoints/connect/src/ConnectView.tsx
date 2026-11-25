@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { RuntimePort } from "@gleam/core";
 import { KeystoneConnectView, type KeystoneConnectViewProps } from "@gleam/keystone";
 import { cameraDeniedHelp } from "@/src/hardware/keystone/camera-help";
-import { backgroundErrorText, ConnectedNotice, ConnectShell } from "./connect-shared";
+import { backgroundErrorText, ConnectedNotice, ConnectShell, useAutoClose } from "./connect-shared";
 import { useT } from "@gleam/app/src/i18n/index.tsx";
 
 export interface ConnectViewProps {
@@ -18,11 +18,7 @@ export function ConnectView({ runtime, Scanner, onClose = () => window.close(), 
   const t = useT();
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    if (!done) return;
-    const timer = setTimeout(onClose, autoCloseMs);
-    return () => clearTimeout(timer);
-  }, [done, onClose, autoCloseMs]);
+  useAutoClose(done, onClose, autoCloseMs);
 
   return (
     <ConnectShell title={t("extension.connectKeystoneTitle")}>

@@ -17,10 +17,16 @@
 /apps/extension/src/adapters/session-key-store.ts                          @skyf0xx
 /packages/runtime/src/handlers/key-session.ts                              @skyf0xx
 /packages/runtime/src/handlers/wallet-lifecycle.ts                         @skyf0xx
+/packages/runtime/src/handlers/wallet-session.ts                           @skyf0xx
+/packages/runtime/src/handlers/keyless-wallets.ts                          @skyf0xx
+/packages/runtime/src/handlers/lifecycle-settings.ts                       @skyf0xx
+/packages/runtime/src/handlers/wallet-records.ts                           @skyf0xx
 /packages/runtime/src/handlers/passkey.ts                                  @skyf0xx
 /packages/runtime/src/handlers/backup.ts                                   @skyf0xx
 /packages/runtime/src/handlers/backup-state.ts                             @skyf0xx
 /packages/runtime/src/backup-sync.ts                                       @skyf0xx
+/packages/runtime/src/stored-data.ts                                       @skyf0xx
+/packages/runtime/src/guards.ts                                            @skyf0xx
 /apps/extension/src/passkey/                                               @skyf0xx
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx
@@ -57,6 +63,10 @@
 /packages/core/src/models/passkey.ts                                       @skyf0xx
 /packages/core/src/models/backup.ts                                        @skyf0xx
 /packages/app/src/keyfile/                                                 @skyf0xx
+/packages/core/src/models/guards.ts                                        @skyf0xx
+/packages/core/src/models/async.ts                                         @skyf0xx
+/packages/core/src/ports/key-watchers.ts                                   @skyf0xx
+/packages/runtime/src/schema-guard.ts                                      @skyf0xx
 
 # 2 Signing
 /packages/core/src/ao/transfer.ts                                          @skyf0xx
@@ -70,6 +80,9 @@
 /packages/keystone/src/                                                 @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
 /packages/runtime/src/handlers/points.ts                                   @skyf0xx
+/packages/runtime/src/handlers/points-seen.ts                              @skyf0xx
+/packages/runtime/src/handlers/points-replies.ts                           @skyf0xx
+/packages/runtime/src/handlers/points-records.ts                           @skyf0xx
 /packages/core/src/models/capabilities.ts                           @skyf0xx
 /apps/extension/src/hardware/keystone/                              @skyf0xx
 /apps/extension/src/hardware/ledger/                                @skyf0xx
@@ -81,12 +94,24 @@
 /packages/app/src/screens/send/src/sendFormSchema.ts                       @skyf0xx
 /packages/app/src/screens/activity/src/validateSendAmount.ts               @skyf0xx
 /packages/app/src/screens/activity/src/useSubmitTransfer.ts                @skyf0xx
+/packages/app/src/screens/activity/index.ts                             @skyf0xx
 /packages/core/src/models/signing.ts                                       @skyf0xx
+/packages/core/src/models/arweave-id.ts                                    @skyf0xx
+/packages/core/src/models/bytes.ts                                         @skyf0xx
+/apps/extension/src/hardware/open-connect.ts                               @skyf0xx
 
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
 /packages/runtime/src/create-runtime.ts                                    @skyf0xx
+/packages/runtime/src/provider-dispatch.ts                                 @skyf0xx
+/packages/runtime/src/site-dispatch.ts                                     @skyf0xx
+/packages/runtime/src/site-events.ts                                       @skyf0xx
+/packages/runtime/src/request-guards.ts                                    @skyf0xx
+/packages/runtime/src/token-preview.ts                                     @skyf0xx
+/packages/runtime/src/vault-lock.ts                                        @skyf0xx
+/packages/runtime/src/first-run-network.ts                                 @skyf0xx
 /packages/runtime/src/handlers/provider.ts                                 @skyf0xx
+/packages/runtime/src/handlers/approval-grants.ts                          @skyf0xx
 /packages/runtime/src/dispatch/site.ts                                     @skyf0xx
 /packages/core/src/models/site-origin.ts                                   @skyf0xx
 /apps/extension/entrypoints/content/                                       @skyf0xx
@@ -131,9 +156,15 @@
 /packages/app/src/screens/browser/src/BrowserView.tsx                     @skyf0xx
 /packages/app/src/screens/browser/src/address.ts                          @skyf0xx
 /apps/mobile/src/adapters/dapp-browser.ts                                 @skyf0xx
+/packages/core/src/arweave/graphql-schema.ts                               @skyf0xx
 
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
+/packages/runtime/src/handlers/approval-types.ts                           @skyf0xx
+/packages/runtime/src/handlers/approval-records.ts                         @skyf0xx
+/packages/runtime/src/handlers/pending-codec.ts                            @skyf0xx
+/packages/runtime/src/handlers/approval-prepared.ts                        @skyf0xx
+/packages/runtime/src/handlers/approval-preview.ts                         @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 /apps/extension/src/hardware/panels/                                       @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
@@ -149,6 +180,10 @@
 /apps/extension/src/adapters/windows.ts                                @skyf0xx
 /packages/core/src/recipients/assess.ts                                @skyf0xx
 /packages/runtime/src/handlers/reads.ts                                @skyf0xx
+/packages/runtime/src/handlers/token-reads.ts                              @skyf0xx
+/packages/runtime/src/handlers/collectibles-reads.ts                       @skyf0xx
+/packages/runtime/src/handlers/activity-reads.ts                           @skyf0xx
+/packages/runtime/src/handlers/price-reads.ts                              @skyf0xx
 /packages/core/src/models/approval.ts                                      @skyf0xx
 /packages/app/src/screens/main-screen/src/formatWinston.ts                 @skyf0xx
 /packages/ui/src/format/truncate-address.ts                                @skyf0xx
@@ -163,6 +198,8 @@
 /packages/app/src/account-avatar.ts                                        @skyf0xx
 /packages/ui/src/components/wallet/AccountAvatar.tsx                       @skyf0xx
 /packages/app/src/screens/receive/src/ReceiveView.tsx                     @skyf0xx
+/apps/extension/src/popup-window.ts                                        @skyf0xx
+/packages/app/src/hostname.ts                                              @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/app/src/screens/network-peers/                                    @skyf0xx
@@ -182,6 +219,7 @@
 /lefthook.yml                                                              @skyf0xx
 /.gitleaks.toml                                                            @skyf0xx
 /scripts/release-gate.mjs                                                  @skyf0xx
+/scripts/is-main.mjs                                                       @skyf0xx
 /scripts/release.mjs                                                       @skyf0xx
 /scripts/app-versions.mjs                                                  @skyf0xx
 /scripts/verify-release.sh                                                 @skyf0xx
@@ -230,7 +268,9 @@
 /scripts/surface-check.mjs                                                 @skyf0xx
 /apps/extension/build-plugins.ts                                           @skyf0xx
 /scripts/check-bundles.mjs                                                 @skyf0xx
+/scripts/bundle-allowlists.mjs                                             @skyf0xx
 /eslint.config.js                                                         @skyf0xx
+/eslint-rules/                                                             @skyf0xx
 /vitest.config.ts                                                         @skyf0xx
 /vitest.setup.ts                                                           @skyf0xx
 /playwright.config.ts                                                      @skyf0xx

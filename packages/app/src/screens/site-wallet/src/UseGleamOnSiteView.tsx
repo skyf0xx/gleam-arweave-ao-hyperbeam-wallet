@@ -3,9 +3,11 @@ import type { PermissionType, RuntimePort } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SiteIcon } from "./SiteWalletCard";
-import { PERMISSION_GROUPS, hostnameOf, initialGroupIds, permissionsFor } from "./site-card";
+import { PERMISSION_GROUPS, initialGroupIds, permissionsFor } from "./site-card";
+import { hostnameOf } from "../../../hostname";
 import { useUseGleamOnSite } from "./useActiveSite";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
@@ -97,9 +99,9 @@ export function UseGleamOnSiteView({
             {t("siteWallet.reloadNote")}
           </p>
           {useGleam.isError ? (
-            <p role="alert" className="text-center text-caption text-warning">
+            <InlineError className="text-center">
               {useGleam.error instanceof Error ? errorText(useGleam.error) : t("siteWallet.switchFailed")}
-            </p>
+            </InlineError>
           ) : null}
           <Button type="button" disabled={useGleam.isPending} onClick={submit}>
             {useGleam.isPending ? t("siteWallet.switching") : t("siteWallet.useGleamHere")}

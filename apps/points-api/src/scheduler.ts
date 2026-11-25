@@ -1,5 +1,6 @@
 import type { Db } from "./db";
-import { runSnapshot, type SnapshotOptions } from "./snapshot";
+import { runSnapshot, type SnapshotOptions } from "./points/snapshot";
+import { errorMessage } from "@gleam/core/src/models/error-message.ts";
 
 /** Arbitrary constant naming the snapshot's Postgres advisory lock. */
 const SNAPSHOT_LOCK_ID = 0x61e4_0001;
@@ -27,7 +28,7 @@ export function startSnapshotScheduler(
         );
       }
     } catch (error) {
-      log(`Snapshot failed: ${error instanceof Error ? error.message : String(error)}`);
+      log(`Snapshot failed: ${errorMessage(error)}`);
     } finally {
       running = false;
     }

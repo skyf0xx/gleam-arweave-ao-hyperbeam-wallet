@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import type { BackupProvider, BackupStatus, RuntimePort } from "@gleam/core";
+import { useBackupStatus, useLeaveBackup, useSetUpBackup, useSyncBackup } from "./useBackup";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { CheckIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { relativeTime } from "../../../relative-time";
+import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 /** The account's own name, which is never translated. */
 export function backupAccountName(provider: BackupProvider): string {
@@ -62,62 +65,50 @@ export const DONE_MS = 2_500;
  */
 export function BackupView({ runtime, onBack }: BackupViewProps) {
   const t = useT();
-  const [status, setStatus] = useState<BackupStatus | null>(null);
+  const statusQuery = useBackupStatus(runtime);
+  const status = statusQuery.data ?? null;
+  const setUpMutation = useSetUpBackup(runtime);
+  const syncMutation = useSyncBackup(runtime);
+  const leaveMutation = useLeaveBackup(runtime);
   const [password, setPassword] = useState("");
-  const [phase, setPhase] = useState<Phase>("idle");
   const [confirming, setConfirming] = useState<"stop" | "delete" | null>(null);
-  const [error, setError] = useState<string | undefined>(undefined);
+  const [done, setDone] = useState(false);
+  const [actionError, setActionError] = useState<string | undefined>(undefined);
+  const error = actionError ?? (status === null && statusQuery.isError ? errorText(statusQuery.error) : undefined);
+  const phase: Phase = done
+    ? "done"
+    : setUpMutation.isPending
+      ? "settingUp"
+      : syncMutation.isPending
+        ? "syncing"
+        : leaveMutation.isPending || leaveMutation.isSuccess
+          ? (leaveMutation.variables ?? "idle")
+          : "idle";
 
   useEffect(() => {
-    if (phase !== "done") return;
-    const timer = setTimeout(() => setPhase("idle"), DONE_MS);
+    if (!done) return;
+    const timer = setTimeout(() => setDone(false), DONE_MS);
     return () => clearTimeout(timer);
-  }, [phase]);
+  }, [done]);
 
-  useEffect(() => {
-    let cancelled = false;
-    runtime
-      .send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined })
-      .then((next) => {
-        if (!cancelled) setStatus(next);
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled) setError(errorText(reason));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime]);
-
-  const run = async (next: "settingUp" | "syncing", request: () => Promise<BackupStatus>) => {
-    setPhase(next);
-    setError(undefined);
-    try {
-      setStatus(await request());
-      setPassword("");
-      setConfirming(null);
-      setPhase("done");
-    } catch (reason) {
-      setError(errorText(reason));
-      // A sign-in that was closed leaves a problem only a fresh read shows.
-      runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }).then(setStatus, () => {});
-      setPhase("idle");
-    }
+  const finished = () => {
+    setPassword("");
+    setConfirming(null);
+    setDone(true);
   };
+  const failed = (reason: unknown) => setActionError(errorText(reason));
 
-  const setUp = () =>
-    run("settingUp", () => runtime.send<{ password: string }, BackupStatus>({ type: "setUpBackup", payload: { password } }));
-  const syncNow = () => run("syncing", () => runtime.send<void, BackupStatus>({ type: "syncBackupNow", payload: undefined }));
-  const leave = async (next: "stopping" | "deleting") => {
-    setPhase(next);
-    setError(undefined);
-    try {
-      await runtime.send<void, BackupStatus>({ type: next === "stopping" ? "stopBackupSync" : "deleteBackup", payload: undefined });
-      onBack();
-    } catch (reason) {
-      setError(errorText(reason));
-      setPhase("idle");
-    }
+  const setUp = () => {
+    setActionError(undefined);
+    setUpMutation.mutate(password, { onSuccess: finished, onError: failed });
+  };
+  const syncNow = () => {
+    setActionError(undefined);
+    syncMutation.mutate(undefined, { onSuccess: finished, onError: failed });
+  };
+  const leave = (next: "stopping" | "deleting") => {
+    setActionError(undefined);
+    leaveMutation.mutate(next, { onSuccess: onBack, onError: failed });
   };
 
   const busy = phase !== "idle";
@@ -135,7 +126,7 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
             className="flex flex-1 flex-col gap-5"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!busy && password.length > 0) void setUp();
+              if (!busy && password.length > 0) setUp();
             }}
           >
             <div className="flex flex-col gap-2.5">
@@ -178,14 +169,15 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
                   <p className="text-body text-foreground">{t("backup.stopConfirm")}</p>
                   <p className="text-caption text-muted">{t("backup.stillIn", { drive })}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(null)} className="flex-1">
-                    {t("backup.cancel")}
-                  </Button>
-                  <Button type="button" disabled={busy} aria-busy={busy} onClick={() => void leave("stopping")} className="flex-1">
-                    {t("backup.stopSyncing")}
-                  </Button>
-                </div>
+                <ButtonPair
+                  cancelLabel={t("backup.cancel")}
+                  onCancel={() => setConfirming(null)}
+                  cancelDisabled={busy}
+                  confirmLabel={t("backup.stopSyncing")}
+                  onConfirm={() => leave("stopping")}
+                  confirmDisabled={busy}
+                  confirmBusy={busy}
+                />
                 <Button
                   type="button"
                   variant="ghost"
@@ -202,18 +194,20 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
                   <p className="text-body text-foreground">{t("backup.deleteConfirm", { drive })}</p>
                   <p className="text-caption text-muted">{t("backup.everyDevice")}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="secondary" disabled={busy} onClick={() => setConfirming(null)} className="flex-1">
-                    {t("backup.cancel")}
-                  </Button>
-                  <Button type="button" variant="destructive" disabled={busy} aria-busy={busy} onClick={() => void leave("deleting")} className="flex-1">
-                    {phase === "deleting" ? t("backup.deleting") : t("backup.deleteBackup")}
-                  </Button>
-                </div>
+                <ButtonPair
+                  cancelLabel={t("backup.cancel")}
+                  onCancel={() => setConfirming(null)}
+                  cancelDisabled={busy}
+                  confirmLabel={phase === "deleting" ? t("backup.deleting") : t("backup.deleteBackup")}
+                  confirmVariant="destructive"
+                  onConfirm={() => leave("deleting")}
+                  confirmDisabled={busy}
+                  confirmBusy={busy}
+                />
               </div>
             ) : (
               <div className="mt-auto flex flex-col gap-2.5">
-                <Button type="button" disabled={busy} aria-busy={busy && phase !== "done"} onClick={() => void syncNow()}>
+                <Button type="button" disabled={busy} aria-busy={busy && phase !== "done"} onClick={() => syncNow()}>
                   {phase === "done" ? (
                     <span role="status" className="flex items-center gap-1.5">
                       <CheckIcon size={16} />
@@ -235,9 +229,9 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
           </>
         )}
         {error && (status === null || status.enabled) ? (
-          <p role="alert" className="text-caption text-warning">
+          <InlineError>
             {error}
-          </p>
+          </InlineError>
         ) : null}
       </div>
     </div>

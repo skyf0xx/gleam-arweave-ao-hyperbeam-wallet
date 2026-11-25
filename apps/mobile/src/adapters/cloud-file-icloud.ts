@@ -1,29 +1,22 @@
 import { CLOUD_ERROR, ICloudFile, type ICloudFilePlugin } from "@gleam/cloud-backup";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import type { CloudFilePort } from "@gleam/core/src/ports/cloud-file.ts";
+import { base64ToBytes, bytesToBase64 } from "@gleam/core/src/vault/base64.ts";
+import { pluginErrorCode } from "./plugin-error";
 
 type Bytes = Uint8Array<ArrayBuffer>;
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}
 
 /** Empty when `text` isn't base64, which the runtime then reads as an unreadable backup. */
 function fromBase64(text: string): Bytes {
   try {
-    const binary = atob(text);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
+    return base64ToBytes(text);
   } catch {
     return new Uint8Array();
   }
 }
 
 function failure(error: unknown): Error {
-  const code = (error as { code?: unknown } | null)?.code;
+  const code = pluginErrorCode(error);
   return new Error(userErrorMessage(code === CLOUD_ERROR.notSignedIn ? "backupSignInNeeded" : "backupUnreachable"));
 }
 
@@ -59,7 +52,7 @@ export function createICloudFile(plugin: ICloudFilePlugin = ICloudFile): CloudFi
     },
 
     async write(bytes) {
-      await call(() => plugin.write({ data: toBase64(bytes) }));
+      await call(() => plugin.write({ data: bytesToBase64(bytes) }));
     },
 
     async remove() {

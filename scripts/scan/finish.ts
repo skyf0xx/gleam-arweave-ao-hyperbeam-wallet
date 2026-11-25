@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { z } from "zod";
 import { join } from "node:path";
 import {
   attestationId,
@@ -14,6 +15,7 @@ import {
   type ScanAreaId,
   type ScanIssue,
 } from "../../packages/core/src/scan/index.ts";
+import { atomicSchema } from "../../packages/core/src/scan/schemas.ts";
 import { callApi } from "./api.ts";
 import { draftProblems } from "./drafts.ts";
 import { draftWarnings } from "./readability.ts";
@@ -22,8 +24,8 @@ import {
   freeAreas,
   listRounds,
   roundOffer,
-  roundReports,
   signedRoundBase,
+  sumReports,
 } from "./rounds.ts";
 import {
   closingJson,
@@ -31,8 +33,10 @@ import {
   fail,
   formatElapsed,
   gitOrUndefined,
+  guardOf,
   isChallengeResponse,
   jsonParseProblem,
+  parseJsonOrUndefined,
   readCurrent,
   readText,
   roundPaths,
@@ -88,12 +92,7 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
   if (challengeText === undefined) {
     return failed([{ path: paths.challenge, message: `There is no challenge for ${scanArea(area).label}; run \`pnpm scan start --area ${area}\` first.` }]);
   }
-  let challengeJson: unknown;
-  try {
-    challengeJson = JSON.parse(challengeText);
-  } catch {
-    challengeJson = undefined;
-  }
+  const challengeJson = parseJsonOrUndefined(challengeText);
   if (!isChallengeResponse(challengeJson)) {
     return failed([{ path: paths.challenge, message: `${paths.challenge} is unreadable; run \`pnpm scan start --area ${area}\` again.` }]);
   }
@@ -236,13 +235,14 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
   };
 }
 
+const rewardsSchema = z.object({ scanRewardAtomic: atomicSchema, day: z.string().optional().catch(undefined) });
+
 /** `GET /scan/rewards`, or undefined when it can't be read: the offer then leaves the amount out. */
 async function fetchRewards(deps: Deps): Promise<{ day: string | null; full: string } | undefined> {
   const fetched = await callApi(deps, "/scan/rewards", undefined, "pnpm scan finish");
-  const body = fetched.ok ? (fetched.body as Record<string, unknown> | null) : null;
-  const atomic = (v: unknown): v is string => typeof v === "string" && /^\d{1,40}$/.test(v);
-  if (!body || !atomic(body.scanRewardAtomic)) return undefined;
-  return { day: typeof body.day === "string" ? body.day : null, full: body.scanRewardAtomic };
+  const body = fetched.ok ? rewardsSchema.safeParse(fetched.body) : null;
+  if (!body?.success) return undefined;
+  return { day: body.data.day ?? null, full: body.data.scanRewardAtomic };
 }
 
 /** Resolves `--area`, or the current round, to an area id. */
@@ -268,7 +268,7 @@ export async function runFinish(deps: Deps, options: { area?: string } = {}): Pr
 
   const rerun = options.area === undefined ? "pnpm scan finish" : `pnpm scan finish --area ${area}`;
   const checked = await validateRound(deps, area, rerun, `\`pnpm scan finish --area ${area}\``);
-  if (!checked.ok) return { ok: false, command: "finish", lines: checked.notes, issues: checked.issues, json: {} };
+  if (!checked.ok) return fail("finish", checked.issues, checked.notes);
   const { attestation, id, paidPlacesLeft } = checked;
   await writeJson(deps, paths.finished, { attestationId: id });
 
@@ -276,8 +276,7 @@ export async function runFinish(deps: Deps, options: { area?: string } = {}): Pr
   const waiting = rounds.filter((round) => round.status === "waiting");
   const base = signedRoundBase(rounds);
   const number = base + waiting.findIndex((round) => round.area === area) + 1;
-  let reports = 0;
-  for (const round of waiting) reports += (await roundReports(deps, round)).unfiled;
+  const { unfiled: reports } = await sumReports(deps, waiting);
 
   const taken = new Set(rounds.map((round) => round.area));
   const areas = await fetchAreas(deps, rerun);
@@ -348,7 +347,4 @@ function fill(draft: Record<string, unknown>, key: "release" | "commit", value: 
   draft[key] = value;
 }
 
-function isLooseAnswer(value: unknown): boolean {
-  const a = value as Record<string, unknown> | null;
-  return a !== null && typeof a === "object" && typeof a.file === "string" && typeof a.symbol === "string" && typeof a.line === "number";
-}
+const isLooseAnswer = guardOf<unknown>(z.object({ file: z.string(), symbol: z.string(), line: z.number() }));

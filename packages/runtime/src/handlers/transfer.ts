@@ -18,7 +18,6 @@ import { assessRecipient } from "@gleam/core/src/recipients/index.ts";
 import {
   capabilityRefusal,
   collectibleSendRefusal,
-  DEFAULT_HYPERBEAM_PEER_URLS,
   isHardwareWalletMethod,
   type ActivityEntry,
   type CollectibleSendDraft,
@@ -35,12 +34,13 @@ import {
   type TransferFeeQuote,
   type Wallet,
   type Winston,
-  isValidNetworkSettings,
+  isValidContact,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { WALLETS_KEY, NETWORK_SETTINGS_KEY, CONTACTS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
+import { activityLogKey, loadActivityLog, loadNetworkSettings, loadWallets, parseActivityLog, requireWallet } from "../stored-data";
+import { CONTACTS_KEY } from "../storage-keys";
 import { dappError } from "../dapp-error";
 import { assertNameTargetMatches, assertTransferMatches } from "./prepared-check";
 import { readL1NodeUrls } from "../peers";
@@ -94,24 +94,6 @@ function approvedFee(req: { fee?: Winston | null }): Winston {
 
 const FIRST_SEEN_LOOKUP_LIMIT = 100;
 
-const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
-  gatewayUrl: "https://arweave.net",
-  peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
-  activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
-};
-
-function isValidWallet(value: unknown): value is Wallet {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string" && typeof candidate.address === "string";
-}
-
-function isValidActivityEntry(value: unknown): value is ActivityEntry {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.txId === "string" && typeof candidate.timestamp === "number";
-}
-
 /** The collectibles cache a sent collectible is dropped from; `ReadsHandler` behind the scenes. */
 export interface CollectibleCache {
   forgetCollectible(req: { address: string; id: string }): Promise<void>;
@@ -142,32 +124,16 @@ export class TransferHandler {
     return this.tokens.tokenTransport({ processId: req.token });
   }
 
-  private async loadNetworkSettings(): Promise<NetworkSettings> {
-    const raw = await this.storage.get<unknown>(NETWORK_SETTINGS_KEY);
-    return isValidNetworkSettings(raw) ? raw : DEFAULT_NETWORK_SETTINGS;
+  private loadNetworkSettings(): Promise<NetworkSettings> {
+    return loadNetworkSettings(this.storage);
   }
 
   private async loadWallet(walletId: string): Promise<Wallet> {
-    const raw = await this.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(raw) ? raw.filter(isValidWallet) : [];
-    const wallet = wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) {
-      throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
-    }
-    return wallet;
-  }
-
-  private async loadActivityLog(address: string): Promise<ActivityEntry[]> {
-    const raw = await this.storage.get<unknown>(`${ACTIVITY_LOG_KEY_PREFIX}${address}`);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(isValidActivityEntry);
+    return requireWallet(await loadWallets(this.storage), walletId);
   }
 
   private async appendActivityLog(address: string, entry: ActivityEntry): Promise<void> {
-    await updateStored(this.storage, `${ACTIVITY_LOG_KEY_PREFIX}${address}`, (raw) => [
-      entry,
-      ...(Array.isArray(raw) ? raw.filter(isValidActivityEntry) : []),
-    ]);
+    await updateStored(this.storage, activityLogKey(address), (raw) => [entry, ...parseActivityLog(raw)]);
   }
 
   /** The unlocked wallet's signer. Throws if the wallet isn't currently unlocked. */
@@ -222,7 +188,7 @@ export class TransferHandler {
 
   private async loadRecipientHistory(settings: NetworkSettings, address: string): Promise<[ActivityEntry[], ActivityEntry[]]> {
     return Promise.all([
-      this.loadActivityLog(address),
+      loadActivityLog(this.storage, address),
       queryActivityTransactions(address, settings.gatewayUrl, FIRST_SEEN_LOOKUP_LIMIT).catch(() => []),
     ]);
   }
@@ -231,15 +197,10 @@ export class TransferHandler {
   private async loadKnownAddresses(): Promise<string[]> {
     const [contacts, wallets] = await Promise.all([
       this.storage.get<unknown>(CONTACTS_KEY),
-      this.storage.get<unknown>(WALLETS_KEY),
+      loadWallets(this.storage),
     ]);
-    const addresses: string[] = [];
-    if (Array.isArray(contacts)) {
-      for (const contact of contacts) {
-        if (contact && typeof contact.address === "string") addresses.push(contact.address);
-      }
-    }
-    if (Array.isArray(wallets)) addresses.push(...wallets.filter(isValidWallet).map((wallet) => wallet.address));
+    const addresses: string[] = Array.isArray(contacts) ? contacts.filter(isValidContact).map((contact) => contact.address) : [];
+    addresses.push(...wallets.map((wallet) => wallet.address));
     return addresses;
   }
 

@@ -1,4 +1,4 @@
-import { isValidArweaveAddress, type Contact, type StoragePort } from "@gleam/core";
+import { isValidArweaveAddress, type Contact, type StoragePort, isValidContact } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { CONTACTS_KEY } from "../storage-keys";
@@ -6,7 +6,7 @@ import { CONTACTS_KEY } from "../storage-keys";
 const MAX_NAME_LENGTH = 32;
 
 function contactsOf(raw: unknown): Contact[] {
-  return Array.isArray(raw) ? (raw as Contact[]) : [];
+  return Array.isArray(raw) ? raw.filter(isValidContact) : [];
 }
 
 /**

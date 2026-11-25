@@ -1,3 +1,5 @@
+import { isRecord } from "./guards";
+
 /**
  * A passkey enrolled to unlock Gleam. The passkey's WebAuthn PRF output
  * wraps the vault password, so a passkey unlock runs the same unlock as
@@ -18,8 +20,8 @@ export interface PasskeyEnrollment {
 }
 
 export function isPasskeyEnrollment(value: unknown): value is PasskeyEnrollment {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   return (
     candidate.version === 1 &&
     typeof candidate.credentialId === "string" &&

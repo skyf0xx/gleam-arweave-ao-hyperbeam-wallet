@@ -1,10 +1,9 @@
 import { useState } from "react";
+import { isValidArweaveAddress } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { Sheet } from "@gleam/ui/src/primitives/sheet.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { useT } from "../../../i18n";
-
-const ARWEAVE_ID = /^[A-Za-z0-9_-]{43}$/;
 
 export interface ChangeTargetSheetProps {
   open: boolean;
@@ -21,7 +20,7 @@ export function ChangeTargetSheet({ open, onOpenChange, container, current, onRe
   const [value, setValue] = useState("");
   const [error, setError] = useState<string>();
   const target = value.trim();
-  const valid = ARWEAVE_ID.test(target);
+  const valid = isValidArweaveAddress(target);
 
   const submit = () => {
     if (!valid) {

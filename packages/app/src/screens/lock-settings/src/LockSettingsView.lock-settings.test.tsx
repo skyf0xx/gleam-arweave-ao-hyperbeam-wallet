@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
+import { renderWithPlatform as render } from "../../../app-platform/testing";
 import type { LockSettings, RuntimePort } from "@gleam/core";
 import { LockSettingsView } from "./LockSettingsView";
 

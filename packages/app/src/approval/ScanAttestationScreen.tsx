@@ -1,17 +1,16 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 import {
   INVITE_REQUIRED_MESSAGE,
+  errorMessage,
   isHardwareWalletMethod,
-  type PointsMembership,
   type RuntimePort,
   type ScanAttestationApprovalPreview,
-  type WalletState,
   type WalletSummary,
 } from "@gleam/core";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { ArmingLabel } from "./ArmingLabel";
 import { FoundingGate } from "../screens/onboarding/src/FoundingGate";
 import { JoinNote } from "../screens/points/src/JoinNote";
@@ -20,6 +19,10 @@ import { useJoinPoints, usePendingInvite } from "../screens/points/src/usePoints
 import { useT, type MessageKey } from "../i18n";
 import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
+import { Field } from "../transfer-review/FieldLabel";
+import { ApprovalActions } from "./ApprovalActions";
+import { usePointsMemberships } from "../screens/points/src/usePoints";
+import { useWalletState } from "../screens/activity";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every
@@ -43,12 +46,7 @@ export interface ScanAttestationScreenProps {
 }
 
 export function ScanAttestationScreen(props: ScanAttestationScreenProps) {
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ScanAttestationFlow {...props} />
-    </QueryClientProvider>
-  );
+  return <ScanAttestationFlow {...props} />;
 }
 
 type Membership =
@@ -59,26 +57,16 @@ type Membership =
 
 function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSign }: ScanAttestationScreenProps) {
   const t = useT();
-  const [membership, setMembership] = useState<Membership>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      runtime.send<void, Record<string, PointsMembership>>({ type: "getPointsMemberships", payload: undefined }),
-      runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } }),
-    ])
-      .then(([memberships, state]) => {
-        if (cancelled) return;
-        const wallet = state.wallets.find((candidate) => candidate.id === preview.walletId) ?? null;
-        setMembership({ status: memberships[preview.walletId] ? "joined" : "not-joined", wallet });
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setMembership({ status: "error", message: errorText(error) });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, preview.walletId]);
+  const membershipsQuery = usePointsMemberships(runtime);
+  const stateQuery = useWalletState(runtime);
+  const [joinedHere, setJoinedHere] = useState(false);
+  const failure = membershipsQuery.error ?? stateQuery.error;
+  const wallet = stateQuery.data?.wallets.find((candidate) => candidate.id === preview.walletId) ?? null;
+  const membership: Membership = failure
+    ? { status: "error", message: errorText(failure) }
+    : membershipsQuery.data === undefined || stateQuery.data === undefined
+      ? { status: "loading" }
+      : { status: joinedHere || membershipsQuery.data[preview.walletId] ? "joined" : "not-joined", wallet };
 
   return (
     <div className="flex min-h-full flex-col">
@@ -102,7 +90,7 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSi
         <JoinFirst
           runtime={runtime}
           walletId={preview.walletId}
-          onJoined={() => setMembership({ status: "joined", wallet: membership.wallet })}
+          onJoined={() => setJoinedHere(true)}
           onCancel={onReject}
         />
       ) : (
@@ -157,9 +145,9 @@ function JoinFirst({
 
       <div className="mt-auto flex flex-col gap-3 pt-2">
         {join.error instanceof Error ? (
-          <p role="alert" className="text-center text-caption text-warning">
+          <InlineError className="text-center">
             {errorText(join.error)}
-          </p>
+          </InlineError>
         ) : null}
         <Button disabled={join.isPending} onClick={() => void joinThenReview()}>
           {join.isPending ? t("approval.joining") : t("approval.joinPoints")}
@@ -202,7 +190,7 @@ function AttestationReview({
     try {
       check = await onCheck();
     } catch (error) {
-      check = { ok: false, error: error instanceof Error ? error.message : String(error) };
+      check = { ok: false, error: errorMessage(error) };
     }
     if (!check.ok) {
       setCheckError(errorText(check.error));
@@ -269,29 +257,13 @@ function AttestationReview({
         </p>
       ) : null}
 
-      <div className="mt-auto flex gap-2.5 pt-1">
-        <Button type="button" variant="secondary" disabled={submitting} onClick={onReject} className="flex-1">
-          {t("approval.reject")}
-        </Button>
-        <Button
-          type="button"
-          disabled={submitting}
-          aria-busy={submitting}
-          onClick={() => void handleSign()}
-          className="flex-1"
-        >
-          {submitting ? t("approval.signing") : <ArmingLabel>{t("approval.sign")}</ArmingLabel>}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-caption font-semibold uppercase tracking-wide text-muted">{label}</span>
-      {children}
+      <ApprovalActions
+        onReject={onReject}
+        disableRejectWhileSubmitting
+        submitting={submitting}
+        onConfirm={() => void handleSign()}
+        confirmLabel={submitting ? t("approval.signing") : <ArmingLabel>{t("approval.sign")}</ArmingLabel>}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { base64UrlToBytes, normalizeEncryptAlgorithm, type EncryptAlgorithm } from "@gleam/core";
-import { decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
+import { base64UrlToBytes, normalizeEncryptAlgorithm, type EncryptAlgorithm, errorMessage, isArweaveId } from "@gleam/core";
+import { decodeTaggedBinary, encodeTaggedBinary, isArrayBuffer } from "@gleam/messaging/src/page-protocol.ts";
 import { dappError } from "../dapp-error";
 
 /**
@@ -28,10 +28,6 @@ export function decodeProviderParams(params: unknown): ProviderArgs {
 /** Binary results go back tagged, because extension messaging is JSON-only. */
 export function encodeProviderResult(result: unknown): unknown {
   return encodeTaggedBinary(result);
-}
-
-function isArrayBuffer(value: unknown): value is ArrayBuffer {
-  return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
 }
 
 /**
@@ -114,7 +110,7 @@ export function readEncryptAlgorithm(options: unknown, method: "encrypt" | "decr
   try {
     return normalizeEncryptAlgorithm(algorithm);
   } catch (error) {
-    throw new Error(dappError(`${method}: ${error instanceof Error ? error.message : String(error)}`));
+    throw new Error(dappError(`${method}: ${errorMessage(error)}`));
   }
 }
 
@@ -150,12 +146,11 @@ function requestBudget(): SpendBytes {
   };
 }
 
-const ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const ATOMIC_AMOUNT_PATTERN = /^\d+$/;
 
 /** An AO process id, which has the same shape as an Arweave address. */
 export function readProcessId(value: unknown, method: string): string {
-  if (typeof value !== "string" || !ADDRESS_PATTERN.test(value)) {
+  if (typeof value !== "string" || !isArweaveId(value)) {
     throw new Error(dappError(`${method}: id must be an AO process id (43 base64url characters).`));
   }
   return value;
@@ -235,7 +230,7 @@ export function readTransaction(value: unknown, method: "sign" | "dispatch"): Pr
   });
 
   const target = readOptionalString(transaction.target, "target", method);
-  if (target !== undefined && !ADDRESS_PATTERN.test(target)) {
+  if (target !== undefined && !isArweaveId(target)) {
     throw new Error(dappError(`${method}: transaction target must be an Arweave address.`));
   }
 
@@ -314,7 +309,7 @@ export function readDataItem(
   });
 
   const target = readOptionalString(item.target, "target", method, "data item");
-  if (target !== undefined && !ADDRESS_PATTERN.test(target)) {
+  if (target !== undefined && !isArweaveId(target)) {
     throw new Error(dappError(`${method}: data item target must be an Arweave address.`));
   }
 

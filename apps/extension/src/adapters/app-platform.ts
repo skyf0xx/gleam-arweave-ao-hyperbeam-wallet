@@ -2,8 +2,7 @@ import { browser } from "wxt/browser";
 import type { AppPlatform } from "@gleam/app/src/app-platform/types.ts";
 import { unavailableDappBrowser } from "@gleam/app/src/app-platform/dapp-browser.ts";
 import type { DeviceSignPanels } from "@gleam/app/src/approval/device-panels.tsx";
-import { openKeystoneConnect } from "@/src/hardware/keystone/open-connect";
-import { openLedgerConnect } from "@/src/hardware/ledger/open-connect";
+import { openConnectPage } from "@/src/hardware/open-connect";
 import { openPasskeyWindow } from "@/src/passkey/open-window";
 import { STORE_REVIEWS_URL } from "@gleam/core";
 import { createExtensionQueryCache } from "./query-cache";
@@ -85,7 +84,7 @@ export function createExtensionAppPlatform(
       requestPermission: () => browser.permissions.request({ permissions: ["downloads"] }).catch(() => false),
     },
     hardwareWallets: {
-      openConnectPage: (device) => (device === "keystone" ? openKeystoneConnect() : openLedgerConnect()),
+      openConnectPage,
       // The action popup closes when it loses focus, so both devices connect in a tab (`openConnectPage`).
       connectViews: {},
       signPanels: options.signPanels ?? null,

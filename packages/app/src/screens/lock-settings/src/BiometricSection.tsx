@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import type { RuntimePort } from "@gleam/core";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
-import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import type { BiometricAvailability, BiometricUnlockPort } from "../../../app-platform/types";
 import { BiometricError, biometryLabel, biometryTitle } from "../../../biometrics/biometrics";
 import { BiometricIcon, Spinner } from "../../unlock/src/UnlockScreen";
 import { useT, type MessageKey } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 type Notice = { text: string; tone: "muted" | "error" };
 
@@ -105,33 +106,27 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+      <SettingsSectionTitle>
         {title}
-      </div>
+      </SettingsSectionTitle>
       {state.kind === "loading" ? (
         <SkeletonRow />
       ) : state.enrolled ? (
-        <div className="flex items-center gap-3 py-3.5">
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <BiometricIcon />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">{t("lockSettings.bioOn", { label })}</span>
-            <span className="text-caption text-muted">
-              {state.availability.available
-                ? t("lockSettings.bioPasswordStillWorks")
-                : t("lockSettings.bioCantCheck")}
-            </span>
-          </span>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void handleRemove()}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
-          >
-            {state.phase === "removing" ? t("lockSettings.turningOff") : t("lockSettings.turnOff")}
-          </button>
-        </div>
+        <IconRow
+          icon={<BiometricIcon />}
+          title={t("lockSettings.bioOn", { label })}
+          description={state.availability.available ? t("lockSettings.bioPasswordStillWorks") : t("lockSettings.bioCantCheck")}
+          trailing={
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleRemove()}
+              className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-hover hover:text-foreground disabled:opacity-60"
+            >
+              {state.phase === "removing" ? t("lockSettings.turningOff") : t("lockSettings.turnOff")}
+            </button>
+          }
+        />
       ) : !state.availability.available ? (
         <p className="py-3.5 text-caption text-muted">{t(UNAVAILABLE_KEYS[state.availability.reason])}</p>
       ) : state.setUp ? (
@@ -152,21 +147,18 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
             onChange={(event) => setPassword(event.target.value)}
             errorMessage={state.passwordError}
           />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => {
-                setPassword("");
-                setState({ ...state, setUp: false, passwordError: undefined, notice: undefined });
-              }}
-              className="flex-1"
-            >
-              {t("lockSettings.cancel")}
-            </Button>
-            <Button type="submit" disabled={busy || password.length === 0} aria-busy={busy} className="flex-1">
-              {state.phase === "checking" ? (
+          <ButtonPair
+            cancelLabel={t("lockSettings.cancel")}
+            onCancel={() => {
+              setPassword("");
+              setState({ ...state, setUp: false, passwordError: undefined, notice: undefined });
+            }}
+            cancelDisabled={busy}
+            confirmType="submit"
+            confirmDisabled={busy || password.length === 0}
+            confirmBusy={busy}
+            confirmLabel={
+              state.phase === "checking" ? (
                 t("lockSettings.checking")
               ) : state.phase === "enrolling" ? (
                 // The full text would wrap on a phone; screen readers still get it.
@@ -177,24 +169,17 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
                 </>
               ) : (
                 t("lockSettings.turnOn")
-              )}
-            </Button>
-          </div>
+              )
+            }
+          />
         </form>
       ) : (
-        <button
-          type="button"
+        <IconRow
+          icon={<BiometricIcon />}
+          title={t("lockSettings.bioUnlockWith", { label })}
+          description={t("lockSettings.bioUseInstead", { label })}
           onClick={() => setState({ ...state, setUp: true, notice: undefined })}
-          className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3.5 text-left hover:bg-hover"
-        >
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
-            <BiometricIcon />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">{t("lockSettings.bioUnlockWith", { label })}</span>
-            <span className="text-caption text-muted">{t("lockSettings.bioUseInstead", { label })}</span>
-          </span>
-        </button>
+        />
       )}
       {state.kind === "ready" && state.notice ? (
         <p

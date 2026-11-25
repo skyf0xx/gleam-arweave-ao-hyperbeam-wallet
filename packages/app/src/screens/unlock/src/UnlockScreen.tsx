@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { SecurityPhrase } from "@gleam/core";
-import { BeamMark, PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
+import { BeamMark, PasswordField, usePasswordEntry } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
@@ -87,41 +87,34 @@ export function UnlockScreen({
   // The form and the links stay disabled while the other way in is running.
   const locked = unlocking || (quick?.busy ?? false);
   const [usePassword, setUsePassword] = useState(false);
-  const [password, setPassword] = useState("");
-  const [capsLockOn, setCapsLockOn] = useState(false);
+  const { password, setPassword } = usePasswordEntry({ submitting: unlocking, serverError: errorMessage });
   const phraseWord = securityPhrase?.word;
   const phraseIcon = useMemo(() => (phraseWord ? securityPhraseIconSvg(phraseWord) : undefined), [phraseWord]);
-
-  // Clear the typed password once a fresh unlock failure arrives, without
-  // an effect (react-hooks/set-state-in-effect): adjust state during
-  // render, keyed off the errorMessage identity we last cleared for, per
-  // https://react.dev/learn/you-might-not-need-an-effect.
-  const [clearedFor, setClearedFor] = useState<string | undefined>(undefined);
-  if (!unlocking && errorMessage && errorMessage !== clearedFor) {
-    setClearedFor(errorMessage);
-    setPassword("");
-  }
 
   const links = (
     <div className="mt-3.5 flex justify-center gap-4">
       {quick && usePassword ? (
-        <button
+        <Button
+          variant="link"
+          size="bare"
           type="button"
           disabled={locked}
           onClick={() => setUsePassword(false)}
-          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
+          className="p-1 phone:flex phone:min-h-11 phone:items-center phone:px-3"
         >
           {quick.switchBack}
-        </button>
+        </Button>
       ) : null}
-      <button
+      <Button
+        variant="link"
+        size="bare"
         type="button"
         disabled={locked}
         onClick={onForgotPassword}
-        className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
+        className="p-1 phone:flex phone:min-h-11 phone:items-center phone:px-3"
       >
         {t("unlock.forgotPassword")}
-      </button>
+      </Button>
     </div>
   );
 
@@ -159,8 +152,6 @@ export function UnlockScreen({
             value={password}
             disabled={locked}
             onChange={(event) => setPassword(event.target.value)}
-            onKeyUp={(event) => setCapsLockOn(event.getModifierState?.("CapsLock") ?? false)}
-            capsLockOn={capsLockOn}
             errorMessage={errorMessage}
           />
 

@@ -11,6 +11,8 @@ import type {
   BiometryKind,
 } from "@gleam/app/src/app-platform/types.ts";
 import { t } from "@gleam/app/src/i18n/index.tsx";
+import { pluginErrorCode } from "./plugin-error";
+import { errorMessage } from "@gleam/core";
 
 /**
  * Every call into the biometric plugin. The vault password is stored only
@@ -51,12 +53,12 @@ const REASONS: Partial<Record<BiometricAuthError, BiometricErrorReason>> = {
 
 /** Capacitor rejects with the native code as a string. */
 function reasonFor(error: unknown): BiometricErrorReason {
-  const code = Number((error as { code?: unknown } | null)?.code);
+  const code = Number(pluginErrorCode(error));
   return (Number.isInteger(code) ? REASONS[code as BiometricAuthError] : undefined) ?? "unknown";
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return errorMessage(error);
 }
 
 async function isSaved(): Promise<boolean> {

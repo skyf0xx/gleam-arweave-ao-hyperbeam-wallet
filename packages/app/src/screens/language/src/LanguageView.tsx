@@ -12,6 +12,7 @@ import ruFlag from "flag-icons/flags/4x3/ru.svg?url";
 import jpFlag from "flag-icons/flags/4x3/jp.svg?url";
 import krFlag from "flag-icons/flags/4x3/kr.svg?url";
 import { LANGUAGES, setLanguagePreference, useLanguagePreference, useT, type Language, type LanguagePreference } from "../../../i18n";
+import { ChoiceRow } from "@gleam/ui/src/primitives/option-list.tsx";
 
 const FLAGS: Record<Language, string> = {
   en: gbFlag,
@@ -39,23 +40,13 @@ export function LanguageView({ onBack }: LanguageViewProps) {
   const renderOption = (value: LanguagePreference, label: string, icon: ReactNode, hint?: string) => {
     const selected = preference === value;
     return (
-      <button
-        key={value}
-        type="button"
-        role="radio"
-        aria-checked={selected}
-        onClick={() => setLanguagePreference(value)}
-        className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-3 rounded-lg px-3 py-3 text-left phone:py-3.5 hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
-      >
+      <ChoiceRow key={value} selected={selected} onSelect={() => setLanguagePreference(value)}>
         {icon}
         <span className="min-w-0 flex-1">
           <span className="block text-label font-semibold text-foreground">{label}</span>
           {hint ? <span className="block text-caption text-muted">{hint}</span> : null}
         </span>
-        <span aria-hidden="true" className="w-4 flex-shrink-0 text-foreground">
-          {selected ? <CheckIcon /> : null}
-        </span>
-      </button>
+      </ChoiceRow>
     );
   };
 
@@ -83,10 +74,3 @@ function GlobeIcon() {
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

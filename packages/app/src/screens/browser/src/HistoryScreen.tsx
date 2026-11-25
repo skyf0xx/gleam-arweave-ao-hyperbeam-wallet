@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useLocale, useT } from "../../../i18n";
 import { siteHost } from "./address";
 import { dayOf, groupHistory, matchHistory, trailText, type BrowserVisit, type HistoryRow } from "./history";
@@ -108,7 +109,7 @@ export function HistoryScreen({ history, onOpen }: { history: readonly BrowserVi
       ) : (
         days.map((day) => (
           <section key={day.start} aria-label={dayName(day.start)} className="flex flex-col">
-            <h2 className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{dayName(day.start)}</h2>
+            <SettingsSectionTitle as="h2">{dayName(day.start)}</SettingsSectionTitle>
             {day.rows.map(renderRow)}
           </section>
         ))

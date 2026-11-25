@@ -66,6 +66,19 @@ describe("discoverHyperBeamPeers", () => {
     await expect(discoverHyperBeamPeers({ gatewayUrl: "https://gw.test", fetchImpl })).resolves.toEqual([]);
   });
 
+  it("stops paging when a page that claims more has no cursor", async () => {
+    const uncursored = { node: record("https://ok.test", "owner-a", 100).node };
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/graphql")) {
+        return new Response(JSON.stringify({ data: { transactions: { pageInfo: { hasNextPage: true }, edges: [uncursored] } } }));
+      }
+      return new Response("operator-address");
+    }) as unknown as typeof fetch;
+    await expect(discoverHyperBeamPeers({ gatewayUrl: "https://gw.test", fetchImpl })).resolves.toEqual(["https://ok.test"]);
+    // One page per Location tag filter; paging on would read each three times.
+    expect(vi.mocked(fetchImpl).mock.calls.filter(([input]) => String(input).endsWith("/graphql"))).toHaveLength(2);
+  });
+
   it("drops a node whose probe answer runs past the probe cap", async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

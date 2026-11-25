@@ -22,14 +22,6 @@ export function siteCardFor(site: ActiveSite | null | undefined): SiteCard | nul
   return { kind: "suggest", ...card };
 }
 
-export function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
-}
-
 export interface PermissionGroup {
   id: string;
   titleKey: MessageKey;

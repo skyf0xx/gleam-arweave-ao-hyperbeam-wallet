@@ -1,6 +1,7 @@
 import {
   base64ToBytes,
   bytesToBase64,
+  singleFlight,
   type JWKInterface,
   type RsaPssSignParams,
   type SessionKeyStorePort,
@@ -90,7 +91,11 @@ const CONNECT_TIMEOUT_MS = 5_000;
  * so a wallet whose keys vanished reads as locked rather than failing.
  */
 export class OffscreenKeyring implements SessionKeyStorePort {
-  private creating: Promise<void> | null = null;
+  private readonly createOnce = singleFlight(() =>
+    this.host.createDocument().catch(async (error: unknown) => {
+      if (!(await this.host.hasDocument())) throw error;
+    }),
+  );
   private port: KeyringBackgroundPort | null = null;
   private portWaiters: Array<(port: KeyringBackgroundPort) => void> = [];
   private readonly pending = new Map<number, Pending>();
@@ -240,15 +245,7 @@ export class OffscreenKeyring implements SessionKeyStorePort {
     // Chrome allows one offscreen document per extension and rejects a
     // second create, so concurrent callers share one attempt, and a
     // rejection is fine when the document exists after all.
-    this.creating ??= this.host
-      .createDocument()
-      .catch(async (error: unknown) => {
-        if (!(await this.host.hasDocument())) throw error;
-      })
-      .finally(() => {
-        this.creating = null;
-      });
-    await this.creating;
+    await this.createOnce();
   }
 
   private async request<R extends KeyringRequest>(request: R): Promise<KeyringResults[R["op"]]> {

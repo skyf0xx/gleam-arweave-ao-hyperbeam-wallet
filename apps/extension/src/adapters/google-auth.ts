@@ -1,5 +1,5 @@
 import { browser, type Browser } from "wxt/browser";
-import type { StoragePort } from "@gleam/core";
+import { singleFlight, type StoragePort } from "@gleam/core";
 import { GOOGLE_DRIVE_SCOPE, type GoogleAuth } from "@gleam/core/src/backup/google-drive.ts";
 
 type IdentityApi = Pick<typeof Browser.identity, "launchWebAuthFlow" | "getRedirectURL">;
@@ -84,21 +84,18 @@ export function createGoogleAuth({ storage, identity = browser.identity, fetchIm
   }
 
   // One flow at a time: Chrome runs a single auth window, and callers arriving together want the same token.
-  let pending: Promise<string | null> | null = null;
+  const signInOnce = singleFlight(signIn);
 
   return {
     async token(interactive) {
       const current = await cached();
       if (current && current.expiresAt - EXPIRY_MARGIN_MS > now()) return current.token;
-      if (pending) {
-        const token = await pending;
+      if (signInOnce.inFlight) {
+        const token = await signInOnce.inFlight;
         // A silent flow that came back empty doesn't answer for a person who is asking.
         if (token !== null || !interactive) return token;
       }
-      pending ??= signIn(interactive).finally(() => {
-        pending = null;
-      });
-      return pending;
+      return signInOnce(interactive);
     },
 
     async forget(token) {

@@ -1,13 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import { BUNDLE_PACKAGES, LAZY_PACKAGES } from "./bundle-allowlists.mjs";
 import {
-  BUNDLE_PACKAGES,
   closureOf,
   entryPackageProblems,
   KEYRING_CSP,
   keyringCspProblems,
   keyringProblems,
-  LAZY_PACKAGES,
   lazyChunkProblems,
   lazyChunksOf,
   packageOf,

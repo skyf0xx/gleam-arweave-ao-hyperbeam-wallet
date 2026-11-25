@@ -1,5 +1,5 @@
-import { formatPoints } from "../../packages/app/src/screens/points/src/formatPoints.ts";
-import { attestationId, isScanAreaId, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
+import { attestationId } from "../../packages/core/src/scan/index.ts";
+import { scanNextSchema, type ScanNext } from "../../packages/core/src/scan/schemas.ts";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { callApi } from "./api.ts";
@@ -8,9 +8,10 @@ import {
   attestLink,
   listRounds,
   nextOffer,
+  pointsText,
   roundAttestation,
-  roundReports,
   signRequest,
+  sumReports,
   type Round,
   type SignedRecord,
 } from "./rounds.ts";
@@ -20,69 +21,27 @@ import {
   closingLines,
   declinesLine,
   fail,
+  guardOf,
   plural,
   readDeclines,
+  shapeProblem,
   writeJson,
   type Deps,
   type Outcome,
   type Problem,
 } from "./shared.ts";
 
-export interface AreaLeft {
-  id: ScanAreaId;
-  label: string;
-  functions: number;
-  examined: number;
-}
+export type NextResponse = ScanNext;
 
-/** `GET /scan/next`: the round the signed attestation was, and what the wallet's next round earns. */
-export interface NextResponse {
-  release: string;
-  /** Null for a whole-surface scan made before areas existed. */
-  area: ScanAreaId | null;
-  /** Null for a scan made before rounds. */
-  round: number | null;
-  points: string;
-  nextRound: number;
-  nextRewardAtomic: string;
-  nextPaid: boolean;
-  areasLeft: AreaLeft[];
-  suggested: ScanAreaId | null;
-}
+export type AreaLeft = NextResponse["areasLeft"][number];
 
-const ATOMIC = /^\d{1,40}$/;
-
-export function isNextResponse(value: unknown): value is NextResponse {
-  if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  const count = (n: unknown) => Number.isInteger(n) && (n as number) >= 0;
-  return (
-    typeof v.release === "string" &&
-    (v.area === null || isScanAreaId(v.area)) &&
-    (v.round === null || (Number.isInteger(v.round) && (v.round as number) >= 1)) &&
-    typeof v.points === "string" &&
-    ATOMIC.test(v.points) &&
-    Number.isInteger(v.nextRound) &&
-    typeof v.nextRewardAtomic === "string" &&
-    ATOMIC.test(v.nextRewardAtomic) &&
-    typeof v.nextPaid === "boolean" &&
-    (v.suggested === null || isScanAreaId(v.suggested)) &&
-    Array.isArray(v.areasLeft) &&
-    v.areasLeft.every((a) => {
-      const area = a as Record<string, unknown> | null;
-      return area !== null && typeof area === "object" && isScanAreaId(area.id) && typeof area.label === "string" && count(area.functions) && count(area.examined);
-    })
-  );
-}
+export const isNextResponse = guardOf<NextResponse>(scanNextSchema);
 
 export function signedRecord(attestationId: string, next: NextResponse): SignedRecord {
   return { attestationId, round: next.round, points: next.points };
 }
 
-const SHAPE: Problem = {
-  path: "next",
-  message: "The points API sent the next round in an unexpected shape; update this checkout (`git fetch --tags`) and run `pnpm scan next` again.",
-};
+const SHAPE = shapeProblem("next", "the next round", "pnpm scan next");
 
 type Asked = { kind: "signed"; next: NextResponse } | { kind: "unsigned" } | { kind: "failed"; issues: Problem[] };
 
@@ -133,7 +92,7 @@ export async function runNext(deps: Deps): Promise<Outcome> {
     round.signed = signedRecord(id, asked.next);
     round.status = "signed";
     if (latest === undefined || (asked.next.round ?? 0) >= latest.round) latest = { round: asked.next.round ?? 0, next: asked.next };
-    lines.push(`${roundName(asked.next.round, round.label)} is signed: ${asked.next.points === "0" ? "no points" : `${formatPoints(asked.next.points)} points`}. Attestation id ${id}; drafts in ${round.paths.dir}/.`);
+    lines.push(`${roundName(asked.next.round, round.label)} is signed: ${pointsText(asked.next.points)}. Attestation id ${id}; drafts in ${round.paths.dir}/.`);
   }
 
   if (latest !== undefined) await rm(join(deps.root, DECLINES_FILE), { force: true });
@@ -149,32 +108,25 @@ export async function runNext(deps: Deps): Promise<Outcome> {
     else dead.push(...checked.issues.map((issue) => ({ ...issue, path: `${round.area} ${issue.path}` })));
   }
   if (dead.length > 0) {
-    return { ok: false, command: "next", lines, issues: dead, json: { unsigned: unsigned.map(({ round }) => round.area) } };
+    return fail("next", dead, lines, { unsigned: unsigned.map(({ round }) => round.area) });
   }
 
   if (live.length > 0) {
     const declines = await readDeclines(deps);
-    let unfiled = 0;
-    let filed = 0;
-    for (const { round } of live) {
-      const reports = await roundReports(deps, round);
-      unfiled += reports.unfiled;
-      filed += reports.filed;
-    }
+    const { unfiled, filed } = await sumReports(deps, live.map(({ round }) => round));
     const names = live.map(({ round }) => round.label);
     const closing = signRequest({ rounds: live.length, link: attestLink(deps, live.map((u) => u.payload)), unfiled, filed });
-    return {
-      ok: false,
-      command: "next",
-      lines: [...lines, ...(declines > 0 ? [declinesLine(declines)] : []), ...closingLines(closing)],
-      issues: [
+    return fail(
+      "next",
+      [
         {
           path: "unsigned",
           message: `${joinNames(names)} ${names.length === 1 ? "isn't" : "aren't"} signed yet; file only the drafts of the signed rounds, and end the turn with the sign request below.`,
         },
       ],
-      json: { unsigned: live.map(({ round }) => round.area), declines, ...closingJson(closing) },
-    };
+      [...lines, ...(declines > 0 ? [declinesLine(declines)] : []), ...closingLines(closing)],
+      { unsigned: live.map(({ round }) => round.area), declines, ...closingJson(closing) },
+    );
   }
 
   // Every round here is signed: the offer comes from the last one's answer, asked again when this run signed none.

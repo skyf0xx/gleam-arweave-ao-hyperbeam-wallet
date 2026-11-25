@@ -1,9 +1,10 @@
 import { z } from "zod";
 import {
-  PERMISSION_TYPES,
   type ConnectAppInfo,
-  type PermissionType,
   type ProviderMethod,
+  ARWEAVE_ID,
+  errorMessage,
+  type PermissionType,
 } from "@gleam/core";
 import { hasPointsProofTag, isPointsMessage, isValidInviteCode } from "@gleam/core/src/points/index.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
@@ -21,6 +22,7 @@ import {
   type ProviderTransaction,
 } from "../handlers/provider-params";
 import { dappError } from "../dapp-error";
+import { isPermissionType } from "../guards";
 
 /**
  * Every method the background answers, with who may call it, whether it
@@ -78,7 +80,7 @@ function reader<T>(read: (value: unknown) => T) {
     try {
       return read(value);
     } catch (error) {
-      ctx.addIssue({ code: "custom", message: error instanceof Error ? error.message : String(error) });
+      ctx.addIssue({ code: "custom", message: errorMessage(error) });
       return z.NEVER;
     }
   });
@@ -131,10 +133,7 @@ function readAppInfo(value: unknown): ConnectAppInfo | null {
 /** Unknown permission names are dropped, and asking for none asks for the address. */
 function readRequestedPermissions(value: unknown): PermissionType[] {
   const requested = Array.isArray(value)
-    ? value.filter(
-        (permission): permission is PermissionType =>
-          typeof permission === "string" && (PERMISSION_TYPES as readonly string[]).includes(permission),
-      )
+    ? value.filter(isPermissionType)
     : [];
   return requested.length > 0 ? requested : ["ACCESS_ADDRESS"];
 }
@@ -144,9 +143,8 @@ const transferField = z.string({ error: TRANSFER_FIELDS_MESSAGE }).min(1, TRANSF
 // The recipient and amount go verbatim into the signed Transfer tags, and
 // the approval screen can only render an address and an atomic integer
 // faithfully, so anything else is refused before a window opens.
-const TRANSFER_ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const transferAddress = (field: "token" | "recipient", what: string) =>
-  transferField.regex(TRANSFER_ADDRESS_PATTERN, `transferAoTokens: ${field} must be ${what} (43 base64url characters).`);
+  transferField.regex(ARWEAVE_ID, `transferAoTokens: ${field} must be ${what} (43 base64url characters).`);
 const transferAmount = transferField.regex(
   /^[1-9]\d*$/,
   "transferAoTokens: amount must be a positive whole number in the token's smallest unit.",
@@ -271,6 +269,8 @@ export const PAGE_METHODS = {
     params: z.object({ id: reader((value) => readProcessId(value, "addToken")) }),
   }),
 } as const satisfies Record<ProviderMethod, PageMethodSpec>;
+
+export type ReportOtherWalletParams = z.output<(typeof BACKGROUND_MESSAGES)["reportOtherWallet"]["params"]>;
 
 export type PageParams<M extends ProviderMethod> = z.output<(typeof PAGE_METHODS)[M]["params"]>;
 

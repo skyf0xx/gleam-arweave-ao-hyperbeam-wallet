@@ -25,7 +25,7 @@ const SIGNER_IMPORTERS = [
   // Gives tests the in-memory Keyring in place of the offscreen one.
   "^packages/runtime/testing/",
   // Points API test fixtures sign with throwaway keys.
-  "^apps/points-api/src/test-signers\\.ts$",
+  "^apps/points-api/src/testing/test-signers\\.ts$",
 ];
 
 /** @type {import("dependency-cruiser").IConfiguration} */
@@ -136,6 +136,14 @@ module.exports = {
       severity: "error",
       from: { path: "^packages/(app|ui|keystone|provider)/src/" },
       to: { path: "^packages/core/src/signer/", pathNot: "^packages/core/src/signer/zeroize\\.ts$", reachable: true },
+    },
+    {
+      name: "no-circular",
+      comment:
+        "No runtime import cycles. A cycle makes load order decide which side sees undefined, and two modules that need each other are one module or need a third. Type-only imports are erased, so a cycle through one is allowed.",
+      severity: "error",
+      from: { path: "^(packages|apps)/" },
+      to: { circular: true, dependencyTypesNot: ["type-only"], viaOnly: { dependencyTypesNot: ["type-only"] } },
     },
   ],
   options: {

@@ -11,24 +11,34 @@ finished scan to the wallet so the user can sign it.
 
 ## Structure
 
-- **`index.html`, `privacy.html`, `terms.html`, `security.html`**: the
-  main pages of the site.
-- **`download.html`, `download.js`**: every download link (Chrome Web
-  Store, TestFlight, APK), with this device's first. `/android` and `/ios`
-  redirect here.
-- **`welcome.html`, `goodbye.html`, `feedback.html`**: the pages people
-  see around installing and uninstalling the extension.
-- **`points.html`, `invite.html`, `program.*`**: Gleam Points and
-  invites.
-- **`scan.html`, `attest.html`, `review-results.html`, `scan-lib.js`**:
-  the community security scans.
+Each page is a folder holding its `index.html` and the CSS and JS only it
+uses. `vercel.json` rewrites `/<page>.html` to `/<page>/index.html`, so
+the public URLs stay as they are: shipped extensions, shared invite links
+and `apps/site-open` link to them. Asset paths in a page are root-absolute
+(`/scan/scan.css`) because the page is served from `/<page>.html`.
+
+- **`index.html`, `styles.css`, `main.js`, `umami.js`**: the home page and
+  what every page shares.
+- **`privacy/`, `terms/`, `security/`**: the policy and security pages.
+- **`download/`**: every download link (Chrome Web Store, TestFlight,
+  APK), with this device's first. `/android` and `/ios` redirect here.
+- **`welcome/`, `goodbye/`, `feedback/`**: the pages people see around
+  installing and uninstalling the extension.
+- **`points/`, `invite/`, `gleam/`**: Gleam Points, invites and the
+  GLEAM vision page.
+- **`scan/`, `attest/`, `review-results/`**: the community security scans.
+  `attest/` hands a finished scan to the wallet to sign. The scan
+  scripts (`scan-lib.js`, `scan-api.js`, `scan-attest.js`) live in
+  `scan/` and the other two pages import them.
+- **`shared/`**: `pages.js`, `program.css` and `program.js`, used by the
+  Points pages and the extension's welcome, goodbye and feedback pages.
 - **`announcements.json`**: the notices that appear on the wallet's main
   screen.
 - **`latest.json`**: the newest release per shell that doesn't update
   itself (`{ "android": "1.54.0" }`). An older install shows an update
   notice. `scripts/publish-latest.sh` sets it once the build is
   downloadable.
-- **`img/`, `fonts/`, `*.css`**: images, fonts and styles.
+- **`img/`, `fonts/`**: images and fonts.
 
 ## Location
 

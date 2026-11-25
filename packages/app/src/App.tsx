@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { vaultHasPassword, type Collectible, type PermissionType, type RuntimePort, type ThemeSettings, type TokenBalance, type WalletState, type WalletSummary } from "@gleam/core";
-import { ExistingMemberReveal, GatedOnboarding, OnboardingView, PendingClaim } from "./screens/onboarding/index.tsx";
+import { vaultHasPassword, type RuntimePort, type ThemeSettings, type WalletState, type WalletSummary } from "@gleam/core";
+import { GatedOnboarding } from "./screens/onboarding/index.tsx";
 import { UnlockView } from "./screens/unlock/index.tsx";
 import {
   AddressIdentityProvider,
@@ -12,35 +12,18 @@ import {
   NO_ADDRESS_IDENTITY_KEY,
   type AddressIdentityKey,
 } from "./address-identity";
-import { CollectibleDetailView, NameTargetView } from "./screens/collectibles/index.tsx";
-import { MainScreenView, type MainScreenTab } from "./screens/main-screen/index.tsx";
-import { useNetworkSettings } from "./screens/main-screen/src/useNetworkSettings";
-import { SendCollectibleView, SendView } from "./screens/send/index.tsx";
-import { ReceiveView } from "./screens/receive/index.tsx";
-import { WalletSwitcherView } from "./screens/wallet-switcher/index.tsx";
-import { WalletDetailView } from "./screens/wallet-detail/index.tsx";
-import { LockSettingsView } from "./screens/lock-settings/index.tsx";
-import { BackupView } from "./screens/backup/index.tsx";
-import { NetworkPeersView } from "./screens/network-peers/index.tsx";
-import { AppearanceView, SettingsHomeView } from "./screens/settings-home/index.tsx";
-import { BrowserView } from "./screens/browser/index.tsx";
-import { ConnectedAppsView } from "./screens/connected-apps/index.tsx";
-import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
-import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
-import { HomeScreenView } from "./screens/home-screen/index.tsx";
-import { LanguageView } from "./screens/language/index.tsx";
+import { type MainScreenTab } from "./screens/main-screen/index.tsx";
 import { useT } from "./i18n";
 import { LocalizedRoot } from "./i18n/LocalizedRoot";
-import { PointsView } from "./screens/points/index.tsx";
-import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
 import { ApprovalSheet } from "./approval/ApprovalSheet";
 import { QueryCachePersistence } from "./query-cache/persistence";
 import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
-import { sitePageUrl } from "@gleam/core";
 import { errorText } from "./i18n/errors";
-import { applyDocumentTheme, Sky, ThemeContext, themeAttribute } from "./theme";
+import { applyStoredTheme, Sky, ThemeContext, themeAttribute } from "./theme";
 import { releasePointerFocusOnBlur } from "./pointer-focus";
+import { resolveActiveWallet, resolveTopView, type MainSubView, type TopView } from "./app-views";
+import { SubViewContent } from "./SubViewContent";
 
 /**
  * The one shared shell mounted from the popup and the side panel (the
@@ -88,54 +71,7 @@ const queryClient = new QueryClient();
 
 const NOTICE_MS = 6000;
 
-type TopView = "loading" | "onboarding" | "unlock" | "main-screen";
-type MainSubView =
-  /** `editTokens` reopens the token list in edit mode, where add-token was opened from. */
-  | { kind: "home"; editTokens?: boolean }
-  /** `token: null` is the AR path (the top-level Send action); an AO token row's click carries its `TokenBalance`. */
-  | { kind: "send"; token: TokenBalance | null; recipient?: string }
-  | { kind: "receive" }
-  | { kind: "wallet-switcher" }
-  | { kind: "wallet-detail"; walletId: string }
-  | { kind: "add-wallet" }
-  | { kind: "settings-home" }
-  | { kind: "appearance" }
-  | { kind: "lock-settings" }
-  | { kind: "backup" }
-  | { kind: "network-peers" }
-  /** `linkId` is set for a page a browse link opened, so a second link reopens the screen on its page. */
-  | { kind: "browser"; url?: string; linkId?: number }
-  /** `origin` is the site whose entry to show; `returnToUrl` is the browser page to go back to. */
-  | { kind: "connected-apps"; origin?: string; returnToUrl?: string }
-  | { kind: "manage-tokens" }
-  | { kind: "display-currency" }
-  | { kind: "home-screen" }
-  | { kind: "language" }
-  | { kind: "collectible"; collectible: Collectible }
-  | { kind: "send-collectible"; collectible: Collectible }
-  | { kind: "name-target"; collectible: Collectible; target: string }
-  | { kind: "points" }
-  | { kind: "use-gleam-on-site"; origin: string; favIconUrl: string | null; requestedPermissions: PermissionType[] };
-
-function resolveTopView(state: WalletState): TopView {
-  if (state.wallets.length === 0) return "onboarding";
-  if (state.session === null || state.session.unlockedWalletIds.length === 0) return "unlock";
-  return "main-screen";
-}
-
-function resolveActiveWallet(state: WalletState): WalletSummary | null {
-  const unlockedId = state.session?.unlockedWalletIds[0] ?? null;
-  const preferredId = state.activeWalletId ?? unlockedId;
-  return state.wallets.find((wallet) => wallet.id === preferredId) ?? state.wallets[0] ?? null;
-}
-
-/** Looks the gateway up only for a name, whose detail links to the name's own site. */
-function CollectibleDetailScreen({ runtime, ...props }: Omit<ComponentProps<typeof CollectibleDetailView>, "gatewayUrl"> & { runtime: RuntimePort }) {
-  const networkSettings = useNetworkSettings(runtime, props.collectible.permawebName !== undefined);
-  return <CollectibleDetailView {...props} gatewayUrl={networkSettings.data?.gatewayUrl} />;
-}
-
-export function App(props: AppProps) {
+function App(props: AppProps) {
   return (
     <LocalizedRoot>
       <AppContent {...props} />
@@ -204,30 +140,12 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   };
 
   /**
-   * Fetches the stored theme preference and applies it to the shared root
-   * before the first substantive paint. No synchronous pre-paint read
-   * exists in MV3, so this awaits alongside `getState` in the same
-   * `init()` gate rather than accepting a flash of the wrong theme.
-   * Never throws: a read failure falls back to light rather than
-   * blocking `init()` or leaving `data-theme` unset.
+   * Applies the stored theme before the first substantive paint. No
+   * synchronous pre-paint read exists in MV3, so this awaits alongside
+   * `getState` in the same `init()` gate rather than accepting a flash of
+   * the wrong theme.
    */
-  const applyTheme = async (runtime: RuntimePort) => {
-    // A document that outlives a view keeps whatever `documentElement`
-    // attribute the last toggle left, and `[data-theme="dark"]` matches any
-    // ancestor, so reset it from the stored preference rather than trust it.
-    let stored: ThemeSettings["theme"] = "light";
-    try {
-      const settings = await runtime.send<void, ThemeSettings>({
-        type: "getThemePreference",
-        payload: undefined,
-      });
-      stored = settings.theme;
-    } catch {
-      // Falls back to light.
-    }
-    setTheme(stored);
-    applyDocumentTheme(stored);
-  };
+  const applyTheme = (runtime: RuntimePort) => applyStoredTheme(runtime, setTheme);
 
   useEffect(() => {
     let cancelled = false;
@@ -328,217 +246,20 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     // > 0 is what got us into this branch), kept as a named fallback
     // rather than crashing.
     content = <div className="p-4 text-body text-muted">{t("app.noActiveWallet")}</div>;
-  } else if (subView.kind === "send") {
-    content = (
-      <SendView
-        runtime={runtime}
-        wallet={wallet}
-        token={subView.token}
-        recipient={subView.recipient}
-        onBack={() => setSubView({ kind: "home" })}
-        onDone={() => setSubView({ kind: "home" })}
-      />
-    );
-  } else if (subView.kind === "collectible") {
-    content = (
-      <CollectibleDetailScreen
-        runtime={runtime}
-        collectible={subView.collectible}
-        onBack={() => setSubView({ kind: "home" })}
-        onSend={(collectible) => setSubView({ kind: "send-collectible", collectible })}
-        onChangeTarget={(target) => setSubView({ kind: "name-target", collectible: subView.collectible, target })}
-        sheetContainer={layoutRoot}
-      />
-    );
-  } else if (subView.kind === "name-target") {
-    const { collectible, target } = subView;
-    const name = collectible.permawebName;
-    content = name ? (
-      <NameTargetView
-        runtime={runtime}
-        wallet={wallet}
-        collectible={{ ...collectible, permawebName: name }}
-        target={target}
-        onBack={() => setSubView({ kind: "collectible", collectible })}
-        onDone={(updated) => setSubView({ kind: "collectible", collectible: updated })}
-      />
-    ) : null;
-  } else if (subView.kind === "send-collectible") {
-    const { collectible } = subView;
-    content = (
-      <SendCollectibleView
-        runtime={runtime}
-        wallet={wallet}
-        collectible={collectible}
-        onBack={() => setSubView({ kind: "collectible", collectible })}
-        onDone={() => setSubView({ kind: "home" })}
-      />
-    );
-  } else if (subView.kind === "points") {
-    content = <PointsView runtime={runtime} wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
-  } else if (subView.kind === "receive") {
-    content = <ReceiveView wallet={wallet} onBack={() => setSubView({ kind: "home" })} />;
-  } else if (subView.kind === "wallet-switcher") {
-    content = (
-      <WalletSwitcherView
-        runtime={runtime}
-        initialWallets={wallets}
-        initialActiveWalletId={wallet?.id ?? null}
-        onSwitched={() => void refresh(runtime)}
-        onBack={() => setSubView({ kind: "home" })}
-        onAddWallet={() => setSubView({ kind: "add-wallet" })}
-        onManage={(walletId) => setSubView({ kind: "wallet-detail", walletId })}
-      />
-    );
-  } else if (subView.kind === "wallet-detail") {
-    const detailWallet = wallets.find((candidate) => candidate.id === subView.walletId) ?? null;
-    content = detailWallet ? (
-      <WalletDetailView
-        runtime={runtime}
-        wallet={detailWallet}
-        onBack={() => setSubView({ kind: "wallet-switcher" })}
-        onRenamed={() => void refresh(runtime)}
-        onRemoved={() => {
-          const remaining = wallets.filter((candidate) => candidate.id !== detailWallet.id);
-          // Drop it now so the list doesn't flash the removed wallet. With none
-          // left, refresh switches to onboarding, which should finish on home.
-          setWallets(remaining);
-          setSubView(remaining.length > 0 ? { kind: "wallet-switcher" } : { kind: "home" });
-          void refresh(runtime);
-        }}
-      />
-    ) : (
-      <div className="p-4 text-body text-muted">{t("app.walletNotFound")}</div>
-    );
-  } else if (subView.kind === "add-wallet") {
-    content = (
-      <OnboardingView
-        runtime={runtime}
-        mode="add-wallet"
-        vaultHasPassword={vaultHasPassword(wallets)}
-        claim={platform.buildInfo.foundingGate ? "founding" : "open"}
-        onCancel={() => setSubView({ kind: "wallet-switcher" })}
-        onComplete={() => {
-          setSubView({ kind: "home" });
-          void refresh(runtime);
-        }}
-      />
-    );
-  } else if (subView.kind === "settings-home") {
-    content = (
-      <SettingsHomeView
-        runtime={runtime}
-        onBack={() => setSubView({ kind: "home" })}
-        onOpenLockSettings={vaultHasPassword(wallets) ? () => setSubView({ kind: "lock-settings" }) : undefined}
-        onOpenConnectedApps={() => setSubView({ kind: "connected-apps" })}
-        onOpenAppearance={() => setSubView({ kind: "appearance" })}
-        onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
-        onOpenFeedback={() =>
-          window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
-        }
-      />
-    );
-  } else if (subView.kind === "appearance") {
-    content = (
-      <AppearanceView
-        runtime={runtime}
-        onBack={() => setSubView({ kind: "settings-home" })}
-        onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
-        onOpenLanguage={() => setSubView({ kind: "language" })}
-        onOpenHomeScreen={() => setSubView({ kind: "home-screen" })}
-      />
-    );
-  } else if (subView.kind === "backup") {
-    content = <BackupView runtime={runtime} onBack={() => setSubView({ kind: "lock-settings" })} />;
-  } else if (subView.kind === "lock-settings") {
-    content = (
-      <LockSettingsView
-        runtime={runtime}
-        onBack={() => setSubView({ kind: "settings-home" })}
-        onLocked={() => void refresh(runtime)}
-        onSetUpPasskey={platform.capabilities.passkey ? () => platform.unlock.openPasskeyWindow("setup") : undefined}
-        biometrics={platform.capabilities.biometrics ? platform.biometrics : undefined}
-        lockOnSystemLock={platform.capabilities.lockOnSystemLock}
-        backup={
-          platform.capabilities.cloudBackup
-            ? { provider: platform.capabilities.cloudBackup, open: () => setSubView({ kind: "backup" }) }
-            : undefined
-        }
-      />
-    );
-  } else if (subView.kind === "network-peers") {
-    content = <NetworkPeersView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
-  } else if (subView.kind === "connected-apps") {
-    const { origin, returnToUrl } = subView;
-    content = (
-      <ConnectedAppsView
-        runtime={runtime}
-        highlightOrigin={origin}
-        wallets={wallets}
-        onBack={() => setSubView(returnToUrl ? { kind: "browser", url: returnToUrl } : { kind: "settings-home" })}
-      />
-    );
-  } else if (subView.kind === "browser") {
-    content = (
-      <BrowserView
-        key={subView.linkId}
-        runtime={runtime}
-        initialUrl={subView.url}
-        onBack={() => setSubView({ kind: "home" })}
-        onOpenConnectedApp={(origin, url) => setSubView({ kind: "connected-apps", origin, returnToUrl: url })}
-        onLocked={() => void refresh(runtime)}
-      />
-    );
-  } else if (subView.kind === "manage-tokens") {
-    content = (
-      <ManageTokensView
-        runtime={runtime}
-        address={wallet.address}
-        onBack={() => setSubView({ kind: "home", editTokens: true })}
-      />
-    );
-  } else if (subView.kind === "display-currency") {
-    content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "appearance" })} />;
-  } else if (subView.kind === "home-screen") {
-    content = <HomeScreenView runtime={runtime} onBack={() => setSubView({ kind: "appearance" })} />;
-  } else if (subView.kind === "language") {
-    content = <LanguageView onBack={() => setSubView({ kind: "appearance" })} />;
-  } else if (subView.kind === "use-gleam-on-site") {
-    content = (
-      <UseGleamOnSiteView
-        runtime={runtime}
-        origin={subView.origin}
-        favIconUrl={subView.favIconUrl}
-        requestedPermissions={subView.requestedPermissions}
-        onBack={() => setSubView({ kind: "home" })}
-        onDone={() => setSubView({ kind: "home" })}
-      />
-    );
   } else {
     content = (
-      <PendingClaim runtime={runtime} wallet={wallet}>
-        <ExistingMemberReveal runtime={runtime} wallet={wallet} enabled={platform.buildInfo.foundingGate}>
-          <MainScreenView
-            runtime={runtime}
-            wallet={wallet}
-            onSend={() => setSubView({ kind: "send", token: null })}
-            onSendToken={(token) => setSubView({ kind: "send", token })}
-            onSendTo={(recipient, token) => setSubView({ kind: "send", token, recipient })}
-            sheetContainer={layoutRoot}
-            onReceive={() => setSubView({ kind: "receive" })}
-            onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
-            onOpenSettings={() => setSubView({ kind: "settings-home" })}
-            onOpenPoints={() => setSubView({ kind: "points" })}
-            onOpenBrowser={platform.capabilities.dappBrowser ? () => setSubView({ kind: "browser" }) : undefined}
-            onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
-            onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
-            onAddToken={() => setSubView({ kind: "manage-tokens" })}
-            initialTokenEditing={subView.kind === "home" && subView.editTokens}
-            initialTab={homeTab}
-            onTabChange={setHomeTab}
-          />
-        </ExistingMemberReveal>
-      </PendingClaim>
+      <SubViewContent
+        subView={subView}
+        setSubView={setSubView}
+        runtime={runtime}
+        wallet={wallet}
+        wallets={wallets}
+        setWallets={setWallets}
+        refresh={refresh}
+        layoutRoot={layoutRoot}
+        homeTab={homeTab}
+        setHomeTab={setHomeTab}
+      />
     );
   }
 

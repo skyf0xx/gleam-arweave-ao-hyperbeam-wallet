@@ -1,6 +1,6 @@
 import type { Tag } from "../models/tag";
+import { ARWEAVE_ID } from "../models/arweave-id";
 
-const ADDRESS = /^[A-Za-z0-9_-]{43}$/;
 const ATOMIC = /^(0|[1-9]\d*)$/;
 
 /** What an AO `Transfer` message moves, read from its own signed target and tags. */
@@ -32,7 +32,7 @@ export function readAoTransferMessage(item: {
   target: string | null | undefined;
   tags: readonly Tag[];
 }): AoTransferMessageReading | null {
-  if (!item.target || !ADDRESS.test(item.target)) return null;
+  if (!item.target || !ARWEAVE_ID.test(item.target)) return null;
   const looksLikeTransfer = item.tags.some(
     (tag) => tag.name.toLowerCase() === "action" && tag.value.toLowerCase() === "transfer",
   );
@@ -50,7 +50,7 @@ export function readAoTransferMessage(item: {
     !once("quantity") ||
     only("Action") !== "Transfer" ||
     recipient === null ||
-    !ADDRESS.test(recipient) ||
+    !ARWEAVE_ID.test(recipient) ||
     quantity === null ||
     !ATOMIC.test(quantity)
   ) {

@@ -17,7 +17,8 @@ import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { dataItemSignatureData } from "@gleam/core/src/arweave/data-item.ts";
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { verifyPointsProof } from "@gleam/core/src/points/index.ts";
-import { ApprovalHandler, type SigningRequestInput } from "./approval";
+import { ApprovalHandler } from "./approval";
+import type { SigningRequestInput } from "./approval-types";
 import { createKeySession } from "./key-session";
 import { TransferHandler } from "./transfer";
 

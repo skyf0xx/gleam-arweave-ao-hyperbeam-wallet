@@ -4,6 +4,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { AnimatedQr } from "./AnimatedQr";
 import { CameraDeniedNotice, type CameraDeniedHelp } from "./CameraDeniedNotice";
 import { QrScanner, type QrScannerProps, type ScannerError } from "./QrScanner";
+import { ScanProgress } from "./ScanProgress";
 import {
   buildKeystoneSignRequest,
   decodeKeystoneSignature,
@@ -156,16 +157,7 @@ export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: K
               onComplete={handleComplete}
               onError={(error) => setStep({ kind: "scan-error", error })}
             />
-            <div
-              role="progressbar"
-              aria-label={t("extension.scanProgress")}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={step.percent}
-              className="h-1 w-full overflow-hidden rounded-full bg-mist"
-            >
-              <div className="h-full bg-foreground transition-[width]" style={{ width: `${step.percent}%` }} />
-            </div>
+            <ScanProgress percent={step.percent} />
             <Button type="button" variant="secondary" onClick={() => setStep({ kind: "show" })}>
               {t("extension.showQrAgain")}
             </Button>

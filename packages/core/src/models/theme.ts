@@ -1,3 +1,5 @@
+import { isRecord } from "./guards";
+
 /**
  * The user-controlled theme preference. No "system/auto" option; light is
  * the default for a wallet with no stored preference yet.
@@ -21,7 +23,7 @@ export interface ThemeSettings {
 }
 
 export function isThemeSettings(value: unknown): value is ThemeSettings {
-  if (value === null || typeof value !== "object") return false;
-  const record = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const record = value;
   return THEME_PREFERENCES.includes(record.theme as ThemePreference);
 }

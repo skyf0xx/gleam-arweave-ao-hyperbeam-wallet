@@ -1,5 +1,10 @@
-import { L1_CANARY_PROCESS_ID } from "../models/network";
-import { readCappedText } from "./capped-body";
+import { L1_CANARY_PROCESS_ID, trimTrailingSlashes } from "../models/network";
+
+export { trimTrailingSlashes as stripTrailingSlashes } from "../models/network";
+import { readCappedDigits, readCappedText } from "./capped-body";
+import { mapLimit } from "../models/concurrency";
+import { z } from "zod";
+import { blockSchema, transactionsReply } from "../arweave/graphql-schema";
 
 export interface DiscoverHyperBeamPeersOptions {
   gatewayUrl: string;
@@ -14,21 +19,16 @@ export interface DiscoverHyperBeamPeersOptions {
   timeoutMs?: number;
 }
 
-interface LocationNode {
-  id: string;
-  owner?: { address?: string } | null;
-  block?: { timestamp?: number } | null;
-  tags?: { name: string; value: string }[] | null;
-}
+const locationPageSchema = transactionsReply(
+  z.object({
+    id: z.string(),
+    owner: z.object({ address: z.string().optional() }).nullish(),
+    block: blockSchema({ timestamp: z.number().optional() }),
+    tags: z.array(z.object({ name: z.string(), value: z.string() })).nullish(),
+  }),
+);
 
-interface LocationPage {
-  data?: {
-    transactions?: {
-      pageInfo?: { hasNextPage?: boolean };
-      edges?: { cursor: string; node: LocationNode }[];
-    };
-  };
-}
+type LocationNode = NonNullable<NonNullable<z.output<typeof locationPageSchema>["data"]>["transactions"]>["edges"][number]["node"];
 
 const LOCATION_TAG_FILTERS = [
   [{ name: "Type", values: ["Location", "Scheduler-Location"] }],
@@ -73,18 +73,11 @@ function isPrivateIpv4(host: string): boolean {
   );
 }
 
-/** `url` without trailing slashes. A loop, not a regex, since record URLs are untrusted. */
-export function stripTrailingSlashes(url: string): string {
-  let end = url.length;
-  while (end > 0 && url[end - 1] === "/") end--;
-  return url.slice(0, end);
-}
-
 /** The bare https origin a location record's `Url` names, or null if it isn't a usable public node. */
 export function normalizePeerUrl(raw: string): string | null {
   let url: URL;
   try {
-    url = new URL(stripTrailingSlashes(raw.trim()));
+    url = new URL(trimTrailingSlashes(raw.trim()));
   } catch {
     return null;
   }
@@ -128,7 +121,7 @@ async function readLocationRecords(
   let after: string | undefined;
   for (let page = 0; page < maxPages; page++) {
     try {
-      const response = await fetchImpl(`${stripTrailingSlashes(gatewayUrl)}/graphql`, {
+      const response = await fetchImpl(`${trimTrailingSlashes(gatewayUrl)}/graphql`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: QUERY, variables: { tags, after } }),
@@ -137,11 +130,14 @@ async function readLocationRecords(
       if (!response.ok) break;
       const text = await readCappedText(response, LOCATION_PAGE_MAX_BYTES);
       if (text === null) break;
-      const body = JSON.parse(text) as LocationPage;
-      const edges = body.data?.transactions?.edges ?? [];
+      const parsed = locationPageSchema.safeParse(JSON.parse(text));
+      if (!parsed.success) break;
+      const edges = parsed.data.data?.transactions?.edges ?? [];
       for (const edge of edges) nodes.push(edge.node);
-      if (!body.data?.transactions?.pageInfo?.hasNextPage || edges.length === 0) break;
-      after = edges[edges.length - 1]!.cursor;
+      // Without a cursor the next request would read the first page again.
+      const cursor = edges[edges.length - 1]?.cursor;
+      if (!parsed.data.data?.transactions?.pageInfo?.hasNextPage || cursor === undefined) break;
+      after = cursor;
     } catch {
       break;
     }
@@ -208,16 +204,12 @@ export async function discoverHyperBeamPeers({
       if (candidates.length >= maxProbes) break;
     }
 
-    const alive = new Array<boolean>(candidates.length).fill(false);
-    let next = 0;
-    const worker = async () => {
-      while (next < candidates.length) {
-        if (signal?.aborted) return;
-        const index = next++;
-        alive[index] = await answersAsNode(candidates[index]!, fetchImpl, timeoutMs, signal);
-      }
-    };
-    await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+    const alive = await mapLimit(
+      candidates,
+      Math.max(1, concurrency),
+      (candidate) => answersAsNode(candidate, fetchImpl, timeoutMs, signal),
+      signal,
+    );
     return candidates.filter((_, index) => alive[index]);
   } catch {
     return [];
@@ -244,24 +236,21 @@ export async function findL1TokenNodes({
   concurrency = 6,
   timeoutMs = 8000,
 }: FindL1TokenNodesOptions): Promise<string[]> {
-  const urls = [...new Set(candidates.map(stripTrailingSlashes))];
-  const serves = new Array<boolean>(urls.length).fill(false);
-  let next = 0;
-  const worker = async () => {
-    while (next < urls.length) {
-      if (signal?.aborted) return;
-      const index = next++;
+  const urls = [...new Set(candidates.map(trimTrailingSlashes))];
+  const serves = await mapLimit(
+    urls,
+    Math.max(1, concurrency),
+    async (url) => {
       try {
-        const response = await fetchImpl(`${urls[index]}/${L1_CANARY_PROCESS_ID}~process@1.0/slot/current`, {
+        const response = await fetchImpl(`${url}/${L1_CANARY_PROCESS_ID}~process@1.0/slot/current`, {
           signal: withTimeout(signal, timeoutMs),
         });
-        const text = response.ok ? await readCappedText(response, PROBE_RESPONSE_MAX_BYTES) : null;
-        serves[index] = text !== null && /^\d+$/.test(text.trim());
+        return response.ok && (await readCappedDigits(response, PROBE_RESPONSE_MAX_BYTES)) !== null;
       } catch {
-        serves[index] = false;
+        return false;
       }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+    },
+    signal,
+  );
   return urls.filter((_, index) => serves[index]);
 }

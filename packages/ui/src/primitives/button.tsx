@@ -26,11 +26,13 @@ const buttonVariants = cva(
         secondary: "gleam-hover-frost border border-line bg-background text-foreground hover:bg-hover disabled:opacity-50",
         ghost: "rounded-md text-muted hover:bg-hover hover:text-foreground disabled:opacity-50",
         destructive: "bg-warning-fill text-white hover:brightness-110 disabled:opacity-50",
+        link: "text-label font-medium text-muted hover:text-foreground hover:underline",
       },
       size: {
         default: "h-11 w-full px-4 py-3",
         sm: "h-8 px-3 text-xs",
         icon: "h-8 w-8 flex-shrink-0",
+        bare: "",
       },
     },
     defaultVariants: {

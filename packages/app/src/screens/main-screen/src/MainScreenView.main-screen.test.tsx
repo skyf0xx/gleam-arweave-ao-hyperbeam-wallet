@@ -92,6 +92,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
         onOpenWalletSwitcher={vi.fn()}
         onOpenSettings={vi.fn()}
         onOpenPoints={vi.fn()}
+        onOpenInvites={vi.fn()}
         onUseGleamOnSite={vi.fn()}
         onOpenCollectible={vi.fn()}
         onAddToken={vi.fn()}
@@ -1599,6 +1600,7 @@ describe("MainScreenView cached-to-live", () => {
           onOpenWalletSwitcher={vi.fn()}
           onOpenSettings={vi.fn()}
           onOpenPoints={vi.fn()}
+          onOpenInvites={vi.fn()}
           onUseGleamOnSite={vi.fn()}
           onOpenCollectible={vi.fn()}
           onAddToken={vi.fn()}

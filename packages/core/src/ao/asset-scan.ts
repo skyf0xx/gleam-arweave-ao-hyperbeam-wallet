@@ -1,28 +1,32 @@
+import { z } from "zod";
 import { postGraphQLWithFailover } from "../arweave/graphql";
+import { tagSchema, transactionsConnection, transactionsReply } from "../arweave/graphql-schema";
+import { ARWEAVE_ID } from "../models/arweave-id";
+import { mapLimit } from "../models/concurrency";
+import { tagMap, type Tag } from "../models/tag";
 
-export interface Tag {
-  name: string;
-  value: string;
-}
+export { mapLimit } from "../models/concurrency";
+export { withRequestTimeout } from "../models/http";
+export { tagMap, type Tag } from "../models/tag";
 
-export interface ScanNode {
-  id: string;
-  recipient?: string | null;
-  owner?: { address: string };
-  tags: Tag[];
-}
+const scanNodeSchema = z.object({
+  id: z.string(),
+  recipient: z.string().nullish(),
+  owner: z.object({ address: z.string() }).optional(),
+  tags: z.array(tagSchema),
+});
 
-interface ConnectionResponse {
-  data?: { transactions?: { pageInfo?: { hasNextPage: boolean }; edges: Array<{ cursor: string; node: ScanNode }> } };
-}
+export type ScanNode = z.output<typeof scanNodeSchema>;
 
-type Connection = NonNullable<NonNullable<ConnectionResponse["data"]>["transactions"]>;
+const scanReplySchema = transactionsReply(scanNodeSchema);
+
+const batchReplySchema = z.object({
+  data: z.record(z.string(), transactionsConnection(scanNodeSchema).nullish()).nullish(),
+});
 
 export type AssetClass = "unique" | "fungible";
 
-export const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
 export const SCAN_PAGE_SIZE = 100;
-export const SCAN_REQUEST_TIMEOUT_MS = 15_000;
 
 const SCAN_QUERY = `query ($first: Int!, $after: String, $owners: [String!], $tags: [TagFilter!]!) {
   transactions(first: $first, after: $after, sort: HEIGHT_DESC, owners: $owners, tags: $tags) {
@@ -44,15 +48,6 @@ const DESCRIPTOR_QUERY = `query ($ids: [ID!]!, $first: Int!) {
   }
 }`;
 
-/** Lower-cased tag names: gateways return spawn tags in whatever case the spawner wrote. */
-export function tagMap(tags: Tag[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const tag of tags) {
-    if (typeof tag?.name === "string" && typeof tag.value === "string") out[tag.name.toLowerCase()] = tag.value;
-  }
-  return out;
-}
-
 /**
  * Classifies a process by its spawn tags. A "unique" is the NFT shape:
  * non-fungible style, denomination 0 and supply 1. The ticker is free:
@@ -68,20 +63,6 @@ export function classifyAsset(tags: Tag[]): AssetClass | null {
     return "unique";
   }
   return style === "fungible" ? "fungible" : null;
-}
-
-export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
-        const index = next++;
-        out[index] = await fn(items[index] as T);
-      }
-    }),
-  );
-  return out;
 }
 
 export interface AssetScannerOptions {
@@ -108,7 +89,7 @@ export function createAssetScanner(options: AssetScannerOptions) {
   const { gatewayUrl, fetchImpl, maxPages, concurrency, deadline, describe } = options;
 
   const query = async (q: string, variables: Record<string, unknown>) =>
-    (await postGraphQLWithFailover<ConnectionResponse>(gatewayUrl, q, variables, fetchImpl, describe)).data
+    (await postGraphQLWithFailover(gatewayUrl, q, variables, scanReplySchema, fetchImpl, describe)).data
       ?.transactions;
 
   const scan = async (filter: ScanFilter, pick?: (node: ScanNode) => string | null | undefined): Promise<string[]> => {
@@ -126,7 +107,7 @@ export function createAssetScanner(options: AssetScannerOptions) {
       const edges = connection?.edges ?? [];
       for (const { node } of edges) {
         const id = pick ? pick(node) : node.id;
-        if (id && PROCESS_ID.test(id)) ids.push(id);
+        if (id && ARWEAVE_ID.test(id)) ids.push(id);
       }
       if (!connection?.pageInfo?.hasNextPage || edges.length === 0) break;
       after = edges[edges.length - 1]?.cursor;
@@ -164,10 +145,11 @@ export function createAssetScanner(options: AssetScannerOptions) {
         variables[`t${i}`] = sources[i]?.filter.tags;
       }
       const data = (
-        await postGraphQLWithFailover<{ data?: Record<string, Connection | undefined> }>(
+        await postGraphQLWithFailover(
           gatewayUrl,
           `query (${declarations}) {\n  ${fields}\n}`,
           variables,
+          batchReplySchema,
           fetchImpl,
           describe,
         )
@@ -179,7 +161,7 @@ export function createAssetScanner(options: AssetScannerOptions) {
         const pick = sources[i]?.pick;
         for (const { node } of edges) {
           const id = pick ? pick(node) : node.id;
-          if (id && PROCESS_ID.test(id)) ids[i]?.push(id);
+          if (id && ARWEAVE_ID.test(id)) ids[i]?.push(id);
         }
         if (connection?.pageInfo?.hasNextPage && edges.length > 0) {
           cursors[i] = edges[edges.length - 1]?.cursor;
@@ -211,9 +193,4 @@ export function createAssetScanner(options: AssetScannerOptions) {
   };
 
   return { scan, scanMany, fetchTags };
-}
-
-/** A fetch that gives every request its own timeout, so one hung host can't hold a scan past its budget. */
-export function withRequestTimeout(fetchImpl: typeof fetch, timeoutMs: number = SCAN_REQUEST_TIMEOUT_MS): typeof fetch {
-  return ((input, init) => fetchImpl(input, { ...init, signal: AbortSignal.timeout(timeoutMs) })) as typeof fetch;
 }

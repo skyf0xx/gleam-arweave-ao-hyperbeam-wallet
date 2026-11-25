@@ -4,6 +4,7 @@ import type { ArweaveTransactionJson } from "../arweave/transaction";
 import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
 import { userErrorMessage } from "../models/user-errors";
+import { ARWEAVE_ID } from "../models/arweave-id";
 
 /**
  * Tokens on `arweave-scheduler@1.0` (fungible tokens and collectibles
@@ -13,7 +14,6 @@ import { userErrorMessage } from "../models/user-errors";
  * that scheduler matches, and the only AR it moves is the activation
  * winston below. The sender pays the network reward.
  */
-const ADDRESS = /^[A-Za-z0-9_-]{43}$/;
 const ATOMIC = /^[1-9]\d*$/;
 
 /**
@@ -63,10 +63,10 @@ export async function prepareL1TokenTransfer(
   quantity: string,
   fee: Winston,
 ): Promise<ArweaveTransactionJson> {
-  if (!ADDRESS.test(processId)) {
+  if (!ARWEAVE_ID.test(processId)) {
     throw new Error(`Token process must be an Arweave id (43 base64url characters), got "${processId}".`);
   }
-  if (!ADDRESS.test(recipient)) {
+  if (!ARWEAVE_ID.test(recipient)) {
     throw new Error(userErrorMessage("recipientInvalid", { recipient }));
   }
   if (!ATOMIC.test(quantity)) {
@@ -105,7 +105,7 @@ export function readL1TokenTransfer(transaction: {
   data_size: string;
   tags: readonly Tag[];
 }): L1TokenTransferReading | null {
-  if (!ADDRESS.test(transaction.target)) return null;
+  if (!ARWEAVE_ID.test(transaction.target)) return null;
   const named = (name: string) => transaction.tags.filter((tag) => tag.name.toLowerCase() === name);
   const actions = named("action");
   if (!actions.some((tag) => tag.value.toLowerCase() === "transfer")) return null;
@@ -122,7 +122,7 @@ export function readL1TokenTransfer(transaction: {
     (value !== "0" && value !== L1_ACTIVATION_WINSTON) ||
     transaction.data_size !== "0" ||
     recipient === null ||
-    !ADDRESS.test(recipient) ||
+    !ARWEAVE_ID.test(recipient) ||
     quantity === null ||
     !ATOMIC.test(quantity)
   ) {

@@ -2,8 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { STORE_REVIEWS_URL } from "@gleam/core";
 
 vi.mock("wxt/browser", () => ({ browser: { runtime: { getManifest: () => ({ version: "1.0.0" }) } } }));
-vi.mock("@/src/hardware/keystone/open-connect", () => ({ openKeystoneConnect: vi.fn() }));
-vi.mock("@/src/hardware/ledger/open-connect", () => ({ openLedgerConnect: vi.fn() }));
+vi.mock("@/src/hardware/open-connect", () => ({ openConnectPage: vi.fn() }));
 vi.mock("@/src/passkey/open-window", () => ({ openPasskeyWindow: vi.fn() }));
 vi.mock("./runtime", () => ({ runtimePort: {} }));
 

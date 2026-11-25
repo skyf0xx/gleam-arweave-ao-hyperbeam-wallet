@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { RuntimePort } from "@gleam/core";
 import type { ReactElement, ReactNode } from "react";
@@ -97,10 +98,15 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
   };
 }
 
-/** A `renderHook`/`render` wrapper that supplies a fake platform. */
+/** A `renderHook`/`render` wrapper that supplies a fake platform and a query client that doesn't retry. */
 export function platformWrapper(platform: AppPlatform = fakeAppPlatform()) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <PlatformProvider platform={platform}>{children}</PlatformProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>
+        <PlatformProvider platform={platform}>{children}</PlatformProvider>
+      </QueryClientProvider>
+    );
   };
 }
 

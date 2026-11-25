@@ -1,5 +1,8 @@
 export { BeamMark, type BeamMarkProps } from "./BeamMark";
 export { StepDots, type StepDotsProps } from "./StepDots";
+export { usePasswordEntry } from "./use-password-entry";
+export { PasswordStep, type PasswordStepProps } from "./PasswordStep";
+export { StepColumn, StepForm, StepIntro } from "./step-layout";
 export { PasswordField, type PasswordFieldProps } from "./PasswordField";
 export {
   PasswordStrengthMeter,

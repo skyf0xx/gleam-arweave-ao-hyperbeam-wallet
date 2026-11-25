@@ -1,10 +1,12 @@
-import type {
-  ApprovalPresenterPort,
-  DeviceKeyPort,
-  DownloadPort,
-  FileDownloadResult,
-  StoragePort,
-  TimerPort,
+import {
+  assertSetManyEntries,
+  KeyWatchers,
+  type ApprovalPresenterPort,
+  type DeviceKeyPort,
+  type DownloadPort,
+  type FileDownloadResult,
+  type StoragePort,
+  type TimerPort,
 } from "@gleam/core";
 import { Keyring } from "@gleam/core/signer";
 import type { LockIndicatorPort, Platform, TabPush, TabsPort } from "../src/platform";
@@ -17,7 +19,7 @@ import type { SiteTab } from "../src/handlers/site-wallet";
 export class InMemoryStorage implements StoragePort {
   /** The stored values, for a test to read or seed directly. */
   readonly entries = new Map<string, unknown>();
-  private readonly watchers = new Map<string, Set<(value: unknown) => void>>();
+  private readonly watchers = new KeyWatchers();
 
   async get<T>(key: string): Promise<T | null> {
     return this.entries.has(key) ? (structuredClone(this.entries.get(key)) as T) : null;
@@ -30,14 +32,7 @@ export class InMemoryStorage implements StoragePort {
 
   async setMany(entries: Record<string, unknown>): Promise<void> {
     const keys = Object.keys(entries);
-    const areas = new Set(keys.map((key) => key.slice(0, key.indexOf(":"))));
-    if (areas.size > 1) {
-      throw new Error(`setMany keys must share one storage area, got ${[...areas].join(", ")}.`);
-    }
-    const nullish = Object.keys(entries).find((key) => entries[key] == null);
-    if (nullish !== undefined) {
-      throw new Error(`setMany value for "${nullish}" is null or undefined; use remove to delete a key.`);
-    }
+    assertSetManyEntries(entries);
     for (const key of keys) this.entries.set(key, structuredClone(entries[key]));
     // Notify only after every entry is in place so no watcher sees a partial write.
     for (const key of keys) this.notify(key, entries[key]);
@@ -49,15 +44,11 @@ export class InMemoryStorage implements StoragePort {
   }
 
   watch<T>(key: string, cb: (value: T | null) => void): () => void {
-    const listeners = this.watchers.get(key) ?? new Set();
-    const listener = cb as (value: unknown) => void;
-    listeners.add(listener);
-    this.watchers.set(key, listeners);
-    return () => void listeners.delete(listener);
+    return this.watchers.watch(key, cb);
   }
 
   private notify(key: string, value: unknown): void {
-    for (const listener of this.watchers.get(key) ?? []) listener(structuredClone(value));
+    for (const listener of this.watchers.of(key)) listener(structuredClone(value));
   }
 }
 

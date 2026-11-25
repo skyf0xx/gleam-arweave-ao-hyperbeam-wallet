@@ -3,14 +3,14 @@ import pg from "pg";
 import { dbFromPool, type Db } from "../src/db";
 
 /** Runs a script body against `DATABASE_URL`, printing a thrown message instead of a stack. */
-export async function runScript(usage: string, parse: () => void, body: (db: Db) => Promise<void>): Promise<void> {
+export async function runScript(usage: string, parse: (argv: string[]) => void, body: (db: Db) => Promise<void>): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.error("DATABASE_URL is required.");
     process.exit(1);
   }
   try {
-    parse();
+    parse(process.argv.slice(2).filter((arg) => arg !== "--"));
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     console.error(usage);

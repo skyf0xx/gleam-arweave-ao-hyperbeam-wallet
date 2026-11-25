@@ -1,3 +1,6 @@
+import { isRecord } from "./guards";
+import { isArweaveId } from "./arweave-id";
+
 /**
  * A saved address-book entry. One list for the whole vault (not
  * per-wallet) since an address a user sends to is meaningful regardless of
@@ -12,19 +15,9 @@ export interface Contact {
   createdAt: number;
 }
 
-/**
- * An Arweave address's on-the-wire shape: 43 base64url characters (a
- * 32-byte id). Same pattern used ad hoc elsewhere (`ao/transfer.ts`'s
- * `createSignedDataItem`, `provider-params.ts`'s `ADDRESS_PATTERN`,
- * `sendFormSchema.ts`'s `recipientSchema`) — exported here so
- * `saveContact` (and any future core caller) can share one definition
- * instead of re-declaring the regex.
- */
-const ARWEAVE_ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-
 export function isValidContact(value: unknown): value is Contact {
-  if (value === null || typeof value !== "object") return false;
-  const { address, name, createdAt } = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const { address, name, createdAt } = value;
   return (
     typeof address === "string" &&
     isValidArweaveAddress(address) &&
@@ -35,5 +28,5 @@ export function isValidContact(value: unknown): value is Contact {
 }
 
 export function isValidArweaveAddress(value: string): boolean {
-  return ARWEAVE_ADDRESS_PATTERN.test(value);
+  return isArweaveId(value);
 }

@@ -131,12 +131,6 @@ describe("SiteWalletHandler", () => {
     expect((await sites.activeSite({ id: 7, url: ORIGIN }))?.otherWallet).toBe(UNKNOWN_WALLET_NAME);
   });
 
-  it("ignores a malformed report", async () => {
-    const sites = handler();
-    await sites.report(7, ORIGIN, { walletName: 1, used: "yes" });
-    expect((await sites.activeSite({ id: 7, url: ORIGIN }))?.otherWallet).toBeNull();
-  });
-
   it("forgets a closed tab", async () => {
     const sites = handler();
     await sites.report(7, ORIGIN, { walletName: "Wander", used: true });

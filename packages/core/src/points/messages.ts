@@ -11,6 +11,7 @@
 
 import { ATTESTATION_ID_PATTERN, RELEASE_PATTERN } from "../scan/format";
 import { userErrorMessage } from "../models/user-errors";
+import { isArweaveId } from "../models/arweave-id";
 
 export const POINTS_MESSAGE_PREFIX = "gleam-points:";
 
@@ -33,7 +34,6 @@ export const POINTS_MESSAGE_MAX_AGE_SECONDS = 600;
 const MAX_FUTURE_SKEW_SECONDS = 60;
 
 const INVITE_CODE_PATTERN = /^[A-Z0-9]{6,16}$/;
-const THUMBPRINT_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const UNIX_SECONDS_PATTERN = /^\d{1,12}$/;
 
 export function isValidInviteCode(code: string): boolean {
@@ -53,7 +53,7 @@ export interface RegisterMessage {
 
 /** Signed by the wallet's RSA key, binding its address to an install's device key. */
 export function buildRegisterMessage(message: RegisterMessage): string {
-  if (!THUMBPRINT_PATTERN.test(message.deviceKeyThumbprint)) {
+  if (!isArweaveId(message.deviceKeyThumbprint)) {
     throw new Error("Device key thumbprint must be a 43-character base64url SHA-256 digest.");
   }
   if (message.inviteCode !== null && !isValidInviteCode(message.inviteCode)) {
@@ -82,7 +82,7 @@ export function parseRegisterMessage(text: string): RegisterMessage | null {
     string,
   ];
   if (scheme !== "gleam-points" || kind !== "register" || version !== "v1") return null;
-  if (!THUMBPRINT_PATTERN.test(thumbprint)) return null;
+  if (!isArweaveId(thumbprint)) return null;
   if (inviteCode !== "-" && !isValidInviteCode(inviteCode)) return null;
   if (!UNIX_SECONDS_PATTERN.test(issuedAt)) return null;
   return {
@@ -92,14 +92,13 @@ export function parseRegisterMessage(text: string): RegisterMessage | null {
   };
 }
 
-const ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 /**
  * Signed by the wallet's RSA key to leave Gleam Points and delete its
  * data. Naming the address binds the signature to that one wallet.
  */
 export function buildLeaveMessage(address: string, issuedAt: number): string {
-  if (!ADDRESS_PATTERN.test(address)) throw new Error(`"${address}" isn't an Arweave address.`);
+  if (!isArweaveId(address)) throw new Error(`"${address}" isn't an Arweave address.`);
   assertUnixSeconds(issuedAt);
   return `gleam-points:leave:v1:${address}:${issuedAt}`;
 }
@@ -109,7 +108,7 @@ export function parseLeaveMessage(text: string): { address: string; issuedAt: nu
   if (parts.length !== 5) return null;
   const [scheme, kind, version, address, issuedAt] = parts as [string, string, string, string, string];
   if (scheme !== "gleam-points" || kind !== "leave" || version !== "v1") return null;
-  if (!ADDRESS_PATTERN.test(address) || !UNIX_SECONDS_PATTERN.test(issuedAt)) return null;
+  if (!isArweaveId(address) || !UNIX_SECONDS_PATTERN.test(issuedAt)) return null;
   return { address, issuedAt: Number(issuedAt) };
 }
 

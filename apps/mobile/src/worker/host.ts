@@ -1,10 +1,10 @@
 import type * as Comlink from "comlink";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import type { WalletState } from "@gleam/core";
+import { isExactHttpOrigin } from "@gleam/core/src/models/site-origin.ts";
 import type { Runtime } from "@gleam/runtime";
 import { BACKGROUND_MESSAGES, type BackgroundMessage } from "@gleam/runtime/src/dispatch/methods.ts";
 import { exposeMethods } from "../adapters/comlink-guard";
-import { isExactWebOrigin } from "../adapters/dapp-tabs";
 import { createPointsLinks, type PointsLinkOutcome } from "./points-link";
 
 /** What the worker exposes to the wallet WebView over `comlink`. */
@@ -65,7 +65,7 @@ export function createRuntimeHost(runtime: HostedRuntime, lifecycle: WorkerLifec
     // content script, so the dispatcher holds it to the same methods,
     // grants and secure-origin check.
     async pageCall(type, data, origin, tabId) {
-      if (!isExactWebOrigin(origin)) throw new Error("A page call needs the page's http(s) origin.");
+      if (!isExactHttpOrigin(origin)) throw new Error("A page call needs the page's http(s) origin.");
       const caller: CallerContext = { tier: "contentScript", origin, tabId: typeof tabId === "number" ? tabId : undefined };
       return runtime.dispatch(messageType(type), data, caller);
     },

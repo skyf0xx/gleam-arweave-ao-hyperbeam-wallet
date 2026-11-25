@@ -2,6 +2,7 @@ import { SECURITY_PHRASE_WORD_MAX_LENGTH, suggestSecurityPhrase, type SecurityPh
 import { useUiLabels } from "../../labels";
 import { TextField } from "../../primitives/text-field";
 import { SecurityPhraseIcon } from "./SecurityPhraseIcon";
+import { InlineError } from "../../primitives/inline-error";
 
 export interface SecurityPhrasePickerProps {
   value: SecurityPhrase;
@@ -44,9 +45,9 @@ export function SecurityPhrasePicker({ value, onChange, iconSvg, disabled = fals
           onChange={(event) => onChange({ word: event.target.value })}
         />
         {errorMessage ? (
-          <p role="alert" className="text-caption text-warning">
+          <InlineError>
             {errorMessage}
-          </p>
+          </InlineError>
         ) : null}
       </div>
     </div>

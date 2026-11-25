@@ -177,9 +177,13 @@ export class GleamProvider {
     return { signal: undefined, rest: options };
   }
 
-  async sign(transaction?: unknown, options?: unknown): Promise<unknown> {
+  private callWithOptions(method: ProviderSurfaceMethod, params: Record<string, unknown>, options: unknown): Promise<unknown> {
     const { signal, rest } = GleamProvider.extractSignal(options);
-    const signed = await this.call("sign", { transaction: serializeTransaction(transaction), options: rest }, signal);
+    return this.call(method, { ...params, options: rest }, signal);
+  }
+
+  async sign(transaction?: unknown, options?: unknown): Promise<unknown> {
+    const signed = await this.callWithOptions("sign", { transaction: serializeTransaction(transaction) }, options);
     return keepCallerTags(transaction, signed);
   }
 
@@ -188,28 +192,23 @@ export class GleamProvider {
   }
 
   encrypt(data?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("encrypt", { data, options: rest }, signal);
+    return this.callWithOptions("encrypt", { data }, options);
   }
 
   decrypt(data?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("decrypt", { data, options: rest }, signal);
+    return this.callWithOptions("decrypt", { data }, options);
   }
 
   signature(data?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("signature", { data, options: rest }, signal);
+    return this.callWithOptions("signature", { data }, options);
   }
 
   signMessage(data?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("signMessage", { data, options: rest }, signal);
+    return this.callWithOptions("signMessage", { data }, options);
   }
 
   privateHash(data?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("privateHash", { data, options: rest }, signal);
+    return this.callWithOptions("privateHash", { data }, options);
   }
 
   verifyMessage(data?: unknown, signature?: unknown, publicKey?: unknown, options?: unknown): Promise<unknown> {
@@ -218,8 +217,7 @@ export class GleamProvider {
 
   /** Resolves to the raw signed item as an `ArrayBuffer`, as Wander does. */
   signDataItem(dataItem?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("signDataItem", { dataItem, options: rest }, signal);
+    return this.callWithOptions("signDataItem", { dataItem }, options);
   }
 
   /**
@@ -259,7 +257,6 @@ export class GleamProvider {
 
   /** Resolves to one `ArrayBuffer` per item, in order. */
   batchSignDataItem(dataItems?: unknown, options?: unknown): Promise<unknown> {
-    const { signal, rest } = GleamProvider.extractSignal(options);
-    return this.call("batchSignDataItem", { dataItems, options: rest }, signal);
+    return this.callWithOptions("batchSignDataItem", { dataItems }, options);
   }
 }

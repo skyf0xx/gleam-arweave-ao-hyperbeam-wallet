@@ -1,5 +1,5 @@
-import * as Comlink from "comlink";
-import { createSerializer, type StoragePort } from "@gleam/core";
+import { assertSetManyEntries, createSerializer, KeyWatchers, retryingOnce, type StoragePort } from "@gleam/core";
+import { requestChannel, type WorkerScope } from "./comlink-guard";
 import { STORE_REQUEST, type SqliteStore, type StoredRow } from "./sqlite-channel";
 
 type Area = "local" | "session";
@@ -39,25 +39,14 @@ function parseRow(key: string, json: string): [string, unknown] {
  */
 export class MobileStoragePort implements StoragePort {
   private readonly session = new Map<string, unknown>();
-  private loaded: Promise<Map<string, unknown>> | undefined;
+  /** The `local:` rows, loaded once. A failed load is tried again on the next access. */
+  private readonly local = retryingOnce(async () => new Map((await this.store.load()).map(([key, json]) => parseRow(key, json))));
   private readonly serializeWrites = createSerializer();
-  private readonly watchers = new Map<string, Set<(value: unknown) => void>>();
+  private readonly watchers = new KeyWatchers();
 
   constructor(private readonly store: Pick<SqliteStore, "load" | "write">) {
     // Starts loading at once; a failure surfaces through the next read or write.
     this.local().catch(() => {});
-  }
-
-  /** The `local:` rows, loaded once. A failed load is tried again on the next access. */
-  private local(): Promise<Map<string, unknown>> {
-    this.loaded ??= this.store.load().then(
-      (rows) => new Map(rows.map(([key, json]) => parseRow(key, json))),
-      (error: unknown) => {
-        this.loaded = undefined;
-        throw error;
-      },
-    );
-    return this.loaded;
   }
 
   async get<T>(key: string): Promise<T | null> {
@@ -73,13 +62,9 @@ export class MobileStoragePort implements StoragePort {
   async setMany(entries: Record<string, unknown>): Promise<void> {
     const keys = Object.keys(entries);
     if (keys.length === 0) return;
-    const areas = new Set(keys.map(areaOf));
-    if (areas.size > 1) throw new Error(`setMany keys must share one storage area, got ${[...areas].join(", ")}.`);
-    const nullish = keys.find((key) => entries[key] == null);
-    if (nullish !== undefined) {
-      throw new Error(`setMany value for "${nullish}" is null or undefined; use remove to delete a key.`);
-    }
-    await this.commit([...areas][0]!, entries, []);
+    const areas = keys.map(areaOf);
+    assertSetManyEntries(entries);
+    await this.commit(areas[0]!, entries, []);
   }
 
   async remove(key: string): Promise<void> {
@@ -87,11 +72,7 @@ export class MobileStoragePort implements StoragePort {
   }
 
   watch<T>(key: string, cb: (value: T | null) => void): () => void {
-    const listeners = this.watchers.get(key) ?? new Set();
-    const listener = cb as (value: unknown) => void;
-    listeners.add(listener);
-    this.watchers.set(key, listeners);
-    return () => void listeners.delete(listener);
+    return this.watchers.watch(key, cb);
   }
 
   private async commit(area: Area, puts: Record<string, unknown>, deletes: string[]): Promise<void> {
@@ -124,7 +105,7 @@ export class MobileStoragePort implements StoragePort {
   }
 
   private notify(key: string, value: unknown): void {
-    for (const listener of this.watchers.get(key) ?? []) {
+    for (const listener of this.watchers.of(key)) {
       // The write has committed; a failing watcher mustn't make it look as if it hadn't.
       try {
         listener(structuredClone(value));
@@ -136,8 +117,6 @@ export class MobileStoragePort implements StoragePort {
 }
 
 /** Opens a channel to the UI thread's `serveSqliteStore` and returns the store on it. */
-export function connectSqliteStore(scope: { postMessage(message: unknown, transfer: Transferable[]): void }): SqliteStore {
-  const channel = new MessageChannel();
-  scope.postMessage({ type: STORE_REQUEST, port: channel.port2 }, [channel.port2]);
-  return Comlink.wrap<SqliteStore>(channel.port1);
+export function connectSqliteStore(scope: WorkerScope): SqliteStore {
+  return requestChannel<SqliteStore>(scope, STORE_REQUEST);
 }

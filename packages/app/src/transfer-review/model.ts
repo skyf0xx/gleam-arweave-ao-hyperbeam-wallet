@@ -4,6 +4,7 @@ import {
   type DeviceSigningSummary,
   type DisplayCurrency,
   type SigningApprovalPreview,
+  type Tag,
   type TokenBalance,
   type TokenPrice,
 } from "@gleam/core";
@@ -12,15 +13,13 @@ import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-tr
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { currencyStep, formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import type { WalletBalances } from "../screens/activity/src/useBalances";
+import type { WalletBalances } from "../screens/activity";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { shownTokenLogo, type RowVisibility } from "../token-visibility";
 import type { TFunction } from "../i18n";
 import { escapeHiddenCharacters } from "../approval/UntrustedText";
 
 const AR_DENOMINATION = 12;
-
-export type Tag = { name: string; value: string };
 
 /** One value-moving transfer. Amounts are atomic strings: Winston for AR, the token's smallest unit otherwise. */
 export interface TransferLine {

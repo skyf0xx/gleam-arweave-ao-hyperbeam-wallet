@@ -3,8 +3,11 @@ import { L1_TOKEN_NODE_URLS } from "../models/network";
 import type { Tag } from "../models/tag";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { clientForGateway } from "./client";
-import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
+import { signRsaPss, verifyRsaPss } from "./rsa-pss";
 import { userErrorMessage } from "../models/user-errors";
+import { isRecord } from "../models/guards";
+import { sha256 } from "../models/bytes";
+import { isSuccessStatus } from "../models/http";
 
 /**
  * Format-2 Arweave transactions split into build, sign and apply, so a
@@ -188,9 +191,9 @@ export async function postTransaction(gatewayUrl: string, signed: ArweaveTransac
  */
 function rejectionReason(statusText: unknown): string {
   if (typeof statusText === "string") return statusText;
-  if (typeof statusText === "object" && statusText !== null) {
+  if (isRecord(statusText)) {
     for (const field of ["error", "body"] as const) {
-      const value = (statusText as Record<string, unknown>)[field];
+      const value = statusText[field];
       if (typeof value === "string" && value !== "") return value;
     }
     return JSON.stringify(statusText);
@@ -236,7 +239,7 @@ export async function broadcastTransaction(
   for (const node of L1_TOKEN_NODE_URLS) {
     try {
       const response = await postTransaction(node, signed);
-      if (response.status >= 200 && response.status < 300) return response;
+      if (isSuccessStatus(response.status)) return response;
     } catch {
       // Try the next node; the gateway's answer is the one worth reporting.
     }

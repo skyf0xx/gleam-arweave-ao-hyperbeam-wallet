@@ -34,7 +34,6 @@ packages/app/src/screens/backup/index.tsx Route entry; mounts backup/src, which 
 packages/app/src/screens/onboarding/index.tsx Route entry; mounts onboarding/src, which is listed.
 packages/app/src/screens/points/src/JoinNote.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/points/src/formatPoints.ts A screen outside the key, signing and approval paths.
-packages/app/src/screens/points/src/useCopy.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/points/src/usePoints.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/SendView.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
 packages/app/src/screens/send/src/TokenInfoPanel.tsx A screen outside the key, signing and approval paths.
@@ -105,7 +104,6 @@ packages/runtime/src/handlers/security-phrase.ts User settings and lists: no key
 packages/runtime/src/index.ts The runtime barrel and the Platform port interface.
 packages/runtime/src/platform.ts The runtime barrel and the Platform port interface.
 packages/ui/src/components/wallet/ActivityRow.tsx Wallet, balance and activity display outside the approval preview.
-packages/ui/src/components/wallet/BalanceDisplay.tsx Wallet, balance and activity display outside the approval preview.
 packages/ui/src/components/wallet/CollectibleThumbnail.tsx Wallet, balance and activity display outside the approval preview.
 packages/ui/src/components/wallet/EmptyState.tsx Wallet, balance and activity display outside the approval preview.
 packages/ui/src/components/wallet/FigurePlaceholder.tsx Wallet, balance and activity display outside the approval preview.
@@ -173,6 +171,7 @@ packages/app/src/screens/main-screen/src/ActivityDetailSheet.tsx A screen outsid
 packages/app/src/screens/main-screen/src/MainScreenNotice.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useNotice.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/notice.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useCollectiblesCatchUp.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/usePortfolioHistory.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useTabSwipe.ts A home screen gesture; touches no data.
 packages/app/src/screens/main-screen/src/useNetworkSettings.ts A screen outside the key, signing and approval paths.
@@ -200,7 +199,49 @@ packages/app/src/screens/settings-home/src/useTheme.ts A screen outside the key,
 packages/app/src/screens/wallet-detail/index.tsx Route entry; mounts WalletDetailView, which is listed.
 packages/app/src/screens/wallet-switcher/index.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/wallet-switcher/src/WalletSwitcherView.tsx Wallet list and switch buttons; switching is the listed wallet-lifecycle handler.
+packages/app/src/screens/wallet-switcher/src/useSwitchWallet.ts Calls switchWallet, the listed wallet-lifecycle handler, and updates the cached state.
 apps/mobile/src/adapters/back-button.ts Android back-button handling; an unused press minimises the app instead of closing it, keeping the unlocked session.
 apps/mobile/src/adapters/qr-scanner.ts Barcode plugin wrapper; scanned text is validated by the listed send form and shown by transfer-review.
 apps/mobile/src/adapters/store-review.ts Store review prompt; the system decides whether anything shows.
 apps/mobile/src/preview/index.ts Throwaway preview ports with an in-memory store; nothing persists.
+packages/core/src/ao/reply-schema.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/models/atomic-schema.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/models/concurrency.ts Promise plumbing: runs the caller's work and holds no data.
+packages/core/src/models/error-message.ts Turns a caught value into its message text.
+packages/core/src/models/http.ts Request timeouts and status checks; the code that reads each reply is listed or exempted on its own.
+packages/core/src/pricing/price-json.ts Fiat prices: display only, never part of what is signed.
+apps/extension/src/mount-root.tsx Mounts the app's React root; takes no input.
+apps/mobile/src/adapters/plugin-error.ts Reads a plugin rejection's code; no data crosses it.
+packages/app/src/security-phrase.ts Loads the security phrase's word; shown to the user, never trusted.
+packages/app/src/screens/activity/src/useWalletState.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/connected-apps/src/useConnectedApps.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/useKnownAddresses.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/main-screen/src/ActivityPanel.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/HomeHeader.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/TokensPanel.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/activityLabels.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/homeIcons.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/portfolioPrefs.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/tokenRows.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useListDock.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useTokenRowControls.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/AboutPoints.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/DeviceApprovalNote.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/EarnItems.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/LeaveControl.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/Standing.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/ComposeStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/NetworkFeeLine.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/RecipientField.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/ReviewStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/SavedAddressesStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/SkeletonPickerRow.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/SuccessStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/TokenPickerStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/namedAddresses.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/sendStep.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/sendTokenFormat.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/SubViewContent.tsx The shell's sub-view routing; mounts the listed screens and passes them only props.
+packages/app/src/app-views.ts The shell's view and active-wallet resolvers; no background calls.
+packages/ui/src/components/wallet/PortfolioChartEmptyLine.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/PortfolioChartHeadline.tsx Wallet, balance and activity display outside the approval preview.

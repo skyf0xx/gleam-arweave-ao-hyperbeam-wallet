@@ -4,8 +4,8 @@ import { TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { displayTicker } from "../../main-screen/src/formatWinston";
 import { useT } from "../../../i18n";
-import { useCopy } from "../../points/src/useCopy";
-import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 
 /**
  * The send screen's Info tab. A detail the token doesn't publish is left
@@ -94,15 +94,13 @@ function ProcessId({ processId }: { processId: string }) {
       <span title={processId} className="mr-1 font-mono text-caption font-medium text-foreground">
         {truncateAddress(processId, 6)}
       </span>
-      <button
-        type="button"
-        onClick={copy}
-        aria-label={copied ? t("send.processIdCopied") : t("send.copyProcessId")}
+      <CopyButton
+        copied={copied}
+        onCopy={copy}
+        label={copied ? t("send.processIdCopied") : t("send.copyProcessId")}
         title={t("send.copyProcessId")}
         className="rounded p-1 text-muted hover:bg-hover hover:text-foreground phone:hit-target"
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
+      />
     </>
   );
 }

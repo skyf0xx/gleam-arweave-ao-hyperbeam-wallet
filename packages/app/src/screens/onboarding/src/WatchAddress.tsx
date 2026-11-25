@@ -1,12 +1,14 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { isValidArweaveAddress, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
+import { StepForm, StepIntro } from "@gleam/ui/src/components/onboarding/index.ts";
 import { usePlatform } from "../../../app-platform/context";
 import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
-import { QrScanIcon } from "../../send/src/SendView";
+import { QrScanIcon } from "@gleam/ui/src/primitives/icons.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
@@ -27,8 +29,15 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
   const [addressError, setAddressError] = useState<string>();
-  const [submitting, setSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const addMutation = useMutation({
+    mutationFn: (input: { address: string; name?: string }) =>
+      runtime.send<{ address: string; name?: string }, WalletSummary>({ type: "addWatchWallet", payload: input }),
+    onSuccess: onAdded,
+    onError: (error) => setAddressError(errorText(error)),
+  });
+  // Stays busy after success: the parent leaves this step.
+  const submitting = addMutation.isPending || addMutation.isSuccess;
 
   async function scan() {
     setScanning(true);
@@ -50,43 +59,26 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
     }
   }
 
-  async function submit() {
+  function submit() {
     const trimmed = address.trim();
     if (!isValidArweaveAddress(trimmed)) {
       setAddressError(t("onboarding.invalidAddress"));
       return;
     }
-    setSubmitting(true);
     setAddressError(undefined);
-    try {
-      onAdded(
-        await runtime.send<{ address: string; name?: string }, WalletSummary>({
-          type: "addWatchWallet",
-          payload: { address: trimmed, name: name.trim() || undefined },
-        }),
-      );
-    } catch (error) {
-      setAddressError(errorText(error));
-      setSubmitting(false);
-    }
+    addMutation.mutate({ address: trimmed, name: name.trim() || undefined });
   }
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("onboarding.watchAddress")} onBack={onBack} busy={submitting} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
+      <StepForm
         onSubmit={(event) => {
           event.preventDefault();
-          if (!submitting) void submit();
+          if (!submitting) submit();
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.watchAddress")}</h1>
-          <p className="text-body leading-relaxed text-muted">
-            {t("onboarding.watchBody")}
-          </p>
-        </div>
+        <StepIntro title={t("onboarding.watchAddress")} body={t("onboarding.watchBody")} />
 
         <TextField
           label={t("onboarding.addressLabel")}
@@ -131,7 +123,7 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
             {submitting ? t("onboarding.adding") : t("onboarding.watchAddressButton")}
           </Button>
         </ScreenFooter>
-      </form>
+      </StepForm>
     </div>
   );
 }

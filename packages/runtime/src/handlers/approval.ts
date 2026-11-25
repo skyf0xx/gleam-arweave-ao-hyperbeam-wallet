@@ -2,7 +2,6 @@ import {
   addressFromOwner,
   base64ToBytes,
   base64UrlToBytes,
-  bytesToBase64,
   bytesToBase64Url,
   capabilitiesFor,
   decrypt,
@@ -13,7 +12,6 @@ import {
   finishDispatch,
   finishSignTransaction,
   isHardwareWalletMethod,
-  WATCH_ONLY_CONNECT_REFUSAL,
   prepareDataItem,
   prepareDataItems,
   prepareDispatch,
@@ -22,72 +20,90 @@ import {
   signMessage as vaultSignMessage,
   signPayloadWithSigner,
   verifyDeviceSignature,
-  PERMISSION_TYPES,
   WALLET_APPROVAL_ORIGIN,
-  type AddTokenApprovalPreview,
-  type CollectibleRef,
-  type ApprovalKind,
   type ApprovalPresenterPort,
   type ApprovalPreview,
   type ApprovalRequest,
-  type ConnectAppInfo,
-  type ConnectApprovalPreview,
-  type DataItemInput,
-  type DeviceSigningPayload,
-  type EncryptAlgorithm,
   type Grant,
   type HardwareDevice,
   type HardwareWalletMethod,
-  type NameTargetPreview,
   type NameTargetRequest,
   type WalletMethod,
   type PermissionType,
-  type ScanAttestationApprovalPreview,
-  type SignTransactionInput,
-  type SigningApprovalPreview,
   type StoragePort,
   type UnsignedPayload,
+  errorMessage,
 } from "@gleam/core";
-import {
-  APPROVAL_MAX_MS,
-  APPROVAL_TIMEOUT_MS,
-  SCAN_ATTESTATION_TIMEOUT_MS,
-} from "@gleam/messaging/src/page-protocol.ts";
+import { APPROVAL_TIMEOUT_MS } from "@gleam/messaging/src/page-protocol.ts";
 import { updateStored } from "../storage-update";
-import {
-  buildAttestMessage,
-  buildOwnershipTransaction,
-  POINTS_PROOF_TAG,
-} from "@gleam/core/src/points/index.ts";
-import {
-  attestationId,
-  parseAttestation,
-  type Attestation,
-  type ParsedAttestation,
-} from "@gleam/core/src/scan/attestation.ts";
+import { buildAttestMessage, buildOwnershipTransaction } from "@gleam/core/src/points/index.ts";
+import { attestationId, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
-import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
-import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
-import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { safeSiteIconUrl } from "./site-wallet";
 import { dappError } from "../dapp-error";
+import { dataItemOf, summarize, transactionOf } from "./prepared-check";
+import { GrantStore } from "./approval-grants";
 import {
-  assertNameTargetMatches,
-  assertTransferMatches,
-  checkDataItem,
-  checkTransaction,
-  dataItemOf,
-  mismatch,
-  summarize,
-  transactionOf,
-  UNSAFE_TEXT,
-} from "./prepared-check";
+  ApprovalDeclinedError,
+  type AddTokenRequestInput,
+  type CreateApprovalInput,
+  type DeviceNameTargetSubmitter,
+  type DeviceTransferSubmitter,
+  type PointsDeviceProof,
+  type ScanAttestationSubmitter,
+  type SigningRequestInput,
+  type TokenWatchList,
+  type TransferSubmitter,
+  type WalletApprovalInput,
+  type WalletTransferRequest,
+} from "./approval-types";
+import {
+  DEVICE_GRACE_MS,
+  DEVICE_SIGNED_KINDS,
+  DISCONNECTED_OUTCOME,
+  needsGrant,
+  PENDING_APPROVALS_KEY,
+  RESOLVING_RECHECK_MS,
+  RESULT_ONLY_KINDS,
+  reviewTimeoutMs,
+  signsForActiveWallet,
+  SITE_DISCONNECTED,
+  TIMED_OUT,
+  validPending,
+  WALLET_SWITCHED,
+  type ApprovalOutcome,
+  type PendingDeviceSigning,
+  type PendingApprovalRecord,
+} from "./approval-records";
+import {
+  fromStored,
+  PENDING_BYTES_LIMIT,
+  PENDING_BYTES_PER_ORIGIN,
+  storedSize,
+  toStored,
+} from "./pending-codec";
+import {
+  assertPreparedMatches,
+  textDecoder,
+  toArrayBuffer,
+  toWirePayload,
+  transactionInputOf,
+} from "./approval-prepared";
+import {
+  buildAddTokenPreview,
+  buildConnectPreview,
+  buildScanAttestationPreview,
+  buildSigningPreview,
+  decodeText,
+  parsedAttestationOf,
+  previewCollectibleId,
+} from "./approval-preview";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -151,776 +167,11 @@ import {
  * `reviewTimeoutMs(kind)` after creation while in review) is hidden from
  * every read and pruned on the next write, unless it is being resolved.
  */
-const GRANTS_KEY = "local:grants";
-
-function activeGrant(grants: readonly Grant[], origin: string): Grant | null {
-  const grant = grants.find((candidate) => candidate.origin === origin);
-  if (!grant) return null;
-  if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) return null;
-  return grant;
-}
-
-/** How long a request waits for its first answer. */
-function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
-  return kind === "scanAttestation" ? SCAN_ATTESTATION_TIMEOUT_MS : APPROVAL_TIMEOUT_MS;
-}
-
-/** How long past its review timeout a request can wait on a hardware device. */
-const DEVICE_GRACE_MS = APPROVAL_MAX_MS - APPROVAL_TIMEOUT_MS;
-const PENDING_APPROVALS_KEY = "session:pendingApprovals";
-
-function isValidPermissionType(value: unknown): value is PermissionType {
-  return typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value);
-}
-
-function isValidGrant(value: unknown): value is Grant {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.origin === "string" &&
-    typeof candidate.walletId === "string" &&
-    Array.isArray(candidate.permissions) &&
-    candidate.permissions.every(isValidPermissionType) &&
-    typeof candidate.createdAt === "number" &&
-    (candidate.expiresAt === null || typeof candidate.expiresAt === "number") &&
-    candidate.budget === null &&
-    (candidate.icon === undefined || candidate.icon === null || typeof candidate.icon === "string") &&
-    (candidate.name === undefined || candidate.name === null || typeof candidate.name === "string")
-  );
-}
-
-function isValidApprovalRequest(value: unknown): value is ApprovalRequest {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.requestId === "string" &&
-    typeof candidate.kind === "string" &&
-    typeof candidate.origin === "string" &&
-    typeof candidate.createdAt === "number" &&
-    candidate.preview !== null &&
-    typeof candidate.preview === "object"
-  );
-}
-
-/** A signing request's decoded intent — the input to `describeIntent`-style preview building. */
-export interface SigningRequestInput {
-  kind: Exclude<ApprovalKind, "connect" | "addToken">;
-  /** Present for value-transfer-shaped calls (`sign` a transfer, `dispatch`, `transferAoTokens`). */
-  recipient?: string | null;
-  amount?: string | null;
-  fee?: string | null;
-  /**
-   * Identifies which token `amount`/`fee` are denominated in — `null` for the
-   * native AR token, an AO processId otherwise. Only ever set for
-   * `transferAoTokens` today (see `SigningApprovalPreview.token`'s own doc
-   * comment); every other signing kind carries no token.
-   */
-  token?: string | null;
-  /**
-   * Decimal-places count for `token`'s atomic `amount` — resolved by the
-   * dispatcher the same way a token balance's denomination is (`ReadsHandler.
-   * previewWatchedToken`) before calling `requestApproval`. `undefined`/`null`
-   * when `token` is `null` or that resolution failed; the approval screen
-   * then falls back to the raw atomic amount (see `SigningApprovalPreview.
-   * tokenDenomination`'s own doc comment).
-   */
-  tokenDenomination?: number | null;
-  /**
-   * `token`'s resolved ticker from that same lookup — the unit label shown
-   * once the amount is scaled by `tokenDenomination`. `undefined`/`null`
-   * when `token` is `null` or the lookup didn't resolve a ticker (see
-   * `SigningApprovalPreview.tokenTicker`'s own doc comment).
-   */
-  tokenTicker?: string | null;
-  /** A wallet `transfer` of this collectible: an L1 transaction to its process carrying the transfer tags. */
-  collectible?: CollectibleRef | null;
-  /** A `setNameTarget`'s name and new target; `fee` is then the reward plus the 1 winston the set carries. */
-  nameTarget?: NameTargetPreview | null;
-  /** See `SigningApprovalPreview.unreadableTokenTransfer`. */
-  unreadableTokenTransfer?: boolean;
-  /** See `SigningApprovalPreview.tokenImpersonating`. */
-  tokenImpersonating?: boolean;
-  /** Raw bytes this request will sign/encrypt/decrypt, for the payload hash and decoded preview. */
-  payload: Uint8Array;
-  tags?: Array<{ name: string; value: string }>;
-  /** `true` when the review screen must escalate to Irreversible-tier framing. */
-  firstSeenOrHighRisk?: boolean;
-  /**
-   * Gateway URL `sign`/`dispatch` need to construct an arweave-js client
-   * (for `last_tx`/reward defaults and, for `dispatch`, posting a `BASE`
-   * transaction) — resolved by the dispatcher from `ReadsHandler.
-   * getNetworkSettings()` at call time, since `ApprovalHandler` itself has
-   * no network-settings storage access of its own.
-   */
-  gatewayUrl?: string;
-  /** Bundler a bundled `dispatch` posts to, from the same settings read; the handler's own default otherwise. */
-  bundlerUrl?: string;
-  /** `sign`/`dispatch`'s transaction-shaped fields beyond `payload`/`tags` — `target`/`quantity`/`reward`/`last_tx`. */
-  target?: string;
-  quantity?: string;
-  reward?: string;
-  last_tx?: string;
-  /** `signDataItem`/`batchSignDataItem`'s items. `payload` and `tags` above are the first item's, for the preview. */
-  dataItems?: DataItemInput[];
-  /**
-   * Display-only token metadata for each `dataItems` entry that is an AO
-   * transfer, by index; never signed. The transfer itself is read from
-   * the item. `collectible` is set when the process is a collectible
-   * rather than a token, so a transfer of 1 previews as that collectible.
-   */
-  itemTokenMetadata?: Array<{
-    tokenDenomination: number | null;
-    tokenTicker: string | null;
-    collectible?: boolean;
-    impersonating?: boolean;
-  } | null>;
-  /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
-  encryptAlgorithm?: EncryptAlgorithm;
-  /** `signMessage`'s hash digest selection. */
-  hashAlgorithm?: "SHA-256" | "SHA-384" | "SHA-512";
-  /**
-   * `scanAttestation`'s attestation, as `parseAttestation` returned it.
-   * `payload` is then the attest message it signs.
-   */
-  attestation?: Attestation;
-  /** `scanAttestation`'s signing wallet address, for the preview. */
-  address?: string;
-}
-
-/**
- * The `AoTokenTransferRequest` shape a `transferAoTokens` signing approval
- * carries through to `performSigning`, so it can call
- * `TransferHandler.submitTransfer` with exactly the fields that handler
- * needs (`token`/`recipient`/`amount`/`fee`/`walletId`) once the user
- * approves — never re-derived from the decoded preview payload, which is
- * display-only.
- */
-export interface AoTransferSigningInput {
-  token: string;
-  recipient: string;
-  amount: string;
-}
-
-/**
- * The subset of `TransferHandler` this handler needs to finalize an
- * approved `transferAoTokens` (or wallet `transfer`) request — injected
- * rather than imported directly, so `ApprovalHandler` doesn't need to know
- * how a transfer is actually submitted (mirrors the existing
- * `StoragePort`/`ApprovalPresenterPort` ports-style injection this class
- * already uses). Optional constructor param: every existing call
- * site/test that never exercises a transfer is unaffected.
- */
-export interface AoTransferSubmitter {
-  submitTransfer(req: SubmitTransferRequest): Promise<{ txId: string }>;
-}
-
-/** The `TransferHandler` steps a hardware wallet's transfer is split into around the device signature. */
-export interface DeviceTransferSubmitter {
-  prepareDeviceTransfer(req: SubmitTransferRequest, ownerB64Url: string): Promise<UnsignedPayload>;
-  /** Posts the transfer and writes its activity entry. */
-  finishDeviceTransfer(
-    req: SubmitTransferRequest,
-    unsigned: UnsignedPayload,
-    signature: Uint8Array,
-    expectedOwner: string,
-  ): Promise<{ txId: string }>;
-}
-
-/** The `TransferHandler` steps a hardware wallet's name change is split into around the device signature. */
-export interface DeviceNameTargetSubmitter {
-  prepareDeviceNameTarget(req: NameTargetRequest, ownerB64Url: string): Promise<UnsignedPayload>;
-  finishDeviceNameTarget(
-    req: NameTargetRequest,
-    unsigned: UnsignedPayload,
-    signature: Uint8Array,
-    expectedOwner: string,
-  ): Promise<{ txId: string }>;
-}
-
-export type TransferSubmitter = AoTransferSubmitter & Partial<DeviceTransferSubmitter> & Partial<DeviceNameTargetSubmitter>;
-
-/**
- * The `PointsHandler` steps a scan attestation needs. A keyfile signs and
- * submits in one call; a hardware wallet signs in this window, then hands
- * its proof over.
- */
-export interface ScanAttestationSubmitter {
-  attest(req: { walletId: string; attestation: ParsedAttestation }): Promise<SiteAttestResponse>;
-  submitAttestation(attestation: ParsedAttestation, proof: OwnershipProof): Promise<SiteAttestResponse>;
-  check(attestation: ParsedAttestation, address?: string): Promise<AttestationCheck>;
-}
-
-/**
- * Thrown to whoever awaits a request the user rejected, closed or let time
- * out, as opposed to one that was approved and then failed.
- */
-export class ApprovalDeclinedError extends Error {
-  constructor(
-    message: string,
-    readonly timedOut: boolean,
-  ) {
-    super(message);
-    this.name = "ApprovalDeclinedError";
-  }
-}
-
-/** A hardware wallet's verified signature over the Gleam Points ownership transaction. */
-export interface PointsDeviceProof {
-  owner: string;
-  address: string;
-  signature: string;
-}
-
-/** A wallet send handed to the approval window, with the token metadata its preview shows. */
-export interface WalletTransferRequest extends SubmitTransferRequest {
-  tokenDenomination?: number | null;
-  tokenTicker?: string | null;
-  /** See `SigningApprovalPreview.tokenImpersonating`. */
-  tokenImpersonating?: boolean;
-}
-
-/** The subset of `ReadsHandler` an approved `addToken` request writes through. */
-export interface TokenWatchList {
-  addWatchedToken(req: { address: string; processId: string }): Promise<unknown>;
-}
-
-/** Metadata is resolved by the caller, which has network settings; this handler has none. */
-export interface AddTokenRequestInput {
-  kind: "addToken";
-  address: string;
-  processId: string;
-  ticker: string | null;
-  name: string | null;
-}
-
-export interface ConnectRequestInput {
-  kind: "connect";
-  requestedPermissions: PermissionType[];
-  /** Omitted by callers (tests, internal re-grants) that have no dApp-supplied identity. */
-  appInfo?: ConnectAppInfo | null;
-  /** The requesting tab's favicon, kept on the grant when `appInfo` has no logo. */
-  favIconUrl?: string | null;
-}
-
-/**
- * A `connect` may arrive before any wallet exists: the approval window
- * runs onboarding first, and the grant goes to whichever wallet is active
- * when the user approves.
- */
-export type CreateApprovalInput =
-  | ({ origin: string; walletId: string | null } & ConnectRequestInput)
-  | ({ origin: string; walletId: string } & SigningRequestInput)
-  | ({ origin: string; walletId: string } & AddTokenRequestInput);
-
-/**
- * `result`, `signingInput` and `device.payloads` hold bytes (payloads, AES
- * IVs, signatures), and `chrome.storage` serializes a `Uint8Array` as a
- * plain object. They are written with `toStored` and read with `fromStored`.
- */
-interface ApprovalOutcome {
-  approved: boolean;
-  /** Tagged-binary encoded. */
-  result?: unknown;
-  error?: string;
-}
-
-interface PendingApprovalRecord {
-  request: ApprovalRequest;
-  /** `null` only for a `connect` made before any wallet existed. */
-  walletId: string | null;
-  /**
-   * A tagged-binary encoded `SigningRequestInput` or `AddTokenRequestInput`;
-   * `null` for a `connect` request.
-   */
-  signingInput: unknown;
-  /** A `connect` request's site icon, saved on the grant it creates. */
-  siteIcon?: string | null;
-  /** Set by `resolveApproval` immediately before the record is removed. */
-  outcome?: ApprovalOutcome;
-  /**
-   * Set, in its own write, just before an approval's work runs. Its work
-   * may post a transfer, so a record still carrying it after a worker
-   * restart is never run again: the first run may already have posted.
-   */
-  attempted?: true;
-  /** Set once a hardware wallet's request is approved and waits for the device. */
-  device?: PendingDeviceSigning;
-}
-
-/** A byte array in a pending record. */
-interface StoredBinary {
-  __gleamStored: "ArrayBuffer" | "Uint8Array";
-  base64: string;
-}
-
-function isStoredBinary(value: unknown): value is StoredBinary {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Partial<StoredBinary>;
-  return (
-    (candidate.__gleamStored === "ArrayBuffer" || candidate.__gleamStored === "Uint8Array") &&
-    typeof candidate.base64 === "string"
-  );
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-/**
- * Bytes go in as base64 rather than the tagged-binary codec's number
- * arrays: `chrome.storage.session` charges every array element as a value
- * of its own, about 32 bytes per byte.
- */
-function toStored(value: unknown): unknown {
-  // `instanceof` is avoided: WebCrypto results and page values can come from another realm.
-  if (Object.prototype.toString.call(value) === "[object ArrayBuffer]") {
-    return { __gleamStored: "ArrayBuffer", base64: bytesToBase64(new Uint8Array(value as ArrayBuffer)) } satisfies StoredBinary;
-  }
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return { __gleamStored: "Uint8Array", base64: bytesToBase64(bytes) } satisfies StoredBinary;
-  }
-  if (Array.isArray(value)) return value.map(toStored);
-  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, toStored(entry)]));
-  return value;
-}
-
-function fromStored(value: unknown): unknown {
-  if (isStoredBinary(value)) {
-    const bytes = base64ToBytes(value.base64);
-    return value.__gleamStored === "ArrayBuffer" ? bytes.buffer : bytes;
-  }
-  if (Array.isArray(value)) return value.map(fromStored);
-  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, fromStored(entry)]));
-  return value;
-}
-
-const STORED_VALUE_BYTES = 32;
-
-/**
- * `string`'s length once encoded as UTF-8, counted without encoding it.
- * A lone surrogate counts as the 3-byte U+FFFD it is replaced with.
- */
-export function utf8ByteLength(string: string): number {
-  let bytes = 0;
-  for (let i = 0; i < string.length; i += 1) {
-    const code = string.charCodeAt(i);
-    if (code < 0x80) bytes += 1;
-    else if (code < 0x800) bytes += 2;
-    else if (code >= 0xd800 && code < 0xdc00 && i + 1 < string.length) {
-      const next = string.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next < 0xe000) {
-        bytes += 4;
-        i += 1;
-      } else bytes += 3;
-    } else bytes += 3;
-  }
-  return bytes;
-}
-
-/**
- * Roughly what `chrome.storage.session` charges for `value`: it counts the
- * memory of the stored value tree, a fixed cost per value plus each
- * string's (and key's) UTF-8 length, since Chrome stores strings as UTF-8.
- */
-function storedSize(value: unknown): number {
-  if (typeof value === "string") return STORED_VALUE_BYTES + utf8ByteLength(value);
-  if (Array.isArray(value)) return value.reduce<number>((sum, entry) => sum + storedSize(entry), STORED_VALUE_BYTES);
-  if (isPlainRecord(value)) {
-    return Object.entries(value).reduce<number>(
-      (sum, [key, entry]) => sum + utf8ByteLength(key) + storedSize(entry),
-      STORED_VALUE_BYTES,
-    );
-  }
-  return STORED_VALUE_BYTES;
-}
-
-/*
- * `chrome.storage.session` holds 10 MiB. Pending requests may use 4 MiB of
- * it and one site 2 MiB, so one site can't fill it, and the outcomes and
- * device payloads written onto records before they are dropped still fit.
- */
-const PENDING_BYTES_LIMIT = 4 * 1024 * 1024;
-const PENDING_BYTES_PER_ORIGIN = 2 * 1024 * 1024;
-
-interface PendingDeviceSigning {
-  /** Tagged-binary encoded `UnsignedPayload[]`. */
-  payloads: unknown;
-  /** Epoch ms. */
-  deadline: number;
-}
-
 interface HardwareWalletInfo {
   method: HardwareWalletMethod;
   device: HardwareDevice | null;
   address: string;
   publicKey: string;
-}
-
-/** Signing kinds a hardware wallet completes with device signatures. */
-const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
-  "sign",
-  "dispatch",
-  "signDataItem",
-  "batchSignDataItem",
-  "transferAoTokens",
-  "transfer",
-  "pointsProof",
-  "scanAttestation",
-  "signMessage",
-  "setNameTarget",
-]);
-
-const WALLET_SWITCHED = "The active wallet changed.";
-
-const SITE_DISCONNECTED = "The site was disconnected.";
-const DISCONNECTED_OUTCOME: ApprovalOutcome = { approved: false, error: SITE_DISCONNECTED };
-
-/** Kinds whose only effect is the result handed back: nothing is posted or stored. */
-const RESULT_ONLY_KINDS: ReadonlySet<ApprovalKind> = new Set([
-  "sign",
-  "signDataItem",
-  "batchSignDataItem",
-  "signMessage",
-  "encrypt",
-  "decrypt",
-]);
-
-/**
- * A dApp request the site's grant let through, so it must not outlive the
- * grant. A connect makes a new grant from the user's own approval, and a
- * scan attestation comes from the Gleam site, which holds none.
- */
-function needsGrant(entry: PendingApprovalRecord): boolean {
-  const kind = entry.request.kind;
-  return kind !== "connect" && kind !== "scanAttestation" && entry.request.origin !== WALLET_APPROVAL_ORIGIN;
-}
-
-/**
- * A dApp's signing request signs with the wallet that was active when it
- * was made, and its approval shows no account, so it must not outlive that
- * wallet being active. A connect approval names the wallet it connects, so
- * it goes too. addToken doesn't sign, a scan attestation shows and unlocks
- * its own wallet, and Gleam's own requests name theirs.
- */
-function signsForActiveWallet(entry: PendingApprovalRecord): boolean {
-  const kind = entry.request.kind;
-  return (
-    kind !== "addToken" &&
-    kind !== "scanAttestation" &&
-    entry.request.origin !== WALLET_APPROVAL_ORIGIN
-  );
-}
-
-const TIMED_OUT = userErrorMessage("approvalTimedOut");
-
-/** How soon a timeout looks again at a request that was being resolved when it fired. */
-const RESOLVING_RECHECK_MS = 5_000;
-
-// A leading byte order mark is signed like any other character, so it is
-// kept, and shown where the text is shown.
-const textDecoder = new TextDecoder("utf-8", { ignoreBOM: true });
-
-function previewCollectibleId(preview: ApprovalRequest["preview"], index = 0): string | null {
-  if ("collectible" in preview && preview.collectible) return preview.collectible.id;
-  // A data-item preview names a collectible per item, not at the top level;
-  // payloads run in the same order as the items, so the index picks it.
-  if ("items" in preview) return preview.items?.[index]?.transfer?.collectible?.id ?? null;
-  return null;
-}
-
-function plainTags(tags: SigningRequestInput["tags"]): Array<{ name: string; value: string }> {
-  return (tags ?? []).map(({ name, value }) => ({ name, value }));
-}
-
-/**
- * Re-reads what was prepared against the request the user approved. The
- * transaction builder fetches the anchor after approval; everything else,
- * the reward included, must come out exactly as requested.
- */
-function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPayload[], address: string): void {
-  switch (input.kind) {
-    case "sign":
-    case "dispatch": {
-      const [payload] = payloads;
-      if (payload?.kind === "dataItem") {
-        checkDataItem(payload, { target: input.target ?? "", tags: plainTags(input.tags), data: input.payload });
-      } else {
-        checkTransaction(payload, {
-          target: input.target ?? "",
-          quantity: input.quantity ?? "0",
-          tags: plainTags(input.tags),
-          data: input.payload,
-          reward: input.reward,
-        });
-      }
-      return;
-    }
-    case "signDataItem":
-    case "batchSignDataItem": {
-      const items = input.kind === "signDataItem" ? (input.dataItems ?? []).slice(0, 1) : (input.dataItems ?? []);
-      if (payloads.length !== items.length) mismatch("item count");
-      items.forEach((item, index) =>
-        checkDataItem(payloads[index], {
-          target: item.target ?? "",
-          tags: plainTags(item.tags),
-          data: base64ToBytes(item.data),
-          anchor: item.anchor ?? "",
-        }),
-      );
-      return;
-    }
-    case "transferAoTokens":
-    case "transfer":
-      assertTransferMatches(
-        {
-          recipient: input.recipient ?? "",
-          amount: input.amount ?? "",
-          token: input.token ?? null,
-          fee: input.fee ?? "",
-          // Only a wallet `transfer` of a collectible is an L1 transaction
-          // carrying the collectible tags. A `transferAoTokens` of one is
-          // an AO data item, so its `collectible` is display-only: passing
-          // it here would check the data item as an L1 transaction and
-          // refuse every approved collectible AO transfer.
-          collectible: input.kind === "transfer" ? input.collectible : undefined,
-        },
-        payloads[0],
-      );
-      return;
-    case "setNameTarget": {
-      const name = input.nameTarget;
-      if (!name || payloads.length !== 1) mismatch("target");
-      assertNameTargetMatches({ carrier: name.carrier, target: name.target, fee: input.fee ?? "" }, payloads[0]);
-      return;
-    }
-    case "signMessage": {
-      const [payload] = payloads;
-      if (payloads.length !== 1 || payload?.kind !== "message") mismatch("message");
-      if (bytesToBase64Url(payload.data) !== bytesToBase64Url(input.payload)) mismatch("message");
-      return;
-    }
-    case "pointsProof":
-    case "scanAttestation":
-      checkTransaction(payloads[0], {
-        target: address,
-        quantity: "0",
-        tags: [{ name: POINTS_PROOF_TAG, value: textDecoder.decode(input.payload) }],
-        data: new Uint8Array(),
-        reward: "0",
-      });
-      return;
-    case "encrypt":
-    case "decrypt":
-      // Nothing is signed, so there are no prepared bytes to read back.
-      return;
-    default: {
-      const unchecked: never = input.kind;
-      throw new Error(dappError(`No prepared-bytes check for ${String(unchecked)}.`));
-    }
-  }
-}
-
-/** The stored attestation, checked again: the brand doesn't survive storage. */
-function parsedAttestationOf(input: SigningRequestInput): ParsedAttestation {
-  const parsed = parseAttestation(input.attestation);
-  if (!parsed.ok) throw new Error(userErrorMessage("attestationInvalid"));
-  return parsed.attestation;
-}
-
-function toWirePayload(payload: UnsignedPayload): DeviceSigningPayload {
-  switch (payload.kind) {
-    case "transaction":
-      return { kind: "transaction", transaction: payload.transaction };
-    case "dataItem":
-      return { kind: "dataItem", raw: bytesToBase64Url(payload.raw) };
-    case "message":
-      return { kind: "message", data: bytesToBase64Url(payload.data) };
-  }
-}
-
-function validGrants(raw: unknown): Grant[] {
-  return Array.isArray(raw) ? raw.filter(isValidGrant) : [];
-}
-
-function validPending(raw: unknown): PendingApprovalRecord[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (entry): entry is PendingApprovalRecord =>
-      entry !== null &&
-      typeof entry === "object" &&
-      isValidApprovalRequest((entry as PendingApprovalRecord).request) &&
-      (typeof (entry as PendingApprovalRecord).walletId === "string" ||
-        (entry as PendingApprovalRecord).walletId === null),
-  );
-}
-
-function transactionInputOf(input: SigningRequestInput): SignTransactionInput {
-  return {
-    data: bytesToBase64(input.payload),
-    target: input.target,
-    quantity: input.quantity,
-    tags: input.tags,
-    reward: input.reward,
-    last_tx: input.last_tx,
-  };
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-/*
- * The window shows the start of the text and offers the rest on request
- * (`getApprovalData`), decoded from the stored payload. A full copy in the
- * preview would be stored a second time beside the payload and count
- * against `PENDING_BYTES_PER_ORIGIN`. The payload and `payloadHash` cover
- * every byte either way.
- */
-const DATA_PREVIEW_CHARS = 4096;
-
-function decodeText(payload: Uint8Array): string | null {
-  try {
-    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(payload);
-  } catch {
-    return null;
-  }
-}
-
-function dataPreview(payload: Uint8Array): { decodedData: string | null; dataTruncated?: true } {
-  const text = decodeText(payload);
-  if (text === null) return { decodedData: null };
-  if (text.length <= DATA_PREVIEW_CHARS) return { decodedData: text };
-  const cut = /[\uD800-\uDBFF]/.test(text[DATA_PREVIEW_CHARS - 1]!) ? DATA_PREVIEW_CHARS - 1 : DATA_PREVIEW_CHARS;
-  return { decodedData: `${text.slice(0, cut)}…`, dataTruncated: true };
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function buildAddTokenPreview(input: AddTokenRequestInput): AddTokenApprovalPreview {
-  return {
-    kind: "addToken",
-    processId: input.processId,
-    ticker: input.ticker,
-    name: input.name,
-    address: input.address,
-  };
-}
-
-/** What the window shows is derived from the attestation, and the message it signs must be the one for it. */
-async function buildScanAttestationPreview(
-  input: SigningRequestInput & { walletId: string },
-): Promise<ScanAttestationApprovalPreview> {
-  if (!input.address) throw new Error(dappError("A scan attestation request needs its signing wallet."));
-  const attestation = parsedAttestationOf(input);
-  const id = await attestationId(attestation);
-  const message = buildAttestMessage(attestation.release, id);
-  if (textDecoder.decode(input.payload) !== message) {
-    throw new Error(userErrorMessage("attestationMessageMismatch"));
-  }
-  return {
-    kind: "scanAttestation",
-    walletId: input.walletId,
-    address: input.address,
-    attestationId: id,
-    message,
-    release: attestation.release,
-    commit: attestation.commit,
-    model: attestation.model,
-    challenge: attestation.challenge,
-    result: attestation.result,
-    answers: attestation.answers,
-    report: attestation.report,
-  };
-}
-
-function buildConnectPreview(
-  requestedPermissions: PermissionType[],
-  appInfo: ConnectAppInfo | null,
-): ConnectApprovalPreview {
-  // The approval window would fetch the page's logo as given, so it gets the
-  // same filter as the icon kept on the grant: no plaintext http fetch.
-  return { kind: "connect", requestedPermissions, appInfo: appInfo && { ...appInfo, logo: safeSiteIconUrl(appInfo.logo) } };
-}
-
-/**
- * `signDataItem`/`batchSignDataItem` carry every item in `input.dataItems`
- * (`input.payload`/`input.tags` are only item 1's, kept for every other
- * kind's single-payload preview) — decodes each one so the approval window
- * can list them all rather than showing item 1 while the rest sign unseen.
- */
-async function buildDataItemPreviews(
-  dataItems: NonNullable<SigningRequestInput["dataItems"]>,
-  tokenMetadata: SigningRequestInput["itemTokenMetadata"],
-): Promise<SigningApprovalPreview["items"]> {
-  return Promise.all(
-    dataItems.map(async (item, index) => {
-      const bytes = base64ToBytes(item.data);
-      const tags = item.tags ?? [];
-      const transfer = readAoTransferMessage({ target: item.target, tags });
-      const metadata = tokenMetadata?.[index] ?? null;
-      // A collectible's transfer of 1 shows as that collectible, as the
-      // L1 path already does, not as 1 raw unit of an unknown token.
-      const collectible =
-        transfer?.kind === "transfer" && metadata?.collectible && transfer.quantity === COLLECTIBLE_TRANSFER_QUANTITY
-          ? { id: transfer.processId }
-          : null;
-      return {
-        ...dataPreview(bytes),
-        dataSize: bytes.byteLength,
-        tags,
-        target: item.target ?? null,
-        payloadHash: await sha256Hex(bytes),
-        transfer:
-          transfer?.kind === "transfer"
-            ? {
-                token: transfer.processId,
-                recipient: transfer.recipient,
-                amount: transfer.quantity,
-                tokenDenomination: metadata?.tokenDenomination ?? null,
-                tokenTicker: metadata?.tokenTicker ?? null,
-                ...(collectible ? { collectible } : {}),
-                ...(metadata?.impersonating ? { tokenImpersonating: true as const } : {}),
-              }
-            : null,
-        ...(transfer?.kind === "unreadable" ? { unreadableTokenTransfer: true } : {}),
-      };
-    }),
-  );
-}
-
-async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
-  if (input.kind === "scanAttestation") throw new Error(dappError("A scan attestation has its own preview."));
-  const payloadHash = await sha256Hex(input.payload);
-  const signedItems =
-    input.kind === "signDataItem"
-      ? input.dataItems?.slice(0, 1)
-      : input.kind === "batchSignDataItem"
-        ? input.dataItems
-        : undefined;
-  return {
-    kind: input.kind,
-    recipient: input.recipient ?? null,
-    amount: input.amount ?? null,
-    fee: input.fee ?? null,
-    token: input.token ?? null,
-    tokenDenomination: input.tokenDenomination ?? null,
-    tokenTicker: input.tokenTicker ?? null,
-    ...(input.collectible ? { collectible: input.collectible } : {}),
-    ...(input.nameTarget ? { nameTarget: input.nameTarget } : {}),
-    ...(input.unreadableTokenTransfer ? { unreadableTokenTransfer: true } : {}),
-    ...(input.tokenImpersonating ? { tokenImpersonating: true } : {}),
-    ...dataPreview(input.payload),
-    dataSize: input.payload.byteLength,
-    tags: input.tags ?? [],
-    payloadHash,
-    items: signedItems ? await buildDataItemPreviews(signedItems, input.itemTokenMetadata) : null,
-  };
 }
 
 export class ApprovalHandler {
@@ -933,6 +184,8 @@ export class ApprovalHandler {
   /** Set while a scan attestation is being opened or awaited, so two can't race past the pending check. */
   private attesting = false;
 
+  private readonly grants: GrantStore;
+
   constructor(
     private readonly storage: StoragePort,
     private readonly keySession: Pick<KeySession, "getSigner" | "getWalletMethod" | "getStoredWallet" | "isVaultLocked">,
@@ -943,24 +196,10 @@ export class ApprovalHandler {
     private readonly tokens?: TokenWatchList,
     private readonly attestations?: ScanAttestationSubmitter,
   ) {
+    this.grants = new GrantStore(storage, keySession, activeWalletId);
     presenter.onDismissed((requestId) => {
       void this.rejectDismissed(requestId);
     });
-  }
-
-  private async loadGrants(): Promise<Grant[]> {
-    return validGrants(await this.storage.get<unknown>(GRANTS_KEY));
-  }
-
-  /** The only way to write grants. `update` sees the current grants and returns the new ones. */
-  private async updateGrants<R>(update: (grants: Grant[]) => { next: Grant[] | null; result: R }): Promise<R> {
-    let result!: R;
-    await updateStored(this.storage, GRANTS_KEY, (raw) => {
-      const outcome = update(validGrants(raw));
-      result = outcome.result;
-      return outcome.next;
-    });
-    return result;
   }
 
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
@@ -1006,7 +245,7 @@ export class ApprovalHandler {
    * still waiting in an approval window (`revokeGrant`, `grantLapsed`).
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
-    return activeGrant(await this.loadGrants(), origin);
+    return this.grants.findActive(origin);
   }
 
   /**
@@ -1306,7 +545,7 @@ export class ApprovalHandler {
             outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
           }
         } catch (error) {
-          outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
+          outcome = { approved: true, error: errorMessage(error) };
         }
       }
       return await this.complete(entry, outcome, result);
@@ -1477,7 +716,7 @@ export class ApprovalHandler {
         result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
         outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
       } catch (error) {
-        outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
+        outcome = { approved: true, error: errorMessage(error) };
       }
       return await this.complete(entry, outcome, result);
     } finally {
@@ -1718,9 +957,8 @@ export class ApprovalHandler {
    * Resolves to `submitTransfer`'s `{ txId }` once the transfer is posted.
    */
   async requestWalletTransfer(req: WalletTransferRequest): Promise<{ txId: string }> {
-    const result = await this.requestApproval({
+    return this.requestWalletApproval<{ txId: string }>({
       kind: "transfer",
-      origin: WALLET_APPROVAL_ORIGIN,
       walletId: req.walletId,
       recipient: req.recipient,
       amount: req.amount,
@@ -1730,10 +968,7 @@ export class ApprovalHandler {
       tokenTicker: req.tokenTicker ?? null,
       collectible: req.collectible ?? null,
       ...(req.tokenImpersonating ? { tokenImpersonating: true } : {}),
-      payload: new Uint8Array(),
-      tags: [],
     });
-    return result as { txId: string };
   }
 
   /**
@@ -1742,16 +977,12 @@ export class ApprovalHandler {
    * posted `set`'s `{ txId }`.
    */
   async requestNameTarget(req: NameTargetRequest): Promise<{ txId: string }> {
-    const result = await this.requestApproval({
+    return this.requestWalletApproval<{ txId: string }>({
       kind: "setNameTarget",
-      origin: WALLET_APPROVAL_ORIGIN,
       walletId: req.walletId,
       fee: req.fee,
       nameTarget: { carrier: req.carrier, label: req.label, target: req.target },
-      payload: new Uint8Array(),
-      tags: [],
     });
-    return result as { txId: string };
   }
 
   /**
@@ -1760,14 +991,22 @@ export class ApprovalHandler {
    * once the device's signature has verified against the wallet's key.
    */
   async requestPointsProof(req: { walletId: string; message: string }): Promise<PointsDeviceProof> {
-    const result = await this.requestApproval({
+    return this.requestWalletApproval<PointsDeviceProof>({
       kind: "pointsProof",
-      origin: WALLET_APPROVAL_ORIGIN,
       walletId: req.walletId,
       payload: new TextEncoder().encode(req.message),
-      tags: [],
     });
-    return result as PointsDeviceProof;
+  }
+
+  /** An approval the wallet itself asks for, with Gleam as the origin and no dApp payload or tags. */
+  private async requestWalletApproval<T>(input: WalletApprovalInput): Promise<T> {
+    const result = await this.requestApproval({
+      ...input,
+      origin: WALLET_APPROVAL_ORIGIN,
+      payload: input.payload ?? new Uint8Array(),
+      tags: [],
+    } as CreateApprovalInput);
+    return result as T;
   }
 
   /**
@@ -1824,7 +1063,7 @@ export class ApprovalHandler {
 
   private async finalizeApproval(entry: PendingApprovalRecord): Promise<unknown> {
     if (entry.request.kind === "connect") {
-      return this.createGrant(entry);
+      return this.grants.createFromConnect(entry);
     }
     if (entry.request.kind === "addToken") {
       return this.addToken(entry);
@@ -1832,64 +1071,12 @@ export class ApprovalHandler {
     return this.performSigning(entry);
   }
 
-  private async createGrant(entry: PendingApprovalRecord): Promise<{ granted: PermissionType[] }> {
-    const preview = entry.request.preview as ConnectApprovalPreview;
-    const name = preview.appInfo?.name ?? null;
-    return this.mergeGrant(entry.request.origin, entry.walletId, preview.requestedPermissions, {
-      icon: entry.siteIcon ?? null,
-      name: name !== null && !UNSAFE_TEXT.test(name) ? name : null,
-    });
-  }
-
   /**
    * Grants `origin` from the popup's "Use Gleam here", where the user
    * picked the permissions themselves, so no approval window opens.
    */
-  async grantSite(req: { origin: string; permissions: PermissionType[]; favIconUrl?: string | null }): Promise<Grant> {
-    const permissions = Array.isArray(req.permissions) ? [...new Set(req.permissions.filter(isValidPermissionType))] : [];
-    if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
-    await this.mergeGrant(req.origin, null, permissions, { icon: safeSiteIconUrl(req.favIconUrl), name: null });
-    const grant = await this.findActiveGrant(req.origin);
-    if (!grant) throw new Error(dappError(`Couldn't save the grant for "${req.origin}".`));
-    return grant;
-  }
-
-  private async mergeGrant(
-    origin: string,
-    walletId: string | null,
-    requested: readonly PermissionType[],
-    site: { icon: string | null; name: string | null },
-  ): Promise<{ granted: PermissionType[] }> {
-    const grantWalletId = walletId ?? (await this.activeWalletId());
-    if (!grantWalletId) {
-      throw new Error(userErrorMessage("noWalletToConnect"));
-    }
-    if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
-      throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
-    }
-    return this.updateGrants((grants) => {
-      const withoutExisting = grants.filter((grant) => grant.origin !== origin);
-      // A connect from an already-connected origin only asks for what the
-      // grant lacks, so approving it adds to the grant instead of narrowing it.
-      const existing = activeGrant(grants, origin);
-      const permissions = [...(existing?.permissions ?? [])];
-      for (const permission of requested) {
-        if (!permissions.includes(permission)) permissions.push(permission);
-      }
-
-      const grant: Grant = {
-        origin,
-        walletId: grantWalletId,
-        permissions,
-        createdAt: Date.now(),
-        expiresAt: null,
-        budget: null,
-        icon: site.icon ?? existing?.icon ?? null,
-        name: site.name ?? existing?.name ?? null,
-      };
-
-      return { next: [...withoutExisting, grant], result: { granted: grant.permissions } };
-    });
+  grantSite(req: { origin: string; permissions: PermissionType[]; favIconUrl?: string | null }): Promise<Grant> {
+    return this.grants.grantSite(req);
   }
 
   /**
@@ -2051,7 +1238,7 @@ export class ApprovalHandler {
    * origins, which should be told they're disconnected.
    */
   async revokeAllAccess(reason = "The wallet was reset."): Promise<string[]> {
-    const origins = await this.updateGrants((grants) => ({ next: null, result: grants.map((grant) => grant.origin) }));
+    const origins = await this.grants.revokeAll();
     await this.rejectPendingWhere(() => true, reason);
     return origins;
   }
@@ -2090,15 +1277,12 @@ export class ApprovalHandler {
    * is done (`withheldIfLapsed`).
    */
   async revokeGrant(req: { origin: string }): Promise<void> {
-    await this.updateGrants((grants) => ({
-      next: grants.filter((grant) => grant.origin !== req.origin),
-      result: undefined,
-    }));
+    await this.grants.revoke(req.origin);
     await this.rejectPendingWhere((entry) => needsGrant(entry) && entry.request.origin === req.origin, SITE_DISCONNECTED);
   }
 
   /** Read-only list of connected origins, for the `connected-apps` popup view. */
   async getConnectedApps(): Promise<Grant[]> {
-    return this.loadGrants();
+    return this.grants.load();
   }
 }

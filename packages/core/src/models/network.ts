@@ -1,3 +1,5 @@
+import { isRecord } from "./guards";
+
 export interface HyperBeamPeer {
   url: string;
   enabled: boolean;
@@ -14,14 +16,14 @@ export interface NetworkSettings {
 }
 
 function isValidHyperBeamPeer(value: unknown): value is HyperBeamPeer {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   return typeof candidate.url === "string" && typeof candidate.enabled === "boolean";
 }
 
 export function isValidNetworkSettings(value: unknown): value is NetworkSettings {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const candidate = value;
   return (
     typeof candidate.gatewayUrl === "string" &&
     Array.isArray(candidate.peers) &&

@@ -1,26 +1,18 @@
 import { classifyAsset } from "../ao/asset-scan";
 import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
+import { isArweaveId } from "../models/arweave-id";
+import { z } from "zod";
+import { tagValue, type Tag } from "../models/tag";
+import { trimTrailingSlashes } from "../models/network";
+import { postGraphQL } from "./graphql";
+import { tagSchema, transactionsReply } from "./graphql-schema";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
  * by `ids` rather than `owners`/`recipients`.
  */
-interface GraphQLTag {
-  name: string;
-  value: string;
-}
-
-interface GraphQLTransactionsByIdResponse {
-  data?: {
-    transactions?: {
-      edges: Array<{ node: { id: string; tags: GraphQLTag[] } }>;
-    };
-  };
-  errors?: Array<{ message: string }>;
-}
-
-const LOGO_TX_ID = /^[A-Za-z0-9_-]{43}$/;
+const transactionsByIdSchema = transactionsReply(z.object({ id: z.string(), tags: z.array(tagSchema) }));
 
 /**
  * Where to load a token's logo from: the `logo` tag is an Arweave
@@ -29,7 +21,7 @@ const LOGO_TX_ID = /^[A-Za-z0-9_-]{43}$/;
  * popup somewhere else, so it yields `null`.
  */
 export function tokenLogoUrl(gatewayUrl: string, logo: string | null): string | null {
-  if (logo === null || !LOGO_TX_ID.test(logo)) return null;
+  if (logo === null || !isArweaveId(logo)) return null;
   try {
     const gateway = new URL(gatewayUrl);
     return gateway.protocol === "https:" ? `${gateway.origin}/${logo}` : null;
@@ -68,28 +60,17 @@ export async function queryTokenMetadata(
     }
   `;
 
-  const url = `${trimTrailingSlash(gatewayUrl)}/graphql`;
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, variables: { ids: [processId] } }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Gateway GraphQL metadata query for process "${processId}" failed (HTTP ${response.status}).`,
-    );
-  }
-
-  const body = (await response.json()) as GraphQLTransactionsByIdResponse;
-
-  if (body.errors && body.errors.length > 0) {
-    throw new Error(
-      `Gateway GraphQL metadata query for process "${processId}" returned errors: ${body.errors
-        .map((error) => error.message)
-        .join("; ")}`,
-    );
-  }
+  const body = await postGraphQL(
+    trimTrailingSlashes(gatewayUrl),
+    query,
+    { ids: [processId] },
+    transactionsByIdSchema,
+    fetchImpl,
+    (_gateway, detail, kind) =>
+      kind === "http"
+        ? `Gateway GraphQL metadata query for process "${processId}" failed (${detail}).`
+        : `Gateway GraphQL metadata query for process "${processId}" returned errors: ${detail}`,
+  );
 
   // Only the process's own spawn transaction describes it: another
   // transaction's tags would give it another token's scale and ticker.
@@ -151,16 +132,15 @@ export async function queryCheckedTokenMetadata(
 }
 
 /** `arweave-scheduler@1.0` is the one scheduler that takes messages as L1 transactions. */
-export function transportFromTags(tags: GraphQLTag[]): TokenTransport {
-  const scheduler = tags.find((tag) => tag.name.toLowerCase() === "scheduler-device")?.value;
+export function transportFromTags(tags: Tag[]): TokenTransport {
+  const scheduler = tagValue(tags, "scheduler-device", { anyCase: true });
   return scheduler === "arweave-scheduler@1.0" ? "l1" : "mu";
 }
 
-export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): TokenMetadata {
-  const tagValue = (name: string): string | null =>
-    tags.find((tag) => tag.name.toLowerCase() === name)?.value ?? null;
+export function tokenMetadataFromTags(processId: string, tags: Tag[]): TokenMetadata {
+  const read = (name: string): string | null => tagValue(tags, name, { anyCase: true }) ?? null;
 
-  const rawDenomination = tagValue("denomination");
+  const rawDenomination = read("denomination");
   // Two digits, like a legacy token's Info: anyone can tag a token, and 10 ** 2e9 throws while it renders.
   const denomination =
     rawDenomination !== null && /^\d{1,2}$/.test(rawDenomination) ? Number(rawDenomination) : null;
@@ -170,14 +150,10 @@ export function tokenMetadataFromTags(processId: string, tags: GraphQLTag[]): To
     transport: transportFromTags(tags),
     assetClass: classifyAsset(tags),
     denomination,
-    ticker: tagValue("ticker"),
-    name: tagValue("name"),
-    description: tagValue("description"),
-    logo: tagValue("logo"),
-    totalSupply: tagValue("total-supply"),
+    ticker: read("ticker"),
+    name: read("name"),
+    description: read("description"),
+    logo: read("logo"),
+    totalSupply: read("total-supply"),
   };
-}
-
-function trimTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
 }
