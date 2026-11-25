@@ -137,6 +137,14 @@ module.exports = {
       from: { path: "^packages/(app|ui|keystone|provider)/src/" },
       to: { path: "^packages/core/src/signer/", pathNot: "^packages/core/src/signer/zeroize\\.ts$", reachable: true },
     },
+    {
+      name: "no-circular",
+      comment:
+        "No runtime import cycles. A cycle makes load order decide which side sees undefined, and two modules that need each other are one module or need a third. Type-only imports are erased, so a cycle through one is allowed.",
+      severity: "error",
+      from: { path: "^(packages|apps)/" },
+      to: { circular: true, dependencyTypesNot: ["type-only"], viaOnly: { dependencyTypesNot: ["type-only"] } },
+    },
   ],
   options: {
     doNotFollow: { path: "node_modules" },
