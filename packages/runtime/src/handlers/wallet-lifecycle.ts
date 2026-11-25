@@ -47,8 +47,8 @@ import {
 import { isSessionExpired, isValidSession, SESSION_KEY, type KeySession } from "./key-session";
 import { POINTS_STORAGE_KEYS } from "./points";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
-import { loadWallets, requireWallet, updateWallet } from "../stored-data";
+import { ACTIVE_WALLET_ID_KEY, BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { activityLogKey, loadWallets, requireWallet, updateWallet } from "../stored-data";
 import { dappError } from "../dapp-error";
 
 /**
@@ -832,7 +832,7 @@ export class WalletLifecycleHandler {
     const wallets = await loadWallets(this.storage);
     await Promise.all(
       wallets.flatMap((wallet) => [
-        this.storage.remove(`${ACTIVITY_LOG_KEY_PREFIX}${wallet.address}`),
+        this.storage.remove(activityLogKey(wallet.address)),
         this.storage.remove(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${wallet.address}`),
       ]),
     );

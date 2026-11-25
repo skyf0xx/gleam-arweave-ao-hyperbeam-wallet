@@ -66,8 +66,8 @@ import type {
   Winston,
 } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { loadWallets } from "../stored-data";
-import { ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, ACTIVITY_LOG_KEY_PREFIX, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { activityLogKey, loadActivityLog, loadWallets, parseActivityLog } from "../stored-data";
+import { ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
 
 /**
@@ -227,24 +227,6 @@ function isValidTokenMetadata(value: unknown): value is TokenMetadata {
   );
 }
 
-function isValidActivityEntry(value: unknown): value is ActivityEntry {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.txId === "string" &&
-    (candidate.type === "send" || candidate.type === "receive" || candidate.type === "upload") &&
-    (candidate.status === "pending" ||
-      candidate.status === "confirmed" ||
-      candidate.status === "failed") &&
-    typeof candidate.address === "string" &&
-    (candidate.amount === null || typeof candidate.amount === "string") &&
-    Array.isArray(candidate.tags) &&
-    typeof candidate.timestamp === "number" &&
-    (candidate.error === undefined || candidate.error === null || typeof candidate.error === "string") &&
-    (candidate.dataSize === undefined || typeof candidate.dataSize === "string")
-  );
-}
-
 interface DiscoveredTokensCache {
   savedAt: number;
   processIds: string[];
@@ -366,9 +348,7 @@ export class ReadsHandler {
   }
 
   async loadActivityLog(address: string): Promise<ActivityEntry[]> {
-    const raw = await this.storage.get<unknown>(`${ACTIVITY_LOG_KEY_PREFIX}${address}`);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(isValidActivityEntry);
+    return loadActivityLog(this.storage, address);
   }
 
   async loadWatchedProcessIds(address: string): Promise<string[]> {
@@ -1097,8 +1077,8 @@ export class ReadsHandler {
    * network stays in the log.
    */
   private async settleActivity(address: string, settled: ReadonlyMap<string, ActivityEntry>): Promise<ActivityEntry[]> {
-    const written = await updateStored(this.storage, `${ACTIVITY_LOG_KEY_PREFIX}${address}`, (raw) =>
-      (Array.isArray(raw) ? raw.filter(isValidActivityEntry) : []).map((entry) => settled.get(entry.txId) ?? entry),
+    const written = await updateStored(this.storage, activityLogKey(address), (raw) =>
+      parseActivityLog(raw).map((entry) => settled.get(entry.txId) ?? entry),
     );
     return written ?? [];
   }
