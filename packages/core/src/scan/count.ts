@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { isRelease } from "./attestation";
 
 export interface ScanStats {
@@ -11,9 +12,20 @@ export interface ScanStats {
   bountyPoolAtomic: string | null;
 }
 
-const isAtomic = (value: unknown): value is string => typeof value === "string" && /^[1-9]\d*$/.test(value);
+const atomicSchema = z.string().regex(/^[1-9]\d*$/);
 
-const isCount = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
+const countSchema = z.number().min(0).refine(Number.isInteger);
+
+const countReplySchema = z.object({ total: countSchema, paidPlacesLeft: countSchema });
+
+/** Each field is read on its own: one that doesn't fit is `undefined`, and a reply that isn't an object has none. */
+const rewardsReplySchema = z
+  .object({
+    day: z.string().optional().catch(undefined),
+    scanRewardAtomic: atomicSchema.optional().catch(undefined),
+    bountyPoolAtomic: atomicSchema.optional().catch(undefined),
+  })
+  .catch({});
 
 async function readJson(fetchImpl: typeof fetch, url: string): Promise<unknown> {
   try {
@@ -42,13 +54,12 @@ export async function fetchScanStats(deps: {
     readJson(deps.fetchImpl, `${deps.apiUrl}/attestations/count?release=${encodeURIComponent(deps.release)}`),
     readJson(deps.fetchImpl, `${deps.apiUrl}/scan/rewards`),
   ]);
-  const { total, paidPlacesLeft } = (count ?? {}) as { total?: unknown; paidPlacesLeft?: unknown };
-  if (!isCount(total) || !isCount(paidPlacesLeft)) return null;
-  const { day, scanRewardAtomic, bountyPoolAtomic } = (rewards ?? {}) as {
-    day?: unknown;
-    scanRewardAtomic?: unknown;
-    bountyPoolAtomic?: unknown;
+  const counts = countReplySchema.safeParse(count);
+  if (!counts.success) return null;
+  const { day, scanRewardAtomic, bountyPoolAtomic } = rewardsReplySchema.parse(rewards);
+  return {
+    ...counts.data,
+    rewardAtomic: day !== undefined && scanRewardAtomic !== undefined ? scanRewardAtomic : null,
+    bountyPoolAtomic: bountyPoolAtomic ?? null,
   };
-  const rewardAtomic = typeof day === "string" && isAtomic(scanRewardAtomic) ? scanRewardAtomic : null;
-  return { total, paidPlacesLeft, rewardAtomic, bountyPoolAtomic: isAtomic(bountyPoolAtomic) ? bountyPoolAtomic : null };
 }

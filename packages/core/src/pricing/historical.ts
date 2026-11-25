@@ -4,6 +4,7 @@
  * users whose network blocks those hosts still get a portfolio chart.
  * The server owns the CoinGecko→CoinPaprika fallback and the caching.
  */
+import { z } from "zod";
 import type { TokenPriceSource } from "./token-sources";
 import { readPriceJson } from "./price-json";
 
@@ -13,6 +14,13 @@ export interface HistoricalPricePoint {
   timestamp: number;
   usd: number;
 }
+
+const historyReplySchema = z.object({
+  series: z
+    .array(z.looseObject({ timestamp: z.number(), usd: z.number() }).nullable().catch(null))
+    .catch([])
+    .transform((points) => points.filter((point) => point !== null)),
+});
 
 export type HistoricalPriceSource = Pick<TokenPriceSource, "coinGeckoId">;
 
@@ -27,17 +35,12 @@ export async function getHistoricalUsdPrices(
   apiUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<HistoricalPricePoint[]> {
-  const body = await readPriceJson<{ series?: unknown }>(
+  const body = await readPriceJson(
     `${apiUrl}/prices/history?id=${encodeURIComponent(source.coinGeckoId)}&range=${range}`,
     fetchImpl,
+    historyReplySchema,
   );
-  if (!Array.isArray(body?.series)) return [];
-  return body.series
-    .filter(
-      (point): point is HistoricalPricePoint =>
-        typeof point?.timestamp === "number" && typeof point?.usd === "number",
-    )
-    .sort((a, b) => a.timestamp - b.timestamp);
+  return (body?.series ?? []).sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /** First-to-last move of a series as a fraction, or `null` when it can't show one. */
