@@ -6,6 +6,7 @@ import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { readCappedText } from "./capped-body";
 import { isRecord } from "../models/guards";
+import { errorMessage } from "../models/error-message";
 
 /** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
 const COMPUTE_TIMEOUT_MS = 8_000;
@@ -285,7 +286,7 @@ function balanceReadError(label: string | undefined, failures: string[]): Error 
 }
 
 function shortReason(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const status = /HTTP (\d{3})|answered (\d{3})/.exec(message);
   if (status) return `HTTP ${status[1] ?? status[2]}`;
   if (/timed? ?out|abort/i.test(message)) return "timed out";

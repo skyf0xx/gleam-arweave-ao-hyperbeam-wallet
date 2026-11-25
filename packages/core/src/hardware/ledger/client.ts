@@ -8,6 +8,7 @@ import { concatBytes, encodeTransactionForLedger, ledgerChunks } from "./seriali
 import type { LedgerTransport } from "./transport";
 import { USER_ERRORS, userErrorMessage } from "../../models/user-errors";
 import { isArweaveId } from "../../models/arweave-id";
+import { errorMessage } from "../../models/error-message";
 
 /**
  * The Arweave Ledger app's APDU protocol (Zondax's `app-arweave`, spec in
@@ -236,7 +237,7 @@ export class LedgerArweaveClient {
       tags = readDataItemFields(raw).tags;
       expected = await dataItemSignatureData(raw);
     } catch (error) {
-      throw new LedgerError("unsupported-payload", error instanceof Error ? error.message : String(error));
+      throw new LedgerError("unsupported-payload", errorMessage(error));
     }
     if (tags.length > MAX_TAGS) {
       throw new LedgerError("too-many-tags", userErrorMessage("ledgerTooManyTags", { max: MAX_TAGS }));

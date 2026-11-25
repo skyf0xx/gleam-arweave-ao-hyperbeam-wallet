@@ -1,4 +1,5 @@
 import type { NetworkSettings } from "../models/network";
+import { errorMessage } from "../models/error-message";
 
 /** Caps how many peers one read tries, so a dead network costs a few timeouts, not one per listed node. */
 const MAX_FAILOVER_ATTEMPTS = 3;
@@ -22,7 +23,7 @@ export function peerFailoverOrder(settings: Pick<NetworkSettings, "peers" | "act
 export function isPeerUnavailableError(error: unknown): boolean {
   if (error instanceof TypeError) return true;
   if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) return true;
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   return /HTTP 5\d\d|answered 5\d\d|\(5\d\d\)|timed? ?out|abort|network|failed to fetch|unreadable answer/i.test(message);
 }
 

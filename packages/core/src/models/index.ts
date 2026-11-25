@@ -64,6 +64,7 @@ export type {
 export type { Tag } from "./tag";
 export { isPlainRecord, isRecord } from "./guards";
 export { ARWEAVE_ID, isArweaveId } from "./arweave-id";
+export { errorMessage } from "./error-message";
 export type {
   AddTokenApprovalPreview,
   ApprovalKind,
