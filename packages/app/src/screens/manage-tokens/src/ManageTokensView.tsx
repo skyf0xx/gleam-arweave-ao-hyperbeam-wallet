@@ -40,8 +40,6 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
   const discovered = watchedQuery.data?.discovered ?? [];
   const error = watchedQuery.isError ? errorText(watchedQuery.error) : null;
   const [newProcessId, setNewProcessId] = useState("");
-  const [preview, setPreview] = useState<TokenBalance | null>(null);
-  const [previewing, setPreviewing] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   // The id in the field now, so a preview that resolves after the field changed is dropped.
   const currentIdRef = useRef("");
@@ -50,7 +48,20 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
     void queryClient.invalidateQueries({ queryKey: walletQueryKeys.balances(address) });
   };
 
-  const handlePreview = async (processId: string) => {
+  const previewMutation = useMutation({
+    mutationFn: (processId: string) =>
+      runtime.send<{ address: string; processId: string }, TokenBalance>({
+        type: "previewWatchedToken",
+        payload: { address, processId },
+      }),
+    onError: (caught, processId) => {
+      if (currentIdRef.current === processId) setAddError(errorText(caught));
+    },
+  });
+  const preview = previewMutation.data ?? null;
+  const previewing = previewMutation.isPending;
+
+  const handlePreview = (processId: string) => {
     if (!isValidArweaveAddress(processId)) {
       setAddError(t("manageTokens.badIdLength", { length: processId.length }));
       return;
@@ -61,19 +72,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
     }
 
     setAddError(null);
-    setPreviewing(true);
-    setPreview(null);
-    try {
-      const balance = await runtime.send<{ address: string; processId: string }, TokenBalance>({
-        type: "previewWatchedToken",
-        payload: { address, processId },
-      });
-      if (currentIdRef.current === processId) setPreview(balance);
-    } catch (error) {
-      if (currentIdRef.current === processId) setAddError(errorText(error));
-    } finally {
-      if (currentIdRef.current === processId) setPreviewing(false);
-    }
+    previewMutation.mutate(processId);
   };
 
   const addMutation = useMutation({
@@ -109,8 +108,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 currentIdRef.current = processId;
                 setNewProcessId(event.target.value);
                 setAddError(null);
-                setPreview(null);
-                setPreviewing(false);
+                previewMutation.reset();
                 // A whole id previews at once, pasted or typed; anything shorter waits for blur to explain itself.
                 if (isValidArweaveAddress(processId)) void handlePreview(processId);
               }}
