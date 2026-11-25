@@ -27,8 +27,6 @@ import { AddressRow } from "../../activity/src/AddressRow";
 import { useActivity } from "../../activity/src/useActivity";
 import { useArFee } from "../../activity/src/useArFee";
 import { useBalances, type WalletBalances } from "../../activity/src/useBalances";
-import { useContacts, useSaveContact } from "../../activity/src/useContacts";
-import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSubmitTransfer } from "../../activity/src/useSubmitTransfer";
 import { feeFiatText } from "../../../transfer-review/model";
 import { validateSendAmount } from "../../activity/src/validateSendAmount";
@@ -44,6 +42,7 @@ import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
 import { feeText, type RecipientRisk, type TransferContext, type TransferRequest } from "../../../transfer-review/model";
 import { InlineInput } from "@gleam/ui/src/primitives/inline-input.tsx";
+import { useKnownAddresses } from "./useKnownAddresses";
 
 /**
  * Compose → review → success, internal step state only (same "no router"
@@ -217,18 +216,8 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
   // `useContacts`'s own doc comment). Drives the saved-addresses screen,
   // the "already saved" check that hides "Save this address", and the
   // known-recipient framing on Review/Success.
-  const contactsQuery = useContacts(runtime);
-  const saveContactMutation = useSaveContact(runtime);
-  const contactFor = (address: string): Contact | undefined =>
-    contactsQuery.data?.find((candidate) => candidate.address === address);
-  // The vault's other wallets — a recipient that's one of your own wallets
-  // counts as known too, same as a saved contact (Review's own-wallet
-  // check below), and the saved-addresses screen lists them under "Your
-  // wallets".
-  const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
-  const ownWalletFor = (address: string): WalletSummary | undefined =>
-    otherWalletsQuery.data?.find((candidate) => candidate.address === address);
-  const knownNameFor = (address: string): string | undefined => (contactFor(address) ?? ownWalletFor(address))?.name;
+  const known = useKnownAddresses(runtime, wallet.id);
+  const { contacts, otherWallets, contactFor, ownWalletFor, knownNameFor, saveContactMutation } = known;
   // Shared cache with the main screen; orders the recipient dropdown.
   const activityQuery = useActivity(runtime, wallet.address);
   const { emphasisPick } = useAddressIdentity();
@@ -242,8 +231,8 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
     runtime,
     wallet,
     step.kind === "compose" ? step.recipient : "",
-    contactsQuery.data ?? [],
-    otherWalletsQuery.data ?? [],
+    contacts,
+    otherWallets,
   );
 
   if (step.kind === "compose") {
@@ -340,7 +329,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
         knownName={knownNameFor(recipientSchema.safeParse(step.recipient).data ?? "")}
         emphasisPick={emphasisPick}
         lookalikeOf={lookalikeOf}
-        suggestions={namedSuggestions(contactsQuery.data ?? [], otherWalletsQuery.data ?? [], activityQuery.data)}
+        suggestions={namedSuggestions(contacts, otherWallets, activityQuery.data)}
         onBack={onBack}
         onChange={(patch) =>
           setStep({
@@ -432,10 +421,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
       <SavedAddressesStep
         runtime={runtime}
         wallet={wallet}
-        contacts={contactsQuery.data ?? []}
-        contactsLoading={contactsQuery.isLoading}
-        otherWallets={otherWalletsQuery.data ?? []}
-        otherWalletsLoading={otherWalletsQuery.isLoading}
+        {...known.listProps}
         onSelect={(recipient) => {
           setStep({
             ...(savedComposeStep ?? INITIAL_STEP),
@@ -532,9 +518,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
       summary={t("send.summary", { amount: `${formatAmount(step.amountAtomic, selectedToken)} ${tickerFor(selectedToken)}`, recipient: step.recipient })}
       txId={step.txId}
       onDone={onDone}
-      isSaved={contactFor(step.recipient) !== undefined || ownWalletFor(step.recipient) !== undefined}
-      onSaveAddress={(name) => saveContactMutation.mutate({ address: step.recipient, name })}
-      saving={saveContactMutation.isPending}
+      {...known.successSaveProps(step.recipient)}
     />
   );
 }
