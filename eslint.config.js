@@ -3,6 +3,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
 import reactHooks from "eslint-plugin-react-hooks";
+import { FILE_SIZE_CAPS, MAX_LINES } from "./scripts/file-size-caps.mjs";
 
 /**
  * Root ESLint flat config (repo-wide lint plus the import-boundary rule
@@ -322,6 +323,8 @@ const NO_DYNAMIC_SIGNER_IMPORT = [
     message: "core/signer uses static imports only, so the import fence above can check them.",
   },
 ];
+
+const maxLines = (max) => ["error", { max, skipBlankLines: true, skipComments: true }];
 
 export default tseslint.config(
   {
@@ -670,4 +673,11 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // One reason to change per file. Tests, catalogs and fixtures are one thing however long they grow.
+    files: ["**/*.{ts,tsx,js,mjs}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/i18n/messages/**", "**/*.fixtures.ts", "**/testing/**"],
+    rules: { "max-lines": maxLines(MAX_LINES) },
+  },
+  ...Object.entries(FILE_SIZE_CAPS).map(([file, max]) => ({ files: [file], rules: { "max-lines": maxLines(max) } })),
 );
