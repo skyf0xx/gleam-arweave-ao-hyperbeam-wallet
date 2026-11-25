@@ -3,31 +3,17 @@ import {
   isFreshIssuedAt,
   parseLeaveMessage,
   verifyPointsProof,
-  type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
+import type { z } from "zod";
 import type { Db } from "../db";
+import { walletSigned } from "../request-fields";
 
-export interface LeaveRequest {
-  owner: string;
-  message: string;
-  signature: string;
-  /** `transaction` for a hardware wallet; see `core/points/ownership.ts`. */
-  proof: PointsProofKind;
-}
+export const leaveRequest = walletSigned;
+export type LeaveRequest = z.infer<typeof leaveRequest>;
 
 export type LeaveOutcome = { ok: true } | { ok: false; status: 400 | 401; error: string };
 
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
-export function parseLeaveRequest(body: unknown): LeaveRequest | null {
-  if (body === null || typeof body !== "object") return null;
-  const { owner, message, signature, proof = "message" } = body as Record<string, unknown>;
-  if (typeof owner !== "string" || owner.length > 700 || !BASE64URL.test(owner)) return null;
-  if (typeof message !== "string" || message.length > 200) return null;
-  if (typeof signature !== "string" || signature.length > 1000 || !BASE64URL.test(signature)) return null;
-  if (proof !== "message" && proof !== "transaction") return null;
-  return { owner, message, signature, proof };
-}
 
 /**
  * Deletes a wallet and everything stored about it (cascading to its

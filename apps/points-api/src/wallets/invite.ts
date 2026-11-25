@@ -1,14 +1,14 @@
 import {
   deviceKeyThumbprint,
-  isDevicePublicJwk,
   isFreshIssuedAt,
   isValidInviteCode,
   normalizeInviteCode,
   parseRedeemMessage,
   verifyDeviceSignature,
-  type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
+import { z } from "zod";
 import type { Db, Queryable } from "../db";
+import { deviceMessage, devicePublicKey, deviceSignature } from "../request-fields";
 
 export const MEMBER_CODE_SEATS = 3;
 export const SEATS_PER_CONVERSION = 2;
@@ -43,38 +43,22 @@ export type InviteCheck =
 
 export type RedeemResult = "ok" | "full" | "unknown";
 
-export interface RedeemRequest {
-  code: string;
-  message: string;
-  signature: string;
-  devicePublicKey: DevicePublicJwk;
-}
+/** Trimmed and uppercased; refused unless it's a well-formed code. */
+const inviteCode = z.string().max(64).transform(normalizeInviteCode).refine(isValidInviteCode);
+
+export const inviteCheckRequest = z.object({ code: inviteCode });
+
+export const redeemRequest = z.object({ code: inviteCode, message: deviceMessage, signature: deviceSignature, devicePublicKey });
+export type RedeemRequest = z.infer<typeof redeemRequest>;
 
 /** `kind` is absent when the code is unknown. */
 export type RedeemOutcome =
   | { ok: true; result: RedeemResult; kind?: InviteCodeKind }
   | { ok: false; status: 400 | 401; error: string };
 
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
-const MAX_RAW_CODE_LENGTH = 64;
 
 /** Returns the trimmed, uppercased code, or null if it isn't a well-formed one. */
-export function parseInviteCode(value: unknown): string | null {
-  if (typeof value !== "string" || value.length > MAX_RAW_CODE_LENGTH) return null;
-  const code = normalizeInviteCode(value);
-  return isValidInviteCode(code) ? code : null;
-}
 
-export function parseRedeemRequest(body: unknown): RedeemRequest | null {
-  if (body === null || typeof body !== "object") return null;
-  const { code, message, signature, devicePublicKey } = body as Record<string, unknown>;
-  const parsedCode = parseInviteCode(code);
-  if (!parsedCode) return null;
-  if (typeof message !== "string" || message.length > 100) return null;
-  if (typeof signature !== "string" || signature.length > 200 || !BASE64URL.test(signature)) return null;
-  if (!isDevicePublicJwk(devicePublicKey)) return null;
-  return { code: parsedCode, message, signature, devicePublicKey };
-}
 
 export async function checkInviteCode(db: Queryable, code: string, pointsPhase: 1 | 2): Promise<InviteCheck> {
   const found = await seatsForCode(db, code, pointsPhase, false);

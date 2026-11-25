@@ -4,27 +4,22 @@ import {
   verifyDeviceSignature,
   type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
+import { z } from "zod";
 import type { Queryable } from "../db";
+import { deviceMessage, deviceSignature } from "../request-fields";
 
-export interface DeviceSignedRequest {
-  deviceId: string;
-  message: string;
-  signature: string;
-}
+const THUMBPRINT = /^[A-Za-z0-9_-]{43}$/;
+
+export const deviceSignedRequest = z.object({
+  deviceId: z.string().regex(THUMBPRINT),
+  message: deviceMessage,
+  signature: deviceSignature,
+});
+export type DeviceSignedRequest = z.infer<typeof deviceSignedRequest>;
 
 export type DeviceAuthOutcome = { ok: true; deviceId: string } | { ok: false; status: 400 | 401 | 404; error: string };
 
-const THUMBPRINT = /^[A-Za-z0-9_-]{43}$/;
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
-export function parseDeviceSignedRequest(body: unknown): DeviceSignedRequest | null {
-  if (body === null || typeof body !== "object") return null;
-  const { deviceId, message, signature } = body as Record<string, unknown>;
-  if (typeof deviceId !== "string" || !THUMBPRINT.test(deviceId)) return null;
-  if (typeof message !== "string" || message.length > 100) return null;
-  if (typeof signature !== "string" || signature.length > 200 || !BASE64URL.test(signature)) return null;
-  return { deviceId, message, signature };
-}
 
 /** Checks a device-signed `heartbeat` or `me` request against the stored device key. */
 export async function authenticateDevice(

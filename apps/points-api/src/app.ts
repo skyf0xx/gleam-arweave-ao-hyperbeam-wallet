@@ -3,27 +3,30 @@ import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
+import { zValidator } from "@hono/zod-validator";
+import type { z } from "zod";
 import {
   AttestationListCache,
   checkAttestation,
   countAttestations,
   listAttestations,
+  checkRequest,
   parseListQuery,
-  parseCheckRequest,
-  parseSubmitRequest,
   scanRewardBasis,
   submitAttestation,
+  submitRequest,
 } from "./scans/attestations";
 import { poolBalance } from "./scans/bounty";
 import type { Db } from "./db";
 import { createGithubClient, type GithubClient } from "./scans/github";
-import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./wallets/heartbeat";
-import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./wallets/invite";
+import { authenticateDevice, deviceSignedRequest, recordHeartbeat } from "./wallets/heartbeat";
+import { checkInviteCode, inviteCheckRequest, redeemInviteCode, redeemRequest } from "./wallets/invite";
 import { randomInviteCode } from "./wallets/invite-code";
-import { parseLeaveRequest, leave } from "./wallets/leave";
+import { leave, leaveRequest } from "./wallets/leave";
 import { createPriceService, parseFxQuery, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices/prices";
 import { RateLimiter } from "./rate-limit";
-import { parseRegisterRequest, register } from "./wallets/register";
+import { register, registerRequest } from "./wallets/register";
 import type { AreaSummary } from "./scans/areas";
 import { issueChallenge, parseChallengeQuery } from "./scans/challenge";
 import type { ScanFailure } from "./scans/errors";
@@ -105,6 +108,17 @@ export function createApp(deps: AppDeps): Hono {
     });
 
   const app = new Hono();
+  // The JSON validator throws on a body that isn't JSON, before a route's
+  // own invalid-input answer can run, so that answer is given here.
+  app.onError((err, c) => {
+    if (err instanceof HTTPException && err.status === 400 && err.message === MALFORMED_JSON) {
+      if (ATTESTATION_PATHS.includes(c.req.path)) return scanMalformed(c);
+      return c.json({ error: c.req.path === "/invite/check" ? "Malformed invite code." : "Malformed request." }, 400);
+    }
+    if (err instanceof HTTPException) return err.getResponse();
+    console.error(err);
+    return c.text("Internal Server Error", 500);
+  });
   app.use("*", async (c, next) => {
     const limit = ATTESTATION_PATHS.includes(c.req.path) ? ATTESTATION_BODY_LIMIT : 16 * 1024;
     return bodyLimit({ maxSize: limit })(c, next);
@@ -163,24 +177,19 @@ export function createApp(deps: AppDeps): Hono {
 
   // Read by invite.html, a static page on another origin.
   app.use("/invite/check", cors({ origin: "*" }));
-  app.post("/invite/check", limit(inviteByIp), async (c) => {
-    const body = await readJson(c);
-    const code = parseInviteCode(body !== null && typeof body === "object" ? (body as { code?: unknown }).code : null);
-    if (!code) return c.json({ error: "Malformed invite code." }, 400);
-    return c.json(await checkInviteCode(deps.db, code, pointsPhase));
+  app.post("/invite/check", limit(inviteByIp), jsonBody(inviteCheckRequest, "Malformed invite code."), async (c) => {
+    return c.json(await checkInviteCode(deps.db, c.req.valid("json").code, pointsPhase));
   });
 
-  app.post("/invite/redeem", limit(inviteByIp), async (c) => {
-    const request = parseRedeemRequest(await readJson(c));
-    if (!request) return c.json({ error: "Malformed request." }, 400);
+  app.post("/invite/redeem", limit(inviteByIp), jsonBody(redeemRequest), async (c) => {
+    const request = c.req.valid("json");
 
     const outcome = await redeemInviteCode(deps.db, request, now(), pointsPhase);
     return outcome.ok ? c.json({ result: outcome.result, kind: outcome.kind }) : c.json({ error: outcome.error }, outcome.status);
   });
 
-  app.post("/register", limit(registerByIp), async (c) => {
-    const request = parseRegisterRequest(await readJson(c));
-    if (!request) return c.json({ error: "Malformed request." }, 400);
+  app.post("/register", limit(registerByIp), jsonBody(registerRequest), async (c) => {
+    const request = c.req.valid("json");
 
     const outcome = await register(deps.db, request, now(), newInviteCode, pointsPhase);
     if (outcome.ok) return c.json(outcome.result);
@@ -188,9 +197,8 @@ export function createApp(deps: AppDeps): Hono {
     return c.json({ error: outcome.error }, outcome.status);
   });
 
-  app.post("/heartbeat", limit(heartbeatByIp), async (c) => {
-    const request = parseDeviceSignedRequest(await readJson(c));
-    if (!request) return c.json({ error: "Malformed request." }, 400);
+  app.post("/heartbeat", limit(heartbeatByIp), jsonBody(deviceSignedRequest), async (c) => {
+    const request = c.req.valid("json");
     if (!heartbeatByDevice.allow(request.deviceId, now().getTime())) return tooManyRequests(c);
 
     const auth = await authenticateDevice(deps.db, "heartbeat", request, now());
@@ -199,17 +207,15 @@ export function createApp(deps: AppDeps): Hono {
     return c.json({ ok: true });
   });
 
-  app.post("/leave", limit(leaveByIp), async (c) => {
-    const request = parseLeaveRequest(await readJson(c));
-    if (!request) return c.json({ error: "Malformed request." }, 400);
+  app.post("/leave", limit(leaveByIp), jsonBody(leaveRequest), async (c) => {
+    const request = c.req.valid("json");
 
     const outcome = await leave(deps.db, request, now());
     return outcome.ok ? c.json({ ok: true }) : c.json({ error: outcome.error }, outcome.status);
   });
 
-  app.post("/me", limit(scoreByIp), async (c) => {
-    const request = parseDeviceSignedRequest(await readJson(c));
-    if (!request) return c.json({ error: "Malformed request." }, 400);
+  app.post("/me", limit(scoreByIp), jsonBody(deviceSignedRequest), async (c) => {
+    const request = c.req.valid("json");
     if (!scoreByDevice.allow(request.deviceId, now().getTime())) return tooManyRequests(c);
 
     const auth = await authenticateDevice(deps.db, "me", request, now());
@@ -256,16 +262,14 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(body);
   });
 
-  app.post("/attestations/check", scanLimit(checkByIp), async (c) => {
-    const request = parseCheckRequest(await readJson(c));
-    if (!request) return scanMalformed(c);
+  app.post("/attestations/check", scanLimit(checkByIp), scanBody(checkRequest), async (c) => {
+    const request = c.req.valid("json");
     const outcome = await checkAttestation(deps.db, github, request, now());
     return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
   });
 
-  app.post("/attestations", scanLimit(attestByIp), async (c) => {
-    const request = parseSubmitRequest(await readJson(c));
-    if (!request) return scanMalformed(c);
+  app.post("/attestations", scanLimit(attestByIp), scanBody(submitRequest), async (c) => {
+    const request = c.req.valid("json");
     const outcome = await submitAttestation(deps.db, github, request, now(), attestationListings);
     return outcome.ok ? c.json({ ok: true, ...outcome.result }) : scanFailure(c, outcome);
   });
@@ -326,12 +330,18 @@ function scanRateLimited(c: Context, limiter: RateLimiter, nowMs: number) {
   return c.json({ error: `Too many scan requests from this address; try again in about ${wait}.`, code: "rate_limited" }, 429);
 }
 
-async function readJson(c: Context): Promise<unknown> {
-  try {
-    return await c.req.json();
-  } catch {
-    return null;
-  }
+const MALFORMED_JSON = "Malformed JSON in request body";
+
+function jsonBody<S extends z.ZodType>(schema: S, error = "Malformed request.") {
+  return zValidator("json", schema, (result, c) => {
+    if (!result.success) return c.json({ error }, 400);
+  });
+}
+
+function scanBody<S extends z.ZodType>(schema: S) {
+  return zValidator("json", schema, (result, c) => {
+    if (!result.success) return scanMalformed(c);
+  });
 }
 
 // Railway's edge replaces any X-Forwarded-For the client sends, so its first

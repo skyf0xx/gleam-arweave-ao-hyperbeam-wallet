@@ -20,9 +20,10 @@ import {
   type ScanAreaId,
   type ScanIssue,
 } from "@gleam/core/src/scan/index.ts";
+import { z } from "zod";
 import type { Db, Queryable } from "../db";
 import { GithubUnavailableError, type GithubClient, type ReleaseFunction } from "./github";
-import { BASE64URL, MAX_MESSAGE_LENGTH, MAX_OWNER_LENGTH, MAX_SIGNATURE_LENGTH } from "../wallets/register";
+import { owner, walletSigned } from "../request-fields";
 import { answeredFunctions, areaSummaries, areasLeft, examinedFunctions, functionKey, walletAreas, type AreaSummary } from "./areas";
 import {
   GITHUB_UNAVAILABLE,
@@ -36,39 +37,20 @@ import {
 import { paidPlaces } from "./places";
 import { LIVENESS_WINDOW_MS } from "../points/snapshot";
 
-export interface CheckRequest {
-  attestation: unknown;
+// JSON has no undefined, so this only refuses a body without the key.
+const attestation = z.unknown().refine((value) => value !== undefined);
+
+export const checkRequest = z.object({
+  attestation,
   /** The wallet that will sign. With it the dry run also reports `already_attested`, which is wallet-specific. */
-  address?: string;
-}
+  address: owner.optional(),
+});
+export type CheckRequest = z.infer<typeof checkRequest>;
 
-export interface SubmitRequest {
-  attestation: unknown;
-  message: string;
-  signature: string;
-  owner: string;
-  /** `transaction` for a hardware wallet; see `core/points/ownership.ts`. */
-  proof: PointsProofKind;
-}
+export const submitRequest = walletSigned.extend({ attestation });
+export type SubmitRequest = z.infer<typeof submitRequest>;
 
-export function parseCheckRequest(body: unknown): CheckRequest | null {
-  if (body === null || typeof body !== "object" || !("attestation" in body)) return null;
-  const { attestation, address } = body as { attestation: unknown; address?: unknown };
-  if (address === undefined) return { attestation };
-  if (typeof address !== "string" || address.length > MAX_OWNER_LENGTH || !BASE64URL.test(address)) return null;
-  return { attestation, address };
-}
 
-export function parseSubmitRequest(body: unknown): SubmitRequest | null {
-  if (body === null || typeof body !== "object" || !("attestation" in body)) return null;
-  const check = { attestation: (body as { attestation: unknown }).attestation };
-  const { owner, message, signature, proof = "message" } = body as Record<string, unknown>;
-  if (typeof owner !== "string" || owner.length > MAX_OWNER_LENGTH || !BASE64URL.test(owner)) return null;
-  if (typeof message !== "string" || message.length > MAX_MESSAGE_LENGTH) return null;
-  if (typeof signature !== "string" || signature.length > MAX_SIGNATURE_LENGTH || !BASE64URL.test(signature)) return null;
-  if (proof !== "message" && proof !== "transaction") return null;
-  return { ...check, owner, message, signature, proof };
-}
 
 export interface CheckResult {
   attestationId: string;
