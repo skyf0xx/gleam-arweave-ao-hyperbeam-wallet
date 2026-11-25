@@ -1,6 +1,6 @@
 import { trimTrailingSlashes } from "../models/network";
-import { isPlainRecord } from "../models/guards";
-import { tagValue, type Tag } from "../models/tag";
+import { tagValue } from "../models/tag";
+import { aoReplySchema } from "./reply-schema";
 /**
  * Resolves what happened to an AO `Transfer` message after the Messenger
  * Unit accepted it, by reading the process's evaluated result from the
@@ -58,21 +58,10 @@ export async function getTransferOutcome(
  * tag of a `Transfer-Error` reply among its outgoing `Messages`.
  */
 function findTransferError(body: unknown): string | null {
-  if (!isPlainRecord(body)) return null;
+  const { error, messages } = aoReplySchema.parse(body);
+  if (error) return typeof error === "string" ? error : JSON.stringify(error);
 
-  const topLevel = body.Error ?? body.error;
-  if (topLevel) return typeof topLevel === "string" ? topLevel : JSON.stringify(topLevel);
-
-  const messages = body.Messages ?? body.messages;
-  if (!Array.isArray(messages)) return null;
-
-  for (const message of messages) {
-    if (!isPlainRecord(message)) continue;
-    const rawTags = message.Tags ?? message.tags;
-    const tags = Array.isArray(rawTags)
-      ? rawTags.filter((tag): tag is Tag => isPlainRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
-      : [];
-    
+  for (const { tags } of messages) {
     if (tagValue(tags, "Action") === "Transfer-Error") {
       return tagValue(tags, "Error") ?? "The token process rejected the transfer.";
     }

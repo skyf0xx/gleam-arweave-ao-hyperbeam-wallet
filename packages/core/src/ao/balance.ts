@@ -5,7 +5,7 @@ import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { readCappedDigits, readCappedText } from "./capped-body";
-import { isRecord } from "../models/guards";
+import { z } from "zod";
 import { errorMessage } from "../models/error-message";
 
 /** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
@@ -71,6 +71,14 @@ async function queryBalance(
  */
 const AO_TOKEN_DENOMINATION = 12;
 
+const balanceObjectSchema = z.object({
+  balance: z.unknown().optional(),
+  quantity: z.unknown().optional(),
+  ticker: z.string().optional().catch(undefined),
+  denomination: z.number().optional().catch(undefined),
+  name: z.string().optional().catch(undefined),
+});
+
 function parseBalanceResponse(
   body: unknown,
   processId: string,
@@ -88,20 +96,17 @@ function parseBalanceResponse(
     };
   }
 
-  if (isRecord(body)) {
-    const candidate = body;
-    const quantity = atomicString(candidate.balance ?? candidate.quantity);
+  const candidate = balanceObjectSchema.safeParse(body);
+  if (candidate.success) {
+    const quantity = atomicString(candidate.data.balance ?? candidate.data.quantity);
 
     if (quantity !== null) {
       return {
         address,
         processId,
-        ticker: typeof candidate.ticker === "string" ? candidate.ticker : processId,
-        denomination:
-          typeof candidate.denomination === "number"
-            ? candidate.denomination
-            : AO_TOKEN_DENOMINATION,
-        name: typeof candidate.name === "string" ? candidate.name : null,
+        ticker: candidate.data.ticker ?? processId,
+        denomination: candidate.data.denomination ?? AO_TOKEN_DENOMINATION,
+        name: candidate.data.name ?? null,
         quantity,
       };
     }

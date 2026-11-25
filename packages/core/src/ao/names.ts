@@ -1,5 +1,6 @@
 import { trimTrailingSlashes } from "../models/network";
 import { ARWEAVE_ID } from "../models/arweave-id";
+import { z } from "zod";
 import { tagMap, type Tag } from "../models/tag";
 import { isPlainRecord } from "../models/guards";
 
@@ -51,23 +52,35 @@ function isOne(value: unknown): boolean {
   return value === 1 || value === "1";
 }
 
+const orderSchema = z.object({ creator: z.unknown().optional(), quantity: z.unknown().optional(), status: z.unknown().optional() });
+
+/** A carrier's `/now` state: what is read of `balances` and `orders` when each is an object, and nothing when it isn't. */
+const carrierStateSchema = z.object({
+  "execution-device": z.literal("carrier@1.0"),
+  value: z.unknown().optional(),
+  balances: z.record(z.string(), z.unknown()).catch({}),
+  orders: z.record(z.string(), z.unknown()).catch({}),
+});
+
 /** What `address` has of the carrier whose `/now` state this is, or null when it has nothing. */
 export function readCarrierHolding(state: unknown, address: string): CarrierHolding | null {
-  if (!isPlainRecord(state) || state["execution-device"] !== "carrier@1.0") return null;
-  const target = carrierTarget(state.value);
+  const parsed = carrierStateSchema.safeParse(state);
+  if (!parsed.success) return null;
+  const { value, balances, orders } = parsed.data;
+  const target = carrierTarget(value);
   const withTarget = target === undefined ? {} : { target };
-  const balances = isPlainRecord(state.balances) ? state.balances : {};
   const held = Object.entries(balances).some(([key, quantity]) => sameAccount(key, address) && isOne(quantity));
   if (held) return { status: "held", ...withTarget };
-  const orders = isPlainRecord(state.orders) ? Object.values(state.orders) : [];
-  const listed = orders.some(
-    (order) =>
-      isPlainRecord(order) &&
-      sameAccount(order.creator, address) &&
-      isOne(order.quantity) &&
-      typeof order.status === "string" &&
-      LIVE_ORDER_STATUSES.has(order.status),
-  );
+  const listed = Object.values(orders).some((raw) => {
+    const order = orderSchema.safeParse(raw);
+    return (
+      order.success &&
+      sameAccount(order.data.creator, address) &&
+      isOne(order.data.quantity) &&
+      typeof order.data.status === "string" &&
+      LIVE_ORDER_STATUSES.has(order.data.status)
+    );
+  });
   return listed ? { status: "listed", ...withTarget } : null;
 }
 

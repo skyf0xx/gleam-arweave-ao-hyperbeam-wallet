@@ -1,7 +1,8 @@
 import { trimTrailingSlashes } from "../models/network";
+import { z } from "zod";
 import { isPlainRecord, isRecord } from "../models/guards";
 import { isArweaveId } from "../models/arweave-id";
-import { atomicString } from "../models/balance";
+import { atomicStringSchema } from "../models/atomic-schema";
 /**
  * Spot price of an AO token from its own swap orderbook, the way Bazar
  * shows "Current unit price": the lowest open ask in the token process's
@@ -77,10 +78,13 @@ function link(value: unknown): string | null {
   return isArweaveId(id) ? id : null;
 }
 
-function atomic(value: unknown): bigint | null {
-  const text = atomicString(value, UINT);
-  return text === null ? null : BigInt(text);
-}
+/** An order message's fields; `order-id` and `status` are checked where they are used. */
+const orderFieldsSchema = z.object({
+  asking: atomicStringSchema(UINT),
+  quantity: atomicStringSchema(UINT),
+  "order-id": z.unknown().optional(),
+  status: z.unknown().optional(),
+});
 
 async function readOrder(
   orderKey: string,
@@ -91,12 +95,14 @@ async function readOrder(
 ): Promise<Order | null> {
   const id = link(value);
   const message = id ? await readMessage(`${base}/${id}~message@1.0`, fetchImpl, signal) : value;
-  if (!isRecord(message)) return null;
-  const fields = message;
-  const asking = atomic(fields.asking);
-  const quantity = atomic(fields.quantity);
+  const parsed = orderFieldsSchema.safeParse(message);
+  if (!parsed.success) return null;
+  const fields = parsed.data;
   // The key and the order's own id must agree, or the entry is not the order it claims to be.
-  if (fields["order-id"] !== orderKey || asking === null || quantity === null || asking < 1n || quantity < 1n) return null;
+  if (fields["order-id"] !== orderKey || fields.asking === null || fields.quantity === null) return null;
+  const asking = BigInt(fields.asking);
+  const quantity = BigInt(fields.quantity);
+  if (asking < 1n || quantity < 1n) return null;
   return { id: id ?? orderKey, asking, quantity, ...(id === null && typeof fields.status === "string" ? { status: fields.status } : {}) };
 }
 

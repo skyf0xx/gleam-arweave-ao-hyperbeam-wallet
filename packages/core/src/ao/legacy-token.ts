@@ -1,9 +1,9 @@
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
 import { trimTrailingSlashes } from "../models/network";
-import { isPlainRecord } from "../models/guards";
 import { tagValue, type Tag } from "../models/tag";
 import { atomicString } from "../models/balance";
+import { aoReplySchema } from "./reply-schema";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -20,19 +20,6 @@ export interface LegacyTokenInfo {
   ticker: string | null;
   denomination: number | null;
   logo: string | null;
-}
-
-function replyMessages(body: unknown): Array<{ data: unknown; tags: Tag[] }> {
-  if (!isPlainRecord(body)) return [];
-  const messages = body.Messages ?? body.messages;
-  if (!Array.isArray(messages)) return [];
-  return messages.filter(isPlainRecord).map((message) => {
-    const rawTags = message.Tags ?? message.tags;
-    const tags = Array.isArray(rawTags)
-      ? rawTags.filter((tag): tag is Tag => isPlainRecord(tag) && typeof tag.name === "string" && typeof tag.value === "string")
-      : [];
-    return { data: message.Data ?? message.data, tags };
-  });
 }
 
 async function dryRun(processId: string, tags: Tag[], cuUrl: string, fetchImpl: typeof fetch): Promise<unknown> {
@@ -73,7 +60,7 @@ export async function readLegacyTokenBalance(
     cuUrl,
     fetchImpl,
   );
-  for (const message of replyMessages(body)) {
+  for (const message of aoReplySchema.parse(body).messages) {
     const fromData = atomic(message.data);
     if (fromData !== null) return fromData;
     const fromTag = atomic(tagValue(message.tags, "Balance"));
@@ -93,7 +80,7 @@ export async function readLegacyTokenInfo(
   fetchImpl: typeof fetch = fetch,
 ): Promise<LegacyTokenInfo> {
   const body = await dryRun(processId, [{ name: "Action", value: "Info" }], cuUrl, fetchImpl);
-  for (const { tags } of replyMessages(body)) {
+  for (const { tags } of aoReplySchema.parse(body).messages) {
     const value = (name: string) => tagValue(tags, name, { anyCase: true })?.trim() || null;
     const ticker = value("ticker");
     const name = value("name");
