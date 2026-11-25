@@ -10,6 +10,7 @@ import { useT } from "../../../i18n";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useContacts, useDeleteContact, useSaveContact } from "../../activity/src/useContacts";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
 
 /**
@@ -160,9 +161,9 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
             className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
           />
           {addError ? (
-            <span role="alert" className="text-caption text-warning">
+            <InlineError as="span">
               {addError}
-            </span>
+            </InlineError>
           ) : null}
           <div className="flex justify-end gap-3 pt-1">
             <button

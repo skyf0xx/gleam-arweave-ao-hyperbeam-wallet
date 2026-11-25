@@ -39,6 +39,7 @@ import { useLookalikeOf } from "./useLookalikeOf";
 import { fetchSendFeeQuote, useRecipientAssessment, useSendFeeQuote } from "./useSendQuotes";
 import { isTokenHidden, readRowVisibility, sendTokenLogo, shownTokenLogo } from "../../../token-visibility";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
 import { feeText, type RecipientRisk, type TransferContext, type TransferRequest } from "../../../transfer-review/model";
@@ -788,9 +789,9 @@ function ComposeStep({
             ) : null}
           </div>
           {step.amountError ? (
-            <div role="alert" className="text-label leading-snug text-warning">
+            <InlineError size="label" as="div">
               {step.amountError}
-            </div>
+            </InlineError>
           ) : null}
           {amountValid && recipientValid ? <NetworkFeeLine quote={feeQuote} fiat={feeFiat} /> : null}
         </div>
@@ -1019,14 +1020,14 @@ export function RecipientField({
         </div>
       )}
       {recipientError ? (
-        <div role="alert" className="text-label leading-snug text-warning">
+        <InlineError size="label" as="div">
           {recipientError}
-        </div>
+        </InlineError>
       ) : null}
       {scanError ? (
-        <div role="alert" className="text-label leading-snug text-warning">
+        <InlineError size="label" as="div">
           {scanError}
-        </div>
+        </InlineError>
       ) : null}
       {lookalikeOf ? (
         <RecipientWarning
@@ -1227,9 +1228,9 @@ function ReviewStep({
       )}
     >
       {step.error ? (
-        <div role="alert" className="text-label leading-snug text-warning">
+        <InlineError size="label" as="div">
           {step.error}
-        </div>
+        </InlineError>
       ) : null}
       {step.submitting && signsOnDevice ? (
         <p role="status" className="text-label leading-snug text-muted">
@@ -1321,9 +1322,9 @@ function TokenPickerStep({
       <ScreenHeader title={t("send.selectToken")} onBack={onBack} />
       <div className="flex flex-1 flex-col px-1 py-2 phone:px-5 silica:gap-2 silica:px-5">
         {errorMessage ? (
-          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
+          <InlineError size="label" as="div" className="px-4 py-3 phone:px-0">
             {errorMessage}
-          </div>
+          </InlineError>
         ) : null}
 
         <TokenRow
@@ -1472,9 +1473,9 @@ export function SavedAddressesStep({
       />
       <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {activityQuery.isError ? (
-          <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
+          <InlineError size="label" as="div" className="px-4 py-3 phone:px-0">
             {errorText(activityQuery.error)}
-          </div>
+          </InlineError>
         ) : loading ? (
           <>
             <SkeletonPickerRow />

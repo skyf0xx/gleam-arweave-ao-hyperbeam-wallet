@@ -26,6 +26,7 @@ import { useLookalikeOf } from "./useLookalikeOf";
 import { namedSuggestions, NetworkFeeLine, RecipientField, SavedAddressesStep, SuccessStep } from "./SendView";
 import { fetchCollectibleFeeQuote, useCollectibleFeeQuote, useRecipientAssessment } from "./useSendQuotes";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
 import type { TransferRequest } from "../../../transfer-review/model";
@@ -195,9 +196,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           {/* A collectible send has no amount field to carry a failed quote, so the reason shows where the fee would. */}
           {quotedRecipient !== undefined && unsupported === null && !step.error ? (
             feeQuoteQuery.isError ? (
-              <div role="alert" className="text-label leading-snug text-warning">
+              <InlineError size="label" as="div">
                 {errorText(feeQuoteQuery.error)}
-              </div>
+              </InlineError>
             ) : (
               <NetworkFeeLine quote={feeQuoteQuery} />
             )
@@ -210,9 +211,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           ) : null}
 
           {step.error ? (
-            <div role="alert" className="text-label leading-snug text-warning">
+            <InlineError size="label" as="div">
               {step.error}
-            </div>
+            </InlineError>
           ) : null}
 
           <ScreenFooter>
@@ -317,9 +318,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
         )}
       >
         {step.error ? (
-          <div role="alert" className="text-label leading-snug text-warning">
+          <InlineError size="label" as="div">
             {step.error}
-          </div>
+          </InlineError>
         ) : null}
         {step.submitting && signsOnDevice ? (
           <p role="status" className="text-label leading-snug text-muted">

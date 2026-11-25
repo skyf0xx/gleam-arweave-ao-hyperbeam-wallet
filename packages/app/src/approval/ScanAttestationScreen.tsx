@@ -12,6 +12,7 @@ import {
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { ArmingLabel } from "./ArmingLabel";
 import { FoundingGate } from "../screens/onboarding/src/FoundingGate";
 import { JoinNote } from "../screens/points/src/JoinNote";
@@ -157,9 +158,9 @@ function JoinFirst({
 
       <div className="mt-auto flex flex-col gap-3 pt-2">
         {join.error instanceof Error ? (
-          <p role="alert" className="text-center text-caption text-warning">
+          <InlineError className="text-center">
             {errorText(join.error)}
-          </p>
+          </InlineError>
         ) : null}
         <Button disabled={join.isPending} onClick={() => void joinThenReview()}>
           {join.isPending ? t("approval.joining") : t("approval.joinPoints")}

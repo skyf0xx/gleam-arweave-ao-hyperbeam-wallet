@@ -48,6 +48,7 @@ import { readRowVisibility, shownTokenLogo, writeRowVisibility, type RowVisibili
 import { relativeTime } from "../../../relative-time";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -1252,9 +1253,9 @@ export function MainScreenView({
                                 <ChevronIcon open={hiddenExpanded} />
                               </button>
                               {hiddenExpanded && ignoreFailed ? (
-                                <p role="alert" className="px-3.5 pb-2 text-caption text-warning phone:px-0">
+                                <InlineError className="px-3.5 pb-2 phone:px-0">
                                   {t("mainScreen.ignoreFailed")}
-                                </p>
+                                </InlineError>
                               ) : hiddenExpanded && confirmingIgnore.size > 0 ? (
                                 <p className="px-3.5 pb-2 text-caption text-muted phone:px-0">{t("mainScreen.ignoreHint")}</p>
                               ) : null}

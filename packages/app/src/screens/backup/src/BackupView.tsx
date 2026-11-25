@@ -5,6 +5,7 @@ import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { CheckIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { relativeTime } from "../../../relative-time";
@@ -235,9 +236,9 @@ export function BackupView({ runtime, onBack }: BackupViewProps) {
           </>
         )}
         {error && (status === null || status.enabled) ? (
-          <p role="alert" className="text-caption text-warning">
+          <InlineError>
             {error}
-          </p>
+          </InlineError>
         ) : null}
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
   SkeletonRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import { BackupSection } from "./BackupSection";
@@ -367,9 +368,9 @@ function PasskeySection({
         </p>
       )}
       {passkey.kind === "ready" && passkey.error ? (
-        <p role="alert" className="pt-1 text-caption text-warning">
+        <InlineError className="pt-1">
           {passkey.error}
-        </p>
+        </InlineError>
       ) : null}
     </div>
   );

@@ -4,6 +4,7 @@ import type { Grant, RuntimePort, WalletSummary } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT, type TFunction } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { SCOPE_COPY } from "../../../approval/ConnectionRequestScreen";
@@ -202,9 +203,9 @@ function GrantRow({
         </div>
       ) : null}
       {failed ? (
-        <span role="alert" className="ml-12 text-caption text-warning">
+        <InlineError as="span" className="ml-12">
           {t("connectedApps.revokeFailed")}
-        </span>
+        </InlineError>
       ) : null}
     </div>
   );

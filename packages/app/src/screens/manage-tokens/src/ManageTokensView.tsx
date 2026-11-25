@@ -4,6 +4,7 @@ import { isValidArweaveAddress, type RuntimePort, type TokenBalance } from "@gle
 import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT } from "../../../i18n";
 import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
@@ -145,9 +146,9 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
             />
             {addError ? (
-              <span role="alert" className="text-caption text-warning">
+              <InlineError as="span">
                 {addError}
-              </span>
+              </InlineError>
             ) : null}
             {previewing ? <TokenSkeletonRow className="py-1" /> : null}
             {preview ? (

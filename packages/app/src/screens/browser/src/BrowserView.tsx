@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEve
 import type { Grant, RuntimePort, WalletState } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { usePlatform } from "../../../app-platform/context";
 import type { DappBrowserFrame } from "../../../app-platform/types";
 import { resolveInput, knownSite, BUILT_IN_SITES, pageTrail, siteHost } from "./address";
@@ -335,9 +336,9 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
         )}
       </div>
       {rejected ? (
-        <p role="alert" className="px-5 pb-2 text-caption text-warning">
+        <InlineError className="px-5 pb-2">
           {t("browser.enterAddress")}
-        </p>
+        </InlineError>
       ) : null}
       {page && nav?.loading && !showingStart && !historyOpen ? <Beam /> : <div className="h-[3px]" />}
 

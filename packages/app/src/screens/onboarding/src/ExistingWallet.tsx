@@ -1,5 +1,6 @@
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { usePlatform } from "../../../app-platform/context";
 import { hasHardwareWallet } from "../../../app-platform/hardware";
 import { useT } from "../../../i18n";
@@ -73,9 +74,9 @@ export function ExistingWallet({ onBack, restore, ...options }: ExistingWalletPr
               onClick={restore.onRestore}
             />
             {restore.error ? (
-              <p role="alert" className="text-caption text-warning">
+              <InlineError>
                 {restore.error}
-              </p>
+              </InlineError>
             ) : null}
           </div>
         ) : null}

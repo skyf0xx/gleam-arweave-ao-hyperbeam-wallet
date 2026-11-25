@@ -6,6 +6,7 @@ import { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, t
 import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
@@ -432,9 +433,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                   className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                 />
                 {gatewayError ? (
-                  <span role="alert" className="text-caption text-warning">
+                  <InlineError as="span">
                     {gatewayError}
-                  </span>
+                  </InlineError>
                 ) : null}
                 <div className="flex items-center gap-2.5">
                   <button
@@ -502,9 +503,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                   className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                 />
                 {bundlerError ? (
-                  <span role="alert" className="text-caption text-warning">
+                  <InlineError as="span">
                     {bundlerError}
-                  </span>
+                  </InlineError>
                 ) : null}
                 <div className="flex items-center gap-2.5">
                   <button
@@ -636,9 +637,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                       className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                     />
                     {addError ? (
-                      <span role="alert" className="text-caption text-warning">
+                      <InlineError as="span">
                         {addError}
-                      </span>
+                      </InlineError>
                     ) : null}
                     <div className="flex items-center gap-2.5">
                       <button
