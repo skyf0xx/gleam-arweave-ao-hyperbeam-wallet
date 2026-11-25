@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addressFromOwner, type ApprovalPresenterPort, type UnsignedPayload } from "@gleam/core";
 import { generateJWK, Keyring } from "@gleam/core/signer";
 import { InMemoryStorage } from "../../testing";
-import { ApprovalHandler, type SigningRequestInput } from "./approval";
+import { ApprovalHandler } from "./approval";
+import type { SigningRequestInput } from "./approval-types";
 import { createKeySession } from "./key-session";
 
 /**

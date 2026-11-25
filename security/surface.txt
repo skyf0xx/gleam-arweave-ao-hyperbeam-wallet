@@ -148,6 +148,11 @@
 3 packages/core/src/arweave/graphql-schema.ts
 
 4 packages/runtime/src/handlers/approval.ts
+4 packages/runtime/src/handlers/approval-types.ts
+4 packages/runtime/src/handlers/approval-records.ts
+4 packages/runtime/src/handlers/pending-codec.ts
+4 packages/runtime/src/handlers/approval-prepared.ts
+4 packages/runtime/src/handlers/approval-preview.ts
 4 apps/extension/entrypoints/approval/
 4 apps/extension/src/hardware/panels/
 4 packages/app/src/approval/

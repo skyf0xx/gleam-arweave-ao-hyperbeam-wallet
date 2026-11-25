@@ -12,7 +12,8 @@ export const FILE_SIZE_CAPS = {
   // One view over one native page; every effect reads the same page state.
   "packages/app/src/screens/browser/src/BrowserView.tsx": 416,
   "packages/runtime/src/create-runtime.ts": 647,
-  "packages/runtime/src/handlers/approval.ts": 1462,
+  // One state machine over the pending approvals; the grant methods could move out (todo.md).
+  "packages/runtime/src/handlers/approval.ts": 981,
   "packages/runtime/src/handlers/wallet-lifecycle.ts": 789,
   "apps/points-api/src/scans/attestations.ts": 586,
   "apps/site/scan-lib.js": 427,

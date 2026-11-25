@@ -3,7 +3,7 @@ import { parseAttestation, type ParsedAttestation } from "@gleam/core/src/scan/a
 import type { SiteAttestResponse, SiteAttestStatusResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { SiteMessage } from "./dispatch/methods";
 import { attestFailure } from "./handlers/attest-errors";
-import { ApprovalDeclinedError } from "./handlers/approval";
+import { ApprovalDeclinedError } from "./handlers/approval-types";
 import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
 
 export interface SiteAttestationDeps {

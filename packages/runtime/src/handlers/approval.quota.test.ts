@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { bytesToBase64, WALLET_APPROVAL_ORIGIN, type ApprovalPresenterPort, type StoragePort } from "@gleam/core";
 import { generateJWK, Keyring } from "@gleam/core/signer";
-import { ApprovalHandler, utf8ByteLength } from "./approval";
+import { ApprovalHandler } from "./approval";
+import { utf8ByteLength } from "./pending-codec";
 import { createKeySession } from "./key-session";
 
 const QUOTA_BYTES = 10 * 1024 * 1024;

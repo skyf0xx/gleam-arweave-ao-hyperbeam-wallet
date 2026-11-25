@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WalletSummary } from "@gleam/core";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
-import { ApprovalDeclinedError } from "./handlers/approval";
+import { ApprovalDeclinedError } from "./handlers/approval-types";
 import { dispatchSiteMessage } from "./dispatch/site";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { signSiteAttestation, siteAttestStatus, type SiteAttestationDeps } from "./points-attest";

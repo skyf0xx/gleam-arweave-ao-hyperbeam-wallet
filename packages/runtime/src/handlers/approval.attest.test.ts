@@ -14,7 +14,8 @@ import { signerFromJwk, generateJWK, Keyring } from "@gleam/core/signer";
 import { buildAttestMessage, verifyPointsProof } from "@gleam/core/src/points/index.ts";
 import { attestationId, parseAttestation, type Attestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
-import { ApprovalDeclinedError, ApprovalHandler, type ScanAttestationSubmitter } from "./approval";
+import { ApprovalHandler } from "./approval";
+import { ApprovalDeclinedError, type ScanAttestationSubmitter } from "./approval-types";
 import { createKeySession } from "./key-session";
 import type { OwnershipProof } from "./points";
 

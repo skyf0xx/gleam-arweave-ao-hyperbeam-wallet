@@ -144,6 +144,11 @@
 
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
+/packages/runtime/src/handlers/approval-types.ts                           @skyf0xx
+/packages/runtime/src/handlers/approval-records.ts                         @skyf0xx
+/packages/runtime/src/handlers/pending-codec.ts                            @skyf0xx
+/packages/runtime/src/handlers/approval-prepared.ts                        @skyf0xx
+/packages/runtime/src/handlers/approval-preview.ts                         @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 /apps/extension/src/hardware/panels/                                       @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
