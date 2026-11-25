@@ -3,6 +3,7 @@ import { Button } from "../../primitives/button";
 import { ScreenFooter } from "../../primitives/screen-footer";
 import { ScreenHeader } from "../../primitives/screen-header";
 import { PasswordField } from "./PasswordField";
+import { StepForm, StepIntro } from "./step-layout";
 import { usePasswordEntry } from "./use-password-entry";
 
 export interface PasswordStepProps {
@@ -47,17 +48,13 @@ export function PasswordStep({
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={headerTitle} onBack={onBack} busy={submitting} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
+      <StepForm
         onSubmit={(event) => {
           event.preventDefault();
           if (!submitting && password.length > 0) onSubmit(password);
         }}
       >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{heading}</h1>
-          <p className="text-body leading-relaxed text-muted">{body}</p>
-        </div>
+        <StepIntro title={heading} body={body} />
 
         {notice}
 
@@ -78,7 +75,7 @@ export function PasswordStep({
           </Button>
           {secondaryAction}
         </ScreenFooter>
-      </form>
+      </StepForm>
     </div>
   );
 }

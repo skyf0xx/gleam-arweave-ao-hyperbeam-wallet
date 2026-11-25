@@ -11,7 +11,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
-import { PasswordStep } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordStep, StepColumn } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useT, type TFunction } from "../../../i18n";
@@ -312,7 +312,7 @@ function RemoveConfirmStep({
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("walletDetail.removeWallet")} onBack={onBack} busy={removing} />
-      <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0">
+      <StepColumn>
         <p className="text-body leading-relaxed text-muted">
           {t("walletDetail.removeIntroBefore")}
           <span className="font-semibold text-foreground">{walletName}</span>
@@ -348,7 +348,7 @@ function RemoveConfirmStep({
             {removing ? t("walletDetail.removing") : t("walletDetail.confirmRemove")}
           </Button>
         </ScreenFooter>
-      </div>
+      </StepColumn>
     </div>
   );
 }
