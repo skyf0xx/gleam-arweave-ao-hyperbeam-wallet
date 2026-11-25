@@ -21,6 +21,7 @@ import { createStoreReview } from "./adapters/store-review";
 import { createDappBridge, serveDappTabs } from "./adapters/dapp-bridge";
 import { createDappBrowser } from "./adapters/dapp-browser";
 import { guardLock } from "./adapters/lock-guard";
+import { createOverlayGuard } from "./adapters/overlay-guard";
 import { createCapacitorFileSaver, serveFileSaver, sweepCapacitorExports } from "./adapters/file-saver";
 import { createWorkerRuntimePort } from "./adapters/runtime-port";
 import { createSqliteStore, openCapacitorDb, serveSqliteStore } from "./adapters/sqlite-store";
@@ -66,8 +67,11 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
   dapps.listening.catch(() => undefined);
   const approvalSheet = createApprovalSheet();
   serveApprovalSheet(worker, approvalSheet);
+  // Another app's overlay can't pass taps through to Approve while the sheet is up.
+  const overlayGuard = !preview && Capacitor.getPlatform() === "android" ? createOverlayGuard() : null;
   approvalSheet.subscribe((requestId) => {
     dappBrowser.setSheetUp(requestId !== null).catch(() => undefined);
+    overlayGuard?.setGuarded(requestId !== null);
   });
   const runtime = guardLock(
     workerRuntime,
@@ -135,7 +139,7 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
     dappBrowser,
     browseLinks,
     backButton: createBackButton(),
-    approvalSheet,
+    approvalSheet: overlayGuard ? { ...approvalSheet, onTouchBlocked: overlayGuard.onTouchBlocked } : approvalSheet,
     ...(preview ? {} : { secureScreen: createSecureScreen() }),
     notices: createLinkNotices(worker),
     activeSite: { subscribe: dapps.subscribe },

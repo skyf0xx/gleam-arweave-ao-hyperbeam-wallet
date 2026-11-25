@@ -203,6 +203,14 @@ wrapped under that passkey's PRF output, as on the device.
   approval. A page can't read Gleam's storage, so a fake approval drawn
   in a page can't show it
   (`packages/core/src/models/security-phrase.ts`).
+- **Another app can't tap Approve through an overlay.** While the
+  approval sheet is up on Android, Gleam hides other apps' overlays
+  (Android 12 and later) and drops any gesture that starts under another
+  app's window, the flag `filterTouchesWhenObscured` reads, on every
+  version. The sheet then says another app is drawing over Gleam
+  (`apps/mobile/android/app/src/main/java/app/gleamwallet/OverlayGuardPlugin.java`).
+  The guard is off on every other screen. iOS lets no app draw over
+  another.
 - **Gleam Points payloads are refused from sites.** A `signMessage`
   whose data starts with `gleam-points:`, and a `sign` or `dispatch`
   with a `Gleam-Points` tag, are refused before any approval opens
@@ -226,7 +234,7 @@ wrapped under that passkey's PRF output, as on the device.
 | Malicious website or dApp | Read addresses, sign or send without consent, reach key methods | Connect approval; per-request approval; fixed method list; origin from the platform, top frame only | A user approving a request they don't understand. The preview is the defense. |
 | Phishing site or fake approval drawn in a page | Trick the user into typing the password or approving | Real requests open Gleam's own window in the extension, and the approval sheet with the dApp view hidden in the app; the security phrase, once picked, shows on every real unlock and approval; Gleam never asks for the password inside a page | Users who don't know the rule or haven't picked a phrase. |
 | Another browser extension | Inject into a page and call `window.arweaveWallet` as that page, open a window styled like Gleam's approval, read Gleam's storage or reach the keyring | Gleam's `chrome.storage` and its extension pages are per-extension; the keyring port accepts only Gleam's own offscreen document (`isKeyringSender` in `apps/extension/src/adapters/offscreen-keyring.ts`); a call made as the page still opens Gleam's approval window | A convincing fake approval window that asks to approve or for the password, the phishing case above. An extension with the `debugger` permission can read anything and is the malware case below. |
-| Another app on the phone | Read Gleam's storage, reach the runtime, open Gleam with a crafted link, draw over the approval sheet | The OS sandbox keeps Gleam's database and WebViews private; the worker can't be reached from outside the app; Gleam claims only verified https links on `open.gleamwallet.app` (universal links, App Links with `autoVerify`) and registers no custom URL scheme; every link is parsed as untrusted (`apps/mobile/src/worker/points-link.ts`, `apps/mobile/src/adapters/browse-link.ts`); Android 12 and later drop taps that pass through another app's opaque overlay | Anyone can send a link: see the gleamwallet.app row. An overlay on Android 8 to 11, or a mostly transparent one on 12 and later, can pass taps through to the approval sheet (see Known limitations). An app with accessibility access is the malware case below. |
+| Another app on the phone | Read Gleam's storage, reach the runtime, open Gleam with a crafted link, draw over the approval sheet | The OS sandbox keeps Gleam's database and WebViews private; the worker can't be reached from outside the app; Gleam claims only verified https links on `open.gleamwallet.app` (universal links, App Links with `autoVerify`) and registers no custom URL scheme; every link is parsed as untrusted (`apps/mobile/src/worker/points-link.ts`, `apps/mobile/src/adapters/browse-link.ts`); while the approval sheet is up on Android, other apps' overlays are hidden (Android 12 and later) and a tap that starts under another app's window is dropped (`OverlayGuardPlugin.java`) | Anyone can send a link: see the gleamwallet.app row. An app with accessibility access is the malware case below. |
 | Network attacker | Inject requests into a page, tamper with data | Code ships in the package, never fetched: the extension in the CRX, the app in its bundled `dist/` with no `server.url` and no live-update plugin; HTTPS for all wallet traffic; plain-`http://` sites can't connect, read or request a signature, except `localhost`, `127.0.0.1` and `[::1]` | Loopback `http://` stays allowed for local development; its traffic never crosses the network. |
 | Compromised npm dependency | Read the unlocked key and send it out | Locked dependency versions; new releases held back 3 days; provenance downgrades refused; dependency PRs reviewed by CI | Code running inside the extension or the app can ask for signatures and decryptions while the wallet is unlocked, and can reach any https host or load an image from any https URL. It can't copy the key: unlocked keys are non-extractable. The largest open risk. |
 | Hijacked store account | Push a malicious update to every user | The accounts' own login protection. Chrome Web Store: releases are packed and signed with an offline CRX key before upload. Play: every upload must be signed with the upload key, held in a KeePassXC database. App Store: none beyond the account | A Web Store takeover alone can't publish a tampered build, since the upload must match the signed CRX; it could still publish an unrelated or reverted listing change. A Play takeover can ask Google to reset the upload key. An App Store Connect takeover can create its own distribution certificate and ship a build. |
@@ -483,11 +491,6 @@ These are true of the current release.
   a separate Activity with `android:process`. Accepted for now. The
   separate profile still keeps cookies and storage apart, and the dApp
   view doesn't open on a WebView without `MULTI_PROFILE`.
-- **Android 8 to 11 deliver taps through other apps' overlays.** The app
-  doesn't set `filterTouchesWhenObscured`, so an app holding the
-  draw-over-other-apps permission could cover the approval sheet and
-  pass the user's taps through to Approve. Android 12 and later drop
-  such taps unless the overlay is mostly transparent.
 - **iOS allows screenshots of the import screens.** The privacy screen
   is on only while a keyfile or recovery phrase is being imported. On
   Android it sets `FLAG_SECURE` (no screenshots, a blank recents card);

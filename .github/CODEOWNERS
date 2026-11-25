@@ -177,6 +177,8 @@
 /packages/core/src/models/user-errors.ts                                   @skyf0xx
 /apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
 /apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx
+/apps/mobile/src/adapters/overlay-guard.ts                                 @skyf0xx
+/apps/mobile/android/app/src/main/java/app/gleamwallet/                    @skyf0xx
 /apps/extension/src/adapters/windows.ts                                @skyf0xx
 /packages/core/src/recipients/assess.ts                                @skyf0xx
 /packages/runtime/src/handlers/reads.ts                                @skyf0xx
