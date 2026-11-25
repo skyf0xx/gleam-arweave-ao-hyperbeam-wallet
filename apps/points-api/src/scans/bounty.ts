@@ -1,3 +1,4 @@
+import { isAttestationId } from "@gleam/core/src/scan/index.ts";
 import { parseArgs } from "node:util";
 import { queryBigInt, type Db, type Queryable } from "../db";
 
@@ -50,7 +51,7 @@ export interface DockOptions {
 }
 
 function attestationArg(value: string | undefined): string {
-  if (!value || !/^[0-9a-f]{64}$/.test(value)) {
+  if (!value || !isAttestationId(value)) {
     throw new Error("--attestation must be the attestation id, 64 lowercase hex characters.");
   }
   return value;

@@ -1,3 +1,4 @@
+import { mapLimit } from "@gleam/core/src/ao/asset-scan.ts";
 import { createHash } from "node:crypto";
 import {
   MAX_SCAN_FILE_BYTES,
@@ -252,15 +253,9 @@ export function createGithubClient(options: GithubClientOptions = {}): GithubCli
     }
 
     const texts = new Map<string, string>();
-    let next = 0;
-    await Promise.all(
-      Array.from({ length: Math.min(FILE_CONCURRENCY, wanted.length) }, async () => {
-        while (next < wanted.length) {
-          const path = wanted[next++]!;
-          texts.set(path, await raw(path, MAX_SCAN_FILE_BYTES));
-        }
-      }),
-    );
+    await mapLimit(wanted, FILE_CONCURRENCY, async (path) => {
+      texts.set(path, await raw(path, MAX_SCAN_FILE_BYTES));
+    });
     try {
       const tiers = surfaceFileTiers(entries, wanted);
       const functions = listSurfaceFunctions(wanted.map((path) => ({ path, text: texts.get(path)! }))).map((fn) => ({

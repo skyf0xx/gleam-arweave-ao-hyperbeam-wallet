@@ -1,3 +1,4 @@
+import { mapLimit } from "@gleam/core/src/ao/asset-scan.ts";
 import { computeDailyPoints, type WalletSnapshot } from "@gleam/core/src/points/index.ts";
 import type { BalanceReader } from "./balances";
 import type { Db } from "../db";
@@ -53,7 +54,7 @@ export async function runSnapshot(db: Db, now: Date, options: SnapshotOptions): 
   const log = options.log ?? console.log;
   const snapshots: WalletSnapshot[] = [];
   let failedCount = 0;
-  await forEachWithConcurrency(wallets, options.concurrency ?? 8, async (wallet) => {
+  await mapLimit(wallets, options.concurrency ?? 8, async (wallet) => {
     if (!wallet.live) {
       snapshots.push({ address: wallet.address, deviceId: wallet.device_id, arAtomic: "0", aoAtomic: "0", live: false, referredBy: wallet.referred_by, originalFounder: wallet.original_founder });
       return;
@@ -147,14 +148,6 @@ async function withRetries<T>(
     }
   }
   return { ok: false, error };
-}
-
-async function forEachWithConcurrency<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>) {
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) await work(items[next++]!);
-  });
-  await Promise.all(workers);
 }
 
 function sleep(ms: number): Promise<void> {
