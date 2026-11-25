@@ -17,7 +17,6 @@ import { signerFromKeyStore, unwrapBackupKey, zeroize, type VaultKeys } from "@g
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { loadWallets } from "../stored-data";
-export { WALLETS_KEY } from "../storage-keys";
 import { loadBackupKey } from "./backup-state";
 import { stringList } from "../guards";
 import { schemaGuard } from "../schema-guard";

@@ -1,7 +1,7 @@
 import { sitePageUrl } from "@gleam/core/src/models/site-links.ts";
 
-export { SITE_URL, SITE_ORIGIN, DEV_SITE_HOSTS } from "@gleam/core/src/models/site-origin.ts";
-export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl, type SitePage } from "@gleam/core/src/models/site-links.ts";
+export { SITE_ORIGIN, DEV_SITE_HOSTS } from "@gleam/core/src/models/site-origin.ts";
+export { sitePageUrl, type SitePage } from "@gleam/core/src/models/site-links.ts";
 
 export interface SitePagesDeps {
   version: string;

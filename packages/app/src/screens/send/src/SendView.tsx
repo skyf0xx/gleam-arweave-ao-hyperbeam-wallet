@@ -1226,19 +1226,6 @@ function ReviewStep({
   );
 }
 
-export function ReviewRow({ label, value, mono, strong }: { label: string; value: string; mono?: boolean; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 phone:border-b-0 phone:py-3">
-      <span className="text-muted">{label}</span>
-      <span
-        className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-caption font-medium" : ""}`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 /**
  * Synthetic `TokenBalance` for the AO default row when `balancesQuery.data`
  * has no matching AO entry yet (unloaded, or a wallet that genuinely holds

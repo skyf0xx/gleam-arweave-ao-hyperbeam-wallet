@@ -6,7 +6,6 @@ import { getLanguage, useLanguage } from "./store";
 export { LANGUAGES, type Language } from "./define";
 export type { MessageKey } from "./catalog";
 export {
-  matchLanguage,
   setLanguagePreference,
   useLanguage,
   useLanguagePreference,

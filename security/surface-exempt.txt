@@ -104,7 +104,6 @@ packages/runtime/src/handlers/security-phrase.ts User settings and lists: no key
 packages/runtime/src/index.ts The runtime barrel and the Platform port interface.
 packages/runtime/src/platform.ts The runtime barrel and the Platform port interface.
 packages/ui/src/components/wallet/ActivityRow.tsx Wallet, balance and activity display outside the approval preview.
-packages/ui/src/components/wallet/BalanceDisplay.tsx Wallet, balance and activity display outside the approval preview.
 packages/ui/src/components/wallet/CollectibleThumbnail.tsx Wallet, balance and activity display outside the approval preview.
 packages/ui/src/components/wallet/EmptyState.tsx Wallet, balance and activity display outside the approval preview.
 packages/ui/src/components/wallet/FigurePlaceholder.tsx Wallet, balance and activity display outside the approval preview.

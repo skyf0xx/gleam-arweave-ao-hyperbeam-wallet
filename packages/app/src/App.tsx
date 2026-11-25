@@ -135,7 +135,7 @@ function CollectibleDetailScreen({ runtime, ...props }: Omit<ComponentProps<type
   return <CollectibleDetailView {...props} gatewayUrl={networkSettings.data?.gatewayUrl} />;
 }
 
-export function App(props: AppProps) {
+function App(props: AppProps) {
   return (
     <LocalizedRoot>
       <AppContent {...props} />

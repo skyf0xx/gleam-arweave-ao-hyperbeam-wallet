@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { AddressDisplay } from "./AddressDisplay";
-import { BalanceDisplay } from "./BalanceDisplay";
 import { TokenRow } from "./TokenRow";
 import { ActivityRow } from "./ActivityRow";
 import { EmptyState } from "./EmptyState";
@@ -26,18 +25,6 @@ describe("AddressDisplay", () => {
 
     expect(onCopy).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Address copied" })).toBeTruthy();
-  });
-});
-
-describe("BalanceDisplay", () => {
-  it("renders the pre-formatted amount label verbatim, no reformatting", () => {
-    render(<BalanceDisplay amountLabel="128.4204 AR" />);
-    expect(screen.getByText("128.4204 AR")).toBeTruthy();
-  });
-
-  it("renders a skeleton instead of the amount while loading", () => {
-    render(<BalanceDisplay amountLabel="128.4204 AR" loading />);
-    expect(screen.queryByText("128.4204 AR")).toBeNull();
   });
 });
 
