@@ -6,6 +6,7 @@
 
 import { execFileSync } from "node:child_process";
 import process from "node:process";
+import { parseArgs } from "node:util";
 import { assertCleanBranch, git, printGate, repoRoot, runGate } from "./release-gate.mjs";
 
 const BRANCH = "master";
@@ -20,7 +21,7 @@ function refuse(reason) {
   process.exit(1);
 }
 
-const confirmed = process.argv.slice(2).includes("--yes");
+const confirmed = parseArgs({ args: process.argv.slice(2), options: { yes: { type: "boolean" } }, strict: false }).values.yes === true;
 
 const root = repoRoot(process.cwd());
 if (root === null) refuse("not inside a git repository");

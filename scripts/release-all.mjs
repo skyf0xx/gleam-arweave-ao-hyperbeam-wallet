@@ -29,6 +29,7 @@
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import process from "node:process";
+import { parseArgs } from "node:util";
 import { checkVersions, readVersions, writeVersions } from "./app-versions.mjs";
 import { assertCleanBranch, repoRoot, runGate } from "./release-gate.mjs";
 import { checkWellKnown } from "./well-known.mjs";
@@ -58,16 +59,16 @@ async function pause(prompt) {
   await rl.question(`\n${prompt} (press enter to continue) `);
 }
 
-const args = process.argv.slice(2);
-const bump = args.find((a) => ["major", "minor", "patch"].includes(a));
+const { values, positionals } = parseArgs({
+  args: process.argv.slice(2),
+  options: { key: { type: "string" }, kdbx: { type: "string" } },
+  allowPositionals: true,
+  strict: false,
+});
+const bump = positionals.find((a) => ["major", "minor", "patch"].includes(a));
 if (!bump) refuse('pass a bump type: "major", "minor" or "patch"');
-/** @param {string} name */
-function flag(name) {
-  const i = args.indexOf(name);
-  return i !== -1 ? args[i + 1] : undefined;
-}
-const key = flag("--key") ?? process.env.GLEAM_CWS_KEY;
-const kdbx = flag("--kdbx") ?? process.env.GLEAM_CWS_KDBX;
+const key = (typeof values.key === "string" ? values.key : undefined) ?? process.env.GLEAM_CWS_KEY;
+const kdbx = (typeof values.kdbx === "string" ? values.kdbx : undefined) ?? process.env.GLEAM_CWS_KDBX;
 if (key && kdbx) refuse("both a KeePassXC database and a key file given; pass only one");
 if (!key && !kdbx) refuse("no private key given: pass --kdbx <path> or --key <path>, or set GLEAM_CWS_KDBX or GLEAM_CWS_KEY");
 const signWith = kdbx ? ["--kdbx", kdbx] : ["--key", /** @type {string} */ (key)];
