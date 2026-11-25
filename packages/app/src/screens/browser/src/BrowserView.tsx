@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import type { Grant, RuntimePort } from "@gleam/core";
+import type { Grant, RuntimePort, WalletState } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
@@ -10,7 +10,6 @@ import { useT } from "../../../i18n";
 import { StartScreen } from "./StartScreen";
 import { HistoryScreen } from "./HistoryScreen";
 import { useBrowserSites } from "./useBrowserSites";
-import { useWalletState } from "../../activity/src/useWalletState";
 
 export interface BrowserViewProps {
   runtime: RuntimePort;
@@ -194,10 +193,17 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   // Auto-lock fires in the background with nothing telling the screen, and
   // the page sits above the lock screen, so the screen asks. Asking isn't
   // activity, or it would keep the wallet awake.
-  const { data: walletState } = useWalletState(runtime, { refetchInterval: LOCK_POLL_MS });
   useEffect(() => {
-    if (walletState && (walletState.session === null || walletState.session.unlockedWalletIds.length === 0)) lockedRef.current();
-  }, [walletState]);
+    const timer = setInterval(() => {
+      runtime
+        .send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } })
+        .then((state) => {
+          if (state.session === null || state.session.unlockedWalletIds.length === 0) lockedRef.current();
+        })
+        .catch(() => undefined);
+    }, LOCK_POLL_MS);
+    return () => clearInterval(timer);
+  }, [runtime]);
 
   const cancelEditing = () => {
     setEditing(false);
