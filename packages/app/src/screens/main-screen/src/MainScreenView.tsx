@@ -47,9 +47,9 @@ import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { readRowVisibility, shownTokenLogo, writeRowVisibility, type RowVisibility } from "../../../token-visibility";
 import { relativeTime } from "../../../relative-time";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
-import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { BackIcon } from "@gleam/ui/src/primitives/icons.tsx";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -885,15 +885,15 @@ export function MainScreenView({
                 {truncateAddress(wallet.address, 6)}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={copyAddress}
-              aria-label={addressCopied ? t("mainScreen.addressCopied") : t("mainScreen.copyAddress")}
+            <CopyButton
+              copied={addressCopied}
+              onCopy={copyAddress}
+              label={addressCopied ? t("mainScreen.addressCopied") : t("mainScreen.copyAddress")}
               title={addressCopied ? t("mainScreen.copied") : t("mainScreen.copyAddress")}
-              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-muted opacity-0 hover:text-foreground"}`}
-            >
-              {addressCopied ? <CheckIcon /> : <CopyIcon />}
-            </button>
+              reveal
+              tone="muted"
+              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target"
+            />
           </div>
         </span>
 

@@ -17,8 +17,8 @@ import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
-import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 import { backupDriveName } from "../../backup/src/BackupView";
+import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -213,15 +213,15 @@ export function WalletDetailView({
             {methodLabel ? <span className="text-label text-faint">{methodLabel}</span> : null}
             <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
           </div>
-          <button
-            type="button"
-            onClick={copyAddress}
-            aria-label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
+          <CopyButton
+            copied={addressCopied}
+            onCopy={copyAddress}
+            label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
             title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
-            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-hover focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
-          >
-            {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
-          </button>
+            iconSize={15}
+            reveal
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-hover focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target"
+          />
         </div>
 
         <TextField
