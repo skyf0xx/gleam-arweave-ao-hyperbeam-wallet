@@ -112,6 +112,7 @@
 3 packages/runtime/src/site-events.ts
 3 packages/runtime/src/request-guards.ts
 3 packages/runtime/src/token-preview.ts
+3 packages/runtime/src/vault-lock.ts
 3 packages/runtime/src/first-run-network.ts
 3 packages/runtime/src/handlers/provider.ts
 3 packages/runtime/src/dispatch/site.ts

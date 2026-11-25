@@ -107,6 +107,7 @@
 /packages/runtime/src/site-events.ts                                       @skyf0xx
 /packages/runtime/src/request-guards.ts                                    @skyf0xx
 /packages/runtime/src/token-preview.ts                                     @skyf0xx
+/packages/runtime/src/vault-lock.ts                                        @skyf0xx
 /packages/runtime/src/first-run-network.ts                                 @skyf0xx
 /packages/runtime/src/handlers/provider.ts                                 @skyf0xx
 /packages/runtime/src/dispatch/site.ts                                     @skyf0xx

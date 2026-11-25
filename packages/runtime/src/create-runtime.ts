@@ -1,10 +1,5 @@
 import type { z } from "zod";
-import {
-  DEFAULT_BUNDLER_URL,
-  POINTS_API_URL,
-  type WalletSummary,
-  vaultHasPassword,
-} from "@gleam/core";
+import { DEFAULT_BUNDLER_URL, POINTS_API_URL, type WalletSummary } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { WalletLifecycleHandler } from "./handlers/wallet-lifecycle";
@@ -44,6 +39,7 @@ import { createProviderDispatch } from "./provider-dispatch";
 import { createSiteDispatch } from "./site-dispatch";
 import { createSiteEvents } from "./site-events";
 import { createTokenPreview } from "./token-preview";
+import { createVaultLock, registerAutoLockAlarm } from "./vault-lock";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -71,8 +67,6 @@ export interface Runtime {
 
 type ProtocolData<K extends keyof ProtocolMap> = Parameters<ProtocolMap[K]>[0];
 type ProtocolResult<K extends keyof ProtocolMap> = ReturnType<ProtocolMap[K]> | Promise<ReturnType<ProtocolMap[K]>>;
-
-const AUTO_LOCK_ALARM_NAME = "auto-lock";
 
 type ContentScriptCaller = Extract<CallerContext, { tier: "contentScript" }>;
 
@@ -171,11 +165,7 @@ export function createRuntime(platform: Platform): Runtime {
   const securityPhrase = new SecurityPhraseHandler(storage);
   const siteWallet = new SiteWalletHandler({ storage, findActiveGrant: (origin) => approval.findActiveGrant(origin) });
 
-  // Auto-lock is otherwise only checked when something reads the session;
-  // this tick drops the keys once the timeout passes even if nothing does.
-  platform.timer.every(AUTO_LOCK_ALARM_NAME, 1, () => {
-    enforceAutoLock().catch((error: unknown) => console.error("Auto-lock failed.", error));
-  });
+  registerAutoLockAlarm(platform.timer, enforceAutoLock);
 
   const {
     favIconFor,
@@ -212,22 +202,7 @@ export function createRuntime(platform: Platform): Runtime {
 
   const dispatchProviderCall = createProviderDispatch({ lifecycle, approval, handlers: providerHandlers });
 
-  async function lockVault(): Promise<void> {
-    await lifecycle.lockWallet();
-    // A vault of only hardware wallets has no password and stays unlocked.
-    if (vaultHasPassword((await lifecycle.getState()).wallets)) void platform.lockIndicator.setLocked(true);
-  }
-
-  /**
-   * Locks when the computer's screen locks, unless auto-lock is "never".
-   * Only `"locked"` counts: the auto-lock timeout already runs from the last
-   * use of the wallet, which is stricter than the OS's idle state.
-   */
-  async function lockOnScreenLock(state: string): Promise<void> {
-    if (state !== "locked") return;
-    if ((await lifecycle.getLockSettings()).autoLockTimeout === "never") return;
-    await lockVault();
-  }
+  const { lockVault, lockOnScreenLock } = createVaultLock(lifecycle, platform.lockIndicator);
 
   // A new wallet becomes the active one. Connected dApps follow the active
   // wallet, so they hear about it; with no earlier wallet there is nothing
