@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidArweaveAddress } from "@gleam/core";
 import { t } from "../../../i18n";
 
 /**
@@ -16,7 +17,7 @@ import { t } from "../../../i18n";
 export const recipientSchema = z
   .string()
   .trim()
-  .regex(/^[A-Za-z0-9_-]{43}$/, { error: () => t("send.addressIncomplete") });
+  .refine(isValidArweaveAddress, { error: () => t("send.addressIncomplete") });
 
 const AMOUNT_SHAPE = /^\d+(\.\d+)?$/;
 

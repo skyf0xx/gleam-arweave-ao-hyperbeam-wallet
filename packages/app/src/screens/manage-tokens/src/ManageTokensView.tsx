@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { RuntimePort, TokenBalance } from "@gleam/core";
+import { isValidArweaveAddress, type RuntimePort, type TokenBalance } from "@gleam/core";
 import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -20,7 +20,6 @@ export interface ManageTokensViewProps {
   onBack: () => void;
 }
 
-const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
 
 interface LoadState {
   processIds: string[];
@@ -76,7 +75,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
   };
 
   const handlePreview = async (processId: string) => {
-    if (!PROCESS_ID.test(processId)) {
+    if (!isValidArweaveAddress(processId)) {
       setAddError(t("manageTokens.badIdLength", { length: processId.length }));
       return;
     }
@@ -137,11 +136,11 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 setPreview(null);
                 setPreviewing(false);
                 // A whole id previews at once, pasted or typed; anything shorter waits for blur to explain itself.
-                if (PROCESS_ID.test(processId)) void handlePreview(processId);
+                if (isValidArweaveAddress(processId)) void handlePreview(processId);
               }}
               onBlur={() => {
                 const processId = newProcessId.trim();
-                if (processId.length > 0 && !PROCESS_ID.test(processId)) void handlePreview(processId);
+                if (processId.length > 0 && !isValidArweaveAddress(processId)) void handlePreview(processId);
               }}
               className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
             />

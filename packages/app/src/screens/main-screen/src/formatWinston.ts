@@ -1,3 +1,4 @@
+import { isValidArweaveAddress } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 
 /**
@@ -84,10 +85,6 @@ export function formatAtomicCompact(atomic: string, denomination: number): strin
   const digits = fraction.slice(zeros, zeros + COMPACT_SIGNIFICANT_DIGITS).replace(/0+$/, "");
   const count = [...String(zeros)].map((digit) => SUBSCRIPT_DIGITS[Number(digit)]).join("");
   return `0.0${count}${digits}`;
-}
-
-function isValidArweaveAddress(address: string): boolean {
-  return /^[A-Za-z0-9_-]{43}$/.test(address);
 }
 
 /**
