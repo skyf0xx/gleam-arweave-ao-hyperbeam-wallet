@@ -4,6 +4,7 @@ import { isValidNetworkSettings } from "../models/network";
 import { isPasskeyEnrollment } from "../models/passkey";
 import { readSecurityPhrase } from "../models/security-phrase";
 import { isLockSettings } from "../models/session";
+import { isExactHttpOrigin } from "../models/site-origin";
 import { isValidWallet, type VaultEnvelopeV2, type Wallet } from "../models/wallet";
 import { base64ToBytes, bytesToBase64 } from "../vault/base64";
 import { isPlainRecord, isRecord } from "../models/guards";
@@ -106,16 +107,6 @@ interface BackupRule {
   ok(value: unknown): boolean;
 }
 
-function isWebOrigin(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  try {
-    const url = new URL(value);
-    return (url.protocol === "https:" || url.protocol === "http:") && url.origin === value;
-  } catch {
-    return false;
-  }
-}
-
 function isTokenId(value: unknown): boolean {
   return typeof value === "string" && isValidArweaveAddress(value);
 }
@@ -144,7 +135,7 @@ const RULES: Readonly<Record<string, BackupRule>> = {
   "local:lockSettings": { list: false, ok: isLockSettings },
   "local:securityPhrase": { list: false, ok: (value) => readSecurityPhrase(value) !== null },
   "local:passkey": { list: false, ok: isPasskeyEnrollment },
-  [SAVED_SITES_BACKUP_KEY]: { list: true, ok: isWebOrigin },
+  [SAVED_SITES_BACKUP_KEY]: { list: true, ok: isExactHttpOrigin },
 };
 
 const WATCHED_TOKENS_RULE: BackupRule = { list: true, ok: isTokenId };
