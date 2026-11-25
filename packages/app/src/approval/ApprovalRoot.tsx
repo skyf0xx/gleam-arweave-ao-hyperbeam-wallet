@@ -33,7 +33,7 @@ import { forgetQueryCache } from "../query-cache/sweep";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
-import { applyDocumentTheme, themeAttribute } from "../theme";
+import { applyStoredTheme, themeAttribute } from "../theme";
 import { LoadSignedDataProvider } from "./SignedDataText";
 import { errorText } from "../i18n/errors";
 import { recipientsOf, transferRequestFromPreview } from "../transfer-review/model";
@@ -206,22 +206,7 @@ function ApprovalRootContent({
     }
   };
 
-  const applyTheme = async (runtime: RuntimePort) => {
-    let stored: ThemeSettings["theme"] = "light";
-    try {
-      const settings = await runtime.send<void, ThemeSettings>({
-        type: "getThemePreference",
-        payload: undefined,
-      });
-      stored = settings.theme;
-    } catch {
-      // Light, as `App` falls back.
-    }
-    // The page behind the root is painted too, or a short request shows
-    // the light page under dark text.
-    applyDocumentTheme(stored);
-    setTheme(stored);
-  };
+  const applyTheme = (runtime: RuntimePort) => applyStoredTheme(runtime, setTheme);
 
   const load = async (runtime: RuntimePort, id: string) => {
     try {

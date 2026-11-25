@@ -39,7 +39,7 @@ import { QueryCachePersistence } from "./query-cache/persistence";
 import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
 import { sitePageUrl } from "@gleam/core";
 import { errorText } from "./i18n/errors";
-import { applyDocumentTheme, Sky, ThemeContext, themeAttribute } from "./theme";
+import { applyStoredTheme, Sky, ThemeContext, themeAttribute } from "./theme";
 import { releasePointerFocusOnBlur } from "./pointer-focus";
 
 /**
@@ -204,30 +204,12 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   };
 
   /**
-   * Fetches the stored theme preference and applies it to the shared root
-   * before the first substantive paint. No synchronous pre-paint read
-   * exists in MV3, so this awaits alongside `getState` in the same
-   * `init()` gate rather than accepting a flash of the wrong theme.
-   * Never throws: a read failure falls back to light rather than
-   * blocking `init()` or leaving `data-theme` unset.
+   * Applies the stored theme before the first substantive paint. No
+   * synchronous pre-paint read exists in MV3, so this awaits alongside
+   * `getState` in the same `init()` gate rather than accepting a flash of
+   * the wrong theme.
    */
-  const applyTheme = async (runtime: RuntimePort) => {
-    // A document that outlives a view keeps whatever `documentElement`
-    // attribute the last toggle left, and `[data-theme="dark"]` matches any
-    // ancestor, so reset it from the stored preference rather than trust it.
-    let stored: ThemeSettings["theme"] = "light";
-    try {
-      const settings = await runtime.send<void, ThemeSettings>({
-        type: "getThemePreference",
-        payload: undefined,
-      });
-      stored = settings.theme;
-    } catch {
-      // Falls back to light.
-    }
-    setTheme(stored);
-    applyDocumentTheme(stored);
-  };
+  const applyTheme = (runtime: RuntimePort) => applyStoredTheme(runtime, setTheme);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RuntimePort, ThemePreference, ThemeSettings } from "@gleam/core";
-import { applyDocumentTheme, useSharedTheme } from "../../../theme";
+import { applyDocumentTheme, loadStoredTheme, useSharedTheme } from "../../../theme";
 
 /** The stored theme, changed at once on screen and put back if saving fails. */
 export function useTheme(runtime: RuntimePort) {
@@ -12,12 +12,9 @@ export function useTheme(runtime: RuntimePort) {
   useEffect(() => {
     if (shared) return;
     let cancelled = false;
-    runtime
-      .send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined })
-      .then((settings) => {
-        if (!cancelled) setLocal(settings.theme);
-      })
-      .catch(() => undefined);
+    void loadStoredTheme(runtime).then((stored) => {
+      if (!cancelled) setLocal(stored);
+    });
     return () => {
       cancelled = true;
     };
