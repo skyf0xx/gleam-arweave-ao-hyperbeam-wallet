@@ -214,3 +214,14 @@ packages/app/src/security-phrase.ts Loads the security phrase's word; shown to t
 packages/app/src/screens/activity/src/useWalletState.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/connected-apps/src/useConnectedApps.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/useKnownAddresses.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/ComposeStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/NetworkFeeLine.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/RecipientField.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/ReviewStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/SavedAddressesStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/SkeletonPickerRow.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/SuccessStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/TokenPickerStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/namedAddresses.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/sendStep.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/sendTokenFormat.ts The send form; transfer-review (listed) shows what is sent and the background checks it.

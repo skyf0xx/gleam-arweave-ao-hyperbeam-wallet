@@ -7,7 +7,7 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { StepForm, StepIntro } from "@gleam/ui/src/components/onboarding/index.ts";
 import { usePlatform } from "../../../app-platform/context";
 import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
-import { QrScanIcon } from "../../send/src/SendView";
+import { QrScanIcon } from "@gleam/ui/src/primitives/icons.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
