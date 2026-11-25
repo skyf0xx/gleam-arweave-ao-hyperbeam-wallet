@@ -61,6 +61,7 @@ import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { NETWORK_SETTINGS_KEY } from "./storage-keys";
+import { requireWallet } from "./stored-data";
 import { dappError } from "./dapp-error";
 import { createProviderHandlers, type ApprovalCall, type GrantedCall, type TokenPreview } from "./handlers/provider";
 
@@ -379,9 +380,7 @@ export function createRuntime(platform: Platform): Runtime {
   }
 
   async function walletAddress(walletId: string): Promise<string> {
-    const wallet = (await lifecycle.getState()).wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
-    return wallet.address;
+    return requireWallet((await lifecycle.getState()).wallets, walletId).address;
   }
 
   async function resolveTokenDenominationAndTicker(

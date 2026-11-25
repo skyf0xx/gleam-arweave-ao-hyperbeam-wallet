@@ -40,7 +40,8 @@ import {
 import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { WALLETS_KEY, NETWORK_SETTINGS_KEY, CONTACTS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
+import { loadWallets, requireWallet } from "../stored-data";
+import { NETWORK_SETTINGS_KEY, CONTACTS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
 import { assertNameTargetMatches, assertTransferMatches } from "./prepared-check";
 import { readL1NodeUrls } from "../peers";
@@ -100,12 +101,6 @@ const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
   activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
 };
 
-function isValidWallet(value: unknown): value is Wallet {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.id === "string" && typeof candidate.address === "string";
-}
-
 function isValidActivityEntry(value: unknown): value is ActivityEntry {
   if (value === null || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
@@ -148,13 +143,7 @@ export class TransferHandler {
   }
 
   private async loadWallet(walletId: string): Promise<Wallet> {
-    const raw = await this.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(raw) ? raw.filter(isValidWallet) : [];
-    const wallet = wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) {
-      throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
-    }
-    return wallet;
+    return requireWallet(await loadWallets(this.storage), walletId);
   }
 
   private async loadActivityLog(address: string): Promise<ActivityEntry[]> {
@@ -231,7 +220,7 @@ export class TransferHandler {
   private async loadKnownAddresses(): Promise<string[]> {
     const [contacts, wallets] = await Promise.all([
       this.storage.get<unknown>(CONTACTS_KEY),
-      this.storage.get<unknown>(WALLETS_KEY),
+      loadWallets(this.storage),
     ]);
     const addresses: string[] = [];
     if (Array.isArray(contacts)) {
@@ -239,7 +228,7 @@ export class TransferHandler {
         if (contact && typeof contact.address === "string") addresses.push(contact.address);
       }
     }
-    if (Array.isArray(wallets)) addresses.push(...wallets.filter(isValidWallet).map((wallet) => wallet.address));
+    addresses.push(...wallets.map((wallet) => wallet.address));
     return addresses;
   }
 

@@ -44,6 +44,7 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { dappError } from "../dapp-error";
 import { updateStored } from "../storage-update";
 import { BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY } from "../storage-keys";
+import { loadWallets } from "../stored-data";
 import { loadBackupKey, loadBackupState, updateBackupState, type BackupState, type StoredBackupKey } from "./backup-state";
 import type { KeySession } from "./key-session";
 
@@ -292,8 +293,7 @@ export class BackupHandler {
   }
 
   private async vaultIsEmpty(): Promise<boolean> {
-    const wallets = await this.storage.get<unknown>(WALLETS_KEY);
-    return !(Array.isArray(wallets) && wallets.length > 0);
+    return (await loadWallets(this.storage)).length === 0;
   }
 
   private requireCloud(): CloudFilePort {
@@ -341,9 +341,7 @@ export class BackupHandler {
    * key to the whole vault backup — below the current cost.
    */
   private async vaultEncryptOptions(): Promise<EncryptOptions> {
-    const wallets = await this.storage.get<unknown>(WALLETS_KEY);
-    const envelope = (Array.isArray(wallets) ? wallets : [])
-      .filter(isValidWallet)
+    const envelope = (await loadWallets(this.storage))
       .map((wallet) => wallet.encryptedKeyfile)
       .find((candidate): candidate is VaultEnvelopeV2 => candidate?.version === 2);
     if (envelope && !envelopeNeedsUpgrade(envelope)) {

@@ -63,11 +63,11 @@ import type {
   UserToken,
   UserTokensOptions,
   UserTokensResult,
-  Wallet,
   Winston,
 } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { WALLETS_KEY, ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, ACTIVITY_LOG_KEY_PREFIX, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { loadWallets } from "../stored-data";
+import { ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, ACTIVITY_LOG_KEY_PREFIX, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
 
 /**
@@ -1150,9 +1150,7 @@ export class ReadsHandler {
    * addresses live: the wallets list.
    */
   async loadTrackedAddresses(): Promise<string[]> {
-    const rawWallets = await this.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(rawWallets) ? (rawWallets as Wallet[]) : [];
-    return wallets.map((wallet) => wallet.address).filter((address): address is string => typeof address === "string");
+    return (await loadWallets(this.storage)).map((wallet) => wallet.address);
   }
 
   /**
@@ -1165,8 +1163,7 @@ export class ReadsHandler {
    * reportable state for the caller to handle.
    */
   private async resolveActiveWalletAddress(): Promise<string | null> {
-    const rawWallets = await this.storage.get<unknown>(WALLETS_KEY);
-    const wallets = Array.isArray(rawWallets) ? (rawWallets as Wallet[]) : [];
+    const wallets = await loadWallets(this.storage);
     if (wallets.length === 0) return null;
 
     const activeWalletId = await this.storage.get<string | null>(ACTIVE_WALLET_ID_KEY);

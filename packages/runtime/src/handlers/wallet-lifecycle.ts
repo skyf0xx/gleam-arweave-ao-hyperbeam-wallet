@@ -12,7 +12,6 @@ import {
   isThemeSettings,
   isValidArweaveAddress,
   isValidHardwareDevice,
-  isValidWallet,
   keyfileFilename,
   validateJWKShape,
   validatePassword,
@@ -49,6 +48,7 @@ import { isSessionExpired, isValidSession, SESSION_KEY, type KeySession } from "
 import { POINTS_STORAGE_KEYS } from "./points";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, BACKUP_KEY, BACKUP_STATE_KEY, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { loadWallets, requireWallet, updateWallet } from "../stored-data";
 import { dappError } from "../dapp-error";
 
 /**
@@ -130,15 +130,6 @@ function keylessWalletIds(wallets: Wallet[]): string[] {
 /** A vault has a password exactly when some wallet holds a keyfile encrypted under it. */
 function hasVaultPassword(wallets: Wallet[]): boolean {
   return wallets.some((wallet) => wallet.encryptedKeyfile !== null);
-}
-
-async function loadWallets(storage: StoragePort): Promise<Wallet[]> {
-  const raw = await storage.get<unknown>(WALLETS_KEY);
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(isValidWallet).map((wallet) => ({
-    ...wallet,
-    backupConfirmedAt: wallet.backupConfirmedAt ?? null,
-  }));
 }
 
 async function saveWallets(storage: StoragePort, wallets: Wallet[]): Promise<void> {
@@ -720,13 +711,7 @@ export class WalletLifecycleHandler {
 
   async renameWallet(req: { walletId: string; name: string }): Promise<void> {
     return this.keySession.withSessionLock(async () => {
-      const wallets = await loadWallets(this.storage);
-      const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
-      if (index === -1) {
-        throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
-      }
-      wallets[index] = { ...wallets[index]!, name: req.name, updatedAt: Date.now() };
-      await saveWallets(this.storage, wallets);
+      await updateWallet(this.storage, req.walletId, { name: req.name, updatedAt: Date.now() });
     });
   }
 
@@ -737,21 +722,12 @@ export class WalletLifecycleHandler {
    */
   async confirmWalletBackup(req: { walletId: string }): Promise<void> {
     return this.keySession.withSessionLock(async () => {
-      const wallets = await loadWallets(this.storage);
-      const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
-      if (index === -1) {
-        throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
-      }
-      wallets[index] = { ...wallets[index]!, backupConfirmedAt: Date.now() };
-      await saveWallets(this.storage, wallets);
+      await updateWallet(this.storage, req.walletId, { backupConfirmedAt: Date.now() });
     });
   }
 
   async switchWallet(req: { walletId: string }): Promise<void> {
-    const wallets = await loadWallets(this.storage);
-    if (!wallets.some((wallet) => wallet.id === req.walletId)) {
-      throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
-    }
+    requireWallet(await loadWallets(this.storage), req.walletId);
     await this.storage.set(ACTIVE_WALLET_ID_KEY, req.walletId);
   }
 

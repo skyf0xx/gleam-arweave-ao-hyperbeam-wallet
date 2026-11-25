@@ -15,7 +15,7 @@ import {
 import { signerFromKeyStore, unwrapBackupKey, zeroize, type VaultKeys } from "@gleam/core/signer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
-import { WALLETS_KEY } from "../storage-keys";
+import { loadWallets } from "../stored-data";
 export { WALLETS_KEY } from "../storage-keys";
 import { loadBackupKey } from "./backup-state";
 
@@ -261,17 +261,11 @@ export interface KeySession {
  */
 export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeySession {
   async function getStoredWallet(walletId: string): Promise<StoredWalletInfo | null> {
-    const wallets = await storage.get<unknown>(WALLETS_KEY);
-    if (!Array.isArray(wallets)) return null;
-    const wallet = (wallets as unknown[]).find(
-      (candidate): candidate is Record<string, unknown> =>
-        candidate !== null && typeof candidate === "object" && (candidate as { id?: unknown }).id === walletId,
-    );
+    const wallet = (await loadWallets(storage)).find((candidate) => candidate.id === walletId);
     if (!wallet) return null;
     const { address, method, publicKey, device } = wallet;
-    if (typeof address !== "string" || typeof method !== "string" || typeof publicKey !== "string") return null;
-    const info: StoredWalletInfo = { id: walletId, address, method: method as WalletMethod, publicKey };
-    if (device !== null && typeof device === "object") info.device = device as HardwareDevice;
+    const info: StoredWalletInfo = { id: walletId, address, method, publicKey };
+    if (device) info.device = device;
     return info;
   }
 
@@ -365,12 +359,7 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
    * `loadSession` would only start again.
    */
   async function storedWalletMethods(): Promise<Array<{ method: WalletMethod }>> {
-    const wallets = await storage.get<unknown>(WALLETS_KEY);
-    if (!Array.isArray(wallets)) return [];
-    return (wallets as unknown[]).flatMap((wallet) => {
-      const method = wallet !== null && typeof wallet === "object" ? (wallet as { method?: unknown }).method : undefined;
-      return typeof method === "string" ? [{ method: method as WalletMethod }] : [];
-    });
+    return (await loadWallets(storage)).map(({ method }) => ({ method }));
   }
 
   async function isHardwareOnlyVault(): Promise<boolean> {

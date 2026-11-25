@@ -21,6 +21,7 @@
 /packages/runtime/src/handlers/backup.ts                                   @skyf0xx
 /packages/runtime/src/handlers/backup-state.ts                             @skyf0xx
 /packages/runtime/src/backup-sync.ts                                       @skyf0xx
+/packages/runtime/src/stored-data.ts                                       @skyf0xx
 /apps/extension/src/passkey/                                               @skyf0xx
 /apps/extension/entrypoints/passkey/                                       @skyf0xx
 /apps/extension/src/adapters/storage.ts                                    @skyf0xx

@@ -28,6 +28,7 @@
 1 packages/runtime/src/handlers/backup.ts
 1 packages/runtime/src/handlers/backup-state.ts
 1 packages/runtime/src/backup-sync.ts
+1 packages/runtime/src/stored-data.ts
 1 apps/extension/src/passkey/
 1 apps/extension/entrypoints/passkey/
 1 apps/extension/src/adapters/storage.ts
