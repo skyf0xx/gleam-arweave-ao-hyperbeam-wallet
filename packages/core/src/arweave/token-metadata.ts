@@ -2,22 +2,17 @@ import { classifyAsset } from "../ao/asset-scan";
 import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
 import { isArweaveId } from "../models/arweave-id";
+import { z } from "zod";
 import { tagValue, type Tag } from "../models/tag";
 import { trimTrailingSlashes } from "../models/network";
 import { postGraphQL } from "./graphql";
+import { tagSchema, transactionsReply } from "./graphql-schema";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
  * by `ids` rather than `owners`/`recipients`.
  */
-interface GraphQLTransactionsByIdResponse {
-  data?: {
-    transactions?: {
-      edges: Array<{ node: { id: string; tags: Tag[] } }>;
-    };
-  };
-  errors?: Array<{ message: string }>;
-}
+const transactionsByIdSchema = transactionsReply(z.object({ id: z.string(), tags: z.array(tagSchema) }));
 
 /**
  * Where to load a token's logo from: the `logo` tag is an Arweave
@@ -65,10 +60,11 @@ export async function queryTokenMetadata(
     }
   `;
 
-  const body = await postGraphQL<GraphQLTransactionsByIdResponse>(
+  const body = await postGraphQL(
     trimTrailingSlashes(gatewayUrl),
     query,
     { ids: [processId] },
+    transactionsByIdSchema,
     fetchImpl,
     (_gateway, detail, kind) =>
       kind === "http"

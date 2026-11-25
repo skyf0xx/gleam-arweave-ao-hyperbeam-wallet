@@ -3,7 +3,8 @@ import { L1_CANARY_PROCESS_ID, trimTrailingSlashes } from "../models/network";
 export { trimTrailingSlashes as stripTrailingSlashes } from "../models/network";
 import { readCappedDigits, readCappedText } from "./capped-body";
 import { mapLimit } from "../models/concurrency";
-import type { Tag } from "../models/tag";
+import { z } from "zod";
+import { blockSchema, transactionsReply } from "../arweave/graphql-schema";
 
 export interface DiscoverHyperBeamPeersOptions {
   gatewayUrl: string;
@@ -18,21 +19,16 @@ export interface DiscoverHyperBeamPeersOptions {
   timeoutMs?: number;
 }
 
-interface LocationNode {
-  id: string;
-  owner?: { address?: string } | null;
-  block?: { timestamp?: number } | null;
-  tags?: Tag[] | null;
-}
+const locationPageSchema = transactionsReply(
+  z.object({
+    id: z.string(),
+    owner: z.object({ address: z.string().optional() }).nullish(),
+    block: blockSchema({ timestamp: z.number().optional() }),
+    tags: z.array(z.object({ name: z.string(), value: z.string() })).nullish(),
+  }),
+);
 
-interface LocationPage {
-  data?: {
-    transactions?: {
-      pageInfo?: { hasNextPage?: boolean };
-      edges?: { cursor: string; node: LocationNode }[];
-    };
-  };
-}
+type LocationNode = NonNullable<NonNullable<z.output<typeof locationPageSchema>["data"]>["transactions"]>["edges"][number]["node"];
 
 const LOCATION_TAG_FILTERS = [
   [{ name: "Type", values: ["Location", "Scheduler-Location"] }],
@@ -134,7 +130,9 @@ async function readLocationRecords(
       if (!response.ok) break;
       const text = await readCappedText(response, LOCATION_PAGE_MAX_BYTES);
       if (text === null) break;
-      const body = JSON.parse(text) as LocationPage;
+      const page = locationPageSchema.safeParse(JSON.parse(text));
+      if (!page.success) break;
+      const body = page.data;
       const edges = body.data?.transactions?.edges ?? [];
       for (const edge of edges) nodes.push(edge.node);
       if (!body.data?.transactions?.pageInfo?.hasNextPage || edges.length === 0) break;

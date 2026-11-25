@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ActivityEntry } from "../models/activity";
 import { COLLECTIBLE_TRANSFER_QUANTITY } from "../ao/collectible-transfer";
 import { L1_ACTIVATION_WINSTON } from "../ao/l1-transfer";
@@ -5,29 +6,24 @@ import { userErrorMessage } from "../models/user-errors";
 import { isArweaveId } from "../models/arweave-id";
 import { tagValue, type Tag } from "../models/tag";
 import { trimTrailingSlashes } from "../models/network";
+import { blockSchema, graphqlErrorsSchema, nullable, tagSchema, transactionsReply } from "./graphql-schema";
 
 /**
- * Minimal shape of the gateway's GraphQL transaction connection response
- * this client actually reads — not the full arweave-graphql schema.
+ * The fields of the gateway's GraphQL transaction node this client
+ * actually reads — not the full arweave-graphql schema.
  */
-interface GraphQLTransactionNode {
-  id: string;
-  owner: { address: string };
-  recipient: string | null;
-  quantity: { winston: string };
-  tags: Tag[];
-  data?: { size: string } | null;
-  block: { timestamp: number } | null;
-}
+const activityNodeSchema = z.object({
+  id: z.string(),
+  owner: z.object({ address: z.string() }),
+  recipient: nullable(z.string()),
+  quantity: z.object({ winston: z.string() }),
+  tags: z.array(tagSchema),
+  data: nullable(z.object({ size: z.string() })),
+  block: blockSchema({ timestamp: z.number() }),
+});
+type GraphQLTransactionNode = z.output<typeof activityNodeSchema>;
 
-interface GraphQLTransactionsResponse {
-  data?: {
-    transactions?: {
-      edges: Array<{ cursor: string; node: GraphQLTransactionNode }>;
-    };
-  };
-  errors?: Array<{ message: string }>;
-}
+const activityReplySchema = transactionsReply(activityNodeSchema);
 
 /**
  * Additional gateways to fall through to when the primary fails outright
@@ -52,14 +48,15 @@ function gatewayCandidates(primaryGatewayUrl: string): string[] {
  * response. A non-2xx status or GraphQL `errors` throw the text
  * `describeFailure` gives for them; a failed fetch throws as it is.
  */
-export async function postGraphQL<T>(
+export async function postGraphQL<S extends z.ZodType>(
   gatewayUrl: string,
   query: string,
   variables: Record<string, unknown>,
+  schema: S,
   fetchImpl: typeof fetch,
   describeFailure: (gatewayUrl: string, detail: string, kind: "http" | "graphql") => string,
   signal?: AbortSignal,
-): Promise<T> {
+): Promise<z.output<S>> {
   const response = await fetchImpl(`${gatewayUrl}/graphql`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -71,15 +68,18 @@ export async function postGraphQL<T>(
     throw new Error(describeFailure(gatewayUrl, `HTTP ${response.status}`, "http"));
   }
 
-  const body = (await response.json()) as { errors?: Array<{ message: string }> } & T;
+  const json: unknown = await response.json();
+  const errors = graphqlErrorsSchema.safeParse(json);
 
-  if (body.errors && body.errors.length > 0) {
+  if (errors.success && errors.data.errors && errors.data.errors.length > 0) {
     throw new Error(
-      describeFailure(gatewayUrl, body.errors.map((error) => error.message).join("; "), "graphql"),
+      describeFailure(gatewayUrl, errors.data.errors.map((error) => error.message).join("; "), "graphql"),
     );
   }
 
-  return body;
+  const body = schema.safeParse(json);
+  if (!body.success) throw new Error(describeFailure(gatewayUrl, "unexpected reply shape", "graphql"));
+  return body.data;
 }
 
 /**
@@ -88,22 +88,24 @@ export async function postGraphQL<T>(
  * the first successful parsed response. Throws only if every candidate
  * fails, with the last gateway's error message.
  */
-export async function postGraphQLWithFailover<T>(
+export async function postGraphQLWithFailover<S extends z.ZodType>(
   primaryGatewayUrl: string,
   query: string,
   variables: Record<string, unknown>,
+  schema: S,
   fetchImpl: typeof fetch,
   describeFailure: (gatewayUrl: string, detail: string) => string,
-): Promise<T> {
+): Promise<z.output<S>> {
   const candidates = gatewayCandidates(primaryGatewayUrl);
   let lastError: Error | null = null;
 
   for (const gatewayUrl of candidates) {
     try {
-      return await postGraphQL<T>(
+      return await postGraphQL(
         gatewayUrl,
         query,
         variables,
+        schema,
         fetchImpl,
         describeFailure,
         AbortSignal.timeout(GRAPHQL_TIMEOUT_MS),
@@ -158,10 +160,11 @@ export async function queryActivityTransactions(
   const describe = (gw: string, detail: string) =>
     userErrorMessage("gatewayQueryFailed", { address, gateway: gw, detail });
   const run = async (query: string) => {
-    const body = await postGraphQLWithFailover<GraphQLTransactionsResponse>(
+    const body = await postGraphQLWithFailover(
       gatewayUrl,
       query,
       { address: [address], first: limit },
+      activityReplySchema,
       fetchImpl,
       describe,
     );
@@ -297,7 +300,7 @@ export async function queryL1TokenReceipts(
   limit: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ActivityEntry[]> {
-  const body = await postGraphQLWithFailover<GraphQLTransactionsResponse>(
+  const body = await postGraphQLWithFailover(
     gatewayUrl,
     `query ($address: [String!]!, $first: Int!) {
       transactions(first: $first, sort: HEIGHT_DESC, tags: [
@@ -306,6 +309,7 @@ export async function queryL1TokenReceipts(
       ]) { ${TRANSACTION_FIELDS} }
     }`,
     { address: [address], first: limit },
+    activityReplySchema,
     fetchImpl,
     (gw, detail) => userErrorMessage("gatewayReceiptQueryFailed", { address, gateway: gw, detail }),
   );
@@ -339,12 +343,11 @@ export async function queryBlockHeights(
   // Doubled below because of the unmined duplicates, and gateways cap a page at 100.
   const lookup = [...new Set(ids)].slice(0, 50);
   if (lookup.length === 0) return heights;
-  const body = await postGraphQLWithFailover<{
-    data?: { transactions?: { edges: Array<{ node: { id: string; block: { height: number } | null } }> } };
-  }>(
+  const body = await postGraphQLWithFailover(
     gatewayUrl,
     `query ($ids: [ID!]!, $first: Int!) { transactions(ids: $ids, first: $first) { edges { node { id block { height } } } } }`,
     { ids: lookup, first: lookup.length * 2 },
+    transactionsReply(z.object({ id: z.string(), block: blockSchema({ height: z.number() }) })),
     fetchImpl,
     (gw, detail) => userErrorMessage("gatewayBlockQueryFailed", { gateway: gw, detail }),
   );
@@ -360,22 +363,16 @@ export async function queryBlockHeights(
  * Arweave's `quantity.winston` field, which only reflects the tiny/zero
  * AR fee the message-send transaction itself carries.
  */
-interface GraphQLAoTransferNode {
-  id: string;
-  owner: { address: string };
-  recipient: string | null;
-  tags: Tag[];
-  block: { timestamp: number } | null;
-}
+const aoTransferNodeSchema = z.object({
+  id: z.string(),
+  owner: z.object({ address: z.string() }),
+  recipient: nullable(z.string()),
+  tags: z.array(tagSchema),
+  block: blockSchema({ timestamp: z.number() }),
+});
+type GraphQLAoTransferNode = z.output<typeof aoTransferNodeSchema>;
 
-interface GraphQLAoTransferResponse {
-  data?: {
-    transactions?: {
-      edges: Array<{ cursor: string; node: GraphQLAoTransferNode }>;
-    };
-  };
-  errors?: Array<{ message: string }>;
-}
+const aoTransferReplySchema = transactionsReply(aoTransferNodeSchema);
 
 const AO_TRANSFER_FIELDS = `
   edges {
@@ -427,10 +424,11 @@ export async function queryAoTransferActivity(
   const describe = (gw: string, detail: string) =>
     `Gateway AO-transfer GraphQL query for "${address}" against "${gw}" failed: ${detail}`;
   const run = async (query: string, variables: Record<string, unknown> = {}) => {
-    const body = await postGraphQLWithFailover<GraphQLAoTransferResponse>(
+    const body = await postGraphQLWithFailover(
       gatewayUrl,
       query,
       { address: [address], first: limit, ...variables },
+      aoTransferReplySchema,
       fetchImpl,
       describe,
     );
