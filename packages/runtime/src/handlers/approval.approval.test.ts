@@ -1247,7 +1247,18 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     const existing = (keySessionStore.get("local:wallets") as Record<string, unknown>[] | undefined) ?? [];
     keySessionStore.set("local:wallets", [
       ...existing.filter((wallet) => wallet.id !== walletId),
-      { id: walletId, method: "jwk", address: await addressFromOwner(publicKey), publicKey, ...extra },
+      {
+        id: walletId,
+        name: walletId,
+        method: "jwk",
+        address: await addressFromOwner(publicKey),
+        publicKey,
+        createdAt: 0,
+        updatedAt: 0,
+        encryptedKeyfile: null,
+        backupConfirmedAt: null,
+        ...extra,
+      },
     ]);
   }
 
@@ -1282,7 +1293,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
   it("refuses to encrypt when the stored public key doesn't match the wallet's address", async () => {
     const realKey = await generateJWK();
     const otherKey = await generateJWK();
-    await storeWallet("hw-1", otherKey.n, { method: "ledger", address: await addressFromOwner(realKey.n) });
+    await storeWallet("hw-1", otherKey.n, { method: "ledger", device: { kind: "ledger" }, address: await addressFromOwner(realKey.n) });
 
     const pending = handler.requestApproval({
       kind: "encrypt",

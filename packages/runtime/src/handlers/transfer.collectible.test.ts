@@ -242,7 +242,7 @@ describe("TransferHandler: sendCollectible", () => {
   });
 
   it("hands a hardware wallet's send to the approval window with the collectible", async () => {
-    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger" }]);
+    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", device: { kind: "ledger" } }]);
     const requestTransfer = vi.fn(async () => ({ txId: "device-tx" }));
     const handler = new TransferHandler(storage, keySession, { requestTransfer });
 

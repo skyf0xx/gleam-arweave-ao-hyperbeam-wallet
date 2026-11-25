@@ -186,7 +186,7 @@ describe("TransferHandler: setNameTarget", () => {
   });
 
   it("hands a hardware wallet's change to the approval window", async () => {
-    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger" }]);
+    keySessionStore.set("local:wallets", [{ ...wallet, method: "ledger", device: { kind: "ledger" } }]);
     const requestNameTarget = vi.fn(async () => ({ txId: "device-tx" }));
     const handler = new TransferHandler(storage, keySession, { requestTransfer: vi.fn(), requestNameTarget });
 
