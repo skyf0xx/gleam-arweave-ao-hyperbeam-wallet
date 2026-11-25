@@ -1,0 +1,36 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // An export only its own file uses is harmless; the report is for code nothing reaches.
+  "ignoreExportsUsedInFile": true,
+  "rules": {
+    // Exported prop and result types document a module's interface; they cost nothing at runtime.
+    "types": "off"
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.{ts,mjs}",
+        "stryker.config.mjs",
+        // The sites are plain HTML pages; each page loads its script directly.
+        "apps/site/*.js",
+        "apps/site-open/*.{js,mjs}"
+      ],
+      // Stryker loads its own API package; the config only names its types.
+      "ignoreDependencies": ["@stryker-mutator/api"]
+    },
+    "apps/extension": {
+      // tailwindcss: loaded by `@import "tailwindcss"` in ui's theme.css, which knip doesn't read.
+      // hash-wasm: named in build-plugins.ts so the keyring chunk keeps it apart from the rest.
+      "ignoreDependencies": ["tailwindcss", "hash-wasm"]
+    },
+    "apps/mobile": {
+      // Run by release.yml and release-app.sh to recompute the bundle hash.
+      "entry": ["scripts/*.mjs"],
+      "ignoreDependencies": ["tailwindcss"]
+    },
+    "packages/app": {
+      // react-dom is the peer @testing-library/react resolves from here.
+      "ignoreDependencies": ["tailwindcss", "react-dom", "@types/react-dom"]
+    }
+  }
+}

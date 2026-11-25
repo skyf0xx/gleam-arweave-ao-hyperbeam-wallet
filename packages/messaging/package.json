@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@webext-core/messaging": "^4.0.1",
     "@gleam/core": "workspace:*"
   },
   "devDependencies": {
