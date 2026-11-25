@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { hostnameOf } from "../../../hostname";
 import { InlineUrlEditor } from "./InlineUrlEditor";
+import { PeerRow } from "./PeerRow";
+import { useHostAccess } from "./useHostAccess";
+import { isHardcodedPeer, normalizeGatewayUrl, normalizePeerUrl } from "./network-urls";
+import { clearPendingEdit, loadPendingEdit, savePendingEdit } from "./pending-edit";
 import { usePlatform } from "../../../app-platform/context";
-import type { EphemeralStatePort } from "../../../app-platform/types";
-import { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
+import { DEFAULT_BUNDLER_URL, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
 import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
-import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
 import { useNetworkSettings, useSaveNetworkSettings } from "../../main-screen/src/useNetworkSettings";
 
 /**
@@ -48,121 +50,11 @@ export interface NetworkPeersViewProps {
   onBack: () => void;
 }
 
-function isHardcodedPeer(peerUrl: string): boolean {
-  return (DEFAULT_HYPERBEAM_PEER_URLS as readonly string[]).includes(peerUrl);
-}
-
-/** Host and port in full: a lookalike peer can differ only at the end. */
-function peerHost(peerUrl: string): string {
-  try {
-    return new URL(peerUrl).host;
-  } catch {
-    return peerUrl;
-  }
-}
-
-function normalizePeerUrl(input: string): string | null {
-  const trimmed = input.trim();
-  if (trimmed.length === 0) return null;
-  try {
-    const url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Stricter than `normalizePeerUrl`: the gateway must already be an
- * `https://` URL rather than having one assumed for it, since silently
- * upgrading a bare host here could mask a typo as a plaintext origin
- * instead of failing loudly.
- */
-function normalizeGatewayUrl(input: string): string | null {
-  const trimmed = input.trim();
-  if (trimmed.length === 0) return null;
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "https:") return null;
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return null;
-  }
-}
-
-/**
- * MV3 host-permission match pattern for a peer's origin — protocol +
- * host, wildcarded path (`<scheme>://<host>/*`) per
- * `chrome.permissions.request`'s documented match-pattern shape. Derived
- * from the already-normalized peer URL rather than the raw input, so it
- * always reflects a URL `normalizePeerUrl` has already validated.
- */
-function peerOriginPattern(normalizedPeerUrl: string): string {
-  const url = new URL(normalizedPeerUrl);
-  return `${url.protocol}//${url.host}/*`;
-}
-
-interface PendingNetworkEdit {
-  kind: "gateway" | "bundler" | "peer";
-  url: string;
-}
-
-const PENDING_EDIT_KEY = "session:pendingNetworkEdit";
-
-async function loadPendingEdit(store: EphemeralStatePort): Promise<PendingNetworkEdit | null> {
-  try {
-    const value = (await store.get(PENDING_EDIT_KEY)) as { kind?: unknown; url?: unknown } | undefined;
-    if (
-      value !== undefined &&
-      value !== null &&
-      typeof value === "object" &&
-      (value.kind === "gateway" || value.kind === "bundler" || value.kind === "peer") &&
-      typeof value.url === "string"
-    ) {
-      return { kind: value.kind, url: value.url };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-async function savePendingEdit(store: EphemeralStatePort, edit: PendingNetworkEdit): Promise<void> {
-  try {
-    await store.set(PENDING_EDIT_KEY, edit);
-  } catch {
-    // Best-effort — if this fails, the user just has to re-paste the URL.
-  }
-}
-
-async function clearPendingEdit(store: EphemeralStatePort): Promise<void> {
-  try {
-    await store.remove(PENDING_EDIT_KEY);
-  } catch {
-    // Nothing to clean up if this fails.
-  }
-}
 
 export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   const t = useT();
-  const { capabilities, hostPermissions, ephemeralState } = usePlatform();
-  // Without runtime host permissions every origin is already reachable.
-  const hasHostAccess = async (url: string): Promise<boolean> => {
-    if (!capabilities.hostPermissions) return true;
-    try {
-      return await hostPermissions.contains([peerOriginPattern(url)]);
-    } catch {
-      return false;
-    }
-  };
-  const requestHostAccess = async (url: string): Promise<boolean> => {
-    if (!capabilities.hostPermissions) return true;
-    try {
-      return await hostPermissions.request([peerOriginPattern(url)]);
-    } catch {
-      return false;
-    }
-  };
+  const { ephemeralState } = usePlatform();
+  const { hasHostAccess, requestHostAccess } = useHostAccess();
   const settingsQuery = useNetworkSettings(runtime);
   const settings = settingsQuery.data ?? null;
   const saveMutation = useSaveNetworkSettings(runtime);
@@ -511,61 +403,17 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
               </>
             ) : (
               <>
-                {(settings?.peers ?? []).map((peer) => {
-                  const isActive = settings?.activePeerUrl === peer.url;
-                  return (
-                    <div key={peer.url} className="flex items-center gap-2.5 py-3.5">
-                      <button
-                        type="button"
-                        disabled={saving || !peer.enabled}
-                        onClick={() => handleSelectActive(peer)}
-                        className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default phone:hit-target"
-                      >
-                        <span
-                          className={`break-all font-mono text-label font-semibold ${
-                            peer.enabled ? "text-foreground" : "text-faint"
-                          }`}
-                        >
-                          {peerHost(peer.url)}
-                        </span>
-                        <span className={`text-caption ${isActive ? "text-positive" : "text-muted"}`}>
-                          {isActive ? t("networkPeers.active") : null}
-                        </span>
-                      </button>
-                      <div className="flex flex-shrink-0 items-center gap-2.5">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={peer.enabled}
-                          aria-label={t("networkPeers.enablePeer", { host: peerHost(peer.url) })}
-                          disabled={saving}
-                          onClick={() => handleToggleEnabled(peer.url)}
-                          className={`relative flex h-5 w-[34px] flex-shrink-0 items-center rounded-full border px-0.5 transition-colors disabled:opacity-60 phone:hit-target ${
-                            peer.enabled ? "border-foreground bg-foreground" : "border-line bg-mist"
-                          }`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`h-3.5 w-3.5 flex-shrink-0 rounded-full bg-background transition-transform ${
-                              peer.enabled ? "translate-x-[14px]" : "translate-x-0"
-                            }`}
-                          />
-                        </button>
-                        {isHardcodedPeer(peer.url) ? null : (
-                          <button
-                            type="button"
-                            aria-label={t("networkPeers.removePeer", { host: peerHost(peer.url) })}
-                            disabled={saving}
-                            onClick={() => handleRemovePeer(peer.url)}
-                            className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-warning disabled:opacity-60"
-                          >
-                            <CloseIcon />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {(settings?.peers ?? []).map((peer) => (
+                  <PeerRow
+                    key={peer.url}
+                    peer={peer}
+                    isActive={settings?.activePeerUrl === peer.url}
+                    saving={saving}
+                    onSelectActive={handleSelectActive}
+                    onToggleEnabled={handleToggleEnabled}
+                    onRemove={handleRemovePeer}
+                  />
+                ))}
 
                 {addingPeer ? (
                   <InlineUrlEditor
