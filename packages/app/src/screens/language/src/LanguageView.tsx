@@ -12,6 +12,7 @@ import ruFlag from "flag-icons/flags/4x3/ru.svg?url";
 import jpFlag from "flag-icons/flags/4x3/jp.svg?url";
 import krFlag from "flag-icons/flags/4x3/kr.svg?url";
 import { LANGUAGES, setLanguagePreference, useLanguagePreference, useT, type Language, type LanguagePreference } from "../../../i18n";
+import { CheckIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 const FLAGS: Record<Language, string> = {
   en: gbFlag,
@@ -53,7 +54,7 @@ export function LanguageView({ onBack }: LanguageViewProps) {
           {hint ? <span className="block text-caption text-muted">{hint}</span> : null}
         </span>
         <span aria-hidden="true" className="w-4 flex-shrink-0 text-foreground">
-          {selected ? <CheckIcon /> : null}
+          {selected ? <CheckIcon size={16} /> : null}
         </span>
       </button>
     );
@@ -83,10 +84,3 @@ function GlobeIcon() {
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

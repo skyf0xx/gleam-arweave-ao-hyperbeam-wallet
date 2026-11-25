@@ -10,6 +10,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
 
 /**
  * The gateway and the AO-peer list are both editable, writing the full
@@ -578,7 +579,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                             onClick={() => handleRemovePeer(peer.url)}
                             className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-warning disabled:opacity-60"
                           >
-                            <RemoveIcon />
+                            <CloseIcon />
                           </button>
                         )}
                       </div>
@@ -620,14 +621,6 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-function RemoveIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
   );
 }
 

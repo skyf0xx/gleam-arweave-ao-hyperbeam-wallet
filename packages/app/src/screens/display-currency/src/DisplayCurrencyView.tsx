@@ -5,6 +5,7 @@ import { OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
 import { SearchField } from "@gleam/ui/src/primitives/search-field.tsx";
 import { useDisplaySettings } from "../../../display-settings";
 import { useLocale, useT } from "../../../i18n";
+import { CheckIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 /**
  * Picks the currency every balance and price is shown in: AO and AR first,
@@ -83,7 +84,7 @@ export function DisplayCurrencyView({ runtime, onBack }: DisplayCurrencyViewProp
         <span className="min-w-0 flex-1 truncate text-label text-muted">{shownName}</span>
         {symbol && symbol !== option.code ? <span className="flex-shrink-0 text-label text-faint">{symbol}</span> : null}
         <span aria-hidden="true" className="w-4 flex-shrink-0 text-foreground">
-          {selected ? <CheckIcon /> : null}
+          {selected ? <CheckIcon size={16} /> : null}
         </span>
       </button>
     );
@@ -120,10 +121,3 @@ export function DisplayCurrencyView({ runtime, onBack }: DisplayCurrencyViewProp
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

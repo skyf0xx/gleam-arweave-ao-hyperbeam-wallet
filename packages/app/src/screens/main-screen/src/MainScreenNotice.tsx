@@ -6,6 +6,7 @@ import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { SITE_URL, sitePageUrl } from "@gleam/core";
 import { useT } from "../../../i18n";
 import { useNotice } from "./useNotice";
+import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
 
 export interface MainScreenNoticeProps {
   runtime: RuntimePort;
@@ -145,14 +146,6 @@ function NoticeContent({ title, text, critical = false }: NoticeContentProps) {
         <span className="min-w-0">{text}</span>
       </span>
     </>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
   );
 }
 

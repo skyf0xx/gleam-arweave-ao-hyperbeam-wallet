@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useBackHandler } from "./back-stack";
 import { cn } from "./cn";
 import { useUiLabels } from "../labels";
+import { BackIcon } from "./icons";
 
 /**
  * The back-button + centered title header shared by every multi-step
@@ -55,10 +56,3 @@ export function ScreenHeader({ title, center, onBack, busy = false, end, subtitl
 
 function ignoreBack() {}
 
-function BackIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
