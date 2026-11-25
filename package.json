@@ -23,7 +23,8 @@
     "release:all": "node scripts/release-all.mjs",
     "scan": "tsx scripts/scan/cli.ts",
     "peers:refresh": "tsx scripts/peers-refresh.ts",
-    "dup": "jscpd"
+    "dup": "jscpd",
+    "health": "node scripts/health.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
