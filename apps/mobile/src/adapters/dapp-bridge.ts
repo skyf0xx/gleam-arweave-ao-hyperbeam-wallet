@@ -12,10 +12,11 @@ import {
   type PageResponseEnvelope,
   type PageSiteModeEnvelope,
 } from "@gleam/messaging/src/page-protocol.ts";
+import { httpOrigin, isExactHttpOrigin } from "@gleam/core/src/models/site-origin.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import type { TabPush, TabsPort } from "@gleam/runtime";
 import { serveOnce } from "./comlink-guard";
-import { isExactWebOrigin, TABS_REQUEST } from "./dapp-tabs";
+import { TABS_REQUEST } from "./dapp-tabs";
 
 /** The runtime worker's entry for page messages (`RuntimeHost.pageCall`). */
 export interface PageRuntime {
@@ -43,15 +44,6 @@ export interface DappBridge {
   subscribe(onChange: () => void): () => void;
 }
 
-function webOrigin(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.origin : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The origin a message may act as, or null when it must be dropped. Only
  * the top frame speaks for the page, matching the extension's
@@ -62,7 +54,7 @@ function webOrigin(url: string): string | null {
  */
 export function attestedOrigin(message: DappViewMessage): string | null {
   if (message.isMainFrame !== true) return null;
-  return isExactWebOrigin(message.origin) ? message.origin : null;
+  return isExactHttpOrigin(message.origin) ? message.origin : null;
 }
 
 function parseEnvelope(data: unknown): PageMessageEnvelope | null {
@@ -122,7 +114,7 @@ export function createDappBridge({
   };
 
   const webTab = (): { id: number; url: string; origin: string } | null => {
-    const origin = tab ? webOrigin(tab.url) : null;
+    const origin = tab ? httpOrigin(tab.url) : null;
     return tab && origin ? { ...tab, origin } : null;
   };
 
@@ -182,8 +174,8 @@ export function createDappBridge({
 
   function onNavigation({ url }: DappViewNavigation): void {
     if (typeof url !== "string") return;
-    const origin = webOrigin(url);
-    if (tab && origin !== null && webOrigin(tab.url) === origin) {
+    const origin = httpOrigin(url);
+    if (tab && origin !== null && httpOrigin(tab.url) === origin) {
       tab.url = url;
       notify();
     } else {

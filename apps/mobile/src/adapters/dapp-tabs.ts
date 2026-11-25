@@ -7,21 +7,6 @@
 import type { TabsPort } from "@gleam/runtime";
 import { requestChannel, type WorkerScope } from "./comlink-guard";
 
-/**
- * True for an http(s) origin in its exact serialized form. "null", file:,
- * data:, about: and other schemes fail, and so does anything with a path,
- * a trailing slash, a default port or different case.
- */
-export function isExactWebOrigin(origin: unknown): origin is string {
-  if (typeof origin !== "string") return false;
-  try {
-    const url = new URL(origin);
-    return (url.protocol === "https:" || url.protocol === "http:") && url.origin === origin;
-  } catch {
-    return false;
-  }
-}
-
 /** The message a worker sends to ask for the tabs, carrying its end of the channel. */
 export const TABS_REQUEST = "gleam:dapp-tabs";
 
