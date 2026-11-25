@@ -9,7 +9,6 @@ export const MAX_LINES = 400;
 export const FILE_SIZE_CAPS = {
   // Classic scripts shared through window; splitting waits on moving the site to ES modules (todo.md).
   "apps/site/gleam/gleam.js": 1716,
-  "apps/site/shared/program.js": 713,
   // One view over one native page; every effect reads the same page state.
   "packages/app/src/screens/browser/src/BrowserView.tsx": 416,
   "packages/runtime/src/create-runtime.ts": 415,
