@@ -4,7 +4,7 @@ import { tierTags, type AppTag } from "@gleam/core/src/ao/tag-tiers.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
 import { UntrustedText } from "../approval/UntrustedText";
-import type { Tag } from "./model";
+import type { Tag } from "@gleam/core";
 import { FieldLabel } from "./FieldLabel";
 
 const ROW = "grid grid-cols-[110px_minmax(0,1fr)] items-baseline gap-x-3 text-label leading-snug";

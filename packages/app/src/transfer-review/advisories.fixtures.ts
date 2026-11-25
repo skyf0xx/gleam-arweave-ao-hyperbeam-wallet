@@ -1,4 +1,4 @@
-import type { SigningApprovalPreview } from "@gleam/core";
+import type { SigningApprovalPreview, Tag } from "@gleam/core";
 import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
@@ -22,7 +22,6 @@ export const RECIPIENT = "r".repeat(43);
 export const DECOY = "d".repeat(43);
 export const COLLECTIBLE = "c".repeat(43);
 
-type Tag = { name: string; value: string };
 
 interface TokenMetadata {
   tokenDenomination: number | null;

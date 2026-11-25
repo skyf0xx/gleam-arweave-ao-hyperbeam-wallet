@@ -4,6 +4,7 @@ import {
   type DeviceSigningSummary,
   type DisplayCurrency,
   type SigningApprovalPreview,
+  type Tag,
   type TokenBalance,
   type TokenPrice,
 } from "@gleam/core";
@@ -19,8 +20,6 @@ import type { TFunction } from "../i18n";
 import { escapeHiddenCharacters } from "../approval/UntrustedText";
 
 const AR_DENOMINATION = 12;
-
-export type Tag = { name: string; value: string };
 
 /** One value-moving transfer. Amounts are atomic strings: Winston for AR, the token's smallest unit otherwise. */
 export interface TransferLine {
