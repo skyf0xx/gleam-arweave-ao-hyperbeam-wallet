@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { z } from "zod";
 import { join } from "node:path";
 import {
   attestationId,
@@ -14,6 +15,7 @@ import {
   type ScanAreaId,
   type ScanIssue,
 } from "../../packages/core/src/scan/index.ts";
+import { atomicSchema } from "../../packages/core/src/scan/schemas.ts";
 import { callApi } from "./api.ts";
 import { draftProblems } from "./drafts.ts";
 import { draftWarnings } from "./readability.ts";
@@ -26,12 +28,12 @@ import {
   sumReports,
 } from "./rounds.ts";
 import {
-  ATOMIC,
   closingJson,
   closingLines,
   fail,
   formatElapsed,
   gitOrUndefined,
+  guardOf,
   isChallengeResponse,
   jsonParseProblem,
   parseJsonOrUndefined,
@@ -233,13 +235,14 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
   };
 }
 
+const rewardsSchema = z.object({ scanRewardAtomic: atomicSchema, day: z.string().optional().catch(undefined) });
+
 /** `GET /scan/rewards`, or undefined when it can't be read: the offer then leaves the amount out. */
 async function fetchRewards(deps: Deps): Promise<{ day: string | null; full: string } | undefined> {
   const fetched = await callApi(deps, "/scan/rewards", undefined, "pnpm scan finish");
-  const body = fetched.ok ? (fetched.body as Record<string, unknown> | null) : null;
-  const atomic = (v: unknown): v is string => typeof v === "string" && ATOMIC.test(v);
-  if (!body || !atomic(body.scanRewardAtomic)) return undefined;
-  return { day: typeof body.day === "string" ? body.day : null, full: body.scanRewardAtomic };
+  const body = fetched.ok ? rewardsSchema.safeParse(fetched.body) : null;
+  if (!body?.success) return undefined;
+  return { day: body.data.day ?? null, full: body.data.scanRewardAtomic };
 }
 
 /** Resolves `--area`, or the current round, to an area id. */
@@ -344,7 +347,4 @@ function fill(draft: Record<string, unknown>, key: "release" | "commit", value: 
   draft[key] = value;
 }
 
-function isLooseAnswer(value: unknown): boolean {
-  const a = value as Record<string, unknown> | null;
-  return a !== null && typeof a === "object" && typeof a.file === "string" && typeof a.symbol === "string" && typeof a.line === "number";
-}
+const isLooseAnswer = guardOf<unknown>(z.object({ file: z.string(), symbol: z.string(), line: z.number() }));

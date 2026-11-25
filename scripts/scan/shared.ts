@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { z } from "zod";
 import { isScanAreaId, type ChallengeFunction, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
+import { ATOMIC, scanAreaIdSchema } from "../../packages/core/src/scan/schemas.ts";
 
 export const SCAN_DIR = ".gleam-scan";
 export const ROUNDS_DIR = `${SCAN_DIR}/rounds`;
@@ -82,8 +84,12 @@ export function fail(command: Outcome["command"], issues: Problem[], lines: stri
   return { ok: false, command, lines, issues, json };
 }
 
-/** A whole number of atomic units, as the API sends amounts. */
-export const ATOMIC = /^\d{1,40}$/;
+export { ATOMIC };
+
+/** A type guard that accepts what `schema` accepts and returns the value itself, so a file or reply keeps any field the schema doesn't name. */
+export function guardOf<T>(schema: z.ZodType): (value: unknown) => value is T {
+  return (value): value is T => schema.safeParse(value).success;
+}
 
 /** The problem for an API answer that isn't the shape this checkout expects; `what` reads after "sent". */
 export function shapeProblem(path: string, what: string, rerun: string): Problem {
@@ -162,22 +168,16 @@ export async function showAtCommit(deps: Deps, commit: string, file: string): Pr
   }
 }
 
-export function isChallengeResponse(value: unknown): value is ChallengeResponse {
-  if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.challenge === "string" &&
-    typeof v.release === "string" &&
-    typeof v.commit === "string" &&
-    typeof v.expiresAt === "string" &&
-    isScanAreaId(v.area) &&
-    Array.isArray(v.functions) &&
-    v.functions.every((fn) => {
-      const f = fn as Record<string, unknown> | null;
-      return f !== null && typeof f === "object" && typeof f.file === "string" && typeof f.symbol === "string";
-    })
-  );
-}
+export const isChallengeResponse = guardOf<ChallengeResponse>(
+  z.object({
+    challenge: z.string(),
+    release: z.string(),
+    commit: z.string(),
+    expiresAt: z.string(),
+    area: scanAreaIdSchema,
+    functions: z.array(z.object({ file: z.string(), symbol: z.string() })),
+  }),
+);
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

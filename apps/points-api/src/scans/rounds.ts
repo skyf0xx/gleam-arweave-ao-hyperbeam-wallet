@@ -1,4 +1,5 @@
-import { isAttestationId, isScanAreaId, roundReward, type ScanAreaId } from "@gleam/core/src/scan/index.ts";
+import { isAttestationId, isScanAreaId, roundReward } from "@gleam/core/src/scan/index.ts";
+import type { ScanNext } from "@gleam/core/src/scan/schemas.ts";
 import { scanReward, walletRoundsDone } from "./attestations";
 import { z } from "zod";
 import type { Queryable } from "../db";
@@ -20,23 +21,7 @@ export async function listAreas(
   });
 }
 
-/** `GET /scan/next`; amounts are atomic-unit integer strings. */
-export interface ScanNext {
-  release: string;
-  /** Null for a whole-surface scan recorded before areas. */
-  area: ScanAreaId | null;
-  /** Null for a scan recorded before rounds. */
-  round: number | null;
-  /** What this scan was credited. */
-  points: string;
-  nextRound: number;
-  /** What the next round earns if submitted now; "0" when no paid place or snapshot day is left. */
-  nextRewardAtomic: string;
-  nextPaid: boolean;
-  /** Areas the wallet hasn't scanned, least covered first; empty once the release isn't the latest. */
-  areasLeft: { id: ScanAreaId; label: string; functions: number; examined: number }[];
-  suggested: ScanAreaId | null;
-}
+export type { ScanNext };
 
 const ATTESTATION_ERROR = "attestation must be an attestation id: 64 lowercase hex characters.";
 

@@ -1,4 +1,5 @@
-import { attestationId, isScanAreaId, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
+import { attestationId } from "../../packages/core/src/scan/index.ts";
+import { scanNextSchema, type ScanNext } from "../../packages/core/src/scan/schemas.ts";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { callApi } from "./api.ts";
@@ -15,12 +16,12 @@ import {
   type SignedRecord,
 } from "./rounds.ts";
 import {
-  ATOMIC,
   DECLINES_FILE,
   closingJson,
   closingLines,
   declinesLine,
   fail,
+  guardOf,
   plural,
   readDeclines,
   shapeProblem,
@@ -30,50 +31,11 @@ import {
   type Problem,
 } from "./shared.ts";
 
-export interface AreaLeft {
-  id: ScanAreaId;
-  label: string;
-  functions: number;
-  examined: number;
-}
+export type NextResponse = ScanNext;
 
-/** `GET /scan/next`: the round the signed attestation was, and what the wallet's next round earns. */
-export interface NextResponse {
-  release: string;
-  /** Null for a whole-surface scan made before areas existed. */
-  area: ScanAreaId | null;
-  /** Null for a scan made before rounds. */
-  round: number | null;
-  points: string;
-  nextRound: number;
-  nextRewardAtomic: string;
-  nextPaid: boolean;
-  areasLeft: AreaLeft[];
-  suggested: ScanAreaId | null;
-}
+export type AreaLeft = NextResponse["areasLeft"][number];
 
-export function isNextResponse(value: unknown): value is NextResponse {
-  if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  const count = (n: unknown) => Number.isInteger(n) && (n as number) >= 0;
-  return (
-    typeof v.release === "string" &&
-    (v.area === null || isScanAreaId(v.area)) &&
-    (v.round === null || (Number.isInteger(v.round) && (v.round as number) >= 1)) &&
-    typeof v.points === "string" &&
-    ATOMIC.test(v.points) &&
-    Number.isInteger(v.nextRound) &&
-    typeof v.nextRewardAtomic === "string" &&
-    ATOMIC.test(v.nextRewardAtomic) &&
-    typeof v.nextPaid === "boolean" &&
-    (v.suggested === null || isScanAreaId(v.suggested)) &&
-    Array.isArray(v.areasLeft) &&
-    v.areasLeft.every((a) => {
-      const area = a as Record<string, unknown> | null;
-      return area !== null && typeof area === "object" && isScanAreaId(area.id) && typeof area.label === "string" && count(area.functions) && count(area.examined);
-    })
-  );
-}
+export const isNextResponse = guardOf<NextResponse>(scanNextSchema);
 
 export function signedRecord(attestationId: string, next: NextResponse): SignedRecord {
   return { attestationId, round: next.round, points: next.points };

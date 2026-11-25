@@ -1,4 +1,5 @@
 import { readdir } from "node:fs/promises";
+import { z } from "zod";
 import { join } from "node:path";
 import { formatPoints } from "../../packages/app/src/screens/points/src/formatPoints.ts";
 import {
@@ -12,11 +13,12 @@ import {
   type ParsedAttestation,
   type ScanAreaId,
 } from "../../packages/core/src/scan/index.ts";
+import { areaCountsSchema, atomicSchema } from "../../packages/core/src/scan/schemas.ts";
 import { callApi, type ApiResult } from "./api.ts";
 import { advisoryDrafts, prDrafts } from "./readability.ts";
 import {
   ROUNDS_DIR,
-  ATOMIC,
+  guardOf,
   isChallengeResponse,
   plural,
   readJson,
@@ -52,18 +54,16 @@ export interface Round {
 }
 
 
-function isSignedRecord(value: unknown): value is SignedRecord {
-  const v = value as Record<string, unknown> | null;
-  return (
-    v !== null &&
-    typeof v === "object" &&
-    typeof v.attestationId === "string" &&
-    isAttestationId(v.attestationId) &&
-    (v.round === null || (Number.isInteger(v.round) && (v.round as number) >= 1)) &&
-    typeof v.points === "string" &&
-    ATOMIC.test(v.points)
-  );
-}
+const isSignedRecord = guardOf<SignedRecord>(
+  z.object({
+    attestationId: z.string().refine(isAttestationId),
+    round: z
+      .number()
+      .refine((n) => Number.isInteger(n) && n >= 1)
+      .nullable(),
+    points: atomicSchema,
+  }),
+);
 
 export async function readRound(deps: Deps, area: ScanAreaId): Promise<Round> {
   const paths = roundPaths(area);
@@ -141,20 +141,9 @@ export interface AreaSummary {
   examined: number;
 }
 
-function isAreasResponse(value: unknown): value is { release: string; areas: AreaSummary[] } {
-  const v = value as Record<string, unknown> | null;
-  const count = (n: unknown) => Number.isInteger(n) && (n as number) >= 0;
-  return (
-    v !== null &&
-    typeof v === "object" &&
-    typeof v.release === "string" &&
-    Array.isArray(v.areas) &&
-    v.areas.every((a) => {
-      const area = a as Record<string, unknown> | null;
-      return area !== null && typeof area === "object" && isScanAreaId(area.id) && typeof area.label === "string" && count(area.functions) && count(area.examined);
-    })
-  );
-}
+const isAreasResponse = guardOf<{ release: string; areas: AreaSummary[] }>(
+  z.object({ release: z.string(), areas: z.array(areaCountsSchema) }),
+);
 
 export async function fetchAreas(deps: Deps, rerun: string): Promise<{ ok: true; release: string; areas: AreaSummary[] } | Extract<ApiResult, { ok: false }>> {
   const fetched = await callApi(deps, "/scan/areas", undefined, rerun);
