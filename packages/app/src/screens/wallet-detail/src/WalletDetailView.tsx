@@ -11,7 +11,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
-import { PasswordField, usePasswordEntry } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordStep } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useT, type TFunction } from "../../../i18n";
@@ -365,47 +365,21 @@ function ExportPasswordStep({
   serverError?: string;
 }) {
   const t = useT();
-  const { password, setPassword } = usePasswordEntry({ submitting, serverError });
-
   return (
-    <div className="flex min-h-full flex-col">
-      <ScreenHeader title={t("walletDetail.backUpKeyfile")} onBack={onBack} busy={submitting} />
-      <form
-        className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!submitting && password.length > 0) onSubmit(password);
-        }}
-      >
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("walletDetail.enterPassword")}</h1>
-          <p className="text-body leading-relaxed text-muted">
-            {t("walletDetail.exportExplain")}
-          </p>
-        </div>
-
-        <RiskNotice>
-          {t("walletDetail.keyfileWarning")}
-        </RiskNotice>
-
-        <PasswordField
-          label={t("walletDetail.password")}
-          placeholder={t("walletDetail.enterPassword")}
-          autoFocus
-          autoComplete="current-password"
-          value={password}
-          disabled={submitting}
-          onChange={(event) => setPassword(event.target.value)}
-          errorMessage={serverError}
-        />
-
-        <ScreenFooter className="mt-8">
-          <Button type="submit" disabled={submitting || password.length === 0}>
-            {submitting ? t("walletDetail.saving") : t("walletDetail.saveKeyfile")}
-          </Button>
-        </ScreenFooter>
-      </form>
-    </div>
+    <PasswordStep
+      headerTitle={t("walletDetail.backUpKeyfile")}
+      heading={t("walletDetail.enterPassword")}
+      body={t("walletDetail.exportExplain")}
+      notice={<RiskNotice>{t("walletDetail.keyfileWarning")}</RiskNotice>}
+      passwordLabel={t("walletDetail.password")}
+      placeholder={t("walletDetail.enterPassword")}
+      submitLabel={t("walletDetail.saveKeyfile")}
+      submittingLabel={t("walletDetail.saving")}
+      onBack={onBack}
+      onSubmit={onSubmit}
+      submitting={submitting}
+      serverError={serverError}
+    />
   );
 }
 
