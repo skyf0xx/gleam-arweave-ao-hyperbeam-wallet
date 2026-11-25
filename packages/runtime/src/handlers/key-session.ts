@@ -1,6 +1,7 @@
 import {
   createSerializer,
   isHardwareWalletMethod,
+  isRecord,
   isWatchWalletMethod,
   vaultHasPassword,
   type AutoLockTimeout,
@@ -17,6 +18,7 @@ import { signerFromKeyStore, unwrapBackupKey, zeroize, type VaultKeys } from "@g
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { loadWallets } from "../stored-data";
+import { WALLETS_KEY } from "../storage-keys";
 import { loadBackupKey } from "./backup-state";
 import { stringList } from "../guards";
 import { schemaGuard } from "../schema-guard";
@@ -348,8 +350,16 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
    * auto-locks it. Matched here so the alarm doesn't end a session that
    * `loadSession` would only start again.
    */
+  // Reads raw records, not valid wallets: a record today's guard rejects
+  // (damaged, or from a newer release) may still hold a key, so it must
+  // keep the vault locking.
   async function storedWalletMethods(): Promise<Array<{ method: WalletMethod }>> {
-    return (await loadWallets(storage)).map(({ method }) => ({ method }));
+    const wallets = await storage.get<unknown>(WALLETS_KEY);
+    if (!Array.isArray(wallets)) return [];
+    return wallets.flatMap((wallet: unknown) => {
+      const method = isRecord(wallet) ? wallet.method : undefined;
+      return typeof method === "string" ? [{ method: method as WalletMethod }] : [];
+    });
   }
 
   async function isHardwareOnlyVault(): Promise<boolean> {

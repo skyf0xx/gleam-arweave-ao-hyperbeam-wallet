@@ -461,6 +461,19 @@ describe("key-session", () => {
       expect(store.has("session:unlockedSession")).toBe(true);
     });
 
+    it("enforceAutoLock still locks when a key record the guard rejects sits beside a hardware wallet", async () => {
+      store.set("local:wallets", [
+        { id: "wallet-h", address: "address-h", name: "Keystone", method: "keystone", publicKey: "n", createdAt: 0, updatedAt: 0, encryptedKeyfile: null, backupConfirmedAt: null, device: { kind: "keystone", xfp: "1a2b3c4d" } },
+        { id: "wallet-x", method: "jwk", fromANewerRelease: true },
+      ]);
+      setSession("5min", Date.now(), ["wallet-h"]);
+
+      vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
+
+      expect(await enforceAutoLock()).toBe(true);
+      expect(store.has("session:unlockedSession")).toBe(false);
+    });
+
     it("enforceAutoLock drops the keys once the timeout passes, without any key read", async () => {
       setSession("5min");
       await cacheKey("wallet-a", jwkA, "address-a");
