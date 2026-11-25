@@ -10,9 +10,10 @@
     ".": {
       "entry": [
         "scripts/**/*.{ts,mjs}",
-        "stryker.config.mjs",
-        // The sites are plain HTML pages; each page loads its script directly.
+        // The sites are plain HTML pages; these are the scripts their <script> tags load.
         "apps/site/*.js",
+        "apps/site/{attest/attest,download/download,gleam/gleam,points/points,review-results/review-results,scan/scan}.js",
+        "apps/site/{invite/invite,invite/invite-launch,shared/pages,shared/program}.js",
         "apps/site-open/*.{js,mjs}"
       ],
       // Stryker loads its own API package; the config only names its types.
