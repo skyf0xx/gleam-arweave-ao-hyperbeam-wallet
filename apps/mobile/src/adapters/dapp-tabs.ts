@@ -4,8 +4,8 @@
  * bridge only exists on the page; the UI thread serves the tab
  * (`serveDappTabs`).
  */
-import * as Comlink from "comlink";
 import type { TabsPort } from "@gleam/runtime";
+import { requestChannel, type WorkerScope } from "./comlink-guard";
 
 /**
  * True for an http(s) origin in its exact serialized form. "null", file:,
@@ -26,10 +26,8 @@ export function isExactWebOrigin(origin: unknown): origin is string {
 export const TABS_REQUEST = "gleam:dapp-tabs";
 
 /** `TabsPort` for the runtime worker: the one tab is the dApp view's page. */
-export function createWorkerTabs(scope: { postMessage(message: unknown, transfer: Transferable[]): void }): TabsPort {
-  const channel = new MessageChannel();
-  scope.postMessage({ type: TABS_REQUEST, port: channel.port2 }, [channel.port2]);
-  const tabs = Comlink.wrap<TabsPort>(channel.port1);
+export function createWorkerTabs(scope: WorkerScope): TabsPort {
+  const tabs = requestChannel<TabsPort>(scope, TABS_REQUEST);
   return {
     webTabs: () => tabs.webTabs(),
     activeTab: () => tabs.activeTab(),

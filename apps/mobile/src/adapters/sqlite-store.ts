@@ -1,5 +1,5 @@
 import { CapacitorSQLite, SQLiteConnection, type capSQLiteSet } from "@capacitor-community/sqlite";
-import { exposeMethods } from "./comlink-guard";
+import { serveOnce } from "./comlink-guard";
 import { STORE_REQUEST, type SqliteStore } from "./sqlite-channel";
 
 /** The part of the plugin's `SQLiteDBConnection` this store uses. */
@@ -63,11 +63,5 @@ export async function openCapacitorDb(): Promise<SqliteDb> {
  * storage stays the database's one writer.
  */
 export function serveSqliteStore(worker: Worker, store: SqliteStore): void {
-  let served = false;
-  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
-    const data = event.data as { type?: unknown; port?: unknown } | null;
-    if (served || data?.type !== STORE_REQUEST || !(data.port instanceof MessagePort)) return;
-    served = true;
-    exposeMethods(store, ["load", "write"], data.port);
-  });
+  serveOnce(worker, STORE_REQUEST, store, ["load", "write"]);
 }

@@ -14,7 +14,7 @@ import {
 } from "@gleam/messaging/src/page-protocol.ts";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
 import type { TabPush, TabsPort } from "@gleam/runtime";
-import { exposeMethods } from "./comlink-guard";
+import { serveOnce } from "./comlink-guard";
 import { isExactWebOrigin, TABS_REQUEST } from "./dapp-tabs";
 
 /** The runtime worker's entry for page messages (`RuntimeHost.pageCall`). */
@@ -258,11 +258,5 @@ export function createDappBridge({
 
 /** Answers the runtime worker's `createWorkerTabs`. */
 export function serveDappTabs(worker: Worker, tabs: TabsPort): void {
-  let served = false;
-  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
-    const data = event.data as { type?: unknown; port?: unknown } | null;
-    if (served || data?.type !== TABS_REQUEST || !(data.port instanceof MessagePort)) return;
-    served = true;
-    exposeMethods(tabs, ["webTabs", "activeTab", "reload", "send"], data.port);
-  });
+  serveOnce(worker, TABS_REQUEST, tabs, ["webTabs", "activeTab", "reload", "send"]);
 }

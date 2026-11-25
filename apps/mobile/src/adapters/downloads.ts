@@ -1,15 +1,14 @@
 import * as Comlink from "comlink";
 import type { DownloadPort } from "@gleam/core";
+import { requestChannel, type WorkerScope } from "./comlink-guard";
 import { SAVER_REQUEST, type FileSaver } from "./download-channel";
 
 /**
  * `DownloadPort` for the runtime worker: the file goes to the UI thread,
  * which opens the share sheet. There is no permission to ask the phone for.
  */
-export function createWorkerDownloads(scope: { postMessage(message: unknown, transfer: Transferable[]): void }): DownloadPort {
-  const channel = new MessageChannel();
-  scope.postMessage({ type: SAVER_REQUEST, port: channel.port2 }, [channel.port2]);
-  const saver = Comlink.wrap<FileSaver>(channel.port1);
+export function createWorkerDownloads(scope: WorkerScope): DownloadPort {
+  const saver = requestChannel<FileSaver>(scope, SAVER_REQUEST);
   return {
     isAllowed: async () => true,
     ensureAllowed: async () => true,

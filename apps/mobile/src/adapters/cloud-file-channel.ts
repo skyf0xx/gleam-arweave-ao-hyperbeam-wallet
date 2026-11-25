@@ -4,7 +4,7 @@
  * free of Capacitor, whose native bridge only exists on the page.
  */
 import type { CloudFilePort } from "@gleam/core/src/ports/cloud-file.ts";
-import { exposeMethods } from "./comlink-guard";
+import { serveOnce } from "./comlink-guard";
 
 /**
  * The cloud file, served to the runtime worker. Google's authorization and
@@ -24,11 +24,5 @@ const METHODS = ["signIn", "read", "write", "remove", "revoke"] as const satisfi
  * `createWorkerCloudFile`. Only the first request is served.
  */
 export function serveCloudFile(worker: Worker, file: CloudFileHost): void {
-  let served = false;
-  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
-    const data = event.data as { type?: unknown; port?: unknown } | null;
-    if (served || data?.type !== CLOUD_FILE_REQUEST || !(data.port instanceof MessagePort)) return;
-    served = true;
-    exposeMethods(file, [...METHODS], data.port);
-  });
+  serveOnce(worker, CLOUD_FILE_REQUEST, file, METHODS);
 }

@@ -1,5 +1,5 @@
-import * as Comlink from "comlink";
 import { createSerializer, type StoragePort } from "@gleam/core";
+import { requestChannel, type WorkerScope } from "./comlink-guard";
 import { STORE_REQUEST, type SqliteStore, type StoredRow } from "./sqlite-channel";
 
 type Area = "local" | "session";
@@ -136,8 +136,6 @@ export class MobileStoragePort implements StoragePort {
 }
 
 /** Opens a channel to the UI thread's `serveSqliteStore` and returns the store on it. */
-export function connectSqliteStore(scope: { postMessage(message: unknown, transfer: Transferable[]): void }): SqliteStore {
-  const channel = new MessageChannel();
-  scope.postMessage({ type: STORE_REQUEST, port: channel.port2 }, [channel.port2]);
-  return Comlink.wrap<SqliteStore>(channel.port1);
+export function connectSqliteStore(scope: WorkerScope): SqliteStore {
+  return requestChannel<SqliteStore>(scope, STORE_REQUEST);
 }

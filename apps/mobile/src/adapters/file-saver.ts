@@ -1,7 +1,7 @@
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import type { FileDownloadResult } from "@gleam/core";
-import { exposeMethods } from "./comlink-guard";
+import { serveOnce } from "./comlink-guard";
 import { SAVER_REQUEST, type FileSaver } from "./download-channel";
 
 /** The parts of the two plugins this saver uses. */
@@ -106,11 +106,5 @@ export function createCapacitorFileSaver(): FileSaver {
  * `createWorkerDownloads`. Only the first request is served.
  */
 export function serveFileSaver(worker: Worker, saver: FileSaver): void {
-  let served = false;
-  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
-    const data = event.data as { type?: unknown; port?: unknown } | null;
-    if (served || data?.type !== SAVER_REQUEST || !(data.port instanceof MessagePort)) return;
-    served = true;
-    exposeMethods(saver, ["save"], data.port);
-  });
+  serveOnce(worker, SAVER_REQUEST, saver, ["save"]);
 }

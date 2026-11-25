@@ -2,6 +2,7 @@ import * as Comlink from "comlink";
 import type { BackupProvider } from "@gleam/core/src/models/backup.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import type { CloudFilePort } from "@gleam/core/src/ports/cloud-file.ts";
+import { requestChannel, type WorkerScope } from "./comlink-guard";
 import { CLOUD_FILE_REQUEST, type CloudFileHost } from "./cloud-file-channel";
 
 /**
@@ -9,13 +10,8 @@ import { CLOUD_FILE_REQUEST, type CloudFileHost } from "./cloud-file-channel";
  * thread, which holds the plugin. What comes back is checked for shape
  * here, and the bytes stay untrusted until the runtime decrypts them.
  */
-export function createWorkerCloudFile(
-  scope: { postMessage(message: unknown, transfer: Transferable[]): void },
-  provider: BackupProvider,
-): CloudFilePort {
-  const channel = new MessageChannel();
-  scope.postMessage({ type: CLOUD_FILE_REQUEST, port: channel.port2 }, [channel.port2]);
-  const host = Comlink.wrap<CloudFileHost>(channel.port1);
+export function createWorkerCloudFile(scope: WorkerScope, provider: BackupProvider): CloudFilePort {
+  const host = requestChannel<CloudFileHost>(scope, CLOUD_FILE_REQUEST);
   return {
     provider,
     signIn: async (interactive) => (await host.signIn(interactive)) === true,
