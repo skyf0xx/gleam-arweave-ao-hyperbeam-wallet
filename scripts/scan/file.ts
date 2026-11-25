@@ -3,7 +3,7 @@ import { callApi } from "./api.ts";
 import { validateRound } from "./finish.ts";
 import { isNextResponse, signedRecord } from "./next.ts";
 import { draftWarnings } from "./readability.ts";
-import { attestLink, listRounds, roundAttestation, roundReports, signRequest, signedRoundBase, type Round } from "./rounds.ts";
+import { attestLink, listRounds, roundAttestation, signRequest, signedRoundBase, sumReports, type Round } from "./rounds.ts";
 import { closingJson, closingLines, declinesLine, fail, readDeclines, writeJson, type Deps, type Outcome, type Problem } from "./shared.ts";
 
 /** Re-checks every waiting round and prints one link that signs them all, in round order. */
@@ -34,18 +34,14 @@ export async function runFile(deps: Deps): Promise<Outcome> {
     notes.push(...checked.notes.map((note) => `${round.area}: ${note}`));
     issues.push(...checked.issues.map((issue) => ({ ...issue, path: `${round.area} ${issue.path}` })));
   }
-  if (issues.length > 0) return { ok: false, command: "file", lines: notes, issues, json: {} };
+  if (issues.length > 0) return fail("file", issues, notes);
   if (ready.length === 0) return fail("file", [{ path: "rounds", message: "Every round in this checkout is signed; run `pnpm scan next`." }]);
 
   const base = signedRoundBase(await listRounds(deps));
-  let unfiled = 0;
-  let filed = 0;
+  const { unfiled, filed } = await sumReports(deps, ready.map((r) => r.round));
   const lines = [...notes];
   const warnings: string[] = [];
   for (const [i, { round, id }] of ready.entries()) {
-    const reports = await roundReports(deps, round);
-    unfiled += reports.unfiled;
-    filed += reports.filed;
     lines.push(`Round ${base + i + 1} (${round.label}): attestation ${id}, drafts in ${round.paths.dir}/.`);
     warnings.push(...(await draftWarnings(deps, round.paths.dir)));
   }

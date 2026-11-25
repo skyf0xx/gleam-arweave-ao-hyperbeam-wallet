@@ -22,10 +22,11 @@ import {
   freeAreas,
   listRounds,
   roundOffer,
-  roundReports,
   signedRoundBase,
+  sumReports,
 } from "./rounds.ts";
 import {
+  ATOMIC,
   closingJson,
   closingLines,
   fail,
@@ -33,6 +34,7 @@ import {
   gitOrUndefined,
   isChallengeResponse,
   jsonParseProblem,
+  parseJsonOrUndefined,
   readCurrent,
   readText,
   roundPaths,
@@ -88,12 +90,7 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
   if (challengeText === undefined) {
     return failed([{ path: paths.challenge, message: `There is no challenge for ${scanArea(area).label}; run \`pnpm scan start --area ${area}\` first.` }]);
   }
-  let challengeJson: unknown;
-  try {
-    challengeJson = JSON.parse(challengeText);
-  } catch {
-    challengeJson = undefined;
-  }
+  const challengeJson = parseJsonOrUndefined(challengeText);
   if (!isChallengeResponse(challengeJson)) {
     return failed([{ path: paths.challenge, message: `${paths.challenge} is unreadable; run \`pnpm scan start --area ${area}\` again.` }]);
   }
@@ -240,7 +237,7 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
 async function fetchRewards(deps: Deps): Promise<{ day: string | null; full: string } | undefined> {
   const fetched = await callApi(deps, "/scan/rewards", undefined, "pnpm scan finish");
   const body = fetched.ok ? (fetched.body as Record<string, unknown> | null) : null;
-  const atomic = (v: unknown): v is string => typeof v === "string" && /^\d{1,40}$/.test(v);
+  const atomic = (v: unknown): v is string => typeof v === "string" && ATOMIC.test(v);
   if (!body || !atomic(body.scanRewardAtomic)) return undefined;
   return { day: typeof body.day === "string" ? body.day : null, full: body.scanRewardAtomic };
 }
@@ -268,7 +265,7 @@ export async function runFinish(deps: Deps, options: { area?: string } = {}): Pr
 
   const rerun = options.area === undefined ? "pnpm scan finish" : `pnpm scan finish --area ${area}`;
   const checked = await validateRound(deps, area, rerun, `\`pnpm scan finish --area ${area}\``);
-  if (!checked.ok) return { ok: false, command: "finish", lines: checked.notes, issues: checked.issues, json: {} };
+  if (!checked.ok) return fail("finish", checked.issues, checked.notes);
   const { attestation, id, paidPlacesLeft } = checked;
   await writeJson(deps, paths.finished, { attestationId: id });
 
@@ -276,8 +273,7 @@ export async function runFinish(deps: Deps, options: { area?: string } = {}): Pr
   const waiting = rounds.filter((round) => round.status === "waiting");
   const base = signedRoundBase(rounds);
   const number = base + waiting.findIndex((round) => round.area === area) + 1;
-  let reports = 0;
-  for (const round of waiting) reports += (await roundReports(deps, round)).unfiled;
+  const { unfiled: reports } = await sumReports(deps, waiting);
 
   const taken = new Set(rounds.map((round) => round.area));
   const areas = await fetchAreas(deps, rerun);

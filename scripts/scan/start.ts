@@ -13,7 +13,7 @@ import {
 import { mkdir, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { callApi } from "./api.ts";
-import { everyAreaHere, fetchAreas, freeAreas, listRounds, roundReports, type Round } from "./rounds.ts";
+import { everyAreaHere, fetchAreas, freeAreas, listRounds, sumReports, type Round } from "./rounds.ts";
 import {
   CURRENT_FILE,
   SCAN_DIR,
@@ -22,8 +22,10 @@ import {
   fail,
   gitOrUndefined,
   isChallengeResponse,
+  parseJsonOrUndefined,
   readText,
   roundPaths,
+  shapeProblem,
   showAtCommit,
   writeJson,
   writeText,
@@ -68,19 +70,17 @@ async function archiveStale(deps: Deps, rounds: readonly Round[], commit: string
 /** No area is free here: end on "file" while rounds wait, else on the wallet having scanned them all. */
 async function noAreaLeft(deps: Deps, release: string, rounds: readonly Round[]): Promise<Outcome> {
   const waiting = rounds.filter((round) => round.status === "waiting");
-  let reports = 0;
-  for (const round of waiting) reports += (await roundReports(deps, round)).unfiled;
+  const { unfiled: reports } = await sumReports(deps, waiting);
   const closing =
     waiting.length > 0
       ? [everyAreaHere(release, waiting.length, reports)]
       : [`This wallet has scanned every area of v${release}; the next release opens new rounds.`];
-  return {
-    ok: false,
-    command: "start",
-    lines: closingLines(closing),
-    issues: [{ path: "area", message: `Every area of v${release} is scanned in this checkout, so there is no round to start; end the turn with the message below.` }],
-    json: closingJson(closing),
-  };
+  return fail(
+    "start",
+    [{ path: "area", message: `Every area of v${release} is scanned in this checkout, so there is no round to start; end the turn with the message below.` }],
+    closingLines(closing),
+    closingJson(closing),
+  );
 }
 
 export async function runStart(deps: Deps, options: { area?: string } = {}): Promise<Outcome> {
@@ -130,9 +130,7 @@ export async function runStart(deps: Deps, options: { area?: string } = {}): Pro
   const fetched = await callApi(deps, `/scan/challenge?area=${area}`, undefined, rerun);
   if (!fetched.ok) return fail("start", fetched.issues);
   if (!isChallengeResponse(fetched.body) || fetched.body.functions.length === 0) {
-    return fail("start", [
-      { path: "challenge", message: `The points API sent a challenge in an unexpected shape; update this checkout (\`git fetch --tags\`) and run \`${rerun}\` again.` },
-    ]);
+    return fail("start", [shapeProblem("challenge", "a challenge", rerun)]);
   }
   const challenge = fetched.body;
   if (head !== challenge.commit) {
@@ -173,12 +171,7 @@ export async function runStart(deps: Deps, options: { area?: string } = {}): Pro
   const existingText = await readText(deps, paths.attestation);
   let keep = false;
   if (existingText !== undefined) {
-    let existing: unknown;
-    try {
-      existing = JSON.parse(existingText);
-    } catch {
-      existing = undefined;
-    }
+    const existing = parseJsonOrUndefined(existingText);
     const old = (existing as { challenge?: unknown } | null | undefined)?.challenge;
     keep = old === challenge.challenge;
     if (!keep) {

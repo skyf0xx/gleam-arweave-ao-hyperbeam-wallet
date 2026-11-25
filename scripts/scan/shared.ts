@@ -78,8 +78,27 @@ export interface Outcome {
   json: Record<string, unknown>;
 }
 
-export function fail(command: Outcome["command"], issues: Problem[]): Outcome {
-  return { ok: false, command, lines: [], issues, json: {} };
+export function fail(command: Outcome["command"], issues: Problem[], lines: string[] = [], json: Record<string, unknown> = {}): Outcome {
+  return { ok: false, command, lines, issues, json };
+}
+
+/** A whole number of atomic units, as the API sends amounts. */
+export const ATOMIC = /^\d{1,40}$/;
+
+/** The problem for an API answer that isn't the shape this checkout expects; `what` reads after "sent". */
+export function shapeProblem(path: string, what: string, rerun: string): Problem {
+  return {
+    path,
+    message: `The points API sent ${what} in an unexpected shape; update this checkout (\`git fetch --tags\`) and run \`${rerun}\` again.`,
+  };
+}
+
+export function parseJsonOrUndefined(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 /** The lines that end a command's output: the header, then the message the agent's turn ends with. */
@@ -110,12 +129,7 @@ export async function writeJson(deps: Deps, file: string, value: unknown): Promi
 
 export async function readJson(deps: Deps, file: string): Promise<unknown> {
   const text = await readText(deps, file);
-  if (text === undefined) return undefined;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  return text === undefined ? undefined : parseJsonOrUndefined(text);
 }
 
 export async function readDeclines(deps: Deps): Promise<number> {

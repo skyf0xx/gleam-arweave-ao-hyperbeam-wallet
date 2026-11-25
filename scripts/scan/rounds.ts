@@ -16,11 +16,13 @@ import { callApi, type ApiResult } from "./api.ts";
 import { advisoryDrafts, prDrafts } from "./readability.ts";
 import {
   ROUNDS_DIR,
+  ATOMIC,
   isChallengeResponse,
   plural,
   readJson,
   readText,
   roundPaths,
+  shapeProblem,
   type ChallengeResponse,
   type Deps,
 } from "./shared.ts";
@@ -49,7 +51,6 @@ export interface Round {
   status: RoundStatus;
 }
 
-const ATOMIC = /^\d{1,40}$/;
 
 function isSignedRecord(value: unknown): value is SignedRecord {
   const v = value as Record<string, unknown> | null;
@@ -119,6 +120,18 @@ export async function roundReports(deps: Deps, round: Round): Promise<{ drafts: 
   return { drafts, unfiled: drafts.length - filed, filed };
 }
 
+/** The unfiled and filed reports across `rounds`. */
+export async function sumReports(deps: Deps, rounds: readonly Round[]): Promise<{ unfiled: number; filed: number }> {
+  let unfiled = 0;
+  let filed = 0;
+  for (const round of rounds) {
+    const reports = await roundReports(deps, round);
+    unfiled += reports.unfiled;
+    filed += reports.filed;
+  }
+  return { unfiled, filed };
+}
+
 /** One area of `GET /scan/areas`. */
 export interface AreaSummary {
   id: ScanAreaId;
@@ -147,10 +160,7 @@ export async function fetchAreas(deps: Deps, rerun: string): Promise<{ ok: true;
   const fetched = await callApi(deps, "/scan/areas", undefined, rerun);
   if (!fetched.ok) return fetched;
   if (!isAreasResponse(fetched.body)) {
-    return {
-      ok: false,
-      issues: [{ path: "areas", message: `The points API sent the areas in an unexpected shape; update this checkout (\`git fetch --tags\`) and run \`${rerun}\` again.` }],
-    };
+    return { ok: false, issues: [shapeProblem("areas", "the areas", rerun)] };
   }
   return { ok: true, release: fetched.body.release, areas: fetched.body.areas.map((a) => ({ ...a, tier: scanArea(a.id).tier })) };
 }
@@ -195,7 +205,7 @@ function rewardClause(round: number, amountAtomic: string | undefined): string {
   return `Round ${round} earns ${formatPoints(amountAtomic)} points even with no findings`;
 }
 
-const pointsText = (atomic: string) => (atomic === "0" ? "no points" : `${formatPoints(atomic)} points`);
+export const pointsText = (atomic: string) => (atomic === "0" ? "no points" : `${formatPoints(atomic)} points`);
 
 function signList(rounds: number, reports: number): string {
   const what = rounds === 1 ? "the round" : `the ${rounds} rounds`;
