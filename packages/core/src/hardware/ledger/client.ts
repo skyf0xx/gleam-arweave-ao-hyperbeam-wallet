@@ -7,6 +7,7 @@ import { LedgerError, SW_OK, statusWordError } from "./errors";
 import { concatBytes, encodeTransactionForLedger, ledgerChunks } from "./serialize";
 import type { LedgerTransport } from "./transport";
 import { USER_ERRORS, userErrorMessage } from "../../models/user-errors";
+import { isArweaveId } from "../../models/arweave-id";
 
 /**
  * The Arweave Ledger app's APDU protocol (Zondax's `app-arweave`, spec in
@@ -164,7 +165,7 @@ export class LedgerArweaveClient {
     const data = await this.command(INS.getAddress, verify ? 1 : 0);
     let address = "";
     for (const byte of data) address += String.fromCharCode(byte);
-    if (!/^[A-Za-z0-9_-]{43}$/.test(address)) throw invalidResponse("address");
+    if (!isArweaveId(address)) throw invalidResponse("address");
     return address;
   }
 

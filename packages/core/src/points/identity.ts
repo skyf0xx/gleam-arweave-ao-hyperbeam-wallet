@@ -1,5 +1,6 @@
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { isRecord } from "../models/guards";
+import { isArweaveId } from "../models/arweave-id";
 
 export interface DevicePublicJwk {
   kty: "EC";
@@ -22,8 +23,6 @@ export async function deviceKeyThumbprint(jwk: DevicePublicJwk): Promise<string>
 
 export { addressFromOwner } from "../keys/address";
 
-const COORDINATE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-
 /** Shape check for a device public key arriving over the wire. */
 export function isDevicePublicJwk(value: unknown): value is DevicePublicJwk {
   if (!isRecord(value)) return false;
@@ -32,9 +31,9 @@ export function isDevicePublicJwk(value: unknown): value is DevicePublicJwk {
     candidate.kty === "EC" &&
     candidate.crv === "P-256" &&
     typeof candidate.x === "string" &&
-    COORDINATE_PATTERN.test(candidate.x) &&
+    isArweaveId(candidate.x) &&
     typeof candidate.y === "string" &&
-    COORDINATE_PATTERN.test(candidate.y)
+    isArweaveId(candidate.y)
   );
 }
 

@@ -1,4 +1,5 @@
 import { postGraphQLWithFailover } from "../arweave/graphql";
+import { ARWEAVE_ID } from "../models/arweave-id";
 
 export interface Tag {
   name: string;
@@ -20,7 +21,7 @@ type Connection = NonNullable<NonNullable<ConnectionResponse["data"]>["transacti
 
 export type AssetClass = "unique" | "fungible";
 
-export const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
+export const PROCESS_ID = ARWEAVE_ID;
 export const SCAN_PAGE_SIZE = 100;
 export const SCAN_REQUEST_TIMEOUT_MS = 15_000;
 

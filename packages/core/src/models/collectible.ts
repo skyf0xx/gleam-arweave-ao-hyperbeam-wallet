@@ -1,5 +1,6 @@
 import type { Winston } from "./balance";
 import { userErrorMessage } from "./user-errors";
+import { isArweaveId } from "./arweave-id";
 
 /** An AO NFT (a unique, non-fungible asset process) the wallet holds. */
 export interface Collectible {
@@ -107,7 +108,6 @@ export interface NameTargetRequest extends NameTargetDraft {
   fee: Winston | null;
 }
 
-const ARWEAVE_ID = /^[A-Za-z0-9_-]{43}$/;
 
 /**
  * Why `sender` can't send collectible `assetId` to `recipient`, or null.
@@ -115,8 +115,8 @@ const ARWEAVE_ID = /^[A-Za-z0-9_-]{43}$/;
  * again before any network call.
  */
 export function collectibleSendRefusal(req: { sender: string; recipient: string; assetId: string }): string | null {
-  if (!ARWEAVE_ID.test(req.assetId)) return userErrorMessage("collectibleIdInvalid");
-  if (!ARWEAVE_ID.test(req.recipient)) {
+  if (!isArweaveId(req.assetId)) return userErrorMessage("collectibleIdInvalid");
+  if (!isArweaveId(req.recipient)) {
     return userErrorMessage("collectibleRecipientInvalid");
   }
   if (req.recipient === req.sender) return userErrorMessage("collectibleSendToSelf");

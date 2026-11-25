@@ -1,6 +1,7 @@
 import { classifyAsset } from "../ao/asset-scan";
 import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
+import { isArweaveId } from "../models/arweave-id";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
@@ -20,7 +21,6 @@ interface GraphQLTransactionsByIdResponse {
   errors?: Array<{ message: string }>;
 }
 
-const LOGO_TX_ID = /^[A-Za-z0-9_-]{43}$/;
 
 /**
  * Where to load a token's logo from: the `logo` tag is an Arweave
@@ -29,7 +29,7 @@ const LOGO_TX_ID = /^[A-Za-z0-9_-]{43}$/;
  * popup somewhere else, so it yields `null`.
  */
 export function tokenLogoUrl(gatewayUrl: string, logo: string | null): string | null {
-  if (logo === null || !LOGO_TX_ID.test(logo)) return null;
+  if (logo === null || !isArweaveId(logo)) return null;
   try {
     const gateway = new URL(gatewayUrl);
     return gateway.protocol === "https:" ? `${gateway.origin}/${logo}` : null;

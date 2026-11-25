@@ -1,5 +1,6 @@
 import { trimTrailingSlashes } from "../models/network";
 import { isPlainRecord, isRecord } from "../models/guards";
+import { isArweaveId } from "../models/arweave-id";
 /**
  * Spot price of an AO token from its own swap orderbook, the way Bazar
  * shows "Current unit price": the lowest open ask in the token process's
@@ -14,7 +15,6 @@ import { isPlainRecord, isRecord } from "../models/guards";
  * real status is read from `/status` for the few orders that matter.
  */
 const STATE_DEVICES = new Set(["carrier@1.0", "name-token@1.0", "token@1.0"]);
-const ADDRESS = /^[A-Za-z0-9_-]{43}$/;
 const UINT = /^(?:0|[1-9]\d*)$/;
 const MAX_DENOMINATION = 255;
 const READ_TIMEOUT_MS = 10_000;
@@ -73,7 +73,7 @@ async function readMessage(url: string, fetchImpl: typeof fetch, signal: AbortSi
 function link(value: unknown): string | null {
   if (typeof value !== "string" || !value.startsWith("ao:")) return null;
   const id = value.slice(3);
-  return ADDRESS.test(id) ? id : null;
+  return isArweaveId(id) ? id : null;
 }
 
 function atomic(value: unknown): bigint | null {
@@ -119,7 +119,7 @@ function winstonPerToken({ asking, quantity }: Order, denomination: number): big
  * The process id comes from the caller's own token list, never from a ticker.
  */
 export async function readBestAsk(processId: string, nodeUrl: string, fetchImpl: typeof fetch = fetch): Promise<BestAsk | null> {
-  if (!ADDRESS.test(processId)) return null;
+  if (!isArweaveId(processId)) return null;
   const base = trimTrailingSlashes(nodeUrl);
   const signal = AbortSignal.timeout(READ_TIMEOUT_MS);
 
@@ -139,7 +139,7 @@ export async function readBestAsk(processId: string, nodeUrl: string, fetchImpl:
         : null;
     if (!table) return null;
 
-    const entries = Object.entries(table).filter(([key]) => ADDRESS.test(key));
+    const entries = Object.entries(table).filter(([key]) => isArweaveId(key));
     if (entries.length > MAX_ORDERS) return null;
 
     const orders = (await Promise.all(entries.map(([key, value]) => readOrder(key, value, base, fetchImpl, signal).catch(() => null))))

@@ -1,5 +1,6 @@
 import { applyDataItemSignature, buildUnsignedDataItem } from "../arweave/data-item";
 import { userErrorMessage } from "../models/user-errors";
+import { isArweaveId } from "../models/arweave-id";
 
 export { createSignedDataItem } from "../arweave/data-item";
 
@@ -46,14 +47,14 @@ const encoder = new TextEncoder();
 
 /** The unsigned `Transfer` data item `ownerB64Url` will sign. */
 export function prepareTransfer(ownerB64Url: string, processId: string, recipient: string, amount: string): Bytes {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(processId)) {
+  if (!isArweaveId(processId)) {
     throw new Error(`AO message target must be a 32-byte Arweave id (43 base64url characters), got "${processId}".`);
   }
   // Both of these go into the signed item as plain tags, and the token
   // process reads them from there: a recipient that isn't an address and a
   // quantity that isn't a whole number build a message that either bounces
   // or credits the wrong amount.
-  if (!/^[A-Za-z0-9_-]{43}$/.test(recipient)) {
+  if (!isArweaveId(recipient)) {
     throw new Error(`AO message recipient must be a 32-byte Arweave id (43 base64url characters), got "${recipient}".`);
   }
   if (!/^\d+$/.test(amount)) {

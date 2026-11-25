@@ -1,7 +1,7 @@
 import type { Tag } from "../models/tag";
 import { HARMLESS_TAGS, isHarmlessTag } from "./other-tags";
+import { ARWEAVE_ID } from "../models/arweave-id";
 
-const ARWEAVE_ADDRESS_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
 /**
@@ -59,7 +59,7 @@ function byName(tags: readonly Tag[], name: string, accept: (tag: Tag) => boolea
 }
 
 function isAddress(value: string): boolean {
-  return ARWEAVE_ADDRESS_PATTERN.test(value) || EVM_ADDRESS_PATTERN.test(value);
+  return ARWEAVE_ID.test(value) || EVM_ADDRESS_PATTERN.test(value);
 }
 
 /**

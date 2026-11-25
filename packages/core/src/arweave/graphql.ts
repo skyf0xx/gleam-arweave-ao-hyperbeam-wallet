@@ -2,6 +2,7 @@ import type { ActivityEntry } from "../models/activity";
 import { COLLECTIBLE_TRANSFER_QUANTITY } from "../ao/collectible-transfer";
 import { L1_ACTIVATION_WINSTON } from "../ao/l1-transfer";
 import { userErrorMessage } from "../models/user-errors";
+import { isArweaveId } from "../models/arweave-id";
 
 /**
  * Minimal shape of the gateway's GraphQL transaction connection response
@@ -211,7 +212,7 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
  */
 function isSwapOrder(tags: GraphQLTag[]): boolean {
   const exact = (name: string) => tags.find((tag) => tag.name === name)?.value;
-  return exact("action") === "register-interest" && /^[A-Za-z0-9_-]{43}$/.test(exact("order-id") ?? "");
+  return exact("action") === "register-interest" && isArweaveId(exact("order-id") ?? "");
 }
 
 /**
@@ -228,7 +229,7 @@ function l1TokenTransferOf(node: { quantity?: { winston: string }; tags: GraphQL
   const recipient = exact("recipient");
   const quantity = exact("quantity");
   if (exact("action") !== "transfer" || quantity === undefined || !/^[1-9]\d*$/.test(quantity)) return null;
-  return recipient !== undefined && /^[A-Za-z0-9_-]{43}$/.test(recipient) ? { recipient, quantity } : null;
+  return recipient !== undefined && isArweaveId(recipient) ? { recipient, quantity } : null;
 }
 
 /**

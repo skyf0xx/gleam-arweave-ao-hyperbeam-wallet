@@ -2,6 +2,7 @@ import type { Signer } from "../vault/signer";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
 import { userErrorMessage } from "../models/user-errors";
+import { isArweaveId } from "../models/arweave-id";
 
 /**
  * ANS-104 data items with signature type 1 (Arweave RSA-PSS 4096), built
@@ -138,7 +139,7 @@ function ownerBytes(ownerB64Url: string): Bytes {
 
 function targetBytes(target: string | undefined): Bytes | null {
   if (!target) return null;
-  const bytes = /^[A-Za-z0-9_-]{43}$/.test(target) ? base64UrlToBytes(target) : new Uint8Array();
+  const bytes = isArweaveId(target) ? base64UrlToBytes(target) : new Uint8Array();
   if (bytes.byteLength !== TARGET_LENGTH) {
     throw new Error(`Data item target must be a 32-byte Arweave id (43 base64url characters), got "${target}".`);
   }

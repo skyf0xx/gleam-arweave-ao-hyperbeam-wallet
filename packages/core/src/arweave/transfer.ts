@@ -8,6 +8,7 @@ import {
 import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
 import { userErrorMessage } from "../models/user-errors";
+import { isArweaveId } from "../models/arweave-id";
 
 /**
  * Builds an AR transfer from the owner's public key (`prepareTransfer`)
@@ -66,7 +67,7 @@ export async function prepareTransfer(
 ): Promise<ArweaveTransactionJson> {
   // arweave-js decodes `target` with strict base64 and would otherwise
   // throw a bare "Invalid character" DOMException.
-  if (!/^[A-Za-z0-9_-]{43}$/.test(recipient)) {
+  if (!isArweaveId(recipient)) {
     throw new Error(userErrorMessage("transferRecipientInvalid", { recipient }));
   }
   // The quantity is what gets signed, and the network only accepts a whole

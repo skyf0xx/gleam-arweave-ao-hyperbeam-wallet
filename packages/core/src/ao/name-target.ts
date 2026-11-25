@@ -5,6 +5,7 @@ import type { Tag } from "../models/tag";
 import { userErrorMessage } from "../models/user-errors";
 import { withRequestTimeout } from "./asset-scan";
 import { readCarrierHolding, readCarrierState } from "./names";
+import { isArweaveId } from "../models/arweave-id";
 
 /**
  * Pointing a Permaweb Name somewhere else is a `set` on its carrier: an L1
@@ -15,7 +16,6 @@ import { readCarrierHolding, readCarrierState } from "./names";
  */
 export const NAME_TARGET_WINSTON = "1";
 
-const ARWEAVE_ID = /^[A-Za-z0-9_-]{43}$/;
 
 export function nameTargetTags(target: string): Tag[] {
   return [
@@ -38,8 +38,8 @@ export async function prepareNameTarget(
   target: string,
   fee: Winston,
 ): Promise<ArweaveTransactionJson> {
-  if (!ARWEAVE_ID.test(carrier)) throw new Error(userErrorMessage("collectibleIdInvalid"));
-  if (!ARWEAVE_ID.test(target)) throw new Error(userErrorMessage("nameTargetInvalid"));
+  if (!isArweaveId(carrier)) throw new Error(userErrorMessage("collectibleIdInvalid"));
+  if (!isArweaveId(target)) throw new Error(userErrorMessage("nameTargetInvalid"));
   const reward = BigInt(fee) - BigInt(NAME_TARGET_WINSTON);
   if (reward < 0n) throw new Error(`A fee of ${fee} winston can't pay the ${NAME_TARGET_WINSTON} winston a set carries.`);
   return prepareTransfer(gatewayUrl, ownerB64Url, carrier, NAME_TARGET_WINSTON, reward.toString(), nameTargetTags(target));
@@ -58,14 +58,14 @@ export function readNameTarget(transaction: {
 }): { carrier: string; target: string } | null {
   const [action, value, ...rest] = transaction.tags;
   if (
-    !ARWEAVE_ID.test(transaction.target) ||
+    !isArweaveId(transaction.target) ||
     transaction.quantity !== NAME_TARGET_WINSTON ||
     transaction.data_size !== "0" ||
     rest.length > 0 ||
     action?.name !== "action" ||
     action.value !== "set" ||
     value?.name !== "reference-value" ||
-    !ARWEAVE_ID.test(value.value)
+    !isArweaveId(value.value)
   ) {
     return null;
   }
