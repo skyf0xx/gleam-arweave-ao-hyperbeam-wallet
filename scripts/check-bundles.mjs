@@ -200,6 +200,7 @@ const CONNECT_PACKAGES = [
   "tslib",
   "vite-plugin-node-polyfills",
   "wxt",
+  "zod",
 ];
 
 /** @type {Record<string, string[]>} */
@@ -283,6 +284,7 @@ export const BUNDLE_PACKAGES = {
     "tailwind-merge",
     "vite-plugin-node-polyfills",
     "wxt",
+    "zod",
   ],
   "popup.html": POPUP_PACKAGES,
   "sidepanel.html": POPUP_PACKAGES,
