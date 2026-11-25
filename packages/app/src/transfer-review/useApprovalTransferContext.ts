@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { DisplayCurrency, DisplaySettings, RuntimePort, TokenPrice } from "@gleam/core";
+import type { DisplayCurrency, RuntimePort } from "@gleam/core";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
-import { DISPLAY_SETTINGS_QUERY_KEY } from "../display-settings";
-import { balancesQuery } from "../screens/activity";
+import { useDisplaySettings } from "../display-settings";
+import { useBalances } from "../screens/activity";
+import { useOrderbookPrices, useTokenPrices } from "../screens/main-screen/src/useTokenPrices";
 import { readRowVisibility } from "../token-visibility";
 import type { TransferContext } from "./model";
 
@@ -17,55 +17,25 @@ import type { TransferContext } from "./model";
  * on the main screen; any other token's price would be its creator's claim.
  */
 export function useApprovalTransferContext(
-  runtime: RuntimePort | null,
+  runtime: RuntimePort,
   address: string | null,
   tokens: Array<string | null>,
 ): TransferContext {
-  const active = runtime !== null && address !== null && tokens.length > 0;
+  const active = address !== null && tokens.length > 0;
   const tokensKey = [...new Set(tokens.map((token) => token ?? ""))].sort().join(",");
 
-  const settingsQuery = useQuery({
-    enabled: active,
-    queryKey: DISPLAY_SETTINGS_QUERY_KEY,
-    queryFn: () => (runtime as RuntimePort).send<void, DisplaySettings>({ type: "getDisplaySettings", payload: undefined }),
-    staleTime: Infinity,
-  });
-  const settings = settingsQuery.data;
+  const { settings: displaySettings } = useDisplaySettings(runtime, active);
+  const balances = useBalances(runtime, address ?? "", active).data;
 
-  const balancesRead = useQuery({
-    enabled: active,
-    queryKey: balancesQuery(runtime as RuntimePort, address ?? "").queryKey,
-    queryFn: () => balancesQuery(runtime as RuntimePort, address as string).queryFn(),
-  });
-  const balances = balancesRead.data;
-
-  const currency: DisplayCurrency | undefined = settings?.currency;
+  const currency: DisplayCurrency | undefined = displaySettings?.currency;
   const watched = (balances?.tokenBalances ?? [])
     .filter((balance) => balance.source !== "discovered" && balance.available !== false)
     .map((balance) => balance.processId)
     .filter((processId) => processId !== DEFAULT_AO_TOKEN.processId && tokensKey.split(",").includes(processId))
     .sort();
 
-  const registryPrices = useQuery({
-    enabled: active && currency !== undefined,
-    queryKey: ["tokenPrices", currency] as const,
-    queryFn: () =>
-      (runtime as RuntimePort).send<{ currency: DisplayCurrency }, TokenPrice[]>({
-        type: "getTokenPrices",
-        payload: { currency: currency as DisplayCurrency },
-      }),
-  });
-  const orderbookPrices = useQuery({
-    enabled: active && currency !== undefined && watched.length > 0,
-    queryKey: ["orderbookPrices", currency, watched] as const,
-    queryFn: async () => {
-      const found = await (runtime as RuntimePort).send<{ currency: DisplayCurrency; processIds: string[] }, TokenPrice[]>({
-        type: "getTokenPrices",
-        payload: { currency: currency as DisplayCurrency, processIds: watched },
-      });
-      return found.filter((entry) => entry.processId !== null && watched.includes(entry.processId));
-    },
-  });
+  const registryPrices = useTokenPrices(runtime, active ? currency : undefined);
+  const orderbookPrices = useOrderbookPrices(runtime, active ? currency : undefined, watched);
 
   // Undefined until every price read has settled, so a row never flips from AR-only to priced.
   const settled = currency !== undefined && !registryPrices.isPending && (watched.length === 0 || !orderbookPrices.isPending);
@@ -78,8 +48,8 @@ export function useApprovalTransferContext(
     balances,
     prices,
     currency,
-    tokenLogos: settings?.tokenLogos ?? true,
-    balancesHidden: settings?.balancesHidden ?? false,
+    tokenLogos: displaySettings?.tokenLogos ?? true,
+    balancesHidden: displaySettings?.balancesHidden ?? false,
     visibility,
   };
 }

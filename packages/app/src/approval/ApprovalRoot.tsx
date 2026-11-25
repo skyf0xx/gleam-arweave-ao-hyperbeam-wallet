@@ -192,7 +192,7 @@ function ApprovalRootContent({
   const armed = useInputArmed(`${state.kind}:${requestId ?? ""}`, armDelayMs);
   const guardClicks = reviewing !== null && !armed;
   const transferContext = useApprovalTransferContext(
-    reviewing?.runtime ?? null,
+    reviewing?.runtime ?? platform.runtime,
     reviewing?.kind === "awaiting-device" ? reviewing.device.address : (reviewing?.wallet?.address ?? null),
     reviewing ? tokensOf(reviewing.request) : [],
   );

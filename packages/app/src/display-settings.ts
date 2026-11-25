@@ -10,9 +10,10 @@ export const DISPLAY_SETTINGS_QUERY_KEY = ["displaySettings"] as const;
  * is in flight; a failed read falls back to the locale defaults rather than
  * leaving every balance unpriced.
  */
-export function useDisplaySettings(runtime: RuntimePort) {
+export function useDisplaySettings(runtime: RuntimePort, enabled = true) {
   const queryClient = useQueryClient();
   const query = useQuery({
+    enabled,
     queryKey: DISPLAY_SETTINGS_QUERY_KEY,
     queryFn: () => runtime.send<void, DisplaySettings>({ type: "getDisplaySettings", payload: undefined }),
     staleTime: Infinity,
