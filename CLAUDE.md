@@ -223,13 +223,39 @@ tests check Gleam's ANS-104 bytes against it.
   that would add the third copy of a block or a repeated line (a guard,
   a wrapper, a form) extracts it first. Code that only looks alike
   stays apart: two error shapes for two readers are two shapes.
+- **Build for the callers that exist.** No parameter, option, interface
+  or generic for a caller that isn't in this change. Generalise when the
+  second real caller arrives.
+- **One reason to change per file.** Before adding a new responsibility
+  to a file, put it in its own module. A file needs splitting when you
+  can only describe it with "and", when it needs section-divider
+  comments to navigate, when its test file has `describe` blocks with
+  unrelated setup, when its parts change in separate commits, or when a
+  React view holds independent state machines or stateful
+  subcomponents. Split along those seams, and only where each piece
+  reads on its own; pieces that would pass half the file's state back
+  and forth stay together. A large file that is one thing (a catalog, a
+  method table, one parser) stays whole.
+- **File size ratchet.** ESLint's `max-lines` is 400 code lines.
+  Files already over it have a cap at their current size in
+  `scripts/file-size-caps.mjs`: a capped file may shrink but never grow, so a
+  change that would grow one extracts something first, and a split
+  lowers or removes the cap in the same commit. Raise a cap only for a
+  file that is one thing, with the reason beside it.
+- **A module's `index.ts` is its public interface.** Import a module
+  through its `index.ts`, not a file inside it, and keep what it doesn't
+  export private. No barrel that only re-exports other barrels, and no
+  `index.ts` in a one-file folder.
 - **Refactor what you touch.** When the code a change touches or calls
   is hard to change (copies, hand-written parsing, a helper in the wrong
-  place), fix it on the same branch, in its own `refactor(<scope>): …`
-  commit ahead of the change that needs it. A refactor changes no
-  behaviour, UX or copy: the tests pass with edits only to imports and
-  call sites. Keep it to the files the change touches or calls; a wider
-  one goes in `todo.md`.
+  place, dead code), fix it on the same branch, in its own
+  `refactor(<scope>): …` commit ahead of the change that needs it.
+  A refactor changes no behaviour, UX or copy: the tests pass with
+  edits only to imports and call sites. Keep it to the files the change
+  touches or calls; a wider one goes in `todo.md`.
+- **A behaviour change comes with a test** that fails without it: a fix
+  with a test that reproduces the bug, a feature with tests of what it
+  promises.
 - **Surface files.** A refactor of a `security/surface.txt` path costs
   the next release an audit like any other change there, so make one in
   passing only when the change already edits that file.
@@ -246,8 +272,9 @@ pnpm test:smoke                            # after wxt:build: loads the built ex
 pnpm vitest run [path-fragment]            # tests
 pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan, tsconfig.scripts.json
 pnpm eslint --max-warnings=0 <files>
-pnpm deps:check                            # the import fences, on resolved files
+pnpm deps:check                            # the import fences and import cycles, on resolved files
 pnpm dup                                   # copied blocks across the repo (jscpd); not a gate
+pnpm health                                # before a release: knip (unused files, exports, deps), jscpd, files at their size cap
 ```
 
 The pre-commit hook (lefthook) runs eslint and gitleaks on staged files,
