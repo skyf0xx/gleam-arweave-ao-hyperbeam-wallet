@@ -11,10 +11,11 @@ export const FILE_SIZE_CAPS = {
   "eslint.config.js": 583,
   // One view over one native page; every effect reads the same page state.
   "packages/app/src/screens/browser/src/BrowserView.tsx": 416,
-  "packages/runtime/src/create-runtime.ts": 647,
+  "packages/runtime/src/create-runtime.ts": 415,
   // One state machine over the pending approvals; the grant methods could move out (todo.md).
   "packages/runtime/src/handlers/approval.ts": 981,
-  "packages/runtime/src/handlers/wallet-lifecycle.ts": 789,
+  // What is left handles key material, which stays in the one file the signer fence allows.
+  "packages/runtime/src/handlers/wallet-lifecycle.ts": 566,
   "apps/points-api/src/scans/attestations.ts": 586,
   "apps/site/scan-lib.js": 427,
   "packages/app/src/App.tsx": 451,
@@ -25,8 +26,6 @@ export const FILE_SIZE_CAPS = {
   "packages/app/src/screens/points/src/PointsView.tsx": 511,
   "packages/app/src/screens/send/src/SendView.tsx": 1408,
   "packages/app/src/transfer-review/TransferReview.tsx": 632,
-  "packages/runtime/src/handlers/points.ts": 455,
-  "packages/runtime/src/handlers/reads.ts": 980,
   "packages/ui/src/components/wallet/PortfolioChart.tsx": 403,
   "scripts/check-bundles.mjs": 434,
 };

@@ -24,6 +24,10 @@
 1 apps/extension/src/adapters/session-key-store.ts
 1 packages/runtime/src/handlers/key-session.ts
 1 packages/runtime/src/handlers/wallet-lifecycle.ts
+1 packages/runtime/src/handlers/wallet-session.ts
+1 packages/runtime/src/handlers/keyless-wallets.ts
+1 packages/runtime/src/handlers/lifecycle-settings.ts
+1 packages/runtime/src/handlers/wallet-records.ts
 1 packages/runtime/src/handlers/passkey.ts
 1 packages/runtime/src/handlers/backup.ts
 1 packages/runtime/src/handlers/backup-state.ts
@@ -82,6 +86,9 @@
 2 packages/keystone/src/
 2 packages/core/src/points/ownership.ts
 2 packages/runtime/src/handlers/points.ts
+2 packages/runtime/src/handlers/points-seen.ts
+2 packages/runtime/src/handlers/points-replies.ts
+2 packages/runtime/src/handlers/points-records.ts
 2 packages/core/src/models/capabilities.ts
 2 apps/extension/src/hardware/keystone/
 2 apps/extension/src/hardware/ledger/
@@ -100,6 +107,12 @@
 
 3 apps/extension/entrypoints/background/
 3 packages/runtime/src/create-runtime.ts
+3 packages/runtime/src/provider-dispatch.ts
+3 packages/runtime/src/site-dispatch.ts
+3 packages/runtime/src/site-events.ts
+3 packages/runtime/src/request-guards.ts
+3 packages/runtime/src/token-preview.ts
+3 packages/runtime/src/first-run-network.ts
 3 packages/runtime/src/handlers/provider.ts
 3 packages/runtime/src/dispatch/site.ts
 3 packages/core/src/models/site-origin.ts
@@ -168,6 +181,10 @@
 4 apps/extension/src/adapters/windows.ts
 4 packages/core/src/recipients/assess.ts
 4 packages/runtime/src/handlers/reads.ts
+4 packages/runtime/src/handlers/token-reads.ts
+4 packages/runtime/src/handlers/collectibles-reads.ts
+4 packages/runtime/src/handlers/activity-reads.ts
+4 packages/runtime/src/handlers/price-reads.ts
 4 packages/core/src/models/approval.ts
 4 packages/app/src/screens/main-screen/src/formatWinston.ts
 4 packages/ui/src/format/truncate-address.ts

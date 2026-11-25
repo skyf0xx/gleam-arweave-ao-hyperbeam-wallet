@@ -17,6 +17,10 @@
 /apps/extension/src/adapters/session-key-store.ts                          @skyf0xx
 /packages/runtime/src/handlers/key-session.ts                              @skyf0xx
 /packages/runtime/src/handlers/wallet-lifecycle.ts                         @skyf0xx
+/packages/runtime/src/handlers/wallet-session.ts                           @skyf0xx
+/packages/runtime/src/handlers/keyless-wallets.ts                          @skyf0xx
+/packages/runtime/src/handlers/lifecycle-settings.ts                       @skyf0xx
+/packages/runtime/src/handlers/wallet-records.ts                           @skyf0xx
 /packages/runtime/src/handlers/passkey.ts                                  @skyf0xx
 /packages/runtime/src/handlers/backup.ts                                   @skyf0xx
 /packages/runtime/src/handlers/backup-state.ts                             @skyf0xx
@@ -76,6 +80,9 @@
 /packages/keystone/src/                                                 @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
 /packages/runtime/src/handlers/points.ts                                   @skyf0xx
+/packages/runtime/src/handlers/points-seen.ts                              @skyf0xx
+/packages/runtime/src/handlers/points-replies.ts                           @skyf0xx
+/packages/runtime/src/handlers/points-records.ts                           @skyf0xx
 /packages/core/src/models/capabilities.ts                           @skyf0xx
 /apps/extension/src/hardware/keystone/                              @skyf0xx
 /apps/extension/src/hardware/ledger/                                @skyf0xx
@@ -95,6 +102,12 @@
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
 /packages/runtime/src/create-runtime.ts                                    @skyf0xx
+/packages/runtime/src/provider-dispatch.ts                                 @skyf0xx
+/packages/runtime/src/site-dispatch.ts                                     @skyf0xx
+/packages/runtime/src/site-events.ts                                       @skyf0xx
+/packages/runtime/src/request-guards.ts                                    @skyf0xx
+/packages/runtime/src/token-preview.ts                                     @skyf0xx
+/packages/runtime/src/first-run-network.ts                                 @skyf0xx
 /packages/runtime/src/handlers/provider.ts                                 @skyf0xx
 /packages/runtime/src/dispatch/site.ts                                     @skyf0xx
 /packages/core/src/models/site-origin.ts                                   @skyf0xx
@@ -164,6 +177,10 @@
 /apps/extension/src/adapters/windows.ts                                @skyf0xx
 /packages/core/src/recipients/assess.ts                                @skyf0xx
 /packages/runtime/src/handlers/reads.ts                                @skyf0xx
+/packages/runtime/src/handlers/token-reads.ts                              @skyf0xx
+/packages/runtime/src/handlers/collectibles-reads.ts                       @skyf0xx
+/packages/runtime/src/handlers/activity-reads.ts                           @skyf0xx
+/packages/runtime/src/handlers/price-reads.ts                              @skyf0xx
 /packages/core/src/models/approval.ts                                      @skyf0xx
 /packages/app/src/screens/main-screen/src/formatWinston.ts                 @skyf0xx
 /packages/ui/src/format/truncate-address.ts                                @skyf0xx

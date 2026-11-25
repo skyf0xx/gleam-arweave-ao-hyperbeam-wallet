@@ -1,51 +1,13 @@
-import {
-  discoverCollectibles,
-  discoverTokens,
-  getTransferOutcome,
-  readLegacyTokenInfo,
-  readTokenStateLogo,
-  readTokenSwapHeight,
-  readTokenBalance,
-  type DiscoverTokensOptions,
-  type ReadTokenBalanceOptions,
-} from "@gleam/core/src/ao/index.ts";
-import { z } from "zod";
-import { peerFailoverOrder, withPeerFailover } from "@gleam/core/src/ao/peer-failover.ts";
-import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
+import { discoverTokens, type DiscoverTokensOptions } from "@gleam/core/src/ao/index.ts";
+import { isRegisteredProcessId, impersonatesRegisteredToken } from "@gleam/core/src/pricing/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
-import {
-  queryActivityTransactions,
-  queryBlockHeights,
-  queryAoTransferActivity,
-  queryL1TokenReceipts,
-} from "@gleam/core/src/arweave/graphql.ts";
-import { crossCheckGatewayUrls, queryCheckedTokenMetadata, tokenLogoUrl, type TokenMetadataCheck } from "@gleam/core/src/arweave/token-metadata.ts";
-import { mergeActivity } from "@gleam/core/src/activity/index.ts";
-import {
-  AO_TOKEN,
-  AR_TOKEN,
-  DEFAULT_TOKEN_REGISTRY,
-  buildPriceAtFromSeries,
-  seriesChange,
-  estimateHistoricalPortfolioValue,
-  getHistoricalUsdPrices,
-  getUsdFxRate,
-  getUsdPrice,
-  changeSinceYesterday,
-  impersonatesRegisteredToken,
-  isRegisteredProcessId,
-  parsePriceSnapshots,
-  readBestAsk,
-  recordPriceSample,
-} from "@gleam/core/src/pricing/index.ts";
-import { POINTS_API_URL, isFiatCurrency, errorMessage, isArweaveId } from "@gleam/core";
+import { POINTS_API_URL, isArweaveId } from "@gleam/core";
 import { updateStored } from "../storage-update";
-import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls, readL1NodeUrls } from "../peers";
+import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls } from "../peers";
 import type {
   ActivityEntry,
   ActivityPage,
   Collectible,
-  CollectibleRef,
   DisplayCurrency,
   NetworkSettings,
   PendingTransfer,
@@ -59,7 +21,6 @@ import type {
   TokenMetadata,
   TokenPrice,
   TokenPriceHistory,
-  TimerPort,
   TokenTransport,
   UserToken,
   UserTokensOptions,
@@ -67,11 +28,24 @@ import type {
   Winston,
 } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { activityLogKey, loadActivityLog, loadNetworkSettings as loadStoredNetworkSettings, loadWallets, parseActivityLog } from "../stored-data";
-import { ACTIVE_WALLET_ID_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
-import { dappError } from "../dapp-error";
+import { loadActivityLog, loadNetworkSettings as loadStoredNetworkSettings } from "../stored-data";
+import { WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { stringList, withFallbackAfter } from "../guards";
-import { schemaGuard } from "../schema-guard";
+import { ActivityReads } from "./activity-reads";
+import { CollectiblesReads } from "./collectibles-reads";
+import { PriceReads } from "./price-reads";
+import {
+  DEFAULT_AO_PROCESS_ID,
+  DISCOVERED_TOKENS_KEY_PREFIX,
+  HIDDEN_PROCESS_IDS_KEY_PREFIX,
+  isDiscoveredTokensCache,
+  loadHiddenProcessIds,
+  loadTokenMetadata,
+  loadWatchedProcessIds,
+  readBalance,
+  tokenRow,
+  type DiscoveredTokensCache,
+} from "./token-reads";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -113,12 +87,6 @@ import { schemaGuard } from "../schema-guard";
  *   balance is read and how it is sent (`core/ao/balance.ts`'s
  *   `readTokenBalance`).
  */
-const PRICE_SNAPSHOTS_KEY = "local:priceSnapshots";
-/** More than a wallet lists is not a real request, and each id costs the node several reads. */
-const MAX_PRICED_PROCESS_IDS = 50;
-const TOKEN_METADATA_KEY_PREFIX = "local:tokenMetadata:";
-const HIDDEN_PROCESS_IDS_KEY_PREFIX = "local:hiddenProcessIds:";
-const DISCOVERED_TOKENS_KEY_PREFIX = "local:discoveredTokens:";
 // A received token should show up within a minute, and the wallet's own
 // history is the only signal that one arrived. A popup open inside this
 // window reuses the last result.
@@ -126,142 +94,12 @@ const DISCOVERED_TOKENS_TTL_MS = 60 * 1000;
 // Long enough for the L1 scans on a slow gateway. Past it the balances
 // return with the last list, and the next read has the new one.
 const DISCOVERY_WAIT_MS = 8_000;
-// A transaction's anchor block expires after about 100 minutes, so one
-// still unmined past this can never land.
-const NEVER_MINED_MS = 2 * 60 * 60 * 1000;
-const NEVER_MINED_ERROR = "This send never reached a block, so nothing moved.";
-const COLLECTIBLES_KEY_PREFIX = "local:collectibles:";
-// Holdings change rarely and discovery is dozens of requests, so a popup
-// open within this window reuses the last result.
-/**
- * How long a discovered list is reused. The popup shows its own copy while
- * a rediscovery runs, so a short life costs no wait. Holdings changes the
- * wallet can see (a receive, a send or order settling) mark it stale sooner.
- */
-const COLLECTIBLES_TTL_MS = 90 * 1000;
-/** Each unconfirmed receipt can cost a metadata and a balance read. */
-const MAX_COLLECTIBLE_RECEIPTS = 10;
-const ACTIVITY_PAGE_LIMIT = 50;
-const WINSTON_PER_AR = 1_000_000_000_000;
-
-const PORTFOLIO_HISTORY_RANGES: readonly PortfolioHistoryRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
-
-function periodLabelForRange(range: PortfolioHistoryRange): string {
-  switch (range) {
-    case "24H":
-      return "Last 24 hours";
-    case "7D":
-      return "Last 7 days";
-    case "1M":
-      return "Last 30 days";
-    case "1Y":
-      return "Last 12 months";
-    case "ALL":
-      return "All time";
-  }
-}
-
-/** Always listed, whatever the watch list holds. */
-const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
-
-const AO_TOKEN_METADATA: TokenMetadata = {
-  processId: DEFAULT_AO_PROCESS_ID,
-  transport: "mu",
-  assetClass: null,
-  denomination: 12,
-  ticker: AO_TOKEN.ticker,
-  name: AO_TOKEN.name,
-  description: null,
-  logo: null,
-  totalSupply: null,
-};
-
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
-
-/**
- * The row fields that come from metadata alone. The ticker falls back to the process id, as the popup expects.
- * A discovered token's logo is still the sender's claim; the popup draws it only once the user shows the row.
- */
-function tokenIdentity(
-  address: string,
-  metadata: TokenMetadata,
-  source: NonNullable<TokenBalance["source"]>,
-  gatewayUrl: string,
-): Omit<TokenBalance, "quantity"> {
-  const logoUrl = tokenLogoUrl(gatewayUrl, metadata.logo);
-  return {
-    address,
-    processId: metadata.processId,
-    ticker: metadata.ticker ?? metadata.processId,
-    denomination: metadata.denomination ?? 0,
-    name: metadata.name,
-    source,
-    ...(logoUrl ? { logoUrl } : {}),
-  };
-}
-
-const nullableString = z.string().nullable();
-
-const isValidTokenMetadata = schemaGuard<TokenMetadata>(
-  z.object({
-    processId: z.string(),
-    transport: z.enum(["l1", "mu"]),
-    assetClass: z.enum(["fungible", "unique"]).nullable(),
-    denomination: z.number().lt(100).nullable(),
-    ticker: nullableString,
-    name: nullableString,
-    description: nullableString,
-    logo: nullableString,
-    totalSupply: nullableString,
-  }),
-);
-
-interface DiscoveredTokensCache {
-  savedAt: number;
-  processIds: string[];
-}
-
-const isDiscoveredTokensCache = schemaGuard<DiscoveredTokensCache>(
-  z.object({ savedAt: z.number(), processIds: z.array(z.string()) }),
-);
-
-interface CollectiblesCache {
-  savedAt: number;
-  collectibles: Collectible[];
-  /** The gateway and peer it was read from; a list read elsewhere is stale. */
-  source?: string;
-}
-
-function collectiblesSource(settings: NetworkSettings): string {
-  return `${settings.gatewayUrl} ${settings.activePeerUrl ?? ""}`;
-}
-
-const cachedCollectibleSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  contentType: z.string().optional(),
-  imageUrl: z.string().optional(),
-  videoUrl: z.string().optional(),
-  description: z.string().optional(),
-  collectionId: z.string().optional(),
-  collectionName: z.string().optional(),
-  permawebName: z.object({ label: z.string(), target: z.string().optional(), listed: z.literal(true).optional() }).optional(),
-});
-
-const isCollectiblesCache = schemaGuard<CollectiblesCache>(
-  z.object({ savedAt: z.number(), source: z.string().optional(), collectibles: z.array(cachedCollectibleSchema) }),
-);
 
 export class ReadsHandler {
-  private readonly collectiblesInFlight = new Map<string, Promise<Collectible[]>>();
   private readonly discoveryInFlight = new Map<string, Promise<string[]>>();
+  private readonly collectibles: CollectiblesReads;
+  private readonly activity: ActivityReads;
+  private readonly prices: PriceReads;
 
   /**
    * `pricesApiUrl` is the Gleam server, which proxies CoinGecko/CoinPaprika
@@ -269,9 +107,14 @@ export class ReadsHandler {
    */
   constructor(
     private readonly storage: StoragePort,
-    private readonly pricesApiUrl: string = POINTS_API_URL,
+    pricesApiUrl: string = POINTS_API_URL,
     private readonly discover: (options: DiscoverTokensOptions) => Promise<TokenMetadata[]> = discoverTokens,
-  ) {}
+  ) {
+    const loadSettings = () => this.loadNetworkSettings();
+    this.collectibles = new CollectiblesReads(storage, loadSettings);
+    this.activity = new ActivityReads(storage, loadSettings, this.collectibles);
+    this.prices = new PriceReads(storage, pricesApiUrl, loadSettings, () => this.loadTrackedAddresses());
+  }
 
   /**
    * The stored settings with the community and discovered peers the user
@@ -284,23 +127,6 @@ export class ReadsHandler {
       await readExtraPeerUrls(this.storage),
       await readDismissedPeers(this.storage),
     );
-  }
-
-  /**
-   * A token balance, failing over to the other enabled peers when the
-   * active one is down. An L1 token reads the peer only as a last resort
-   * after the gateway and L1 nodes, so it gets one pass.
-   */
-  private async readBalance(
-    settings: NetworkSettings,
-    options: Omit<ReadTokenBalanceOptions, "gatewayUrl" | "peerUrl">,
-  ): Promise<string> {
-    const peers = peerFailoverOrder(settings);
-    const l1NodeUrls = options.transport === "l1" ? await readL1NodeUrls(this.storage) : undefined;
-    const read = (peerUrl: string | null) =>
-      readTokenBalance({ ...options, gatewayUrl: settings.gatewayUrl, peerUrl, ...(l1NodeUrls ? { l1NodeUrls } : {}) });
-    if (peers.length === 0 || options.transport === "l1") return read(settings.activePeerUrl);
-    return withPeerFailover(peers, read);
   }
 
   /**
@@ -319,228 +145,23 @@ export class ReadsHandler {
   }
 
   async loadWatchedProcessIds(address: string): Promise<string[]> {
-    return stringList(await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`));
+    return loadWatchedProcessIds(this.storage, address);
   }
 
-  /**
-   * Cached per wallet in `local:collectibles:{address}`. A failed
-   * rediscovery serves the stale cache instead of an error; with no cache
-   * it throws, so the popup can show its error state. Concurrent calls for
-   * one wallet share one discovery.
-   */
-  async getCollectibles(req: { address: string; refresh?: boolean }): Promise<Collectible[]> {
-    const key = `${COLLECTIBLES_KEY_PREFIX}${req.address}`;
-    const raw = await this.storage.get<unknown>(key);
-    const cached = isCollectiblesCache(raw) ? raw : null;
-    const source = collectiblesSource(await this.loadNetworkSettings());
-    if (cached && req.refresh !== true && cached.source === source && Date.now() - cached.savedAt < COLLECTIBLES_TTL_MS) {
-      return cached.collectibles;
-    }
-
-    const running = this.collectiblesInFlight.get(req.address);
-    if (running) return running;
-
-    const run = (async () => {
-      try {
-        const settings = await this.loadNetworkSettings();
-        if (settings.activePeerUrl === null) {
-          throw new Error(userErrorMessage("noPeerConfigured"));
-        }
-        const l1NodeUrls = await readL1NodeUrls(this.storage);
-        const discovered = await withPeerFailover(peerFailoverOrder(settings), (peerUrl) =>
-          discoverCollectibles({ address: req.address, gatewayUrl: settings.gatewayUrl, peerUrl, l1NodeUrls }),
-        );
-        // A send still pending hasn't reached the asset yet, so its balance
-        // reads as held. It stays off the list until the send settles.
-        const sending = new Set(
-          (await this.loadActivityLog(req.address)).flatMap((entry) =>
-            entry.type === "send" && entry.status === "pending" && entry.collectible ? [entry.collectible.id] : [],
-          ),
-        );
-        const collectibles = discovered.filter((collectible) => !sending.has(collectible.id));
-        // Queued behind forgetCollectible, which updates the same cache.
-        await updateStored<CollectiblesCache>(this.storage, key, () => ({
-          savedAt: Date.now(),
-          collectibles,
-          source: collectiblesSource(settings),
-        }));
-        return collectibles;
-      } catch (error) {
-        if (cached) return cached.collectibles;
-        throw error;
-      } finally {
-        this.collectiblesInFlight.delete(req.address);
-      }
-    })();
-    this.collectiblesInFlight.set(req.address, run);
-    return run;
+  getCollectibles(req: { address: string; refresh?: boolean }): Promise<Collectible[]> {
+    return this.collectibles.get(req);
   }
 
-  /**
-   * Drops a collectible the wallet just sent from its cache. Its balance
-   * only moves once the asset process reads the L1 transaction, so a
-   * rediscovery right after the send would still list it.
-   */
-  async forgetCollectible(req: { address: string; id: string }): Promise<void> {
-    await updateStored<CollectiblesCache>(this.storage, `${COLLECTIBLES_KEY_PREFIX}${req.address}`, (raw) =>
-      isCollectiblesCache(raw)
-        ? { ...raw, collectibles: raw.collectibles.filter((collectible) => collectible.id !== req.id) }
-        : undefined,
-    );
+  forgetCollectible(req: { address: string; id: string }): Promise<void> {
+    return this.collectibles.forget(req);
   }
 
-  /**
-   * Points a cached name at the target its accepted `set` names. The
-   * carrier reads the set once the transaction is mined, so a rediscovery
-   * meanwhile still reads the old target.
-   */
-  async setCachedNameTarget(req: { address: string; id: string; target: string }): Promise<void> {
-    await updateStored<CollectiblesCache>(this.storage, `${COLLECTIBLES_KEY_PREFIX}${req.address}`, (raw) =>
-      isCollectiblesCache(raw)
-        ? {
-            ...raw,
-            collectibles: raw.collectibles.map((collectible) =>
-              collectible.id === req.id && collectible.permawebName
-                ? { ...collectible, permawebName: { ...collectible.permawebName, target: req.target } }
-                : collectible,
-            ),
-          }
-        : undefined,
-    );
-  }
-
-  /** Makes the next `getCollectibles` rediscover, keeping the list to show meanwhile. */
-  private async markCollectiblesStale(address: string): Promise<void> {
-    await updateStored<CollectiblesCache>(this.storage, `${COLLECTIBLES_KEY_PREFIX}${address}`, (current) =>
-      isCollectiblesCache(current) ? { ...current, savedAt: 0 } : undefined,
-    );
+  setCachedNameTarget(req: { address: string; id: string; target: string }): Promise<void> {
+    return this.collectibles.setCachedNameTarget(req);
   }
 
   async getWatchedTokens(req: { address: string }): Promise<string[]> {
     return this.loadWatchedProcessIds(req.address);
-  }
-
-  private async loadHiddenProcessIds(address: string): Promise<string[]> {
-    return stringList(await this.storage.get<unknown>(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${address}`));
-  }
-
-  /**
-   * A token's identity and transport. AO is fixed. Any other token comes
-   * from its spawn tags, plus, for a legacy token whose Lua sets its
-   * ticker and denomination, its `Info` reply. Cached by process id with
-   * no expiry once complete; spawn tags and a token's Info don't change.
-   * Throws with a message the add-token preview can show as-is.
-   */
-  private async loadTokenMetadata(processId: string, settings: NetworkSettings): Promise<TokenMetadata> {
-    const gatewayUrl = settings.gatewayUrl;
-    if (processId === DEFAULT_AO_PROCESS_ID) return AO_TOKEN_METADATA;
-    const cacheKey = `${TOKEN_METADATA_KEY_PREFIX}${processId}`;
-    const cached = await this.storage.get<unknown>(cacheKey);
-    if (isValidTokenMetadata(cached)) return cached;
-
-    let metadata: TokenMetadata;
-    let check: TokenMetadataCheck;
-    try {
-      ({ metadata, check } = await queryCheckedTokenMetadata(processId, gatewayUrl, crossCheckGatewayUrls(gatewayUrl)));
-    } catch (error) {
-      const message = errorMessage(error);
-      throw new Error(
-        message.startsWith("No spawn transaction")
-          ? userErrorMessage("tokenNotIndexed")
-          : userErrorMessage("tokenLookupUnreachable", { host: hostOf(gatewayUrl) }),
-      );
-    }
-    // Gateways that disagree on the decimals leave them unknown, so amounts show unscaled. Not cached: asked again next time.
-    if (check === "disagreed") return metadata;
-    if (metadata.transport === "mu" && (metadata.ticker === null || metadata.denomination === null)) {
-      try {
-        const info = await readLegacyTokenInfo(processId);
-        metadata = {
-          ...metadata,
-          ticker: info.ticker ?? metadata.ticker,
-          name: info.name ?? metadata.name,
-          denomination: info.denomination ?? metadata.denomination,
-          logo: info.logo ?? metadata.logo,
-        };
-      } catch {
-        // Spawn tags alone; not cached, so the next read retries Info.
-        return metadata;
-      }
-    }
-    if (metadata.logo === null && metadata.assetClass !== "unique") {
-      // Current `token@1.0` processes keep `logo` in live state, not in spawn tags.
-      // The host that serves this token's balance: arweave-scheduler tokens live on the gateway's node, legacy ones on the peer.
-      const stateHost = metadata.transport === "l1" ? gatewayUrl : settings.activePeerUrl;
-      try {
-        if (stateHost === null) return metadata;
-        metadata = { ...metadata, logo: await readTokenStateLogo(processId, stateHost) };
-      } catch {
-        // Not cached, so the next read asks again; the row just shows letters meanwhile.
-        return metadata;
-      }
-    }
-    // Unchecked decimals aren't kept, so the next read checks them again.
-    if (check === "unconfirmed") return metadata;
-    // A cache fill: the value comes from the network, not from what was stored.
-    // eslint-disable-next-line gleam/no-storage-read-modify-write
-    await this.storage.set(cacheKey, metadata);
-    return metadata;
-  }
-
-  private async tryTokenMetadata(processId: string, settings: NetworkSettings): Promise<TokenMetadata | null> {
-    try {
-      return await this.loadTokenMetadata(processId, settings);
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * One token row. A failed read marks only this row unavailable, with the
-   * reason, rather than failing every other token's balance too. A token
-   * whose denomination can't be confirmed is unavailable as well: scaling
-   * its quantity by a guess could be off by orders of magnitude.
-   */
-  private async tokenRow(
-    address: string,
-    processId: string,
-    settings: NetworkSettings,
-    source: NonNullable<TokenBalance["source"]>,
-  ): Promise<TokenBalance> {
-    const metadata = await this.tryTokenMetadata(processId, settings);
-    if (metadata === null) {
-      return {
-        address,
-        processId,
-        ticker: processId,
-        denomination: 0,
-        name: null,
-        quantity: "0",
-        available: false,
-        unavailableReason: userErrorMessage("tokenDetailsUnavailable"),
-        source,
-      };
-    }
-    const identity = tokenIdentity(address, metadata, source, settings.gatewayUrl);
-    try {
-      const quantity = await this.readBalance(settings, {
-        processId,
-        address,
-        transport: metadata.transport,
-        label: identity.ticker === processId ? "token" : identity.ticker,
-      });
-      if (metadata.denomination === null) {
-        return { ...identity, quantity, available: false, unavailableReason: userErrorMessage("tokenNoDecimals") };
-      }
-      return { ...identity, quantity };
-    } catch (error) {
-      return {
-        ...identity,
-        quantity: "0",
-        available: false,
-        unavailableReason: errorMessage(error),
-      };
-    }
   }
 
   /**
@@ -619,14 +240,14 @@ export class ReadsHandler {
     }
     if (processId === req.address) throw new Error(userErrorMessage("tokenIsOwnAddress"));
     const settings = await this.loadNetworkSettings();
-    const metadata = await this.loadTokenMetadata(processId, settings);
+    const metadata = await loadTokenMetadata(this.storage, processId, settings);
     if (metadata.assetClass === "unique") {
       throw new Error(userErrorMessage("tokenIsCollectible"));
     }
     if (metadata.ticker === null && metadata.name === null) {
       throw new Error(userErrorMessage("tokenNoIdentity"));
     }
-    return this.tokenRow(req.address, processId, settings, "watched");
+    return tokenRow(this.storage, req.address, processId, settings, "watched");
   }
 
   /**
@@ -708,7 +329,7 @@ export class ReadsHandler {
     const settings = await this.loadNetworkSettings();
     const [watched, hidden] = await Promise.all([
       this.loadWatchedProcessIds(req.address),
-      this.loadHiddenProcessIds(req.address),
+      loadHiddenProcessIds(this.storage, req.address),
     ]);
     const baseIds = [...new Set([DEFAULT_AO_PROCESS_ID, ...watched])];
     const skip = new Set([...baseIds, ...hidden]);
@@ -716,12 +337,12 @@ export class ReadsHandler {
     const [base, discovered] = await Promise.all([
       Promise.all(
         baseIds.map((processId) =>
-          this.tokenRow(req.address, processId, settings, processId === DEFAULT_AO_PROCESS_ID ? "default" : "watched"),
+          tokenRow(this.storage, req.address, processId, settings, processId === DEFAULT_AO_PROCESS_ID ? "default" : "watched"),
         ),
       ),
       this.discoveredProcessIds(req.address, settings).then((ids) =>
         Promise.all(
-          ids.filter((id) => !skip.has(id)).map((id) => this.tokenRow(req.address, id, settings, "discovered")),
+          ids.filter((id) => !skip.has(id)).map((id) => tokenRow(this.storage, req.address, id, settings, "discovered")),
         ),
       ),
     ]);
@@ -736,81 +357,6 @@ export class ReadsHandler {
   }
 
   /**
-   * What each balance read doesn't include yet, for the popup to show and
-   * to take off what can be spent. Not applied to the reads themselves, so
-   * a dApp still sees the chain's balance.
-   *
-   * An AR or legacy send is outgoing while its activity entry is pending.
-   * An L1 token send stays outgoing after it is mined, until the token
-   * reaches its block (`readTokenSwapHeight`). If no node answers it stays
-   * outgoing, and ages out with `NEVER_MINED_MS`.
-   *
-   * Incoming amounts are L1 receipts for listed tokens: claims by the
-   * sender until the process applies them, so they only ever go in a note.
-   */
-  async getPendingTransfers(req: { address: string }): Promise<PendingTransfer[]> {
-    const settings = await this.loadNetworkSettings();
-    const recent = (entry: ActivityEntry) => Date.now() - entry.timestamp < NEVER_MINED_MS;
-    const [log, receipts] = await Promise.all([
-      this.loadActivityLog(req.address),
-      queryL1TokenReceipts(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT).catch(() => []),
-    ]);
-    const sends = log.filter((entry) => entry.type === "send" && entry.status !== "failed" && entry.amount !== null && !entry.collectible && recent(entry));
-    const transportOf = new Map<string, TokenTransport | undefined>();
-    const [listedReceipts] = await Promise.all([
-      this.receiptsForListedTokens(req.address, receipts, settings),
-      ...[...new Set(sends.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
-        transportOf.set(id, (await this.tryTokenMetadata(id, settings))?.transport);
-      }),
-    ]);
-    const l1Sends = sends.filter((entry) => entry.token && transportOf.get(entry.token) === "l1");
-    const otherSends = sends.filter((entry) => !l1Sends.includes(entry) && entry.status === "pending");
-    // An unmined receipt has a timestamp of 0.
-    const incoming = listedReceipts.filter((entry) => entry.timestamp === 0 || recent(entry));
-
-    const l1Entries = [...l1Sends, ...incoming];
-    const swapHeights = new Map<string, number>();
-    const l1NodeUrls = await readL1NodeUrls(this.storage);
-    const [heights] = await Promise.all([
-      queryBlockHeights(
-        l1Entries.map((entry) => entry.txId),
-        settings.gatewayUrl,
-      ).catch(() => new Map<string, number>()),
-      ...[...new Set(l1Entries.flatMap((entry) => (entry.token ? [entry.token] : [])))].map(async (id) => {
-        for (const node of l1NodeUrls) {
-          try {
-            swapHeights.set(id, await readTokenSwapHeight(id, node));
-            return;
-          } catch {
-            // Try the next node.
-          }
-        }
-      }),
-    ]);
-    const notApplied = (entry: ActivityEntry) => {
-      const height = heights.get(entry.txId);
-      const swapHeight = swapHeights.get(entry.token ?? "");
-      return height === undefined || swapHeight === undefined || swapHeight < height;
-    };
-
-    const totals = new Map<string | null, { outgoing: bigint; incoming: bigint }>();
-    const add = (entry: ActivityEntry, side: "outgoing" | "incoming") => {
-      if (entry.amount === null || !/^\d+$/.test(entry.amount)) return;
-      const token = entry.token ?? null;
-      const total = totals.get(token) ?? { outgoing: 0n, incoming: 0n };
-      total[side] += BigInt(entry.amount);
-      totals.set(token, total);
-    };
-    [...otherSends, ...l1Sends.filter(notApplied)].forEach((entry) => add(entry, "outgoing"));
-    incoming.filter(notApplied).forEach((entry) => add(entry, "incoming"));
-    return [...totals].map(([token, total]) => ({
-      token,
-      outgoing: total.outgoing.toString(),
-      incoming: total.incoming.toString(),
-    }));
-  }
-
-  /**
    * `window.arweaveWallet.tokenBalance(id)`, Wander-shaped: one token's
    * atomic balance, read the way that token is routed. Read-only, so only
    * the connection grant gates it. A balance that can't be read is a
@@ -818,8 +364,8 @@ export class ReadsHandler {
    */
   async tokenBalance(req: { address: string } & TokenBalanceRequest): Promise<TokenBalanceResult> {
     const settings = await this.loadNetworkSettings();
-    const metadata = await this.loadTokenMetadata(req.id, settings);
-    return this.readBalance(settings, {
+    const metadata = await loadTokenMetadata(this.storage, req.id, settings);
+    return readBalance(this.storage, settings, {
       processId: req.id,
       address: req.address,
       transport: metadata.transport,
@@ -830,7 +376,7 @@ export class ReadsHandler {
   /** Read for a send: whether `processId` takes transfers as L1 transactions. */
   async tokenTransport(req: { processId: string }): Promise<TokenTransport> {
     const settings = await this.loadNetworkSettings();
-    return (await this.loadTokenMetadata(req.processId, settings)).transport;
+    return (await loadTokenMetadata(this.storage, req.processId, settings)).transport;
   }
 
   /**
@@ -855,607 +401,40 @@ export class ReadsHandler {
     });
   }
 
-  async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
-    void req.cursor; // most-recent-N only — no deeper pagination cursor is implemented yet.
-    const settings = await this.loadNetworkSettings();
-    const [localLog, arEntries, aoEntries, l1Receipts] = await Promise.all([
-      this.loadActivityLog(req.address),
-      queryActivityTransactions(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
-      queryAoTransferActivity(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
-      // Receipts are extra detail; a failed query shouldn't blank the feed.
-      queryL1TokenReceipts(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT).catch(() => []),
-    ]);
-    const [receipts, collectibleReceipts] = await Promise.all([
-      this.receiptsForListedTokens(req.address, l1Receipts, settings),
-      this.heldCollectibleReceipts(req.address, l1Receipts, settings),
-    ]);
-    const gatewayEntries = [
-      ...(await this.resolveSingleUnitTransfers([...arEntries, ...aoEntries], settings)),
-      ...receipts,
-      ...collectibleReceipts,
-    ];
-
-    return mergeActivity(localLog, gatewayEntries, ACTIVITY_PAGE_LIMIT);
+  getPendingTransfers(req: { address: string }): Promise<PendingTransfer[]> {
+    return this.activity.getPendingTransfers(req);
   }
 
-  /**
-   * An L1 receipt is anyone's claim, so one is kept only for a token the
-   * user already lists (watched, or discovered and not hidden) whose
-   * spawn tags make it a fungible `arweave-scheduler@1.0` token. Reads
-   * only cached discovery, never starting one.
-   */
-  private async receiptsForListedTokens(
-    address: string,
-    receipts: ActivityEntry[],
-    settings: NetworkSettings,
-  ): Promise<ActivityEntry[]> {
-    if (receipts.length === 0) return [];
-    const [watched, hidden, rawDiscovered] = await Promise.all([
-      this.loadWatchedProcessIds(address),
-      this.loadHiddenProcessIds(address),
-      this.storage.get<unknown>(`${DISCOVERED_TOKENS_KEY_PREFIX}${address}`),
-    ]);
-    const discovered = isDiscoveredTokensCache(rawDiscovered) ? rawDiscovered.processIds : [];
-    const listed = new Set([...watched, ...discovered].filter((id) => !hidden.includes(id)));
-    const tokens = [...new Set(receipts.flatMap((entry) => (entry.token && listed.has(entry.token) ? [entry.token] : [])))];
-    const fungible = new Set<string>();
-    await Promise.all(
-      tokens.map(async (id) => {
-        const metadata = await this.tryTokenMetadata(id, settings);
-        if (metadata?.transport === "l1" && metadata.assetClass === "fungible") fungible.add(id);
-      }),
-    );
-    return receipts.filter((entry) => entry.token && fungible.has(entry.token));
+  getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
+    return this.activity.getActivity(req);
   }
 
-  /**
-   * L1 receipts of a collectible the wallet holds now, as collectible
-   * receives. A receipt is anyone's claim, so one counts only for an asset
-   * whose spawn tags make it unique and whose balance this wallet holds:
-   * the cached collectibles, else a balance read, for the newest receipt
-   * of each asset and at most `MAX_COLLECTIBLE_RECEIPTS` of them.
-   */
-  private async heldCollectibleReceipts(
-    address: string,
-    receipts: ActivityEntry[],
-    settings: NetworkSettings,
-  ): Promise<ActivityEntry[]> {
-    const newest = new Map<string, ActivityEntry>();
-    for (const entry of receipts) {
-      if (entry.token && entry.amount === COLLECTIBLE_TRANSFER_QUANTITY && !newest.has(entry.token)) newest.set(entry.token, entry);
-    }
-    if (newest.size === 0) return [];
-    const raw = await this.storage.get<unknown>(`${COLLECTIBLES_KEY_PREFIX}${address}`);
-    const cached = new Map((isCollectiblesCache(raw) ? raw.collectibles : []).map((collectible) => [collectible.id, collectible]));
-    const held = await Promise.all(
-      [...newest.values()].slice(0, MAX_COLLECTIBLE_RECEIPTS).map(async (entry): Promise<ActivityEntry | null> => {
-        const id = entry.token!;
-        const metadata = await this.tryTokenMetadata(id, settings);
-        if (metadata?.transport !== "l1" || metadata.assetClass !== "unique") return null;
-        const known = cached.get(id);
-        if (!known) {
-          const quantity = await this.readBalance(settings, { processId: id, address, transport: "l1" }).catch(() => "0");
-          if (BigInt(quantity) === 0n) return null;
-        }
-        const collectible: CollectibleRef = known
-          ? { id, name: known.name, ...(known.imageUrl ? { imageUrl: known.imageUrl } : {}) }
-          : { id, ...(metadata.name ? { name: metadata.name } : {}) };
-        return {
-          txId: entry.txId,
-          type: "receive",
-          status: entry.status,
-          address: entry.address,
-          amount: null,
-          tags: entry.tags,
-          timestamp: entry.timestamp,
-          collectible,
-          // Holding the asset doesn't show this receipt's sender moved it.
-          ...(entry.unverified ? { unverified: true as const } : {}),
-        };
-      }),
-    );
-    const received = held.filter((entry): entry is ActivityEntry => entry !== null);
-    // The cached list predates this receive.
-    if (received.some((entry) => !cached.has(entry.collectible!.id))) await this.markCollectiblesStale(address);
-    return received;
+  promotePendingActivity(address: string): Promise<void> {
+    return this.activity.promotePendingActivity(address);
   }
 
-  /**
-   * The gateway parser reads the wallet's own L1 transfer of exactly 1
-   * unit as a collectible send. Where the process's spawn tags say it is
-   * a fungible token, the entry becomes a 1-unit token send instead.
-   */
-  private async resolveSingleUnitTransfers(entries: ActivityEntry[], settings: NetworkSettings): Promise<ActivityEntry[]> {
-    const ids = [...new Set(entries.flatMap((entry) => (entry.collectible && !entry.token ? [entry.collectible.id] : [])))];
-    if (ids.length === 0) return entries;
-    const fungible = new Set<string>();
-    await Promise.all(
-      ids.map(async (id) => {
-        const metadata = await this.tryTokenMetadata(id, settings);
-        if (metadata?.assetClass === "fungible") fungible.add(id);
-      }),
-    );
-    return entries.map((entry) => {
-      if (!entry.collectible || !fungible.has(entry.collectible.id)) return entry;
-      const { collectible, ...rest } = entry;
-      return { ...rest, token: collectible.id, amount: "1" };
-    });
+  loadTrackedAddresses(): Promise<string[]> {
+    return this.activity.loadTrackedAddresses();
   }
 
-  /**
-   * Background pending→confirmed promotion check
-   * (`registerActivityPromotionAlarm` below): re-runs `getActivity` for
-   * every address with a locally-pending entry and persists the result
-   * back into the per-address activity log, so a pending entry the
-   * gateway has since indexed is written back as confirmed even with no
-   * popup open to trigger a read. Reuses `getActivity`'s existing
-   * `mergeActivity`-based promotion logic rather than duplicating it —
-   * this method only adds "run it on a timer and persist the outcome."
-   *
-   * Only entries `mergeActivity` actually resolved as no-longer-pending
-   * are written back (a local entry `mergeActivity` still reports
-   * `"pending"` is left as-is, since the gateway hasn't caught up to it
-   * yet) — this never overwrites a still-genuinely-pending entry, and
-   * never removes a local entry the gateway hasn't indexed at all.
-   */
-  async promotePendingActivity(address: string): Promise<void> {
-    const storedLog = await this.loadActivityLog(address);
-    if (!storedLog.some((entry) => entry.status === "pending")) return;
-
-    const localLog = await this.resolvePendingAoTransfers(address, storedLog);
-    if (!localLog.some((entry) => entry.status === "pending")) return;
-
-    const page = await this.getActivity({ address });
-    const promoted = page.entries.filter((entry) => entry.status !== "pending");
-    const promotedIds = new Set(promoted.map((entry) => entry.txId));
-
-    // Asked by id: `page` only holds the newest entries, and a failure here
-    // can't be undone once the send does turn up.
-    const overdue = localLog.filter((entry) => entry.status === "pending" && !promotedIds.has(entry.txId) && Date.now() - entry.timestamp >= NEVER_MINED_MS);
-    const unmined = new Set<string>();
-    if (overdue.length > 0) {
-      const ids = overdue.map((entry) => entry.txId).slice(0, 50);
-      const settings = await this.loadNetworkSettings();
-      await queryBlockHeights(ids, settings.gatewayUrl)
-        .then((heights) => ids.filter((id) => !heights.has(id)).forEach((id) => unmined.add(id)))
-        .catch(() => undefined);
-    }
-    const settled = new Map<string, ActivityEntry>();
-    for (const entry of localLog) {
-      const confirmed = promotedIds.has(entry.txId) ? promoted.find((candidate) => candidate.txId === entry.txId) : undefined;
-      if (confirmed) settled.set(entry.txId, confirmed);
-      else if (unmined.has(entry.txId) && (await this.neverMined(entry))) {
-        settled.set(entry.txId, { ...entry, status: "failed", error: NEVER_MINED_ERROR });
-      }
-    }
-    if (settled.size === 0) return;
-    await this.settleActivity(address, settled);
-    // A collectible send or market order that confirmed or failed has
-    // changed what the wallet holds, or put back what it hid.
-    if ([...settled.values()].some((entry) => entry.collectible || entry.swap)) await this.markCollectiblesStale(address);
-  }
-
-  /**
-   * Writes each settled entry over the one with its id in the stored log,
-   * read afresh: a send recorded while the settle was waiting on the
-   * network stays in the log.
-   */
-  private async settleActivity(address: string, settled: ReadonlyMap<string, ActivityEntry>): Promise<ActivityEntry[]> {
-    const written = await updateStored(this.storage, activityLogKey(address), (raw) =>
-      parseActivityLog(raw).map((entry) => settled.get(entry.txId) ?? entry),
-    );
-    return written ?? [];
-  }
-
-  /** A pending L1 transaction, AR or token, too old to be mined. A legacy AO send settles from its CU result instead. */
-  private async neverMined(entry: ActivityEntry): Promise<boolean> {
-    if (entry.status !== "pending" || Date.now() - entry.timestamp < NEVER_MINED_MS) return false;
-    if (!entry.token) return true;
-    const metadata = await this.storage.get<unknown>(`${TOKEN_METADATA_KEY_PREFIX}${entry.token}`);
-    return isValidTokenMetadata(metadata) && metadata.transport === "l1";
-  }
-
-  /**
-   * Settles pending AO sends from the token process's own evaluated result
-   * (`core/ao/result.ts`) rather than the gateway index, which marks an
-   * indexed AO message `"confirmed"` even when the process rejected the
-   * transfer. Entries the CU hasn't evaluated yet stay pending for the
-   * next tick. A `"failed"` outcome's reason is persisted on the entry's
-   * `error` field for the activity row to show. Persists and returns the
-   * updated log.
-   */
-  private async resolvePendingAoTransfers(address: string, localLog: ActivityEntry[]): Promise<ActivityEntry[]> {
-    const settled = new Map<string, ActivityEntry>();
-    await Promise.all(
-      localLog.map(async (entry) => {
-        if (entry.status !== "pending" || !entry.token) return;
-        // An L1 token send settles through the gateway index, like an AR send.
-        const metadata = await this.storage.get<unknown>(`${TOKEN_METADATA_KEY_PREFIX}${entry.token}`);
-        if (isValidTokenMetadata(metadata) && metadata.transport === "l1") return;
-        const outcome = await getTransferOutcome(entry.txId, entry.token);
-        if (outcome.status === "pending") return;
-        settled.set(entry.txId, {
-          ...entry,
-          status: outcome.status,
-          error: outcome.status === "failed" ? outcome.error : entry.error,
-        });
-      }),
-    );
-
-    return settled.size > 0 ? this.settleActivity(address, settled) : localLog;
-  }
-
-  /**
-   * Every address currently holding at least one local activity-log entry
-   * — the set `promotePendingActivity` needs to check on each alarm tick.
-   * `local:activityLog:{address}` keys have no separate index anywhere
-   * (each is written directly by `handlers/transfer.ts`), so this derives
-   * the address set from the one place this handler already knows
-   * addresses live: the wallets list.
-   */
-  async loadTrackedAddresses(): Promise<string[]> {
-    return (await loadWallets(this.storage)).map((wallet) => wallet.address);
-  }
-
-  /**
-   * Resolves the active wallet's plaintext `address` directly from
-   * storage — see this file's doc comment for why `getPortfolioHistory`
-   * needs this and can't just take an `{ address }` request like every
-   * other read here. Returns `null` when there's no active wallet yet
-   * (matches `getState`'s own "no wallets" possibility) rather than
-   * throwing, since an empty/unresolvable portfolio is itself a valid,
-   * reportable state for the caller to handle.
-   */
-  private async resolveActiveWalletAddress(): Promise<string | null> {
-    const wallets = await loadWallets(this.storage);
-    if (wallets.length === 0) return null;
-
-    const activeWalletId = await this.storage.get<string | null>(ACTIVE_WALLET_ID_KEY);
-    const active = wallets.find((wallet) => wallet.id === activeWalletId) ?? wallets[0];
-    return active?.address ?? null;
-  }
-
-  /** De-duplicated so the same address imported twice isn't counted twice in the all-wallets total. */
-  private async resolvePortfolioAddresses(scope: PortfolioScope, requested: string | undefined): Promise<string[]> {
-    if (requested !== undefined && !(await this.loadTrackedAddresses()).includes(requested)) {
-      throw new Error(userErrorMessage("walletNotInGleam"));
-    }
-    if (scope === "all") return [...new Set(await this.loadTrackedAddresses())];
-    const address = requested ?? (await this.resolveActiveWalletAddress());
-    return address === null ? [] : [address];
-  }
-
-  /**
-   * Drives the main screen's total-portfolio-value chart
-   * (`ProtocolMap.getPortfolioHistory`). Sources each registered token's
-   * (see `core/pricing`'s `DEFAULT_TOKEN_REGISTRY`) historical USD price
-   * series via `getHistoricalUsdPrices` (the Gleam server's price proxy) and reduces them through
-   * `estimateHistoricalPortfolioValue` at each AR series timestamp against
-   * the *current* balance of that token, either the active wallet's or,
-   * with `scope: "all"`, the sum across every stored wallet — this project models
-   * only a current/latest-known balance, not reconstructed historical
-   * balances (`estimateHistoricalPortfolioValue`'s own doc comment states
-   * this is out of scope), so the chart shows how today's holdings would
-   * have been valued over time, not a true historical balance curve.
-   *
-   * Only tokens in `DEFAULT_TOKEN_REGISTRY` (AR, AO) are priced — any other
-   * watched AO token has no confirmed CoinGecko/CoinPaprika listing, so
-   * it's left out of this estimate rather than guessed at (same HONESTY
-   * contract as `priceSourceForProcessId`). AR's price series is the
-   * timeline the chart is drawn against; if AO's own series fetch fails
-   * independently, AO is silently left out of that run's total rather than
-   * failing the whole chart — a temporary provider hiccup for one token
-   * shouldn't blank the entire portfolio value.
-   *
-   * The USD series is then converted to `currency`: a fiat currency at
-   * today's exchange rate, AR or AO at that token's price at each point,
-   * so a chart in AR shows what the holdings were worth in AR at the time.
-   *
-   * An unrecognized `range` throws a named error (never silently falls
-   * back to a different range than the one requested). An empty AR price
-   * series (both sources unavailable), or a currency that can't be priced,
-   * reports `series: []` per `PortfolioHistory`'s own contract — the popup
-   * shows `NetworkErrorBanner` for that case rather than this handler
-   * fabricating a flat line.
-   */
-  async getPortfolioHistory(req: {
+  getPortfolioHistory(req: {
     range: PortfolioHistoryRange;
     address?: string;
     scope?: PortfolioScope;
     currency?: DisplayCurrency;
   }): Promise<PortfolioHistory> {
-    if (!PORTFOLIO_HISTORY_RANGES.includes(req.range)) {
-      throw new Error(dappError(`Unrecognized portfolio history range "${String(req.range)}".`));
-    }
-
-    const periodLabel = periodLabelForRange(req.range);
-    const empty: PortfolioHistory = { range: req.range, series: [], currentValue: 0, change: 0, periodLabel };
-    const currency = req.currency ?? "USD";
-    const addresses = await this.resolvePortfolioAddresses(req.scope ?? "wallet", req.address);
-
-    if (addresses.length === 0) return empty;
-
-    const settings = await this.loadNetworkSettings();
-    const historyOf = (source: typeof AR_TOKEN.priceSource) =>
-      source ? getHistoricalUsdPrices(source, req.range, this.pricesApiUrl) : Promise.resolve([]);
-    const spotOf = (source: typeof AR_TOKEN.priceSource) => (source ? getUsdPrice(source, this.pricesApiUrl) : Promise.resolve(null));
-    const [arBalancesWinston, arPriceSeries, aoPriceSeries, aoQuantities, arSpot, aoSpot, fxRate] = await Promise.all([
-      Promise.all(addresses.map((address) => getArBalance(address, settings.gatewayUrl))),
-      historyOf(AR_TOKEN.priceSource),
-      historyOf(AO_TOKEN.priceSource),
-      // A failed read leaves that wallet's AO out rather than failing the
-      // whole chart whenever a peer hiccups — there's no way to tell whether
-      // the wallet even holds AO.
-      Promise.all(
-        (AO_TOKEN.priceSource ? addresses : []).map(async (address) => {
-          try {
-            const quantity = await this.readBalance(settings, {
-              processId: DEFAULT_AO_PROCESS_ID,
-              address,
-              transport: "mu",
-            });
-            return Number(quantity) / 10 ** (AO_TOKEN_METADATA.denomination ?? 12);
-          } catch {
-            return null;
-          }
-        }),
-      ),
-      spotOf(AR_TOKEN.priceSource),
-      spotOf(AO_TOKEN.priceSource),
-      isFiatCurrency(currency) ? getUsdFxRate(currency, this.pricesApiUrl) : Promise.resolve(null),
-    ]);
-
-    if (arPriceSeries.length === 0) return empty;
-
-    const arBalanceWinston = arBalancesWinston.reduce((sum, winston) => sum + BigInt(winston), 0n);
-    const arBalance = Number(arBalanceWinston) / WINSTON_PER_AR;
-    const arPriceAt = buildPriceAtFromSeries(arPriceSeries);
-    const tokens = [{ balance: arBalance, priceAt: arPriceAt, spot: arSpot }];
-    const readQuantities = aoQuantities.filter((quantity): quantity is number => quantity !== null);
-    if (readQuantities.length > 0) {
-      const aoQuantity = readQuantities.reduce((sum, quantity) => sum + quantity, 0);
-      if (aoPriceSeries.length > 0) {
-        tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(aoPriceSeries), spot: aoSpot });
-      } else if (aoQuantity > 0) {
-        // A held AO balance with no price series would silently drop out of
-        // the total, so an AO-only portfolio would chart as $0. Reported as
-        // a failed range instead, like AR's own empty-series case.
-        return empty;
-      }
-    }
-
-    // The last historical point lags the spot price the token rows use, so
-    // the headline total would drift from the rows' sum. The final point is
-    // re-priced at spot, falling back to the series price when spot is down.
-    const lastTimestamp = arPriceSeries[arPriceSeries.length - 1]?.timestamp ?? 0;
-    const spotUsdValue = tokens.reduce((sum, token) => sum + token.balance * (token.spot ?? token.priceAt(lastTimestamp)), 0);
-    const spotUnitUsd = (ticker: "AR" | "AO", fallback: number) => (ticker === "AR" ? arSpot : aoSpot) ?? fallback;
-
-    let unitPriceAt: (timestamp: number) => number;
-    if (currency === "AR") {
-      unitPriceAt = arPriceAt;
-    } else if (currency === "AO") {
-      if (aoPriceSeries.length === 0) return empty;
-      unitPriceAt = buildPriceAtFromSeries(aoPriceSeries);
-    } else {
-      if (fxRate === null) return empty;
-      unitPriceAt = () => 1 / fxRate;
-    }
-
-    const series = arPriceSeries.map((point, index) => {
-      const isLast = index === arPriceSeries.length - 1;
-      let unitPrice = unitPriceAt(point.timestamp);
-      if (isLast && (currency === "AR" || currency === "AO")) unitPrice = spotUnitUsd(currency, unitPrice);
-      const usdValue = isLast ? spotUsdValue : estimateHistoricalPortfolioValue(tokens, point.timestamp);
-      return { timestamp: point.timestamp, value: unitPrice > 0 ? usdValue / unitPrice : 0 };
-    });
-
-    const firstValue = series[0]?.value ?? 0;
-    const currentValue = series[series.length - 1]?.value ?? 0;
-    const change = firstValue !== 0 ? (currentValue - firstValue) / firstValue : 0;
-
-    return { range: req.range, series, currentValue, change, periodLabel };
+    return this.prices.getPortfolioHistory(req);
   }
 
-  /**
-   * Current spot price, in `currency`, for every token in
-   * `DEFAULT_TOKEN_REGISTRY` (`ProtocolMap.getTokenPrices`) — drives each
-   * `TokenRow`'s value line. A token whose price sources fail, or any
-   * token when the currency itself can't be priced, comes back with
-   * `price: null` (never a fabricated `0`).
-   *
-   * `processIds` adds tokens outside the registry, each priced from its own
-   * orderbook (`readBestAsk`) at AR's price. Only an exact process id is
-   * priced, never a ticker. One the node can't price is left out of the
-   * result, not returned as `null`, so the caller shows no price for it.
-   *
-   * `change24h` comes from the same 24H series the chart uses. A fiat
-   * display currency is treated as flat over the day; in AR or AO the move
-   * is relative to that token, and the token itself has no move to show.
-   * An orderbook token's move is against the device's own price samples.
-   */
-  async getTokenPrices(req: { currency?: DisplayCurrency; processIds?: string[] } = {}): Promise<TokenPrice[]> {
-    const currency = req.currency ?? "USD";
-    const priced = DEFAULT_TOKEN_REGISTRY.filter((token) => token.priceSource !== null);
-    const [usdPrices, rate] = await Promise.all([
-      Promise.all(
-        priced.map(async (token) => {
-          const source = token.priceSource as NonNullable<typeof token.priceSource>;
-          const [usd, series] = await Promise.all([
-            getUsdPrice(source, this.pricesApiUrl),
-            getHistoricalUsdPrices(source, "24H", this.pricesApiUrl),
-          ]);
-          return { token, usd, change: seriesChange(series) };
-        }),
-      ),
-      isFiatCurrency(currency) ? getUsdFxRate(currency, this.pricesApiUrl) : Promise.resolve(null),
-    ]);
-
-    const unitUsd = isFiatCurrency(currency)
-      ? rate === null ? null : 1 / rate
-      : (usdPrices.find(({ token }) => token.ticker === currency)?.usd ?? null);
-
-    const unitChange = isFiatCurrency(currency) ? 0 : (usdPrices.find(({ token }) => token.ticker === currency)?.change ?? null);
-
-    const registered = usdPrices.map(({ token, usd, change }) => ({
-      processId: token.processId,
-      price: usd === null || unitUsd === null || unitUsd <= 0 ? null : usd / unitUsd,
-      change24h: change === null || unitChange === null || token.ticker === currency ? null : (1 + change) / (1 + unitChange) - 1,
-    }));
-
-    const arUsd = usdPrices.find(({ token }) => token.processId === null)?.usd ?? null;
-    if (arUsd === null || unitUsd === null || unitUsd <= 0) return registered;
-
-    const orderbook = await this.getOrderbookPrices(req.processIds ?? [], arUsd);
-    return [
-      ...registered,
-      ...orderbook.map(({ processId, usd, change }) => ({
-        processId,
-        price: usd / unitUsd,
-        change24h: change === null || unitChange === null ? null : (1 + change) / (1 + unitChange) - 1,
-      })),
-    ];
+  getTokenPrices(req: { currency?: DisplayCurrency; processIds?: string[] } = {}): Promise<TokenPrice[]> {
+    return this.prices.getTokenPrices(req);
   }
 
-  /**
-   * One registered token's price over `range` in `currency`
-   * (`ProtocolMap.getTokenPriceHistory`). Only `DEFAULT_TOKEN_REGISTRY`
-   * tokens have a price listing to chart; an orderbook-priced token has no
-   * history and gets `series: []`, as does a token shown in its own unit.
-   *
-   * In AR or AO each point is priced against that token at the same
-   * moment. The last point is re-priced at spot so the chart ends on the
-   * figure the Price row shows.
-   */
-  async getTokenPriceHistory(req: {
+  getTokenPriceHistory(req: {
     processId: string | null;
     range: PortfolioHistoryRange;
     currency?: DisplayCurrency;
   }): Promise<TokenPriceHistory> {
-    if (!PORTFOLIO_HISTORY_RANGES.includes(req.range)) {
-      throw new Error(dappError(`Unrecognized price history range "${String(req.range)}".`));
-    }
-    const empty: TokenPriceHistory = { range: req.range, series: [] };
-    const currency = req.currency ?? "USD";
-    const token = DEFAULT_TOKEN_REGISTRY.find((candidate) => candidate.processId === req.processId);
-    const source = token?.priceSource;
-    if (!token || !source || token.ticker === currency) return empty;
-
-    const unitSource = DEFAULT_TOKEN_REGISTRY.find((candidate) => candidate.ticker === currency)?.priceSource ?? null;
-
-    const loadUnit = async () => {
-      if (isFiatCurrency(currency)) {
-        const rate = await getUsdFxRate(currency, this.pricesApiUrl);
-        return rate === null ? null : { kind: "fiat" as const, rate };
-      }
-      if (unitSource === null) return null;
-      const [series, spot] = await Promise.all([
-        getHistoricalUsdPrices(unitSource, req.range, this.pricesApiUrl),
-        getUsdPrice(unitSource, this.pricesApiUrl),
-      ]);
-      return series.length === 0 ? null : { kind: "token" as const, priceAt: buildPriceAtFromSeries(series), spot };
-    };
-    const [usdSeries, spotUsd, unit] = await Promise.all([
-      getHistoricalUsdPrices(source, req.range, this.pricesApiUrl),
-      getUsdPrice(source, this.pricesApiUrl),
-      loadUnit(),
-    ]);
-    if (usdSeries.length === 0 || unit === null) return empty;
-
-    const toCurrency = (usd: number, timestamp: number, isLast: boolean): number => {
-      if (unit.kind === "fiat") return usd * unit.rate;
-      const unitUsd = isLast && unit.spot !== null ? unit.spot : unit.priceAt(timestamp);
-      return unitUsd > 0 ? usd / unitUsd : 0;
-    };
-    const series = usdSeries.map((point, index) => {
-      const isLast = index === usdSeries.length - 1;
-      const usd = isLast && spotUsd !== null ? spotUsd : point.usd;
-      return { timestamp: point.timestamp, value: toCurrency(usd, point.timestamp, isLast) };
-    });
-    return { range: req.range, series };
+    return this.prices.getTokenPriceHistory(req);
   }
-
-  /** USD price and 24h move of each token the node can price from its orderbook; the rest are absent. */
-  private async getOrderbookPrices(
-    requested: readonly string[],
-    arUsd: number,
-  ): Promise<{ processId: string; usd: number; change: number | null }[]> {
-    const processIds = [...new Set(requested)]
-      .filter((id) => isArweaveId(id) && !isRegisteredProcessId(id))
-      .slice(0, MAX_PRICED_PROCESS_IDS);
-    const nodeUrl = (await this.loadNetworkSettings()).activePeerUrl;
-    if (processIds.length === 0 || nodeUrl === null) return [];
-
-    const asks = await Promise.all(processIds.map(async (processId) => ({ processId, ask: await readBestAsk(processId, nodeUrl) })));
-    const now = Date.now();
-    let prices: { processId: string; usd: number; change: number | null }[] = [];
-    await updateStored(this.storage, PRICE_SNAPSHOTS_KEY, (raw) => {
-      const snapshots = parsePriceSnapshots(raw);
-      prices = asks.flatMap(({ processId, ask }) => {
-        if (ask === null) return [];
-        const usd = ask.arPerToken * arUsd;
-        if (!Number.isFinite(usd) || usd <= 0) return [];
-        const samples = snapshots[processId] ?? [];
-        snapshots[processId] = recordPriceSample(samples, usd, now);
-        return [{ processId, usd, change: changeSinceYesterday(samples, usd, now) }];
-      });
-      return prices.length > 0 ? snapshots : undefined;
-    });
-    return prices;
-  }
-}
-
-/**
- * Name of the timer this module registers — namespaced
- * with the extension's own prefix convention (matches
- * `key-session.ts`/`wallet-lifecycle.ts`'s storage-key prefixes) so it
- * can't collide with an alarm another handler might register later.
- */
-export const ACTIVITY_PROMOTION_ALARM_NAME = "gleam:activityPromotion";
-
-/**
- * Every minute — frequent enough that a pending send/receive promotes to
- * confirmed within about the same window a user re-opening the popup
- * would already observe it (`getActivity` is called fresh on every popup
- * open), infrequent enough not to hammer the configured gateway on a
- * wallet with no pending activity (`promotePendingActivity` itself
- * short-circuits to a single storage read and no network call when there's
- * nothing pending, so most ticks cost nothing per tracked address anyway).
- * A tighter or looser interval is trivial to change here as a single
- * constant.
- */
-const ACTIVITY_PROMOTION_INTERVAL_MINUTES = 1;
-
-/**
- * Registers the `TimerPort` interval that actively promotes a
- * locally-pending activity entry to confirmed once the gateway indexes
- * it — independent of any popup being open. Only the timer registration
- * lives here; all the actual promotion/merge logic is `ReadsHandler.promotePendingActivity`, reusing
- * the existing `mergeActivity`-backed `getActivity` path rather than
- * duplicating it.
- *
- * Call once from the background entrypoint with a `ReadsHandler`
- * instance, e.g.: `registerActivityPromotionAlarm(new
- * ReadsHandler(storage), timer)`. Errors from an individual address's promotion
- * check are caught and logged per-address so one failing gateway/address
- * never blocks promotion for the wallet's other tracked addresses on the
- * same tick.
- */
-export function registerActivityPromotionAlarm(handler: ReadsHandler, timer: TimerPort): void {
-  timer.every(ACTIVITY_PROMOTION_ALARM_NAME, ACTIVITY_PROMOTION_INTERVAL_MINUTES, () => {
-    void runActivityPromotionTick(handler);
-  });
-}
-
-async function runActivityPromotionTick(handler: ReadsHandler): Promise<void> {
-  const addresses = await handler.loadTrackedAddresses();
-  await Promise.all(
-    addresses.map(async (address) => {
-      try {
-        await handler.promotePendingActivity(address);
-      } catch (error) {
-        console.error(`Activity promotion check failed for "${address}":`, error);
-      }
-    }),
-  );
 }

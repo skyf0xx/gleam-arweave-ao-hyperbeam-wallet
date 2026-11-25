@@ -22,8 +22,10 @@ describe("dispatch/methods: tiers", () => {
   // A page method opens a window only through the `requestApproval` its
   // call carries, which `ProviderHandlers` types give only to methods marked
   // `approval: true`. A direct call from a handler would skip the flag.
-  it("calls approval.requestApproval in create-runtime.ts only to hand it to approval methods", () => {
-    const source = readFileSync(join(import.meta.dirname, "../create-runtime.ts"), "utf8");
+  it("calls approval.requestApproval in provider-dispatch.ts only to hand it to approval methods", () => {
+    const runtime = readFileSync(join(import.meta.dirname, "../create-runtime.ts"), "utf8");
+    expect(runtime.match(/approval\.requestApproval\(/g)).toBeNull();
+    const source = readFileSync(join(import.meta.dirname, "../provider-dispatch.ts"), "utf8");
     expect(source.match(/approval\.requestApproval\(/g)).toHaveLength(1);
     expect(source).toMatch(/spec\.approval\s*\?\s*\{ requestApproval: \(request\) => approval\.requestApproval\(request\) \}/);
   });

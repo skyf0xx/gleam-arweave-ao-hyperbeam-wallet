@@ -29,13 +29,15 @@ import {
   POINTS_INVITE_UNLOCK_KEY,
   POINTS_MEMBERSHIPS_KEY,
   POINTS_PENDING_INVITE_KEY,
+  PointsHandler,
+  type PointsDeviceState,
+} from "./points";
+import {
   POINTS_CLAIM_PENDING_KEY,
   POINTS_REVEAL_SEEN_KEY,
   POINTS_SEATS_SEEN_KEY,
   POINTS_SHARE_SEEN_KEY,
-  PointsHandler,
-  type PointsDeviceState,
-} from "./points";
+} from "./points-seen";
 
 
 function createFakeStorage(initial: Record<string, unknown> = {}): StoragePort & { store: Map<string, unknown> } {
