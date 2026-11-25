@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { bindTouchGesture } from "./touch-gesture";
 
 /** Finger travel is damped to this fraction, so the pull feels like it is stretching. */
 const RESISTANCE = 0.6;
@@ -124,17 +125,7 @@ export function usePullToRefresh({
       }
     };
 
-    element.addEventListener("touchstart", onStart, { passive: true });
-    // Non-passive so a pull we own can cancel the scroll; onMove bails before preventDefault otherwise.
-    element.addEventListener("touchmove", onMove, { passive: false });
-    element.addEventListener("touchend", onEnd);
-    element.addEventListener("touchcancel", onEnd);
-    return () => {
-      element.removeEventListener("touchstart", onStart);
-      element.removeEventListener("touchmove", onMove);
-      element.removeEventListener("touchend", onEnd);
-      element.removeEventListener("touchcancel", onEnd);
-    };
+    return bindTouchGesture(element, { onStart, onMove, onEnd });
   }, [target, threshold]);
 
   return state;
