@@ -28,6 +28,10 @@
       "entry": ["scripts/*.mjs"],
       "ignoreDependencies": ["tailwindcss"]
     },
+    "packages/keystone": {
+      // The shells' polyfill plugin injects `vite-plugin-node-polyfills/shims/*` imports into keystone's files.
+      "ignoreDependencies": ["vite-plugin-node-polyfills"]
+    },
     "packages/app": {
       // react-dom is the peer @testing-library/react resolves from here.
       "ignoreDependencies": ["tailwindcss", "react-dom", "@types/react-dom"]
