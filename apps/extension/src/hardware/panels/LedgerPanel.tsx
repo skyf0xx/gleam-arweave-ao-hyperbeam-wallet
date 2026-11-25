@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   base64UrlToBytes,
   bytesToBase64Url,
-  LedgerArweaveClient,
   LedgerError,
   ledgerMaxPayloadBytes,
   LEDGER_PERMAWEB_INSTALLER_URL,
@@ -11,7 +10,7 @@ import {
   type LedgerTransport,
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { connectLedger, LedgerCancelled, ledgerErrorText, waitForLedgerApp } from "../ledger";
+import { connectLedger, LedgerCancelled, ledgerErrorText, withLedgerClient } from "../ledger";
 import type { DeviceSignPanel, DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
 import { t, useT } from "@gleam/app/src/i18n/index.tsx";
 
@@ -84,54 +83,51 @@ export function createLedgerPanel({
       abortRef.current = abort;
       const { signal } = abort;
       const activity = setInterval(() => callbacks.current.onActivity(), activityMs);
-      let transport: LedgerTransport | null = null;
       let signatures: string[] | null = null;
       let failure: ReactNode = null;
       setStep({ kind: "connecting" });
       try {
-        const opened = await openTransport();
-        transport = opened;
-        signal.addEventListener("abort", () => void opened.close().catch(() => undefined), { once: true });
-        if (signal.aborted) throw new LedgerCancelled();
-        const client = new LedgerArweaveClient(opened);
-
-        const version = await waitForLedgerApp(client, {
+        signatures = await withLedgerClient(
+          openTransport,
           signal,
-          pollMs,
-          appTimeoutMs,
-          keyTimeoutMs,
-          onWaiting: (reason) => setStep({ kind: "waiting", reason }),
-          appTimeoutMessage: t("extension.ledgerAppNotFound", { app: appName }),
-        });
+          {
+            pollMs,
+            appTimeoutMs,
+            keyTimeoutMs,
+            onWaiting: (reason) => setStep({ kind: "waiting", reason }),
+            appTimeoutMessage: t("extension.ledgerAppNotFound", { app: appName }),
+          },
+          async ({ client, version }) => {
+            if (needsPermaweb) {
+              let app: string | null = null;
+              try {
+                app = (await client.getAppInfo()).app;
+              } catch (error) {
+                // Older firmware may not answer; signDataItem checks the app again itself.
+                if (!(error instanceof LedgerError)) throw error;
+              }
+              if (app === "Arweave") throw new LedgerError("permaweb-app-required", LEDGER_PERMAWEB_REQUIRED_MESSAGE);
+            }
 
-        if (needsPermaweb) {
-          let app: string | null = null;
-          try {
-            app = (await client.getAppInfo()).app;
-          } catch (error) {
-            // Older firmware may not answer; signDataItem checks the app again itself.
-            if (!(error instanceof LedgerError)) throw error;
-          }
-          if (app === "Arweave") throw new LedgerError("permaweb-app-required", LEDGER_PERMAWEB_REQUIRED_MESSAGE);
-        }
+            const account = await client.getAccount();
+            if (account.address !== wallet.address) throw new LedgerError("owner-mismatch", wrongLedgerMessage());
 
-        const account = await client.getAccount();
-        if (account.address !== wallet.address) throw new LedgerError("owner-mismatch", wrongLedgerMessage());
-
-        const maxBytes = ledgerMaxPayloadBytes(version);
-        const signed: string[] = [];
-        for (const [index, payload] of payloads.entries()) {
-          if (signal.aborted) throw new LedgerCancelled();
-          setStep({ kind: "signing", index });
-          if (payload.kind === "message") throw new LedgerError("unsupported-payload", LEDGER_MESSAGE_UNSUPPORTED);
-          const signature =
-            payload.kind === "transaction"
-              ? await client.signTransaction(payload.transaction, { maxBytes })
-              : await client.signDataItem(base64UrlToBytes(payload.raw), { maxBytes });
-          signed.push(bytesToBase64Url(signature));
-          callbacks.current.onActivity();
-        }
-        signatures = signed;
+            const maxBytes = ledgerMaxPayloadBytes(version);
+            const signed: string[] = [];
+            for (const [index, payload] of payloads.entries()) {
+              if (signal.aborted) throw new LedgerCancelled();
+              setStep({ kind: "signing", index });
+              if (payload.kind === "message") throw new LedgerError("unsupported-payload", LEDGER_MESSAGE_UNSUPPORTED);
+              const signature =
+                payload.kind === "transaction"
+                  ? await client.signTransaction(payload.transaction, { maxBytes })
+                  : await client.signDataItem(base64UrlToBytes(payload.raw), { maxBytes });
+              signed.push(bytesToBase64Url(signature));
+              callbacks.current.onActivity();
+            }
+            return signed;
+          },
+        );
       } catch (error) {
         if (!(error instanceof LedgerCancelled) && !signal.aborted) {
           failure =
@@ -141,7 +137,6 @@ export function createLedgerPanel({
         }
       } finally {
         clearInterval(activity);
-        await transport?.close().catch(() => undefined);
       }
       if (signal.aborted) return;
       if (signatures) callbacks.current.onSignatures(signatures);

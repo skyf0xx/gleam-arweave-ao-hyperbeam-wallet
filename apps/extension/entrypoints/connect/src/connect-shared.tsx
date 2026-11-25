@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { errorText } from "@gleam/app/src/i18n/errors.ts";
@@ -11,6 +11,15 @@ export function backgroundErrorText(error: unknown): string {
     return t("extension.lockedHelp");
   }
   return errorText(error);
+}
+
+/** Calls `onClose` `ms` after `done` turns true, so the tab closes itself once the device is connected. */
+export function useAutoClose(done: boolean, onClose: () => void, ms: number): void {
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(onClose, ms);
+    return () => clearTimeout(timer);
+  }, [done, onClose, ms]);
 }
 
 export function ConnectShell({ title, children }: { title: string; children: ReactNode }) {

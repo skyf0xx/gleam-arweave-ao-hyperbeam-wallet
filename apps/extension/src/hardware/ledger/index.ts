@@ -17,3 +17,4 @@ export {
   type LedgerWaitReason,
   type WaitForLedgerAppOptions,
 } from "./wait-for-app";
+export { withLedgerClient } from "./with-ledger-client";
