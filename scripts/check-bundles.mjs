@@ -242,6 +242,15 @@ function scriptsOf(htmlPath) {
   return scripts;
 }
 
+/**
+ * The scripts one BUNDLE_PACKAGES entry loads: an HTML page's, or the file itself.
+ * @param {string} out
+ * @param {string} entry
+ */
+function entryScripts(out, entry) {
+  return entry.endsWith(".html") ? scriptsOf(join(out, entry)) : [entry];
+}
+
 function main() {
   const extension = fileURLToPath(new URL("../apps/extension/.output/", import.meta.url));
   const out = join(extension, "chrome-mv3");
@@ -264,7 +273,7 @@ function main() {
   ];
 
   for (const entry of Object.keys(BUNDLE_PACKAGES)) {
-    const files = entry.endsWith(".html") ? scriptsOf(join(out, entry)) : [entry];
+    const files = entryScripts(out, entry);
     const lazy = lazyChunksOf(entry, chunks);
     const modules = files.flatMap((file) => closureOf(file, chunks, lazy).modules);
     problems.push(...entryPackageProblems(entry, modules), ...lazyChunkProblems(entry, modules, chunks));
@@ -282,7 +291,7 @@ function main() {
   const covered = new Set();
   for (const script of scripts) for (const file of closureOf(script, chunks).chunks) covered.add(file);
   for (const entry of Object.keys(BUNDLE_PACKAGES)) {
-    const files = entry.endsWith(".html") ? scriptsOf(join(out, entry)) : [entry];
+    const files = entryScripts(out, entry);
     for (const file of files) for (const loaded of closureOf(file, chunks).chunks) covered.add(loaded);
   }
   for (const fileName of Object.keys(PAGE_SCRIPTS)) covered.add(fileName);
