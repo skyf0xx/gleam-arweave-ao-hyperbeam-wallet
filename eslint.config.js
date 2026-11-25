@@ -419,7 +419,7 @@ export default tseslint.config(
       "apps/extension/entrypoints/keyring/main.ts",
       "apps/mobile/src/adapters/session-key-store.ts",
       // Points API test fixtures sign with throwaway keys.
-      "apps/points-api/src/test-signers.ts",
+      "apps/points-api/src/testing/test-signers.ts",
       // Gives tests the in-memory `Keyring` in place of the offscreen one.
       "vitest.setup.ts",
       "packages/runtime/testing/**",

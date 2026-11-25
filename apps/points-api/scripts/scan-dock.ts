@@ -1,4 +1,4 @@
-import { dockAttestation, parseDockArgs, type DockOptions } from "../src/bounty";
+import { dockAttestation, parseDockArgs, type DockOptions } from "../src/scans/bounty";
 import { askYesNo, runScript } from "./cli";
 
 let options: DockOptions;

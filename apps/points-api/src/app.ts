@@ -12,22 +12,22 @@ import {
   parseSubmitRequest,
   scanRewardBasis,
   submitAttestation,
-} from "./attestations";
-import { poolBalance } from "./bounty";
+} from "./scans/attestations";
+import { poolBalance } from "./scans/bounty";
 import type { Db } from "./db";
-import { createGithubClient, type GithubClient } from "./github";
-import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./heartbeat";
-import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./invite";
-import { randomInviteCode } from "./invite-code";
-import { parseLeaveRequest, leave } from "./leave";
-import { createPriceService, parseFxQuery, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices";
+import { createGithubClient, type GithubClient } from "./scans/github";
+import { authenticateDevice, parseDeviceSignedRequest, recordHeartbeat } from "./wallets/heartbeat";
+import { checkInviteCode, parseInviteCode, parseRedeemRequest, redeemInviteCode } from "./wallets/invite";
+import { randomInviteCode } from "./wallets/invite-code";
+import { parseLeaveRequest, leave } from "./wallets/leave";
+import { createPriceService, parseFxQuery, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices/prices";
 import { RateLimiter } from "./rate-limit";
-import { parseRegisterRequest, register } from "./register";
-import type { AreaSummary } from "./scan-areas";
-import { issueChallenge, parseChallengeQuery } from "./scan-challenge";
-import type { ScanFailure } from "./scan-errors";
-import { listAreas, scanNext } from "./scan-rounds";
-import { scoresForDevice } from "./score";
+import { parseRegisterRequest, register } from "./wallets/register";
+import type { AreaSummary } from "./scans/areas";
+import { issueChallenge, parseChallengeQuery } from "./scans/challenge";
+import type { ScanFailure } from "./scans/errors";
+import { listAreas, scanNext } from "./scans/rounds";
+import { scoresForDevice } from "./points/score";
 
 const MOBILE_ORIGINS = new Set(["https://localhost", "capacitor://localhost"]);
 

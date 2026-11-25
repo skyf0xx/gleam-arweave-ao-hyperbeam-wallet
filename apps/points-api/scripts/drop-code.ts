@@ -1,6 +1,6 @@
 import pg from "pg";
 import { dbFromPool } from "../src/db";
-import { DEFAULT_SITE_URL, createDropCode, formatDropCode, parseDropCodeArgs } from "../src/drop-codes";
+import { DEFAULT_SITE_URL, createDropCode, formatDropCode, parseDropCodeArgs } from "../src/wallets/drop-codes";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

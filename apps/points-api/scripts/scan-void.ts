@@ -1,4 +1,4 @@
-import { parseVoidArgs, voidAttestation, type VoidOptions } from "../src/bounty";
+import { parseVoidArgs, voidAttestation, type VoidOptions } from "../src/scans/bounty";
 import { askYesNo, runScript } from "./cli";
 
 let options: VoidOptions;

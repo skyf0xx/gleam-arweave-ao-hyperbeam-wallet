@@ -25,7 +25,7 @@ const SIGNER_IMPORTERS = [
   // Gives tests the in-memory Keyring in place of the offscreen one.
   "^packages/runtime/testing/",
   // Points API test fixtures sign with throwaway keys.
-  "^apps/points-api/src/test-signers\\.ts$",
+  "^apps/points-api/src/testing/test-signers\\.ts$",
 ];
 
 /** @type {import("dependency-cruiser").IConfiguration} */

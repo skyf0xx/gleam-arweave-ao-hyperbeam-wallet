@@ -1,5 +1,5 @@
-import { applyExaminedBackfill, planExaminedBackfill } from "../src/examined-backfill";
-import { createGithubClient } from "../src/github";
+import { applyExaminedBackfill, planExaminedBackfill } from "../src/scans/examined-backfill";
+import { createGithubClient } from "../src/scans/github";
 import { askYesNo, runScript } from "./cli";
 
 let yes = false;

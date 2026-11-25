@@ -1,4 +1,4 @@
-import { awardFinding, parseAwardArgs, type AwardOptions } from "../src/bounty";
+import { awardFinding, parseAwardArgs, type AwardOptions } from "../src/scans/bounty";
 import { askYesNo, runScript } from "./cli";
 
 let options: AwardOptions;

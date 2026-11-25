@@ -1,6 +1,6 @@
 import pg from "pg";
 import { dbFromPool } from "../src/db";
-import { formatFunnel, readFunnel } from "../src/funnel";
+import { formatFunnel, readFunnel } from "../src/points/funnel";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

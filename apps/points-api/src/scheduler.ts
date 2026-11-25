@@ -1,5 +1,5 @@
 import type { Db } from "./db";
-import { runSnapshot, type SnapshotOptions } from "./snapshot";
+import { runSnapshot, type SnapshotOptions } from "./points/snapshot";
 
 /** Arbitrary constant naming the snapshot's Postgres advisory lock. */
 const SNAPSHOT_LOCK_ID = 0x61e4_0001;

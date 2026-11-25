@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
-import { createTestDb } from "./test-db";
+import { createTestDb } from "./testing/test-db";
 
 describe("GET /health", () => {
   it("reports ok once the database answers", async () => {
