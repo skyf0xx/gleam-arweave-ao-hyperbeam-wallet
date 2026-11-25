@@ -1,13 +1,12 @@
 import {
   addressFromOwner,
   deviceKeyThumbprint,
-  isFreshIssuedAt,
   parseRegisterMessage,
   verifyPointsProof,
 } from "@gleam/core/src/points/index.ts";
 import type { z } from "zod";
 import type { Db, Queryable } from "../db";
-import { devicePublicKey, walletSigned } from "../request-fields";
+import { devicePublicKey, isFresh, walletSigned } from "../request-fields";
 
 export const registerRequest = walletSigned.extend({ devicePublicKey });
 export type RegisterRequest = z.infer<typeof registerRequest>;
@@ -56,7 +55,7 @@ export async function register(
 ): Promise<RegisterOutcome> {
   const message = parseRegisterMessage(request.message);
   if (!message) return { ok: false, status: 400, error: "Malformed register message." };
-  if (!isFreshIssuedAt(message.issuedAt, Math.floor(now.getTime() / 1000))) {
+  if (!isFresh(message.issuedAt, now)) {
     return { ok: false, status: 401, error: "Register message is stale." };
   }
   if ((await deviceKeyThumbprint(request.devicePublicKey)) !== message.deviceKeyThumbprint) {

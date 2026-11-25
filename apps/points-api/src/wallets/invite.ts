@@ -1,6 +1,5 @@
 import {
   deviceKeyThumbprint,
-  isFreshIssuedAt,
   isValidInviteCode,
   normalizeInviteCode,
   parseRedeemMessage,
@@ -8,7 +7,7 @@ import {
 } from "@gleam/core/src/points/index.ts";
 import { z } from "zod";
 import { queryNumber, type Db, type Queryable } from "../db";
-import { deviceMessage, devicePublicKey, deviceSignature } from "../request-fields";
+import { deviceMessage, devicePublicKey, deviceSignature, isFresh } from "../request-fields";
 
 export const MEMBER_CODE_SEATS = 3;
 export const SEATS_PER_CONVERSION = 2;
@@ -83,7 +82,7 @@ export async function redeemInviteCode(
   if (message.code !== request.code) {
     return { ok: false, status: 400, error: "Invite code doesn't match the signed message." };
   }
-  if (!isFreshIssuedAt(message.issuedAt, Math.floor(now.getTime() / 1000))) {
+  if (!isFresh(message.issuedAt, now)) {
     return { ok: false, status: 401, error: "Redeem message is stale." };
   }
   if (!(await verifyDeviceSignature(request.devicePublicKey, request.message, request.signature))) {

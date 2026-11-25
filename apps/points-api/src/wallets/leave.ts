@@ -1,12 +1,11 @@
 import {
   addressFromOwner,
-  isFreshIssuedAt,
   parseLeaveMessage,
   verifyPointsProof,
 } from "@gleam/core/src/points/index.ts";
 import type { z } from "zod";
 import type { Db } from "../db";
-import { walletSigned } from "../request-fields";
+import { isFresh, walletSigned } from "../request-fields";
 
 export const leaveRequest = walletSigned;
 export type LeaveRequest = z.infer<typeof leaveRequest>;
@@ -26,7 +25,7 @@ export type LeaveOutcome = { ok: true } | { ok: false; status: 400 | 401; error:
 export async function leave(db: Db, request: LeaveRequest, now: Date): Promise<LeaveOutcome> {
   const message = parseLeaveMessage(request.message);
   if (!message) return { ok: false, status: 400, error: "Malformed leave message." };
-  if (!isFreshIssuedAt(message.issuedAt, Math.floor(now.getTime() / 1000))) {
+  if (!isFresh(message.issuedAt, now)) {
     return { ok: false, status: 401, error: "Leave message is stale." };
   }
 

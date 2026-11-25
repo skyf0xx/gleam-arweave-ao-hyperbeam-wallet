@@ -1,4 +1,4 @@
-import { isDevicePublicJwk, type DevicePublicJwk } from "@gleam/core/src/points/index.ts";
+import { isDevicePublicJwk, isFreshIssuedAt, type DevicePublicJwk } from "@gleam/core/src/points/index.ts";
 import { z } from "zod";
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -20,3 +20,8 @@ export const walletSigned = z.object({ owner, message: walletMessage, signature:
 export const deviceMessage = z.string().max(100);
 export const deviceSignature = base64url(200);
 export const devicePublicKey = z.custom<DevicePublicJwk>(isDevicePublicJwk);
+
+/** Whether a signed message's `issuedAt` (epoch seconds) is within the allowed window of `now`. */
+export function isFresh(issuedAt: number, now: Date): boolean {
+  return isFreshIssuedAt(issuedAt, Math.floor(now.getTime() / 1000));
+}

@@ -1,12 +1,11 @@
 import {
-  isFreshIssuedAt,
   parseDeviceMessage,
   verifyDeviceSignature,
   type DevicePublicJwk,
 } from "@gleam/core/src/points/index.ts";
 import { z } from "zod";
 import type { Queryable } from "../db";
-import { deviceMessage, deviceSignature } from "../request-fields";
+import { deviceMessage, deviceSignature, isFresh } from "../request-fields";
 
 const THUMBPRINT = /^[A-Za-z0-9_-]{43}$/;
 
@@ -30,7 +29,7 @@ export async function authenticateDevice(
 ): Promise<DeviceAuthOutcome> {
   const issuedAt = parseDeviceMessage(kind, request.message);
   if (issuedAt === null) return { ok: false, status: 400, error: `Malformed ${kind} message.` };
-  if (!isFreshIssuedAt(issuedAt, Math.floor(now.getTime() / 1000))) {
+  if (!isFresh(issuedAt, now)) {
     return { ok: false, status: 401, error: `${kind} message is stale.` };
   }
 
