@@ -1,4 +1,4 @@
-import { PROVIDER_EVENT, PROVIDER_SURFACE_METHODS, type ProviderSurfaceMethod } from "@gleam/messaging/src/page-protocol.ts";
+import { createOtherWalletDedup, PROVIDER_EVENT, PROVIDER_SURFACE_METHODS, type ProviderSurfaceMethod } from "@gleam/messaging/src/page-protocol.ts";
 import { GleamProvider, WALLET_NAME } from "./provider";
 import type { ProviderTransport } from "./transport";
 
@@ -223,10 +223,7 @@ export function installProvider({ transport, walletVersion, arweaveWalletName }:
   // ends up behind the slot is announced once. Undefined until the first.
   let announced: WalletLike | null | undefined;
   let dispatching = false;
-  let reportedPresence = false;
-  let reportedUse = false;
-  // The last permission list reported, joined, so each change is sent once.
-  let reportedPermissions = "";
+  const reported = createOtherWalletDedup();
   let modeTimeout: ReturnType<typeof setTimeout> | undefined;
   let settleTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -254,9 +251,7 @@ export function installProvider({ transport, walletVersion, arweaveWalletName }:
 
   const report = (used: boolean): void => {
     const wallet = other();
-    if (!wallet || (used ? reportedUse : reportedPresence)) return;
-    reportedPresence = true;
-    if (used) reportedUse = true;
+    if (!wallet || !reported.firstReport(used)) return;
     transport.reportOtherWallet({ walletName: nameOf(wallet), used });
   };
 
@@ -264,9 +259,7 @@ export function installProvider({ transport, walletVersion, arweaveWalletName }:
     const wallet = other();
     if (!wallet || !Array.isArray(value)) return;
     const permissions = value.filter((permission): permission is string => typeof permission === "string");
-    const key = permissions.join(",");
-    if (permissions.length === 0 || key === reportedPermissions) return;
-    reportedPermissions = key;
+    if (permissions.length === 0 || !reported.newPermissions(permissions)) return;
     transport.reportOtherWallet({ walletName: nameOf(wallet), used: true, permissions });
   };
 

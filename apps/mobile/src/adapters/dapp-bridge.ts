@@ -1,15 +1,15 @@
 import type { DappViewMessage, DappViewNavigation, DappViewPlugin, DappViewRect } from "@gleam/dapp-view";
 import {
+  createOtherWalletDedup,
   EVENT,
+  handlePageRequest,
   OTHER_WALLET,
   PROVIDER_SURFACE_METHODS,
   REQUEST,
-  RESPONSE,
   SITE_MODE,
   SITE_MODE_REQUEST,
   type PageEventEnvelope,
   type PageMessageEnvelope,
-  type PageResponseEnvelope,
   type PageSiteModeEnvelope,
 } from "@gleam/messaging/src/page-protocol.ts";
 import { httpOrigin, isExactHttpOrigin } from "@gleam/core/src/models/site-origin.ts";
@@ -99,7 +99,7 @@ export function createDappBridge({
 }): DappBridge & { listening: Promise<void> } {
   let tab: { id: number; url: string } | null = null;
   let lastTabId = 0;
-  const freshRelays = () => ({ modeAsked: false, presence: false, use: false, permissions: "" });
+  const freshRelays = () => ({ modeAsked: false, otherWallet: createOtherWalletDedup() });
   let relayed = freshRelays();
   const subscribers = new Set<() => void>();
   const notify = () => {
@@ -140,13 +140,11 @@ export function createDappBridge({
       typeof envelope.id === "string" &&
       PROVIDER_SURFACE_METHODS.includes(envelope.method)
     ) {
-      const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
-      try {
-        response.result = await runtime.pageCall("providerCall", { method: envelope.method, params: envelope.params }, origin, tabId);
-      } catch (error) {
-        response.error = { message: error instanceof Error ? error.message : String(error) };
-      }
-      reply(response, origin);
+      await handlePageRequest(
+        envelope,
+        (method, params) => runtime.pageCall("providerCall", { method, params }, origin, tabId),
+        (response) => reply(response, origin),
+      );
     } else if (envelope.type === SITE_MODE_REQUEST) {
       if (relayed.modeAsked) return;
       relayed.modeAsked = true;
@@ -160,13 +158,9 @@ export function createDappBridge({
     } else if (envelope.type === OTHER_WALLET) {
       const { walletName, used, permissions } = envelope;
       if (Array.isArray(permissions)) {
-        const key = permissions.join(",");
-        if (key === relayed.permissions) return;
-        relayed.permissions = key;
-      } else {
-        if (used ? relayed.use : relayed.presence) return;
-        relayed.presence = true;
-        if (used) relayed.use = true;
+        if (!relayed.otherWallet.newPermissions(permissions)) return;
+      } else if (!relayed.otherWallet.firstReport(used)) {
+        return;
       }
       await runtime.pageCall("reportOtherWallet", { walletName, used, permissions }, origin, tabId).catch(() => undefined);
     }

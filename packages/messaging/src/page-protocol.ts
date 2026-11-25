@@ -311,3 +311,47 @@ export type PageMessageEnvelope =
   | PageSiteModeRequestEnvelope
   | PageSiteModeEnvelope
   | PageOtherWalletEnvelope;
+
+/**
+ * Remembers which other-wallet reports have gone by, so each one is sent
+ * once: the first sighting, the first use, and each distinct permission list.
+ */
+export function createOtherWalletDedup() {
+  let presence = false;
+  let use = false;
+  let permissions = "";
+  return {
+    /** True the first time a report with this `used` goes by; a use also counts as a sighting. */
+    firstReport(used: boolean): boolean {
+      if (used ? use : presence) return false;
+      presence = true;
+      if (used) use = true;
+      return true;
+    },
+    /** True when `list` differs from the last one reported. */
+    newPermissions(list: readonly string[]): boolean {
+      const key = list.join(",");
+      if (key === permissions) return false;
+      permissions = key;
+      return true;
+    },
+  };
+}
+
+/**
+ * Answers a page's request: `call` runs it and `reply` carries the response
+ * back. Only the error's message goes to the page.
+ */
+export async function handlePageRequest(
+  envelope: PageRequestEnvelope,
+  call: (method: ProviderSurfaceMethod, params: unknown) => Promise<unknown>,
+  reply: (response: PageResponseEnvelope) => void,
+): Promise<void> {
+  const response: PageResponseEnvelope = { type: RESPONSE, id: envelope.id };
+  try {
+    response.result = await call(envelope.method, envelope.params);
+  } catch (error) {
+    response.error = { message: error instanceof Error ? error.message : String(error) };
+  }
+  reply(response);
+}
