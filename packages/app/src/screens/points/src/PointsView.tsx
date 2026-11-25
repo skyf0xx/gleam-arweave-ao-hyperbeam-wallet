@@ -4,39 +4,37 @@ import {
   capabilityRefusal,
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
-  type PointsWalletScore,
   type RuntimePort,
   type WalletSummary,
 } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { useT } from "../../../i18n";
 import { inviteLinkFor, invitesRemainingLine } from "../../../points-share";
 import { FoundingGate } from "../../onboarding/src/FoundingGate";
-import { usePlatform } from "../../../app-platform/context";
-import { gleamUrl, howItWorksUrl, JoinNote, scanUrl } from "./JoinNote";
+import { AboutPoints } from "./AboutPoints";
+import { DeviceApprovalNote } from "./DeviceApprovalNote";
+import { ACTION_ICON, ACTION_LINK, EarnItem, ReviewItem } from "./EarnItems";
+import { JoinNote } from "./JoinNote";
+import { LeaveControl } from "./LeaveControl";
 import { RecentEarnings } from "./RecentEarnings";
 import { useSharePrompt } from "./SharePrompt";
+import { Standing } from "./Standing";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useCountUp } from "./useCountUp";
 import { useFlash } from "./useFlash";
-import { useScanStats } from "./useScanStats";
 import {
   useJoinPoints,
-  useLeavePoints,
   usePendingInvite,
   usePointsStanding,
 } from "./usePoints";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
-import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { errorText } from "../../../i18n/errors";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
-import { ButtonPair } from "@gleam/ui/src/primitives/button-pair.tsx";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -259,102 +257,6 @@ function JoinedView({
 }
 
 /**
- * The place leads because it's what a member acts on, with the gap to the
- * next place under it. The total reads as a balance in the top corner and
- * turns into the percentile on a tap, so only one of them is on screen. Before the first snapshot ranks the
- * wallet, the total leads instead, with the join welcome in the line the
- * gap to the next rank uses later.
- */
-function Standing({
-  score,
-  total,
-  highlighted,
-  welcome,
-  holdsNothing,
-}: {
-  score: PointsWalletScore | null | undefined;
-  total: string;
-  highlighted: boolean;
-  welcome: string | null;
-  holdsNothing: boolean;
-}) {
-  const t = useT();
-  const rank = score?.rank ?? null;
-  const toNext =
-    rank !== null && score?.pointsToNextRankAtomic != null
-      ? t("points.toNextRank", { amount: formatPoints(score.pointsToNextRankAtomic), next: rank - 1 })
-      : null;
-  const totalText = (
-    <span className={cn("tabular-nums transition-colors duration-700 motion-reduce:transition-none", highlighted && "text-positive")}>
-      {total}
-    </span>
-  );
-  // The leader skips "Top N%" because an only ranked wallet is also "Top 100%".
-  const percent = rank !== 1 && score?.topPercent != null ? t("points.top", { percent: score.topPercent }) : null;
-  const [showPercent, setShowPercent] = useState(false);
-  const line = welcome ?? toNext;
-
-  return (
-    <section aria-label={t("points.standing")} className="relative flex flex-col gap-2">
-      <Beam className="mb-2 w-10" />
-      {rank !== null ? (
-        <>
-          <p className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">
-            {t("points.rank", { rank })}
-          </p>
-          {/* After the rank in reading order, drawn on the beam's row. */}
-          <div className="absolute right-0 top-[1.5px] -translate-y-1/2 text-body text-muted">
-            {percent ? (
-              // The dashed underline says the figure has another reading: the percentile.
-              <button
-                type="button"
-                aria-pressed={showPercent}
-                onClick={() => setShowPercent((value) => !value)}
-                className="underline decoration-line decoration-dashed underline-offset-4 hover:text-foreground hover:decoration-faint phone:min-h-11"
-              >
-                {showPercent ? (
-                  percent
-                ) : (
-                  <>
-                    <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
-                    <span aria-hidden="true">
-                      {totalText} {t("points.unit")}
-                    </span>
-                  </>
-                )}
-              </button>
-            ) : (
-              <p>
-                <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
-                <span aria-hidden="true">
-                  {totalText} {t("points.unit")}
-                </span>
-              </p>
-            )}
-          </div>
-        </>
-      ) : (
-        <p className="flex items-baseline gap-2 text-foreground">
-          <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
-          <span aria-hidden="true" className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em]">
-            {totalText}
-          </span>
-          <span aria-hidden="true" className="text-body text-muted">
-            {t("points.unit")}
-          </span>
-        </p>
-      )}
-      {line ? <p className="text-h3 text-foreground">{line}</p> : null}
-      {!welcome && toNext ? <p className="text-label text-muted">{t("points.holdToClimb")}</p> : null}
-      {rank === null && score ? (
-        <p className="text-body text-muted">{t(holdsNothing ? "points.holdToEarn" : "points.unrankedHint")}</p>
-      ) : null}
-      {score?.originalFounder ? <p className="text-label text-faint">{t("points.earlyMember")}</p> : null}
-    </section>
-  );
-}
-
-/**
  * Shown when the server lists this wallet under another install's device.
  * Joining again from here only moves the wallet to this install (the
  * server keeps its points, invite code and referrer), so it earns from
@@ -379,200 +281,3 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
     </section>
   );
 }
-
-/** One way to earn: what it pays, then its action, which names it. */
-function EarnItem({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section aria-label={label} className="flex flex-col gap-1">
-      {children}
-    </section>
-  );
-}
-
-/** Earn actions are text, not buttons, so nothing competes with the place above. */
-const ACTION_LINK =
-  "self-start text-body font-medium text-foreground hover:underline phone:min-h-11";
-
-/**
- * Reviews need a registered wallet, so only members see this. The button
- * stays once the paid places are gone: an unpaid review is still published
- * and a confirmed vulnerability still earns from the bounty pool.
- */
-function ReviewItem({ runtime }: { runtime: RuntimePort }) {
-  const t = useT();
-  const { version } = usePlatform().buildInfo;
-  const stats = useScanStats(runtime);
-  const placesLeft = stats.data?.paidPlacesLeft ?? null;
-  const rewardAtomic = stats.data?.rewardAtomic ?? null;
-  const pool = stats.data?.bountyPoolAtomic ? formatPoints(stats.data.bountyPoolAtomic) : null;
-  const paying = placesLeft !== null && placesLeft > 0;
-
-  return (
-    <EarnItem label={t("points.review")}>
-      <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer" className={ACTION_LINK}>
-        {t("points.startReview")}
-        <span aria-hidden="true"> ↗</span>
-      </a>
-      <p className="mt-1.5 text-label text-muted">
-        <span>
-          {paying && rewardAtomic
-            ? `${t("points.reviewEarnBefore")}${formatPoints(rewardAtomic)} GLEAM${t("points.reviewEarnAfter")}`
-            : t("points.reviewPlain")}
-        </span>{" "}
-        {placesLeft === 0 ? (
-          <span>{pool ? t("points.placesTakenPool", { pool }) : t("points.placesTaken")}</span>
-        ) : pool ? (
-          <span>{t("points.poolPlus", { pool })}</span>
-        ) : null}
-      </p>
-    </EarnItem>
-  );
-}
-
-/**
- * The footer, folded so nothing competes with the screen's one action.
- * Opened, the two reading links lead and anything passed in (Leave) sits
- * apart below them, quieter.
- */
-function AboutPoints({
-  className,
-  children,
-}: {
-  className?: string;
-  children?: ReactNode;
-}) {
-  const t = useT();
-  const { version } = usePlatform().buildInfo;
-  const [open, setOpen] = useState(false);
-
-  return (
-    <footer className={cn("flex flex-col items-center gap-3", className)}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="points-about"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1 text-caption text-muted hover:text-foreground phone:min-h-11"
-      >
-        {t("points.about")}
-        <ChevronIcon open={open} />
-      </button>
-      {open ? (
-        <div id="points-about" className="flex w-full flex-col gap-4">
-          <ul className="flex flex-col gap-6">
-            <AboutLink
-              href={howItWorksUrl(version)}
-              title={t("points.howToEarn")}
-              detail={t("points.howToEarnDetail")}
-            />
-            <AboutLink
-              href={gleamUrl(version)}
-              title={t("points.future")}
-              detail={t("points.futureDetail")}
-            />
-          </ul>
-          {children ? (
-            <div className="flex justify-center">{children}</div>
-          ) : null}
-        </div>
-      ) : null}
-    </footer>
-  );
-}
-
-function AboutLink({
-  href,
-  title,
-  detail,
-}: {
-  href: string;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <li>
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 hover:bg-hover phone:-mx-3 phone:px-3"
-      >
-        <span className="flex flex-col gap-0.5">
-          <span className="text-label font-semibold text-foreground">
-            {title}
-          </span>
-          <span className="text-caption text-muted">{detail}</span>
-        </span>
-        <span aria-hidden="true" className="text-muted">
-          ↗
-        </span>
-      </a>
-    </li>
-  );
-}
-
-function LeaveControl({
-  runtime,
-  wallet,
-  points,
-}: {
-  runtime: RuntimePort;
-  wallet: WalletSummary;
-  points: string;
-}) {
-  const t = useT();
-  const leave = useLeavePoints(runtime);
-  const [confirming, setConfirming] = useState(false);
-  useBackHandler(confirming ? () => setConfirming(false) : null);
-
-  if (!confirming) {
-    return (
-      <button
-        type="button"
-        onClick={() => setConfirming(true)}
-        className="text-label text-faint hover:text-muted"
-      >
-        {t("points.leave")}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      role="alertdialog"
-      aria-label={t("points.leave")}
-      className="flex w-full flex-col gap-3 rounded-lg border border-line p-4"
-    >
-      <p className="text-label text-foreground">
-        {t("points.leaveWarning", { points })}
-      </p>
-      {leave.error instanceof Error ? (
-        <p className="text-caption text-warning">{errorText(leave.error)}</p>
-      ) : null}
-      <ButtonPair
-        size="sm"
-        cancelLabel={t("points.cancel")}
-        onCancel={() => setConfirming(false)}
-        confirmLabel={leave.isPending ? t("points.leaving") : t("points.leaveConfirm")}
-        confirmVariant="destructive"
-        confirmDisabled={leave.isPending}
-        onConfirm={() => leave.mutate({ walletId: wallet.id })}
-      />
-      {leave.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
-    </div>
-  );
-}
-
-/** A hardware wallet proves ownership on the device, in the approval window the background opens. */
-function DeviceApprovalNote() {
-  const t = useT();
-  return (
-    <p role="status" className="text-center text-caption text-muted">
-      {t("points.deviceApproval")}
-    </p>
-  );
-}
-
-/** Sized and aligned to sit after an earn action's text, like the scan link's ↗. */
-const ACTION_ICON = "ml-1.5 inline-block align-[-0.125em]";
-

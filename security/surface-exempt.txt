@@ -223,6 +223,11 @@ packages/app/src/screens/main-screen/src/portfolioPrefs.ts A screen outside the 
 packages/app/src/screens/main-screen/src/tokenRows.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useListDock.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/main-screen/src/useTokenRowControls.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/AboutPoints.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/DeviceApprovalNote.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/EarnItems.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/LeaveControl.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/Standing.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/ComposeStep.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
 packages/app/src/screens/send/src/NetworkFeeLine.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
 packages/app/src/screens/send/src/RecipientField.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.

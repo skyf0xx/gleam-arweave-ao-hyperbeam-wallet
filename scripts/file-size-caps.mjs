@@ -18,7 +18,6 @@ export const FILE_SIZE_CAPS = {
   "packages/runtime/src/handlers/wallet-lifecycle.ts": 566,
   "apps/points-api/src/scans/attestations.ts": 586,
   "apps/site/scan-lib.js": 427,
-  "packages/app/src/screens/points/src/PointsView.tsx": 511,
   "packages/ui/src/components/wallet/PortfolioChart.tsx": 403,
   "scripts/check-bundles.mjs": 434,
 };
