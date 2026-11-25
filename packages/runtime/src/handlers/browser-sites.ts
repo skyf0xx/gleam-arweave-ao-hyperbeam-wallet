@@ -1,6 +1,8 @@
+import { isPlainRecord } from "@gleam/core";
 import type { StoragePort } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
+import { stringList } from "../guards";
 
 /**
  * Background-side implementation of the dApp browser's saved and recent
@@ -67,10 +69,6 @@ function webOrigin(url: string): string {
   return parsed.origin;
 }
 
-function origins(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
-}
-
 export function isValidBrowserVisit(value: unknown): value is BrowserVisit {
   if (typeof value !== "object" || value === null) return false;
   const visit = value as Record<string, unknown>;
@@ -97,7 +95,7 @@ function cleanTitle(title: unknown, url: string): string {
 }
 
 function icons(raw: unknown): Record<string, string> {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  if (!isPlainRecord(raw)) return {};
   return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => isValidSiteIcon(entry[1])));
 }
 
@@ -108,7 +106,7 @@ export class BrowserSitesHandler {
   ) {}
 
   private async load(key: string): Promise<string[]> {
-    return origins(await this.storage.get<unknown>(key));
+    return stringList(await this.storage.get<unknown>(key));
   }
 
   async listBrowserSites(): Promise<BrowserSites> {
@@ -133,7 +131,7 @@ export class BrowserSitesHandler {
     const origin = webOrigin(req.url);
     await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => [
       origin,
-      ...origins(raw).filter((entry) => entry !== origin),
+      ...stringList(raw).filter((entry) => entry !== origin),
     ]);
     const icon = req.icon;
     if (isValidSiteIcon(icon)) {
@@ -143,7 +141,7 @@ export class BrowserSitesHandler {
 
   async removeBrowserSite(req: { origin: string }): Promise<void> {
     await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => {
-      const saved = origins(raw);
+      const saved = stringList(raw);
       const next = saved.filter((entry) => entry !== req.origin);
       return next.length !== saved.length ? next : undefined;
     });
@@ -162,7 +160,7 @@ export class BrowserSitesHandler {
   async recordRecentSite(req: { url: string; title?: string }): Promise<void> {
     const origin = webOrigin(req.url);
     await updateStored(this.storage, BROWSER_RECENT_SITES_KEY, (raw) =>
-      [origin, ...origins(raw).filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
+      [origin, ...stringList(raw).filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
     );
     if (req.url.length > MAX_HISTORY_URL_LENGTH) return;
     const visit: BrowserVisit = { url: req.url, title: cleanTitle(req.title, req.url), at: this.now() };

@@ -130,7 +130,7 @@ export function isTaggedBinary(value: unknown): value is TaggedBinary {
 
 // `instanceof` is avoided on purpose: WebCrypto results, page values and
 // test globals can each come from a different realm.
-function isArrayBuffer(value: unknown): value is ArrayBuffer {
+export function isArrayBuffer(value: unknown): value is ArrayBuffer {
   return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
 }
 
@@ -144,20 +144,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
  * the JSON serialization of extension messaging and `chrome.storage`.
  */
 export function encodeTaggedBinary(value: unknown): unknown {
-  if (isArrayBuffer(value)) {
-    return { __gleamType: "ArrayBuffer", data: Array.from(new Uint8Array(value)) } satisfies TaggedArrayBuffer;
-  }
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return { __gleamType: "Uint8Array", data: Array.from(bytes) } satisfies TaggedUint8Array;
-  }
-  if (Array.isArray(value)) {
-    return value.map(encodeTaggedBinary);
-  }
-  if (isPlainRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, encodeTaggedBinary(entry)]));
-  }
-  return value;
+  return mapBinaryDeep(value, (bytes, kind) => ({ __gleamType: kind, data: Array.from(bytes) }) as TaggedBinary);
 }
 
 /** The inverse of `encodeTaggedBinary`. */
@@ -354,4 +341,22 @@ export async function handlePageRequest(
     response.error = { message: error instanceof Error ? error.message : String(error) };
   }
   reply(response);
+}
+
+/**
+ * Copies `value` with every `ArrayBuffer` and typed-array view replaced by
+ * `encodeLeaf(bytes, kind)`, walking arrays and plain objects. `kind` is
+ * `ArrayBuffer` for a buffer and `Uint8Array` for any view.
+ */
+export function mapBinaryDeep(
+  value: unknown,
+  encodeLeaf: (bytes: Uint8Array, kind: "ArrayBuffer" | "Uint8Array") => unknown,
+): unknown {
+  if (isArrayBuffer(value)) return encodeLeaf(new Uint8Array(value), "ArrayBuffer");
+  if (ArrayBuffer.isView(value)) return encodeLeaf(new Uint8Array(value.buffer, value.byteOffset, value.byteLength), "Uint8Array");
+  if (Array.isArray(value)) return value.map((entry) => mapBinaryDeep(entry, encodeLeaf));
+  if (isPlainRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, mapBinaryDeep(entry, encodeLeaf)]));
+  }
+  return value;
 }

@@ -2,6 +2,7 @@ import { COMMUNITY_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, isRecord, type Netwo
 import { discoverHyperBeamPeers, findL1TokenNodes, stripTrailingSlashes } from "@gleam/core/src/ao/peer-discovery.ts";
 import { updateStored } from "./storage-update";
 import { NETWORK_SETTINGS_KEY } from "./storage-keys";
+import { stringList } from "./guards";
 
 export const DISCOVERED_PEERS_KEY = "local:discoveredPeers";
 /** Community or discovered peers the user removed in Network & peers; merging skips them. */
@@ -43,13 +44,9 @@ export async function readExtraPeerUrls(storage: StoragePort): Promise<string[]>
 }
 
 /** Community or discovered peers the user has removed. */
-function dismissedPeersOf(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((url): url is string => typeof url === "string") : [];
-}
-
 export async function readDismissedPeers(storage: StoragePort): Promise<string[]> {
   try {
-    return dismissedPeersOf(await storage.get<unknown>(DISMISSED_PEERS_KEY));
+    return stringList(await storage.get<unknown>(DISMISSED_PEERS_KEY));
   } catch {
     return [];
   }
@@ -69,7 +66,7 @@ export async function saveNetworkSettings(storage: StoragePort, next: NetworkSet
   const shown = [...(await readStoredPeerUrls(storage)), ...(await readExtraPeerUrls(storage))];
   const removed = [...new Set(shown)].filter((url) => !kept.has(url));
   if (removed.length > 0) {
-    await updateStored(storage, DISMISSED_PEERS_KEY, (raw) => [...new Set([...dismissedPeersOf(raw), ...removed])]);
+    await updateStored(storage, DISMISSED_PEERS_KEY, (raw) => [...new Set([...stringList(raw), ...removed])]);
   }
   // A whole-value write, queued behind the other updates of this key.
   await updateStored(storage, NETWORK_SETTINGS_KEY, () => next);

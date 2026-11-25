@@ -18,6 +18,7 @@ import { updateStored } from "../storage-update";
 import { loadWallets } from "../stored-data";
 export { WALLETS_KEY } from "../storage-keys";
 import { loadBackupKey } from "./backup-state";
+import { stringList } from "../guards";
 
 /**
  * The signing keys of currently-unlocked wallets, held in two places:
@@ -46,10 +47,6 @@ import { loadBackupKey } from "./backup-state";
  */
 const KEY_PREFIX = "session:key:";
 const CACHED_WALLET_IDS_KEY = "session:cachedWalletIds";
-
-function cachedIds(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : [];
-}
 
 /** Written by `wallet-lifecycle.ts`; read here so every key read can enforce auto-lock. */
 export const SESSION_KEY = "session:unlockedSession";
@@ -285,14 +282,14 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
 
   async function trackWalletId(walletId: string): Promise<void> {
     await updateStored<string[]>(storage, CACHED_WALLET_IDS_KEY, (current) => {
-      const ids = cachedIds(current);
+      const ids = stringList(current);
       return ids.includes(walletId) ? undefined : [...ids, walletId];
     });
   }
 
   async function untrackWalletId(walletId: string): Promise<void> {
     await updateStored<string[]>(storage, CACHED_WALLET_IDS_KEY, (current) =>
-      cachedIds(current).filter((id) => id !== walletId),
+      stringList(current).filter((id) => id !== walletId),
     );
   }
 

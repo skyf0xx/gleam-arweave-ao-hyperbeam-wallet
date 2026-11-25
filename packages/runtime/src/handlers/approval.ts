@@ -22,7 +22,6 @@ import {
   signMessage as vaultSignMessage,
   signPayloadWithSigner,
   verifyDeviceSignature,
-  PERMISSION_TYPES,
   WALLET_APPROVAL_ORIGIN,
   type AddTokenApprovalPreview,
   type CollectibleRef,
@@ -47,6 +46,8 @@ import {
   type SigningApprovalPreview,
   type StoragePort,
   type UnsignedPayload,
+  errorMessage,
+  isPlainRecord,
 } from "@gleam/core";
 import {
   APPROVAL_MAX_MS,
@@ -88,6 +89,8 @@ import {
   transactionOf,
   UNSAFE_TEXT,
 } from "./prepared-check";
+import { isPermissionType } from "../guards";
+import { mapBinaryDeep } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -169,10 +172,6 @@ function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
 const DEVICE_GRACE_MS = APPROVAL_MAX_MS - APPROVAL_TIMEOUT_MS;
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 
-function isValidPermissionType(value: unknown): value is PermissionType {
-  return typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value);
-}
-
 function isValidGrant(value: unknown): value is Grant {
   if (value === null || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
@@ -180,7 +179,7 @@ function isValidGrant(value: unknown): value is Grant {
     typeof candidate.origin === "string" &&
     typeof candidate.walletId === "string" &&
     Array.isArray(candidate.permissions) &&
-    candidate.permissions.every(isValidPermissionType) &&
+    candidate.permissions.every(isPermissionType) &&
     typeof candidate.createdAt === "number" &&
     (candidate.expiresAt === null || typeof candidate.expiresAt === "number") &&
     candidate.budget === null &&
@@ -462,27 +461,13 @@ function isStoredBinary(value: unknown): value is StoredBinary {
   );
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 /**
  * Bytes go in as base64 rather than the tagged-binary codec's number
  * arrays: `chrome.storage.session` charges every array element as a value
  * of its own, about 32 bytes per byte.
  */
 function toStored(value: unknown): unknown {
-  // `instanceof` is avoided: WebCrypto results and page values can come from another realm.
-  if (Object.prototype.toString.call(value) === "[object ArrayBuffer]") {
-    return { __gleamStored: "ArrayBuffer", base64: bytesToBase64(new Uint8Array(value as ArrayBuffer)) } satisfies StoredBinary;
-  }
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return { __gleamStored: "Uint8Array", base64: bytesToBase64(bytes) } satisfies StoredBinary;
-  }
-  if (Array.isArray(value)) return value.map(toStored);
-  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, toStored(entry)]));
-  return value;
+  return mapBinaryDeep(value, (bytes, kind) => ({ __gleamStored: kind, base64: bytesToBase64(bytes) }) satisfies StoredBinary);
 }
 
 function fromStored(value: unknown): unknown {
@@ -1306,7 +1291,7 @@ export class ApprovalHandler {
             outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
           }
         } catch (error) {
-          outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
+          outcome = { approved: true, error: errorMessage(error) };
         }
       }
       return await this.complete(entry, outcome, result);
@@ -1477,7 +1462,7 @@ export class ApprovalHandler {
         result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
         outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
       } catch (error) {
-        outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
+        outcome = { approved: true, error: errorMessage(error) };
       }
       return await this.complete(entry, outcome, result);
     } finally {
@@ -1846,7 +1831,7 @@ export class ApprovalHandler {
    * picked the permissions themselves, so no approval window opens.
    */
   async grantSite(req: { origin: string; permissions: PermissionType[]; favIconUrl?: string | null }): Promise<Grant> {
-    const permissions = Array.isArray(req.permissions) ? [...new Set(req.permissions.filter(isValidPermissionType))] : [];
+    const permissions = Array.isArray(req.permissions) ? [...new Set(req.permissions.filter(isPermissionType))] : [];
     if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
     await this.mergeGrant(req.origin, null, permissions, { icon: safeSiteIconUrl(req.favIconUrl), name: null });
     const grant = await this.findActiveGrant(req.origin);

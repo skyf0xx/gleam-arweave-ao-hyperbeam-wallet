@@ -1,6 +1,8 @@
+import { isPlainRecord } from "@gleam/core";
 import type { Announcement, StoragePort } from "@gleam/core";
 import { SITE_URL } from "@gleam/core/src/models/site-origin.ts";
 import { updateStored } from "../storage-update";
+import { stringList } from "../guards";
 
 export const ANNOUNCEMENTS_URL = new URL("announcements.json", SITE_URL).toString();
 /** The newest release per shell that doesn't update itself, as `{ "android": "1.54.0" }`. */
@@ -103,8 +105,8 @@ export function parseAnnouncements(raw: unknown, target: AnnouncementTarget): An
  * own, stay quiet by being left out of it.
  */
 export function availableUpdate(raw: unknown, target: AnnouncementTarget): string | null {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw) || target.shell === "web") return null;
-  const latest = (raw as Record<string, unknown>)[target.shell];
+  if (!isPlainRecord(raw) || target.shell === "web") return null;
+  const latest = raw[target.shell];
   const bound = parseVersion(latest);
   const current = parseVersion(target.version);
   return bound !== null && current !== null && isBelow(current, bound) ? (latest as string) : null;
@@ -171,6 +173,4 @@ export class AnnouncementsHandler {
   }
 }
 
-function dismissedIds(stored: unknown): string[] {
-  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
-}
+const dismissedIds = stringList;

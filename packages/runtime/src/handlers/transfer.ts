@@ -34,6 +34,7 @@ import {
   type TransferFeeQuote,
   type Wallet,
   type Winston,
+  isValidContact,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
@@ -198,12 +199,7 @@ export class TransferHandler {
       this.storage.get<unknown>(CONTACTS_KEY),
       loadWallets(this.storage),
     ]);
-    const addresses: string[] = [];
-    if (Array.isArray(contacts)) {
-      for (const contact of contacts) {
-        if (contact && typeof contact.address === "string") addresses.push(contact.address);
-      }
-    }
+    const addresses: string[] = Array.isArray(contacts) ? contacts.filter(isValidContact).map((contact) => contact.address) : [];
     addresses.push(...wallets.map((wallet) => wallet.address));
     return addresses;
   }

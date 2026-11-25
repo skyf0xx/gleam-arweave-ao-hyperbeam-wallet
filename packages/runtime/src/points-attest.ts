@@ -1,4 +1,4 @@
-import { capabilitiesFor, type WalletSummary } from "@gleam/core";
+import { capabilitiesFor, type WalletSummary, errorMessage } from "@gleam/core";
 import { parseAttestation, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse, SiteAttestStatusResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { SiteMessage } from "./dispatch/methods";
@@ -47,7 +47,7 @@ export async function signSiteAttestation(
     });
   } catch (error) {
     if (error instanceof ApprovalDeclinedError) return attestFailure(error.timedOut ? "timed_out" : "rejected", release);
-    return attestFailure("signing_failed", release, error instanceof Error ? error.message : String(error));
+    return attestFailure("signing_failed", release, errorMessage(error));
   }
 }
 

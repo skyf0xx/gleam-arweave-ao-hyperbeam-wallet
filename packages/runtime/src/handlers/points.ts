@@ -17,6 +17,7 @@ import {
   type StoragePort,
   type TimerPort,
   type WalletMethod,
+  isPlainRecord,
 } from "@gleam/core";
 import {
   buildAttestMessage,
@@ -638,7 +639,7 @@ async function runHeartbeat(handler: PointsHandler): Promise<void> {
 }
 
 function storedRecord<T>(raw: unknown): Record<string, T> {
-  return raw !== null && typeof raw === "object" && !Array.isArray(raw) ? { ...(raw as Record<string, T>) } : {};
+  return isPlainRecord(raw) ? ({ ...raw } as Record<string, T>) : {};
 }
 
 const membershipsOf = (raw: unknown) => storedRecord<PointsMembership>(raw);

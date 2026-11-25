@@ -1,5 +1,4 @@
 import {
-  PERMISSION_TYPES,
   UNKNOWN_WALLET_NAME,
   type ActiveSite,
   type Grant,
@@ -7,6 +6,7 @@ import {
   type StoragePort,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
+import { isPermissionType, stringList } from "../guards";
 
 /**
  * One `SeenOtherWallet` per tab, so tabs reporting at once never overwrite
@@ -71,10 +71,6 @@ export function safeSiteIconUrl(raw: unknown): string | null {
   }
 }
 
-function originList(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
-}
-
 function seenOf(raw: unknown): SeenOtherWallet | null {
   return raw !== null && typeof raw === "object" && typeof (raw as SeenOtherWallet).origin === "string"
     ? (raw as SeenOtherWallet)
@@ -83,7 +79,7 @@ function seenOf(raw: unknown): SeenOtherWallet | null {
 
 function knownPermissions(raw: unknown): PermissionType[] {
   if (!Array.isArray(raw)) return [];
-  const known = raw.filter((entry): entry is PermissionType => (PERMISSION_TYPES as readonly unknown[]).includes(entry));
+  const known = raw.filter(isPermissionType);
   return [...new Set(known)];
 }
 
@@ -107,7 +103,7 @@ export class SiteWalletHandler {
   }
 
   private async loadOrigins(key: string): Promise<string[]> {
-    return originList(await this.deps.storage.get<unknown>(key));
+    return stringList(await this.deps.storage.get<unknown>(key));
   }
 
   private async usesGleam(origin: string): Promise<{ usesGleam: boolean; grant: Grant | null }> {
@@ -121,7 +117,7 @@ export class SiteWalletHandler {
 
   async setUseGleam(origin: string, useGleam: boolean): Promise<void> {
     await updateStored(this.deps.storage, GLEAM_SITES_KEY, (raw) => {
-      const sites = originList(raw).filter((site) => site !== origin);
+      const sites = stringList(raw).filter((site) => site !== origin);
       return useGleam ? [...sites, origin] : sites;
     });
   }
@@ -181,7 +177,7 @@ export class SiteWalletHandler {
 
   async dismiss(origin: string): Promise<void> {
     await updateStored(this.deps.storage, SUGGESTIONS_DISMISSED_KEY, (raw) => {
-      const dismissed = originList(raw);
+      const dismissed = stringList(raw);
       return dismissed.includes(origin) ? undefined : [...dismissed, origin];
     });
   }

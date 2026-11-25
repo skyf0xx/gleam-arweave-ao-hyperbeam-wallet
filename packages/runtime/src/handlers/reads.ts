@@ -37,7 +37,7 @@ import {
   readBestAsk,
   recordPriceSample,
 } from "@gleam/core/src/pricing/index.ts";
-import { POINTS_API_URL, isFiatCurrency } from "@gleam/core";
+import { POINTS_API_URL, isFiatCurrency, errorMessage, isArweaveId } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls, readL1NodeUrls } from "../peers";
 import type {
@@ -69,6 +69,7 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { activityLogKey, loadActivityLog, loadNetworkSettings as loadStoredNetworkSettings, loadWallets, parseActivityLog } from "../stored-data";
 import { ACTIVE_WALLET_ID_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
+import { stringList } from "../guards";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -173,7 +174,6 @@ const AO_TOKEN_METADATA: TokenMetadata = {
   totalSupply: null,
 };
 
-const PROCESS_ID = /^[A-Za-z0-9_-]{43}$/;
 
 function hostOf(url: string): string {
   try {
@@ -341,7 +341,7 @@ export class ReadsHandler {
   }
 
   async loadWatchedProcessIds(address: string): Promise<string[]> {
-    return processIdList(await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`));
+    return stringList(await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`));
   }
 
   /**
@@ -443,7 +443,7 @@ export class ReadsHandler {
   }
 
   private async loadHiddenProcessIds(address: string): Promise<string[]> {
-    return processIdList(await this.storage.get<unknown>(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${address}`));
+    return stringList(await this.storage.get<unknown>(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${address}`));
   }
 
   /**
@@ -465,7 +465,7 @@ export class ReadsHandler {
     try {
       ({ metadata, check } = await queryCheckedTokenMetadata(processId, gatewayUrl, crossCheckGatewayUrls(gatewayUrl)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       throw new Error(
         message.startsWith("No spawn transaction")
           ? userErrorMessage("tokenNotIndexed")
@@ -560,7 +560,7 @@ export class ReadsHandler {
         ...identity,
         quantity: "0",
         available: false,
-        unavailableReason: error instanceof Error ? error.message : String(error),
+        unavailableReason: errorMessage(error),
       };
     }
   }
@@ -637,7 +637,7 @@ export class ReadsHandler {
   async previewWatchedToken(req: { address: string; processId: string }): Promise<TokenBalance> {
     const processId = req.processId.trim();
     if (processId.length === 0) throw new Error(userErrorMessage("tokenPasteId"));
-    if (!PROCESS_ID.test(processId)) {
+    if (!isArweaveId(processId)) {
       throw new Error(
         userErrorMessage("tokenBadId"),
       );
@@ -680,12 +680,12 @@ export class ReadsHandler {
 
     if (processId !== DEFAULT_AO_PROCESS_ID) {
       await updateStored(this.storage, `${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
-        const existing = processIdList(raw);
+        const existing = stringList(raw);
         return existing.includes(processId) ? undefined : [...existing, processId];
       });
     }
     await updateStored(this.storage, `${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
-      const hidden = processIdList(raw);
+      const hidden = stringList(raw);
       return hidden.includes(processId) ? hidden.filter((id) => id !== processId) : undefined;
     });
     return resolved;
@@ -705,12 +705,12 @@ export class ReadsHandler {
   async removeWatchedToken(req: { address: string; processId: string }): Promise<void> {
     if (req.processId === DEFAULT_AO_PROCESS_ID) return;
     await updateStored(this.storage, `${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
-      const existing = processIdList(raw);
+      const existing = stringList(raw);
       const next = existing.filter((id) => id !== req.processId);
       return next.length !== existing.length ? next : undefined;
     });
     await updateStored(this.storage, `${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
-      const hidden = processIdList(raw);
+      const hidden = stringList(raw);
       return hidden.includes(req.processId) ? undefined : [...hidden, req.processId];
     });
   }
@@ -1406,7 +1406,7 @@ export class ReadsHandler {
     arUsd: number,
   ): Promise<{ processId: string; usd: number; change: number | null }[]> {
     const processIds = [...new Set(requested)]
-      .filter((id) => PROCESS_ID.test(id) && !isRegisteredProcessId(id))
+      .filter((id) => isArweaveId(id) && !isRegisteredProcessId(id))
       .slice(0, MAX_PRICED_PROCESS_IDS);
     const nodeUrl = (await this.loadNetworkSettings()).activePeerUrl;
     if (processIds.length === 0 || nodeUrl === null) return [];
@@ -1483,8 +1483,4 @@ async function runActivityPromotionTick(handler: ReadsHandler): Promise<void> {
       }
     }),
   );
-}
-
-function processIdList(raw: unknown): string[] {
-  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : [];
 }
