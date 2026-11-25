@@ -46,7 +46,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.2",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "zod": "^4.6.7"
   },
   "packageManager": "pnpm@11.25.0"
 }
