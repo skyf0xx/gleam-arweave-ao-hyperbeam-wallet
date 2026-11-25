@@ -58,14 +58,16 @@ export function ForgotPassword({
         >
           {resetting ? t("unlock.resetting") : confirming ? t("unlock.confirmReset") : t("unlock.reset")}
         </Button>
-        <button
+        <Button
+          variant="link"
+          size="bare"
           type="button"
           onClick={confirming ? () => setConfirming(false) : onCancel}
           disabled={resetting}
-          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-4"
+          className="p-1 phone:flex phone:min-h-11 phone:items-center phone:px-4"
         >
           {t("unlock.cancel")}
-        </button>
+        </Button>
       </ScreenFooter>
     </div>
   );

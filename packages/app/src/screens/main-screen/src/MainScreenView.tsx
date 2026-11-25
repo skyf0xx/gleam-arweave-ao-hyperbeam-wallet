@@ -50,6 +50,7 @@ import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { BackIcon } from "@gleam/ui/src/primitives/icons.tsx";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
 /**
  * Main screen: AR balance, AO token balances (empty until a "watch a
@@ -1366,13 +1367,15 @@ export function MainScreenView({
                   </div>
                   {activityQuery.data && activityQuery.data.entries.length > 0 ? (
                     <div className="pt-2.5 text-center phone:pt-1">
-                      <button
+                      <Button
+                        variant="link"
+                        size="bare"
                         type="button"
                         onClick={() => openInExplorer(wallet.address)}
-                        className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
+                        className="phone:min-h-11 phone:px-4"
                       >
                         {t("mainScreen.viewAll")}
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                   <ActivityDetailSheet

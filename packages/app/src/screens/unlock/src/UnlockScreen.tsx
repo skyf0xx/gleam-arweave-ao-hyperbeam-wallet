@@ -94,23 +94,27 @@ export function UnlockScreen({
   const links = (
     <div className="mt-3.5 flex justify-center gap-4">
       {quick && usePassword ? (
-        <button
+        <Button
+          variant="link"
+          size="bare"
           type="button"
           disabled={locked}
           onClick={() => setUsePassword(false)}
-          className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
+          className="p-1 phone:flex phone:min-h-11 phone:items-center phone:px-3"
         >
           {quick.switchBack}
-        </button>
+        </Button>
       ) : null}
-      <button
+      <Button
+        variant="link"
+        size="bare"
         type="button"
         disabled={locked}
         onClick={onForgotPassword}
-        className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
+        className="p-1 phone:flex phone:min-h-11 phone:items-center phone:px-3"
       >
         {t("unlock.forgotPassword")}
-      </button>
+      </Button>
     </div>
   );
 

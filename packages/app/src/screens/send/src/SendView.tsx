@@ -1666,13 +1666,14 @@ export function SuccessStep({
               </button>
             </div>
           ) : (
-            <button
+            <Button
+              variant="link"
+              size="bare"
               type="button"
               onClick={() => setShowSave(true)}
-              className="text-label font-medium text-muted hover:text-foreground hover:underline"
             >
               {t("send.saveAsContact")}
-            </button>
+            </Button>
           )}
         </div>
       ) : null}
