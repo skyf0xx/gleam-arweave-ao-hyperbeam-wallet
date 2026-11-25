@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hostnameOf } from "../../../hostname";
+import { InlineUrlEditor } from "./InlineUrlEditor";
 import { usePlatform } from "../../../app-platform/context";
 import type { EphemeralStatePort } from "../../../app-platform/types";
 import { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
 import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
@@ -421,45 +421,23 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
             {state.loading ? (
               <SkeletonRow />
             ) : editingGateway ? (
-              <div className="flex flex-col gap-2 py-3.5">
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="https://arweave.net"
-                  value={newGatewayUrl}
-                  onChange={(event) => {
-                    setNewGatewayUrl(event.target.value);
-                    setGatewayError(null);
-                  }}
-                  className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
-                />
-                {gatewayError ? (
-                  <InlineError as="span">
-                    {gatewayError}
-                  </InlineError>
-                ) : null}
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    disabled={saving || checkingGateway}
-                    onClick={() => void handleEditGateway()}
-                    className="text-label font-semibold text-foreground disabled:opacity-60"
-                  >
-                    {checkingGateway ? t("networkPeers.checking") : t("networkPeers.save")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingGateway(false);
-                      setNewGatewayUrl("");
-                      setGatewayError(null);
-                    }}
-                    className="text-label font-semibold text-muted"
-                  >
-                    {t("networkPeers.cancel")}
-                  </button>
-                </div>
-              </div>
+              <InlineUrlEditor
+                placeholder="https://arweave.net"
+                value={newGatewayUrl}
+                onChange={(value) => {
+                  setNewGatewayUrl(value);
+                  setGatewayError(null);
+                }}
+                error={gatewayError}
+                submitLabel={checkingGateway ? t("networkPeers.checking") : t("networkPeers.save")}
+                submitDisabled={saving || checkingGateway}
+                onSubmit={() => void handleEditGateway()}
+                onCancel={() => {
+                  setEditingGateway(false);
+                  setNewGatewayUrl("");
+                  setGatewayError(null);
+                }}
+              />
             ) : (
               <button
                 type="button"
@@ -491,36 +469,20 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
             {state.loading ? (
               <SkeletonRow />
             ) : editingBundler ? (
-              <div className="flex flex-col gap-2 py-3.5">
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder={DEFAULT_BUNDLER_URL}
-                  value={newBundlerUrl}
-                  onChange={(event) => {
-                    setNewBundlerUrl(event.target.value);
-                    setBundlerError(null);
-                  }}
-                  className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
-                />
-                {bundlerError ? (
-                  <InlineError as="span">
-                    {bundlerError}
-                  </InlineError>
-                ) : null}
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void handleEditBundler()}
-                    className="text-label font-semibold text-foreground disabled:opacity-60"
-                  >
-                    {t("networkPeers.save")}
-                  </button>
-                  <button type="button" onClick={closeBundlerEditor} className="text-label font-semibold text-muted">
-                    {t("networkPeers.cancel")}
-                  </button>
-                  {state.settings?.bundlerUrl ? (
+              <InlineUrlEditor
+                placeholder={DEFAULT_BUNDLER_URL}
+                value={newBundlerUrl}
+                onChange={(value) => {
+                  setNewBundlerUrl(value);
+                  setBundlerError(null);
+                }}
+                error={bundlerError}
+                submitLabel={t("networkPeers.save")}
+                submitDisabled={saving}
+                onSubmit={() => void handleEditBundler()}
+                onCancel={closeBundlerEditor}
+                extraAction={
+                  state.settings?.bundlerUrl ? (
                     <button
                       type="button"
                       disabled={saving}
@@ -529,9 +491,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     >
                       {t("networkPeers.useAutomatic")}
                     </button>
-                  ) : null}
-                </div>
-              </div>
+                  ) : null
+                }
+              />
             ) : (
               <button
                 type="button"
@@ -625,45 +587,23 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                 })}
 
                 {addingPeer ? (
-                  <div className="flex flex-col gap-2 py-3.5">
-                    <input
-                      type="text"
-                      autoFocus
-                      placeholder="hyperbeam.example.com"
-                      value={newPeerUrl}
-                      onChange={(event) => {
-                        setNewPeerUrl(event.target.value);
-                        setAddError(null);
-                      }}
-                      className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
-                    />
-                    {addError ? (
-                      <InlineError as="span">
-                        {addError}
-                      </InlineError>
-                    ) : null}
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void handleAddPeer()}
-                        className="text-label font-semibold text-foreground disabled:opacity-60"
-                      >
-                        {t("networkPeers.add")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddingPeer(false);
-                          setNewPeerUrl("");
-                          setAddError(null);
-                        }}
-                        className="text-label font-semibold text-muted"
-                      >
-                        {t("networkPeers.cancel")}
-                      </button>
-                    </div>
-                  </div>
+                  <InlineUrlEditor
+                    placeholder="hyperbeam.example.com"
+                    value={newPeerUrl}
+                    onChange={(value) => {
+                      setNewPeerUrl(value);
+                      setAddError(null);
+                    }}
+                    error={addError}
+                    submitLabel={t("networkPeers.add")}
+                    submitDisabled={saving}
+                    onSubmit={() => void handleAddPeer()}
+                    onCancel={() => {
+                      setAddingPeer(false);
+                      setNewPeerUrl("");
+                      setAddError(null);
+                    }}
+                  />
                 ) : (
                   <button
                     type="button"
