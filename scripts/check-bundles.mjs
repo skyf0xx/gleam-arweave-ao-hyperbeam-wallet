@@ -105,6 +105,102 @@ const POPUP_PACKAGES = [
   "zod",
 ];
 
+/**
+ * What the Keystone panel adds: its QR and UR libraries and the Node
+ * polyfills they pull in. The approval page loads it lazily; the connect
+ * page loads it up front.
+ */
+const KEYSTONE_PANEL_PACKAGES = [
+  "@keystonehq/alias-sampling",
+  "@keystonehq/bc-ur-registry",
+  "@keystonehq/bc-ur-registry-arweave",
+  "@ngraveio/bc-ur",
+  "assert",
+  "available-typed-arrays",
+  "base-x",
+  "base64-js",
+  "bs58",
+  "bs58check",
+  "buffer",
+  "call-bind",
+  "call-bind-apply-helpers",
+  "call-bound",
+  "cbor-sync",
+  "cipher-base",
+  "core-util-is",
+  "crc",
+  "create-hash",
+  "define-data-property",
+  "define-properties",
+  "dunder-proto",
+  "es-define-property",
+  "es-errors",
+  "es-object-atoms",
+  "events",
+  "for-each",
+  "generator-function",
+  "get-intrinsic",
+  "get-proto",
+  "gopd",
+  "has-property-descriptors",
+  "has-symbols",
+  "has-tostringtag",
+  "hash-base",
+  "hasown",
+  "ieee754",
+  "inherits",
+  "is-arguments",
+  "is-callable",
+  "is-generator-function",
+  "is-nan",
+  "is-regex",
+  "is-typed-array",
+  "isarray",
+  "jsbi",
+  "jsqr",
+  "math-intrinsics",
+  "md5.js",
+  "object-is",
+  "object-keys",
+  "object.assign",
+  "possible-typed-array-names",
+  "process-nextick-args",
+  "qrcode-generator",
+  "readable-stream",
+  "ripemd160",
+  "safe-buffer",
+  "safe-regex-test",
+  "set-function-length",
+  "sha.js",
+  "stream-browserify",
+  "string_decoder",
+  "to-buffer",
+  "typed-array-buffer",
+  "util",
+  "util-deprecate",
+  "uuid",
+  "which-typed-array",
+];
+
+const CONNECT_PACKAGES = [
+  "@aklinker1/zero-serialize-error",
+  "@radix-ui/react-compose-refs",
+  "@radix-ui/react-slot",
+  "@webext-core/messaging",
+  "@wxt-dev/browser",
+  "arweave",
+  "bignumber.js",
+  "class-variance-authority",
+  "clsx",
+  "react",
+  "react-dom",
+  "scheduler",
+  "tailwind-merge",
+  "tslib",
+  "vite-plugin-node-polyfills",
+  "wxt",
+];
+
 /** @type {Record<string, string[]>} */
 export const BUNDLE_PACKAGES = {
   "background.js": [
@@ -167,93 +263,7 @@ export const BUNDLE_PACKAGES = {
     "wxt",
     "zod",
   ],
-  "connect.html": [
-    "@aklinker1/zero-serialize-error",
-    "@keystonehq/alias-sampling",
-    "@keystonehq/bc-ur-registry",
-    "@keystonehq/bc-ur-registry-arweave",
-    "@ngraveio/bc-ur",
-    "@radix-ui/react-compose-refs",
-    "@radix-ui/react-slot",
-    "@webext-core/messaging",
-    "@wxt-dev/browser",
-    "arweave",
-    "assert",
-    "available-typed-arrays",
-    "base-x",
-    "base64-js",
-    "bignumber.js",
-    "bs58",
-    "bs58check",
-    "buffer",
-    "call-bind",
-    "call-bind-apply-helpers",
-    "call-bound",
-    "cbor-sync",
-    "cipher-base",
-    "class-variance-authority",
-    "clsx",
-    "core-util-is",
-    "crc",
-    "create-hash",
-    "define-data-property",
-    "define-properties",
-    "dunder-proto",
-    "es-define-property",
-    "es-errors",
-    "es-object-atoms",
-    "events",
-    "for-each",
-    "generator-function",
-    "get-intrinsic",
-    "get-proto",
-    "gopd",
-    "has-property-descriptors",
-    "has-symbols",
-    "has-tostringtag",
-    "hash-base",
-    "hasown",
-    "ieee754",
-    "inherits",
-    "is-arguments",
-    "is-callable",
-    "is-generator-function",
-    "is-nan",
-    "is-regex",
-    "is-typed-array",
-    "isarray",
-    "jsbi",
-    "jsqr",
-    "math-intrinsics",
-    "md5.js",
-    "object-is",
-    "object-keys",
-    "object.assign",
-    "possible-typed-array-names",
-    "process-nextick-args",
-    "qrcode-generator",
-    "react",
-    "react-dom",
-    "readable-stream",
-    "ripemd160",
-    "safe-buffer",
-    "safe-regex-test",
-    "scheduler",
-    "set-function-length",
-    "sha.js",
-    "stream-browserify",
-    "string_decoder",
-    "tailwind-merge",
-    "to-buffer",
-    "tslib",
-    "typed-array-buffer",
-    "util",
-    "util-deprecate",
-    "uuid",
-    "vite-plugin-node-polyfills",
-    "which-typed-array",
-    "wxt",
-  ],
+  "connect.html": [...CONNECT_PACKAGES, ...KEYSTONE_PANEL_PACKAGES].sort(),
   "passkey.html": [
     "@aklinker1/zero-serialize-error",
     "@dicebear/core",
@@ -287,77 +297,7 @@ export const BUNDLE_PACKAGES = {
 export const LAZY_PACKAGES = {
   "approval.html": {
     // The Keystone panel, loaded the first time a Keystone wallet signs.
-    "apps/extension/src/hardware/panels/keystone.ts": [
-      "@keystonehq/alias-sampling",
-      "@keystonehq/bc-ur-registry",
-      "@keystonehq/bc-ur-registry-arweave",
-      "@ngraveio/bc-ur",
-      "assert",
-      "available-typed-arrays",
-      "base-x",
-      "base64-js",
-      "bs58",
-      "bs58check",
-      "buffer",
-      "call-bind",
-      "call-bind-apply-helpers",
-      "call-bound",
-      "cbor-sync",
-      "cipher-base",
-      "core-util-is",
-      "crc",
-      "create-hash",
-      "define-data-property",
-      "define-properties",
-      "dunder-proto",
-      "es-define-property",
-      "es-errors",
-      "es-object-atoms",
-      "events",
-      "for-each",
-      "generator-function",
-      "get-intrinsic",
-      "get-proto",
-      "gopd",
-      "has-property-descriptors",
-      "has-symbols",
-      "has-tostringtag",
-      "hash-base",
-      "hasown",
-      "ieee754",
-      "inherits",
-      "is-arguments",
-      "is-callable",
-      "is-generator-function",
-      "is-nan",
-      "is-regex",
-      "is-typed-array",
-      "isarray",
-      "jsbi",
-      "jsqr",
-      "math-intrinsics",
-      "md5.js",
-      "object-is",
-      "object-keys",
-      "object.assign",
-      "possible-typed-array-names",
-      "process-nextick-args",
-      "qrcode-generator",
-      "readable-stream",
-      "ripemd160",
-      "safe-buffer",
-      "safe-regex-test",
-      "set-function-length",
-      "sha.js",
-      "stream-browserify",
-      "string_decoder",
-      "to-buffer",
-      "typed-array-buffer",
-      "util",
-      "util-deprecate",
-      "uuid",
-      "which-typed-array",
-    ],
+    "apps/extension/src/hardware/panels/keystone.ts": KEYSTONE_PANEL_PACKAGES,
   },
 };
 
@@ -580,7 +520,7 @@ export function pageScriptProblems(fileName, bytes, modules) {
   /** @type {string[]} */
   const problems = [];
   if (bytes > maxBytes) problems.push(`${fileName} is ${bytes} bytes, over its ${maxBytes}-byte budget`);
-  for (const name of new Set(modules.map(packageOf).filter((name) => name !== null))) {
+  for (const name of packagesOf(modules)) {
     if (!packages.includes(name)) problems.push(`${fileName} contains npm package ${name}`);
   }
   return problems;
@@ -601,6 +541,7 @@ function main() {
   const extension = fileURLToPath(new URL("../apps/extension/.output/", import.meta.url));
   const out = join(extension, "chrome-mv3");
   const mapDir = join(extension, "bundle-modules");
+  const sizeOf = (/** @type {string} */ fileName) => statSync(join(out, fileName)).size;
   if (!existsSync(out) || !existsSync(mapDir)) throw new Error("no build found; run pnpm wxt:build first");
 
   const chunks = new Map(
@@ -627,7 +568,7 @@ function main() {
   for (const fileName of Object.keys(PAGE_SCRIPTS)) {
     const chunk = chunks.get(fileName);
     if (!chunk) throw new Error(`no module map for ${fileName}`);
-    problems.push(...pageScriptProblems(fileName, statSync(join(out, fileName)).size, chunk.modules));
+    problems.push(...pageScriptProblems(fileName, sizeOf(fileName), chunk.modules));
   }
 
   // Every built script must be accounted for: in a checked closure, or a
@@ -641,19 +582,10 @@ function main() {
   }
   for (const fileName of Object.keys(PAGE_SCRIPTS)) covered.add(fileName);
 
-  /** @type {string[]} */
-  const builtFiles = [];
-  const walk = (/** @type {string} */ dir, /** @type {string} */ prefix) => {
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full, `${prefix}${name}/`);
-      else if (name.endsWith(".js")) builtFiles.push(`${prefix}${name}`);
-    }
-  };
-  walk(out, "");
+  const builtFiles = /** @type {string[]} */ (readdirSync(out, { recursive: true })).filter((name) => name.endsWith(".js"));
   for (const fileName of builtFiles) {
     if (workerPatternOf(fileName) !== null) {
-      problems.push(...workerScriptProblems(fileName, statSync(join(out, fileName)).size));
+      problems.push(...workerScriptProblems(fileName, sizeOf(fileName)));
     }
   }
   problems.push(...uncoveredScriptProblems(builtFiles, covered), ...unusedWorkerPatterns(builtFiles));
@@ -666,11 +598,11 @@ function main() {
   process.stdout.write(
     `bundles ok: keyring loads ${chunkCount} chunk(s) of key code; ` +
       Object.keys(PAGE_SCRIPTS)
-        .map((fileName) => `${fileName} ${statSync(join(out, fileName)).size} bytes`)
+        .map((fileName) => `${fileName} ${sizeOf(fileName)} bytes`)
         .join(", ") +
       builtFiles
         .filter((fileName) => workerPatternOf(fileName) !== null)
-        .map((fileName) => `; worker ${fileName} ${statSync(join(out, fileName)).size} bytes`)
+        .map((fileName) => `; worker ${fileName} ${sizeOf(fileName)} bytes`)
         .join("") +
       "\n",
   );
