@@ -10,9 +10,9 @@ import {
 } from "@gleam/core/src/scan/index.ts";
 import { z } from "zod";
 import type { Queryable } from "../db";
-import { GithubUnavailableError, type GithubClient } from "./github";
+import type { GithubClient } from "./github";
 import { areaSummaries, byLeastCovered, canChallenge, functionKey, functionLooks } from "./areas";
-import { GITHUB_UNAVAILABLE, NO_RELEASE, failure, type ScanFailure } from "./errors";
+import { NO_RELEASE, failure, withGithub, type ScanFailure } from "./errors";
 import { openRelease } from "./places";
 
 /** Long enough for a session that scans several areas and signs them all at the end. */
@@ -51,7 +51,7 @@ export async function issueChallenge(
   now: Date,
   requested: ScanAreaId | null = null,
 ): Promise<{ ok: true; challenge: IssuedChallenge } | ScanFailure> {
-  try {
+  return withGithub(async () => {
     const latest = await github.latestRelease();
     if (!latest) return NO_RELEASE;
     const { functions } = await github.filesAt(latest.commit);
@@ -105,8 +105,5 @@ export async function issueChallenge(
       ok: true,
       challenge: { challenge: id, release: latest.release, commit: latest.commit, area, functions: picked, expiresAt: expiresAt.toISOString() },
     };
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  });
 }

@@ -2,9 +2,9 @@ import { isAttestationId, isScanAreaId, roundReward, type ScanAreaId } from "@gl
 import { scanReward, walletRoundsDone } from "./attestations";
 import { z } from "zod";
 import type { Queryable } from "../db";
-import { GithubUnavailableError, type GithubClient } from "./github";
+import type { GithubClient } from "./github";
 import { areaSummaries, areasLeft, walletAreas, type AreaSummary } from "./areas";
-import { GITHUB_UNAVAILABLE, NO_RELEASE, failure, type ScanFailure } from "./errors";
+import { NO_RELEASE, failure, withGithub, type ScanFailure } from "./errors";
 import { paidPlaces } from "./places";
 
 /** `GET /scan/areas`: the latest release's areas in tier order. */
@@ -12,15 +12,12 @@ export async function listAreas(
   db: Queryable,
   github: GithubClient,
 ): Promise<{ ok: true; body: { release: string; areas: AreaSummary[] } } | ScanFailure> {
-  try {
+  return withGithub(async () => {
     const latest = await github.latestRelease();
     if (!latest) return NO_RELEASE;
     const { functions } = await github.filesAt(latest.commit);
     return { ok: true, body: { release: latest.release, areas: await areaSummaries(db, latest.release, functions) } };
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  });
 }
 
 /** `GET /scan/next`; amounts are atomic-unit integer strings. */
@@ -70,7 +67,7 @@ export async function scanNext(
     );
   }
 
-  try {
+  return withGithub(async () => {
     const nextRound = (await walletRoundsDone(db, row.address, row.release)) + 1;
     const places = await paidPlaces(db, github, row.release);
     const nextReward = places.left > 0 ? roundReward(await scanReward(db, now), nextRound) : 0n;
@@ -95,8 +92,5 @@ export async function scanNext(
         suggested: left[0]?.id ?? null,
       },
     };
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  });
 }

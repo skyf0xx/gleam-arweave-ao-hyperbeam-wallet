@@ -1,4 +1,5 @@
 import type { ScanIssue } from "@gleam/core/src/scan/index.ts";
+import { GithubUnavailableError } from "./github";
 
 /**
  * Codes the scan endpoints answer with, besides the answer-check codes in
@@ -89,3 +90,13 @@ export const GITHUB_UNAVAILABLE: ScanFailure = {
   ),
   retryAfterSeconds: 60,
 };
+
+/** Runs `fn`, answering a GitHub outage with `GITHUB_UNAVAILABLE`; other errors propagate. */
+export async function withGithub<T>(fn: () => Promise<T>): Promise<T | ScanFailure> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
+    throw error;
+  }
+}

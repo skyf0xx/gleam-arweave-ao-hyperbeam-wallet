@@ -26,7 +26,7 @@ import { GithubUnavailableError, type GithubClient, type ReleaseFunction } from 
 import { owner, walletSigned } from "../request-fields";
 import { answeredFunctions, areaSummaries, areasLeft, examinedFunctions, functionKey, walletAreas, type AreaSummary } from "./areas";
 import {
-  GITHUB_UNAVAILABLE,
+  withGithub,
   NO_RELEASE,
   failure,
   failureFromIssues,
@@ -190,7 +190,7 @@ export async function checkAttestation(
 ): Promise<{ ok: true; result: CheckResult } | ScanFailure> {
   const parsed = parseAttestation(request.attestation);
   if (!parsed.ok) return invalidAttestation(parsed.issues);
-  try {
+  return withGithub(async () => {
     const checked = await checkAgainstRelease(db, github, parsed.attestation, now);
     if (!checked.ok) return checked;
     if (request.address !== undefined) {
@@ -209,10 +209,7 @@ export async function checkAttestation(
         area: checked.area,
       },
     };
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  });
 }
 
 /**
@@ -291,15 +288,8 @@ export async function submitAttestation(
   }
 
   // 2 and 3. Release, commit, challenge and answers.
-  let checked: Checked;
-  try {
-    const outcome = await checkAgainstRelease(db, github, attestation, now);
-    if (!outcome.ok) return outcome;
-    checked = outcome;
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  const checked = await withGithub(() => checkAgainstRelease(db, github, attestation, now));
+  if (!checked.ok) return checked;
 
   const outcome = await db.transaction(async (tx): Promise<{ ok: true; result: SubmitResult } | ScanFailure> => {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`attest:${attestation.release}`]);
@@ -585,13 +575,10 @@ export async function countAttestations(
   github: GithubClient,
   release: string,
 ): Promise<{ ok: true; release: string; total: number; paidPlacesLeft: number; paidScans: number } | ScanFailure> {
-  try {
+  return withGithub(async () => {
     const [total, places] = await Promise.all([attestationTotal(db, release), paidPlaces(db, github, release)]);
     return { ok: true, release, total, paidPlacesLeft: places.left, paidScans: places.taken };
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  });
 }
 
 /**
@@ -610,7 +597,7 @@ export async function listAttestations(
   const cached = cache.page(key);
   if (cached) return { ok: true, listing: cached };
 
-  try {
+  return withGithub(async () => {
     let release: string;
     let commit: string;
     let isLatest: boolean;
@@ -714,10 +701,7 @@ export async function listAttestations(
     };
     cache.setPage(key, listing);
     return { ok: true, listing };
-  } catch (error) {
-    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
-    throw error;
-  }
+  });
 }
 
 /**
