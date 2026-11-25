@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlatform } from "../../../app-platform/context";
 import { capabilitiesFor, isHardwareWalletMethod, type BackupStatus, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
@@ -20,6 +21,7 @@ import { errorText } from "../../../i18n/errors";
 import { backupDriveName } from "../../backup/src/BackupView";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 import { useBackupStatus } from "../../backup/src/useBackup";
+import { WALLET_STATE_QUERY_KEY } from "../../activity/src/useWalletState";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -71,10 +73,7 @@ export interface WalletDetailViewProps {
   requestDownloadPermission?: RequestDownloadsPermission;
 }
 
-type Step =
-  | { kind: "detail" }
-  | { kind: "export-password"; submitting: boolean; serverError?: string }
-  | { kind: "remove-confirm"; removing: boolean; serverError?: string };
+type Step = "detail" | "export-password" | "remove-confirm";
 
 export function WalletDetailView({
   runtime,
@@ -91,10 +90,9 @@ export function WalletDetailView({
   const { copied: addressCopied, copy: copyAddress } = useCopy(wallet.address);
 
   const [name, setName] = useState(wallet.name);
-  const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [backupConfirmedAt, setBackupConfirmedAt] = useState(wallet.backupConfirmedAt);
-  const [step, setStep] = useState<Step>({ kind: "detail" });
+  const [step, setStep] = useState<Step>("detail");
   const [savedAs, setSavedAs] = useState<string | null>(null);
   const cloudProvider = capabilities.cloudBackup;
   const createdAt = wallet.createdAt;
@@ -104,87 +102,78 @@ export function WalletDetailView({
   const trimmedName = name.trim();
   const nameChanged = trimmedName.length > 0 && trimmedName !== wallet.name;
 
-  const handleRename = async () => {
+  const queryClient = useQueryClient();
+  const renameMutation = useMutation({
+    mutationFn: (newName: string) =>
+      runtime.send<{ walletId: string; name: string }, void>({ type: "renameWallet", payload: { walletId: wallet.id, name: newName } }),
+    onSuccess: (_result, newName) => {
+      void queryClient.invalidateQueries({ queryKey: WALLET_STATE_QUERY_KEY });
+      onRenamed(newName);
+    },
+    onError: (caught) => setNameError(errorText(caught)),
+  });
+  const savingName = renameMutation.isPending;
+
+  const handleRename = () => {
     if (!nameChanged || savingName) return;
-    setSavingName(true);
     setNameError(null);
-    try {
-      await runtime.send<{ walletId: string; name: string }, void>({
-        type: "renameWallet",
-        payload: { walletId: wallet.id, name: trimmedName },
-      });
-      onRenamed(trimmedName);
-    } catch (error) {
-      setNameError(errorText(error));
-    } finally {
-      setSavingName(false);
-    }
+    renameMutation.mutate(trimmedName);
   };
 
-  const handleExportPassword = async (password: string) => {
-    setStep({ kind: "export-password", submitting: true });
-    try {
-      const result = await downloadKeyfile(runtime, { walletId: wallet.id, password }, requestDownloadPermission ?? downloads.requestPermission);
+  const [exportError, setExportError] = useState<string | undefined>(undefined);
+  const exportMutation = useMutation({
+    mutationFn: (password: string) =>
+      downloadKeyfile(runtime, { walletId: wallet.id, password }, requestDownloadPermission ?? downloads.requestPermission),
+    onSuccess: (result) => {
       if (!result.ok) {
-        setStep({ kind: "export-password", submitting: false, serverError: keyfileDownloadError(result) ?? undefined });
+        setExportError(keyfileDownloadError(result) ?? undefined);
         return;
       }
       // The background has already recorded the backup.
       setSavedAs(result.filename);
       setBackupConfirmedAt((current) => current ?? Date.now());
-      setStep({ kind: "detail" });
-    } catch (error) {
-      setStep({
-        kind: "export-password",
-        submitting: false,
-        serverError: errorText(error),
-      });
-    }
-  };
+      setStep("detail");
+    },
+    onError: (caught) => setExportError(errorText(caught)),
+  });
 
-  const handleRemove = async () => {
-    setStep({ kind: "remove-confirm", removing: true });
-    try {
-      await runtime.send<{ walletId: string }, void>({
-        type: "deleteWallet",
-        payload: { walletId: wallet.id },
-      });
+  const removeMutation = useMutation({
+    mutationFn: () => runtime.send<{ walletId: string }, void>({ type: "deleteWallet", payload: { walletId: wallet.id } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: WALLET_STATE_QUERY_KEY });
       onRemoved();
-    } catch (error) {
-      setStep({
-        kind: "remove-confirm",
-        removing: false,
-        serverError: errorText(error),
-      });
-    }
-  };
+    },
+  });
 
   const hardware = isHardwareWalletMethod(wallet.method);
   const watchOnly = wallet.method === "watch";
   const methodLabel = walletMethodLabel(t, wallet.method);
 
-  if (step.kind === "remove-confirm") {
+  if (step === "remove-confirm") {
     return (
       <RemoveConfirmStep
         walletName={wallet.name}
         hardware={hardware}
         watchOnly={watchOnly}
         backedUp={backupConfirmedAt !== null}
-        onBack={() => setStep({ kind: "detail" })}
-        onConfirm={() => void handleRemove()}
-        removing={step.removing}
-        serverError={step.serverError}
+        onBack={() => setStep("detail")}
+        onConfirm={() => removeMutation.mutate()}
+        removing={removeMutation.isPending || removeMutation.isSuccess}
+        serverError={removeMutation.isError ? errorText(removeMutation.error) : undefined}
       />
     );
   }
 
-  if (step.kind === "export-password") {
+  if (step === "export-password") {
     return (
       <ExportPasswordStep
-        onBack={() => setStep({ kind: "detail" })}
-        onSubmit={(password) => void handleExportPassword(password)}
-        submitting={step.submitting}
-        serverError={step.serverError}
+        onBack={() => setStep("detail")}
+        onSubmit={(password) => {
+          setExportError(undefined);
+          exportMutation.mutate(password);
+        }}
+        submitting={exportMutation.isPending}
+        serverError={exportError}
       />
     );
   }
@@ -220,7 +209,7 @@ export function WalletDetailView({
             setName(event.target.value);
             setNameError(null);
           }}
-          onBlur={() => void handleRename()}
+          onBlur={handleRename}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.currentTarget.blur();
@@ -232,7 +221,10 @@ export function WalletDetailView({
         {capabilitiesFor(wallet.method).exportKey ? (
           <button
             type="button"
-            onClick={() => setStep({ kind: "export-password", submitting: false })}
+            onClick={() => {
+            setExportError(undefined);
+            setStep("export-password");
+          }}
             aria-describedby="keyfile-backup-status"
             className="flex w-full items-center gap-2.5 gleam-hover-frost rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05] silica:hover:bg-foreground/[0.03]"
           >
@@ -259,7 +251,10 @@ export function WalletDetailView({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => setStep({ kind: "remove-confirm", removing: false })}
+          onClick={() => {
+            removeMutation.reset();
+            setStep("remove-confirm");
+          }}
           className="mt-auto text-warning hover:text-warning"
         >
           {t("walletDetail.removeWallet")}
