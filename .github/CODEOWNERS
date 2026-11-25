@@ -59,6 +59,10 @@
 /packages/core/src/models/passkey.ts                                       @skyf0xx
 /packages/core/src/models/backup.ts                                        @skyf0xx
 /packages/app/src/keyfile/                                                 @skyf0xx
+/packages/core/src/models/guards.ts                                        @skyf0xx
+/packages/core/src/models/async.ts                                         @skyf0xx
+/packages/core/src/ports/key-watchers.ts                                   @skyf0xx
+/packages/runtime/src/schema-guard.ts                                      @skyf0xx
 
 # 2 Signing
 /packages/core/src/ao/transfer.ts                                          @skyf0xx
@@ -84,6 +88,9 @@
 /packages/app/src/screens/activity/src/validateSendAmount.ts               @skyf0xx
 /packages/app/src/screens/activity/src/useSubmitTransfer.ts                @skyf0xx
 /packages/core/src/models/signing.ts                                       @skyf0xx
+/packages/core/src/models/arweave-id.ts                                    @skyf0xx
+/packages/core/src/models/bytes.ts                                         @skyf0xx
+/apps/extension/src/hardware/open-connect.ts                               @skyf0xx
 
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
@@ -133,6 +140,7 @@
 /packages/app/src/screens/browser/src/BrowserView.tsx                     @skyf0xx
 /packages/app/src/screens/browser/src/address.ts                          @skyf0xx
 /apps/mobile/src/adapters/dapp-browser.ts                                 @skyf0xx
+/packages/core/src/arweave/graphql-schema.ts                               @skyf0xx
 
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
@@ -165,6 +173,8 @@
 /packages/app/src/account-avatar.ts                                        @skyf0xx
 /packages/ui/src/components/wallet/AccountAvatar.tsx                       @skyf0xx
 /packages/app/src/screens/receive/src/ReceiveView.tsx                     @skyf0xx
+/apps/extension/src/popup-window.ts                                        @skyf0xx
+/packages/app/src/hostname.ts                                              @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/app/src/screens/network-peers/                                    @skyf0xx
@@ -184,6 +194,7 @@
 /lefthook.yml                                                              @skyf0xx
 /.gitleaks.toml                                                            @skyf0xx
 /scripts/release-gate.mjs                                                  @skyf0xx
+/scripts/is-main.mjs                                                       @skyf0xx
 /scripts/release.mjs                                                       @skyf0xx
 /scripts/app-versions.mjs                                                  @skyf0xx
 /scripts/verify-release.sh                                                 @skyf0xx
