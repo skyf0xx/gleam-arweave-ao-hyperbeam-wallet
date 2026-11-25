@@ -1,29 +1,15 @@
-import { useEffect, useState } from "react";
 import type { BackupProvider, BackupStatus, RuntimePort } from "@gleam/core";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
+import { useBackupStatus } from "../../backup/src/useBackup";
 import { backupDriveName, backupSummary } from "../../backup/src/BackupView";
 
 /** Security's Backup row: where the backup lives and how current it is. The Backup screen does the rest. */
 export function BackupSection({ runtime, provider, onOpen }: { runtime: RuntimePort; provider: BackupProvider; onOpen: () => void }) {
   const t = useT();
-  const [status, setStatus] = useState<BackupStatus | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }).then(
-      (next) => {
-        if (!cancelled) setStatus(next);
-      },
-      () => {
-        if (!cancelled) setStatus({ provider, enabled: false, lastBackupAt: null, problem: null });
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, provider]);
+  const statusQuery = useBackupStatus(runtime);
+  const status: BackupStatus | null = statusQuery.data ?? (statusQuery.isError ? { provider, enabled: false, lastBackupAt: null, problem: null } : null);
 
   const summary = status ? backupSummary(t, status) : "";
   const current = status?.enabled && status.problem === null;

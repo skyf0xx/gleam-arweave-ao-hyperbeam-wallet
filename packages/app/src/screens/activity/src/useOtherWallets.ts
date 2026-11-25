@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { RuntimePort, WalletState } from "@gleam/core";
+import type { RuntimePort } from "@gleam/core";
+import { walletStateQuery } from "./useWalletState";
 
 /**
  * The vault's other wallets (every stored wallet except `excludeWalletId`)
@@ -12,9 +13,7 @@ import type { RuntimePort, WalletState } from "@gleam/core";
  */
 export function useOtherWallets(runtime: RuntimePort, excludeWalletId: string) {
   return useQuery({
-    queryKey: ["wallets", "state"],
-    queryFn: () =>
-      runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } }),
+    ...walletStateQuery(runtime),
     select: (state) => state.wallets.filter((wallet) => wallet.id !== excludeWalletId),
   });
 }

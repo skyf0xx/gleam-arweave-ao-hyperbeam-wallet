@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -7,6 +7,8 @@ import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useWalletState, WALLET_STATE_QUERY_KEY } from "../../activity/src/useWalletState";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 // The label sits inside the name's truncating span, so a narrow row cuts
@@ -45,13 +47,6 @@ export interface WalletSwitcherViewProps {
   onManage: (walletId: string) => void;
 }
 
-interface LoadState {
-  wallets: WalletSummary[];
-  activeWalletId: string | null;
-  loading: boolean;
-  error: string | null;
-}
-
 /** "Wallet 2" before "Wallet 10", and case and accents don't split names apart. */
 export function sortByName(wallets: WalletSummary[], locale: string): WalletSummary[] {
   return [...wallets].sort((a, b) => a.name.localeCompare(b.name, locale, { numeric: true, sensitivity: "base" }));
@@ -60,76 +55,63 @@ export function sortByName(wallets: WalletSummary[], locale: string): WalletSumm
 export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalletId = null, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
   const t = useT();
   const locale = useLocale();
-  const [state, setState] = useState<LoadState>({
-    wallets: initialWallets ?? [],
-    activeWalletId: initialActiveWalletId,
-    loading: !initialWallets?.length,
-    error: null,
+  const queryClient = useQueryClient();
+  // Shown at once, so the remount that follows a switch doesn't flash a skeleton.
+  const walletsQuery = useWalletState(runtime, {
+    ...(initialWallets?.length
+      ? { placeholderData: { wallets: initialWallets, activeWalletId: initialActiveWalletId, session: null } }
+      : {}),
   });
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const wallets = walletsQuery.data?.wallets ?? [];
+  const activeWalletId = walletsQuery.data?.activeWalletId ?? null;
+  const switchMutation = useMutation({
+    mutationFn: (walletId: string) => runtime.send<{ walletId: string }, void>({ type: "switchWallet", payload: { walletId } }),
+  });
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const error = switchError ?? (walletsQuery.isError ? errorText(walletsQuery.error) : null);
+  const switchingId = switchMutation.isPending ? switchMutation.variables : null;
 
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: prev.wallets.length === 0, error: null }));
-    try {
-      const result = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
-      setState({
-        wallets: result.wallets,
-        activeWalletId: result.activeWalletId,
-        loading: false,
-        error: null,
-      });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: errorText(error),
-      }));
-    }
-  }, [runtime]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleSwitch = async (walletId: string) => {
-    if (walletId === state.activeWalletId) return;
-    setSwitchingId(walletId);
-    try {
-      await runtime.send<{ walletId: string }, void>({ type: "switchWallet", payload: { walletId } });
-      setState((prev) => ({ ...prev, activeWalletId: walletId }));
-      onSwitched(walletId);
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: errorText(error),
-      }));
-    } finally {
-      setSwitchingId(null);
-    }
+  const handleSwitch = (walletId: string) => {
+    if (walletId === activeWalletId) return;
+    switchMutation.mutate(walletId, {
+      onSuccess: () => {
+        queryClient.setQueryData<WalletState>(WALLET_STATE_QUERY_KEY, (state) => (state ? { ...state, activeWalletId: walletId } : state));
+        onSwitched(walletId);
+      },
+      onError: (caught) => setSwitchError(errorText(caught)),
+    });
   };
 
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label={t("walletSwitcher.switchWallet")}>
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {error ? (
+        <NetworkErrorBanner
+          onRetry={() => {
+            setSwitchError(null);
+            void walletsQuery.refetch();
+          }}
+          retrying={walletsQuery.isFetching}
+        />
+      ) : null}
 
       <ScreenHeader title={t("walletSwitcher.wallets")} onBack={onBack} />
 
       <div className="px-6 phone:px-5 pb-3 pt-9 phone:pt-4">
         <div>
-          {state.loading ? (
+          {walletsQuery.isPending ? (
             <>
               <SkeletonRow />
               <SkeletonRow />
             </>
           ) : (
             // By name, never active-first: a list that reshuffles on every switch loses people.
-            sortByName(state.wallets, locale).map((wallet) => (
+            sortByName(wallets, locale).map((wallet) => (
               <WalletSwitcherRow
                 key={wallet.id}
                 wallet={wallet}
-                active={wallet.id === state.activeWalletId}
+                active={wallet.id === activeWalletId}
                 switching={switchingId === wallet.id}
-                onSwitch={() => void handleSwitch(wallet.id)}
+                onSwitch={() => handleSwitch(wallet.id)}
                 onManage={() => onManage(wallet.id)}
               />
             ))

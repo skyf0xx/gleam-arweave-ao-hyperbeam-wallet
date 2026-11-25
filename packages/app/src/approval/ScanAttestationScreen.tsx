@@ -1,11 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
-  type PointsMembership,
   type RuntimePort,
   type ScanAttestationApprovalPreview,
-  type WalletState,
   type WalletSummary,
 } from "@gleam/core";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
@@ -22,6 +20,8 @@ import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
 import { Field } from "../transfer-review/FieldLabel";
 import { ApprovalActions } from "./ApprovalActions";
+import { usePointsMemberships } from "../screens/points/src/usePoints";
+import { useWalletState } from "../screens/activity/src/useWalletState";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every
@@ -56,26 +56,16 @@ type Membership =
 
 function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSign }: ScanAttestationScreenProps) {
   const t = useT();
-  const [membership, setMembership] = useState<Membership>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      runtime.send<void, Record<string, PointsMembership>>({ type: "getPointsMemberships", payload: undefined }),
-      runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } }),
-    ])
-      .then(([memberships, state]) => {
-        if (cancelled) return;
-        const wallet = state.wallets.find((candidate) => candidate.id === preview.walletId) ?? null;
-        setMembership({ status: memberships[preview.walletId] ? "joined" : "not-joined", wallet });
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setMembership({ status: "error", message: errorText(error) });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, preview.walletId]);
+  const membershipsQuery = usePointsMemberships(runtime);
+  const stateQuery = useWalletState(runtime);
+  const [joinedHere, setJoinedHere] = useState(false);
+  const failure = membershipsQuery.error ?? stateQuery.error;
+  const wallet = stateQuery.data?.wallets.find((candidate) => candidate.id === preview.walletId) ?? null;
+  const membership: Membership = failure
+    ? { status: "error", message: errorText(failure) }
+    : membershipsQuery.data === undefined || stateQuery.data === undefined
+      ? { status: "loading" }
+      : { status: joinedHere || membershipsQuery.data[preview.walletId] ? "joined" : "not-joined", wallet };
 
   return (
     <div className="flex min-h-full flex-col">
@@ -99,7 +89,7 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSi
         <JoinFirst
           runtime={runtime}
           walletId={preview.walletId}
-          onJoined={() => setMembership({ status: "joined", wallet: membership.wallet })}
+          onJoined={() => setJoinedHere(true)}
           onCancel={onReject}
         />
       ) : (

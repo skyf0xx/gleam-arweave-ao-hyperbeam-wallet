@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
 import { hostnameOf } from "../../../hostname";
 import { usePlatform } from "../../../app-platform/context";
-import type { AutoLockTimeout, Grant, LockSettings, NetworkSettings, RuntimePort, ThemePreference } from "@gleam/core";
+import type { AutoLockTimeout, RuntimePort, ThemePreference } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow } from "@gleam/ui/src/primitives/option-list.tsx";
 import { SegmentedRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useDisplaySettings } from "../../../display-settings";
+import { useLockSettings } from "../../lock-settings/src/useLockSettings";
+import { useNetworkSettings } from "../../main-screen/src/useNetworkSettings";
+import { useConnectedApps } from "../../connected-apps/src/useConnectedApps";
 import { AboutBuild } from "./AboutBuild";
 import { useTheme } from "./useTheme";
 import { LANGUAGES, useLanguage, useT, type MessageKey } from "../../../i18n";
@@ -34,13 +36,6 @@ export interface SettingsHomeViewProps {
   onOpenFeedback: () => void;
 }
 
-interface LoadState {
-  lockSettings: LockSettings | null;
-  networkSettings: NetworkSettings | null;
-  connectedApps: number | null;
-  loading: boolean;
-}
-
 export function SettingsHomeView({
   runtime,
   onBack,
@@ -54,28 +49,15 @@ export function SettingsHomeView({
   const t = useT();
   const language = useLanguage();
   const { version } = platform.buildInfo;
-  const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, connectedApps: null, loading: true });
+  const lockQuery = useLockSettings(runtime);
+  const networkQuery = useNetworkSettings(runtime);
+  const appsQuery = useConnectedApps(runtime);
+  const loading = lockQuery.isPending || networkQuery.isPending || appsQuery.isPending;
+  const lockSettings = lockQuery.data ?? null;
+  const networkSettings = networkQuery.data ?? null;
+  const connectedApps = appsQuery.data?.length ?? null;
   const theme = useTheme(runtime);
   const { settings: display } = useDisplaySettings(runtime);
-
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true }));
-    const [lockSettings, networkSettings, connectedApps] = await Promise.allSettled([
-      runtime.send<void, LockSettings>({ type: "getLockSettings", payload: undefined }),
-      runtime.send<void, NetworkSettings>({ type: "getNetworkSettings", payload: undefined }),
-      runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined }),
-    ]);
-    setState({
-      lockSettings: lockSettings.status === "fulfilled" ? lockSettings.value : null,
-      networkSettings: networkSettings.status === "fulfilled" ? networkSettings.value : null,
-      connectedApps: connectedApps.status === "fulfilled" ? (connectedApps.value?.length ?? null) : null,
-      loading: false,
-    });
-  }, [runtime]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const languageName = LANGUAGES.find((entry) => entry.code === language)?.name;
 
@@ -116,7 +98,7 @@ export function SettingsHomeView({
           {onOpenLockSettings ? (
             <OptionRow
               title={t("settingsHome.security")}
-              value={state.loading ? undefined : state.lockSettings ? t(TIMEOUT_KEYS[state.lockSettings.autoLockTimeout]) : "—"}
+              value={loading ? undefined : lockSettings ? t(TIMEOUT_KEYS[lockSettings.autoLockTimeout]) : "—"}
               onClick={onOpenLockSettings}
             />
           ) : null}
@@ -127,7 +109,7 @@ export function SettingsHomeView({
           />
           <OptionRow
             title={t("settingsHome.networkTitle")}
-            value={state.loading ? undefined : state.networkSettings ? hostnameOf(state.networkSettings.gatewayUrl) : "—"}
+            value={loading ? undefined : networkSettings ? hostnameOf(networkSettings.gatewayUrl) : "—"}
             onClick={onOpenNetworkPeers}
           />
         </div>
@@ -135,7 +117,7 @@ export function SettingsHomeView({
         <div className="flex flex-col">
           <OptionRow
             title={t("settingsHome.connectedApps")}
-            count={state.connectedApps ?? undefined}
+            count={connectedApps ?? undefined}
             onClick={onOpenConnectedApps}
           />
           <OptionRow external title={t("settingsHome.sendFeedback")} onClick={onOpenFeedback} />

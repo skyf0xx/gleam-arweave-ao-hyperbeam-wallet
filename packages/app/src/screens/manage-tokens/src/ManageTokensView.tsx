@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isValidArweaveAddress, type RuntimePort, type TokenBalance } from "@gleam/core";
 import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -23,54 +23,28 @@ export interface ManageTokensViewProps {
 }
 
 
-interface LoadState {
-  processIds: string[];
-  discovered: TokenBalance[];
-  balances: Map<string, TokenBalance>;
-  loading: boolean;
-  error: string | null;
-}
-
 export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewProps) {
   const t = useT();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<LoadState>({
-    processIds: [],
-    discovered: [],
-    balances: new Map(),
-    loading: true,
-    error: null,
-  });
-  const [newProcessId, setNewProcessId] = useState("");
-  const [preview, setPreview] = useState<TokenBalance | null>(null);
-  const [previewing, setPreviewing] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  // The id in the field now, so a preview that resolves after the field changed is dropped.
-  const currentIdRef = useRef("");
-
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
+  const watchedQuery = useQuery({
+    queryKey: walletQueryKeys.watchedTokens(address),
+    queryFn: async () => {
       const [processIds, tokenBalances] = await Promise.all([
         runtime.send<{ address: string }, string[]>({ type: "getWatchedTokens", payload: { address } }),
         runtime.send<{ address: string }, TokenBalance[]>({ type: "getTokenBalances", payload: { address } }),
       ]);
-      const balances = new Map(tokenBalances.map((balance) => [balance.processId, balance]));
-      const discovered = tokenBalances.filter((balance) => balance.source === "discovered");
-      setState({ processIds, discovered, balances, loading: false, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: errorText(error),
-      }));
-    }
-  }, [runtime, address]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+      return { processIds, discovered: tokenBalances.filter((balance) => balance.source === "discovered") };
+    },
+  });
+  const processIds = watchedQuery.data?.processIds ?? [];
+  const discovered = watchedQuery.data?.discovered ?? [];
+  const error = watchedQuery.isError ? errorText(watchedQuery.error) : null;
+  const [newProcessId, setNewProcessId] = useState("");
+  const [preview, setPreview] = useState<TokenBalance | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  // The id in the field now, so a preview that resolves after the field changed is dropped.
+  const currentIdRef = useRef("");
 
   const invalidateBalances = () => {
     void queryClient.invalidateQueries({ queryKey: walletQueryKeys.balances(address) });
@@ -81,7 +55,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       setAddError(t("manageTokens.badIdLength", { length: processId.length }));
       return;
     }
-    if (state.processIds.includes(processId) || state.discovered.some((token) => token.processId === processId)) {
+    if (processIds.includes(processId) || discovered.some((token) => token.processId === processId)) {
       setAddError(t("manageTokens.alreadyListed"));
       return;
     }
@@ -102,26 +76,26 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
     }
   };
 
-  const handleConfirmAdd = async () => {
-    if (!preview) return;
-    setAdding(true);
-    try {
-      await runtime.send<{ address: string; processId: string }, TokenBalance>({
-        type: "addWatchedToken",
-        payload: { address, processId: preview.processId },
-      });
+  const addMutation = useMutation({
+    mutationFn: (processId: string) =>
+      runtime.send<{ address: string; processId: string }, TokenBalance>({ type: "addWatchedToken", payload: { address, processId } }),
+    onSuccess: () => {
       invalidateBalances();
+      void queryClient.invalidateQueries({ queryKey: walletQueryKeys.watchedTokens(address) });
       onBack();
-    } catch (error) {
-      setAddError(errorText(error));
-      setAdding(false);
-    }
+    },
+    onError: (caught) => setAddError(errorText(caught)),
+  });
+  const adding = addMutation.isPending || addMutation.isSuccess;
+
+  const handleConfirmAdd = () => {
+    if (preview) addMutation.mutate(preview.processId);
   };
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("manageTokens.add")} onBack={onBack} />
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {error ? <NetworkErrorBanner onRetry={() => void watchedQuery.refetch()} retrying={watchedQuery.isFetching} /> : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-6 phone:pt-4">
         <div>
@@ -179,7 +153,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
               </div>
             ) : null}
             {preview ? (
-              <Button className="mt-1" disabled={adding} onClick={() => void handleConfirmAdd()}>
+              <Button className="mt-1" disabled={adding} onClick={() => handleConfirmAdd()}>
                 {adding
                   ? t("manageTokens.adding")
                   : preview.ticker === preview.processId

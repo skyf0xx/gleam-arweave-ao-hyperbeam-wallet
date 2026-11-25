@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import { capabilitiesFor, isHardwareWalletMethod, type BackupStatus, type RuntimePort, type WalletSummary } from "@gleam/core";
 import {
@@ -19,6 +19,7 @@ import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { backupDriveName } from "../../backup/src/BackupView";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
+import { useBackupStatus } from "../../backup/src/useBackup";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -95,23 +96,10 @@ export function WalletDetailView({
   const [backupConfirmedAt, setBackupConfirmedAt] = useState(wallet.backupConfirmedAt);
   const [step, setStep] = useState<Step>({ kind: "detail" });
   const [savedAs, setSavedAs] = useState<string | null>(null);
-  const [cloudBackup, setCloudBackup] = useState<string | null>(null);
-
   const cloudProvider = capabilities.cloudBackup;
   const createdAt = wallet.createdAt;
-  useEffect(() => {
-    if (!cloudProvider) return;
-    let cancelled = false;
-    runtime.send<void, BackupStatus>({ type: "getBackupStatus", payload: undefined }).then(
-      (status) => {
-        if (!cancelled) setCloudBackup(cloudBackupOf(status, { createdAt }));
-      },
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [runtime, cloudProvider, createdAt]);
+  const backupQuery = useBackupStatus(runtime, Boolean(cloudProvider));
+  const cloudBackup = backupQuery.data ? cloudBackupOf(backupQuery.data, { createdAt }) : null;
 
   const trimmedName = name.trim();
   const nameChanged = trimmedName.length > 0 && trimmedName !== wallet.name;

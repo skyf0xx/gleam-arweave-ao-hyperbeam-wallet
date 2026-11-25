@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   BackupProvider,
   AutoLockTimeout,
-  LockSettings,
   PasskeyStatus,
   RuntimePort,
 } from "@gleam/core";
@@ -15,6 +14,7 @@ import {
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { IconRow, SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
+import { useLockNow, useLockSettings, useSetAutoLockTimeout } from "./useLockSettings";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import { BackupSection } from "./BackupSection";
@@ -53,12 +53,6 @@ export interface LockSettingsViewProps {
   backup?: { provider: BackupProvider; open: () => void };
 }
 
-interface LoadState {
-  settings: LockSettings | null;
-  loading: boolean;
-  error: string | null;
-}
-
 export function LockSettingsView({
   runtime,
   onBack,
@@ -70,77 +64,36 @@ export function LockSettingsView({
   backup,
 }: LockSettingsViewProps) {
   const t = useT();
-  const [state, setState] = useState<LoadState>({
-    settings: null,
-    loading: true,
-    error: null,
-  });
-  const [locking, setLocking] = useState(false);
-  const [savingTimeout, setSavingTimeout] = useState<AutoLockTimeout | null>(
-    null,
-  );
+  const settingsQuery = useLockSettings(runtime);
+  const settings = settingsQuery.data ?? null;
+  const lockNow = useLockNow(runtime);
+  const setTimeoutMutation = useSetAutoLockTimeout(runtime);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? (settingsQuery.isError ? errorText(settingsQuery.error) : null);
+  const locking = lockNow.isPending || lockNow.isSuccess;
+  const savingTimeout = setTimeoutMutation.isPending ? setTimeoutMutation.variables : null;
 
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const settings = await runtime.send<void, LockSettings>({
-        type: "getLockSettings",
-        payload: undefined,
-      });
-      setState({ settings, loading: false, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: errorText(error),
-      }));
-    }
-  }, [runtime]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleLockNow = async () => {
-    setLocking(true);
-    try {
-      await runtime.send<void, void>({
-        type: "lockWallet",
-        payload: undefined,
-      });
-      onLocked();
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: errorText(error),
-      }));
-      setLocking(false);
-    }
+  const handleLockNow = () => {
+    lockNow.mutate(undefined, {
+      onSuccess: onLocked,
+      onError: (caught) => setActionError(errorText(caught)),
+    });
   };
 
-  const handleSelectTimeout = async (autoLockTimeout: AutoLockTimeout) => {
-    if (state.settings?.autoLockTimeout === autoLockTimeout) return;
-    setSavingTimeout(autoLockTimeout);
-    try {
-      await runtime.send<LockSettings, void>({
-        type: "setLockSettings",
-        payload: { autoLockTimeout },
-      });
-      setState((prev) => ({ ...prev, settings: { autoLockTimeout } }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: errorText(error),
-      }));
-    } finally {
-      setSavingTimeout(null);
-    }
+  const handleSelectTimeout = (autoLockTimeout: AutoLockTimeout) => {
+    if (settings?.autoLockTimeout === autoLockTimeout) return;
+    setTimeoutMutation.mutate(autoLockTimeout, { onError: (caught) => setActionError(errorText(caught)) });
+  };
+
+  const retry = () => {
+    setActionError(null);
+    void settingsQuery.refetch();
   };
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("lockSettings.title")} onBack={onBack} />
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {error ? <NetworkErrorBanner onRetry={retry} retrying={settingsQuery.isFetching} /> : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10 phone:pb-8">
@@ -149,7 +102,7 @@ export function LockSettingsView({
             title={locking ? t("lockSettings.locking") : t("lockSettings.lockNow")}
             description={t("lockSettings.lockNowHint")}
             disabled={locking}
-            onClick={() => void handleLockNow()}
+            onClick={() => handleLockNow()}
           />
         </div>
 
@@ -172,7 +125,7 @@ export function LockSettingsView({
             {t("lockSettings.autoLock")}
           </SettingsSectionTitle>
           <div>
-            {state.loading ? (
+            {settingsQuery.isPending ? (
               <>
                 <SkeletonRow />
                 <SkeletonRow />
@@ -180,14 +133,14 @@ export function LockSettingsView({
             ) : (
               TIMEOUT_OPTIONS.map((option) => {
                 const selected =
-                  state.settings?.autoLockTimeout === option.value;
+                  settings?.autoLockTimeout === option.value;
                 return (
                   <ChoiceRow
                     key={option.value}
                     radio={false}
                     selected={selected}
                     disabled={savingTimeout !== null}
-                    onSelect={() => void handleSelectTimeout(option.value)}
+                    onSelect={() => handleSelectTimeout(option.value)}
                     checkIcon={<CheckIcon />}
                   >
                     <span className="flex-1 text-label font-semibold text-foreground">
@@ -198,7 +151,7 @@ export function LockSettingsView({
               })
             )}
           </div>
-          {state.settings?.autoLockTimeout === "never" ? (
+          {settings?.autoLockTimeout === "never" ? (
             <p
               role="note"
               className="pt-2.5 text-caption leading-relaxed text-warning"

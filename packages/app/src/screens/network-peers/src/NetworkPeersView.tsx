@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { hostnameOf } from "../../../hostname";
 import { InlineUrlEditor } from "./InlineUrlEditor";
 import { usePlatform } from "../../../app-platform/context";
@@ -11,6 +11,7 @@ import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx"
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CloseIcon } from "@gleam/ui/src/primitives/icons.tsx";
+import { useNetworkSettings, useSaveNetworkSettings } from "../../main-screen/src/useNetworkSettings";
 
 /**
  * The gateway and the AO-peer list are both editable, writing the full
@@ -49,12 +50,6 @@ export interface NetworkPeersViewProps {
 
 function isHardcodedPeer(peerUrl: string): boolean {
   return (DEFAULT_HYPERBEAM_PEER_URLS as readonly string[]).includes(peerUrl);
-}
-
-interface LoadState {
-  settings: NetworkSettings | null;
-  loading: boolean;
-  error: string | null;
 }
 
 /** Host and port in full: a lookalike peer can differ only at the end. */
@@ -168,8 +163,12 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return false;
     }
   };
-  const [state, setState] = useState<LoadState>({ settings: null, loading: true, error: null });
-  const [saving, setSaving] = useState(false);
+  const settingsQuery = useNetworkSettings(runtime);
+  const settings = settingsQuery.data ?? null;
+  const saveMutation = useSaveNetworkSettings(runtime);
+  const saving = saveMutation.isPending;
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const error = saveError ?? (settingsQuery.isError ? errorText(settingsQuery.error) : null);
   const [addingPeer, setAddingPeer] = useState(false);
   const [newPeerUrl, setNewPeerUrl] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -181,33 +180,12 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   const [newBundlerUrl, setNewBundlerUrl] = useState("");
   const [bundlerError, setBundlerError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const settings = await runtime.send<void, NetworkSettings>({
-        type: "getNetworkSettings",
-        payload: undefined,
-      });
-      setState({ settings, loading: false, error: null });
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: errorText(error),
-      }));
-    }
-  }, [runtime]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   // Resumes a gateway/peer edit interrupted by Chrome closing the popup for
   // its own permission prompt. Runs once per mount, after settings load, so
   // a granted-on-remount edit reads against the freshest NetworkSettings.
   const resumedRef = useRef(false);
   useEffect(() => {
-    if (resumedRef.current || state.settings === null) return;
+    if (resumedRef.current || settings === null) return;
     resumedRef.current = true;
 
     void (async () => {
@@ -242,14 +220,11 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
           setGatewayError(t("networkPeers.gatewayUnreachable"));
           setEditingGateway(true);
         } else {
-          const settings = state.settings;
           if (settings) await persist({ ...settings, gatewayUrl: pending.url });
         }
       } else if (pending.kind === "bundler") {
-        const settings = state.settings;
         if (settings) await persist({ ...settings, bundlerUrl: pending.url });
       } else {
-        const settings = state.settings;
         if (settings && !settings.peers.some((peer) => peer.url === pending.url)) {
           const peers = [...settings.peers, { url: pending.url, enabled: true }];
           await persist({ ...settings, peers });
@@ -257,54 +232,51 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       }
       await clearPendingEdit(ephemeralState);
     })();
-    // state.settings is read fresh inside the async closure via the outer
+    // settings is read fresh inside the async closure via the outer
     // `state` reference at call time, so it isn't in the dependency array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.settings]);
+  }, [settings]);
 
   const persist = async (next: NetworkSettings) => {
-    setSaving(true);
+    setSaveError(null);
     try {
-      await runtime.send<NetworkSettings, void>({ type: "setNetworkSettings", payload: next });
-      setState((prev) => ({ ...prev, settings: next }));
-    } catch (error) {
-      setState((prev) => ({ ...prev, error: errorText(error) }));
-    } finally {
-      setSaving(false);
+      await saveMutation.mutateAsync(next);
+    } catch (caught) {
+      setSaveError(errorText(caught));
     }
   };
 
   const handleToggleEnabled = (peerUrl: string) => {
-    if (!state.settings) return;
-    const peers = state.settings.peers.map((peer) =>
+    if (!settings) return;
+    const peers = settings.peers.map((peer) =>
       peer.url === peerUrl ? { ...peer, enabled: !peer.enabled } : peer,
     );
-    const togglingOff = state.settings.peers.find((peer) => peer.url === peerUrl)?.enabled === true;
-    const activePeerUrl = togglingOff && state.settings.activePeerUrl === peerUrl ? null : state.settings.activePeerUrl;
-    void persist({ ...state.settings, peers, activePeerUrl });
+    const togglingOff = settings.peers.find((peer) => peer.url === peerUrl)?.enabled === true;
+    const activePeerUrl = togglingOff && settings.activePeerUrl === peerUrl ? null : settings.activePeerUrl;
+    void persist({ ...settings, peers, activePeerUrl });
   };
 
   const handleSelectActive = (peer: HyperBeamPeer) => {
-    if (!state.settings || !peer.enabled) return;
-    const activePeerUrl = state.settings.activePeerUrl === peer.url ? null : peer.url;
-    void persist({ ...state.settings, activePeerUrl });
+    if (!settings || !peer.enabled) return;
+    const activePeerUrl = settings.activePeerUrl === peer.url ? null : peer.url;
+    void persist({ ...settings, activePeerUrl });
   };
 
   const handleRemovePeer = (peerUrl: string) => {
-    if (!state.settings || isHardcodedPeer(peerUrl)) return;
-    const peers = state.settings.peers.filter((peer) => peer.url !== peerUrl);
-    const activePeerUrl = state.settings.activePeerUrl === peerUrl ? null : state.settings.activePeerUrl;
-    void persist({ ...state.settings, peers, activePeerUrl });
+    if (!settings || isHardcodedPeer(peerUrl)) return;
+    const peers = settings.peers.filter((peer) => peer.url !== peerUrl);
+    const activePeerUrl = settings.activePeerUrl === peerUrl ? null : settings.activePeerUrl;
+    void persist({ ...settings, peers, activePeerUrl });
   };
 
   const handleEditGateway = async () => {
-    if (!state.settings) return;
+    if (!settings) return;
     const normalized = normalizeGatewayUrl(newGatewayUrl);
     if (normalized === null) {
       setGatewayError(t("networkPeers.gatewayInvalid"));
       return;
     }
-    if (normalized === state.settings.gatewayUrl) {
+    if (normalized === settings.gatewayUrl) {
       setEditingGateway(false);
       setGatewayError(null);
       return;
@@ -331,7 +303,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return;
     }
 
-    await persist({ ...state.settings, gatewayUrl: normalized });
+    await persist({ ...settings, gatewayUrl: normalized });
     setEditingGateway(false);
     setGatewayError(null);
     await clearPendingEdit(ephemeralState);
@@ -344,13 +316,13 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   };
 
   const handleEditBundler = async () => {
-    if (!state.settings) return;
+    if (!settings) return;
     const normalized = normalizeGatewayUrl(newBundlerUrl);
     if (normalized === null) {
       setBundlerError(t("networkPeers.bundlerInvalid"));
       return;
     }
-    if (normalized === state.settings.bundlerUrl) {
+    if (normalized === settings.bundlerUrl) {
       closeBundlerEditor();
       return;
     }
@@ -363,19 +335,19 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return;
     }
 
-    await persist({ ...state.settings, bundlerUrl: normalized });
+    await persist({ ...settings, bundlerUrl: normalized });
     closeBundlerEditor();
     await clearPendingEdit(ephemeralState);
   };
 
   const handleUseAutomaticBundler = async () => {
-    if (!state.settings) return;
-    await persist({ ...state.settings, bundlerUrl: null });
+    if (!settings) return;
+    await persist({ ...settings, bundlerUrl: null });
     closeBundlerEditor();
   };
 
   const handleAddPeer = async () => {
-    if (!state.settings) return;
+    if (!settings) return;
     // Only `https://*/*` is an optional host permission, so an http peer could never be granted.
     if (/^http:\/\//i.test(newPeerUrl.trim())) {
       setAddError(t("networkPeers.peerNotHttps"));
@@ -386,7 +358,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       setAddError(t("networkPeers.peerInvalid"));
       return;
     }
-    if (state.settings.peers.some((peer) => peer.url === normalized)) {
+    if (settings.peers.some((peer) => peer.url === normalized)) {
       setAddError(t("networkPeers.peerDuplicate"));
       return;
     }
@@ -400,8 +372,8 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       return;
     }
 
-    const peers = [...state.settings.peers, { url: normalized, enabled: true }];
-    await persist({ ...state.settings, peers });
+    const peers = [...settings.peers, { url: normalized, enabled: true }];
+    await persist({ ...settings, peers });
     setNewPeerUrl("");
     setAddingPeer(false);
     setAddError(null);
@@ -411,7 +383,15 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("networkPeers.title")} onBack={onBack} />
-      {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
+      {error ? (
+        <NetworkErrorBanner
+          onRetry={() => {
+            setSaveError(null);
+            void settingsQuery.refetch();
+          }}
+          retrying={settingsQuery.isFetching}
+        />
+      ) : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10">
@@ -419,7 +399,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
             {t("networkPeers.gateway")}
           </SettingsSectionTitle>
           <div>
-            {state.loading ? (
+            {settingsQuery.isPending ? (
               <SkeletonRow />
             ) : editingGateway ? (
               <InlineUrlEditor
@@ -443,14 +423,14 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
               <button
                 type="button"
                 onClick={() => {
-                  setNewGatewayUrl(state.settings?.gatewayUrl ?? "");
+                  setNewGatewayUrl(settings?.gatewayUrl ?? "");
                   setEditingGateway(true);
                 }}
                 className="flex w-full items-center gap-2.5 py-3.5 text-left"
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-label font-semibold text-foreground">
-                    {state.settings ? hostnameOf(state.settings.gatewayUrl) : "—"}
+                    {settings ? hostnameOf(settings.gatewayUrl) : "—"}
                   </span>
                   <span className="text-caption text-muted">{t("networkPeers.gatewayHint")}</span>
                 </span>
@@ -467,7 +447,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
             {t("networkPeers.bundler")}
           </SettingsSectionTitle>
           <div>
-            {state.loading ? (
+            {settingsQuery.isPending ? (
               <SkeletonRow />
             ) : editingBundler ? (
               <InlineUrlEditor
@@ -483,7 +463,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                 onSubmit={() => void handleEditBundler()}
                 onCancel={closeBundlerEditor}
                 extraAction={
-                  state.settings?.bundlerUrl ? (
+                  settings?.bundlerUrl ? (
                     <button
                       type="button"
                       disabled={saving}
@@ -499,14 +479,14 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
               <button
                 type="button"
                 onClick={() => {
-                  setNewBundlerUrl(state.settings?.bundlerUrl ?? "");
+                  setNewBundlerUrl(settings?.bundlerUrl ?? "");
                   setEditingBundler(true);
                 }}
                 className="flex w-full items-center gap-2.5 py-3.5 text-left"
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-label font-semibold text-foreground">
-                    {state.settings?.bundlerUrl ? hostnameOf(state.settings.bundlerUrl) : t("networkPeers.automatic")}
+                    {settings?.bundlerUrl ? hostnameOf(settings.bundlerUrl) : t("networkPeers.automatic")}
                   </span>
                   <span className="text-caption text-muted">{t("networkPeers.bundlerHint")}</span>
                 </span>
@@ -524,15 +504,15 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
           </SettingsSectionTitle>
           <p className="pb-1 text-caption leading-relaxed text-faint">{t("networkPeers.peersHint")}</p>
           <div>
-            {state.loading ? (
+            {settingsQuery.isPending ? (
               <>
                 <SkeletonRow />
                 <SkeletonRow />
               </>
             ) : (
               <>
-                {(state.settings?.peers ?? []).map((peer) => {
-                  const isActive = state.settings?.activePeerUrl === peer.url;
+                {(settings?.peers ?? []).map((peer) => {
+                  const isActive = settings?.activePeerUrl === peer.url;
                   return (
                     <div key={peer.url} className="flex items-center gap-2.5 py-3.5">
                       <button
