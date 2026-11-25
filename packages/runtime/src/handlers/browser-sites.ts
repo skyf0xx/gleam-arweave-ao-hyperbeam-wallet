@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { isPlainRecord } from "@gleam/core";
 import type { StoragePort } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { stringList } from "../guards";
+import { schemaGuard } from "../schema-guard";
 import { webOrigin } from "./site-wallet";
 
 /**
@@ -54,9 +56,7 @@ export interface BrowserSites {
 /** Raster and SVG images only; an `<img>` never runs an SVG's script. */
 const SITE_ICON = /^data:image\/(?:png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
 
-export function isValidSiteIcon(value: unknown): value is string {
-  return typeof value === "string" && value.length <= MAX_SITE_ICON_LENGTH && SITE_ICON.test(value);
-}
+export const isValidSiteIcon = schemaGuard<string>(z.string().max(MAX_SITE_ICON_LENGTH).regex(SITE_ICON));
 
 /** The origin of an http(s) URL, or throws. */
 function requireWebOrigin(url: string): string {
@@ -65,18 +65,13 @@ function requireWebOrigin(url: string): string {
   return origin;
 }
 
-export function isValidBrowserVisit(value: unknown): value is BrowserVisit {
-  if (typeof value !== "object" || value === null) return false;
-  const visit = value as Record<string, unknown>;
-  return (
-    typeof visit.url === "string" &&
-    visit.url.length <= MAX_HISTORY_URL_LENGTH &&
-    typeof visit.title === "string" &&
-    visit.title.length <= MAX_TITLE_LENGTH &&
-    typeof visit.at === "number" &&
-    Number.isFinite(visit.at)
-  );
-}
+export const isValidBrowserVisit = schemaGuard<BrowserVisit>(
+  z.object({
+    url: z.string().max(MAX_HISTORY_URL_LENGTH),
+    title: z.string().max(MAX_TITLE_LENGTH),
+    at: z.number(),
+  }),
+);
 
 function visits(raw: unknown): BrowserVisit[] {
   return Array.isArray(raw) ? raw.filter(isValidBrowserVisit) : [];

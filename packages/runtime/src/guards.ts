@@ -1,4 +1,7 @@
+import { z } from "zod";
 import { PERMISSION_TYPES, type PermissionType } from "@gleam/core";
+
+export const permissionTypeSchema = z.enum(PERMISSION_TYPES);
 
 /** The strings in a stored or page-supplied array; anything else in it is dropped. */
 export function stringList(raw: unknown): string[] {

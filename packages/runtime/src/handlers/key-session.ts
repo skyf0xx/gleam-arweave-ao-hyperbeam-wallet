@@ -12,6 +12,7 @@ import {
   type StoragePort,
   type WalletMethod,
 } from "@gleam/core";
+import { z } from "zod";
 import { signerFromKeyStore, unwrapBackupKey, zeroize, type VaultKeys } from "@gleam/core/signer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
@@ -19,6 +20,7 @@ import { loadWallets } from "../stored-data";
 export { WALLETS_KEY } from "../storage-keys";
 import { loadBackupKey } from "./backup-state";
 import { stringList } from "../guards";
+import { schemaGuard } from "../schema-guard";
 
 /**
  * The signing keys of currently-unlocked wallets, held in two places:
@@ -114,11 +116,7 @@ function entryKey(walletId: string): string {
  * JWK older releases stored here, marks an old entry that may hold
  * private key material.
  */
-function isSessionKeyEntry(value: unknown): value is SessionKeyEntry {
-  if (value === null || typeof value !== "object") return false;
-  const { address, owner } = value as Record<string, unknown>;
-  return typeof address === "string" && typeof owner === "string" && Object.keys(value).length === 2;
-}
+const isSessionKeyEntry = schemaGuard<SessionKeyEntry>(z.strictObject({ address: z.string(), owner: z.string() }));
 
 /**
  * `zeroize()` (core/signer/zeroize.ts) operates on byte buffers, but these
@@ -137,18 +135,14 @@ function zeroStrings(value: unknown): unknown {
   return value;
 }
 
-export function isValidSession(value: unknown): value is Session {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.unlockedAt === "number" &&
-    typeof candidate.lastActivityAt === "number" &&
-    typeof candidate.autoLockTimeout === "string" &&
-    Object.hasOwn(AUTO_LOCK_TIMEOUT_MS, candidate.autoLockTimeout) &&
-    Array.isArray(candidate.unlockedWalletIds) &&
-    candidate.unlockedWalletIds.every((id) => typeof id === "string")
-  );
-}
+export const isValidSession = schemaGuard<Session>(
+  z.object({
+    unlockedAt: z.number(),
+    lastActivityAt: z.number(),
+    autoLockTimeout: z.string().refine((timeout) => Object.hasOwn(AUTO_LOCK_TIMEOUT_MS, timeout)),
+    unlockedWalletIds: z.array(z.string()),
+  }),
+);
 
 const CLOCK_SLACK_MS = 5 * 60_000;
 

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   UNKNOWN_WALLET_NAME,
   type ActiveSite,
@@ -6,7 +7,7 @@ import {
   type StoragePort,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
-import { isPermissionType, stringList } from "../guards";
+import { permissionTypeSchema, stringList } from "../guards";
 import type { ReportOtherWalletParams } from "../dispatch/methods";
 
 /**
@@ -73,16 +74,19 @@ export function safeSiteIconUrl(raw: unknown): string | null {
   }
 }
 
+const seenOtherWalletSchema = z.object({ origin: z.string() });
+
 function seenOf(raw: unknown): SeenOtherWallet | null {
-  return raw !== null && typeof raw === "object" && typeof (raw as SeenOtherWallet).origin === "string"
-    ? (raw as SeenOtherWallet)
-    : null;
+  return seenOtherWalletSchema.safeParse(raw).success ? (raw as SeenOtherWallet) : null;
 }
 
+const permissionListSchema = z
+  .array(permissionTypeSchema.nullable().catch(null))
+  .catch([])
+  .transform((known) => [...new Set(known.filter((permission) => permission !== null))]);
+
 function knownPermissions(raw: unknown): PermissionType[] {
-  if (!Array.isArray(raw)) return [];
-  const known = raw.filter(isPermissionType);
-  return [...new Set(known)];
+  return permissionListSchema.parse(raw);
 }
 
 export function displayWalletName(raw: string): string {

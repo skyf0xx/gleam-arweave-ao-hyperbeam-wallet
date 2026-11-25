@@ -1,5 +1,7 @@
+import { z } from "zod";
 import {
   addressFromOwner,
+  isRecord,
   base64ToBytes,
   base64UrlToBytes,
   bytesToBase64,
@@ -89,7 +91,8 @@ import {
   transactionOf,
   UNSAFE_TEXT,
 } from "./prepared-check";
-import { isPermissionType } from "../guards";
+import { isPermissionType, permissionTypeSchema } from "../guards";
+import { schemaGuard } from "../schema-guard";
 import { mapBinaryDeep } from "@gleam/messaging/src/page-protocol.ts";
 
 /**
@@ -172,34 +175,26 @@ function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
 const DEVICE_GRACE_MS = APPROVAL_MAX_MS - APPROVAL_TIMEOUT_MS;
 const PENDING_APPROVALS_KEY = "session:pendingApprovals";
 
-function isValidGrant(value: unknown): value is Grant {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.origin === "string" &&
-    typeof candidate.walletId === "string" &&
-    Array.isArray(candidate.permissions) &&
-    candidate.permissions.every(isPermissionType) &&
-    typeof candidate.createdAt === "number" &&
-    (candidate.expiresAt === null || typeof candidate.expiresAt === "number") &&
-    candidate.budget === null &&
-    (candidate.icon === undefined || candidate.icon === null || typeof candidate.icon === "string") &&
-    (candidate.name === undefined || candidate.name === null || typeof candidate.name === "string")
-  );
-}
+const isValidGrant = schemaGuard<Grant>(
+  z.object({
+    origin: z.string(),
+    walletId: z.string(),
+    permissions: z.array(permissionTypeSchema),
+    createdAt: z.number(),
+    expiresAt: z.number().nullable(),
+    budget: z.null(),
+    icon: z.string().nullish(),
+    name: z.string().nullish(),
+  }),
+);
 
-function isValidApprovalRequest(value: unknown): value is ApprovalRequest {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.requestId === "string" &&
-    typeof candidate.kind === "string" &&
-    typeof candidate.origin === "string" &&
-    typeof candidate.createdAt === "number" &&
-    candidate.preview !== null &&
-    typeof candidate.preview === "object"
-  );
-}
+const approvalRequestSchema = z.object({
+  requestId: z.string(),
+  kind: z.string(),
+  origin: z.string(),
+  createdAt: z.number(),
+  preview: z.unknown().refine(isRecord),
+});
 
 /** A signing request's decoded intent — the input to `describeIntent`-style preview building. */
 export interface SigningRequestInput {
@@ -734,16 +729,11 @@ function validGrants(raw: unknown): Grant[] {
   return Array.isArray(raw) ? raw.filter(isValidGrant) : [];
 }
 
+const pendingRecordSchema = z.object({ request: approvalRequestSchema, walletId: z.string().nullable() });
+
 function validPending(raw: unknown): PendingApprovalRecord[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (entry): entry is PendingApprovalRecord =>
-      entry !== null &&
-      typeof entry === "object" &&
-      isValidApprovalRequest((entry as PendingApprovalRecord).request) &&
-      (typeof (entry as PendingApprovalRecord).walletId === "string" ||
-        (entry as PendingApprovalRecord).walletId === null),
-  );
+  return raw.filter(schemaGuard<PendingApprovalRecord>(pendingRecordSchema));
 }
 
 function transactionInputOf(input: SigningRequestInput): SignTransactionInput {

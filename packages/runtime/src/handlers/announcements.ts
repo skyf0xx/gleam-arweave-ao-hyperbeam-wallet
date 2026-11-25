@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { isPlainRecord } from "@gleam/core";
 import type { Announcement, StoragePort } from "@gleam/core";
 import { SITE_URL } from "@gleam/core/src/models/site-origin.ts";
@@ -38,7 +39,7 @@ export interface AnnouncementTarget {
   version: string;
 }
 
-const SHELLS: readonly string[] = ["extension", "android", "ios"] satisfies AnnouncementShell[];
+const SHELLS = ["extension", "android", "ios"] as const satisfies readonly AnnouncementShell[];
 
 function parseVersion(raw: unknown): [number, number, number] | null {
   if (typeof raw !== "string") return null;
@@ -53,48 +54,62 @@ function isBelow(version: [number, number, number], bound: [number, number, numb
   return false;
 }
 
-/**
- * Whether an entry's optional `platforms` and `below` let it show on this
- * install, or null when either is malformed, which drops the entry. An
- * update notice names the platforms that don't update themselves and the
- * version that fixes things, so installs already on it never see it.
- */
-function matchesTarget(platforms: unknown, below: unknown, target: AnnouncementTarget): boolean | null {
-  if (platforms !== undefined) {
-    if (!Array.isArray(platforms) || platforms.length === 0) return null;
-    if (!platforms.every((shell) => typeof shell === "string" && SHELLS.includes(shell))) return null;
-    if (!(platforms as string[]).includes(target.shell)) return false;
+const nonBlank = z.string().refine((text) => text.trim() !== "");
+
+/** A malformed `platforms` or `below` drops the entry. */
+const versionSchema = z.string().transform((version, ctx) => {
+  const parsed = parseVersion(version);
+  if (parsed === null) {
+    ctx.addIssue({ code: "custom", message: "not a version" });
+    return z.NEVER;
   }
-  if (below !== undefined) {
-    const bound = parseVersion(below);
-    if (bound === null) return null;
-    const current = parseVersion(target.version);
-    // A version that can't be read can't be shown to be older.
-    if (current === null || !isBelow(current, bound)) return false;
+  return parsed;
+});
+
+/** An entry's `url` passes only when it is a link `allowedUrl` accepts. */
+const linkSchema = z.unknown().transform((raw, ctx) => {
+  const safe = allowedUrl(raw);
+  if (safe === null) {
+    ctx.addIssue({ code: "custom", message: "link not allowed" });
+    return z.NEVER;
   }
-  return true;
-}
+  return safe;
+});
+
+const announcementEntrySchema = z.object({
+  id: z.string().min(1),
+  level: z.enum(["info", "critical"]),
+  title: nonBlank.optional(),
+  text: nonBlank,
+  url: linkSchema.optional(),
+  platforms: z.array(z.enum(SHELLS)).min(1).optional(),
+  below: versionSchema.optional(),
+});
 
 /**
  * Keeps the well-formed entries meant for `target`; a file that isn't an
- * array yields none.
+ * array yields none. An entry's optional `platforms` and `below` let it
+ * show on this install: an update notice names the platforms that don't
+ * update themselves and the version that fixes things, so installs
+ * already on it never see it.
  */
 export function parseAnnouncements(raw: unknown, target: AnnouncementTarget): Announcement[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
   const out: Announcement[] = [];
   for (const entry of raw as unknown[]) {
-    if (entry === null || typeof entry !== "object") continue;
-    const { id, level, title, text, url, platforms, below } = entry as Record<string, unknown>;
-    if (typeof id !== "string" || id === "" || seen.has(id)) continue;
-    if (level !== "info" && level !== "critical") continue;
-    if (typeof text !== "string" || text.trim() === "") continue;
-    if (title !== undefined && (typeof title !== "string" || title.trim() === "")) continue;
-    const safe = url === undefined ? undefined : allowedUrl(url);
-    if (safe === null) continue;
-    if (matchesTarget(platforms, below, target) !== true) continue;
+    const parsed = announcementEntrySchema.safeParse(entry);
+    if (!parsed.success) continue;
+    const { id, level, title, text, url, platforms, below } = parsed.data;
+    if (seen.has(id)) continue;
+    if (platforms !== undefined && !platforms.includes(target.shell as AnnouncementShell)) continue;
+    if (below !== undefined) {
+      const current = parseVersion(target.version);
+      // A version that can't be read can't be shown to be older.
+      if (current === null || !isBelow(current, below)) continue;
+    }
     seen.add(id);
-    out.push({ id, level, ...(title === undefined ? {} : { title }), text, ...(safe === undefined ? {} : { url: safe }) });
+    out.push({ id, level, ...(title === undefined ? {} : { title }), text, ...(url === undefined ? {} : { url }) });
   }
   return out;
 }

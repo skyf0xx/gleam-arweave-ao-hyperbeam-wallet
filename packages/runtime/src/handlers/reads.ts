@@ -9,6 +9,7 @@ import {
   type DiscoverTokensOptions,
   type ReadTokenBalanceOptions,
 } from "@gleam/core/src/ao/index.ts";
+import { z } from "zod";
 import { peerFailoverOrder, withPeerFailover } from "@gleam/core/src/ao/peer-failover.ts";
 import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
@@ -70,6 +71,7 @@ import { activityLogKey, loadActivityLog, loadNetworkSettings as loadStoredNetwo
 import { ACTIVE_WALLET_ID_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
 import { stringList, withFallbackAfter } from "../guards";
+import { schemaGuard } from "../schema-guard";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -205,36 +207,30 @@ function tokenIdentity(
   };
 }
 
-function isValidTokenMetadata(value: unknown): value is TokenMetadata {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.processId === "string" &&
-    (candidate.transport === "l1" || candidate.transport === "mu") &&
-    (candidate.assetClass === null || candidate.assetClass === "fungible" || candidate.assetClass === "unique") &&
-    (candidate.denomination === null || (typeof candidate.denomination === "number" && candidate.denomination < 100)) &&
-    (candidate.ticker === null || typeof candidate.ticker === "string") &&
-    (candidate.name === null || typeof candidate.name === "string") &&
-    (candidate.description === null || typeof candidate.description === "string") &&
-    (candidate.logo === null || typeof candidate.logo === "string") &&
-    (candidate.totalSupply === null || typeof candidate.totalSupply === "string")
-  );
-}
+const nullableString = z.string().nullable();
+
+const isValidTokenMetadata = schemaGuard<TokenMetadata>(
+  z.object({
+    processId: z.string(),
+    transport: z.enum(["l1", "mu"]),
+    assetClass: z.enum(["fungible", "unique"]).nullable(),
+    denomination: z.number().lt(100).nullable(),
+    ticker: nullableString,
+    name: nullableString,
+    description: nullableString,
+    logo: nullableString,
+    totalSupply: nullableString,
+  }),
+);
 
 interface DiscoveredTokensCache {
   savedAt: number;
   processIds: string[];
 }
 
-function isDiscoveredTokensCache(value: unknown): value is DiscoveredTokensCache {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.savedAt === "number" &&
-    Array.isArray(candidate.processIds) &&
-    candidate.processIds.every((id) => typeof id === "string")
-  );
-}
+const isDiscoveredTokensCache = schemaGuard<DiscoveredTokensCache>(
+  z.object({ savedAt: z.number(), processIds: z.array(z.string()) }),
+);
 
 interface CollectiblesCache {
   savedAt: number;
@@ -247,39 +243,21 @@ function collectiblesSource(settings: NetworkSettings): string {
   return `${settings.gatewayUrl} ${settings.activePeerUrl ?? ""}`;
 }
 
-function isCollectiblesCache(value: unknown): value is CollectiblesCache {
-  if (value === null || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.savedAt === "number" &&
-    (candidate.source === undefined || typeof candidate.source === "string") &&
-    Array.isArray(candidate.collectibles) &&
-    candidate.collectibles.every(isCachedCollectible)
-  );
-}
+const cachedCollectibleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  contentType: z.string().optional(),
+  imageUrl: z.string().optional(),
+  videoUrl: z.string().optional(),
+  description: z.string().optional(),
+  collectionId: z.string().optional(),
+  collectionName: z.string().optional(),
+  permawebName: z.object({ label: z.string(), target: z.string().optional(), listed: z.literal(true).optional() }).optional(),
+});
 
-const OPTIONAL_COLLECTIBLE_STRINGS = ["contentType", "imageUrl", "videoUrl", "description", "collectionId", "collectionName"] as const;
-
-function isCachedCollectible(item: unknown): item is Collectible {
-  if (item === null || typeof item !== "object") return false;
-  const fields = item as Record<string, unknown>;
-  return (
-    typeof fields.id === "string" &&
-    typeof fields.name === "string" &&
-    OPTIONAL_COLLECTIBLE_STRINGS.every((key) => fields[key] === undefined || typeof fields[key] === "string") &&
-    (fields.permawebName === undefined || isCachedPermawebName(fields.permawebName))
-  );
-}
-
-function isCachedPermawebName(value: unknown): boolean {
-  if (value === null || typeof value !== "object") return false;
-  const fields = value as Record<string, unknown>;
-  return (
-    typeof fields.label === "string" &&
-    (fields.target === undefined || typeof fields.target === "string") &&
-    (fields.listed === undefined || fields.listed === true)
-  );
-}
+const isCollectiblesCache = schemaGuard<CollectiblesCache>(
+  z.object({ savedAt: z.number(), source: z.string().optional(), collectibles: z.array(cachedCollectibleSchema) }),
+);
 
 export class ReadsHandler {
   private readonly collectiblesInFlight = new Map<string, Promise<Collectible[]>>();
