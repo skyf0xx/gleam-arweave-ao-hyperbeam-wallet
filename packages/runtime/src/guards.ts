@@ -8,3 +8,8 @@ export function stringList(raw: unknown): string[] {
 export function isPermissionType(value: unknown): value is PermissionType {
   return typeof value === "string" && (PERMISSION_TYPES as readonly string[]).includes(value);
 }
+
+/** `promise`, or `fallback` once `ms` pass first. The slow work isn't cancelled. */
+export function withFallbackAfter<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+}

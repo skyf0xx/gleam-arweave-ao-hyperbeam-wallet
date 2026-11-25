@@ -3,6 +3,7 @@ import type { StoragePort } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { stringList } from "../guards";
+import { webOrigin } from "./site-wallet";
 
 /**
  * Background-side implementation of the dApp browser's saved and recent
@@ -58,15 +59,10 @@ export function isValidSiteIcon(value: unknown): value is string {
 }
 
 /** The origin of an http(s) URL, or throws. */
-function webOrigin(url: string): string {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(userErrorMessage("enterWebAddress"));
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error(userErrorMessage("enterWebAddress"));
-  return parsed.origin;
+function requireWebOrigin(url: string): string {
+  const origin = webOrigin(url);
+  if (origin === null) throw new Error(userErrorMessage("enterWebAddress"));
+  return origin;
 }
 
 export function isValidBrowserVisit(value: unknown): value is BrowserVisit {
@@ -128,7 +124,7 @@ export class BrowserSitesHandler {
 
   /** An `icon` that isn't a small image data URL is dropped, and the site is saved without one. */
   async saveBrowserSite(req: { url: string; icon?: string }): Promise<void> {
-    const origin = webOrigin(req.url);
+    const origin = requireWebOrigin(req.url);
     await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => [
       origin,
       ...stringList(raw).filter((entry) => entry !== origin),
@@ -158,7 +154,7 @@ export class BrowserSitesHandler {
    * title that arrived late) updates the newest visit instead of adding one.
    */
   async recordRecentSite(req: { url: string; title?: string }): Promise<void> {
-    const origin = webOrigin(req.url);
+    const origin = requireWebOrigin(req.url);
     await updateStored(this.storage, BROWSER_RECENT_SITES_KEY, (raw) =>
       [origin, ...stringList(raw).filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
     );

@@ -62,6 +62,8 @@ import type { Platform } from "./platform";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { NETWORK_SETTINGS_KEY } from "./storage-keys";
 import { requireWallet } from "./stored-data";
+import { withFallbackAfter } from "./guards";
+import { webOrigin } from "./handlers/site-wallet";
 import { dappError } from "./dapp-error";
 import { createProviderHandlers, type ApprovalCall, type GrantedCall, type TokenPreview } from "./handlers/provider";
 
@@ -252,11 +254,7 @@ export function createRuntime(platform: Platform): Runtime {
     const ids: number[] = [];
     for (const tab of await tabs.webTabs()) {
       if (typeof tab.id !== "number" || !tab.url) continue;
-      try {
-        if (new URL(tab.url).origin === origin) ids.push(tab.id);
-      } catch {
-        // Not a parseable URL — never a candidate.
-      }
+      if (webOrigin(tab.url) === origin) ids.push(tab.id);
     }
     return ids;
   }
@@ -266,11 +264,7 @@ export function createRuntime(platform: Platform): Runtime {
     try {
       for (const tab of await tabs.webTabs()) {
         if (!tab.url || !tab.favIconUrl) continue;
-        try {
-          if (new URL(tab.url).origin === origin) return tab.favIconUrl;
-        } catch {
-          // Not a parseable URL — never a candidate.
-        }
+        if (webOrigin(tab.url) === origin) return tab.favIconUrl;
       }
     } catch {
       // A missing icon only means the letter fallback.
@@ -340,11 +334,7 @@ export function createRuntime(platform: Platform): Runtime {
   async function reloadActiveTabFor(origin: string): Promise<void> {
     const tab = await tabs.activeTab();
     if (typeof tab?.id !== "number" || !tab.url) return;
-    try {
-      if (new URL(tab.url).origin !== origin) return;
-    } catch {
-      return;
-    }
+    if (webOrigin(tab.url) !== origin) return;
     await tabs.reload(tab.id).catch(() => undefined);
   }
 
@@ -357,8 +347,7 @@ export function createRuntime(platform: Platform): Runtime {
     if (!isSecureSigningOrigin(origin)) return null;
     const grant = await approval.findActiveGrant(origin);
     if (!grant || missingPermissions("getActiveAddress", grant.permissions).length > 0) return null;
-    const state = await lifecycle.getState();
-    const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
+    const wallet = await activeWallet();
     if (!wallet || isWatchWalletMethod(wallet.method)) return null;
     return wallet.address;
   }
@@ -421,10 +410,7 @@ export function createRuntime(platform: Platform): Runtime {
           ? { ...UNRESOLVED, collectible: true }
           : UNRESOLVED,
       );
-    const timeout = new Promise<TokenPreview>((resolve) =>
-      setTimeout(() => resolve(UNRESOLVED), TOKEN_METADATA_LOOKUP_TIMEOUT_MS),
-    );
-    return Promise.race([lookup, timeout]);
+    return withFallbackAfter(lookup, TOKEN_METADATA_LOOKUP_TIMEOUT_MS, UNRESOLVED);
   }
 
   /**
@@ -438,8 +424,7 @@ export function createRuntime(platform: Platform): Runtime {
       const { gatewayUrl } = await reads.getNetworkSettings();
       return estimateL1TransferFee(gatewayUrl, processId);
     })().catch(() => null);
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), TOKEN_FEE_QUOTE_TIMEOUT_MS));
-    return Promise.race([lookup, timeout]);
+    return withFallbackAfter(lookup, TOKEN_FEE_QUOTE_TIMEOUT_MS, null);
   }
 
   const PROVIDER_HANDLERS = createProviderHandlers({

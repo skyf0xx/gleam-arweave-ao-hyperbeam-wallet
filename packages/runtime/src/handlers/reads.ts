@@ -69,7 +69,7 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { activityLogKey, loadActivityLog, loadNetworkSettings as loadStoredNetworkSettings, loadWallets, parseActivityLog } from "../stored-data";
 import { ACTIVE_WALLET_ID_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
-import { stringList } from "../guards";
+import { stringList, withFallbackAfter } from "../guards";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -621,10 +621,7 @@ export class ReadsHandler {
       running = Promise.race([early, done]);
       this.discoveryInFlight.set(address, running);
     }
-    return Promise.race([
-      running,
-      new Promise<string[]>((resolve) => setTimeout(() => resolve(cached?.processIds ?? []), DISCOVERY_WAIT_MS)),
-    ]);
+    return withFallbackAfter(running, DISCOVERY_WAIT_MS, cached?.processIds ?? []);
   }
 
   /**

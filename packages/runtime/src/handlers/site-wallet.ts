@@ -47,7 +47,8 @@ export interface SiteWalletHandlerDeps {
   now?: () => number;
 }
 
-function webOrigin(url: string | undefined): string | null {
+/** The origin of an http(s) URL, or null. */
+export function webOrigin(url: string | undefined): string | null {
   if (!url) return null;
   try {
     const parsed = new URL(url);
