@@ -1,9 +1,8 @@
 import { createGoogleDriveFile } from "@gleam/core/src/backup/google-drive.ts";
 import { createGoogleAuth } from "@/src/adapters/google-auth";
-import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineBackground } from "wxt/utils/define-background";
 import { browser } from "wxt/browser";
-import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import { messenger } from "@/src/adapters/runtime";
 import { WxtStoragePort } from "@/src/adapters/storage";
 import { listenForKeyringConnections, sessionKeyStore } from "@/src/adapters/session-key-store";
 import { WindowApprovalPresenter } from "@/src/adapters/windows";
@@ -25,7 +24,6 @@ import type { Platform } from "@gleam/runtime/src/platform.ts";
  * Every message's caller is built from Chrome's `sender`, never from
  * anything the message body claims.
  */
-const messenger = defineExtensionMessaging<ProtocolMap>();
 const extensionBaseUrl = browser.runtime.getURL("");
 
 void restrictSessionStorageToTrustedContexts();

@@ -1,5 +1,7 @@
 import { browser } from "wxt/browser";
-import { createSerializer, type ApprovalPresenterPort, type StoragePort } from "@gleam/core";
+import type { ApprovalPresenterPort, StoragePort } from "@gleam/core";
+import { updateStored } from "@gleam/runtime/src/storage-update.ts";
+import { openPopupWindow } from "@/src/popup-window";
 
 /**
  * Implements `ApprovalPresenterPort` with one `browser.windows` popup per
@@ -10,13 +12,11 @@ import { createSerializer, type ApprovalPresenterPort, type StoragePort } from "
  * `browser.windows` by numeric window id. The `requestId -> windowId` map
  * lives in `session:approvalWindows`, so a service worker that restarts
  * while an approval window is open can still close, focus, or notice the
- * user closing that window. Every read-modify-write of the map runs on one
- * promise chain, so concurrent creates and closes can't drop each other's
+ * user closing that window. Every read-modify-write of the map goes through
+ * `updateStored`, so concurrent creates and closes can't drop each other's
  * entries.
  */
 const APPROVAL_WINDOW_PATH = "/approval.html";
-const APPROVAL_WINDOW_WIDTH = 390;
-const APPROVAL_WINDOW_HEIGHT = 640;
 const APPROVAL_WINDOWS_KEY = "session:approvalWindows";
 
 type ApprovalWindowMap = Record<string, number>;
@@ -30,46 +30,39 @@ function isApprovalWindowMap(value: unknown): value is ApprovalWindowMap {
   );
 }
 
+function readMap(raw: unknown): ApprovalWindowMap {
+  return isApprovalWindowMap(raw) ? raw : {};
+}
+
 export class WindowApprovalPresenter implements ApprovalPresenterPort {
-  private readonly serialize = createSerializer();
   private readonly dismissedListeners = new Set<(requestId: string) => void>();
   private listeningForRemovals = false;
 
   constructor(private readonly storage: StoragePort) {}
 
   private async loadMap(): Promise<ApprovalWindowMap> {
-    const raw = await this.storage.get<unknown>(APPROVAL_WINDOWS_KEY);
-    return isApprovalWindowMap(raw) ? raw : {};
+    return readMap(await this.storage.get<unknown>(APPROVAL_WINDOWS_KEY));
   }
 
   /** Removes `requestId` from the map and returns its window id, if it had one. */
-  private untrack(requestId: string): Promise<number | undefined> {
-    return this.serialize(async () => {
-      const map = await this.loadMap();
-      const windowId = map[requestId];
+  private async untrack(requestId: string): Promise<number | undefined> {
+    let windowId: number | undefined;
+    await updateStored(this.storage, APPROVAL_WINDOWS_KEY, (current) => {
+      const map = readMap(current);
+      windowId = map[requestId];
       if (windowId === undefined) return undefined;
       delete map[requestId];
-      await this.storage.set(APPROVAL_WINDOWS_KEY, map);
-      return windowId;
+      return map;
     });
+    return windowId;
   }
 
   async present(requestId: string): Promise<void> {
-    const created = await browser.windows.create({
-      url: `${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`,
-      type: "popup",
-      width: APPROVAL_WINDOW_WIDTH,
-      height: APPROVAL_WINDOW_HEIGHT,
-      focused: true,
-    });
+    const created = await openPopupWindow(`${APPROVAL_WINDOW_PATH}?requestId=${encodeURIComponent(requestId)}`);
 
     const windowId = created?.id;
     if (typeof windowId !== "number") return;
-    await this.serialize(async () => {
-      const map = await this.loadMap();
-      map[requestId] = windowId;
-      await this.storage.set(APPROVAL_WINDOWS_KEY, map);
-    });
+    await updateStored(this.storage, APPROVAL_WINDOWS_KEY, (current) => ({ ...readMap(current), [requestId]: windowId }));
   }
 
   async dismiss(requestId: string): Promise<void> {
@@ -113,13 +106,13 @@ export class WindowApprovalPresenter implements ApprovalPresenterPort {
   }
 
   private async handleWindowRemoved(windowId: number): Promise<void> {
-    const requestId = await this.serialize(async () => {
-      const map = await this.loadMap();
-      const match = Object.entries(map).find(([, id]) => id === windowId)?.[0];
-      if (match === undefined) return undefined;
-      delete map[match];
-      await this.storage.set(APPROVAL_WINDOWS_KEY, map);
-      return match;
+    let requestId: string | undefined;
+    await updateStored(this.storage, APPROVAL_WINDOWS_KEY, (current) => {
+      const map = readMap(current);
+      requestId = Object.entries(map).find(([, id]) => id === windowId)?.[0];
+      if (requestId === undefined) return undefined;
+      delete map[requestId];
+      return map;
     });
     if (requestId === undefined) return;
     for (const listener of this.dismissedListeners) listener(requestId);

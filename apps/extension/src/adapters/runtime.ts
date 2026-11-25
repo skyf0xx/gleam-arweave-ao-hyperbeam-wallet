@@ -21,7 +21,7 @@ import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
  * conformance but unused: every `ProtocolMap` call in this layer is
  * popup-to-background, which never needs a `tabId`.
  */
-const messenger = defineExtensionMessaging<ProtocolMap>();
+export const messenger = defineExtensionMessaging<ProtocolMap>();
 
 export class WebextCoreRuntimePort implements RuntimePort {
   async send<TPayload, TResponse>(

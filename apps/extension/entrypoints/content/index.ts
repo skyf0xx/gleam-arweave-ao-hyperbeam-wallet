@@ -1,4 +1,3 @@
-import { defineExtensionMessaging } from "@webext-core/messaging";
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { injectScript } from "wxt/utils/inject-script";
 import {
@@ -16,7 +15,7 @@ import {
   type PageRequestEnvelope,
   type PageSiteModeEnvelope,
 } from "@gleam/messaging/src/page-protocol.ts";
-import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import { messenger } from "@/src/adapters/runtime";
 
 /**
  * The content-script half of the page ↔ content bridge: `document_start`,
@@ -44,13 +43,13 @@ import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
  * `wxt/utils/*` (pure, side-effect-free at import time) rather than
  * relied on as WXT's unimport-injected globals, which only exist inside
  * WXT's own build/dev pipeline, never under plain Vitest. Separately,
- * `defineExtensionMessaging<ProtocolMap>()` below throws synchronously
- * outside a real extension context (same `@webext-core/messaging`
- * behavior `App.tsx`'s own doc comment documents) — its test file mocks
- * `@webext-core/messaging` before dynamically importing this module, the
- * same pattern `adapters/runtime.unlock.test.ts` already established.
+ * `defineExtensionMessaging<ProtocolMap>()` in `adapters/runtime.ts`
+ * throws synchronously outside a real extension context (same
+ * `@webext-core/messaging` behavior `App.tsx`'s own doc comment
+ * documents) — its test file mocks `@webext-core/messaging` before
+ * dynamically importing this module, the same pattern
+ * `adapters/runtime.unlock.test.ts` already established.
  */
-const messenger = defineExtensionMessaging<ProtocolMap>();
 
 function isPageRequestEnvelope(value: unknown): value is PageRequestEnvelope {
   return (
