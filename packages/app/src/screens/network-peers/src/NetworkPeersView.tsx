@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { hostnameOf } from "../../../hostname";
 import { usePlatform } from "../../../app-platform/context";
 import type { EphemeralStatePort } from "../../../app-platform/types";
 import { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
@@ -51,14 +52,6 @@ interface LoadState {
   settings: NetworkSettings | null;
   loading: boolean;
   error: string | null;
-}
-
-function gatewayHostname(gatewayUrl: string): string {
-  try {
-    return new URL(gatewayUrl).hostname;
-  } catch {
-    return gatewayUrl;
-  }
 }
 
 /** Host and port in full: a lookalike peer can differ only at the end. */
@@ -476,7 +469,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-label font-semibold text-foreground">
-                    {state.settings ? gatewayHostname(state.settings.gatewayUrl) : "—"}
+                    {state.settings ? hostnameOf(state.settings.gatewayUrl) : "—"}
                   </span>
                   <span className="text-caption text-muted">{t("networkPeers.gatewayHint")}</span>
                 </span>
@@ -548,7 +541,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-label font-semibold text-foreground">
-                    {state.settings?.bundlerUrl ? gatewayHostname(state.settings.bundlerUrl) : t("networkPeers.automatic")}
+                    {state.settings?.bundlerUrl ? hostnameOf(state.settings.bundlerUrl) : t("networkPeers.automatic")}
                   </span>
                   <span className="text-caption text-muted">{t("networkPeers.bundlerHint")}</span>
                 </span>

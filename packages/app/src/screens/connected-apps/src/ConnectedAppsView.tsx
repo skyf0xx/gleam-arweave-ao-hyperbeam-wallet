@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { hostnameOf } from "../../../hostname";
 import type { Grant, RuntimePort, WalletSummary } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
@@ -20,14 +21,6 @@ export interface ConnectedAppsViewProps {
   highlightOrigin?: string;
   /** Names each grant's wallet when there is more than one to tell apart. */
   wallets?: readonly WalletSummary[];
-}
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
 }
 
 function canRequestPayments(grant: Grant): boolean {

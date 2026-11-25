@@ -1,4 +1,6 @@
 import { useState } from "react";
+
+import { hostnameOf } from "../hostname";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { AccountAvatar, MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
@@ -40,23 +42,11 @@ export const SCOPE_COPY: Record<PermissionType, { title: MessageKey; detail: Mes
 };
 
 function faviconLetter(origin: string): string {
-  try {
-    return new URL(origin).hostname.charAt(0).toUpperCase();
-  } catch {
-    return origin.charAt(0).toUpperCase();
-  }
+  return hostnameOf(origin).charAt(0).toUpperCase();
 }
 
 /** Stands in for the site's name so the sentence can be translated whole and the name rendered as untrusted text. */
 const NAME_SLOT = "\u0000";
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
-}
 
 export function ConnectionRequestScreen({ origin, preview, wallet = null, onReject, onGrant }: ConnectionRequestScreenProps) {
   const t = useT();

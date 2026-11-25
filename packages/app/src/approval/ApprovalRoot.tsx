@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { hostnameOf } from "../hostname";
 import { useT, type MessageKey } from "../i18n";
 import { LocalizedRoot } from "../i18n/LocalizedRoot";
 import type {
@@ -167,14 +168,6 @@ function tokensOf(request: ApprovalRequest): Array<string | null> {
   const transfer = transferRequestFromPreview(preview);
   if (transfer) return transfer.transfers.filter((line) => !line.collectible).map((line) => line.token);
   return request.device ? [preview.token] : [];
-}
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
 }
 
 export function ApprovalRoot(props: ApprovalRootProps) {

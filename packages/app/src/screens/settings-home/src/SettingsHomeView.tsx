@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { hostnameOf } from "../../../hostname";
 import { usePlatform } from "../../../app-platform/context";
 import type { AutoLockTimeout, Grant, LockSettings, NetworkSettings, RuntimePort, ThemePreference } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -16,14 +17,6 @@ const TIMEOUT_KEYS = {
   "1hr": "settingsHome.timeout1hr",
   "4hr": "settingsHome.timeout4hr",
 } as const satisfies Record<AutoLockTimeout, MessageKey>;
-
-function gatewayHostname(gatewayUrl: string): string {
-  try {
-    return new URL(gatewayUrl).hostname;
-  } catch {
-    return gatewayUrl;
-  }
-}
 
 /**
  * The settings screen the gear icon opens: the wallet's own settings, then
@@ -134,7 +127,7 @@ export function SettingsHomeView({
           />
           <OptionRow
             title={t("settingsHome.networkTitle")}
-            value={state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"}
+            value={state.loading ? undefined : state.networkSettings ? hostnameOf(state.networkSettings.gatewayUrl) : "—"}
             onClick={onOpenNetworkPeers}
           />
         </div>
