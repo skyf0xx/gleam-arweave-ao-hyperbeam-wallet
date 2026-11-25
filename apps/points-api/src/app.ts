@@ -28,6 +28,7 @@ import { randomInviteCode } from "./wallets/invite-code";
 import { leave, leaveRequest } from "./wallets/leave";
 import { createPriceService, fxQuery, historyQuery, spotQuery, type PriceService } from "./prices/prices";
 import { RateLimiter } from "./rate-limit";
+import { ttlCache } from "./ttl-cache";
 import { register, registerRequest } from "./wallets/register";
 import type { AreaSummary } from "./scans/areas";
 import { challengeQuery, issueChallenge } from "./scans/challenge";
@@ -285,18 +286,6 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   return app;
-}
-
-/** Holds one value for `ttlMs`; `set` returns the value so a miss reads `get() ?? set(await load())`. */
-function ttlCache<T>(ttlMs: number, nowMs: () => number) {
-  let entry: { value: T; expiresAt: number } | null = null;
-  return {
-    get: (): T | undefined => (entry && nowMs() < entry.expiresAt ? entry.value : undefined),
-    set: (value: T): T => {
-      entry = { value, expiresAt: nowMs() + ttlMs };
-      return value;
-    },
-  };
 }
 
 function refusal(c: Context, outcome: { error: string; status: ContentfulStatusCode }) {

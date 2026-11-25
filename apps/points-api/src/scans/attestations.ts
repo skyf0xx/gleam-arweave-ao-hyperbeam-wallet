@@ -35,6 +35,7 @@ import {
   type ServerIssue,
 } from "./errors";
 import { paidPlaces } from "./places";
+import { keyedTtlCache } from "../ttl-cache";
 import { LIVENESS_WINDOW_MS } from "../points/snapshot";
 
 // JSON has no undefined, so this only refuses a body without the key.
@@ -441,39 +442,34 @@ interface ReleaseSummary {
  * shows up when the minute ends. The oldest entry goes when one is full.
  */
 export class AttestationListCache {
-  private readonly pages = new Map<string, { listing: AttestationListing; expiresAt: number }>();
-  private readonly summaries = new Map<string, { summary: ReleaseSummary; expiresAt: number }>();
+  private readonly pages: ReturnType<typeof keyedTtlCache<AttestationListing>>;
+  private readonly summaries: ReturnType<typeof keyedTtlCache<ReleaseSummary>>;
 
-  constructor(private readonly now: () => number) {}
+  constructor(now: () => number) {
+    this.pages = keyedTtlCache(LISTING_TTL_MS, now, MAX_CACHED_LISTINGS);
+    this.summaries = keyedTtlCache(LISTING_TTL_MS, now, MAX_CACHED_LISTINGS);
+  }
 
   page(key: string): AttestationListing | undefined {
-    const hit = this.pages.get(key);
-    return hit && this.now() < hit.expiresAt ? hit.listing : undefined;
+    return this.pages.get(key);
   }
 
   setPage(key: string, listing: AttestationListing): void {
-    remember(this.pages, key, { listing, expiresAt: this.now() + LISTING_TTL_MS });
+    this.pages.set(key, listing);
   }
 
   summary(release: string): ReleaseSummary | undefined {
-    const hit = this.summaries.get(release);
-    return hit && this.now() < hit.expiresAt ? hit.summary : undefined;
+    return this.summaries.get(release);
   }
 
   setSummary(release: string, summary: ReleaseSummary): void {
-    remember(this.summaries, release, { summary, expiresAt: this.now() + LISTING_TTL_MS });
+    this.summaries.set(release, summary);
   }
 
   clear(): void {
     this.pages.clear();
     this.summaries.clear();
   }
-}
-
-function remember<V>(map: Map<string, V>, key: string, value: V): void {
-  map.delete(key);
-  map.set(key, value);
-  if (map.size > MAX_CACHED_LISTINGS) map.delete(map.keys().next().value!);
 }
 
 export interface ListQuery {
