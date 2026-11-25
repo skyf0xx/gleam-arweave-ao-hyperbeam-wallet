@@ -14,6 +14,7 @@ import { NameTargetReview, ReviewButtons, TransferReview } from "../transfer-rev
 import { requestTypeText, transferRequestFromPreview, type TransferContext } from "../transfer-review/model";
 import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
+import { Field, FieldLabel } from "../transfer-review/FieldLabel";
 
 /**
  * The highest-stakes screen in the product. A request that moves value
@@ -173,9 +174,9 @@ export function SigningApprovalScreen({
         {preview.items ? (
           <div className="flex flex-col gap-8">
             {preview.items.length > 1 ? (
-              <span className="-mb-4 text-caption font-semibold uppercase tracking-wide text-muted">
+              <FieldLabel className="-mb-4">
                 {t("approval.manyItemsToSign", { count: preview.items.length })}
-              </span>
+              </FieldLabel>
             ) : null}
             {preview.items.map((item, index) => (
               <DataItemCard
@@ -192,8 +193,7 @@ export function SigningApprovalScreen({
             <TagTiers tags={preview.tags} target={preview.recipient} walletAddress={from?.address ?? null} />
 
             {preview.decodedData !== null && preview.decodedData !== "" ? (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
+              <Field label={t("approval.decodedData")}>
                 <SignedDataText
                   text={preview.decodedData}
                   size={preview.dataSize}
@@ -201,12 +201,11 @@ export function SigningApprovalScreen({
                   boxClassName={DATA_BOX}
                   collapsedClassName="max-h-24"
                 />
-              </div>
+              </Field>
             ) : preview.decodedData === null && (preview.dataSize ?? 0) > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.data")}</span>
+              <Field label={t("approval.data")}>
                 <span className="font-mono text-caption text-foreground">{t("approval.bytes", { size: String(preview.dataSize) })}</span>
-              </div>
+              </Field>
             ) : null}
 
 
@@ -242,8 +241,7 @@ export function SigningApprovalScreen({
 
 function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-caption font-semibold uppercase tracking-wide text-muted">{label}</span>
+    <Field label={label}>
       <div className="flex items-start gap-2 rounded-md border border-line bg-background p-3">
         <span className="flex-1 break-all font-mono text-caption leading-relaxed text-foreground">{value}</span>
         <button
@@ -255,7 +253,7 @@ function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: stri
           <CopyIcon />
         </button>
       </div>
-    </div>
+    </Field>
   );
 }
 

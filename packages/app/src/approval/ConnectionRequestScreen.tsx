@@ -8,6 +8,7 @@ import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey } from "../i18n";
 import { UntrustedText } from "./UntrustedText";
 import { ArmingLabel } from "./ArmingLabel";
+import { Field } from "../transfer-review/FieldLabel";
 
 /**
  * Ports `connection-request.html` (6.1): origin identity, "wants to:"
@@ -85,8 +86,7 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
         {/* In silica, a lens runs from the wallet the site will see down through what it may do with it. */}
         <div className="gleam-lens-down flex flex-col gap-5 silica:-mx-5 silica:px-5 silica:pb-5 silica:pt-4">
           {wallet ? (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.connectingAs")}</span>
+            <Field label={t("approval.connectingAs")}>
               <div className="flex items-center gap-3">
                 <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label="" size={32} />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -94,7 +94,7 @@ export function ConnectionRequestScreen({ origin, preview, wallet = null, onReje
                   <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
                 </div>
               </div>
-            </div>
+            </Field>
           ) : null}
 
           <div className="text-center text-caption font-semibold text-muted">

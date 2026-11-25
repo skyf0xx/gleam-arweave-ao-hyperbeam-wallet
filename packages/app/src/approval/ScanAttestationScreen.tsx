@@ -21,6 +21,7 @@ import { useJoinPoints, usePendingInvite } from "../screens/points/src/usePoints
 import { useT, type MessageKey } from "../i18n";
 import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
+import { Field } from "../transfer-review/FieldLabel";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every
@@ -284,15 +285,6 @@ function AttestationReview({
           {submitting ? t("approval.signing") : <ArmingLabel>{t("approval.sign")}</ArmingLabel>}
         </Button>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-caption font-semibold uppercase tracking-wide text-muted">{label}</span>
-      {children}
     </div>
   );
 }

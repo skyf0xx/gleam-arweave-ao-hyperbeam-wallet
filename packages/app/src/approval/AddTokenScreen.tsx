@@ -8,6 +8,7 @@ import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
 import { ArmingLabel } from "./ArmingLabel";
 import { UntrustedText } from "./UntrustedText";
+import { Field } from "../transfer-review/FieldLabel";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -60,23 +61,21 @@ export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: A
 
         {/* In silica, one lens holds both addresses and what adding the token means. */}
         <div className="gleam-lens-down flex flex-col gap-5 silica:-mx-6 silica:px-6 silica:pb-6 silica:pt-4 phone:silica:-mx-5 phone:silica:px-5">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.processId")}</span>
+          <Field label={t("approval.processId")}>
             <MemorableAddress
               address={preview.processId}
               emphasisPick={identity.emphasisPick}
               avatarSvg={identity.avatarSvg(preview.processId)}
             />
-          </div>
+          </Field>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.toWallet")}</span>
+          <Field label={t("approval.toWallet")}>
             <MemorableAddress
               address={preview.address}
               emphasisPick={identity.emphasisPick}
               avatarSvg={identity.avatarSvg(preview.address)}
             />
-          </div>
+          </Field>
 
           <p className="text-caption leading-snug text-muted">
             {t("approval.tokenNotice")}

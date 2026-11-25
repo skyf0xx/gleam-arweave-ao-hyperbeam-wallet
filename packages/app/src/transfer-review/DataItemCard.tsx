@@ -2,6 +2,7 @@ import { useT } from "../i18n";
 import { SignedDataText } from "../approval/SignedDataText";
 import { TagTiers } from "./TagTiers";
 import type { OtherItem } from "./model";
+import { Field } from "./FieldLabel";
 
 /**
  * One data item a request signs that moves no value: its tags in tiers,
@@ -34,8 +35,7 @@ export function DataItemCard({
       <TagTiers tags={item.tags} target={item.target} walletAddress={walletAddress} />
 
       {item.decodedData !== null && item.decodedData !== "" ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
+        <Field label={t("approval.decodedData")} className="gap-1">
           <SignedDataText
             text={item.decodedData}
             size={item.dataSize}
@@ -44,18 +44,16 @@ export function DataItemCard({
             boxClassName="overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-caption leading-relaxed text-foreground"
             collapsedClassName="max-h-20"
           />
-        </div>
+        </Field>
       ) : item.decodedData === null && (item.dataSize ?? 0) > 0 ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.data")}</span>
+        <Field label={t("approval.data")} className="gap-1">
           <span className="font-mono text-caption text-foreground">{t("approval.bytes", { size: String(item.dataSize) })}</span>
-        </div>
+        </Field>
       ) : null}
 
-      <div className="flex flex-col gap-1">
-        <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.payloadHash")}</span>
+      <Field label={t("approval.payloadHash")} className="gap-1">
         <span className="break-all font-mono text-caption text-foreground">{item.payloadHash}</span>
-      </div>
+      </Field>
     </div>
   );
 }
