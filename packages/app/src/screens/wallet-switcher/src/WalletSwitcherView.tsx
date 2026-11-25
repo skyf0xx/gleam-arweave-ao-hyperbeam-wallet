@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
+import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
@@ -7,8 +7,8 @@ import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { OPENED_WALLET_STATE_QUERY_KEY, useWalletState, WALLET_STATE_QUERY_KEY } from "../../activity";
+import { useWalletState } from "../../activity";
+import { useSwitchWallet } from "./useSwitchWallet";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 // The label sits inside the name's truncating span, so a narrow row cuts
@@ -55,7 +55,6 @@ export function sortByName(wallets: WalletSummary[], locale: string): WalletSumm
 export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalletId = null, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
   const t = useT();
   const locale = useLocale();
-  const queryClient = useQueryClient();
   // Shown at once, so the remount that follows a switch doesn't flash a skeleton.
   const walletsQuery = useWalletState(runtime, {
     recordActivity: true,
@@ -65,9 +64,7 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
   });
   const wallets = walletsQuery.data?.wallets ?? [];
   const activeWalletId = walletsQuery.data?.activeWalletId ?? null;
-  const switchMutation = useMutation({
-    mutationFn: (walletId: string) => runtime.send<{ walletId: string }, void>({ type: "switchWallet", payload: { walletId } }),
-  });
+  const switchMutation = useSwitchWallet(runtime);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const error = switchError ?? (walletsQuery.isError ? errorText(walletsQuery.error) : null);
   const switchingId = switchMutation.isPending ? switchMutation.variables : null;
@@ -75,12 +72,7 @@ export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalle
   const handleSwitch = (walletId: string) => {
     if (walletId === activeWalletId) return;
     switchMutation.mutate(walletId, {
-      onSuccess: () => {
-        for (const key of [WALLET_STATE_QUERY_KEY, OPENED_WALLET_STATE_QUERY_KEY]) {
-          queryClient.setQueryData<WalletState>(key, (state) => (state ? { ...state, activeWalletId: walletId } : state));
-        }
-        onSwitched(walletId);
-      },
+      onSuccess: () => onSwitched(walletId),
       onError: (caught) => setSwitchError(errorText(caught)),
     });
   };
