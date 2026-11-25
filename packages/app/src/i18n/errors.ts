@@ -1,3 +1,4 @@
+import { errorMessage } from "@gleam/core/src/models/error-message.ts";
 import { matchUserError, type UserErrorCode } from "@gleam/core/src/models/user-errors.ts";
 import type { MessageKey } from "./catalog";
 import { t, type MessageParams } from "./index";
@@ -80,7 +81,7 @@ function localizedParam(name: string, value: string): string | null {
  * spliced into a translated sentence.
  */
 export function errorText(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const match = matchUserError(message);
   if (!match) return message;
   const params: MessageParams = {};

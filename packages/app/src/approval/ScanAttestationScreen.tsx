@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   INVITE_REQUIRED_MESSAGE,
+  errorMessage,
   isHardwareWalletMethod,
   type RuntimePort,
   type ScanAttestationApprovalPreview,
@@ -189,7 +190,7 @@ function AttestationReview({
     try {
       check = await onCheck();
     } catch (error) {
-      check = { ok: false, error: error instanceof Error ? error.message : String(error) };
+      check = { ok: false, error: errorMessage(error) };
     }
     if (!check.ok) {
       setCheckError(errorText(check.error));
