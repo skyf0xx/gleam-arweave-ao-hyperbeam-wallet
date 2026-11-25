@@ -1,5 +1,6 @@
 import type { Winston } from "../models/balance";
 import { userErrorMessage } from "../models/user-errors";
+import { trimTrailingSlashes } from "../models/network";
 
 /** A gateway that never answers would otherwise hold every balance read open. */
 const BALANCE_TIMEOUT_MS = 10_000;
@@ -15,7 +16,7 @@ export async function getBalance(
   gatewayUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<Winston> {
-  const url = `${trimTrailingSlash(gatewayUrl)}/wallet/${address}/balance`;
+  const url = `${trimTrailingSlashes(gatewayUrl)}/wallet/${address}/balance`;
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(BALANCE_TIMEOUT_MS) });
 
   if (!response.ok) {
@@ -32,8 +33,4 @@ export async function getBalance(
   }
 
   return body;
-}
-
-function trimTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
 }

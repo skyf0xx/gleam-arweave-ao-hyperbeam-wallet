@@ -4,6 +4,7 @@ import { L1_ACTIVATION_WINSTON } from "../ao/l1-transfer";
 import { userErrorMessage } from "../models/user-errors";
 import { isArweaveId } from "../models/arweave-id";
 import { tagValue, type Tag } from "../models/tag";
+import { trimTrailingSlashes } from "../models/network";
 
 /**
  * Minimal shape of the gateway's GraphQL transaction connection response
@@ -41,8 +42,8 @@ export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "htt
 const GRAPHQL_TIMEOUT_MS = 10_000;
 
 function gatewayCandidates(primaryGatewayUrl: string): string[] {
-  const primary = trimTrailingSlash(primaryGatewayUrl);
-  const candidates = [primary, ...FALLBACK_GATEWAYS.map(trimTrailingSlash)];
+  const primary = trimTrailingSlashes(primaryGatewayUrl);
+  const candidates = [primary, ...FALLBACK_GATEWAYS.map(trimTrailingSlashes)];
   return [...new Set(candidates)];
 }
 
@@ -472,8 +473,4 @@ function toAoReceiveEntry(node: GraphQLAoTransferNode): ActivityEntry | null {
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
     token,
   };
-}
-
-function trimTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
 }

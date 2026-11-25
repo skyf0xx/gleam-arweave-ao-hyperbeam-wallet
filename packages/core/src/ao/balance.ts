@@ -1,5 +1,5 @@
 import type { TokenBalance } from "../models/balance";
-import { L1_TOKEN_NODE_URLS } from "../models/network";
+import { L1_TOKEN_NODE_URLS, trimTrailingSlashes } from "../models/network";
 import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
@@ -41,7 +41,7 @@ async function queryBalance(
   peerUrl: string,
   fetchImpl: typeof fetch,
 ): Promise<TokenBalance | null> {
-  const url = `${trimTrailingSlash(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
+  const url = `${trimTrailingSlashes(peerUrl)}/${processId}~process@1.0/compute/balances/${address}`;
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(COMPUTE_TIMEOUT_MS) });
 
   if (response.status === 404) return null;
@@ -161,7 +161,7 @@ export async function readTokenBalance(options: ReadTokenBalanceOptions): Promis
   const failures: string[] = [];
   if (peerUrl !== null) {
     try {
-      return (await getTokenBalance(processId, address, trimTrailingSlash(peerUrl), fetchImpl)).quantity;
+      return (await getTokenBalance(processId, address, trimTrailingSlashes(peerUrl), fetchImpl)).quantity;
     } catch (error) {
       failures.push(`${hostOf(peerUrl)} (${shortReason(error)})`);
     }
@@ -203,7 +203,7 @@ export async function readL1Balance(
 ): Promise<string> {
   const groups = await furthestAheadFirst(
     processId,
-    [...new Set([gatewayUrl, ...l1NodeUrls, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlash))],
+    [...new Set([gatewayUrl, ...l1NodeUrls, peerUrl].filter((url): url is string => url !== null).map(trimTrailingSlashes))],
     fetchImpl,
   );
   const failures: string[] = [];
@@ -299,8 +299,4 @@ function hostOf(url: string): string {
   } catch {
     return url;
   }
-}
-
-function trimTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
 }

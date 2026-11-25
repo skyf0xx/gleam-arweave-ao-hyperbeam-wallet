@@ -3,6 +3,7 @@ import type { TokenMetadata, TokenTransport } from "../models/token-metadata";
 import { FALLBACK_GATEWAY_URLS } from "./first-run-gateway";
 import { isArweaveId } from "../models/arweave-id";
 import { tagValue, type Tag } from "../models/tag";
+import { trimTrailingSlashes } from "../models/network";
 
 /**
  * A process id is itself the spawning transaction's id, so this queries
@@ -64,7 +65,7 @@ export async function queryTokenMetadata(
     }
   `;
 
-  const url = `${trimTrailingSlash(gatewayUrl)}/graphql`;
+  const url = `${trimTrailingSlashes(gatewayUrl)}/graphql`;
   const response = await fetchImpl(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -171,8 +172,4 @@ export function tokenMetadataFromTags(processId: string, tags: Tag[]): TokenMeta
     logo: read("logo"),
     totalSupply: read("total-supply"),
   };
-}
-
-function trimTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
 }

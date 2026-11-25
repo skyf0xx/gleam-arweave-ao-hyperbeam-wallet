@@ -1,4 +1,6 @@
-import { L1_CANARY_PROCESS_ID } from "../models/network";
+import { L1_CANARY_PROCESS_ID, trimTrailingSlashes } from "../models/network";
+
+export { trimTrailingSlashes as stripTrailingSlashes } from "../models/network";
 import { readCappedText } from "./capped-body";
 import { mapLimit } from "../models/concurrency";
 import type { Tag } from "../models/tag";
@@ -75,18 +77,11 @@ function isPrivateIpv4(host: string): boolean {
   );
 }
 
-/** `url` without trailing slashes. A loop, not a regex, since record URLs are untrusted. */
-export function stripTrailingSlashes(url: string): string {
-  let end = url.length;
-  while (end > 0 && url[end - 1] === "/") end--;
-  return url.slice(0, end);
-}
-
 /** The bare https origin a location record's `Url` names, or null if it isn't a usable public node. */
 export function normalizePeerUrl(raw: string): string | null {
   let url: URL;
   try {
-    url = new URL(stripTrailingSlashes(raw.trim()));
+    url = new URL(trimTrailingSlashes(raw.trim()));
   } catch {
     return null;
   }
@@ -130,7 +125,7 @@ async function readLocationRecords(
   let after: string | undefined;
   for (let page = 0; page < maxPages; page++) {
     try {
-      const response = await fetchImpl(`${stripTrailingSlashes(gatewayUrl)}/graphql`, {
+      const response = await fetchImpl(`${trimTrailingSlashes(gatewayUrl)}/graphql`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: QUERY, variables: { tags, after } }),
@@ -242,7 +237,7 @@ export async function findL1TokenNodes({
   concurrency = 6,
   timeoutMs = 8000,
 }: FindL1TokenNodesOptions): Promise<string[]> {
-  const urls = [...new Set(candidates.map(stripTrailingSlashes))];
+  const urls = [...new Set(candidates.map(trimTrailingSlashes))];
   const serves = await mapLimit(
     urls,
     Math.max(1, concurrency),
