@@ -94,6 +94,7 @@
 /packages/app/src/screens/send/src/sendFormSchema.ts                       @skyf0xx
 /packages/app/src/screens/activity/src/validateSendAmount.ts               @skyf0xx
 /packages/app/src/screens/activity/src/useSubmitTransfer.ts                @skyf0xx
+/packages/app/src/screens/activity/index.ts                             @skyf0xx
 /packages/core/src/models/signing.ts                                       @skyf0xx
 /packages/core/src/models/arweave-id.ts                                    @skyf0xx
 /packages/core/src/models/bytes.ts                                         @skyf0xx

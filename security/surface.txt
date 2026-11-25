@@ -100,6 +100,7 @@
 2 packages/app/src/screens/send/src/sendFormSchema.ts
 2 packages/app/src/screens/activity/src/validateSendAmount.ts
 2 packages/app/src/screens/activity/src/useSubmitTransfer.ts
+2 packages/app/src/screens/activity/index.ts
 2 packages/core/src/models/signing.ts
 2 packages/core/src/models/arweave-id.ts
 2 packages/core/src/models/bytes.ts
