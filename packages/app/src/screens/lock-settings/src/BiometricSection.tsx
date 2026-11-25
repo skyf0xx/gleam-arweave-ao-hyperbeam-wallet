@@ -3,6 +3,7 @@ import type { RuntimePort } from "@gleam/core";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import type { BiometricAvailability, BiometricUnlockPort } from "../../../app-platform/types";
 import { BiometricError, biometryLabel, biometryTitle } from "../../../biometrics/biometrics";
 import { BiometricIcon, Spinner } from "../../unlock/src/UnlockScreen";
@@ -105,9 +106,9 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+      <SettingsSectionTitle>
         {title}
-      </div>
+      </SettingsSectionTitle>
       {state.kind === "loading" ? (
         <SkeletonRow />
       ) : state.enrolled ? (

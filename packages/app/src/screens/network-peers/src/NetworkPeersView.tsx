@@ -7,6 +7,7 @@ import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
@@ -413,9 +414,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10">
-          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <SettingsSectionTitle>
             {t("networkPeers.gateway")}
-          </div>
+          </SettingsSectionTitle>
           <div>
             {state.loading ? (
               <SkeletonRow />
@@ -483,9 +484,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         </div>
 
         <div className="pb-10">
-          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <SettingsSectionTitle>
             {t("networkPeers.bundler")}
-          </div>
+          </SettingsSectionTitle>
           <div>
             {state.loading ? (
               <SkeletonRow />
@@ -555,9 +556,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         </div>
 
         <div>
-          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <SettingsSectionTitle>
             {t("networkPeers.aoPeers")}
-          </div>
+          </SettingsSectionTitle>
           <p className="pb-1 text-caption leading-relaxed text-faint">{t("networkPeers.peersHint")}</p>
           <div>
             {state.loading ? (

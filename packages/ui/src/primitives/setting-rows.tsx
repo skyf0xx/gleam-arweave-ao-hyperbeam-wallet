@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
@@ -177,4 +177,9 @@ export function SegmentedRow<T extends string>({
       </div>
     </div>
   );
+}
+
+/** The small uppercase title over a group of settings rows. */
+export function SettingsSectionTitle({ as: Tag = "div", children }: { as?: "div" | "h2"; children: ReactNode }) {
+  return <Tag className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{children}</Tag>;
 }

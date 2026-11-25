@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { BackupProvider, BackupStatus, RuntimePort } from "@gleam/core";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useT } from "../../../i18n";
 import { backupDriveName, backupSummary } from "../../backup/src/BackupView";
 
@@ -29,7 +30,7 @@ export function BackupSection({ runtime, provider, onOpen }: { runtime: RuntimeP
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">{t("backup.title")}</div>
+      <SettingsSectionTitle>{t("backup.title")}</SettingsSectionTitle>
       {status === null ? (
         <SkeletonRow />
       ) : (

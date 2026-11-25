@@ -3,6 +3,7 @@ import { readSecurityPhrase, suggestSecurityPhrase, type RuntimePort, type Secur
 import { SecurityPhraseMark, SecurityPhrasePicker } from "@gleam/ui/src/components/security-phrase/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { loadSecurityPhrase } from "../../../security-phrase";
 import { useAddressIdentity } from "../../../address-identity";
@@ -52,9 +53,9 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+      <SettingsSectionTitle>
         {t("lockSettings.phraseTitle")}
-      </div>
+      </SettingsSectionTitle>
       {state.kind === "loading" ? (
         <SkeletonRow />
       ) : state.kind === "editing" ? (

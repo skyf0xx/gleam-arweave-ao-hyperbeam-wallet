@@ -14,6 +14,7 @@ import {
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
+import { SettingsSectionTitle } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import { BackupSection } from "./BackupSection";
@@ -177,9 +178,9 @@ export function LockSettingsView({
         <SecurityPhraseSection runtime={runtime} />
 
         <div>
-          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+          <SettingsSectionTitle>
             {t("lockSettings.autoLock")}
-          </div>
+          </SettingsSectionTitle>
           <div>
             {state.loading ? (
               <>
@@ -321,9 +322,9 @@ function PasskeySection({
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+      <SettingsSectionTitle>
         {t("lockSettings.passkey")}
-      </div>
+      </SettingsSectionTitle>
       {passkey.kind === "loading" ? (
         <SkeletonRow />
       ) : passkey.status.enrolled ? (
