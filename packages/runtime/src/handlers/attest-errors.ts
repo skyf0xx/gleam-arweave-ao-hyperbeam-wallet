@@ -93,11 +93,16 @@ const SERVER_CODES: ReadonlySet<string> = new Set<SiteAttestErrorCode>([
   "challenge_unavailable",
 ]);
 
+/** The server's own sentence for a failure, or its status. */
+export function serverReason(body: { error?: unknown } | null, status: number): string {
+  return typeof body?.error === "string" ? body.error : `HTTP ${status}`;
+}
+
 /** A refusal from `POST /attestations`, by its `code`; an unknown one keeps the server's own sentence. */
 export function serverAttestFailure(status: number, body: { code?: unknown; error?: unknown } | null, release: string): SiteAttestResponse {
   const code = typeof body?.code === "string" ? body.code : null;
   if (code !== null && SERVER_CODES.has(code)) return attestFailure(code as SiteAttestErrorCode, release);
   if (status === 429) return attestFailure("rate_limited", release);
   if (status === 413) return attestFailure("invalid_attestation", release);
-  return attestFailure("server_error", release, typeof body?.error === "string" ? body.error : `HTTP ${status}`);
+  return attestFailure("server_error", release, serverReason(body, status));
 }

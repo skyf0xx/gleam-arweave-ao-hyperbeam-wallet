@@ -32,7 +32,7 @@ import {
 } from "@gleam/core/src/points/index.ts";
 import { attestationId, type ParsedAttestation } from "@gleam/core/src/scan/attestation.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
-import { attestFailure, serverAttestFailure } from "./attest-errors";
+import { attestFailure, serverAttestFailure, serverReason } from "./attest-errors";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
@@ -155,8 +155,7 @@ export class PointsHandler {
     await this.requirePointsCapability(req.walletId, JOIN);
     const typed = req.inviteCode?.trim() ? normalizeInviteCode(req.inviteCode) : null;
     if (typed !== null && !isValidInviteCode(typed)) throw new Error(userErrorMessage("inviteCodeInvalid"));
-    const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
-    const inviteCode = typed ?? (typeof pending === "string" && isValidInviteCode(pending) ? pending : null);
+    const inviteCode = typed ?? (await this.pendingInvite());
 
     const device = await this.deps.deviceKey.loadOrCreate();
     const message = buildRegisterMessage({
@@ -165,11 +164,7 @@ export class PointsHandler {
       issuedAt: Math.floor(this.now() / 1000),
     });
     const proof = await this.proveOwnership(req.walletId, JOIN, () => message);
-    const response = await this.fetchImpl(`${this.deps.apiUrl}/register`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...proofBody(proof), devicePublicKey: device.publicKey }),
-    });
+    const response = await this.postJson("/register", { ...proofBody(proof), devicePublicKey: device.publicKey });
     const body = (await response.json().catch(() => null)) as {
       address?: unknown;
       inviteCode?: unknown;
@@ -185,8 +180,7 @@ export class PointsHandler {
         await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
         throw new Error(INVITE_REQUIRED_MESSAGE);
       }
-      const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
-      throw new Error(userErrorMessage("pointsJoinFailed", { reason }));
+      throw new Error(userErrorMessage("pointsJoinFailed", { reason: serverReason(body, response.status) }));
     }
     if (body?.address !== proof.address || typeof body.inviteCode !== "string" || typeof body.referred !== "boolean") {
       throw new Error(userErrorMessage("pointsUnexpectedResponse"));
@@ -199,14 +193,10 @@ export class PointsHandler {
       joinedAt: this.now(),
     };
     await updateStored(this.deps.storage, POINTS_MEMBERSHIPS_KEY, (current) => ({
-      ...(current !== null && typeof current === "object" ? current : {}),
+      ...storedRecord(current),
       [req.walletId]: membership,
     }));
-    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
-    await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
-      registered: true,
-      lastHeartbeatAt: this.now(),
-    });
+    await this.setDeviceState(true);
     await this.deps.storage.remove(POINTS_PENDING_INVITE_KEY);
     await this.setClaimPending({ walletId: req.walletId, pending: false });
     return membership;
@@ -269,10 +259,7 @@ export class PointsHandler {
     let response: Response;
     let body: Record<string, unknown> | null;
     try {
-      response = await this.fetchImpl(`${this.deps.apiUrl}/attestations/check`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(address ? { attestation, address } : { attestation }),
+      response = await this.postJson("/attestations/check", address ? { attestation, address } : { attestation }, {
         signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
       });
       body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
@@ -292,13 +279,8 @@ export class PointsHandler {
     let response: Response;
     let body: Record<string, unknown> | null;
     try {
-      response = await this.fetchImpl(`${this.deps.apiUrl}/attestations`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ attestation, ...proofBody(proof) }),
-        // The approval window and the site's reply both wait on this.
-        signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS),
-      });
+      // The approval window and the site's reply both wait on the timeout.
+      response = await this.postJson("/attestations", { attestation, ...proofBody(proof) }, { signal: AbortSignal.timeout(ATTEST_TIMEOUT_MS) });
       body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     } catch {
       return attestFailure("offline", attestation.release);
@@ -326,13 +308,12 @@ export class PointsHandler {
   }
 
   async getClaimPending(): Promise<string[]> {
-    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_CLAIM_PENDING_KEY);
-    return stored !== null && typeof stored === "object" ? Object.keys(stored) : [];
+    return Object.keys(storedRecord(await this.deps.storage.get<unknown>(POINTS_CLAIM_PENDING_KEY)));
   }
 
   async setClaimPending(req: { walletId: string; pending: boolean }): Promise<void> {
     await updateStored(this.deps.storage, POINTS_CLAIM_PENDING_KEY, (stored) => {
-      const next = { ...(stored !== null && typeof stored === "object" ? stored : {}) } as Record<string, true>;
+      const next = storedRecord<true>(stored);
       if (req.pending) next[req.walletId] = true;
       else delete next[req.walletId];
       return next;
@@ -390,13 +371,12 @@ export class PointsHandler {
   }
 
   async getRevealSeen(): Promise<string[]> {
-    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_REVEAL_SEEN_KEY);
-    return stored !== null && typeof stored === "object" ? Object.keys(stored) : [];
+    return Object.keys(storedRecord(await this.deps.storage.get<unknown>(POINTS_REVEAL_SEEN_KEY)));
   }
 
   async markRevealSeen(req: { walletId: string }): Promise<void> {
     await updateStored(this.deps.storage, POINTS_REVEAL_SEEN_KEY, (stored) => ({
-      ...(stored !== null && typeof stored === "object" ? stored : {}),
+      ...storedRecord(stored),
       [req.walletId]: true,
     }));
   }
@@ -405,15 +385,11 @@ export class PointsHandler {
     try {
       const device = await this.deps.deviceKey.loadOrCreate();
       const message = buildRedeemMessage(code, Math.floor(this.now() / 1000));
-      const response = await this.fetchImpl(`${this.deps.apiUrl}/invite/redeem`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          code,
-          message,
-          signature: await signDeviceMessage(device.privateKey, message),
-          devicePublicKey: device.publicKey,
-        }),
+      const response = await this.postJson("/invite/redeem", {
+        code,
+        message,
+        signature: await signDeviceMessage(device.privateKey, message),
+        devicePublicKey: device.publicKey,
       });
       if (!response.ok) return { result: "offline" };
       const body = (await response.json().catch(() => null)) as { result?: unknown; kind?: unknown } | null;
@@ -435,15 +411,10 @@ export class PointsHandler {
     await this.requirePointsCapability(req.walletId, LEAVE);
     const issuedAt = Math.floor(this.now() / 1000);
     const proof = await this.proveOwnership(req.walletId, LEAVE, (address) => buildLeaveMessage(address, issuedAt));
-    const response = await this.fetchImpl(`${this.deps.apiUrl}/leave`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(proofBody(proof)),
-    });
+    const response = await this.postJson("/leave", proofBody(proof));
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
-      const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
-      throw new Error(userErrorMessage("pointsLeaveFailed", { reason }));
+      throw new Error(userErrorMessage("pointsLeaveFailed", { reason: serverReason(body, response.status) }));
     }
 
     const remaining = await updateStored(this.deps.storage, POINTS_MEMBERSHIPS_KEY, (raw) =>
@@ -454,8 +425,7 @@ export class PointsHandler {
     const seats = await updateStored(this.deps.storage, POINTS_SEATS_SEEN_KEY, (raw) => without(seatsOf(raw), req.walletId));
     await this.updateBadge(seats ?? {});
     if (Object.keys(remaining ?? {}).length === 0) {
-      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
-      await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
+      await this.setDeviceState(false);
     }
   }
 
@@ -471,8 +441,7 @@ export class PointsHandler {
       // The server forgot this device (a leave on another install deletes the wallet everywhere), so the local memberships no longer mean anything.
       // Queued like join's update, so a join in flight can't write the forgotten memberships back.
       await updateStored(this.deps.storage, POINTS_MEMBERSHIPS_KEY, () => ({}));
-      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value reset, not derived from the read
-      await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
+      await this.setDeviceState(false);
       return null;
     }
     if (!response.ok) throw new Error(userErrorMessage("pointsLoadFailed", { status: response.status }));
@@ -566,31 +535,39 @@ export class PointsHandler {
     const response = await this.postDeviceSigned("heartbeat");
 
     if (response.status === 404) {
-      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
-      await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
+      await this.setDeviceState(false);
       return false;
     }
     if (!response.ok) throw new Error(dappError(`Points heartbeat failed (HTTP ${response.status}).`));
 
-    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
-    await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
-      registered: true,
-      lastHeartbeatAt: this.now(),
-    });
+    await this.setDeviceState(true);
     return true;
   }
 
   private async postDeviceSigned(kind: "heartbeat" | "me"): Promise<Response> {
     const device = await this.deps.deviceKey.loadOrCreate();
     const message = buildDeviceMessage(kind, Math.floor(this.now() / 1000));
-    return this.fetchImpl(`${this.deps.apiUrl}/${kind}`, {
+    return this.postJson(`/${kind}`, {
+      deviceId: device.id,
+      message,
+      signature: await signDeviceMessage(device.privateKey, message),
+    });
+  }
+
+  private postJson(path: string, body: unknown, init: RequestInit = {}): Promise<Response> {
+    return this.fetchImpl(`${this.deps.apiUrl}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        deviceId: device.id,
-        message,
-        signature: await signDeviceMessage(device.privateKey, message),
-      }),
+      body: JSON.stringify(body),
+      ...init,
+    });
+  }
+
+  private async setDeviceState(registered: boolean): Promise<void> {
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
+    await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
+      registered,
+      lastHeartbeatAt: registered ? this.now() : null,
     });
   }
 }
@@ -642,7 +619,7 @@ function storedRecord<T>(raw: unknown): Record<string, T> {
   return isPlainRecord(raw) ? ({ ...raw } as Record<string, T>) : {};
 }
 
-const membershipsOf = (raw: unknown) => storedRecord<PointsMembership>(raw);
+export const membershipsOf = (raw: unknown) => storedRecord<PointsMembership>(raw);
 const shareSeenOf = (raw: unknown) => storedRecord<PointsSharePrompt[]>(raw);
 const seatsOf = (raw: unknown) => storedRecord<PointsSeatsRecord>(raw);
 
