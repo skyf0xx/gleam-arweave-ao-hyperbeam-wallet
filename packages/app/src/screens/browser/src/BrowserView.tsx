@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import type { Grant, RuntimePort, WalletState } from "@gleam/core";
+import type { RuntimePort, WalletState } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
@@ -7,6 +7,7 @@ import { usePlatform } from "../../../app-platform/context";
 import type { DappBrowserFrame } from "../../../app-platform/types";
 import { resolveInput, knownSite, BUILT_IN_SITES, pageTrail, siteHost } from "./address";
 import { useT } from "../../../i18n";
+import { useConnectedApps } from "../../connected-apps/src/useConnectedApps";
 import { StartScreen } from "./StartScreen";
 import { HistoryScreen } from "./HistoryScreen";
 import { useBrowserSites } from "./useBrowserSites";
@@ -68,7 +69,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const [text, setText] = useState("");
   const [rejected, setRejected] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const [grants, setGrants] = useState<Grant[]>([]);
+  const { data: grants = [], refetch: loadGrants } = useConnectedApps(runtime);
   const placeholder = useRef<HTMLDivElement>(null);
   // Native calls run in order behind `open`, so a move or a hide never reaches a view that isn't there yet.
   const opening = useRef<Promise<unknown>>(Promise.resolve());
@@ -170,22 +171,15 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     [browser, runtime],
   );
 
-  const loadGrants = useCallback(() => {
-    runtime
-      .send<void, Grant[]>({ type: "getConnectedApps", payload: undefined })
-      .then(setGrants)
-      .catch(() => undefined);
-  }, [runtime]);
-
   // A site may have been connected through an approval since the last look.
   useEffect(() => {
-    loadGrants();
+    void loadGrants();
   }, [loadGrants, origin]);
   const subscribeSheet = platform.approvalSheet?.subscribe;
   useEffect(
     () =>
       subscribeSheet?.((requestId) => {
-        if (requestId === null) loadGrants();
+        if (requestId === null) void loadGrants();
       }),
     [subscribeSheet, loadGrants],
   );
