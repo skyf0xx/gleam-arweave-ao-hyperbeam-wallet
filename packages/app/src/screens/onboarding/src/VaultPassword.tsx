@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordField, usePasswordEntry } from "@gleam/ui/src/components/onboarding/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
@@ -26,17 +25,7 @@ export function VaultPassword({
   serverError,
 }: VaultPasswordProps) {
   const t = useT();
-  const [password, setPassword] = useState("");
-
-  // Clear the field once a new rejection arrives, adjusting state during
-  // render rather than in an effect (react-hooks/set-state-in-effect).
-  const [clearedFor, setClearedFor] = useState<string | undefined>(undefined);
-  // Reset while submitting so a repeat of the same rejection clears again.
-  if (submitting && clearedFor !== undefined) setClearedFor(undefined);
-  if (!submitting && serverError && serverError !== clearedFor) {
-    setClearedFor(serverError);
-    setPassword("");
-  }
+  const { password, setPassword } = usePasswordEntry({ submitting, serverError });
 
   return (
     <div className="flex min-h-full flex-col">

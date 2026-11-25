@@ -11,7 +11,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
-import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
+import { PasswordField, usePasswordEntry } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useT, type TFunction } from "../../../i18n";
@@ -365,14 +365,7 @@ function ExportPasswordStep({
   serverError?: string;
 }) {
   const t = useT();
-  const [password, setPassword] = useState("");
-
-  const [clearedFor, setClearedFor] = useState<string | undefined>(undefined);
-  if (submitting && clearedFor !== undefined) setClearedFor(undefined);
-  if (!submitting && serverError && serverError !== clearedFor) {
-    setClearedFor(serverError);
-    setPassword("");
-  }
+  const { password, setPassword } = usePasswordEntry({ submitting, serverError });
 
   return (
     <div className="flex min-h-full flex-col">
