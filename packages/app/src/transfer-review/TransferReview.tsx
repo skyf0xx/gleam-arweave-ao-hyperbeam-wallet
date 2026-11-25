@@ -40,6 +40,7 @@ import {
   type TransferRequest,
 } from "./model";
 import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
 
 export interface TransferReviewProps {
   /** `RequestHeader` in an approval, the screen's own back header on Send. */
@@ -652,14 +653,6 @@ function PayloadHash({ value }: { value: string }) {
       </div>
     </div>
   );
-}
-
-async function copyToClipboard(value: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    // The value is still on screen and selectable.
-  }
 }
 
 function ChevronIcon({ open }: { open: boolean }) {

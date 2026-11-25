@@ -13,6 +13,7 @@ import { ArmingLabel } from "./ArmingLabel";
 import { NameTargetReview, ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromPreview, type TransferContext } from "../transfer-review/model";
 import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
+import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
 
 /**
  * The highest-stakes screen in the product. A request that moves value
@@ -63,15 +64,6 @@ function actionCopy(preview: SigningApprovalPreview, t: TFunction): string {
 
 function formatFee(fee: string): string {
   return `${formatWinstonAsAr(fee, 12)} AR`;
-}
-
-async function copyToClipboard(value: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    // Clipboard access can be denied by the browser — the value is still
-    // fully visible and selectable on screen, so this is a soft failure.
-  }
 }
 
 export function SigningApprovalScreen({

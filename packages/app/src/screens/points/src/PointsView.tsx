@@ -22,7 +22,7 @@ import { gleamUrl, howItWorksUrl, JoinNote, scanUrl } from "./JoinNote";
 import { RecentEarnings } from "./RecentEarnings";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
-import { useCopy } from "./useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useCountUp } from "./useCountUp";
 import { useFlash } from "./useFlash";
 import { useScanStats } from "./useScanStats";

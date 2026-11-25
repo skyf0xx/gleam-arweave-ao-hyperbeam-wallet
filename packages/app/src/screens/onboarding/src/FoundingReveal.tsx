@@ -6,7 +6,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { inviteLinkFor } from "../../../points-share";
 import { useT } from "../../../i18n";
-import { useCopy } from "../../points/src/useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { usePointsScores } from "../../points/src/usePoints";
 
 export const REVEAL_SEEN_QUERY_KEY = ["points", "revealSeen"] as const;

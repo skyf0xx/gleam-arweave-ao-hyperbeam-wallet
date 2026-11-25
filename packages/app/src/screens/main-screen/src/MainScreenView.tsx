@@ -43,7 +43,7 @@ import { useOrderbookPrices, useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
 import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/index.tsx";
 import { PointsTokenRow } from "../../points/index.tsx";
-import { useCopy } from "../../points/src/useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { readRowVisibility, shownTokenLogo, writeRowVisibility, type RowVisibility } from "../../../token-visibility";
 import { relativeTime } from "../../../relative-time";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";

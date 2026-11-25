@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ActivityEntry, RuntimePort } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { Sheet } from "@gleam/ui/src/primitives/sheet.tsx";
+import { copyToClipboard } from "@gleam/ui/src/primitives/use-copy.ts";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { AddressDisplay } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
@@ -113,7 +114,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
               ) : null}
             </div>
           )}
-          <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} onLens />
+          <AddressDisplay address={entry.address} onCopy={() => void copyToClipboard(entry.address)} onLens />
         </div>
 
         {naming ? (

@@ -3,7 +3,7 @@ import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
-import { useCopy } from "../../points/src/useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";

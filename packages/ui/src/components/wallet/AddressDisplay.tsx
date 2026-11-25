@@ -3,6 +3,7 @@ import { cn } from "../../primitives/cn";
 import { MemorableAddress } from "./MemorableAddress";
 import { useUiLabels } from "../../labels";
 import { CheckIcon, CopyIcon } from "../../primitives/copy-icons";
+import { useCopiedFlag } from "../../primitives/use-copy";
 
 const HOLD_MS = 500;
 
@@ -44,15 +45,7 @@ export function AddressDisplay({
 }: AddressDisplayProps) {
   const contextLabels = useUiLabels();
   const labels = labelsProp ?? contextLabels.addressDisplay;
-  const [copied, setCopied] = React.useState(false);
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  React.useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
+  const { copied, flash } = useCopiedFlag(copiedDurationMs);
   const holdRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const heldRef = React.useRef(false);
 
@@ -64,9 +57,7 @@ export function AddressDisplay({
 
   const handleCopy = () => {
     onCopy();
-    setCopied(true);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => setCopied(false), copiedDurationMs);
+    flash();
   };
 
   const stopHold = () => {

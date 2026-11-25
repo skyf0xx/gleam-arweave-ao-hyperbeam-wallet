@@ -4,7 +4,7 @@ import { TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { displayTicker } from "../../main-screen/src/formatWinston";
 import { useT } from "../../../i18n";
-import { useCopy } from "../../points/src/useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 /**

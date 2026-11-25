@@ -13,7 +13,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
-import { useCopy } from "../../points/src/useCopy";
+import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
