@@ -37,7 +37,7 @@ import {
   readBestAsk,
   recordPriceSample,
 } from "@gleam/core/src/pricing/index.ts";
-import { DEFAULT_HYPERBEAM_PEER_URLS, POINTS_API_URL, isFiatCurrency, isValidNetworkSettings } from "@gleam/core";
+import { POINTS_API_URL, isFiatCurrency } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls, readL1NodeUrls } from "../peers";
 import type {
@@ -66,8 +66,8 @@ import type {
   Winston,
 } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { activityLogKey, loadActivityLog, loadWallets, parseActivityLog } from "../stored-data";
-import { ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { activityLogKey, loadActivityLog, loadNetworkSettings as loadStoredNetworkSettings, loadWallets, parseActivityLog } from "../stored-data";
+import { ACTIVE_WALLET_ID_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
 
 /**
@@ -157,12 +157,6 @@ function periodLabelForRange(range: PortfolioHistoryRange): string {
       return "All time";
   }
 }
-
-const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
-  gatewayUrl: "https://arweave.net",
-  peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
-  activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
-};
 
 /** Always listed, whatever the watch list holds. */
 const DEFAULT_AO_PROCESS_ID = AO_TOKEN.processId as string;
@@ -308,15 +302,10 @@ export class ReadsHandler {
    */
   async loadNetworkSettings(): Promise<NetworkSettings> {
     return mergeDiscoveredPeers(
-      await this.loadStoredNetworkSettings(),
+      await loadStoredNetworkSettings(this.storage),
       await readExtraPeerUrls(this.storage),
       await readDismissedPeers(this.storage),
     );
-  }
-
-  private async loadStoredNetworkSettings(): Promise<NetworkSettings> {
-    const raw = await this.storage.get<unknown>(NETWORK_SETTINGS_KEY);
-    return isValidNetworkSettings(raw) ? raw : DEFAULT_NETWORK_SETTINGS;
   }
 
   /**

@@ -18,7 +18,6 @@ import { assessRecipient } from "@gleam/core/src/recipients/index.ts";
 import {
   capabilityRefusal,
   collectibleSendRefusal,
-  DEFAULT_HYPERBEAM_PEER_URLS,
   isHardwareWalletMethod,
   type ActivityEntry,
   type CollectibleSendDraft,
@@ -35,13 +34,12 @@ import {
   type TransferFeeQuote,
   type Wallet,
   type Winston,
-  isValidNetworkSettings,
 } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { activityLogKey, loadActivityLog, loadWallets, parseActivityLog, requireWallet } from "../stored-data";
-import { NETWORK_SETTINGS_KEY, CONTACTS_KEY } from "../storage-keys";
+import { activityLogKey, loadActivityLog, loadNetworkSettings, loadWallets, parseActivityLog, requireWallet } from "../stored-data";
+import { CONTACTS_KEY } from "../storage-keys";
 import { dappError } from "../dapp-error";
 import { assertNameTargetMatches, assertTransferMatches } from "./prepared-check";
 import { readL1NodeUrls } from "../peers";
@@ -95,12 +93,6 @@ function approvedFee(req: { fee?: Winston | null }): Winston {
 
 const FIRST_SEEN_LOOKUP_LIMIT = 100;
 
-const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
-  gatewayUrl: "https://arweave.net",
-  peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
-  activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
-};
-
 /** The collectibles cache a sent collectible is dropped from; `ReadsHandler` behind the scenes. */
 export interface CollectibleCache {
   forgetCollectible(req: { address: string; id: string }): Promise<void>;
@@ -131,9 +123,8 @@ export class TransferHandler {
     return this.tokens.tokenTransport({ processId: req.token });
   }
 
-  private async loadNetworkSettings(): Promise<NetworkSettings> {
-    const raw = await this.storage.get<unknown>(NETWORK_SETTINGS_KEY);
-    return isValidNetworkSettings(raw) ? raw : DEFAULT_NETWORK_SETTINGS;
+  private loadNetworkSettings(): Promise<NetworkSettings> {
+    return loadNetworkSettings(this.storage);
   }
 
   private async loadWallet(walletId: string): Promise<Wallet> {

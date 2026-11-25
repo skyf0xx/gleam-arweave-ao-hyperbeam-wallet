@@ -822,7 +822,7 @@ export function createRuntime(platform: Platform): Runtime {
    * (`resolveInitialGatewayUrl` — pure, given `fetch`). Only ever writes
    * `NETWORK_SETTINGS_KEY` when it was previously empty, so a user's own
    * gateway choice is never touched. Errors are swallowed: this must never
-   * block startup, and `reads.ts`'s own `DEFAULT_NETWORK_SETTINGS` fallback
+   * block startup, and `stored-data.ts`'s `DEFAULT_NETWORK_SETTINGS` fallback
    * already covers "nothing was ever written" for every other read path.
    */
   async function initializeNetworkSettingsIfMissing(): Promise<void> {

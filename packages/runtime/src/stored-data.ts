@@ -1,6 +1,15 @@
-import { isRecord, isValidWallet, type ActivityEntry, type StoragePort, type Wallet } from "@gleam/core";
+import {
+  DEFAULT_HYPERBEAM_PEER_URLS,
+  isRecord,
+  isValidNetworkSettings,
+  isValidWallet,
+  type ActivityEntry,
+  type NetworkSettings,
+  type StoragePort,
+  type Wallet,
+} from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
-import { ACTIVITY_LOG_KEY_PREFIX, WALLETS_KEY } from "./storage-keys";
+import { ACTIVITY_LOG_KEY_PREFIX, NETWORK_SETTINGS_KEY, WALLETS_KEY } from "./storage-keys";
 import { updateStored } from "./storage-update";
 
 /** The valid wallets in a stored value; a record that fails the guard is dropped, never repaired. */
@@ -58,4 +67,16 @@ export function parseActivityLog(raw: unknown): ActivityEntry[] {
 
 export async function loadActivityLog(storage: StoragePort, address: string): Promise<ActivityEntry[]> {
   return parseActivityLog(await storage.get<unknown>(activityLogKey(address)));
+}
+
+export const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
+  gatewayUrl: "https://arweave.net",
+  peers: DEFAULT_HYPERBEAM_PEER_URLS.map((url) => ({ url, enabled: true })),
+  activePeerUrl: DEFAULT_HYPERBEAM_PEER_URLS[0] ?? null,
+};
+
+/** The settings as the user saved them: no discovered peers merged in. */
+export async function loadNetworkSettings(storage: StoragePort): Promise<NetworkSettings> {
+  const raw = await storage.get<unknown>(NETWORK_SETTINGS_KEY);
+  return isValidNetworkSettings(raw) ? raw : DEFAULT_NETWORK_SETTINGS;
 }
