@@ -44,6 +44,7 @@ export type { Announcement } from "./announcement";
 export type { ReviewMoment } from "./review-prompt";
 export { isValidArweaveAddress, isValidContact } from "./contact";
 export type { Winston, Balance, PendingAmounts, PendingTransfer, TokenBalance } from "./balance";
+export { atomicString } from "./balance";
 export type { Collectible, CollectibleKind, CollectibleRef, CollectibleSendDraft, CollectibleSendRequest, NameTargetDraft, NameTargetRequest, PermawebName } from "./collectible";
 export { collectibleKind, collectibleSendRefusal, nameSiteUrl, permawebNameLabel } from "./collectible";
 export type {
@@ -62,6 +63,10 @@ export type {
   AoTokenTransferResult,
 } from "./transfer";
 export type { Tag } from "./tag";
+export { tagValue } from "./tag";
+export { concatBytes, sha256 } from "./bytes";
+export { mapLimit } from "./concurrency";
+export { isSuccessStatus, withRequestTimeout } from "./http";
 export { isPlainRecord, isRecord } from "./guards";
 export { ARWEAVE_ID, isArweaveId } from "./arweave-id";
 export { errorMessage } from "./error-message";
