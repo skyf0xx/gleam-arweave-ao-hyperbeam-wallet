@@ -70,6 +70,10 @@ tests check Gleam's ANS-104 bytes against it.
   `server.url` and no live-update plugin (`capacitor.config.mobile.test.ts`).
 - `apps/points-api`: the Gleam Points server (Hono, Postgres, runs with
   `tsx` on Railway).
+- `apps/site`: gleamwallet.app, plain HTML with no build step. Each page
+  is a folder (`<page>/index.html` beside its own CSS and JS), shared files
+  are in `shared/`, and `vercel.json` rewrites `/<page>.html` to it so
+  public URLs don't change (`apps/site/README.md`).
 - `scripts/scan/`: the `pnpm scan start|finish` CLI that scan agents run
   (spec in `SCANS.md`).
 

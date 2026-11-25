@@ -8,7 +8,7 @@ import {
   $,
   el,
   formatPoints,
-} from "./scan-lib.js";
+} from "../scan/scan-lib.js";
 import {
   appAttestHref,
   checkGleam,
@@ -18,10 +18,10 @@ import {
   roundSummary,
   sendAttestation,
   sumPoints,
-} from "./scan-attest.js";
+} from "../scan/scan-attest.js";
 import {
   resultsHref,
-} from "./scan-api.js";
+} from "../scan/scan-api.js";
 
 const link = decodeAttestationLink(location.hash);
 const result = $("[data-result]");

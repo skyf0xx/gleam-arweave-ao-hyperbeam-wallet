@@ -25,7 +25,7 @@ import {
   roundLabel,
   roundStepPercent,
   unusedModels,
-} from "../apps/site/scan-lib.js";
+} from "../apps/site/scan/scan-lib.js";
 import {
   appAttestHref,
   decodeAttestationFragment,
@@ -36,7 +36,7 @@ import {
   sendAttestation,
   sumPoints,
   checkGleam,
-} from "../apps/site/scan-attest.js";
+} from "../apps/site/scan/scan-attest.js";
 import {
   MIN_PAID_SCANS_PER_MINOR_RELEASE,
   MIN_PAID_SCANS_PER_RELEASE,
@@ -49,7 +49,7 @@ import {
   nextScanReward,
   placesOf,
   resultsHref,
-} from "../apps/site/scan-api.js";
+} from "../apps/site/scan/scan-api.js";
 
 /** A decoded round, as `decodeAttestationLink` documents it (the site lib is plain JS). */
 type Round = { ok: true; payload: string; attestation: { report: string } } | { ok: false; payload: string; error: string };
@@ -66,8 +66,8 @@ const attestation = {
 
 describe("site pages", () => {
   it.each(["attest", "scan", "review-results"])("%s.html has every element its script looks up", (name) => {
-    const script = readFileSync(`apps/site/${name}.js`, "utf8");
-    const page = readFileSync(`apps/site/${name}.html`, "utf8");
+    const script = readFileSync(`apps/site/${name}/${name}.js`, "utf8");
+    const page = readFileSync(`apps/site/${name}/index.html`, "utf8");
     const attributes = [...script.matchAll(/\$\("\[(data-[a-z-]+)\]"\)/g)].map(([, attribute]) => attribute!);
     expect(attributes.length).toBeGreaterThan(0);
     // A lookup that misses throws before the page wires up the rest.

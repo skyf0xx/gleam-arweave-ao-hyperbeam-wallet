@@ -225,7 +225,7 @@
   function warm() {
     if (warmed || !window.fetch) return;
     warmed = true;
-    ["gleam.html", "gleam.css", "gleam.js"].forEach(function (url) {
+    ["/gleam.html", "/gleam/gleam.css", "/gleam/gleam.js"].forEach(function (url) {
       window.fetch(url, { priority: "low" }).catch(function () {});
     });
   }

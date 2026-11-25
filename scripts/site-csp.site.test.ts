@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SITE = join(__dirname, "../apps/site");
+
+// Every page: the home page and each folder's index.html.
+const PAGES = ["index.html", ...readdirSync(SITE).filter((dir) => existsSync(join(SITE, dir, "index.html"))).map((dir) => `${dir}/index.html`)];
 
 function contentSecurityPolicy(): string {
   const config = JSON.parse(readFileSync(join(SITE, "vercel.json"), "utf8")) as {
@@ -19,7 +22,7 @@ function contentSecurityPolicy(): string {
 describe("site CSP", () => {
   const scriptSrc = contentSecurityPolicy().match(/script-src ([^;]+)/)?.[1] ?? "";
 
-  for (const page of readdirSync(SITE).filter((file) => file.endsWith(".html"))) {
+  for (const page of PAGES) {
     it(`allows every inline script in ${page}`, () => {
       const html = readFileSync(join(SITE, page), "utf8");
       for (const [, body] of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
@@ -38,7 +41,7 @@ describe("site CSP", () => {
   });
 
   it("loads every script from the site", () => {
-    for (const page of readdirSync(SITE).filter((file) => file.endsWith(".html"))) {
+    for (const page of PAGES) {
       const html = readFileSync(join(SITE, page), "utf8");
       for (const [, src] of html.matchAll(/<script[^>]*\bsrc="([^"]*)"/gi)) {
         expect(src, `${page} loads a remote script`).not.toMatch(/^(https?:)?\/\//i);
@@ -47,7 +50,7 @@ describe("site CSP", () => {
   });
 
   it("never allows inline event handlers", () => {
-    for (const page of readdirSync(SITE).filter((file) => file.endsWith(".html"))) {
+    for (const page of PAGES) {
       expect(readFileSync(join(SITE, page), "utf8")).not.toMatch(/\son[a-z]+="/i);
     }
   });

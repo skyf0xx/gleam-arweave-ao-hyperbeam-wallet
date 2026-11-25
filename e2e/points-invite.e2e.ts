@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
  * to the built extension over externally_connectable. The site's files are
  * served under its real origin, since externally_connectable matches only
  * that origin. The unpacked extension's id differs from the store id, so
- * pages.js is served with the test id swapped in.
+ * shared/pages.js is served with the test id swapped in.
  */
 const extensionPath = fileURLToPath(new URL("../apps/extension/.output/chrome-mv3", import.meta.url));
 const siteDir = fileURLToPath(new URL("../apps/site/", import.meta.url));
@@ -46,11 +46,13 @@ test.beforeAll(async () => {
     route.fulfill({ json: { result: "ok", kind: "member" } }),
   );
   await context.route(`${SITE}/**`, async (route) => {
-    const path = new URL(route.request().url()).pathname.replace(/^\//, "") || "index.html";
+    const requested = new URL(route.request().url()).pathname.replace(/^\//, "") || "index.html";
+    // vercel.json serves /x.html from x/index.html.
+    const path = requested.replace(/^([a-z-]+)\.html$/, (whole, page) => (existsSync(`${siteDir}${page}/index.html`) ? `${page}/index.html` : whole));
     const file = `${siteDir}${path}`;
     if (!existsSync(file)) return route.fulfill({ status: 404 });
     let body: string | Buffer = readFileSync(file);
-    if (path === "pages.js") body = body.toString().replace(STORE_EXTENSION_ID, extensionId);
+    if (path === "shared/pages.js") body = body.toString().replace(STORE_EXTENSION_ID, extensionId);
     await route.fulfill({ body, contentType: CONTENT_TYPES[extname(path)] ?? "application/octet-stream" });
   });
 });

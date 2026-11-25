@@ -185,7 +185,7 @@
   flex: none;
   width: 13px;
   height: 15px;
-  background: url("favicon.svg") center / contain no-repeat;
+  background: url("/favicon.svg") center / contain no-repeat;
 }
 
 /* The record: what anyone can check on the results page. Hairlines, modest figures. */

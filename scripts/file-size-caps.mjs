@@ -8,8 +8,8 @@ export const MAX_LINES = 400;
 /** @type {Record<string, number>} */
 export const FILE_SIZE_CAPS = {
   // Classic scripts shared through window; splitting waits on moving the site to ES modules (todo.md).
-  "apps/site/gleam.js": 1716,
-  "apps/site/program.js": 713,
+  "apps/site/gleam/gleam.js": 1716,
+  "apps/site/shared/program.js": 713,
   "eslint.config.js": 404,
   // One view over one native page; every effect reads the same page state.
   "packages/app/src/screens/browser/src/BrowserView.tsx": 416,
