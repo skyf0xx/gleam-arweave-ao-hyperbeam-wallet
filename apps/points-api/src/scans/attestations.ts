@@ -21,7 +21,7 @@ import {
   type ScanIssue,
 } from "@gleam/core/src/scan/index.ts";
 import { z } from "zod";
-import type { Db, Queryable } from "../db";
+import { queryNumber, type Db, type Queryable } from "../db";
 import { GithubUnavailableError, type GithubClient, type ReleaseFunction } from "./github";
 import { owner, walletSigned } from "../request-fields";
 import { answeredFunctions, areaSummaries, areasLeft, examinedFunctions, functionKey, walletAreas, type AreaSummary } from "./areas";
@@ -165,11 +165,7 @@ function invalidAttestation(issues: ScanIssue[]): ScanFailure {
 }
 
 async function attestationTotal(db: Queryable, release: string): Promise<number> {
-  const { rows } = await db.query<{ total: string }>(
-    "SELECT count(*)::text AS total FROM attestations WHERE release = $1 AND voided_at IS NULL",
-    [release],
-  );
-  return Number(rows[0]!.total);
+  return queryNumber(db, "SELECT count(*)::text AS total FROM attestations WHERE release = $1 AND voided_at IS NULL", [release], "total");
 }
 
 async function distinctModels(db: Queryable, release: string): Promise<string[]> {
@@ -361,11 +357,12 @@ export async function submitAttestation(
 
 /** The wallet's non-voided scans of the release; the next one is this plus one. */
 export async function walletRoundsDone(db: Queryable, address: string, release: string): Promise<number> {
-  const { rows } = await db.query<{ n: string }>(
+  return queryNumber(
+    db,
     "SELECT count(*)::text AS n FROM attestations WHERE address = $1 AND release = $2 AND voided_at IS NULL",
     [address, release],
+    "n",
   );
-  return Number(rows[0]!.n);
 }
 
 /** `already_attested` when the wallet has scanned the challenge's area, naming the least-covered area it can scan instead. */

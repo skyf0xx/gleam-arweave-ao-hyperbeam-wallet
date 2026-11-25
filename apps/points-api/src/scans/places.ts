@@ -1,5 +1,5 @@
 import { paidPlacesFor } from "@gleam/core/src/scan/index.ts";
-import type { Queryable } from "../db";
+import { queryNumber, type Queryable } from "../db";
 import type { GithubClient, ReleaseFunction } from "./github";
 import { examinedFunctions } from "./areas";
 
@@ -43,10 +43,11 @@ export async function paidPlaces(db: Queryable, github: GithubClient, release: s
     const latest = await github.latestRelease();
     total = latest?.release === release ? await openRelease(db, release, (await github.filesAt(latest.commit)).functions) : 0;
   }
-  const { rows } = await db.query<{ taken: string }>(
+  const taken = await queryNumber(
+    db,
     "SELECT count(*)::text AS taken FROM attestations WHERE release = $1 AND paid AND voided_at IS NULL",
     [release],
+    "taken",
   );
-  const taken = Number(rows[0]!.taken);
   return { total, taken, left: Math.max(0, total - taken) };
 }

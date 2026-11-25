@@ -19,7 +19,7 @@ import {
   submitRequest,
 } from "./scans/attestations";
 import { poolBalance } from "./scans/bounty";
-import type { Db } from "./db";
+import { queryNumber, type Db } from "./db";
 import { createGithubClient, type GithubClient } from "./scans/github";
 import { authenticateDevice, deviceSignedRequest, recordHeartbeat } from "./wallets/heartbeat";
 import { checkInviteCode, inviteCheckRequest, redeemInviteCode, redeemRequest } from "./wallets/invite";
@@ -150,7 +150,7 @@ export function createApp(deps: AppDeps): Hono {
     const foundingMembers =
       statsCache.get() ??
       statsCache.set(
-        Number((await deps.db.query<{ count: string }>("SELECT count(founding_number)::text AS count FROM wallets")).rows[0]!.count),
+        await queryNumber(deps.db, "SELECT count(founding_number)::text AS count FROM wallets", [], "count"),
       );
     c.header("Cache-Control", SHARED_CACHE_CONTROL);
     return c.json({ foundingMembers });

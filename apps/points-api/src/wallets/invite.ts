@@ -7,7 +7,7 @@ import {
   verifyDeviceSignature,
 } from "@gleam/core/src/points/index.ts";
 import { z } from "zod";
-import type { Db, Queryable } from "../db";
+import { queryNumber, type Db, type Queryable } from "../db";
 import { deviceMessage, devicePublicKey, deviceSignature } from "../request-fields";
 
 export const MEMBER_CODE_SEATS = 3;
@@ -151,8 +151,6 @@ async function seatsForCode(
   if (!drop.rows[0]) return null;
   const seats = drop.rows[0].seats;
   if (pointsPhase !== 1 || seats === null) return { kind: "drop", seatsLeft: null };
-  const used = await db.query<{ n: string }>("SELECT count(*)::text AS n FROM invite_redemptions WHERE code = $1", [
-    code,
-  ]);
-  return { kind: "drop", seatsLeft: Math.max(0, seats - Number(used.rows[0]!.n)) };
+  const used = await queryNumber(db, "SELECT count(*)::text AS n FROM invite_redemptions WHERE code = $1", [code], "n");
+  return { kind: "drop", seatsLeft: Math.max(0, seats - used) };
 }

@@ -1,4 +1,4 @@
-import type { Db } from "../db";
+import { queryNumber, type Db } from "../db";
 import { GithubUnavailableError, type GithubClient } from "./github";
 
 export interface BackfillPlan {
@@ -56,14 +56,15 @@ export async function planExaminedBackfill(db: Db, github: GithubClient): Promis
 export async function applyExaminedBackfill(db: Db, plan: BackfillPlan): Promise<number> {
   if (plan.rows.length === 0) return 0;
   return db.transaction(async (tx) => {
-    const { rows } = await tx.query<{ n: string }>(
+    return queryNumber(
+      tx,
       `WITH added AS (
          INSERT INTO examined_functions (attestation_id, file, symbol, fingerprint)
          SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[])
          ON CONFLICT DO NOTHING RETURNING 1
        ) SELECT count(*)::text AS n FROM added`,
       [plan.rows.map((r) => r.attestationId), plan.rows.map((r) => r.file), plan.rows.map((r) => r.symbol), plan.rows.map((r) => r.fingerprint)],
+      "n",
     );
-    return Number(rows[0]!.n);
   });
 }

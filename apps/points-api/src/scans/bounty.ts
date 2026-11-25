@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import type { Db, Queryable } from "../db";
+import { queryBigInt, type Db, type Queryable } from "../db";
 
 /**
  * Nothing below medium is paid (SCANS.md § Points). `fix` is the bonus for a
@@ -135,8 +135,7 @@ async function readAttestation(db: Queryable, id: string, lock = false): Promise
 
 /** The pool's balance: the sum of its ledger. */
 export async function poolBalance(db: Queryable): Promise<bigint> {
-  const { rows } = await db.query<{ balance: string }>("SELECT coalesce(sum(delta_atomic), 0)::text AS balance FROM bounty_pool");
-  return BigInt(rows[0]!.balance);
+  return queryBigInt(db, "SELECT coalesce(sum(delta_atomic), 0)::text AS balance FROM bounty_pool", [], "balance");
 }
 
 async function assertAwardable(db: Queryable, options: AwardOptions, lock = false) {
@@ -311,9 +310,10 @@ async function dockable(db: Queryable, options: DockOptions): Promise<bigint> {
 }
 
 async function sumPoints(db: Queryable, attestationId: string, kind: "scan" | "finding" | "dock"): Promise<bigint> {
-  const { rows } = await db.query<{ total: string }>(
+  return queryBigInt(
+    db,
     "SELECT coalesce(sum(amount_atomic), 0)::text AS total FROM scan_points WHERE attestation_id = $1 AND kind = $2",
     [attestationId, kind],
+    "total",
   );
-  return BigInt(rows[0]!.total);
 }

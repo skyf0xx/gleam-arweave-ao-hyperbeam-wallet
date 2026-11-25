@@ -1,4 +1,4 @@
-import type { Queryable } from "../db";
+import { queryNumber, type Queryable } from "../db";
 import { MEMBER_SEAT_BALANCE_SQL } from "../wallets/invite";
 
 const RETENTION_DAYS = 28;
@@ -65,8 +65,11 @@ export async function readFunnel(db: Queryable, now: Date): Promise<Funnel> {
   const member = counts(Number(row(false)?.redemptions ?? 0), Number(row(false)?.claims ?? 0));
   const drop = counts(Number(row(true)?.redemptions ?? 0), Number(row(true)?.claims ?? 0));
 
-  const unused = await db.query<{ n: string }>(
+  const unused = await queryNumber(
+    db,
     `SELECT coalesce(sum(greatest(0, ${MEMBER_SEAT_BALANCE_SQL})), 0)::text AS n FROM wallets w`,
+    [],
+    "n",
   );
 
   const drops = await db.query<{
@@ -101,7 +104,7 @@ export async function readFunnel(db: Queryable, now: Date): Promise<Funnel> {
     member,
     drop,
     seatsRefilled: member.claims,
-    memberSeatsUnused: Number(unused.rows[0]!.n),
+    memberSeatsUnused: unused,
     dropCodes: drops.rows.map((r) => {
       const used = Number(r.used);
       const first = r.first ? new Date(r.first) : null;
