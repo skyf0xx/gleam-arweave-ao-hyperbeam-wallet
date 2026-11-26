@@ -38,6 +38,11 @@ If a change touches signing, network requests, or extension wiring, also load
 `apps/extension/.output/chrome-mv3` unpacked in Chrome and check it by hand —
 none of the automated checks exercise the real extension runtime.
 
+## Code style
+
+Code follows the ESLint rules in [eslint.config.js](eslint.config.js)
+and the conventions in [CLAUDE.md](CLAUDE.md).
+
 ## Conventions
 
 Read [CLAUDE.md](CLAUDE.md) first — it covers the architecture (hexagonal
@@ -52,7 +57,7 @@ signing) and the patterns a change is expected to follow.
   through `packages/messaging`.
 - Tests sit next to the file they test (`foo.ts` → `foo.*.test.ts`). Mock the
   network with a stubbed `fetch`, not a live gateway.
-- Comments explain non-obvious *why*, not the change that produced the code.
+- Comments explain non-obvious _why_, not the change that produced the code.
 
 ## Security
 
