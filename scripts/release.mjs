@@ -7,6 +7,7 @@
 import { execFileSync } from "node:child_process";
 import process from "node:process";
 import { parseArgs } from "node:util";
+import { readChangelogSection } from "./changelog.mjs";
 import { assertCleanBranch, git, printGate, repoRoot, runGate } from "./release-gate.mjs";
 
 const BRANCH = "master";
@@ -36,6 +37,13 @@ if (head !== upstream) refuse(`HEAD ${head.slice(0, 12)} is not ${REMOTE}/${BRAN
 const result = runGate({ cwd: root });
 printGate(result);
 if (!result.ok) process.exit(1);
+
+// release.yml fails without notes, and by then the tag is already pushed.
+try {
+  readChangelogSection(root, result.version);
+} catch (error) {
+  refuse(/** @type {Error} */ (error).message);
+}
 
 const tag = `v${result.version}`;
 if (git(root, ["rev-parse", "--verify", "--quiet", `refs/tags/${tag}`]).ok) refuse(`tag ${tag} already exists locally`);

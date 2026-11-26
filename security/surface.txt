@@ -265,6 +265,7 @@
 5 apps/extension/src/adapters/app-platform.ts
 5 scripts/well-known.mjs
 5 scripts/release-all.mjs
+5 scripts/changelog.mjs
 5 scripts/pack-release.sh
 5 packages/runtime/src/device-key-store.ts
 5 security/surface-exempt.txt

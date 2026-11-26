@@ -262,6 +262,7 @@
 /apps/extension/src/adapters/app-platform.ts                        @skyf0xx
 /scripts/well-known.mjs                                            @skyf0xx
 /scripts/release-all.mjs                                           @skyf0xx
+/scripts/changelog.mjs                                             @skyf0xx
 /scripts/pack-release.sh                                            @skyf0xx
 /packages/runtime/src/device-key-store.ts                                @skyf0xx
 /security/surface-exempt.txt                                               @skyf0xx
