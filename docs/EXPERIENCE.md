@@ -72,7 +72,6 @@ explicit confirmation naming exactly what gets wiped).
 ## Flow: Receive
 
 Single screen (Routine): QR code, full untruncated address, one-tap copy.
-Dual-address type switcher deferred to Phase 2 (Ethereum keys).
 
 ## Flow: Tokens & activity
 
