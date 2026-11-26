@@ -86,7 +86,9 @@ beforeAll(() => {
   writeFileSync(join(stage, "manifest.json"), '{"name":"Gleam"}');
   sh(stage, "zip", ["-q", join(base, TAG, ZIP), "manifest.json"]);
 
-  fake("gh", 'exit "$GH_EXIT"');
+  // `gh release download <tag> --repo <r> --pattern <file> --output <path>` serves
+  // the draft's files; every other call (the attestation check) exits GH_EXIT.
+  fake("gh", `if [ "$1 $2" = "release download" ]; then cp "${base}/$3/$7" "$9"; exit; fi; exit "$GH_EXIT"`);
   fake("pnpm", "exit 1");
   fake("keepassxc-cli", 'echo key > "${@: -1}"');
   // chrome --pack-extension=<dir> writes <dir>.crx next to it.
@@ -140,6 +142,16 @@ describe("pack-release.sh", () => {
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain("refusing to pack");
     expect(run.calls.map((call) => call.split(" ")[0])).toEqual(["gh"]);
+  });
+
+  it("downloads a draft release through gh when the public URL has nothing", () => {
+    publish(goodManifest());
+    const run = pack({ GLEAM_RELEASE_BASE_URL: `file://${join(root, "no-public-release")}` });
+    expect(run.status, run.stderr).toBe(0);
+    expect(existsSync(join(run.out, `${TAG}.crx`))).toBe(true);
+    expect(run.calls[0]).toContain(`gh release download ${TAG} --repo owner/repo --pattern release-manifest.json --output `);
+    expect(run.calls[1]).toContain(`gh release download ${TAG} --repo owner/repo --pattern ${ZIP} --output `);
+    expect(run.calls.slice(2).map((call) => call.split(" ")[0])).toEqual(["gh", "keepassxc-cli", "chrome"]);
   });
 
   it("refuses a zip whose hash differs from the manifest before asking gh", () => {
