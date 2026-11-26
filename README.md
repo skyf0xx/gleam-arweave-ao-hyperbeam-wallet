@@ -1,4 +1,4 @@
-# Gleam
+<img src="docs/branding/images/readme-banner.png" alt="Gleam" width="100%" />
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17147/badge)](https://www.bestpractices.dev/projects/17147)
 
