@@ -11,6 +11,15 @@ Node 22+ and pnpm (see `packageManager` in [package.json](package.json)) are
 required. The `prepare` script installs a [lefthook](lefthook.yml)
 pre-commit hook that runs eslint and tsc on staged files — don't skip it.
 
+## Reporting bugs and requesting features
+
+Open a [GitHub issue](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/issues)
+for a bug or an enhancement. For a bug, say what you did, what you expected,
+what happened, and the Gleam version and browser or device. Never include a
+keyfile, private key or password. You can also use the form at
+[gleamwallet.app/feedback](https://gleamwallet.app/feedback). Vulnerabilities
+go through [SECURITY.md](SECURITY.md), not a public issue.
+
 ## Before opening a PR
 
 ```bash
