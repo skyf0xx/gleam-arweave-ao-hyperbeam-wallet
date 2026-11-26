@@ -104,6 +104,23 @@ jobs:
             echo "built-at=$built_at"
           } >> "$GITHUB_OUTPUT"
 
+      # Before pnpm install and uploaded at once, so no install script can
+      # rewrite the notes. A release with no notes fails here.
+      - name: Read this release's notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-notes
+          node scripts/changelog.mjs "$VERSION" > release-notes/changes.md \
+            || { echo "::error::CHANGELOG.md has no notes for v$VERSION: add a '## v$VERSION (<date>)' section"; exit 1; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: release-notes/changes.md
+          if-no-files-found: error
+          retention-days: 7
+
       # No dependency cache: a cache written by another run must not feed
       # a release build.
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -186,6 +203,10 @@ jobs:
         with:
           name: release-zip
           path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: release-notes
 
       - name: Check the zip is the one that was built
         env:
@@ -237,7 +258,15 @@ jobs:
             > dist/release-manifest.json
           cat dist/release-manifest.json
 
-          cat > dist/notes.md <<EOF
+          grep -q '[^[:space:]]' release-notes/changes.md \
+            || { echo "::error::the notes for $TAG are empty"; exit 1; }
+          {
+            printf "## What's changed\n\n"
+            cat release-notes/changes.md
+            printf '\n'
+          } > dist/notes.md
+
+          cat >> dist/notes.md <<EOF
           Gleam $TAG, built from $COMMIT.
 
           SHA-256 of \`$ZIP_NAME\`: \`$ZIP_SHA256\`
