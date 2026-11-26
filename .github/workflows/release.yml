@@ -2,7 +2,9 @@ name: Release
 
 # pnpm release --yes pushes a signed tag v<version>; this builds that commit,
 # attests the extension zip, hashes the mobile apps' web bundle into the
-# manifest and publishes it all as a GitHub Release. The Chrome Web Store
+# manifest and puts it all in a draft GitHub Release. release-app.sh
+# android-apk adds the APK and publishes it, and the repo's immutable
+# releases then lock its tag and files. The Chrome Web Store
 # and app store uploads stay manual, so no store credentials live in CI.
 on:
   push:
@@ -186,7 +188,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # Runs no repository code: it only attests and publishes the built zip.
+  # Runs no repository code: it only attests the built zip and drafts the release.
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -333,7 +335,7 @@ jobs:
           The native shell is not reproducible, because the stores re-sign it. The apps can reach the stores a day or two after the extension, since store review takes time.
           EOF
 
-      - name: Publish the release
+      - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -343,6 +345,6 @@ jobs:
           gh release create "$TAG" \
             "dist/$ZIP_NAME" "dist/$ZIP_NAME.intoto.jsonl" dist/release-manifest.json sbom/*.cdx.json \
             --verify-tag \
-            --latest \
+            --draft \
             --title "Gleam $TAG" \
             --notes-file dist/notes.md

@@ -45,10 +45,13 @@ key or store credential.
 4. **Bump, tag and extension.** `pnpm release:all <major|minor|patch>`
    sets one version in the extension, the mobile package, iOS and Android
    (`scripts/app-versions.mjs`), adds 1 to both build numbers, and opens
-   the bump PR. After the merge it tags, and `release.yml` publishes the
-   zip and `release-manifest.json` (with `mobileBundleSha256`) as a GitHub
-   Release. Run `scripts/verify-release.sh v<version>` in its own terminal
-   session first: it rebuilds the tag and runs npm code. `pack-release.sh`
+   the bump PR. After the merge it tags, and `release.yml` puts the zip
+   and `release-manifest.json` (with `mobileBundleSha256`) in a draft
+   GitHub Release. Releases are immutable once published, so the draft
+   stays open until `release-app.sh … android-apk` adds `gleam.apk` and
+   publishes it. A mistake found after that ships as a new patch version.
+   Run `scripts/verify-release.sh v<version>` in its own terminal session
+   first: it rebuilds the tag and runs npm code. `pack-release.sh`
    then checks the Release's zip against its manifest, its attestation
    and the receipt the rebuild left, and signs that zip as the `.crx`,
    running no npm code. Without a matching receipt it refuses.
@@ -69,7 +72,7 @@ key or store credential.
 
 ## The three signed builds
 
-Once the GitHub Release exists and `scripts/verify-release.sh v<version>`
+Once the draft GitHub Release exists and `scripts/verify-release.sh v<version>`
 has passed in another terminal session, the three signed builds come from
 a clean checkout of the tag:
 
@@ -78,3 +81,7 @@ scripts/pack-release.sh v<version> --kdbx <db> && \
 apps/mobile/scripts/release-app.sh v<version> ios --kdbx <db> && \
 apps/mobile/scripts/release-app.sh v<version> android-apk --kdbx <db>
 ```
+
+The last command publishes the release. Until then `verify-release.sh`
+and `pack-release.sh` read the draft through `gh`, since a draft has no
+public download URL.

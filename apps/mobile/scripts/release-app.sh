@@ -90,6 +90,9 @@ if [ "$target" = android-apk ]; then
   gh release view "$tag" > /dev/null 2>&1 || { echo "no GitHub Release for $tag yet; wait for release.yml" >&2; exit 2; }
   gh release view "$tag" --json assets -q '.assets[].name' | grep -qx gleam.apk \
     && { echo "$tag already has gleam.apk; delete that asset first to replace it" >&2; exit 2; }
+  # Published releases are immutable, so the APK can only go into the draft.
+  [ "$(gh release view "$tag" --json isDraft -q .isDraft)" = true ] \
+    || { echo "$tag is already published and can no longer take an APK; release a new patch version" >&2; exit 2; }
 fi
 
 # Fastlane and Gradle need newer tools than macOS ships; fail now, not after
@@ -266,6 +269,9 @@ if [ "$target" = android-apk ]; then
   gh release edit "$tag" --notes "$notes
 
 Android APK \`gleam.apk\` SHA-256: \`$apk_sha\`" > /dev/null || exit 1
+  # The APK is the last file in, so publish now: from here the tag and files
+  # are locked, and releases/latest points here.
+  gh release edit "$tag" --draft=false --latest > /dev/null || exit 1
   # Only now is there an APK to download, so only now are installs told.
   "$repo_root/scripts/publish-latest.sh" "$tag" android || exit 1
 fi

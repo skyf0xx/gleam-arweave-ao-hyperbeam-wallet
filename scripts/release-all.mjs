@@ -18,8 +18,9 @@
 //      .well-known files, run scripts/release.mjs --yes (signed tag + push).
 //      Confirms before tagging, since a tag CI has already built on is not
 //      something to casually re-push.
-//   3. Wait for you to confirm the GitHub Release (with its zip and
-//      release-manifest.json) exists for that tag.
+//   3. Wait for you to confirm the draft GitHub Release (with its zip and
+//      release-manifest.json) exists for that tag. release-app.sh
+//      android-apk publishes it later, after adding the APK.
 //   4. Ask you to run scripts/verify-release.sh in another terminal (it
 //      rebuilds from source, running npm code), then run
 //      scripts/pack-release.sh, which checks the Release's zip against the
@@ -150,7 +151,7 @@ run("node", ["scripts/release.mjs", "--yes"], root);
 
 process.stdout.write("\n== Stage 3: CI build ==\n");
 process.stdout.write(`release.yml is now building and attesting v${next} from the pushed tag.\n`);
-await pause(`Watch it finish, confirm the GitHub Release for v${next} has its zip and release-manifest.json, then`);
+await pause(`Watch it finish, confirm the draft GitHub Release for v${next} has its zip and release-manifest.json, then`);
 
 // --- stage 4: pack and sign -------------------------------------------------
 
