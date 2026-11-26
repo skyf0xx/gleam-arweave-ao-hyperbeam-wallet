@@ -198,6 +198,18 @@ jobs:
         with:
           subject-path: dist/${{ needs.build.outputs.zip-name }}
 
+      # Scorecard's Signed-Releases check and offline verifiers read the
+      # provenance from a release asset, not from GitHub's attestation store.
+      - name: Save the attestation bundle as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ZIP_NAME: ${{ needs.build.outputs.zip-name }}
+        run: |
+          set -euo pipefail
+          gh attestation download "dist/$ZIP_NAME" --repo "$REPO"
+          mv sha256:*.jsonl "dist/$ZIP_NAME.intoto.jsonl"
+
       - name: Write release-manifest.json and notes
         env:
           VERSION: ${{ needs.build.outputs.version }}
@@ -245,6 +257,12 @@ jobs:
           gh attestation verify $ZIP_NAME --repo $REPO
           \`\`\`
 
+          Or check it offline with the bundle in \`$ZIP_NAME.intoto.jsonl\`:
+
+          \`\`\`bash
+          gh attestation verify $ZIP_NAME --repo $REPO --bundle $ZIP_NAME.intoto.jsonl
+          \`\`\`
+
           Build provenance: $ATTESTATION
 
           ## Mobile apps
@@ -268,7 +286,7 @@ jobs:
           ZIP_NAME: ${{ needs.build.outputs.zip-name }}
         run: |
           gh release create "$TAG" \
-            "dist/$ZIP_NAME" dist/release-manifest.json \
+            "dist/$ZIP_NAME" "dist/$ZIP_NAME.intoto.jsonl" dist/release-manifest.json \
             --verify-tag \
             --latest \
             --title "Gleam $TAG" \
