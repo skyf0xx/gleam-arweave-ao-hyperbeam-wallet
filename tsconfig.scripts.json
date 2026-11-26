@@ -28,6 +28,7 @@
     "apps/mobile/*.test.ts",
     "apps/mobile/scripts/*.ts",
     "apps/mobile/scripts/*.mjs",
-    "apps/site-open/*.test.ts"
+    "apps/site-open/*.test.ts",
+    "apps/site/*.test.ts"
   ]
 }

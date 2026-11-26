@@ -38,6 +38,9 @@ and `apps/site-open` link to them. Asset paths in a page are root-absolute
   itself (`{ "android": "1.54.0" }`). An older install shows an update
   notice. `scripts/publish-latest.sh` sets it once the build is
   downloadable.
+- **`.well-known/security.txt`**: where to report a vulnerability
+  (RFC 9116). `well-known.test.ts` fails 30 days before its `Expires`
+  date.
 - **`img/`, `fonts/`**: images and fonts.
 
 ## Location
