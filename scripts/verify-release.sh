@@ -11,8 +11,9 @@
 #      (ignores _metadata/ and the key/update_url fields the Chrome Web Store
 #      adds to manifest.json)
 #
-# Needs git, node, pnpm, curl, unzip and shasum or sha256sum. Builds in the
-# current checkout if it is clean and at the tag, else in a temporary clone.
+# Needs git, node, pnpm, curl, unzip and shasum or sha256sum, and gh for a
+# draft release (one whose APK is not uploaded yet). Builds in the current
+# checkout if it is clean and at the tag, else in a temporary clone.
 #
 # Overrides, for testing against a local stand-in:
 #   GLEAM_RELEASE_BASE_URL  default https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/download
@@ -124,9 +125,17 @@ fi
 
 # --- published files ----------------------------------------------------------
 
+# A release stays a draft until its APK is uploaded, and a draft has no public
+# download URL, so a run by the maintainer falls back to gh's authenticated one.
+fetch_release_file() {
+  curl -fsSL --retry 2 -o "$2" "$BASE_URL/$tag/$1" 2> /dev/null && return 0
+  command -v gh > /dev/null 2>&1 || return 1
+  gh release download "$tag" --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --pattern "$1" --output "$2" --clobber
+}
+
 dl="$work/release"
 mkdir -p "$dl"
-if ! curl -fsSL --retry 2 -o "$dl/release-manifest.json" "$BASE_URL/$tag/release-manifest.json"; then
+if ! fetch_release_file release-manifest.json "$dl/release-manifest.json"; then
   die "could not download release-manifest.json for $tag from $BASE_URL"
 fi
 manifest_field() { node -p 'const v=require(process.argv[1])[process.argv[2]];typeof v==="string"?v:""' "$dl/release-manifest.json" "$1"; }
@@ -137,7 +146,7 @@ if [[ ! "$zip_name" =~ ^[A-Za-z0-9._-]+\.zip$ ]] || [[ ! "$want_sha" =~ ^[0-9a-f
   die "release-manifest.json has no valid zipName and zipSha256"
 fi
 
-if ! curl -fsSL --retry 2 -o "$dl/$zip_name" "$BASE_URL/$tag/$zip_name"; then
+if ! fetch_release_file "$zip_name" "$dl/$zip_name"; then
   die "could not download $zip_name for $tag from $BASE_URL"
 fi
 got_sha="$(sha256 "$dl/$zip_name")"

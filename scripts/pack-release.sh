@@ -128,10 +128,17 @@ tag_commit="$(git -C "$repo_root" rev-parse "refs/tags/$tag^{commit}")"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# A release stays a draft until its APK is uploaded, and a draft has no public
+# download URL, so fall back to gh's authenticated one.
+fetch_release_file() {
+  curl -fsSL --retry 2 -o "$2" "$BASE_URL/$tag/$1" 2> /dev/null && return 0
+  gh release download "$tag" --repo "$GH_REPO" --pattern "$1" --output "$2" --clobber
+}
+
 echo "== Downloading $tag =="
 dl="$work/release"
 mkdir -p "$dl"
-curl -fsSL --retry 2 -o "$dl/release-manifest.json" "$BASE_URL/$tag/release-manifest.json" \
+fetch_release_file release-manifest.json "$dl/release-manifest.json" \
   || { echo "could not download release-manifest.json for $tag from $BASE_URL" >&2; exit 1; }
 # Run from $work so node picks up nothing from the checkout.
 manifest_field() {
@@ -147,7 +154,7 @@ fi
 [ "$manifest_commit" = "$tag_commit" ] \
   || { echo "manifest commit is ${manifest_commit:-missing}, $tag points to $tag_commit; refusing to pack" >&2; exit 1; }
 zip="$dl/$zip_name"
-curl -fsSL --retry 2 -o "$zip" "$BASE_URL/$tag/$zip_name" \
+fetch_release_file "$zip_name" "$zip" \
   || { echo "could not download $zip_name for $tag from $BASE_URL" >&2; exit 1; }
 got_sha="$(sha256 "$zip")"
 [ "$got_sha" = "$want_sha" ] \
