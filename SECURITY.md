@@ -1,13 +1,17 @@
 # Security Policy
 
-Gleam is a browser-extension wallet holding user private keys. Please report
+Gleam is a wallet for Arweave and AO, shipped as a Chrome extension and
+an iOS and Android app, that holds user private keys. Please report
 vulnerabilities privately rather than through a public GitHub issue.
 
 How Gleam protects keys, what it defends against, its by-design
 trade-offs and its known limitations are in
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md). The files
 in scope for a security review are listed in
-[security/surface.txt](security/surface.txt).
+[security/surface.txt](security/surface.txt). How Gleam is built and
+released is in [docs/SECURITY_PRACTICES.md](docs/SECURITY_PRACTICES.md),
+and how reports and incidents are handled is in
+[docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md).
 
 ## Reporting a vulnerability
 
@@ -77,11 +81,47 @@ defence in depth, or disclosure of non-secret internals is `none`.
 
 ## Scope
 
-In scope: the extension itself (`apps/extension`), the core signing/vault
-logic (`packages/core`), and the messaging contracts between them
-(`packages/messaging`). Third-party dependency vulnerabilities are tracked
-via Dependabot; if you find one that isn't already flagged in the Security
-tab, reporting it here is still welcome.
+In scope: the extension (`apps/extension`), the iOS and Android app
+(`apps/mobile`), every package they ship (`packages/`), and the release
+pipeline that builds them (`.github/workflows/release.yml` and the
+release scripts in `scripts/`). Third-party dependency vulnerabilities
+are tracked via Dependabot; if you find one that isn't already flagged
+in the Security tab, reporting it here is still welcome.
+
+Out of scope:
+
+- Bugs in Chrome, iOS, Android or a hardware wallet's firmware. Report
+  those to their vendor.
+- Arweave gateways and AO nodes Gleam talks to, such as `arweave.net`
+  and `ao-testnet.xyz`. Gleam's handling of a hostile response is in
+  scope.
+- Everything under [THREAT_MODEL.md § Out of scope](docs/THREAT_MODEL.md#out-of-scope),
+  such as a compromised device or another extension that can read pages.
+- Denial of service by traffic volume, spam, social engineering and
+  physical access.
+- A finding that only a development build shows.
+
+## Safe harbor
+
+Research done in good faith under this policy is authorized, and Gleam
+won't take or support legal action against you for it. Good faith means
+you:
+
+- test only with wallets, devices and accounts you own;
+- never move, read or keep anyone else's funds or data;
+- don't degrade gleamwallet.app or the Points server for other people;
+- keep the report private until its advisory is published.
+
+If someone else takes legal action against you for research that
+followed this policy, we will say publicly that it was authorized.
+
+## Disclosure
+
+Please don't share a report with anyone until its advisory is published.
+We publish a Low finding once its fix is merged, and a Medium or higher
+one once the release with its fix is live. If that hasn't happened 90
+days after your report, you may publish your findings, and we'd ask for
+a week's notice first.
 
 ## Vault backup
 
@@ -99,6 +139,17 @@ passkey wrapping or the file's encryption is in scope.
 
 ## Response
 
-We aim to acknowledge reports within a few days and to keep the reporter
-updated as a fix is developed. Credit is given in the advisory unless you'd
-rather stay anonymous.
+| Step | Within |
+| --- | --- |
+| First reply | 3 business days |
+| Reproduced and rated, or closed with the reason | 10 business days |
+| Fix released: Critical | 7 days of the rating |
+| Fix released: High | 30 days |
+| Fix released: Medium | 60 days |
+| Fix released: Low | The next release |
+
+You'll hear from us at least every two weeks until the advisory is
+published, and we'll ask you to check the fix before it ships if you'd
+like to. Credit is given in the advisory unless you'd rather stay
+anonymous. Paid awards for Medium and higher findings are set out in
+[SCANS.md § Points](SCANS.md#points).
