@@ -12,6 +12,7 @@
     "mobile:ios": "pnpm --filter @gleam/mobile ios",
     "mobile:android": "pnpm --filter @gleam/mobile android",
     "mobile:android:wifi": "pnpm --filter @gleam/mobile android:wifi",
+    "test": "vitest run",
     "test:smoke": "playwright test",
     "eslint": "eslint",
     "deps:check": "depcruise packages apps/extension/src apps/extension/entrypoints apps/mobile/src apps/points-api/src --output-type err",

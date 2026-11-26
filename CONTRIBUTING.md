@@ -23,7 +23,7 @@ go through [SECURITY.md](SECURITY.md), not a public issue.
 ## Before opening a PR
 
 ```bash
-pnpm vitest run                            # tests
+pnpm test                                   # tests
 pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, apps/extension
 pnpm eslint --max-warnings=0 .
 pnpm wxt:build                             # production build
