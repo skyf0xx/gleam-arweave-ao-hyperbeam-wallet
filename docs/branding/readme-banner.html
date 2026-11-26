@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<!-- Source for docs/branding/images/readme-banner.png (1280×320, captured at 2×). Open this file at 1280×320 and screenshot it. -->
+<style>
+  @font-face { font-family: "Inter"; src: url("../../apps/site/fonts/inter-var-latin.woff2") format("woff2"); font-weight: 100 900; }
+  :root {
+    --ink: #0A0A0A; --on-ink: #FFFFFF; --on-ink-muted: #A3A3A3;
+    --beam-red: #FF1717; --beam-purple: #8B12FF; --beam-sky: #73C9E8; --beam-yellow: #FFE45C; --beam-green: #28F02D;
+  }
+  html, body { margin: 0; width: 1280px; height: 320px; overflow: hidden; background: var(--ink); }
+  .banner { position: relative; width: 1280px; height: 320px; overflow: hidden; isolation: isolate; color: var(--on-ink); font-family: "Inter", sans-serif; }
+
+  /* The same faint grid as the share cards, kept to the beam's side */
+  .banner::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+    background-size: 40px 40px; background-position: 0 20px;
+    -webkit-mask-image: radial-gradient(ellipse 45% 90% at 82% 50%, #000, transparent 75%);
+    mask-image: radial-gradient(ellipse 45% 90% at 82% 50%, #000, transparent 75%);
+  }
+
+  .mark { position: absolute; left: 96px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 28px; }
+  .mark img { width: 92px; height: 105px; }
+  .mark h1 { margin: 0; font-size: 128px; font-weight: 600; line-height: 1; letter-spacing: -0.055em; padding-bottom: 14px; }
+  .tagline { position: absolute; left: 100px; bottom: 44px; margin: 0; font-size: 22px; letter-spacing: -0.01em; color: var(--on-ink-muted); }
+
+  /* Five hard-edged lines entering from the right edge and fading out under the wordmark */
+  .beam { position: absolute; left: 560px; right: 0; top: 50%; height: 15px; margin-top: -7px; display: flex; flex-direction: column;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%); mask-image: linear-gradient(90deg, transparent, #000 40%); }
+  .beam span { flex: 1; }
+  .beam span:nth-child(1) { background: var(--beam-red); }
+  .beam span:nth-child(2) { background: var(--beam-purple); }
+  .beam span:nth-child(3) { background: var(--beam-sky); }
+  .beam span:nth-child(4) { background: var(--beam-yellow); }
+  .beam span:nth-child(5) { background: var(--beam-green); }
+</style></head>
+<body><div class="banner">
+  <div class="mark"><img src="../../apps/site/favicon.svg" alt=""><h1>gleam</h1></div>
+  <p class="tagline">A wallet for Arweave and AO</p>
+  <div class="beam"><span></span><span></span><span></span><span></span><span></span></div>
+</div></body></html>
