@@ -590,3 +590,25 @@ the wallet's boundary, ranked by impact, for both shells. It is the scope
 for audits and security review. The release gate
 (`scripts/release-gate.mjs`) refuses to tag a release while any of those
 files has changed since the last audit (`security/audits/README.md`).
+
+## Assurance case
+
+| Design principle | Where |
+| --- | --- |
+| Least privilege | Caller tiers per method (`dispatch/methods.ts`) |
+| Complete mediation | Tier, approval and schema checks before every handler; `prepared-check.ts` before every signature |
+| Fail-safe defaults | Unknown methods, malformed params and unconnected sites are refused |
+| Separation of privilege | Non-extractable keys in the keyring |
+| Economy of mechanism | WebCrypto and Argon2id |
+| Open design | Public source and reproducible releases |
+| Psychological acceptability | Decoded previews; site text renders through `UntrustedText` |
+
+| Weakness | Countered by |
+| --- | --- |
+| CWE-20 input validation | zod schemas and storage type guards |
+| CWE-79 XSS | React, `UntrustedText`, the extension CSP |
+| CWE-346 origin spoofing | Platform-reported top-frame origin |
+| CWE-312 cleartext keys | AES-256-GCM under Argon2id |
+| CWE-362 race conditions | `updateStored` |
+| CWE-1333 ReDoS | `trimTrailingSlashes`, CodeQL |
+| CWE-1395 vulnerable dependencies | Dependabot, osv-scanner |
