@@ -5,6 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest)
 [![CI](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/actions/workflows/ci.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17147/badge)](https://www.bestpractices.dev/projects/17147)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/badge)](https://scorecard.dev/viewer/?uri=github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)
 [![License: MIT](https://img.shields.io/github/license/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)](LICENSE)
 
 A wallet for Arweave and AO, for Chrome, Android and iOS.
