@@ -56,10 +56,7 @@ If `window.gleam` is `undefined`, Gleam is not installed:
 Put the [Gleam icon](apps/site/favicon.svg) next to the text, in `Inter`
 at medium weight:
 
-```text
-[icon] Connect with Gleam
-[icon] Open in Gleam
-```
+<img src="docs/branding/images/connect-buttons.png" alt="Connect with Gleam and Open in Gleam buttons" width="500" />
 
 <details>
 <summary>Example</summary>
