@@ -8,7 +8,7 @@ rule — Phase 1 mining reads only these two.
 ## §3 Glossary
 
 - **Wallet** — a stored key record: `id`, `address`, `name`, `method`
-  (`jwk` for Phase 1; `ethereum`, `ledger` are Phase 2), `publicKey`,
+  (`jwk` for Phase 1; `ledger` is Phase 2), `publicKey`,
   timestamps, `encryptedKeyfile` envelope. Ledger wallets store no key
   material, only address/pubkey. A browser profile can hold multiple
   Wallets.
@@ -67,7 +67,7 @@ Session 0—N Wallet (which are currently unlocked).
 
 Each Feature below is Phase 1 scope only (per `CLAUDE.md`'s explicit
 phasing) — the build this project executes now. Phase 2+ items
-(Ethereum keys, Ledger, ArNS, uniques, auto-sign/gatekeeper,
+(Ledger, ArNS, uniques, auto-sign/gatekeeper,
 import/export settings, fullscreen surface, passkeys, full simulation,
 budgeted grants) are named in the sibling repo's docs as later scope and
 are **not** mined into intents here.
