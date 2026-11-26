@@ -1,5 +1,7 @@
 # Gleam
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17147/badge)](https://www.bestpractices.dev/projects/17147)
+
 <img src="docs/branding/images/dashboard-tilted-crisp.png" alt="Gleam wallet dashboard" width="360" />
 
 A Chrome browser-extension wallet for Arweave and AO.
