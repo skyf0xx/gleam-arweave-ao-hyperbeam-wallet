@@ -140,7 +140,7 @@ Extension        Mobile
 pnpm install
 pnpm dev            # dev build with live reload
 pnpm wxt:build      # production build
-pnpm vitest run     # tests
+pnpm test           # tests
 ```
 
 Load `apps/extension/.output/chrome-mv3` unpacked in Chrome to try it.
