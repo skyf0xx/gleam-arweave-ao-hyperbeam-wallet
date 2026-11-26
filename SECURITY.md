@@ -101,6 +101,10 @@ Out of scope:
   physical access.
 - A finding that only a development build shows.
 
+## Supported versions
+
+Fixes ship in the latest release.
+
 ## Safe harbor
 
 Research done in good faith under this policy is authorized, and Gleam
