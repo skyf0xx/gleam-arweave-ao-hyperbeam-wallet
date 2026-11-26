@@ -9,8 +9,12 @@ A Chrome browser-extension wallet for Arweave and AO.
 ### Works with `window.arweaveWallet`
 
 Gleam implements the [ArConnect API](https://docs.arconnect.io/api/intro).
-Code written for `window.arweaveWallet` **works with Gleam unchanged**,
-except for `privateHash` and the deprecated `signature` (see below).
+Code written for `window.arweaveWallet` works unchanged, except:
+
+- `privateHash` is not supported. It needs the private key to stay
+  readable while the wallet is unlocked.
+- `signature` is deprecated and not supported. It signs whatever bytes a
+  site passes. Use `signMessage` or `signDataItem`.
 
 ### Keep a user's data private across devices
 
@@ -33,26 +37,19 @@ const sameKey = await window.arweaveWallet.decrypt(locked, {
 
 </details>
 
-Gleam does not support `privateHash`, because it needs the private key to
-stay readable while the wallet is unlocked.
-
-Gleam does not support the deprecated `signature`, because it signs
-whatever bytes a site passes, such as a hash the site computed. Use `signMessage` or
-`signDataItem` instead.
-
 ### Add a Connect with Gleam button
 
-Use `window.gleam` instead of `window.arweaveWallet`.
+Check `window.gleam`. If it is `undefined`, Gleam is not installed:
 
-If `window.gleam` is `undefined`, Gleam is not installed. On a computer,
-link to [gleamwallet.app/download](https://gleamwallet.app/download)
-instead. On a phone, label the button "Open in Gleam" and link to
-`https://open.gleamwallet.app/browse?url=<your page, URL-encoded>`, which
-opens your dApp in the Gleam app, or the download page if the app is not
-installed.
+- On a computer, link to
+  [gleamwallet.app/download](https://gleamwallet.app/download).
+- On a phone, label the button "Open in Gleam" and link to
+  `https://open.gleamwallet.app/browse?url=<your page, URL-encoded>`. It
+  opens your dApp in the Gleam app, or the download page if the app is
+  not installed.
 
-Use the [Gleam icon](apps/site/favicon.svg) next to the button text, set in
-`Inter` (Gleam's UI font) at medium weight:
+Put the [Gleam icon](apps/site/favicon.svg) next to the text, in `Inter`
+at medium weight:
 
 ```text
 [icon] Connect with Gleam
