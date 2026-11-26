@@ -135,7 +135,7 @@ High
 
 ### Attacker
 
-Malicious website
+Malicious website or dApp
 
 ### Loss
 
