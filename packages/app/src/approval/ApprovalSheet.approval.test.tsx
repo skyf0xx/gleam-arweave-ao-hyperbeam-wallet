@@ -114,6 +114,25 @@ describe("ApprovalSheet", () => {
     expect(port.dismissed).toHaveBeenCalledWith("req-1");
   });
 
+  it("says why a tap did nothing when another app covered the sheet", async () => {
+    const { port, show } = fakePort();
+    let blockTouch: () => void = () => {};
+    port.onTouchBlocked = (listener) => {
+      blockTouch = listener;
+      return () => {
+        blockTouch = () => {};
+      };
+    };
+    mount(port);
+    await show("req-1");
+    await screen.findByText(/bazar\.arweave\.net/);
+    expect(screen.queryByText("Another app is drawing over Gleam, so taps are blocked.")).toBeNull();
+
+    act(() => blockTouch());
+
+    expect(screen.getByRole("alert").textContent).toBe("Another app is drawing over Gleam, so taps are blocked.");
+  });
+
   it("closes without reporting when the shell takes the request down", async () => {
     const { port, show } = fakePort();
     mount(port);

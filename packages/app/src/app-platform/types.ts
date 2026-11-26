@@ -168,6 +168,11 @@ export interface ApprovalSheetPort {
   subscribe(onChange: (requestId: string | null) => void): () => void;
   /** The user closed the sheet for `requestId` themselves, which rejects it. */
   dismissed(requestId: string): void;
+  /**
+   * Calls `listener` when the host dropped a tap on the sheet because
+   * another app's window covered it. Omitted where the host can't tell.
+   */
+  onTouchBlocked?(listener: () => void): () => void;
 }
 
 /**

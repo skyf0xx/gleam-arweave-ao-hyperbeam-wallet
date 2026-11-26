@@ -1,10 +1,12 @@
 # Gleam threat model
 
-Gleam is a Chrome extension wallet for Arweave and AO. This document
-describes what it protects, who it protects against, how, and where the
-protection stops. It describes the current code. Deliberate trade-offs
-are listed under [By design](#by-design), and gaps under
-[Known limitations](#known-limitations), rather than left out.
+Gleam is a wallet for Arweave and AO. It ships as a Chrome extension and
+as an iOS and Android app, and both run the same core and runtime. This
+document describes what Gleam protects, who it protects against, how,
+and where the protection stops, on each shell. It describes the current
+code. Deliberate trade-offs are listed under [By design](#by-design),
+and gaps under [Known limitations](#known-limitations), rather than left
+out.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
@@ -19,30 +21,54 @@ To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 ## Architecture and trust boundaries
 
+Both shells have the same four layers. Only the runtime holds unlocked
+keys and signs.
+
 ```text
- web page (untrusted)
-   └─ provider script        page world; exposes window.arweaveWallet
-        │ postMessage
-   └─ content script         isolated world, top frame only
-        │ runtime messaging — Chrome attaches the sender
- background service worker   trusted; holds unlocked keys, signs
-        │ runtime messaging
- extension pages             trusted; popup, side panel, approval window,
-                             passkey window
+ dApp page (untrusted)      provider script; window.arweaveWallet
+        │ top frame only, origin read by the platform
+ relay                      passes page calls on, adds nothing
+        │
+ runtime (trusted)          dispatcher, handlers, approvals, keys
+        │
+ wallet UI (trusted)        Gleam's own screens and approval UI
 ```
 
-- **The background decides who is asking from Chrome's `sender`, never
-  from the message body.** A content script can send only `providerCall`
-  (plus two read-only questions about its own tab). Every other method,
-  including key export, wallet creation and approving requests, is
-  accepted only from the extension's own pages (`isExtensionPageSender`
-  in `apps/extension/src/sender.ts`).
-- **A page's origin is the origin Chrome reports for the sending frame.**
-  Only the top frame counts. Iframes never get the content script, and a
-  sandboxed document with an opaque origin is refused.
+| Layer | Extension | App (iOS, Android) |
+| --- | --- | --- |
+| dApp page | A browser tab | A native dApp WebView with its own profile and data store |
+| Relay | Content script in the isolated world, top frame only | The dApp WebView's native message handler, passed on by the wallet WebView |
+| Runtime | Background service worker | A dedicated worker started by the wallet WebView |
+| Unlocked keys | Keyring offscreen document | The runtime worker's heap |
+| Wallet UI | Popup, side panel, approval window, passkey window | The wallet WebView, which draws the approval sheet |
+
+- **The runtime decides who is asking from the platform, never from the
+  message body.** In the extension, that is Chrome's `sender`. A content
+  script can send only `providerCall` (plus two read-only questions
+  about its own tab). Every other method, including key export, wallet
+  creation and approving requests, is accepted only from the extension's
+  own pages (`isExtensionPageSender` in `apps/extension/src/sender.ts`).
+  In the app, a dedicated worker hears only the page that started it,
+  which is the wallet WebView loading the bundled app, so its calls get
+  the extension pages' tier. dApp pages have no handle on the worker.
+  Their calls arrive through `pageCall` with the content script's tier
+  (`apps/mobile/src/worker/host.ts`).
+- **A page's origin is the one the platform reports for the sending
+  frame.** Only the top frame counts. In the extension, iframes never
+  get the content script. In the app, native code reads each message's
+  origin and frame from the WebView (`WKFrameInfo` on iOS, the web
+  message listener on Android), and `attestedOrigin`
+  (`apps/mobile/src/adapters/dapp-bridge.ts`) drops a subframe's message
+  and any origin that isn't an exact http(s) origin. A sandboxed
+  document with an opaque origin is refused on both shells.
 - **A page can reach a fixed list of methods** (`PROVIDER_SURFACE_METHODS`
   in `packages/messaging/src/page-protocol.ts`), disjoint from the key and
   approval methods. Anything else is rejected before a handler runs.
+- **The app's worker answers only named methods.** Comlink would follow
+  any property path, so `exposeMethods`
+  (`apps/mobile/src/adapters/comlink-guard.ts`) lets through only a
+  one-segment call to `dispatch`, `pageCall`, `tabClosed`, `resume` or
+  `openLink`, with plain cloned arguments.
 - **A site must be connected before it can read anything**, and `connect`
   itself needs the user's approval. Connections can be revoked in
   Settings → Connected apps.
@@ -54,92 +80,149 @@ from the user's password by Argon2id (64 MiB, 5 passes, parallelism 1,
 16-byte random salt, 12-byte random IV). The ciphertext is bound to its
 wallet record by additional authenticated data
 (`gleam:v2:<walletId>:<address>`), so an envelope moved onto another
-wallet's record fails to decrypt. It is stored in `chrome.storage.local`.
-The derived key is a non-extractable WebCrypto key, and the password bytes
-and the raw Argon2id output are zeroed after use. A PBKDF2-HMAC-SHA256
-(v1, 600,000 iterations) envelope still opens, and unlocking re-encrypts
-it with Argon2id. Stored Argon2id parameters are
-bounded, so a corrupted envelope can't make the worker allocate gigabytes.
-See `packages/core/src/signer/envelope.ts`.
+wallet's record fails to decrypt. The derived key is a non-extractable
+WebCrypto key, and the password bytes and the raw Argon2id output are
+zeroed after use. A PBKDF2-HMAC-SHA256 (v1, 600,000 iterations) envelope
+still opens, and unlocking re-encrypts it with Argon2id. Stored Argon2id
+parameters are bounded, so a corrupted envelope can't make the runtime
+allocate gigabytes. See `packages/core/src/signer/envelope.ts`.
 
-**While unlocked.** Unlocking decrypts the keyfile and hands it, once,
-to the keyring: an offscreen document the background opens for this
-alone. The keyring imports it as non-extractable WebCrypto keys: one
-RSA-PSS signing key per hash (SHA-256, SHA-384, SHA-512) and one RSA-OAEP
-decryption key. They can sign and decrypt, but their bytes can't be
-exported, and they exist only in the keyring's memory. Nothing
-key-related is written to disk: not IndexedDB, which would store the key
-material in the browser profile, and not `chrome.storage`. No code keeps
-a reference to the decrypted JWK after the import, but the parsed copies
-in the background and in the keyring stay in memory until garbage
-collection, since JavaScript can't overwrite strings. Since no private
-key material is readable while unlocked, `privateHash` is refused (see
-[By design](#by-design)).
+The extension stores the vault in `chrome.storage.local`. The app stores
+it in a SQLite database that the runtime worker alone writes
+(`apps/mobile/src/adapters/storage.ts`). The database itself is not
+encrypted again, since the vault inside is already sealed. Neither
+platform's backup copies it: on iOS the database sits in
+`Library/CapacitorDatabase`, which the SQLite plugin creates excluded
+from iCloud and device backups (`capacitor.config.ts`). On Android,
+`allowBackup="false"` and `data_extraction_rules.xml` exclude every
+domain from cloud backup and device transfer.
 
-The keyring opens one port to the background and reopens it whenever the
-service worker restarts. The background accepts that port only from the
-keyring document, judged by Chrome's sender (extension id, page URL, no
-tab, offscreen document id), and disconnects any other page that
-connects under the keyring's name. What the background posts on the port
-reaches only the keyring, so the JWK goes nowhere else. What the keyring
-posts back, signatures and decrypted plaintexts, reaches every extension
-page listening for connections, and such a page could also send the
-keyring requests. No Gleam page listens; a compromised one is the
-"compromised extension code" case below: it can get signatures and
-decryptions while the wallet is unlocked, never the key.
+**While unlocked.** Unlocking decrypts the keyfile and imports it as
+non-extractable WebCrypto keys: one RSA-PSS signing key per hash
+(SHA-256, SHA-384, SHA-512) and one RSA-OAEP decryption key. They can
+sign and decrypt, but their bytes can't be exported, and they exist only
+in memory. Nothing key-related is written to disk: not IndexedDB, which
+would store the key material in the browser profile, and not storage. No
+code keeps a reference to the decrypted JWK after the import, but parsed
+copies stay in memory until garbage collection, since JavaScript can't
+overwrite strings. Since no private key material is readable while
+unlocked, `privateHash` is refused (see [By design](#by-design)).
 
-`chrome.storage.session` holds only the address, the public key and
-which wallets are unlocked. That storage lives in memory only, is
-cleared when the browser closes, and is not readable by content scripts
-or web pages. A wallet counts as unlocked only while the session lists
-it and the keyring holds its key; if the keyring document is gone, the
-wallet reads as locked. Lock, auto-lock, wallet removal, reset and
-browser startup clear the keyring and close its document. Locking
-overwrites each session entry before removing it. Auto-lock is checked
-on every key read and by a one-minute alarm, so the keys go when the
-timeout passes even if nothing reads them. The timeout counts from the
-last time the popup or side panel loaded the wallet state, or the user
-approved or rejected a request in an approval window; a connected site's
-calls, and the approval windows it opens, don't extend it. New installs
-default to 1 hour. The vault also locks when the computer's screen locks, unless
-auto-lock is set to "never" (see [By design](#by-design)). Lock and
-unlock run one at a time, so a lock can't race an unlock and leave keys
-behind. See
-`packages/runtime/src/handlers/key-session.ts` and
-`apps/extension/entrypoints/keyring/`.
+- **Extension.** The background hands the JWK, once, to the keyring: an
+  offscreen document it opens for this alone
+  (`apps/extension/entrypoints/keyring/`). The keyring opens one port
+  to the background and reopens it whenever the service worker
+  restarts. The background accepts that port only from the keyring
+  document, judged by Chrome's sender (extension id, page URL, no tab,
+  offscreen document id), and disconnects any other page that connects
+  under the keyring's name. What the background posts on the port
+  reaches only the keyring, so the JWK goes nowhere else. What the
+  keyring posts back, signatures and decrypted plaintexts, reaches every
+  extension page listening for connections, and such a page could also
+  send the keyring requests. No Gleam page listens; a compromised one is
+  the "compromised dependency" case below: it can get signatures and
+  decryptions while the wallet is unlocked, never the key.
+  `chrome.storage.session` holds only the address, the public key and
+  which wallets are unlocked. That storage lives in memory only, is
+  cleared when the browser closes, and is not readable by content
+  scripts or web pages. A wallet counts as unlocked only while the
+  session lists it and the keyring holds its key; if the keyring
+  document is gone, the wallet reads as locked.
+- **App.** The keys live in the runtime worker's heap
+  (`apps/mobile/src/adapters/session-key-store.ts`), and so do the
+  session records, which never reach SQLite or the wallet WebView's main
+  thread (`apps/mobile/src/adapters/storage.ts`). The main thread can
+  ask the worker to sign or decrypt through `dispatch`, but has no path
+  to the keys. The OS ending the app's process locks every wallet.
 
-**Passkey unlock.** A passkey's WebAuthn PRF output wraps the vault
-password. Unlocking with a passkey recovers the password and then unlocks
-exactly as typing it would. The relying party is the extension's own id.
+Lock, auto-lock, wallet removal and reset clear the keys, and so does
+browser startup in the extension. Locking overwrites each session entry
+before removing it. Lock and unlock run one at a time, so a lock can't
+race an unlock and leave keys behind. Auto-lock is checked on every key
+read and on a one-minute timer, so the keys go when the timeout passes
+even if nothing reads them. The timeout counts from the last time
+Gleam's own screens loaded the wallet state, or the user approved or
+rejected a request; a connected site's calls, and the approvals it
+opens, don't extend it. New installs default to 1 hour. In the
+extension, the vault also locks when the computer's screen locks,
+unless auto-lock is set to "never" (see [By design](#by-design)). The
+app's OS suspends its JavaScript in the background, and the timer then
+runs every check it missed, once, as the app resumes
+(`apps/mobile/src/adapters/timer.ts`). See
+`packages/runtime/src/handlers/key-session.ts`.
 
-**Hardware wallets.** Keystone and Ledger wallets keep the key on the
-device. Gleam stores only the public key and address.
+**Passkey unlock (extension).** A passkey's WebAuthn PRF output wraps the
+vault password. Unlocking with a passkey recovers the password and then
+unlocks exactly as typing it would. The relying party is the extension's
+own id.
+
+**Biometric unlock (app).** The vault password is stored with the OS's
+biometric protection and read back only after the OS's own biometric
+check: Keychain access control on iOS, a Keystore key bound to a
+`BiometricPrompt` `CryptoObject` on Android, which only strong (Class 3)
+biometrics can release. The OS discards it when the enrolled biometrics
+change. Unlocking with biometrics then unlocks exactly as typing the
+password would (`apps/mobile/src/adapters/biometric-unlock.ts`).
+
+**Hardware wallets.** Keystone (both shells) and Ledger (the extension)
+keep the key on the device. Gleam stores only the public key and
+address.
 
 **Watch wallets.** A watch wallet is only an address, with no key. A
 site can't connect while one is active, and every signing call for it
 is refused before any approval opens.
 
+**Vault backup.** Backup is off until the user turns it on. It keeps one
+file in the user's own cloud account: a Google Drive app folder in the
+extension and on Android (the `drive.appdata` scope, which reaches no
+other file), and a record in the app's CloudKit private database on
+iOS. The file's body is encrypted under a random backup key, which is
+stored wrapped under the vault password in the same Argon2id envelope
+the wallets use (`packages/core/src/signer/backup-key.ts`), and held
+unwrapped only beside the signing keys while Gleam is unlocked. The
+body holds the wallets with their sealed keyfiles, contacts, added
+tokens, saved sites and settings, and only the storage keys
+`packages/core/src/backup/file.ts` lists. The clear header holds the
+wrapped backup key and, for each enrolled passkey, the vault password
+wrapped under that passkey's PRF output, as on the device.
+
 ## Signing and approvals
 
-- **Every signing, decryption and transfer request from a site opens a
-  separate Gleam window** (a Chrome popup window, not part of the page)
-  with a preview decoded from the request.
-- **The window can't change what gets signed.** It returns only the
-  request id and approve or reject. The background signs its own stored
-  copy of the request, so the preview and the signed bytes come from the
-  same object.
+- **Every signing, decryption and transfer request from a site opens
+  Gleam's own approval UI** with a preview decoded from the request. In
+  the extension, it is a separate Gleam window (a Chrome popup window,
+  not part of the page). In the app, it is the approval sheet, drawn by
+  the wallet WebView with the dApp view hidden; requests that arrive
+  meanwhile wait their turn (`apps/mobile/src/adapters/approval-sheet.ts`).
+- **The approval UI can't change what gets signed.** It returns only the
+  request id and approve or reject. The runtime signs its own stored copy
+  of the request, so the preview and the signed bytes come from the same
+  object.
+- **A security phrase marks Gleam's own screens.** A user who picks one
+  sees it, with an icon drawn from it, on the unlock screen and every
+  approval. A page can't read Gleam's storage, so a fake approval drawn
+  in a page can't show it
+  (`packages/core/src/models/security-phrase.ts`).
+- **Another app can't tap Approve through an overlay.** While the
+  approval sheet is up on Android, Gleam hides other apps' overlays
+  (Android 12 and later) and drops any gesture that starts under another
+  app's window, the flag `filterTouchesWhenObscured` reads, on every
+  version. The sheet then says another app is drawing over Gleam
+  (`apps/mobile/android/app/src/main/java/app/gleamwallet/OverlayGuardPlugin.java`).
+  The guard is off on every other screen. iOS lets no app draw over
+  another.
 - **Gleam Points payloads are refused from sites.** A `signMessage`
   whose data starts with `gleam-points:`, and a `sign` or `dispatch`
-  with a `Gleam-Points` tag, are refused before any window opens
+  with a `Gleam-Points` tag, are refused before any approval opens
   (`packages/runtime/src/dispatch/methods.ts`). The tag refusal adds to
   how a hardware proof is built (`core/points/ownership.ts`), which
   already keeps a site's transaction from matching one.
 - **There is no auto-approval.** No setting lets a site sign without the
-  window.
+  approval UI.
 - **Requests expire.** An unanswered request is rejected after 5 minutes
   (20 for a scan attestation from the Gleam site). A hardware wallet's
   request waiting on the device can run to 15 minutes from creation (30
-  for a scan attestation) while the window reports device activity.
+  for a scan attestation) while the approval reports device activity.
 - **AO messages are built and signed with plain WebCrypto**
   (`packages/core/src/ao/transfer.ts`). No third-party library touches
   the key on the signing path.
@@ -148,24 +231,26 @@ is refused before any approval opens.
 
 | Attacker | What they try | What stops them | What's left |
 | --- | --- | --- | --- |
-| Malicious website | Read addresses, sign or send without consent, reach key methods | Connect approval; per-request approval window; fixed method list; origin from Chrome's sender | A user approving a request they don't understand. The preview is the defense. |
-| Phishing site or fake popup drawn in a page | Trick the user into typing the password or approving | Real requests always open a separate browser window; Gleam never asks for the password inside a page | Users who don't know the rule. |
+| Malicious website or dApp | Read addresses, sign or send without consent, reach key methods | Connect approval; per-request approval; fixed method list; origin from the platform, top frame only | A user approving a request they don't understand. The preview is the defense. |
+| Phishing site or fake approval drawn in a page | Trick the user into typing the password or approving | Real requests open Gleam's own window in the extension, and the approval sheet with the dApp view hidden in the app; the security phrase, once picked, shows on every real unlock and approval; Gleam never asks for the password inside a page | Users who don't know the rule or haven't picked a phrase. |
 | Another browser extension | Inject into a page and call `window.arweaveWallet` as that page, open a window styled like Gleam's approval, read Gleam's storage or reach the keyring | Gleam's `chrome.storage` and its extension pages are per-extension; the keyring port accepts only Gleam's own offscreen document (`isKeyringSender` in `apps/extension/src/adapters/offscreen-keyring.ts`); a call made as the page still opens Gleam's approval window | A convincing fake approval window that asks to approve or for the password, the phishing case above. An extension with the `debugger` permission can read anything and is the malware case below. |
-| Network attacker | Inject requests into a page, tamper with data | Extension code ships in the package, never fetched; HTTPS for all extension traffic; plain-`http://` sites can't connect, read or request a signature, except `localhost`, `127.0.0.1` and `[::1]` | Loopback `http://` stays allowed for local development; its traffic never crosses the network. |
-| Compromised npm dependency | Read the unlocked key and send it out | Locked dependency versions; new releases held back 3 days; provenance downgrades refused; dependency PRs reviewed by CI | Code running inside the extension can ask for signatures and decryptions while the wallet is unlocked, and can reach any https host or load an image from any URL. It can't copy the key: unlocked keys are non-extractable. The largest open risk. |
-| Hijacked Chrome Web Store account | Push a malicious update to every user | The developer account's own login protection; releases are packed and signed with an offline CRX key before upload | A takeover of the Web Store account alone can't publish a tampered build, since the upload must match the signed CRX; it could still publish an unrelated or reverted listing change. |
+| Another app on the phone | Read Gleam's storage, reach the runtime, open Gleam with a crafted link, draw over the approval sheet | The OS sandbox keeps Gleam's database and WebViews private; the worker can't be reached from outside the app; Gleam claims only verified https links on `open.gleamwallet.app` (universal links, App Links with `autoVerify`) and registers no custom URL scheme; every link is parsed as untrusted (`apps/mobile/src/worker/points-link.ts`, `apps/mobile/src/adapters/browse-link.ts`); while the approval sheet is up on Android, other apps' overlays are hidden (Android 12 and later) and a tap that starts under another app's window is dropped (`OverlayGuardPlugin.java`) | Anyone can send a link: see the gleamwallet.app row. An app with accessibility access is the malware case below. |
+| Network attacker | Inject requests into a page, tamper with data | Code ships in the package, never fetched: the extension in the CRX, the app in its bundled `dist/` with no `server.url` and no live-update plugin; HTTPS for all wallet traffic; plain-`http://` sites can't connect, read or request a signature, except `localhost`, `127.0.0.1` and `[::1]` | Loopback `http://` stays allowed for local development; its traffic never crosses the network. |
+| Compromised npm dependency | Read the unlocked key and send it out | Locked dependency versions; new releases held back 3 days; provenance downgrades refused; dependency PRs reviewed by CI | Code running inside the extension or the app can ask for signatures and decryptions while the wallet is unlocked, and can reach any https host or load an image from any https URL. It can't copy the key: unlocked keys are non-extractable. The largest open risk. |
+| Hijacked store account | Push a malicious update to every user | The accounts' own login protection. Chrome Web Store: releases are packed and signed with an offline CRX key before upload. Play: every upload must be signed with the upload key, held in a KeePassXC database. App Store: none beyond the account | A Web Store takeover alone can't publish a tampered build, since the upload must match the signed CRX; it could still publish an unrelated or reverted listing change. A Play takeover can ask Google to reset the upload key. An App Store Connect takeover can create its own distribution certificate and ship a build. |
 | Hijacked GitHub account or token | Change the source or CI | 2FA; protected `master`: signed commits, PR with passing CI, no force-push, no admin bypass | An account takeover can change the rules. |
-| Malware on the user's computer | Copy the vault, log keystrokes | Encrypted vault; unlocked keys in memory only, cleared on lock | Malware that can read browser memory or keystrokes wins; no browser wallet can stop it. A stolen vault can be attacked offline: see the password policy under By design. |
+| Malware on the user's computer or phone | Copy the vault, log keystrokes | Encrypted vault; unlocked keys in memory only, cleared on lock | Malware that can read process memory or keystrokes wins, and so does a rooted or jailbroken phone's; no software wallet can stop it. A stolen vault can be attacked offline: see the password policy under By design. |
 | Someone at an unlocked browser | Send funds, export the key | Export needs the password; sends need confirmation | Auto-lock is 1 hour by default; the user can choose "never", with a warning. |
-| Compromised gleamwallet.app | Message the extension, put a signing request in front of the user, show announcements | The site sends only the `SITE_MESSAGES` in `packages/runtime/src/dispatch/methods.ts`: `gleam-points:invite` hands over an invite code, `gleam-points:attest` opens a scan-attestation approval window, which signs only a points ownership message, never a transaction, and `gleam-points:attest-status` asks only whether the wallet can sign one. Announcement links are limited to the Gleam site and x.com; a production build accepts site messages only from `https://gleamwallet.app` (`isSiteOrigin` in `packages/runtime/src/dispatch/site.ts`) | Misleading announcement text, and an attestation prompt the user didn't ask for. A development build also accepts site messages from any `http://localhost` or `http://127.0.0.1` page, so local pages can send a dev build invites and scan attestations. |
-| Compromised maintainer machine | Steal the CRX signing key or the store and keystore credentials, or ship a tampered build | The keys live in a KeePassXC database unlocked only at the signing step; the release zip is built and attested in CI; `pack-release.sh` signs that downloaded zip after checking its hash and `gh attestation verify`, and runs no npm code. The local rebuild (`verify-release.sh`) runs in a separate terminal session and leaves a receipt of the hash it reproduced; `pack-release.sh` signs only a zip that matches it | A compromised machine itself. The CRX key is written to a private temp file for the `chrome --pack-extension` call. |
+| Thief with the phone, or someone at an unlocked phone | Send funds, export the key | The vault is encrypted at rest; biometric unlock keeps the password behind the OS's own biometric check; leaving the app dismisses any open approval sheet (`apps/mobile/src/adapters/app-away.ts`); auto-lock locks after the chosen time without use | Locking the phone or leaving the app doesn't lock Gleam. Within the auto-lock time, the same as an unlocked browser. See Known limitations. |
+| Compromised cloud account | Read or replace the vault backup | The backup's body is encrypted under a key wrapped under the vault password; a file the password can't open is never joined or merged into this install; each restore checks the clear header against the encrypted copy | A stolen backup can be attacked offline as a stolen vault can. Deleting the file loses the backup. |
+| Compromised gleamwallet.app | Message the extension, put a signing request in front of the user, show announcements | The site sends only the `SITE_MESSAGES` in `packages/runtime/src/dispatch/methods.ts`: `gleam-points:invite` hands over an invite code, `gleam-points:attest` opens a scan-attestation approval, which signs only a points ownership message, never a transaction, and `gleam-points:attest-status` asks only whether the wallet can sign one. Announcement links are limited to the Gleam site and x.com; a production build accepts site messages only from `https://gleamwallet.app` (`isSiteOrigin` in `packages/runtime/src/dispatch/site.ts`). In the app, the invite and attest messages arrive as links on `open.gleamwallet.app` instead, held to the same handlers and schemas | Misleading announcement text, and an attestation prompt the user didn't ask for. Anyone can write an app link, so in the app those two hold for any sender of a link. A development build of the extension also accepts site messages from any `http://localhost` or `http://127.0.0.1` page, so local pages can send it invites and scan attestations. |
+| Compromised maintainer machine | Steal the CRX signing key or the store and keystore credentials, or ship a tampered build | The keys live in a KeePassXC database unlocked only at the signing step; the release zip is built and attested in CI; `pack-release.sh` signs that downloaded zip after checking its hash and `gh attestation verify`, and runs no npm code. The local rebuild (`verify-release.sh`) runs in a separate terminal session and leaves a receipt of the hash it reproduced; `pack-release.sh` signs only a zip that matches it. `release-app.sh` builds the app's web bundle from a signed tag on `master` and signs only a bundle whose hash matches the release manifest's `mobileBundleSha256`, before any credential is unlocked | A compromised machine itself. The CRX key is written to a private temp file for the `chrome --pack-extension` call. The app's native projects are compiled and signed on the machine. |
 | Compromised CI or GitHub Action | Swap the release zip or manifest, mint a provenance attestation for another file, or exfiltrate a token | Every Action is pinned to a commit SHA; Dependabot never auto-merges an Action bump or a production dependency; release jobs block egress (harden-runner) and hold no signing key or store credential; the CRX is signed only for a zip a local rebuild of the tag reproduced | A malicious Action merged after review runs with the release job's write and OIDC tokens. |
-| Thief with the phone, or someone at an unlocked phone | Send funds, export the key | The vault is encrypted at rest; biometric unlock keeps the password behind the OS's own biometric check (`biometric-unlock.ts`); leaving the app dismisses any open approval sheet (`app-away.ts`); auto-lock locks after the chosen time without use, as in the extension | Locking the phone or leaving the app doesn't lock Gleam, and Lock settings on the phone say only that it locks after the chosen time. Within that time, the same as an unlocked browser. See the mobile entries under Known limitations. |
 | Lying gateway, AO unit, HyperBEAM peer or price API | Show wrong balances, history or prices | Signed transactions are built locally from the user's own input; a token's decimals are kept only when two other gateways agree, and otherwise stay unknown so amounts show unscaled (`queryCheckedTokenMetadata`); peers discovered from on-chain Location records only serve reads and never get a host permission of their own | Wrong balances or history on screen; a dishonest gateway can drop a transaction. A discovered peer is anyone who published a Location record. |
 
 ## Network
 
-The extension talks to:
+Gleam talks to:
 
 - **Arweave gateways:** `arweave.net` by default, a few fallbacks, or one
   the user sets. Used for balances, history (GraphQL) and posting
@@ -181,14 +266,22 @@ The extension talks to:
 - **Gleam:** `api.gleamwallet.app` (prices: the token id only, relayed to
   CoinGecko and CoinPaprika; Gleam Points: the wallet address, a signed
   proof of ownership, and a device id) and `gleamwallet.app`
-  (announcements, the welcome and uninstall pages).
+  (announcements, the newest release per shell, and the extension's
+  welcome and uninstall pages).
+- **Vault backup, when on:** `www.googleapis.com` (Google Drive, in the
+  extension and on Android) and CloudKit (iOS). They see the encrypted
+  file and the account it belongs to.
 
-The content security policy limits `fetch` and other connections to
-`https:`, but not to a host list, and leaves image, font and frame
-sources unrestricted (see [By design](#by-design)).
+Pages in the app's dApp view load whatever they load, as in a browser
+tab; that traffic is the dApp's, not the wallet's.
 
-No key, password or seed ever leaves the device. Addresses do: every
-gateway sees the addresses it is asked about.
+The extension's content security policy (`apps/extension/src/csp.ts`)
+and the app's (`apps/mobile/index.html`) limit `fetch` and other
+connections to `https:`, but not to a host list (see
+[By design](#by-design)).
+
+No key, password or seed ever leaves the device unencrypted. Addresses
+do: every gateway sees the addresses it is asked about.
 
 ## By design
 
@@ -206,49 +299,58 @@ Each entry gives the decision, why it was made, and what would still
 count as a finding.
 
 - **Auto-lock can be set to "never".** Some users keep the wallet open
-  all day. A new install defaults to 1 hour, and the vault also locks
-  when the computer's screen locks. "Never" turns off both. While it is
-  selected, Settings → Lock & unlock shows "Gleam stays unlocked always,
-  even when your computer locks", and the Settings list shows the
-  current timeout. Only the extension's own pages can change it
+  all day. A new install defaults to 1 hour, and the extension's vault
+  also locks when the computer's screen locks. "Never" turns off both.
+  While it is selected, Settings → Security shows "Gleam stays
+  unlocked always even when your computer locks." in the extension and
+  "Gleam stays unlocked always." in the app, and the Settings list shows
+  the current timeout. Only Gleam's own screens can change it
   (`setLockSettings` is extension-tier in
   `packages/runtime/src/dispatch/methods.ts`). A vault with no stored
   timeout reads as 1 hour, and an update never writes one. A vault holding
   only hardware wallets has no password, so it never locks.
-  *Still a finding if,* by any path, a web page, content script or
-  message from outside the extension's pages changes the timeout; the
-  setting changes on update; or
-  a vault holding a password-encrypted key stays unlocked past the chosen
-  timeout, or past a screen lock with any timeout other than "never".
+  *Still a finding if,* by any path, a web page, a dApp view page, a
+  content script, a link or a message from outside Gleam's own screens
+  changes the timeout; the setting changes on update; a vault holding a
+  password-encrypted key stays usable past the chosen timeout, or, in
+  the extension, past a screen lock with any timeout other than "never".
 - **The password policy is a minimum length and a blocklist.** The
   vault password must be at least 12 characters and not one of about
   160 common passwords, matched case-insensitively
   (`packages/core/src/vault/password-policy.ts`). There are no
   character-class rules, which push users toward predictable patterns.
-  Argon2id makes each guess against a stolen vault slow, but a reused or
-  predictable password can still be guessed. The background checks the
-  policy when the first wallet sets the vault password. Later wallets
-  must open the existing vault with the same password instead.
+  Argon2id makes each guess against a stolen vault or backup slow, but a
+  reused or predictable password can still be guessed. The runtime
+  checks the policy when the first wallet sets the vault password. Later
+  wallets must open the existing vault with the same password instead.
   *Still a finding if,* by any path (the UI, a direct call to the
-  background, an import), a vault ends up protected by a password
-  shorter than 12 characters or on the blocklist; or a new envelope is
-  written with weaker parameters than the Argon2id ones under "How the
-  key is kept".
+  runtime, an import, a restore), a vault ends up protected by a
+  password shorter than 12 characters or on the blocklist; or a new
+  envelope is written with weaker parameters than the Argon2id ones
+  under "How the key is kept".
 - **Key export saves an unencrypted keyfile once the password is
   given.** A standard keyfile is what every other Arweave wallet
   imports. Export asks for the vault password even while unlocked, and
-  the screen warns that the file isn't password-protected. The
-  background decrypts the keyfile and saves it through
-  `chrome.downloads` itself, so the plaintext never crosses messaging
-  to the popup. Chrome keeps a download's `data:` URL in its history, so
-  the background erases that row once the download settles
-  (`apps/extension/src/adapters/downloads.ts`). Hardware wallets have no
-  keyfile to export.
+  the screen warns that the file isn't password-protected. Hardware
+  wallets have no keyfile to export.
+  In the extension, the background decrypts the keyfile and saves it
+  through `chrome.downloads` itself, so the plaintext never crosses
+  messaging to the popup. Chrome keeps a download's `data:` URL in its
+  history, so the background erases that row once the download settles
+  (`apps/extension/src/adapters/downloads.ts`).
+  In the app, the runtime worker hands the file to the wallet WebView,
+  which writes it to its own folder in the app's cache (never backed
+  up, and the only folder Android's `FileProvider` shares), opens the
+  share sheet, and deletes the folder once the sheet closes; leftovers
+  from a killed app are swept on the next start
+  (`apps/mobile/src/adapters/file-saver.ts`). The app the user picks in
+  the share sheet receives the plaintext keyfile.
   *Still a finding if,* by any path, the plaintext keyfile is saved or
-  returned without the correct password; it reaches the popup, a content
-  script or a page; a page can make the extension download it; or the
-  download's history row still holds the key after the download
-  completes or is cancelled.
+  returned without the correct password; it reaches the popup, a
+  content script, a page or the dApp view; a page can make Gleam save
+  it; the extension's download history row still holds the key after
+  the download completes or is cancelled; or the app's copy outlives
+  the share sheet past the next start.
 - **Plain `http://` is allowed on loopback.** Developers run dApps on
   `http://localhost`, and loopback traffic never crosses the network.
   Every page method but `disconnect`, reads and `connect` included, is
@@ -256,17 +358,18 @@ count as a finding.
   `localhost`, `127.0.0.1` or `[::1]` (`isSecureSigningOrigin` in
   `packages/core/src/policy/signing-origin.ts`, checked on every call in
   `packages/runtime/src/create-runtime.ts`), so a grant made
-  before a site lost https reads nothing.
+  before a site lost https reads nothing. The app's dApp view can show
+  a plain-http page, marked insecure in the address bar, and the same
+  rule refuses its calls.
   *Still a finding if,* by any method, a plain-http origin with any
   other hostname, such as `foo.localhost`, a LAN address or a public
-  host, connects, reads an address or balance, or opens an approval
-  window.
+  host, connects, reads an address or balance, or opens an approval.
 - **`privateHash` is refused.** Wander's `privateHash` digests the
   private key itself. Gleam's unlocked keys are non-extractable, so it
   can't compute one, and handing sites a value derived from the key is
   a risk with no matching need: `encrypt`, `decrypt` and `signMessage`
   cover its uses. Every site gets the same error, before any grant
-  check, and no window opens (`REFUSED_PROVIDER_METHODS` in
+  check, and no approval opens (`REFUSED_PROVIDER_METHODS` in
   `packages/core/src/models/method-privileges.ts`).
   *Still a finding if,* by any path, `privateHash` resolves, or any
   provider method returns a value derived from private key material
@@ -275,8 +378,8 @@ count as a finding.
   and as the `walletSwitch` event dApps rely on expects, a site's grant
   follows the active wallet. After the user switches to or imports
   another wallet, a site with "See your address" reads the new active
-  address and can ask it for signatures, each in its own approval window
-  that names the wallet that signs. `grant.walletId` only records which
+  address and can ask it for signatures, each in its own approval that
+  names the wallet that signs. `grant.walletId` only records which
   wallet approved the connection (`GrantedCall` in
   `packages/runtime/src/handlers/provider.ts`). A user who keeps wallets
   apart disconnects the site before switching.
@@ -292,7 +395,7 @@ count as a finding.
   hand a site the signing wallet's address once the user approves, even
   without "See your address". Every Arweave wallet does the same: a
   signature can't be checked or posted without its owner, and the
-  approval window names the wallet that signs.
+  approval names the wallet that signs.
   *Still a finding if* a site learns an address without a signature the
   user approved, or a signed result carries a different wallet's key
   from the one the approval named.
@@ -312,25 +415,32 @@ count as a finding.
   *Still a finding if,* by any path, a page gets an RSA-PSS signature
   over bytes it chose without Gleam hashing or encoding them itself.
 - **The content security policy limits connections and scripts, not
-  hosts or images.** `apps/extension/src/csp.ts` sets `script-src 'self'
+  hosts.** `connect-src` is `https:`, scheme-wide rather than a host
+  allowlist, because users add their own gateways and HyperBEAM peers at
+  runtime, and images load from any https URL for token logos and NFT
+  thumbnails. Code running inside Gleam can therefore reach any https
+  host, and an image URL can carry data out.
+  The extension (`apps/extension/src/csp.ts`) sets `script-src 'self'
   'wasm-unsafe-eval'`, `object-src 'none'`, `base-uri 'none'` and
-  `connect-src https:`. `connect-src` is scheme-wide rather than a host
-  allowlist because users add their own gateways and HyperBEAM peers at
-  runtime. `default-src` is deliberately unset so remote images (token
-  logos, NFT thumbnails) stay unrestricted, which leaves image, font and
-  frame sources open too. Code running inside the extension can
-  therefore reach any https host, and an image URL can carry data out.
+  `connect-src https:`, and leaves `default-src` unset, so image, font
+  and frame sources are unrestricted.
+  The app (`apps/mobile/index.html`) sets `default-src 'self'`, the same
+  `script-src`, `object-src`, `base-uri` and `connect-src`, `img-src
+  'self' https: data: blob:`, `frame-src 'none'` and `form-action
+  'none'`.
   *Still a finding if,* by any path, code from a remote source runs in
-  an extension page or the service worker, or the extension sends or
-  receives data over a non-https connection (for example through a
-  production `connect-src` that permits a non-https scheme, or a
-  `script-src` that permits a remote source).
+  an extension page, the service worker, the wallet WebView or the
+  runtime worker, or Gleam sends or receives wallet data over a
+  non-https connection (for example through a production `connect-src`
+  that permits a non-https scheme, or a `script-src` that permits a
+  remote source).
 - **Dependency advisories that touch only development tools.** Each
   package below either has no patched release, or has one only in a major
   version that the dependent pulling it in doesn't accept.
   `osv-scanner.toml` ignores each advisory until 2027-04-16 unless noted,
-  so the scan fails again and the entry is re-checked. Every Gleam signature is RSA-PSS through WebCrypto
-  (`core/signer/keys.ts`, `core/arweave/rsa-pss.ts`).
+  so the scan fails again and the entry is re-checked. Every Gleam
+  signature is RSA-PSS through WebCrypto (`core/signer/keys.ts`,
+  `core/arweave/rsa-pss.ts`).
   - `elliptic` ≤ 6.6.1 (GHSA-848j-6mx2-7j84): faulty ECDSA nonces can
     leak the signing key. It enters the lockfile through
     `@dha-team/arbundles` (`@ethersproject/signing-key`, `secp256k1`), a
@@ -349,11 +459,11 @@ count as a finding.
     time, which passes `rimraf` no `AbortSignal`, and isn't in the build.
     Its ignore runs until 2027-01-31.
 
-  *Still a finding if,* by any path, `.output/chrome-mv3` contains code
-  from any of these packages, or shipped code signs or verifies with ECDSA or
-  PKCS#1 v1.5, so the advisory's harm reaches users; or a patched
-  version that the dependent accepts exists for any of them, which ends
-  the ignore.
+  *Still a finding if,* by any path, `.output/chrome-mv3` or
+  `apps/mobile/dist` contains code from any of these packages, or
+  shipped code signs or verifies with ECDSA or PKCS#1 v1.5, so the
+  advisory's harm reaches users; or a patched version that the
+  dependent accepts exists for any of them, which ends the ignore.
 
 ## Known limitations
 
@@ -364,14 +474,29 @@ These are true of the current release.
   beta Permaweb app: the stock Arweave app has no data-item command, and
   the Ledger panel refuses a data item on it. `dispatch` stays on L1 for
   Ledger, and it signs no messages. Keystone signs transactions, data
-  items and messages. Neither decrypts or exports, since the key stays on the device
-  (`core/models/capabilities.ts`).
+  items and messages. Neither decrypts or exports, since the key stays on
+  the device (`core/models/capabilities.ts`). The app supports Keystone
+  only.
+- **Leaving the app or locking the phone doesn't lock Gleam.** Only
+  auto-lock does, after the chosen time without use, and the app's Lock
+  settings say only that. While the OS has the app suspended, its
+  JavaScript doesn't run, so unlocked keys stay in the worker's memory
+  past the timeout until the app resumes, when the missed check locks
+  before anything reads a key, or until the OS ends the process.
 - **On Android, a dApp page and the wallet share one renderer process.**
   Android WebViews in an app run in a single renderer process, across
   WebView instances and profiles. A renderer exploit in a page loaded in
   the dApp view could therefore reach the memory of the wallet WebView.
   Isolating them would need the dApp view in its own process, for example
-  a separate Activity with `android:process`. Accepted for now.
+  a separate Activity with `android:process`. Accepted for now. The
+  separate profile still keeps cookies and storage apart, and the dApp
+  view doesn't open on a WebView without `MULTI_PROFILE`.
+- **iOS allows screenshots of the import screens.** The privacy screen
+  is on only while a keyfile or recovery phrase is being imported. On
+  Android it sets `FLAG_SECURE` (no screenshots, a blank recents card);
+  on iOS it covers only the app switcher, since blocking screenshots
+  needs an unofficial window-layer change
+  (`apps/mobile/src/adapters/secure-screen.ts`).
 - **Pending figures trust the nodes Gleam ships with.** A token node's
   2xx is taken as accepted with no gateway confirmation. The first node
   to answer sets `swap-height`, so a lying node can clear a pending
@@ -415,7 +540,7 @@ These are true of the current release.
   signed with the upload key and Play installs with the Play signing
   key, so moving over means uninstalling, which deletes a vault that
   isn't backed up.
-- **Mobile link and dApp-view gaps.**
+- **App link and dApp-view gaps.**
   - A `target=_blank` or `window.open` from a cross-origin iframe takes
     the main-frame path for an external-app link, so the "Open in another
     app?" prompt can carry page-chosen text. The user still has to tap
@@ -426,7 +551,7 @@ These are true of the current release.
   - The approval sheet doesn't wait for the native dApp view to hide.
     The view sits above the sheet, so it would take the tap, not approve.
   - An invite link redeems its code with no tap. It signs nothing; the
-    desktop site message works the same way.
+    extension's site message works the same way.
 - **The Swift CodeQL job runs without `harden-runner`.** It doesn't
   support macOS runners on the community tier.
 - **Points and scans.**
@@ -451,7 +576,8 @@ These are true of the current release.
 
 ## Out of scope
 
-- A compromised operating system or browser.
+- A compromised operating system or browser, including a rooted or
+  jailbroken phone.
 - A user who gives away their keyfile or password.
 - The security of AO processes, tokens or dApps the user chooses to use.
 - Other extensions with broad permissions reading or changing pages.
@@ -460,7 +586,7 @@ These are true of the current release.
 
 [`security/surface.txt`](../security/surface.txt) lists every file where a
 bug could leak a key, produce an unapproved signature, or let a page past
-the wallet's boundary, ranked by impact. It is the scope for audits and
-security review. The release gate (`scripts/release-gate.mjs`) refuses to
-tag a release while any of those files has changed since the last audit
-(`security/audits/README.md`).
+the wallet's boundary, ranked by impact, for both shells. It is the scope
+for audits and security review. The release gate
+(`scripts/release-gate.mjs`) refuses to tag a release while any of those
+files has changed since the last audit (`security/audits/README.md`).

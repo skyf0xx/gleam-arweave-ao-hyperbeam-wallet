@@ -181,6 +181,8 @@
 4 packages/core/src/models/user-errors.ts
 4 apps/mobile/src/adapters/approval-presenter.ts
 4 apps/mobile/src/adapters/approval-sheet.ts
+4 apps/mobile/src/adapters/overlay-guard.ts
+4 apps/mobile/android/app/src/main/java/app/gleamwallet/
 4 apps/extension/src/adapters/windows.ts
 4 packages/core/src/recipients/assess.ts
 4 packages/runtime/src/handlers/reads.ts
