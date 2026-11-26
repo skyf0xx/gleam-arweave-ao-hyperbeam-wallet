@@ -31,6 +31,9 @@ pnpm wxt:build                             # production build
 
 CI runs all of the above on every PR; it won't merge if any fail.
 
+A change in behaviour comes with a test that fails without it: a fix with a
+test that reproduces the bug, a feature with tests of what it promises.
+
 If a change touches signing, network requests, or extension wiring, also load
 `apps/extension/.output/chrome-mv3` unpacked in Chrome and check it by hand —
 none of the automated checks exercise the real extension runtime.
