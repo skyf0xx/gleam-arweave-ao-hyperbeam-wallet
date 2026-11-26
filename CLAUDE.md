@@ -277,7 +277,7 @@ pnpm wxt:build                             # production build → apps/extension
 pnpm mobile:build                          # app web bundle → apps/mobile/dist (mobile:ios / mobile:android sync and open the native project)
 pnpm check:bundles                         # after wxt:build: what the keyring page and provider.js contain, and their size
 pnpm test:smoke                            # after wxt:build: loads the built extension in Chromium
-pnpm vitest run [path-fragment]            # tests
+pnpm test [path-fragment]                   # tests
 pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan, tsconfig.scripts.json
 pnpm eslint --max-warnings=0 <files>
 pnpm deps:check                            # the import fences and import cycles, on resolved files
