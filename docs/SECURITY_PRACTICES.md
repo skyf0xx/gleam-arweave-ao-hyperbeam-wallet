@@ -59,6 +59,17 @@ A weekly Stryker mutation run over `core/signer`, `core/vault` and
   for the app (`gleam-<shell>-<version>.cdx.json`), listing every package
   each one bundles.
 
+## Staying current
+
+Dependabot alerts and the Web Store's policy emails reach the
+maintainer directly. The maintainer also gets security notices from:
+
+- Node.js, through the `nodejs-sec` list;
+- the GitHub repositories of Capacitor, pnpm, arweave-js, AO, HyperBEAM,
+  node-forge and hash-wasm, through their published advisories.
+
+## Third-party code
+
 Third-party code in the shipped wallet:
 
 | Package                                                                                              | Used for                                                                               |
