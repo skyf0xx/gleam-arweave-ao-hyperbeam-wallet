@@ -1,11 +1,9 @@
 <img src="docs/branding/images/readme-banner.png" alt="Gleam" width="100%" />
 
-[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/einabcphdmlicabnjllaaallnebfkmki?label=chrome%20web%20store)](https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki)
-[![Chrome Web Store users](https://img.shields.io/chrome-web-store/users/einabcphdmlicabnjllaaallnebfkmki)](https://chromewebstore.google.com/detail/gleam/einabcphdmlicabnjllaaallnebfkmki)
 [![Release](https://img.shields.io/github/v/release/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest)
 [![CI](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/actions/workflows/ci.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17147/badge)](https://www.bestpractices.dev/projects/17147)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/badge)](https://scorecard.dev/viewer/?uri=github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet?label=openssf%20scorecard)](https://scorecard.dev/viewer/?uri=github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)
 [![License: MIT](https://img.shields.io/github/license/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)](LICENSE)
 
 A wallet for Arweave and AO, for Chrome, Android and iOS.
