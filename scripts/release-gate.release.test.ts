@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseSurface, surfacePaths } from "../security/surface.mjs";
-import { blockingFindings, parseFindings, parseFrontmatter, parseList, runGate } from "./release-gate.mjs";
+import { assertCleanBranch, blockingFindings, parseFindings, parseFrontmatter, parseList, runGate } from "./release-gate.mjs";
 
 const SHA = "a".repeat(40);
 
@@ -195,6 +195,32 @@ describe("runGate against a throwaway repo", () => {
     write("README.md", "changed\n");
     commit("docs");
     expect(runGate({ cwd: repo }).ok).toBe(true);
+  });
+
+  describe("assertCleanBranch", () => {
+    const refuse = (reason: string): never => {
+      throw new Error(reason);
+    };
+
+    it("refuses a changed tracked file unless it is allowed", () => {
+      commit("base");
+      write("README.md", "changed\n");
+      expect(() => assertCleanBranch(repo, "master", "", refuse)).toThrow(/uncommitted changes/);
+      expect(() => assertCleanBranch(repo, "master", "", refuse, ["README.md"])).not.toThrow();
+    });
+
+    it("still refuses another changed file beside an allowed one", () => {
+      commit("base");
+      write("README.md", "changed\n");
+      write("lock.yaml", "a: 2\n");
+      expect(() => assertCleanBranch(repo, "master", "", refuse, ["README.md"])).toThrow(/uncommitted changes/);
+    });
+
+    it("refuses the wrong branch", () => {
+      commit("base");
+      run("checkout", "--quiet", "-b", "other");
+      expect(() => assertCleanBranch(repo, "master", " here", refuse)).toThrow('on "other" here');
+    });
   });
 
   it("fails and lists the files when a surface file changed", () => {

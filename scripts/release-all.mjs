@@ -8,8 +8,9 @@
 //   pnpm release:all <major|minor|patch> --key <path-to-private-key>
 //
 // Stages:
-//   1. Bump the extension and both mobile apps (scripts/app-versions.mjs),
-//      commit, push a branch, open a PR.
+//   1. Refuse unless CHANGELOG.md has notes for the new version (they may
+//      be uncommitted), bump the extension and both mobile apps
+//      (scripts/app-versions.mjs), commit both, push a branch, open a PR.
 //      Stops here: merge it yourself (release-gate.mjs also requires
 //      security/audits/v<version>.md to exist with no open critical/high
 //      findings — write that first if it's missing).
@@ -31,7 +32,8 @@ import { createInterface } from "node:readline/promises";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { checkVersions, readVersions, writeVersions } from "./app-versions.mjs";
-import { assertCleanBranch, repoRoot, runGate } from "./release-gate.mjs";
+import { CHANGELOG_FILE, readChangelogSection } from "./changelog.mjs";
+import { assertCleanBranch, git, repoRoot, runGate } from "./release-gate.mjs";
 import { checkWellKnown } from "./well-known.mjs";
 
 const REMOTE = "origin";
@@ -75,7 +77,9 @@ const signWith = kdbx ? ["--kdbx", kdbx] : ["--key", /** @type {string} */ (key)
 
 const root = repoRoot(process.cwd());
 if (root === null) refuse("not inside a git repository");
-assertCleanBranch(root, BRANCH, `; start release:all from ${BRANCH}`, refuse);
+// The new version's notes may be written but not yet committed: they go
+// into the bump PR.
+assertCleanBranch(root, BRANCH, `; start release:all from ${BRANCH}`, refuse, [CHANGELOG_FILE]);
 
 // --- stage 1: bump, commit, PR -------------------------------------------
 
@@ -84,11 +88,21 @@ const [maj, min, patch] = current.split(".").map(Number);
 const next =
   bump === "major" ? `${maj + 1}.0.0` : bump === "minor" ? `${maj}.${min + 1}.0` : `${maj}.${min}.${patch + 1}`;
 
+try {
+  readChangelogSection(root, next);
+} catch (error) {
+  refuse(/** @type {Error} */ (error).message);
+}
+
 process.stdout.write(`== Stage 1: bump ${current} -> ${next} ==\n`);
 const changed = writeVersions(root, next);
 
 const bumpBranch = `release/v${next}`;
 run("git", ["checkout", "-b", bumpBranch], root);
+if (git(root, ["status", "--porcelain", "--", CHANGELOG_FILE]).out !== "") {
+  run("git", ["add", "--", CHANGELOG_FILE], root);
+  run("git", ["commit", "-m", `docs(changelog): v${next}`], root);
+}
 run("git", ["add", "--", ...changed], root);
 run("git", ["commit", "-m", `chore: bump version to ${next}`], root);
 run("git", ["push", "-u", REMOTE, bumpBranch], root);

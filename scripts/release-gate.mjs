@@ -169,16 +169,19 @@ export function repoRoot(cwd) {
 /**
  * Calls `refuse` unless `root` is on `branch` with no uncommitted changes to
  * tracked files. Untracked files can't end up in a tagged commit, so they
- * don't count.
+ * don't count, nor do changes to the repo-relative paths in `allowDirty`.
  * @param {string} root
  * @param {string} branch
  * @param {string} wrongBranchHint what follows `on "<branch>"` in the reason when the branch is wrong
  * @param {(reason: string) => never} refuse
+ * @param {string[]} [allowDirty]
  */
-export function assertCleanBranch(root, branch, wrongBranchHint, refuse) {
+export function assertCleanBranch(root, branch, wrongBranchHint, refuse, allowDirty = []) {
   const current = git(root, ["rev-parse", "--abbrev-ref", "HEAD"]).out;
   if (current !== branch) refuse(`on "${current}"${wrongBranchHint}`);
-  if (git(root, ["status", "--porcelain", "--untracked-files=no"]).out !== "") refuse("working tree has uncommitted changes");
+  const pathspec = [".", ...allowDirty.map((path) => `:(exclude,top)${path}`)];
+  const status = git(root, ["status", "--porcelain", "--untracked-files=no", "--", ...pathspec]);
+  if (!status.ok || status.out !== "") refuse("working tree has uncommitted changes");
 }
 
 /**
