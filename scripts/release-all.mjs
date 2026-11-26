@@ -35,6 +35,7 @@ import { parseArgs } from "node:util";
 import { checkVersions, readVersions, writeVersions } from "./app-versions.mjs";
 import { CHANGELOG_FILE, readChangelogSection } from "./changelog.mjs";
 import { assertCleanBranch, git, repoRoot, runGate } from "./release-gate.mjs";
+import { fetchScorecardScore, writeReadmeBadges } from "./readme-badges.mjs";
 import { checkWellKnown } from "./well-known.mjs";
 
 const REMOTE = "origin";
@@ -97,6 +98,7 @@ try {
 
 process.stdout.write(`== Stage 1: bump ${current} -> ${next} ==\n`);
 const changed = writeVersions(root, next);
+changed.push(...writeReadmeBadges(root, next, await fetchScorecardScore()));
 
 const bumpBranch = `release/v${next}`;
 run("git", ["checkout", "-b", bumpBranch], root);
