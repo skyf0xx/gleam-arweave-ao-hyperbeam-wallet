@@ -112,7 +112,9 @@ cipher or signature scheme of its own. The details and parameters are in
 
 Gleam has a single maintainer who holds all accounts below. CI doesn't hold secrets: its only token is the per-run `GITHUB_TOKEN`. Signing keys and
 API keys live in one KeePassXC database on the maintainer's machine and
-are unlocked only at the steps that use them.
+are unlocked only at the steps that use them. Every account below signs
+in with a passkey, directly or through a GitHub or Google sign-in that
+uses one.
 
 | System                             | What it controls                                            | Credential                                                               |
 | ---------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
