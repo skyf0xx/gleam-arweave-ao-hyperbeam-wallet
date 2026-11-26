@@ -39,7 +39,10 @@ const sameKey = await window.arweaveWallet.decrypt(locked, {
 
 ### Add a Connect with Gleam button
 
-Check `window.gleam`. If it is `undefined`, Gleam is not installed:
+Use `window.gleam` to open Gleam's connect approval window. It supports the
+same methods as `window.arweaveWallet`.
+
+If `window.gleam` is `undefined`, Gleam is not installed:
 
 - On a computer, link to
   [gleamwallet.app/download](https://gleamwallet.app/download).
