@@ -12,7 +12,7 @@ A wallet for Arweave and AO, for Chrome, Android and iOS.
 [![Android](https://img.shields.io/badge/Android-0A0A0A?style=for-the-badge&logo=android&logoColor=white)](https://gleamwallet.app/android)
 [![iOS](https://img.shields.io/badge/iOS-0A0A0A?style=for-the-badge&logo=apple&logoColor=white)](https://gleamwallet.app/ios)
 
-<img src="docs/branding/images/dashboard-tilted-crisp.png" alt="Gleam wallet dashboard" width="360" />
+<img src="docs/branding/images/readme-dashboard.png" alt="Gleam wallet dashboard" width="360" />
 
 ## For dApp developers
 
