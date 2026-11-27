@@ -13,7 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Decides whether a pull request changes only prose that no check reads.
+  # Decides whether a pull request changes only files that no check reads:
+  # prose, the branding sources under docs/branding and editor settings.
   # The jobs below skip only on an explicit "false": if this job fails, its
   # output is empty and every check runs.
   changes:
@@ -31,6 +32,7 @@ jobs:
       # A pull request checks out its merge commit, so HEAD^1 is the base.
       # Tests read docs/THREAT_MODEL.md, security/scan/REPORT.md and the PR
       # template, so Markdown under security/ or .github/ counts as code.
+      # docs/branding holds images and HTML mock-ups that nothing imports.
       - id: diff
         env:
           EVENT: ${{ github.event_name }}
@@ -45,7 +47,7 @@ jobs:
             while IFS= read -r path; do
               case "$path" in
                 security/*|.github/*|docs/THREAT_MODEL.md) code=true ;;
-                *.md) ;;
+                *.md|docs/branding/*|LICENSE|.vscode/*) ;;
                 *) code=true ;;
               esac
             done < changed.txt
