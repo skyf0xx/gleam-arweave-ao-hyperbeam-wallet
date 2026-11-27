@@ -31,6 +31,14 @@ describe("getArTotalSupply", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back past a gateway whose reply runs past a few dozen digits", async () => {
+    const fetchImpl = stubFetch({
+      "https://gw.test/total_supply": () => new Response("9".repeat(1_000_000)),
+      "https://arweave.net/total_supply": () => new Response(SUPPLY),
+    });
+    expect(await getArTotalSupply("https://gw.test", fetchImpl)).toBe(SUPPLY);
+  });
+
   it("refuses a supply of 0", async () => {
     const fetchImpl = stubFetch({ "https://arweave.net/total_supply": () => new Response("0") });
     await expect(getArTotalSupply("https://arweave.net", fetchImpl)).rejects.toThrow();

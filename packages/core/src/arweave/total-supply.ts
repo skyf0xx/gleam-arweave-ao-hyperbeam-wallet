@@ -1,7 +1,10 @@
 import type { Winston } from "../models/balance";
+import { readTextCapped } from "../models/http";
 import { trimTrailingSlashes } from "../models/network";
 
 const SUPPLY_TIMEOUT_MS = 10_000;
+/** A Winston amount is a few dozen digits. */
+const MAX_REPLY_BYTES = 64;
 
 /** Serves `/total_supply`, which AR.IO gateways answer with an error page. */
 const TOTAL_SUPPLY_HOST = "https://arweave.net";
@@ -15,7 +18,7 @@ export async function getArTotalSupply(gatewayUrl: string, fetchImpl: typeof fet
   for (const host of new Set([trimTrailingSlashes(gatewayUrl), TOTAL_SUPPLY_HOST])) {
     try {
       const response = await fetchImpl(`${host}/total_supply`, { signal: AbortSignal.timeout(SUPPLY_TIMEOUT_MS) });
-      const body = response.ok ? (await response.text()).trim() : "";
+      const body = response.ok ? ((await readTextCapped(response, MAX_REPLY_BYTES)) ?? "").trim() : "";
       if (/^\d+$/.test(body) && BigInt(body) > 0n) return body;
     } catch {
       // The next host may answer.

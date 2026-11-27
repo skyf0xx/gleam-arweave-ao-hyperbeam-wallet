@@ -1,12 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { getBalance } from "./balance";
 
-function fakeFetch(body: string, ok = true, status = 200): typeof fetch {
-  return vi.fn(async () => ({
-    ok,
-    status,
-    text: async () => body,
-  })) as unknown as typeof fetch;
+function fakeFetch(body: string, status = 200): typeof fetch {
+  return vi.fn(async () => new Response(body, { status })) as unknown as typeof fetch;
 }
 
 describe("getBalance", () => {
@@ -26,7 +22,7 @@ describe("getBalance", () => {
   });
 
   it("throws on a non-2xx response", async () => {
-    const fetchImpl = fakeFetch("", false, 500);
+    const fetchImpl = fakeFetch("", 500);
     await expect(getBalance("addr123", "https://arweave.net", fetchImpl)).rejects.toThrow(
       /HTTP 500/,
     );
@@ -44,5 +40,10 @@ describe("getBalance", () => {
     const fetchImpl = fakeFetch(huge);
     const result = await getBalance("addr123", "https://arweave.net", fetchImpl);
     expect(result).toBe(huge);
+  });
+
+  it("refuses a reply far longer than any balance, without buffering it", async () => {
+    const fetchImpl = fakeFetch("9".repeat(1_000_000));
+    await expect(getBalance("addr123", "https://arweave.net", fetchImpl)).rejects.toThrow(/non-integer balance/);
   });
 });
