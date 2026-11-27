@@ -274,3 +274,13 @@ jobs:
             semgrep/semgrep@sha256:529ee8a277ec8adc5b534d7c74eea0a47e9de21d62852b6ba7ac6ba9566845c3 \
             semgrep scan --metrics=off --error \
               --config p/typescript --config p/javascript --config p/react --config p/secrets
+
+      # mobsfscan 1.2.0 over the native shells. The built APK and IPA get a
+      # full MobSF scan in release-app.sh, because CI doesn't build them.
+      - name: mobsfscan
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/src" -w /src \
+            opensecurity/mobsfscan@sha256:b5983d43bcb34ddcf0ff4c8e8d29b160123182505d5e757db458bbb8aafc3329 \
+            --config apps/mobile/.mobsf --exit-warning \
+            apps/mobile/android/app/src/main apps/mobile/ios/App/App apps/mobile/plugins

@@ -37,6 +37,7 @@ adds a YubiKey.
   `brew install ruby`, then put `$(brew --prefix ruby)/bin` first on
   `PATH`. `bundle install` runs from `apps/mobile`. The script checks for
   Ruby 3 or newer before it unlocks anything.
+- Docker running, for the MobSF scan before signing.
 - iOS: macOS with Xcode.
 - Android: JDK 21 (checked by the script; `JAVA_HOME` is used when set)
   and the Android SDK.

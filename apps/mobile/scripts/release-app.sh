@@ -85,6 +85,7 @@ esac
 [ -f "$kdbx" ] || { echo "KeePassXC database not found: $kdbx" >&2; exit 2; }
 command -v keepassxc-cli > /dev/null || { echo "keepassxc-cli not found; brew install --cask keepassxc" >&2; exit 2; }
 command -v bundle > /dev/null || { echo "bundler not found; see apps/mobile/fastlane/README.md" >&2; exit 2; }
+docker info > /dev/null 2>&1 || { echo "Docker is not running; it runs the MobSF scan" >&2; exit 2; }
 if [ "$target" = android-apk ]; then
   command -v gh > /dev/null || { echo "gh not found; it uploads the APK to the GitHub Release" >&2; exit 2; }
   gh release view "$tag" > /dev/null 2>&1 || { echo "no GitHub Release for $tag yet; wait for release.yml" >&2; exit 2; }
@@ -186,6 +187,8 @@ bundle exec fastlane "$platform" prepare "tag:$tag" || exit 1
 work="$(mktemp -d)"
 chmod 700 "$work"
 case "$work/" in "$repo_root"/*) echo "temp dir is inside the repo; refusing" >&2; exit 1 ;; esac
+
+"$mobile/scripts/mobsf-scan.sh" "$platform" "$work" || exit 1
 
 echo "== Unlocking $kdbx =="
 yubikey=()

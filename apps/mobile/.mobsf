@@ -1,0 +1,12 @@
+---
+# mobsfscan (CI security-scan job) over the native shells. Its INFO rules
+# report protections the app doesn't have, such as root detection or
+# certificate pinning, on every run, so only warnings and errors fail.
+- severity-filter:
+    - WARNING
+    - ERROR
+  ignore-rules:
+    # Both read targetSdk from the manifest, where Capacitor doesn't put it,
+    # so they assume Android 8. minSdk is 29, and Android 10 fixes both.
+    - android_task_hijacking1
+    - android_task_hijacking2

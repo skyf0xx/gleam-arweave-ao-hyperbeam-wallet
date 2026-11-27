@@ -240,6 +240,10 @@
 /apps/mobile/scripts/bundle-hash.mjs                                     @skyf0xx
 /apps/mobile/scripts/verify-bundle.mjs                                   @skyf0xx
 /apps/mobile/scripts/release-app.sh                                      @skyf0xx
+/apps/mobile/scripts/mobsf-scan.sh                                      @skyf0xx
+/apps/mobile/scripts/mobsf-check.mjs                                      @skyf0xx
+/apps/mobile/mobsf-baseline.json                                      @skyf0xx
+/apps/mobile/.mobsf                                      @skyf0xx
 /apps/mobile/android/app/src/main/res/xml/file_paths.xml                 @skyf0xx
 /apps/mobile/ios/App/CapApp-SPM/Package.swift                            @skyf0xx
 /apps/mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved @skyf0xx
