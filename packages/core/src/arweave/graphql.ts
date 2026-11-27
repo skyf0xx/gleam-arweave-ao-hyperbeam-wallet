@@ -34,7 +34,7 @@ const activityReplySchema = transactionsReply(activityNodeSchema);
  * config surface. Exported so `wxt.config.ts` grants each a static host
  * permission.
  */
-export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://arweave-search.goldsky.com"];
+export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://ar-io.dev"];
 
 /** Per gateway, so one that never answers falls through to the next candidate. */
 const GRAPHQL_TIMEOUT_MS = 10_000;

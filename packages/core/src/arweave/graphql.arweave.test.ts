@@ -339,6 +339,18 @@ describe("queryActivityTransactions", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
+  it("asks the chosen gateway, then arweave.net, then ar-io.dev", async () => {
+    const asked: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      asked.push(new URL(url).origin);
+      return { ok: false, status: 502, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+
+    await queryActivityTransactions(ADDRESS, "https://my-gateway.example", 10, fetchImpl).catch(() => undefined);
+
+    expect([...new Set(asked)]).toEqual(["https://my-gateway.example", "https://arweave.net", "https://ar-io.dev"]);
+  });
+
   it("throws only after every candidate gateway fails", async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: false,
