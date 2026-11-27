@@ -36,6 +36,7 @@ Every PR runs:
 | Playwright smoke test                            | The built extension loading and running in Chromium                                                    |
 | web-ext lint                                     | Manifest and bundle problems                                                                           |
 | CodeQL, Semgrep                                  | Static analysis of the TypeScript, the Kotlin and Swift shells, and the workflows                      |
+| mobsfscan                                        | Insecure settings and code in the Kotlin and Swift shells and the Android manifest                     |
 | osv-scanner, dependency-review                   | Known vulnerabilities in locked dependencies, and in a PR's new ones                                   |
 | gitleaks (also pre-commit)                       | Committed secrets                                                                                      |
 | zizmor                                           | Unsafe GitHub Actions workflows                                                                        |
@@ -103,6 +104,10 @@ Third-party code in the shipped wallet:
    by hand. The app is signed only when its web bundle's hash matches the
    manifest. The native iOS and Android shells are not reproducible,
    because the stores re-sign them.
+5. Before the app is signed, MobSF scans an unsigned build of it. The
+   release stops on a high or warning finding that isn't in
+   `apps/mobile/mobsf-baseline.json`, which gives each accepted one its
+   reason.
 
 ## Cryptography
 

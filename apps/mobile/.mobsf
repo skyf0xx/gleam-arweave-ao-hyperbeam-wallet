@@ -1,0 +1,12 @@
+---
+# mobsfscan (CI security-scan job) over the native shells. Its INFO rules
+# report protections the app doesn't have, such as root detection or
+# certificate pinning, on every run, so only warnings and errors fail.
+- severity-filter:
+    - WARNING
+    - ERROR
+  ignore-rules:
+    # MainActivity is singleTask without taskAffinity="". Open decision,
+    # tracked in todo.md; remove these once it's settled.
+    - android_task_hijacking1
+    - android_task_hijacking2

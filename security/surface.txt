@@ -243,6 +243,10 @@
 5 apps/mobile/scripts/bundle-hash.mjs
 5 apps/mobile/scripts/verify-bundle.mjs
 5 apps/mobile/scripts/release-app.sh
+5 apps/mobile/scripts/mobsf-scan.sh
+5 apps/mobile/scripts/mobsf-check.mjs
+5 apps/mobile/mobsf-baseline.json
+5 apps/mobile/.mobsf
 5 apps/mobile/android/app/src/main/res/xml/file_paths.xml
 5 apps/mobile/ios/App/CapApp-SPM/Package.swift
 5 apps/mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
