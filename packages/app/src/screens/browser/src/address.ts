@@ -32,6 +32,20 @@ export function siteHost(url: string): SiteHost | null {
   }
 }
 
+/**
+ * A URL piece decoded for reading, without control or format characters:
+ * a decoded bidi override could make it draw over the host.
+ */
+export function readable(raw: string): string {
+  let text: string;
+  try {
+    text = decodeURIComponent(raw);
+  } catch {
+    text = raw;
+  }
+  return text.replace(/[\p{Cc}\p{Cf}]/gu, "");
+}
+
 /** A segment that reads as an ID (a tx id, hash or token) rather than a word. */
 const ID_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{16,}$/;
 const MAX_SEGMENT = 32;
@@ -57,14 +71,7 @@ export function pageTrail(url: string, { idEnds = false }: { idEnds?: boolean } 
   const trail: string[] = [];
   for (const raw of path.split("/")) {
     if (raw === "") continue;
-    let segment: string;
-    try {
-      segment = decodeURIComponent(raw);
-    } catch {
-      segment = raw;
-    }
-    // A decoded bidi override could make the path draw over the host.
-    segment = segment.replace(/[\p{Cc}\p{Cf}]/gu, "");
+    const segment = readable(raw);
     if (segment === "") continue;
     const shortened = segment.length > MAX_SEGMENT || ID_SEGMENT.test(segment);
     const shown = !shortened ? segment : idEnds ? `${segment.slice(0, ID_ENDS)}…${segment.slice(-ID_ENDS)}` : "…";
