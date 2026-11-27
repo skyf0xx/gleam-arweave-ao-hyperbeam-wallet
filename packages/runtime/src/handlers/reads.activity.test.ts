@@ -635,6 +635,25 @@ describe("ReadsHandler: token decimals across gateways", () => {
     expect(preview.denomination).toBe(0);
   });
 
+  it("keeps the decimals the gateways agree on when the token's Info names others", async () => {
+    const { handler } = await setup({});
+    const agreed = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes("/graphql")) {
+        // Gateways agree on 6 decimals but carry no ticker, so Info is asked.
+        const reply = await (agreed(url) as unknown as Promise<{ json: () => Promise<unknown> }>);
+        const body = JSON.stringify(await reply.json()).replace('{"name":"ticker","value":"wUSDC"},', "");
+        return { ok: true, status: 200, json: async () => JSON.parse(body) };
+      }
+      if (url.includes("/dry-run")) {
+        return Response.json({ Messages: [{ Tags: [{ name: "Ticker", value: "wUSDC" }, { name: "Denomination", value: "3" }], Data: "" }] });
+      }
+      return agreed(url);
+    }) as unknown as typeof fetch;
+    const preview = await handler.previewWatchedToken({ address: "addr1", processId });
+    expect(preview.denomination).toBe(6);
+  });
+
   it("keeps and caches the decimals the gateways agree on", async () => {
     const { storage, handler } = await setup({});
     const preview = await handler.previewWatchedToken({ address: "addr1", processId });
