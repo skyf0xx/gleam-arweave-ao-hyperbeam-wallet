@@ -150,6 +150,8 @@ export function encodeTaggedBinary(value: unknown): unknown {
 /** The inverse of `encodeTaggedBinary`. */
 export function decodeTaggedBinary(value: unknown): unknown {
   if (isTaggedBinary(value)) {
+    // Uint8Array.from would coerce each element, which throws a TypeError on an object with no usable toString.
+    if (!value.data.every((byte) => typeof byte === "number")) throw new Error("Binary data must be an array of numbers.");
     const bytes = Uint8Array.from(value.data);
     return value.__gleamType === "ArrayBuffer" ? bytes.buffer : bytes;
   }

@@ -68,9 +68,7 @@ describe("page parameter readers on arbitrary input", () => {
   });
 });
 
-// `Uint8Array.from` throws a TypeError on an element whose own `toString`
-// and `valueOf` aren't functions, so the byte values leave those keys out.
-const byteValue = fc.anything({ key: fc.string().filter((key) => key !== "toString" && key !== "valueOf") });
+const byteValue = fc.oneof(fc.anything(), fc.anything({ key: fc.constantFrom("toString", "valueOf", "a") }));
 const tagged = fc.record({
   __gleamType: fc.constantFrom("ArrayBuffer", "Uint8Array", "Blob"),
   data: fc.array(fc.oneof(fc.nat(300), byteValue), { maxLength: 8 }),
