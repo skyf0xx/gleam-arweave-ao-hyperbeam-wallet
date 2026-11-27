@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -76,6 +76,28 @@ describe("verify-bundle", () => {
     const r = run([TAG, native]);
     expect(r.code).toBe(1);
     expect(r.out).toContain("not v1.2.3");
+  });
+
+  it("reads a draft release's manifest through gh when the download URL has none", () => {
+    // A stand-in gh on PATH prints the manifest only for the exact download command.
+    const bin = join(root, "bin");
+    write(bin, "gh", `#!/bin/sh
+[ "$*" = "release download ${TAG} --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --pattern release-manifest.json --output -" ] || exit 1
+echo '${JSON.stringify({ tag: TAG, mobileBundleSha256: distHash })}'
+`);
+    chmodSync(join(bin, "gh"), 0o755);
+    const r = run([TAG, native], { PATH: `${bin}:${process.env.PATH ?? ""}` });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("PASS dist matches the manifest");
+  });
+
+  it("fails when neither the download URL nor gh has the manifest", () => {
+    const bin = join(root, "bin");
+    write(bin, "gh", "#!/bin/sh\nexit 1\n");
+    chmodSync(join(bin, "gh"), 0o755);
+    const r = run([TAG, native], { PATH: `${bin}:${process.env.PATH ?? ""}` });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("could not fetch or parse release-manifest.json");
   });
 
   it("rejects a malformed tag", () => {

@@ -13,7 +13,39 @@ on:
 permissions: read-all
 
 jobs:
+  # Scorecard counts the Gradle wrapper jar as validated only once ci.yml
+  # has a successful run on the commit it scores, and both start on the same
+  # push, so a push waits for that run. The analysis runs either way.
+  wait-for-ci:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+    steps:
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        with:
+          egress-policy: audit
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 80); do
+            state=$(gh run list --repo "$REPO" --workflow ci.yml --commit "$SHA" --event push \
+              --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')
+            case "$state" in
+              "completed success") exit 0 ;;
+              completed*) echo "::warning::CI on $SHA finished as $state"; exit 0 ;;
+            esac
+            sleep 30
+          done
+          echo "::warning::CI on $SHA was still running after 40 minutes"
+
   analysis:
+    needs: wait-for-ci
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
