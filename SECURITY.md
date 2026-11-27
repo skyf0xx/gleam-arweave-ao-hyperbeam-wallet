@@ -23,8 +23,7 @@ The [report form](.github/VULNERABILITY_REPORT.yml) accepts Medium and
 above. A report sent through the API uses the form's labels as
 `### <label>` headings.
 
-If you signed a [community scan](SCANS.md), add its attestation id. Any
-attestation your wallet signed counts.
+If you signed a [community scan](SCANS.md), add its attestation id.
 
 ## Severity
 
