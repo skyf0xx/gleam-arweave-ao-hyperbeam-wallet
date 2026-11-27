@@ -535,3 +535,20 @@ describe("BrowserView full address", () => {
     expect(browser.port.goBack).not.toHaveBeenCalled();
   });
 });
+
+describe("BrowserView editing an open page's address", () => {
+  it("starts from the page's own URL, selected, and keeps the saved sites in view until it changes", async () => {
+    const browser = fakeBrowser();
+    mount({ browser: browser.port, runtime: fakeRuntime({ saved: ["https://my.example/"], recent: [] }).runtime, initialUrl: "https://a.example/page?x=1" });
+    await browser.emit({ kind: "navigation", url: "https://a.example/page?x=1", canGoBack: false, loading: false });
+
+    fireEvent.click(screen.getByLabelText(/Address, a\.example/));
+    const input = screen.getByLabelText("Address") as HTMLInputElement;
+    expect(input.value).toBe("https://a.example/page?x=1");
+    expect(await screen.findByText("Saved")).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "my" } });
+    expect(screen.queryByText("Saved")).toBeNull();
+    expect(screen.getByText("my.example")).toBeTruthy();
+  });
+});

@@ -74,6 +74,8 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const [historyOpen, setHistoryOpen] = useState(false);
   const [reveal, setReveal] = useState<AddressReveal>("none");
   const [text, setText] = useState("");
+  // The page's URL that editing started from; until it changes, the start screen reads it as nothing typed.
+  const [editFrom, setEditFrom] = useState("");
   const [rejected, setRejected] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const { data: grants = [], refetch: loadGrants } = useConnectedApps(runtime);
@@ -102,6 +104,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
 
   const open = (url: string) => {
     setEditing(false);
+    setEditFrom("");
     setReveal("none");
     setHistoryOpen(false);
     setText("");
@@ -207,8 +210,15 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     return () => clearInterval(timer);
   }, [runtime]);
 
+  const startEditing = () => {
+    setText(currentUrl ?? "");
+    setEditFrom(currentUrl ?? "");
+    setEditing(true);
+  };
+
   const cancelEditing = () => {
     setEditing(false);
+    setEditFrom("");
     setText("");
     setRejected(false);
   };
@@ -303,6 +313,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
               autoCorrect="off"
               spellCheck={false}
               autoFocus={editing}
+              onFocus={(event) => event.currentTarget.select()}
               value={text}
               onChange={(event) => {
                 setText(event.target.value);
@@ -317,7 +328,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             ) : null}
           </form>
         ) : (
-          <AddressBar parts={parts} trail={trail} onEdit={() => setEditing(true)} reveal={reveal} onReveal={setReveal} />
+          <AddressBar parts={parts} trail={trail} onEdit={startEditing} reveal={reveal} onReveal={setReveal} />
         )}
       </div>
       {rejected ? (
@@ -332,7 +343,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
         {showingStart ? (
           <div className="absolute inset-0 overflow-y-auto bg-background">
             <StartScreen
-              query={text}
+              query={text === editFrom ? "" : text}
               saved={sites.saved}
               recent={sites.recent}
               history={sites.history}
