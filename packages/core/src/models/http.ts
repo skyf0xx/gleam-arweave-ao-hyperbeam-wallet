@@ -9,3 +9,32 @@ export function withRequestTimeout(fetchImpl: typeof fetch, timeoutMs: number = 
 export function isSuccessStatus(status: number): boolean {
   return status >= 200 && status < 300;
 }
+
+/**
+ * The body as text, or `null` once it runs past `maxBytes`: a reply that
+ * should be one short value can't make the reader buffer a hostile host's
+ * gigabytes. Reading stops at the cap.
+ */
+export async function readTextCapped(response: Response, maxBytes: number): Promise<string | null> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}

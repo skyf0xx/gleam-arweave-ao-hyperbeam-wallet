@@ -1,6 +1,7 @@
 import { discoverTokens, type DiscoverTokensOptions } from "@gleam/core/src/ao/index.ts";
 import { isRegisteredProcessId, impersonatesRegisteredToken } from "@gleam/core/src/pricing/index.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
+import { getArTotalSupply } from "@gleam/core/src/arweave/total-supply.ts";
 import { POINTS_API_URL, isArweaveId } from "@gleam/core";
 import { updateStored } from "../storage-update";
 import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls } from "../peers";
@@ -314,6 +315,11 @@ export class ReadsHandler {
   async getBalance(req: { address: string }): Promise<Winston> {
     const settings = await this.loadNetworkSettings();
     return getArBalance(req.address, settings.gatewayUrl);
+  }
+
+  async getArTotalSupply(): Promise<Winston> {
+    const settings = await this.loadNetworkSettings();
+    return getArTotalSupply(settings.gatewayUrl);
   }
 
   /**

@@ -71,11 +71,7 @@ afterEach(() => {
 
 describe("ReadsHandler: getBalance", () => {
   it("reads the AR balance as a Winston string via the configured gateway", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () => "555000000000",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => new Response("555000000000")) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(createFakeStorage());
     const balance = await handler.getBalance({ address: "addr1" });
@@ -85,11 +81,7 @@ describe("ReadsHandler: getBalance", () => {
   });
 
   it("defaults to arweave.net when no network settings are stored", async () => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () => "0",
-    })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => new Response("0")) as unknown as typeof fetch;
 
     const handler = new ReadsHandler(createFakeStorage());
     await handler.getBalance({ address: "addr1" });
@@ -1106,7 +1098,7 @@ describe("ReadsHandler: getPortfolioHistory", () => {
 
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes("wallet/addr1/balance")) {
-        return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
+        return new Response("2000000000000"); // 2 AR
       }
       if (url.includes("/prices/history")) {
         return {
@@ -1147,8 +1139,8 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null });
 
     globalThis.fetch = vi.fn(async (url: string) => {
-      if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
-      if (url.includes("wallet/addr2/balance")) return { ok: true, status: 200, text: async () => "3000000000000" }; // 3 AR
+      if (url.includes("wallet/addr1/balance")) return new Response("2000000000000"); // 2 AR
+      if (url.includes("wallet/addr2/balance")) return new Response("3000000000000"); // 3 AR
       if (url.includes("/prices/history")) {
         return { ok: true, status: 200, json: async () => ({ series: [{ timestamp: 1000, usd: 10 }, { timestamp: 2000, usd: 20 }] }) };
       }
@@ -1176,8 +1168,8 @@ describe("ReadsHandler: getPortfolioHistory", () => {
     await storage.set("local:networkSettings", { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null });
 
     globalThis.fetch = vi.fn(async (url: string) => {
-      if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" }; // 2 AR
-      if (url.includes("wallet/addr2/balance")) return { ok: true, status: 200, text: async () => "3000000000000" }; // 3 AR
+      if (url.includes("wallet/addr1/balance")) return new Response("2000000000000"); // 2 AR
+      if (url.includes("wallet/addr2/balance")) return new Response("3000000000000"); // 3 AR
       if (url.includes("/prices/history")) {
         return { ok: true, status: 200, json: async () => ({ series: [{ timestamp: 1000, usd: 10 }, { timestamp: 2000, usd: 20 }] }) };
       }
@@ -1202,7 +1194,7 @@ describe("ReadsHandler: getPortfolioHistory", () => {
 
     globalThis.fetch = vi.fn(async (url: string) => {
       if (url.includes("wallet/addr1/balance")) {
-        return { ok: true, status: 200, text: async () => "1000000000000" };
+        return new Response("1000000000000");
       }
       return { ok: false, status: 500, json: async () => ({}) };
     }) as unknown as typeof fetch;
@@ -1230,7 +1222,7 @@ describe("ReadsHandler: display currency", () => {
   // 2 AR, no AO; AR went from $10 to $20 while EUR is 0.5 per dollar.
   function pricedFetch({ fxRate = 0.5 as number | null } = {}) {
     return vi.fn(async (url: string) => {
-      if (url.includes("wallet/addr1/balance")) return { ok: true, status: 200, text: async () => "2000000000000" };
+      if (url.includes("wallet/addr1/balance")) return new Response("2000000000000");
       if (url.includes("/prices/fx")) return { ok: true, status: 200, json: async () => ({ rate: fxRate }) };
       if (url.includes("/prices/history")) {
         return { ok: true, status: 200, json: async () => ({ series: [{ timestamp: 1000, usd: 10 }, { timestamp: 2000, usd: 20 }] }) };

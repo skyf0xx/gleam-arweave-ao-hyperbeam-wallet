@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
-import { explorerUrlFor, type TokenBalance } from "@gleam/core";
+import { explorerUrlFor, type RuntimePort, type TokenBalance } from "@gleam/core";
 import { TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
+import { formatTokenAmount } from "../../main-screen/src/formatTokenAmount";
 import { displayTicker } from "../../main-screen/src/formatWinston";
-import { useT } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
+import { useArTotalSupply } from "./useArTotalSupply";
 import { useCopy } from "@gleam/ui/src/primitives/use-copy.ts";
 import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
 
@@ -12,26 +14,41 @@ import { CopyButton } from "@gleam/ui/src/primitives/copy-button.tsx";
  * out rather than shown as a dash.
  */
 export function TokenInfoPanel({
+  runtime,
   token,
   priceDisplay,
   chart,
 }: {
+  runtime: RuntimePort;
   token: TokenBalance | null;
   priceDisplay: string | undefined;
   /** The price chart, or nothing for a token without a price history. */
   chart?: ReactNode;
 }) {
   const t = useT();
+  const locale = useLocale();
   const denomination = token === null ? 12 : token.denomination;
+  const arTotalSupply = useArTotalSupply(runtime, token === null);
+  // An unavailable row's decimals can't be trusted to scale the supply.
+  const totalSupply = token === null ? arTotalSupply.data : token.available !== false ? token.totalSupply : undefined;
 
   return (
     <div className="flex flex-col gap-6">
       {chart}
 
+      {token?.description !== undefined ? (
+        <p dir="auto" className="whitespace-pre-line break-words text-label text-muted">
+          {token.description}
+        </p>
+      ) : null}
+
       <dl className="flex flex-col gap-3">
         {/* The chart's figure is the price; the row stands in for a token without one. */}
         {priceDisplay !== undefined && !chart ? <InfoRow label={t("send.price")}>{priceDisplay}</InfoRow> : null}
         <InfoRow label={t("send.decimals")}>{denomination}</InfoRow>
+        {totalSupply !== undefined ? (
+          <InfoRow label={t("send.totalSupply")}>{formatTokenAmount(totalSupply, denomination, locale)}</InfoRow>
+        ) : null}
         {token !== null ? (
           <InfoRow label={t("send.process")}>
             {/* On a phone the two 44px tap areas sit side by side rather than overlapping. */}
@@ -42,6 +59,7 @@ export function TokenInfoPanel({
           </InfoRow>
         ) : null}
       </dl>
+
     </div>
   );
 }
