@@ -263,12 +263,20 @@ if [ "$target" = android-apk ]; then
   apk="$work/gleam.apk"
   cp "$mobile/android/app/build/outputs/apk/release/app-release.apk" "$apk" || exit 1
   apk_sha="$(shasum -a 256 "$apk" | awk '{ print $1 }')"
+  # release.yml leaves this marker where the APK's hash goes, inside the
+  # verify block. Check it before the upload so a failure leaves no APK behind.
+  marker='<!-- apk -->'
+  notes="$(gh release view "$tag" --json body -q .body)" || exit 1
+  case "$notes" in
+    *"$marker"*) ;;
+    *) echo "the $tag notes have no $marker line for the APK hash" >&2; exit 1 ;;
+  esac
   echo "== Uploading gleam.apk (SHA-256 $apk_sha) to the $tag release =="
   gh release upload "$tag" "$apk" || exit 1
-  notes="$(gh release view "$tag" --json body -q .body)" || exit 1
-  gh release edit "$tag" --notes "$notes
-
-Android APK \`gleam.apk\` SHA-256: \`$apk_sha\`" > /dev/null || exit 1
+  apk_entry="**Android** · \`gleam.apk\`
+SHA-256 \`$apk_sha\`
+"
+  gh release edit "$tag" --notes "${notes/"$marker"/$apk_entry}" > /dev/null || exit 1
   # The APK is the last file in, so publish now: from here the tag and files
   # are locked, and releases/latest points here.
   gh release edit "$tag" --draft=false --latest > /dev/null || exit 1
