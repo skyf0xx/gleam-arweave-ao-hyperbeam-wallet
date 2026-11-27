@@ -73,11 +73,6 @@ const tagged = fc.record({
   data: fc.array(fc.oneof(fc.nat(300), fc.anything()), { maxLength: 8 }),
 });
 
-// `String()` throws a TypeError on an object whose own `toString` and
-// `valueOf` aren't functions, and readHashAlgorithm's refusal message
-// calls it on the page's value, so its values leave those keys out.
-const convertible = fc.anything({ key: fc.string().filter((key) => key !== "toString" && key !== "valueOf") });
-
 const options = fc.oneof(
   fc.anything(),
   fc.record(
@@ -85,7 +80,7 @@ const options = fc.oneof(
       name: fc.oneof(fc.constantFrom("RSA-OAEP", "AES-GCM", "AES-CBC", "RSA-PSS"), fc.anything()),
       label: fc.oneof(fc.uint8Array({ maxLength: 8 }), fc.anything()),
       algorithm: fc.oneof(fc.constant("RSA-OAEP"), fc.anything()),
-      hashAlgorithm: fc.oneof(fc.constantFrom("SHA-256", "SHA-384", "SHA-512", "sha-256", "SHA-1"), convertible),
+      hashAlgorithm: fc.oneof(fc.constantFrom("SHA-256", "SHA-384", "SHA-512", "sha-256", "SHA-1"), fc.anything({ key: fc.constantFrom("toString", "valueOf", "a") }), fc.anything()),
     },
     { requiredKeys: [] },
   ),

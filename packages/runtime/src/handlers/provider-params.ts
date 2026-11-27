@@ -82,7 +82,7 @@ export function readHashAlgorithm(options: unknown, method: string): HashAlgorit
   const hashAlgorithm = readOptions(options, method)?.hashAlgorithm;
   if (hashAlgorithm === undefined) return undefined;
   if (!HASH_ALGORITHMS.includes(hashAlgorithm as HashAlgorithm)) {
-    throw new Error(dappError(`${method} does not support hashAlgorithm "${String(hashAlgorithm)}". Use SHA-256, SHA-384 or SHA-512.`));
+    throw new Error(dappError(`${method} does not support hashAlgorithm "${typeof hashAlgorithm === "string" ? hashAlgorithm : typeof hashAlgorithm}". Use SHA-256, SHA-384 or SHA-512.`));
   }
   return hashAlgorithm as HashAlgorithm;
 }
