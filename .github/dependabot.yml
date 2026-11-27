@@ -65,3 +65,16 @@ updates:
           - github/codeql-action*
     commit-message:
       prefix: chore(ci)
+
+  # Every Dockerfile pins its base image by digest
+  # (scripts/dockerfiles.ci.test.ts), and this keeps the digests current.
+  - package-ecosystem: docker
+    directories:
+      - "/.oss-scanner"
+      - "/apps/points-api"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore(docker)
