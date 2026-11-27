@@ -120,18 +120,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm eslint --max-warnings=0 .
       - run: pnpm deps:check
-      - run: pnpm tsc -p packages/core --noEmit
-      - run: pnpm tsc -p packages/messaging --noEmit
-      - run: pnpm tsc -p packages/ui --noEmit
-      - run: pnpm tsc -p packages/runtime --noEmit
-      - run: pnpm tsc -p packages/app --noEmit
-      - run: pnpm tsc -p packages/provider --noEmit
-      - run: pnpm tsc -p packages/keystone --noEmit
-      - run: pnpm tsc -p apps/extension --noEmit
-      - run: pnpm tsc -p apps/mobile --noEmit
-      - run: pnpm tsc -p apps/points-api --noEmit
-      - run: pnpm tsc -p scripts/scan --noEmit
-      - run: pnpm tsc -p tsconfig.scripts.json --noEmit
+      # The projects write nothing, so they check side by side; the step
+      # fails if any one of them does.
+      - name: tsc
+        run: |
+          pids=()
+          pnpm tsc -p packages/core --noEmit & pids+=($!)
+          pnpm tsc -p packages/messaging --noEmit & pids+=($!)
+          pnpm tsc -p packages/ui --noEmit & pids+=($!)
+          pnpm tsc -p packages/runtime --noEmit & pids+=($!)
+          pnpm tsc -p packages/app --noEmit & pids+=($!)
+          pnpm tsc -p packages/provider --noEmit & pids+=($!)
+          pnpm tsc -p packages/keystone --noEmit & pids+=($!)
+          pnpm tsc -p apps/extension --noEmit & pids+=($!)
+          pnpm tsc -p apps/mobile --noEmit & pids+=($!)
+          pnpm tsc -p apps/points-api --noEmit & pids+=($!)
+          pnpm tsc -p scripts/scan --noEmit & pids+=($!)
+          pnpm tsc -p tsconfig.scripts.json --noEmit & pids+=($!)
+          status=0
+          for pid in "${pids[@]}"; do wait "$pid" || status=1; done
+          exit "$status"
 
   test-shard:
     name: test (${{ matrix.shard }}/4)
