@@ -3,6 +3,17 @@
 What changed in each Gleam release, newest first. One release covers the
 Chrome extension and the iOS and Android apps.
 
+## v1.56.1 (2026-11-27)
+
+### Fixed
+
+- Activity loads even when a gateway is slow to list your AO token transfers.
+- Sends that went through no longer stay marked as sending when that happens.
+
+### Upgrade notes
+
+- The Android app now needs Android 10 or later.
+
 ## v1.56.0 (2026-11-27)
 
 ### Added

@@ -1042,6 +1042,39 @@ describe("ReadsHandler: getActivity", () => {
 
     expect(page.entries.map((e) => e.txId).sort()).toEqual(["gw-1", "local-1"]);
   });
+
+  it("keeps the local log and AR entries when every gateway fails the AO query", async () => {
+    const storage = createFakeStorage();
+    await storage.set("local:activityLog:addr1", [
+      { txId: "local-1", type: "send", status: "pending", address: "addr2", amount: "1", tags: [], timestamp: 500 },
+    ]);
+    globalThis.fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      if (String(init.body).includes("Data-Protocol")) throw new DOMException("timed out", "TimeoutError");
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            transactions: {
+              edges: [{ cursor: "gw-1", node: { id: "gw-1", owner: { address: "addr3" }, recipient: "addr1", quantity: { winston: "2" }, tags: [], data: { size: "0" }, block: { timestamp: 1 } } }],
+            },
+          },
+        }),
+      };
+    }) as unknown as typeof fetch;
+
+    const page = await new ReadsHandler(storage).getActivity({ address: "addr1" });
+
+    expect(page.entries.map((e) => e.txId).sort()).toEqual(["gw-1", "local-1"]);
+  });
+
+  it("fails when both the AR and the AO queries fail", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    }) as unknown as typeof fetch;
+
+    await expect(new ReadsHandler(createFakeStorage()).getActivity({ address: "addr1" })).rejects.toThrow();
+  });
 });
 
 describe("ReadsHandler: getPortfolioHistory", () => {
@@ -1958,6 +1991,12 @@ describe("ReadsHandler: pending transfers", () => {
     ]);
     chain({}, 1);
     expect(await read(storage)).toEqual([{ token: null, outgoing: "7", incoming: "0" }]);
+  });
+
+  it("stops counting a pending AR send once it is mined, before its entry settles", async () => {
+    const storage = await storageWith([send("ar", "pending", "7", null), send("ar2", "pending", "3", null)]);
+    chain({ ar: 2050937 }, 1);
+    expect(await read(storage)).toEqual([{ token: null, outgoing: "3", incoming: "0" }]);
   });
 
   it("reports an unapplied receipt for a listed token as incoming, and skips one for any other process", async () => {
