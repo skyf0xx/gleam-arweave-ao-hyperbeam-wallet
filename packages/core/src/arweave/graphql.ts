@@ -19,7 +19,8 @@ const activityNodeSchema = z.object({
   // An integer string: a reply with anything else is refused, so the next gateway is asked.
   quantity: z.object({ winston: z.string().regex(/^\d*$/) }),
   tags: z.array(tagSchema),
-  data: nullable(z.object({ size: z.string() })),
+  // arweave.net sends `size: null` for some AO messages.
+  data: nullable(z.object({ size: nullable(z.string()) })),
   block: blockSchema({ timestamp: z.number() }),
 });
 type GraphQLTransactionNode = z.output<typeof activityNodeSchema>;
@@ -33,7 +34,7 @@ const activityReplySchema = transactionsReply(activityNodeSchema);
  * config surface. Exported so `wxt.config.ts` grants each a static host
  * permission.
  */
-export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://arweave-search.goldsky.com"];
+export const FALLBACK_GATEWAYS: readonly string[] = ["https://arweave.net", "https://ar-io.dev"];
 
 /** Per gateway, so one that never answers falls through to the next candidate. */
 const GRAPHQL_TIMEOUT_MS = 10_000;

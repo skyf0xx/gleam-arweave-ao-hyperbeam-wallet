@@ -190,7 +190,7 @@ what the code calls, check what each request contains (for example, whether
 price requests include the wallet address), and state it accurately. The list
 as of this brief:
 
-- Arweave gateways, `arweave.net` by default: balances, activity (GraphQL), transaction posts. First-run reachability checks go to `ar-io.dev` and `permagate.io`. GraphQL falls back to `arweave-search.goldsky.com`.
+- Arweave gateways, `arweave.net` by default: balances, activity (GraphQL), transaction posts. First-run reachability checks go to `ar-io.dev` and `permagate.io`. GraphQL falls back to `arweave.net`, then `ar-io.dev`.
 - `up.arweave.net`: data uploads.
 - `mu.ao-testnet.xyz`: submitting AO messages (token sends). `cu.ao-testnet.xyz`: reading results.
 - HyperBEAM peers, `state.forward.computer` by default, plus any peer you add: AO balance reads.

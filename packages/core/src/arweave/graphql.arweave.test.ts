@@ -173,6 +173,16 @@ describe("queryActivityTransactions", () => {
     expect(entry).toMatchObject({ type: "upload", dataSize: "12400" });
   });
 
+  it("reads a reply whose data item has a null size, as arweave.net sends for some AO messages", async () => {
+    const node = edge({ id: "up", ownerAddress: ADDRESS, recipient: "", winston: "0", timestamp: 1 });
+    const fetchImpl = fakeSidedFetch([{ ...node, node: { ...node.node, data: { size: null } } }], []);
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry).toMatchObject({ txId: "up", type: "upload" });
+    expect(entry).not.toHaveProperty("dataSize");
+  });
+
   it.each(["0", "1"])("reads a collectible send carrying %s winston as a send to the recipient in its tags, with the asset as its collectible", async (winston) => {
     const recipient = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
     const fetchImpl = fakeSidedFetch(
@@ -327,6 +337,18 @@ describe("queryActivityTransactions", () => {
     expect(entry?.txId).toBe("tx5");
     // Each of the two queries fails over once.
     expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  it("asks the chosen gateway, then arweave.net, then ar-io.dev", async () => {
+    const asked: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      asked.push(new URL(url).origin);
+      return { ok: false, status: 502, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+
+    await queryActivityTransactions(ADDRESS, "https://my-gateway.example", 10, fetchImpl).catch(() => undefined);
+
+    expect([...new Set(asked)]).toEqual(["https://my-gateway.example", "https://arweave.net", "https://ar-io.dev"]);
   });
 
   it("throws only after every candidate gateway fails", async () => {
