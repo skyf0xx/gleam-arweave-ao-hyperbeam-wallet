@@ -45,8 +45,8 @@ key or store credential.
 4. **Bump, tag and extension.** `pnpm release:all <major|minor|patch>`
    sets one version in the extension, the mobile package, iOS and Android
    (`scripts/app-versions.mjs`), adds 1 to both build numbers, writes the
-   version and the current OpenSSF Scorecard score into the README's
-   badges (`scripts/readme-badges.mjs`), and opens the bump PR. After the merge it tags, and `release.yml` puts the zip
+   release and current OpenSSF Scorecard badges the README shows as SVG
+   files in `docs/badges/` (`scripts/readme-badges.mjs`), and opens the bump PR. After the merge it tags, and `release.yml` puts the zip
    and `release-manifest.json` (with `mobileBundleSha256`) in a draft
    GitHub Release. Releases are immutable once published, so the draft
    stays open until `release-app.sh … android-apk` adds `gleam.apk` and

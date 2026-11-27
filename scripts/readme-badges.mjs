@@ -1,16 +1,17 @@
 // @ts-check
-// Writes the release version and the OpenSSF Scorecard score into the
-// README's badges as fixed text. A live shields badge has to fetch its value
-// first, and on a cold cache that outlasts GitHub's image proxy, which then
-// shows a broken image. release:all runs this in the bump PR.
+// Writes the release and OpenSSF Scorecard badges as SVG files in the repo,
+// which the README shows by relative path. GitHub serves those itself; a
+// shields URL goes through GitHub's image proxy, which shows a broken image
+// whenever shields is slow on a URL it hasn't cached, as each release's new
+// URL is. release:all runs this in the bump PR.
+import console from "node:console";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const README = "README.md";
 const SCORECARD_API = "https://api.securityscorecards.dev/projects/github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet";
-
-const RELEASE_BADGE = /\[!\[Release\]\([^)]*\)\]/g;
-const SCORECARD_BADGE = /\[!\[OpenSSF Scorecard\]\([^)]*\)\]/g;
+export const RELEASE_BADGE = "docs/badges/release.svg";
+export const SCORECARD_BADGE = "docs/badges/scorecard.svg";
+const MAX_BADGE_BYTES = 16 * 1024;
 
 /** @param {number} score */
 function scoreColor(score) {
@@ -20,34 +21,29 @@ function scoreColor(score) {
   return "red";
 }
 
-/**
- * Replaces the one badge `re` matches, so a renamed or duplicated badge
- * fails loudly instead of going stale.
- * @param {string} text @param {RegExp} re @param {string} badge @param {string} label
- */
-function replaceOne(text, re, badge, label) {
-  const count = [...text.matchAll(re)].length;
-  if (count !== 1) throw new Error(`${README}: expected one ${label} badge, found ${count}`);
-  return text.replace(re, badge);
+/** @param {string} version e.g. "1.55.0" */
+export function releaseBadgeUrl(version) {
+  return `https://img.shields.io/badge/release-v${version}-blue`;
+}
+
+/** @param {number} score */
+export function scorecardBadgeUrl(score) {
+  return `https://img.shields.io/badge/openssf_scorecard-${score.toFixed(1)}-${scoreColor(score)}`;
 }
 
 /**
- * @param {string} text the README
- * @param {string} version e.g. "1.55.0"
- * @param {number | null} score the Scorecard score, or null to leave that badge as it is
+ * One badge's SVG. Throws unless the reply is a small SVG with no script,
+ * since it is committed and shown on the repo page.
+ * @param {string} url @param {typeof fetch} fetchImpl
  */
-export function readmeWithBadges(text, version, score) {
-  let out = replaceOne(text, RELEASE_BADGE, `[![Release](https://img.shields.io/badge/release-v${version}-blue)]`, "Release");
-  if (score !== null) {
-    const value = score.toFixed(1);
-    out = replaceOne(
-      out,
-      SCORECARD_BADGE,
-      `[![OpenSSF Scorecard](https://img.shields.io/badge/openssf_scorecard-${value}-${scoreColor(score)})]`,
-      "OpenSSF Scorecard",
-    );
+export async function fetchBadge(url, fetchImpl) {
+  const res = await fetchImpl(url, { signal: globalThis.AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  const svg = await res.text();
+  if (svg.length > MAX_BADGE_BYTES || !/^<svg[\s>]/.test(svg) || !svg.trimEnd().endsWith("</svg>") || /<script|<foreignObject/i.test(svg)) {
+    throw new Error(`${url}: not a badge SVG`);
   }
-  return out;
+  return svg;
 }
 
 /**
@@ -68,14 +64,33 @@ export async function fetchScorecardScore(fetchImpl = globalThis.fetch) {
 }
 
 /**
- * Rewrites the README's badges for `version` and returns the files it changed.
+ * Writes the release badge for `version` and, with a score, the Scorecard
+ * badge, and returns the files it changed. A release badge it can't fetch
+ * fails the bump, since a stale version misleads; a Scorecard badge it can't
+ * fetch keeps the last one, as a stale score is better than a failed release.
  * @param {string} root @param {string} version @param {number | null} score
+ * @param {typeof fetch} [fetchImpl]
  */
-export function writeReadmeBadges(root, version, score) {
-  const path = join(root, README);
-  const before = readFileSync(path, "utf8");
-  const after = readmeWithBadges(before, version, score);
-  if (after === before) return [];
-  writeFileSync(path, after);
-  return [README];
+export async function writeReadmeBadges(root, version, score, fetchImpl = globalThis.fetch) {
+  /** @type {[string, string][]} */
+  const badges = [[RELEASE_BADGE, await fetchBadge(releaseBadgeUrl(version), fetchImpl)]];
+  if (score !== null) {
+    try {
+      badges.push([SCORECARD_BADGE, await fetchBadge(scorecardBadgeUrl(score), fetchImpl)]);
+    } catch (error) {
+      console.warn(`Kept the last Scorecard badge: ${/** @type {Error} */ (error).message}`);
+    }
+  }
+  return badges.flatMap(([file, svg]) => {
+    const path = join(root, file);
+    let before = null;
+    try {
+      before = readFileSync(path, "utf8");
+    } catch {
+      // A first write.
+    }
+    if (before === svg) return [];
+    writeFileSync(path, svg);
+    return [file];
+  });
 }
