@@ -7,6 +7,7 @@ import {
   MAX_BACKUP_DEVICES,
   SAVED_SITES_BACKUP_KEY,
   WALLETS_BACKUP_KEY,
+  WATCHED_TOKENS_BACKUP_PREFIX,
   backupValueOf,
   decodeBackupBody,
   decodeBackupFile,
@@ -18,9 +19,13 @@ import {
   isValidBackupHeader,
   mergeBackupDevices,
   planPull,
+  pulledItemId,
+  removedOf,
+  walletsOf,
   watchedTokensBackupKey,
   type BackupBody,
   type BackupData,
+  type BackupDevice,
   type BackupHeader,
 } from "./index";
 import { address, contact, keyfileWallet } from "./fixtures.testing";
@@ -38,6 +43,7 @@ type Path = Array<string | number>;
 const ID_CHARS = [..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"];
 const stampId = fc.string({ unit: fc.constantFrom(...ID_CHARS), minLength: 16, maxLength: 24 });
 const seed = fc.constantFrom("a", "b", "c", "d");
+const THEME_KEY = "local:themeSettings";
 
 /** One install's vault: wallets that may share an address with another install's, and what hangs off them. */
 const deviceData: fc.Arbitrary<BackupData> = fc
@@ -49,9 +55,10 @@ const deviceData: fc.Arbitrary<BackupData> = fc
     contacts: fc.uniqueArray(seed, { maxLength: 2 }),
     active: fc.boolean(),
     tokens: fc.uniqueArray(seed, { maxLength: 2 }),
-    sites: fc.boolean(),
+    sites: fc.subarray(["https://app.example", "https://b.example"]),
+    theme: fc.option(fc.constantFrom("dark", "light"), { nil: undefined }),
   })
-  .map(({ wallets, contacts, active, tokens, sites }) => {
+  .map(({ wallets, contacts, active, tokens, sites, theme }) => {
     // One address per install, as the wallet list holds it.
     const unique = wallets.filter((wallet, index) => wallets.findIndex((other) => other.at === wallet.at) === index);
     const records = unique.map(({ id, at, updatedAt, watch }) =>
@@ -62,7 +69,8 @@ const deviceData: fc.Arbitrary<BackupData> = fc
     if (active && records[0]) data[ACTIVE_WALLET_BACKUP_KEY] = records[0].id;
     if (contacts.length > 0) data[CONTACTS_BACKUP_KEY] = contacts.map((at) => contact(at));
     if (records[0] && tokens.length > 0) data[watchedTokensBackupKey(records[0].address)] = tokens.map((at) => address(at.toUpperCase()));
-    if (sites) data[SAVED_SITES_BACKUP_KEY] = ["https://app.example"];
+    if (sites.length > 0) data[SAVED_SITES_BACKUP_KEY] = sites;
+    if (theme) data[THEME_KEY] = { theme };
     return data;
   });
 
@@ -124,10 +132,30 @@ function hostile(valid: Json): fc.Arbitrary<Json> {
     fc.oneof(fc.constantFrom("__proto__", "constructor", WALLETS_BACKUP_KEY, CONTACTS_BACKUP_KEY, "local:lockSettings", "local:passkey"), fc.string()),
     { freq: 3 },
   );
-  const replacement = fc.oneof(fc.jsonValue({ maxDepth: 2 }) as fc.Arbitrary<Json>, fc.constant(REMOVE));
-  return fc
-    .tuple(fc.constantFrom(...pathsOf(valid)), replacement, addKey)
-    .map(([path, value, key]) => edited(valid, path, { replacement: value, addKey: key }));
+  return fc.constantFrom(...pathsOf(valid)).chain((path) => {
+    const replacement = fc.oneof(
+      fc.jsonValue({ maxDepth: 2 }) as fc.Arbitrary<Json>,
+      { weight: 2, arbitrary: fc.constantFrom(...nearMisses(valueAt(valid, path))) },
+      fc.constant(REMOVE),
+    );
+    return fc.tuple(replacement, addKey).map(([value, key]) => edited(valid, path, { replacement: value, addKey: key }));
+  });
+}
+
+function valueAt(value: Json, path: Path): Json {
+  return path.reduce<Json>((node, step) => (node as Record<string | number, Json>)[step]!, value);
+}
+
+/** Values one step from a valid one, which a loose guard would let through. */
+const NEAR_MISSES: Json[] = [
+  0, -1, 1, 3, 1.5, 1e9, 262_145, "", "2", "AES-CBC", "Argon2id", "PBKDF2-HMAC-SHA256", "watch", "ledger",
+  `${address("a")}a`, address("a").slice(1), "https://app.example/", "http://app.example", "app.example", null, true, [], {},
+];
+
+function nearMisses(current: Json): Json[] {
+  if (typeof current === "string") return [...NEAR_MISSES, `${current}a`, current.slice(1), current.toUpperCase(), ` ${current}`];
+  if (typeof current === "number") return [...NEAR_MISSES, current + 1, current - 1, -current, current + 0.5, String(current)];
+  return NEAR_MISSES;
 }
 
 const encodeJson = (value: Json) => new TextEncoder().encode(JSON.stringify(value));
@@ -165,7 +193,7 @@ describe("decodeBackupBody refuses a hostile body before anything merges it", ()
       ),
       { numRuns: 400 },
     );
-    // Many edits leave a valid body (an unknown key, a removed optional list).
+    // Many edits leave a valid body (an unknown key, a removed optional list): about 165 in 400.
     expect(accepted).toBeGreaterThan(40);
   });
 
@@ -186,6 +214,51 @@ describe("decodeBackupBody refuses a hostile body before anything merges it", ()
       }),
       { numRuns: 300 },
     );
+  });
+});
+
+const PULLED_KEYS = [WALLETS_BACKUP_KEY, CONTACTS_BACKUP_KEY, SAVED_SITES_BACKUP_KEY];
+const isPulledKey = (key: string) => PULLED_KEYS.includes(key) || key.startsWith(WATCHED_TOKENS_BACKUP_PREFIX);
+const idsIn = (data: BackupData | undefined, key: string) =>
+  new Set((Array.isArray(data?.[key]) ? (data[key] as unknown[]) : []).flatMap((item) => pulledItemId(key, item) ?? []));
+
+/** This install's copy at its last write, with what it recorded as removed since. */
+const ownDevice: fc.Arbitrary<BackupDevice> = fc
+  .tuple(deviceData, fc.nat(), fc.subarray(["a", "b", "c", "d"]), fc.subarray(["https://app.example", "https://b.example"]))
+  .map(([data, updatedAt, gone, sites]) => ({
+    updatedAt,
+    data,
+    removed: { [WALLETS_BACKUP_KEY]: gone.map(address), [CONTACTS_BACKUP_KEY]: gone.map(address), [SAVED_SITES_BACKUP_KEY]: sites },
+  }));
+
+describe("planPull adds only what this install lacks and never removed", () => {
+  /*
+   * A pull adds something in about 220 of 300 runs; the floor sits far under
+   * that, so a plan that adds nothing can't pass.
+   */
+  it("never settings, never a changed copy of an item here, never an item removed here", () => {
+    let added = 0;
+    fc.assert(
+      fc.property(deviceData, ownDevice, fc.array(deviceData.map((data) => ({ updatedAt: 1, data })), { minLength: 1, maxLength: 3 }), (local, own, others) => {
+        const { add } = planPull(local, own, others);
+        if (Object.keys(add).length > 0) added += 1;
+        expect(Object.keys(add).every(isPulledKey)).toBe(true);
+        const removed = removedOf(own);
+        for (const [key, items] of Object.entries(add)) {
+          const here = idsIn(local, key);
+          const goneHere = [...idsIn(own.data, key), ...(removed[key] ?? [])].filter((id) => !here.has(id));
+          for (const item of items as unknown[]) {
+            const id = pulledItemId(key, item)!;
+            expect(here.has(id)).toBe(false);
+            expect(goneHere).not.toContain(id);
+          }
+        }
+        const localWalletIds = new Set(walletsOf(local).map((wallet) => wallet.id));
+        expect(walletsOf(add).some((wallet) => localWalletIds.has(wallet.id))).toBe(false);
+      }),
+      { numRuns: 300 },
+    );
+    expect(added).toBeGreaterThan(100);
   });
 });
 

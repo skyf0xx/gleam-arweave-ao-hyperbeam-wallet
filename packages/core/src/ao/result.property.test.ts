@@ -58,6 +58,17 @@ describe("getTransferOutcome on any CU reply", () => {
     );
   });
 
+  it("is failed with the handler's error when the reply carries one", async () => {
+    const thrown = fc.oneof(fc.string({ minLength: 1, maxLength: 20 }), fc.jsonValue({ maxDepth: 1 }).filter(Boolean));
+    await fc.assert(
+      fc.asyncProperty(fc.constantFrom("Error", "error"), thrown, messages, async (field, value, list) => {
+        const error = typeof value === "string" ? value : JSON.stringify(value);
+        expect(await read(respond(JSON.stringify({ [field]: value, Messages: list })))).toEqual({ status: "failed", error });
+      }),
+      { numRuns: 200 },
+    );
+  });
+
   it("is failed with the reason once a Transfer-Error reply is among the messages", async () => {
     await fc.assert(
       fc.asyncProperty(

@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import fc from "fast-check";
 import * as hashWasm from "hash-wasm";
-import { VaultKdfError, decryptFromEnvelope, encryptToEnvelope } from "./envelope";
-import { base64ToBytes } from "../vault/base64";
-import type { VaultEnvelope, VaultEnvelopeV2 } from "../models/wallet";
+import { VaultKdfError, VaultKeys, decryptFromEnvelope, encryptToEnvelope } from "./envelope";
+import { base64ToBytes, bytesToBase64 } from "../vault/base64";
+import type { VaultEnvelope, VaultEnvelopeV1, VaultEnvelopeV2 } from "../models/wallet";
 
 /*
  * A stored envelope, or the wrapped backup key in a cloud file's clear
@@ -13,19 +13,34 @@ import type { VaultEnvelope, VaultEnvelopeV2 } from "../models/wallet";
  * corrupted envelope, and never makes the KDF run past its caps.
  */
 
-// A stand-in for Argon2id that still depends on every input, so a changed
-// salt or cost gives another key, without spending real seconds per run.
-vi.mock("hash-wasm", () => ({
-  argon2id: vi.fn(async (options: { password: Uint8Array; salt: Uint8Array; memorySize: number; iterations: number; parallelism: number }) =>
-    new Uint8Array(
-      createHash("sha256")
-        .update(options.password)
-        .update(options.salt)
-        .update(`${options.memorySize}:${options.iterations}:${options.parallelism}`)
-        .digest(),
-    ),
-  ),
-}));
+interface Argon2Options {
+  password: Uint8Array;
+  salt: Uint8Array;
+  memorySize: number;
+  iterations: number;
+  parallelism: number;
+}
+
+/*
+ * The real Argon2id at its smallest memory (8 KiB a lane), with the asked
+ * memory hashed into the result. hash-wasm itself checks every input as
+ * it always does, and so refuses what it would refuse at full size; the
+ * memory checks it makes are repeated here first. What this can't show is
+ * the time or memory a full-size run takes: the caps are asserted on the
+ * calls instead (`expectKdfWithinCaps`).
+ */
+vi.mock("hash-wasm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("hash-wasm")>();
+  return {
+    ...actual,
+    argon2id: vi.fn(async (options: Argon2Options & { hashLength: number; outputType: "binary" }) => {
+      if (!Number.isInteger(options.memorySize)) throw new Error("Memory size should be specified.");
+      if (options.memorySize < 8 * options.parallelism) throw new Error("Memory size should be at least 8 * parallelism.");
+      const small = (await actual.argon2id({ ...options, memorySize: 8 * options.parallelism })) as Uint8Array;
+      return new Uint8Array(createHash("sha256").update(small).update(String(options.memorySize)).digest());
+    }),
+  };
+});
 
 const PASSWORD = "correct horse battery staple";
 const WALLET_ID = "wallet-1";
@@ -40,9 +55,6 @@ beforeAll(async () => {
   genuine = await encryptToEnvelope(plaintext.slice(), PASSWORD, WALLET_ID, ADDRESS, {
     params: { memoryKiB: 64, iterations: 1, parallelism: 1 },
   });
-  // PBKDF2's 600,000 rounds would dominate the run; no genuine envelope here uses it.
-  const key = await crypto.subtle.importKey("raw", new Uint8Array(32), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
-  vi.spyOn(crypto.subtle, "deriveKey").mockResolvedValue(key);
 });
 
 beforeEach(() => {
@@ -98,6 +110,17 @@ const sameFields = (envelope: VaultEnvelope) =>
   (Object.keys(genuine) as Array<keyof VaultEnvelopeV2>).every((field) => (envelope as unknown as VaultEnvelopeV2)[field] === genuine[field]);
 
 describe("decryptFromEnvelope on a hostile envelope", () => {
+  // A hostile v1 envelope runs PBKDF2's 600,000 rounds per try; these stand
+  // in for it here, and the real one is covered below.
+  let deriveKey: MockInstance<SubtleCrypto["deriveKey"]>;
+  beforeAll(async () => {
+    const key = await crypto.subtle.importKey("raw", new Uint8Array(32), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    deriveKey = vi.spyOn(crypto.subtle, "deriveKey").mockResolvedValue(key);
+  });
+  afterAll(() => {
+    deriveKey.mockRestore();
+  });
+
   it("refuses it as a wrong password or a corrupted envelope, within the KDF caps", async () => {
     await fc.assert(
       fc.asyncProperty(hostileEnvelope, async (envelope) => {
@@ -125,6 +148,9 @@ describe("decryptFromEnvelope on a hostile envelope", () => {
           const result = await outcome(genuine, password, walletId, address);
           if (password === PASSWORD && walletId === WALLET_ID && address === ADDRESS) {
             expect(result).toEqual({ opened: plaintext });
+          } else if (password === "") {
+            // Argon2id takes no empty password, so the check can't run at all.
+            expect(result.error).toBeInstanceOf(VaultKdfError);
           } else {
             expect(result.error?.message).toBe(WRONG_PASSWORD);
           }
@@ -147,5 +173,42 @@ describe("decryptFromEnvelope on a hostile envelope", () => {
       }),
       { numRuns: 200 },
     );
+  });
+});
+
+describe("a version 1 envelope, with the real PBKDF2", () => {
+  let v1: VaultEnvelopeV1;
+  beforeAll(async () => {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(PASSWORD), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: 600_000, hash: "SHA-256" },
+      material,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt"],
+    );
+    const additionalData = new TextEncoder().encode(`gleam:v1:${WALLET_ID}:${ADDRESS}`);
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData }, key, plaintext));
+    v1 = {
+      version: 1,
+      algorithm: "AES-GCM",
+      kdf: "PBKDF2-HMAC-SHA256",
+      iterations: 600_000,
+      salt: bytesToBase64(salt),
+      iv: bytesToBase64(iv),
+      ciphertext: bytesToBase64(ciphertext),
+    };
+  });
+
+  it("opens under its own password and record, and only there", async () => {
+    // One instance, so the key derives once for every attempt below.
+    const keys = new VaultKeys(PASSWORD);
+    expect(await decryptFromEnvelope(v1, keys, WALLET_ID, ADDRESS)).toEqual(plaintext);
+    await expect(decryptFromEnvelope(v1, keys, WALLET_ID, `${ADDRESS}b`)).rejects.toThrow(WRONG_PASSWORD);
+    await expect(decryptFromEnvelope({ ...v1, version: 2 } as unknown as VaultEnvelope, keys, WALLET_ID, ADDRESS)).rejects.toBeInstanceOf(VaultKdfError);
+    await expect(decryptFromEnvelope({ ...v1, kdf: "Argon2id" } as unknown as VaultEnvelope, keys, WALLET_ID, ADDRESS)).rejects.toBeInstanceOf(VaultKdfError);
+    await expect(decryptFromEnvelope({ ...v1, iv: bytesToBase64(new Uint8Array(16)) }, keys, WALLET_ID, ADDRESS)).rejects.toBeInstanceOf(VaultKdfError);
   });
 });

@@ -68,9 +68,12 @@ describe("page parameter readers on arbitrary input", () => {
   });
 });
 
+// `Uint8Array.from` throws a TypeError on an element whose own `toString`
+// and `valueOf` aren't functions, so the byte values leave those keys out.
+const byteValue = fc.anything({ key: fc.string().filter((key) => key !== "toString" && key !== "valueOf") });
 const tagged = fc.record({
   __gleamType: fc.constantFrom("ArrayBuffer", "Uint8Array", "Blob"),
-  data: fc.array(fc.oneof(fc.nat(300), fc.anything()), { maxLength: 8 }),
+  data: fc.array(fc.oneof(fc.nat(300), byteValue), { maxLength: 8 }),
 });
 
 const options = fc.oneof(
@@ -151,40 +154,92 @@ function readOrNull<T>(read: () => T): T | null {
   }
 }
 
+/** Mostly a value the reader accepts, sometimes a near miss it must refuse, now and then any field. */
+const near = (valid: unknown[], invalid: unknown[]) =>
+  fc.oneof({ weight: 8, arbitrary: fc.constantFrom(...valid) }, { weight: 1, arbitrary: fc.constantFrom(...invalid) }, { weight: 1, arbitrary: field });
+const ID = "a".repeat(43);
+const NEAR_MISS_IDS = ["a".repeat(42), `${"a".repeat(42)}+`, `${ID}a`];
+
+/*
+ * Requests close enough to valid that the readers accept a good share, so
+ * the assertions on what they return run. Measured means per 500 runs:
+ * transactions ~105 accepted, ~35 sending AR, ~40 with a reward; data items
+ * ~185 accepted, ~100 with an anchor, ~75 with a target. Each floor sits
+ * at least four standard deviations under its mean.
+ */
+const nearTransaction = fc.record(
+  {
+    target: near([ID, ""], NEAR_MISS_IDS),
+    quantity: near(["0", "5", "007", "18446744073709551616"], ["-1", "1.5", " 5", "1e3"]),
+    reward: near(["0", "10"], ["", "x", "-5"]),
+    last_tx: near(["AAAA"], ["A", "!!"]),
+    data: near(["AAEC", new Uint8Array([1, 2])], ["!!"]),
+    tags: near([[], [{ name: "QQ", value: "Qg" }]], [[{ name: "QQ" }], [{ name: "!!", value: "Qg" }]]),
+  },
+  { requiredKeys: [] },
+);
+
+const nearDataItem = fc.record(
+  {
+    data: near(["text", new Uint8Array([1]), "\uD800"], [7]),
+    tags: near([[], [{ name: "A", value: "B" }], null], [[{ name: "A" }], "A"]),
+    target: near([ID, ""], NEAR_MISS_IDS),
+    anchor: near(["a".repeat(32), "é".repeat(16), ""], ["a".repeat(31), "a".repeat(33), "é".repeat(32)]),
+  },
+  { requiredKeys: ["data"] },
+);
+
 describe("what the transaction and data item readers return", () => {
   it("a transaction sends AR only to a real target, in whole Winston", () => {
-    const amount = fc.oneof(fc.constantFrom("0", "5", "007", "", "-1", "1.5", " 5", "1e3"), field);
-    const nearTransaction = fc.record(
-      { target: fc.oneof(fc.constantFrom("", "a".repeat(43), "a".repeat(42)), field), quantity: amount, reward: amount, last_tx: field },
-      { requiredKeys: [] },
-    );
+    const counts = { accepted: 0, sendsAr: 0, rewarded: 0 };
     fc.assert(
-      fc.property(fc.oneof(pageValue, nearTransaction), (value) => {
+      fc.property(fc.oneof(pageValue, { weight: 3, arbitrary: nearTransaction }), (value) => {
         const transaction = readOrNull(() => readTransaction(value, "sign"));
         if (transaction === null) return;
+        counts.accepted += 1;
         if (transaction.target !== undefined) expect(isArweaveId(transaction.target)).toBe(true);
         if (transaction.quantity !== undefined) expect(transaction.quantity).toMatch(/^\d+$/);
-        if (transaction.quantity !== undefined && BigInt(transaction.quantity) > 0n) expect(transaction.target).toBeDefined();
+        if (transaction.quantity !== undefined && BigInt(transaction.quantity) > 0n) {
+          counts.sendsAr += 1;
+          expect(transaction.target).toBeDefined();
+        }
         // A reward of "0" is left out, so the gateway's price is used.
-        if (transaction.reward !== undefined) expect(transaction.reward).toMatch(/^(?!0$)\d+$/);
+        if (transaction.reward !== undefined) {
+          counts.rewarded += 1;
+          expect(transaction.reward).toMatch(/^(?!0$)\d+$/);
+        }
         if (transaction.last_tx !== undefined) expect(() => base64UrlToBytes(transaction.last_tx!)).not.toThrow();
         expect(transaction.tags.every((tag) => typeof tag.name === "string" && typeof tag.value === "string")).toBe(true);
       }),
       { numRuns: 500 },
     );
+    expect(counts.accepted).toBeGreaterThan(50);
+    expect(counts.sendsAr).toBeGreaterThan(8);
+    expect(counts.rewarded).toBeGreaterThan(12);
   });
 
   it("a data item has a real target and a 32-byte anchor, if any", () => {
+    const counts = { accepted: 0, anchored: 0, targeted: 0 };
     fc.assert(
-      fc.property(pageValue, (value) => {
+      fc.property(fc.oneof(pageValue, { weight: 3, arbitrary: nearDataItem }), (value) => {
         const item = readOrNull(() => readDataItem(value, "signDataItem"));
         if (item === null) return;
-        if (item.target !== undefined) expect(isArweaveId(item.target)).toBe(true);
-        if (item.anchor !== undefined) expect(new TextEncoder().encode(item.anchor).byteLength).toBe(32);
+        counts.accepted += 1;
+        if (item.target !== undefined) {
+          counts.targeted += 1;
+          expect(isArweaveId(item.target)).toBe(true);
+        }
+        if (item.anchor !== undefined) {
+          counts.anchored += 1;
+          expect(new TextEncoder().encode(item.anchor).byteLength).toBe(32);
+        }
         expect(ArrayBuffer.isView(item.data)).toBe(true);
         expect(item.tags.every((tag) => typeof tag.name === "string" && typeof tag.value === "string")).toBe(true);
       }),
       { numRuns: 500 },
     );
+    expect(counts.accepted).toBeGreaterThan(60);
+    expect(counts.anchored).toBeGreaterThan(30);
+    expect(counts.targeted).toBeGreaterThan(25);
   });
 });

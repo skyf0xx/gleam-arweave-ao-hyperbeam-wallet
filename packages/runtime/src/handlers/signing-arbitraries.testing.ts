@@ -5,7 +5,12 @@ import { bytesToBase64Url } from "@gleam/core";
 
 export const address = fc.uint8Array({ minLength: 32, maxLength: 32 }).map(bytesToBase64Url);
 
-export const winston = fc.oneof(fc.constantFrom("0", "1", "007"), fc.bigInt({ min: 0n, max: 10n ** 20n }).map(String));
+/** Whole Winston, small, large, and either side of 2^64, where a fixed-width reader would wrap. */
+export const winston = fc.oneof(
+  fc.constantFrom("0", "1", "007"),
+  fc.bigInt({ min: 0n, max: 10n ** 20n }).map(String),
+  fc.constantFrom(2n ** 63n, 2n ** 64n - 1n, 2n ** 64n, 2n ** 64n + 1n).map(String),
+);
 
 /** Any code point, NUL and bidi controls included. */
 export const text = (maxLength: number) => fc.string({ unit: "binary", maxLength });
@@ -31,7 +36,7 @@ const mostly = <T>(usual: T, ...others: T[]) =>
  * the preview and the device step make is reached.
  */
 export const signingTags = (value: fc.Arbitrary<string>) => {
-  const amount = fc.oneof({ weight: 2, arbitrary: fc.constant("1") }, fc.bigInt({ min: 1n, max: 10n ** 24n }).map(String), value);
+  const amount = fc.oneof({ weight: 4, arbitrary: fc.constant("1") }, fc.bigInt({ min: 1n, max: 10n ** 24n }).map(String), value);
   const random = fc.array(fc.record({ name: fc.oneof(fc.constantFrom("Action", "action", "Recipient", "Quantity"), value), value }), {
     maxLength: 6,
   });
@@ -59,5 +64,5 @@ export const signingTags = (value: fc.Arbitrary<string>) => {
     { name: "action", value: "set" },
     { name: "reference-value", value: target },
   ]);
-  return fc.oneof(random, { weight: 3, arbitrary: transfer }, nameTarget);
+  return fc.oneof(random, { weight: 3, arbitrary: transfer }, { weight: 2, arbitrary: nameTarget });
 };

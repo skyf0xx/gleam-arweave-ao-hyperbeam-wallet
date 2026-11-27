@@ -101,13 +101,21 @@ describe("checkTransaction passes exactly the payloads that sign the approved by
       ),
       { numRuns: 200 },
     );
+    // A variant changes some field in about 140 of 200 runs; 50 is many deviations under that.
     expect(refused).toBeGreaterThan(50);
   });
 });
 
+/** 32 bytes once UTF-8 encoded, in one-, two- and three-byte characters. */
+const anchor = fc.oneof(
+  fc.constant(""),
+  fc.string({ unit: fc.constantFrom(..."abcdefghijklmnopqrstuvwxyz0123456789"), minLength: 32, maxLength: 32 }),
+  fc.constantFrom("\u00e9".repeat(16), `${"\u20ac".repeat(10)}ab`),
+);
+
 const dataItem: fc.Arbitrary<Required<ExpectedDataItem>> = fc.record({
   target: fc.oneof(fc.constant(""), address),
-  anchor: fc.oneof(fc.constant(""), fc.string({ unit: fc.constantFrom(..."abcdefghijklmnopqrstuvwxyz0123456789"), minLength: 32, maxLength: 32 })),
+  anchor,
   tags,
   data,
 });
@@ -115,7 +123,8 @@ const dataItem: fc.Arbitrary<Required<ExpectedDataItem>> = fc.record({
 const itemVariantOf = (approved: Required<ExpectedDataItem>) =>
   fc.record({
     target: perturb(approved.target, fc.oneof(fc.constant(""), address)),
-    anchor: perturb(approved.anchor, fc.constantFrom("", "z".repeat(32))),
+    // Any other length can't be built, which refuses the request before anything signs.
+    anchor: perturb(approved.anchor, fc.oneof(anchor, fc.constantFrom("a".repeat(31), "a".repeat(33), "\u20ac".repeat(11)))),
     tags: perturbTags(approved.tags),
     data: perturbData(approved.data),
   });
@@ -125,6 +134,17 @@ const builtItem = (request: Required<ExpectedDataItem>): UnsignedPayload & { kin
   raw: buildUnsignedDataItem(OWNER, request),
 });
 
+/** The variant's item, or null when its anchor isn't 32 bytes and it can't be built at all. */
+function builtOrRefused(request: Required<ExpectedDataItem>): (UnsignedPayload & { kind: "dataItem" }) | null {
+  try {
+    return builtItem(request);
+  } catch (error) {
+    expect((error as Error).message).toMatch(/anchor must be 32 bytes/);
+    expect(new TextEncoder().encode(request.anchor).byteLength).not.toBe(32);
+    return null;
+  }
+}
+
 describe("checkDataItem passes exactly the payloads that sign the approved bytes", () => {
   it("for any approved item and any variant of it", async () => {
     let refused = 0;
@@ -132,7 +152,11 @@ describe("checkDataItem passes exactly the payloads that sign the approved bytes
       fc.asyncProperty(
         dataItem.chain((approved) => fc.tuple(fc.constant(approved), itemVariantOf(approved))),
         async ([approved, variant]) => {
-          const [mine, theirs] = [builtItem(approved), builtItem(variant)];
+          const [mine, theirs] = [builtItem(approved), builtOrRefused(variant)];
+          if (theirs === null) {
+            refused += 1;
+            return;
+          }
           const same = sameBytes(await dataItemSignatureData(mine.raw), await dataItemSignatureData(theirs.raw));
           const passed = passes(() => checkDataItem(theirs, approved));
           if (!passed) refused += 1;
@@ -141,6 +165,7 @@ describe("checkDataItem passes exactly the payloads that sign the approved bytes
       ),
       { numRuns: 150 },
     );
+    // About 97 of 150 variants differ; 50 is many deviations under that.
     expect(refused).toBeGreaterThan(50);
   });
 
