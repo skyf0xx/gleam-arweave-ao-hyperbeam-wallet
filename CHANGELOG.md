@@ -3,6 +3,13 @@
 What changed in each Gleam release, newest first. One release covers the
 Chrome extension and the iOS and Android apps.
 
+## v1.54.2 (2026-11-27)
+
+### Security
+
+- On Android, the approval screen ignores taps made through another app's window.
+- Security fixes.
+
 ## v1.54.1 (2026-11-25)
 
 ### Fixed
