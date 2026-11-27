@@ -90,7 +90,7 @@ export function ActivityPanel({ runtime, wallet, showSkeleton, fresh, activity, 
                       : t("mainScreen.failed")
                     : relativeTime(t, entry.timestamp);
             const amountLabel = entry.amount
-              ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, tokenBalances)}`
+              ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, tokenBalances, locale)}`
               : entry.dataSize
                 ? formatDataSize(entry.dataSize, locale)
                 : undefined;

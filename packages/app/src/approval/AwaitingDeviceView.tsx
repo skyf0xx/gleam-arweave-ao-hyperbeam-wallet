@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CollectibleRef, DeviceSigningRequest, DeviceSigningSummary, NameTargetPreview } from "@gleam/core";
 import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
-import { useT, type TFunction } from "../i18n";
+import { useLocale, useT, type TFunction } from "../i18n";
+import { localizeAmount } from "../screens/main-screen/src/formatTokenAmount";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { DEVICE_NAMES, type DeviceSignPanel } from "./device-panels";
 import { errorText } from "../i18n/errors";
@@ -199,6 +200,8 @@ export function AwaitingDeviceView({
 
 function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token: AwaitingDeviceViewProps["token"] }) {
   const t = useT();
+  const locale = useLocale();
+  const ar = (winston: string) => `${localizeAmount(formatWinstonAsAr(winston, 12), locale)} AR`;
   if (summary.kind === "transaction") {
     return (
       <>
@@ -207,9 +210,9 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
             {t("transferReview.unreadableTokenTransfer")}
           </p>
         ) : null}
-        {summary.recipient !== null ? <Row label={t("approval.amount")} value={`${formatWinstonAsAr(summary.quantity, 12)} AR`} /> : null}
+        {summary.recipient !== null ? <Row label={t("approval.amount")} value={ar(summary.quantity)} /> : null}
         {summary.recipient !== null ? <AddressRow label={t("approval.recipient")} address={summary.recipient} /> : null}
-        <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
+        <Row label={t("approval.fee")} value={ar(summary.fee)} />
         {summary.dataSize !== "0" ? <Row label={t("approval.data")} value={t("approval.bytes", { size: summary.dataSize })} /> : null}
       </>
     );
@@ -221,7 +224,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
     const quantity =
       scale?.denomination != null ? (
         <>
-          {formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)}
+          {localizeAmount(formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination), locale)}
           {scale.ticker?.trim() ? <> <UntrustedText text={scale.ticker} /></> : null}
         </>
       ) : (
@@ -234,7 +237,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
         <Row label={t("approval.amount")} value={quantity} />
         <AddressRow label={t("approval.recipient")} address={summary.recipient} />
         <AddressRow label={t("approval.tokenProcess")} address={summary.process} />
-        {summary.kind === "l1TokenTransfer" ? <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} /> : null}
+        {summary.kind === "l1TokenTransfer" ? <Row label={t("approval.fee")} value={ar(summary.fee)} /> : null}
       </>
     );
   }
@@ -243,7 +246,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
       <>
         <AddressRow label={t("approval.collectible")} address={summary.asset} />
         <AddressRow label={t("approval.recipient")} address={summary.recipient} />
-        <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
+        <Row label={t("approval.fee")} value={ar(summary.fee)} />
       </>
     );
   }
@@ -252,7 +255,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
       <>
         <AddressRow label={t("collectibles.name")} address={summary.carrier} />
         <AddressRow label={t("collectibles.pointsTo")} address={summary.target} />
-        <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
+        <Row label={t("approval.fee")} value={ar(summary.fee)} />
       </>
     );
   }

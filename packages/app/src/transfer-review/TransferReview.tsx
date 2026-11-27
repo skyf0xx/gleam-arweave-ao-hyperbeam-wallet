@@ -7,7 +7,7 @@ import {
   RecipientWarning,
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import { UntrustedText } from "../approval/UntrustedText";
 import { ArmingLabel } from "../approval/ArmingLabel";
 import { DataItemCard } from "./DataItemCard";
@@ -65,12 +65,13 @@ export function TransferReview({
   footer,
 }: TransferReviewProps) {
   const t = useT();
+  const locale = useLocale();
   const identity = useAddressIdentity();
   const noticed = showsWarning(request, risk);
   const warned = showsRisk(request, risk);
   const batch = request.transfers.length > 1 || request.others.length > 0;
   const first = request.transfers[0]!;
-  const balanceAfter = balanceAfterParts(context, request);
+  const balanceAfter = balanceAfterParts(context, request, locale);
   const lookalikeOf = risk?.lookalikeOf ?? null;
 
   const warning = noticed ? (

@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import { UntrustedText } from "../approval/UntrustedText";
 import {
   feeFiatText,
@@ -32,10 +32,11 @@ export function DataRow({ transfer }: { transfer: TransferLine & { part: SignedP
 
 export function FeeValue({ fee, context }: { fee: string | null; context: TransferContext }) {
   const t = useT();
+  const locale = useLocale();
   const fiat = feeFiatText(fee, context);
   return (
     <>
-      {feeText(fee, t)}
+      {feeText(fee, t, locale)}
       {fiat ? <span className="ml-1.5 text-muted">{fiat}</span> : null}
     </>
   );

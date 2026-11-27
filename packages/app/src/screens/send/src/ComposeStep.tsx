@@ -8,11 +8,12 @@ import { AccountAvatar, TokenGlyph } from "@gleam/ui/src/components/wallet/index
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { useAddressIdentity } from "../../../address-identity";
-import { useT } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { readRowVisibility, sendTokenLogo } from "../../../token-visibility";
 import { feeFiatText } from "../../../transfer-review/model";
-import { formatAtomicAsDisplay, formatAtomicCompact, parseDisplayToAtomic } from "../../main-screen/src/formatWinston";
+import { formatTokenAmount } from "../../main-screen/src/formatTokenAmount";
+import { formatAtomicAsDisplay, parseDisplayToAtomic } from "../../main-screen/src/formatWinston";
 import type { WalletBalances } from "../../activity";
 import { validateSendAmount } from "../../activity";
 import type { NamedAddress } from "./namedAddresses";
@@ -104,6 +105,7 @@ export function ComposeStep({
   savingAddress: boolean;
 }) {
   const t = useT();
+  const locale = useLocale();
   const denomination = token === null ? 12 : token.denomination;
   const ticker = tickerFor(token);
   // Every non-AR send is an AO data item, which not every wallet kind can sign.
@@ -144,7 +146,7 @@ export function ComposeStep({
       : rawMaxAtomic;
   // Every digit: Max goes into the amount, so rounding would leave dust behind, or fill 0 for a tiny balance.
   const maxDisplay = maxAtomic === undefined ? undefined : formatAtomicAsDisplay(maxAtomic, denomination, denomination);
-  const balanceDisplay = rawMaxAtomic === undefined ? undefined : formatAtomicCompact(rawMaxAtomic, denomination);
+  const balanceDisplay = rawMaxAtomic === undefined ? undefined : formatTokenAmount(rawMaxAtomic, denomination, locale);
   const amountNumber = Number(step.amountDisplay);
   // Display only: the value line is an estimate, so a float is fine here.
   // Priced in the token being sent, it would only repeat the amount.

@@ -14,7 +14,8 @@ import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { currencyStep, formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import type { WalletBalances } from "../screens/activity";
-import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
+import { formatTokenAmount, localizeAmount } from "../screens/main-screen/src/formatTokenAmount";
+import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { shownTokenLogo, type RowVisibility } from "../token-visibility";
 import type { TFunction } from "../i18n";
 import { escapeHiddenCharacters } from "../approval/UntrustedText";
@@ -292,11 +293,11 @@ export function isUnknownScale(transfer: TransferLine): boolean {
 }
 
 /** The scaled amount, or the grouped raw one when the scale is unknown. */
-export function amountText(transfer: TransferLine): string {
+export function amountText(transfer: TransferLine, locale: string): string {
   if (transfer.collectible) return "1";
   if (transfer.denomination === null) return groupDigits(transfer.amount);
-  if (transfer.token === null) return formatWinstonAsAr(transfer.amount, AR_DENOMINATION);
-  return formatAtomicAsDisplay(transfer.amount, transfer.denomination, transfer.denomination);
+  if (transfer.token === null) return localizeAmount(formatWinstonAsAr(transfer.amount, AR_DENOMINATION), locale);
+  return localizeAmount(formatAtomicAsDisplay(transfer.amount, transfer.denomination, transfer.denomination), locale);
 }
 
 /**
@@ -374,13 +375,13 @@ const FEE_SIGNIFICANT_DIGITS = 3n;
  * The fee in AR to three significant digits, rounded up so it never reads
  * lower than what is paid; "None" for a request that pays none.
  */
-export function feeText(fee: string | null, t: TFunction): string {
+export function feeText(fee: string | null, t: TFunction, locale: string): string {
   if (fee === null) return t("transferReview.none");
   const winston = BigInt(fee);
   const digits = BigInt(winston.toString().length);
   const unit = digits > FEE_SIGNIFICANT_DIGITS ? 10n ** (digits - FEE_SIGNIFICANT_DIGITS) : 1n;
   const rounded = ((winston + unit - 1n) / unit) * unit;
-  return `${formatWinstonAsAr(String(rounded), AR_DENOMINATION)} AR`;
+  return `${localizeAmount(formatWinstonAsAr(String(rounded), AR_DENOMINATION), locale)} AR`;
 }
 
 /** The fee's value in the display currency, when AR is priced and isn't itself the display currency. */
@@ -402,7 +403,7 @@ export interface BalanceAfterPart {
  * pays the fee. A token whose balance isn't known is left out, and so is
  * one the request would overdraw, which the signing step refuses anyway.
  */
-export function balanceAfterParts(context: TransferContext, request: TransferRequest): BalanceAfterPart[] | undefined {
+export function balanceAfterParts(context: TransferContext, request: TransferRequest, locale: string): BalanceAfterPart[] | undefined {
   const balances = context.balances;
   if (!balances) return undefined;
   const spent = new Map<string | null, { transfer: TransferLine; total: bigint }>();
@@ -426,7 +427,7 @@ export function balanceAfterParts(context: TransferContext, request: TransferReq
       parts.push({ amount: groupDigits(left.toString()), ticker: null });
     } else {
       const ticker = token === null ? "AR" : transfer.ticker !== null && transfer.ticker !== token ? displayTicker(transfer.ticker) : null;
-      parts.push({ amount: formatAtomicCompact(left.toString(), transfer.denomination), ticker: ticker?.trim() ? ticker : null });
+      parts.push({ amount: formatTokenAmount(left.toString(), transfer.denomination, locale), ticker: ticker?.trim() ? ticker : null });
     }
   }
   return parts.length > 0 ? parts : undefined;

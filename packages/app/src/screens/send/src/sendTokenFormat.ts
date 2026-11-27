@@ -1,4 +1,5 @@
 import type { TokenBalance, TokenPrice } from "@gleam/core";
+import { localizeAmount } from "../../main-screen/src/formatTokenAmount";
 import { displayTicker, formatAtomicAsDisplay, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 
 /** `token.ticker` for an AO token, `"AR"` for the native token (`token === null`). */
@@ -6,8 +7,8 @@ export function tickerFor(token: TokenBalance | null): string {
   return token === null ? "AR" : displayTicker(token.ticker);
 }
 
-export function formatAmount(atomic: string, token: TokenBalance | null): string {
-  return token === null ? formatWinstonAsAr(atomic, 12) : formatAtomicAsDisplay(atomic, token.denomination, token.denomination);
+export function formatAmount(atomic: string, token: TokenBalance | null, locale: string): string {
+  return localizeAmount(token === null ? formatWinstonAsAr(atomic, 12) : formatAtomicAsDisplay(atomic, token.denomination, token.denomination), locale);
 }
 
 /** `TokenPrice.price` is `null` for a token that couldn't be priced; that reads as no price here. */

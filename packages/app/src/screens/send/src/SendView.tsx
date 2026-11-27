@@ -3,9 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isHardwareWalletMethod, type RuntimePort, type TokenBalance, type TransferFeeQuote, type WalletSummary } from "@gleam/core";
 import { ContactsView } from "../../contacts/index.tsx";
 import { useAddressIdentity } from "../../../address-identity";
-import { useT } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
 import { DEFAULT_AO_TOKEN } from "@gleam/ui";
+import { localizeAmount } from "../../main-screen/src/formatTokenAmount";
 import { AR_DENOMINATION, formatWinstonAsAr, parseDisplayToAtomic } from "../../main-screen/src/formatWinston";
 import { useOrderbookPrices, useTokenPrices } from "../../main-screen/src/useTokenPrices";
 import { useActivity } from "../../activity";
@@ -83,6 +84,7 @@ function isFullAddress(value: string): boolean {
 
 export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: SendViewProps) {
   const t = useT();
+  const locale = useLocale();
   const [step, setStep] = useState<Step>(() => ({ ...INITIAL_STEP, recipient: recipient ?? "" }));
   // Store the compose step state when opening the token picker so we can restore it
   const [savedComposeStep, setSavedComposeStep] = useState<Extract<Step, { kind: "compose" }> | null>(null);
@@ -394,7 +396,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
           ...step,
           estimate,
           submitting: false,
-          error: balanceError ?? t("send.feeChanged", { fee: `${formatWinstonAsAr(estimate.fee, 12)} AR` }),
+          error: balanceError ?? t("send.feeChanged", { fee: `${localizeAmount(formatWinstonAsAr(estimate.fee, 12), locale)} AR` }),
         });
       }
     };
@@ -427,7 +429,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
 
   return (
     <SuccessStep
-      summary={t("send.summary", { amount: `${formatAmount(step.amountAtomic, selectedToken)} ${tickerFor(selectedToken)}`, recipient: step.recipient })}
+      summary={t("send.summary", { amount: `${formatAmount(step.amountAtomic, selectedToken, locale)} ${tickerFor(selectedToken)}`, recipient: step.recipient })}
       txId={step.txId}
       onDone={onDone}
       {...known.successSaveProps(step.recipient)}

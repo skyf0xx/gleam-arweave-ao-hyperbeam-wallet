@@ -139,7 +139,7 @@ describe("transferRequestFromPreview", () => {
     })!;
     const line = parsed.transfers[0]!;
     expect(line.collectible).toEqual({ id: P });
-    expect(amountText(line)).toBe("1");
+    expect(amountText(line, "en")).toBe("1");
     expect(isUnknownScale(line)).toBe(false);
     expect(showsWarning(parsed, null)).toBe(false);
   });
@@ -239,7 +239,7 @@ describe("transferRequestFromDevice", () => {
 
 describe("balanceAfterParts", () => {
   it("takes the amount and the fee off an AR balance", () => {
-    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"))).toEqual([
+    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"), "en")).toEqual([
       { amount: "0.5", ticker: "AR" },
     ]);
   });
@@ -253,25 +253,31 @@ describe("balanceAfterParts", () => {
         ],
       },
     };
-    expect(balanceAfterParts(context, request({ token: P, ticker: "\u202EXYZ", denomination: 6, amount: "2500000" }, null))).toEqual([
+    expect(balanceAfterParts(context, request({ token: P, ticker: "\u202EXYZ", denomination: 6, amount: "2500000" }, null), "en")).toEqual([
       { amount: "2.5", ticker: "\u202EXYZ" },
     ]);
-    expect(balanceAfterParts(context, request({ token: P, ticker: P, denomination: 6, amount: "2500000" }, null))).toEqual([
+    expect(balanceAfterParts(context, request({ token: P, ticker: P, denomination: 6, amount: "2500000" }, null), "en")).toEqual([
       { amount: "2.5", ticker: null },
     ]);
-    expect(balanceAfterParts(context, request({ token: P, ticker: "  ", denomination: 6, amount: "2500000" }, null))).toEqual([
+    expect(balanceAfterParts(context, request({ token: P, ticker: "  ", denomination: 6, amount: "2500000" }, null), "en")).toEqual([
       { amount: "2.5", ticker: null },
     ]);
   });
 
   it("masks every amount while balances are hidden", () => {
-    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] }, balancesHidden: true }, request())).toEqual([
+    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] }, balancesHidden: true }, request(), "en")).toEqual([
       { amount: HIDDEN_AMOUNT, ticker: null },
     ]);
   });
 
+  it("groups and separates the amount for the reader's locale", () => {
+    expect(balanceAfterParts({ balances: { arBalance: "12345600000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"), "es")).toEqual([
+      { amount: "12.345,1", ticker: "AR" },
+    ]);
+  });
+
   it("leaves out a balance the request would overdraw", () => {
-    expect(balanceAfterParts({ balances: { arBalance: "5", tokenBalances: [] } }, request())).toBeUndefined();
+    expect(balanceAfterParts({ balances: { arBalance: "5", tokenBalances: [] } }, request(), "en")).toBeUndefined();
   });
 });
 
@@ -324,13 +330,13 @@ describe("showsWarning", () => {
 
 describe("feeText", () => {
   it("rounds up to three significant digits", () => {
-    expect(feeText("42855127", t)).toBe("0.0000429 AR");
-    expect(feeText("42800000", t)).toBe("0.0000428 AR");
-    expect(feeText("1", t)).toBe("0.000000000001 AR");
+    expect(feeText("42855127", t, "en")).toBe("0.0000429 AR");
+    expect(feeText("42800000", t, "en")).toBe("0.0000428 AR");
+    expect(feeText("1", t, "en")).toBe("0.000000000001 AR");
   });
 
   it("says None for a request with no fee", () => {
-    expect(feeText(null, t)).toBe(t("transferReview.none"));
+    expect(feeText(null, t, "en")).toBe(t("transferReview.none"));
   });
 });
 

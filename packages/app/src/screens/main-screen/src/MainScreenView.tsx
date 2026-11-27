@@ -218,7 +218,7 @@ export function MainScreenView({
       ]),
   });
 
-  const defaultTokenRows = buildDefaultTokenRows(t, balancesQuery.data, tokenPrices, currency);
+  const defaultTokenRows = buildDefaultTokenRows(t, locale, balancesQuery.data, tokenPrices, currency);
   const tokensCached = restoredCache(balancesQuery, openedAt) || restoredCache(tokenPricesQuery, openedAt);
   const collectiblesCached = restoredCache(collectiblesQuery, openedAt);
   const activityCached = restoredCache(activityQuery, openedAt);

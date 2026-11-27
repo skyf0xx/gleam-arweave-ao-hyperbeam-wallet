@@ -5,7 +5,8 @@ import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
-import { useT } from "../../../i18n";
+import { useLocale, useT } from "../../../i18n";
+import { localizeAmount } from "../../main-screen/src/formatTokenAmount";
 import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity";
 import { errorText } from "../../../i18n/errors";
@@ -25,6 +26,7 @@ export interface ManageTokensViewProps {
 
 export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewProps) {
   const t = useT();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const watchedQuery = useQuery({
     queryKey: walletQueryKeys.watchedTokens(address),
@@ -139,7 +141,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                     </span>
                   </span>
                   <span className="flex-shrink-0 font-mono text-label text-muted">
-                    {preview.available === false ? t("manageTokens.unavailable") : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
+                    {preview.available === false ? t("manageTokens.unavailable") : localizeAmount(formatAtomicAsDisplay(preview.quantity, preview.denomination), locale)}
                   </span>
                 </div>
                 {preview.available === false ? (
