@@ -19,6 +19,9 @@ Use [GitHub's private vulnerability reporting](https://github.com/skyf0xx/gleam-
 for this repository (Security tab → Report a vulnerability). This opens a
 private draft advisory visible only to maintainers until a fix ships.
 
+If you can't use GitHub, email the primary security contact,
+kawess@gmail.com.
+
 The report form ([`.github/VULNERABILITY_REPORT.yml`](.github/VULNERABILITY_REPORT.yml))
 asks for a summary, the answers to the three questions under Severity,
 the function a fix has to change, a failing test and the details. It
