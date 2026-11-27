@@ -6,7 +6,7 @@
     - WARNING
     - ERROR
   ignore-rules:
-    # MainActivity is singleTask without taskAffinity="". Open decision,
-    # tracked in todo.md; remove these once it's settled.
+    # Both read targetSdk from the manifest, where Capacitor doesn't put it,
+    # so they assume Android 8. minSdk is 29, and Android 10 fixes both.
     - android_task_hijacking1
     - android_task_hijacking2

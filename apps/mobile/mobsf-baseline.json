@@ -12,11 +12,6 @@
     },
     {
       "severity": "warning",
-      "title": "App can be installed on a vulnerable Android version 8.0, minSdk=26]",
-      "why": "minSdk 26. Open decision in todo.md."
-    },
-    {
-      "severity": "warning",
       "title": "Service (com.google.android.gms.auth.api.signin.RevocationBoundService) is Protected by a permission, but the protection level of the permission should be checked. Permission: com.google.android.gms.auth.api.signin.permission.REVOCATION_NOTIFICATION [android:exported=true]",
       "why": "Google Sign-In's own service, behind Google's signature permission."
     },
