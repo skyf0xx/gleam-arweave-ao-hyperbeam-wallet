@@ -3,6 +3,13 @@
 What changed in each Gleam release, newest first. One release covers the
 Chrome extension and the iOS and Android apps.
 
+## v1.56.2 (2026-11-28)
+
+### Fixed
+
+- Token amounts now show the number style of your language, like 10,000 in English or 10.000 in Spanish.
+- Gleam now finds more of the tokens and collectibles your wallet holds, including some that were missing until you added them by hand.
+
 ## v1.56.1 (2026-11-27)
 
 ### Fixed
