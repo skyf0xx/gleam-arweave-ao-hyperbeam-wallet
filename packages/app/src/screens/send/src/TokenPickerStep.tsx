@@ -4,10 +4,11 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
 import { TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
-import { t, useT } from "../../../i18n";
+import { t, useLocale, useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 import { isTokenHidden, readRowVisibility, sendTokenLogo, shownTokenLogo } from "../../../token-visibility";
-import { displayTicker, formatAtomicCompact } from "../../main-screen/src/formatWinston";
+import { formatTokenAmount } from "../../main-screen/src/formatTokenAmount";
+import { displayTicker } from "../../main-screen/src/formatWinston";
 import type { WalletBalances } from "../../activity";
 import { SkeletonPickerRow } from "./SkeletonPickerRow";
 
@@ -69,6 +70,7 @@ export function TokenPickerStep({
   onBack: () => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const loading = balancesQuery.isLoading;
   const errorMessage = balancesQuery.error ? errorText(balancesQuery.error) : null;
 
@@ -99,7 +101,7 @@ export function TokenPickerStep({
           amount={
             balancesQuery.data === undefined
               ? DEFAULT_AR_TOKEN.defaultDisplayAmount
-              : formatAtomicCompact(balancesQuery.data.arBalance, 12)
+              : formatTokenAmount(balancesQuery.data.arBalance, 12, locale)
           }
           loading={loading}
           onClick={() => onSelect(null)}
@@ -113,7 +115,7 @@ export function TokenPickerStep({
             aoBalance
               ? aoBalance.available === false
                 ? unavailableTokenBalanceLabel()
-                : formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
+                : formatTokenAmount(aoBalance.quantity, aoBalance.denomination, locale)
               : DEFAULT_AO_TOKEN.defaultDisplayAmount
           }
           loading={loading}
@@ -135,7 +137,7 @@ export function TokenPickerStep({
               amount={
                 candidate.available === false
                   ? unavailableTokenBalanceLabel()
-                  : formatAtomicCompact(candidate.quantity, candidate.denomination)
+                  : formatTokenAmount(candidate.quantity, candidate.denomination, locale)
               }
               onClick={candidate.available === false ? undefined : () => onSelect(candidate)}
               className="border-b-0"

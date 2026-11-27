@@ -38,3 +38,8 @@ export function useT(): TFunction {
 export function useLocale(): string {
   return useLanguage();
 }
+
+/** `useLocale` for code outside React. */
+export function currentLocale(): string {
+  return getLanguage();
+}

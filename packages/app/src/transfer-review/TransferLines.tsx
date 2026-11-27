@@ -7,7 +7,7 @@ import {
   TokenGlyph,
 } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import { UntrustedText } from "../approval/UntrustedText";
 import { DataRow, GUTTER, OtherTags, SummaryRow, TokenValue } from "./review-parts";
 import {
@@ -38,6 +38,7 @@ function Glyph({ transfer, context, size }: { transfer: TransferLine; context: T
 
 export function Hero({ transfer, context }: { transfer: TransferLine; context: TransferContext }) {
   const t = useT();
+  const locale = useLocale();
   if (transfer.collectible) {
     const name = transfer.collectible.name ?? truncateAddress(transfer.collectible.id, 6);
     return (
@@ -64,7 +65,7 @@ export function Hero({ transfer, context }: { transfer: TransferLine; context: T
       {isUnknownScale(transfer) ? (
         <div className="flex max-w-full flex-col items-center gap-1">
           <span dir="ltr" className="font-mono text-display-sm font-medium leading-tight tracking-[-0.02em] tabular-nums text-foreground [overflow-wrap:anywhere]">
-            {amountText(transfer)}
+            {amountText(transfer, locale)}
           </span>
           <span className="text-body text-muted"><UntrustedText text={unitText(transfer, t)} /></span>
         </div>
@@ -72,7 +73,7 @@ export function Hero({ transfer, context }: { transfer: TransferLine; context: T
         <div className="flex max-w-full flex-col items-center gap-1">
           <div className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2">
             <span className="text-display-lg font-semibold dark:font-medium leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground [overflow-wrap:anywhere]">
-              {amountText(transfer)}
+              {amountText(transfer, locale)}
             </span>
             <span className="text-h3 font-semibold text-muted"><UntrustedText text={unitText(transfer, t)} /></span>
           </div>
@@ -99,6 +100,7 @@ export function BatchHero({ request, context }: { request: TransferRequest; cont
 
 export function TransferCard({ transfer, context }: { transfer: TransferLine & { part: SignedPart }; context: TransferContext }) {
   const t = useT();
+  const locale = useLocale();
   const identity = useAddressIdentity();
   const fiat = fiatText(context, transfer);
   return (
@@ -110,7 +112,7 @@ export function TransferCard({ transfer, context }: { transfer: TransferLine & {
             dir="ltr"
             className={`font-semibold tracking-[-0.02em] tabular-nums text-foreground [overflow-wrap:anywhere] ${isUnknownScale(transfer) ? "font-mono text-body" : "text-xl"}`}
           >
-            {amountText(transfer)}
+            {amountText(transfer, locale)}
           </span>
           <span className="text-body font-semibold text-muted"><UntrustedText text={unitText(transfer, t)} /></span>
         </div>

@@ -195,6 +195,7 @@
 4 packages/runtime/src/handlers/activity-reads.ts
 4 packages/runtime/src/handlers/price-reads.ts
 4 packages/core/src/models/approval.ts
+4 packages/app/src/screens/main-screen/src/formatTokenAmount.ts
 4 packages/app/src/screens/main-screen/src/formatWinston.ts
 4 packages/ui/src/format/truncate-address.ts
 4 packages/ui/src/components/wallet/AddressDisplay.tsx

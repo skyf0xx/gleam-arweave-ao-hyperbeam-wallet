@@ -1,5 +1,6 @@
 import type { TokenBalance } from "@gleam/core";
-import { t } from "../../../i18n";
+import { currentLocale, t } from "../../../i18n";
+import { localizeAmount } from "../../main-screen/src/formatTokenAmount";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import type { WalletBalances } from "./useBalances";
 
@@ -57,7 +58,7 @@ export function validateSendAmount(
       return t("activity.overBalance");
     }
     if (token === null && arFeeAtomic !== undefined && BigInt(amountAtomic) + BigInt(arFeeAtomic) > BigInt(available)) {
-      const fee = `${formatWinstonAsAr(arFeeAtomic, 12)} AR`;
+      const fee = `${localizeAmount(formatWinstonAsAr(arFeeAtomic, 12), currentLocale())} AR`;
       return feeIsNewAddress
         ? t("activity.overBalanceWithFeeNewAddress", { fee })
         : t("activity.overBalanceWithFee", { fee });

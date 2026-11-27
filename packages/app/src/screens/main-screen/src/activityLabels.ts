@@ -1,7 +1,8 @@
 import type { ActivityEntry, CollectibleRef, TokenBalance } from "@gleam/core";
 import { explorerUrlFor } from "@gleam/core";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import { displayTicker, formatAtomicCompact } from "./formatWinston";
+import { formatTokenAmount } from "./formatTokenAmount";
+import { displayTicker } from "./formatWinston";
 import type { TFunction } from "../../../i18n";
 
 /**
@@ -19,13 +20,13 @@ import type { TFunction } from "../../../i18n";
  * `ticker` is still used when resolved (not just an echoed process id),
  * since identity can be known even when the balance isn't.
  */
-export function formatActivityAmount(entry: { amount: string | null; token?: string | null }, tokenBalances: TokenBalance[] | undefined): string {
+export function formatActivityAmount(entry: { amount: string | null; token?: string | null }, tokenBalances: TokenBalance[] | undefined, locale: string): string {
   if (entry.amount === null) return "—";
-  if (!entry.token) return `${formatAtomicCompact(entry.amount, 12)} AR`;
+  if (!entry.token) return `${formatTokenAmount(entry.amount, 12, locale)} AR`;
 
   const match = tokenBalances?.find((token) => token.processId === entry.token);
   if (match && match.available !== false) {
-    return `${formatAtomicCompact(entry.amount, match.denomination)} ${displayTicker(match.ticker)}`;
+    return `${formatTokenAmount(entry.amount, match.denomination, locale)} ${displayTicker(match.ticker)}`;
   }
 
   const ticker = match && match.ticker !== entry.token ? match.ticker : entry.token;

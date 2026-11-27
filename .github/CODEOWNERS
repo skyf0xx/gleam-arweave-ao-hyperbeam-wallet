@@ -191,6 +191,7 @@
 /packages/runtime/src/handlers/activity-reads.ts                           @skyf0xx
 /packages/runtime/src/handlers/price-reads.ts                              @skyf0xx
 /packages/core/src/models/approval.ts                                      @skyf0xx
+/packages/app/src/screens/main-screen/src/formatTokenAmount.ts             @skyf0xx
 /packages/app/src/screens/main-screen/src/formatWinston.ts                 @skyf0xx
 /packages/ui/src/format/truncate-address.ts                                @skyf0xx
 /packages/ui/src/components/wallet/AddressDisplay.tsx                      @skyf0xx

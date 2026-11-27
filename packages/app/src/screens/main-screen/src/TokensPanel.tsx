@@ -5,7 +5,8 @@ import { HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { InlineError } from "@gleam/ui/src/primitives/inline-error.tsx";
-import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact } from "./formatWinston";
+import { formatTokenAmount } from "./formatTokenAmount";
+import { displayTicker, formatAtomicAsDisplay } from "./formatWinston";
 import { useLocale, useT } from "../../../i18n";
 import { shownTokenLogo } from "../../../token-visibility";
 import type { WalletBalances } from "../../activity";
@@ -95,7 +96,7 @@ export function TokensPanel({
         <TokenRow
           glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: tokenLogos ? row.logoUrl : undefined }}
           name={row.name}
-          amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
+          amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, locale, row.pending, 12, masked))}
           value={
             row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
           }
@@ -138,8 +139,8 @@ export function TokensPanel({
               token.available === false
                 ? unavailableBalanceLabel(t)
                 : withPendingNote(
-                    masked ? HIDDEN_AMOUNT : formatAtomicCompact(token.quantity, token.denomination),
-                    pendingNote(t, token.pending, token.denomination, masked),
+                    masked ? HIDDEN_AMOUNT : formatTokenAmount(token.quantity, token.denomination, locale),
+                    pendingNote(t, locale, token.pending, token.denomination, masked),
                   )
             }
             value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}

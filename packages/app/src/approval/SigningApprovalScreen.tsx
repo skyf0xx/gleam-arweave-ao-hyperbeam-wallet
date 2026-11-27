@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
 import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
-import { useT, type MessageKey, type TFunction } from "../i18n";
+import { useLocale, useT, type MessageKey, type TFunction } from "../i18n";
+import { localizeAmount } from "../screens/main-screen/src/formatTokenAmount";
 import { formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { errorText } from "../i18n/errors";
 import { SignedDataText } from "./SignedDataText";
@@ -63,8 +64,8 @@ function actionCopy(preview: SigningApprovalPreview, t: TFunction): string {
   return t(REQUEST_KIND_COPY[preview.kind]);
 }
 
-function formatFee(fee: string): string {
-  return `${formatWinstonAsAr(fee, 12)} AR`;
+function formatFee(fee: string, locale: string): string {
+  return `${localizeAmount(formatWinstonAsAr(fee, 12), locale)} AR`;
 }
 
 export function SigningApprovalScreen({
@@ -78,6 +79,7 @@ export function SigningApprovalScreen({
   onSign,
 }: SigningApprovalScreenProps) {
   const t = useT();
+  const locale = useLocale();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const transfer = transferRequestFromPreview(preview);
@@ -165,7 +167,7 @@ export function SigningApprovalScreen({
         {preview.fee !== null ? (
           <div className="flex items-center justify-between gap-4 text-label">
             <span className="text-muted">{t("approval.networkFee")}</span>
-            <span className="text-right font-semibold tabular-nums text-foreground">{formatFee(preview.fee)}</span>
+            <span className="text-right font-semibold tabular-nums text-foreground">{formatFee(preview.fee, locale)}</span>
           </div>
         ) : null}
 

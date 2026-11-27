@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { DisplayCurrency, PendingAmounts, TokenBalance, TokenPrice } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
-import { formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "./formatWinston";
+import { formatTokenAmount } from "./formatTokenAmount";
+import { formatAtomicAsDisplay, formatWinstonAsAr } from "./formatWinston";
 import type { TFunction } from "../../../i18n";
 import type { WalletBalances } from "../../activity";
 
@@ -39,11 +40,11 @@ export interface DefaultTokenRow {
 export const unavailableBalanceLabel = (t: TFunction): string => t("mainScreen.unavailable");
 
 /** `0.2 sending`, `+0.5 arriving`, or both. With balances hidden the amounts go, and the words stay. */
-export function pendingNote(t: TFunction, pending: PendingAmounts | undefined, denomination: number, masked: boolean): string | null {
+export function pendingNote(t: TFunction, locale: string, pending: PendingAmounts | undefined, denomination: number, masked: boolean): string | null {
   if (!pending) return null;
   const notes: string[] = [];
-  if (pending.outgoing !== "0") notes.push(masked ? t("mainScreen.sending") : t("mainScreen.sendingAmount", { amount: formatAtomicCompact(pending.outgoing, denomination) }));
-  if (pending.incoming !== "0") notes.push(masked ? t("mainScreen.arriving") : t("mainScreen.arrivingAmount", { amount: formatAtomicCompact(pending.incoming, denomination) }));
+  if (pending.outgoing !== "0") notes.push(masked ? t("mainScreen.sending") : t("mainScreen.sendingAmount", { amount: formatTokenAmount(pending.outgoing, denomination, locale) }));
+  if (pending.incoming !== "0") notes.push(masked ? t("mainScreen.arriving") : t("mainScreen.arrivingAmount", { amount: formatTokenAmount(pending.incoming, denomination, locale) }));
   return notes.length > 0 ? notes.join(t("mainScreen.noteSeparator")) : null;
 }
 
@@ -113,6 +114,7 @@ export function restoredCache(query: { data: unknown; dataUpdatedAt: number }, o
  */
 export function buildDefaultTokenRows(
   t: TFunction,
+  locale: string,
   data: WalletBalances | undefined,
   prices: TokenPrice[] | undefined,
   currency: DisplayCurrency | undefined,
@@ -128,7 +130,7 @@ export function buildDefaultTokenRows(
       ticker: DEFAULT_AR_TOKEN.ticker,
       name: DEFAULT_AR_TOKEN.name,
       logoUrl: DEFAULT_AR_TOKEN.logoUrl,
-      amount: data?.arBalance !== undefined ? formatAtomicCompact(data.arBalance, 12) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
+      amount: data?.arBalance !== undefined ? formatTokenAmount(data.arBalance, 12, locale) : DEFAULT_AR_TOKEN.defaultDisplayAmount,
       pending: data?.arPending,
       amountNumber: data?.arBalance !== undefined ? arAmount : undefined,
       value: data?.arBalance !== undefined ? valueFor(prices, currency, null, arAmount) : undefined,
@@ -142,7 +144,7 @@ export function buildDefaultTokenRows(
       name: DEFAULT_AO_TOKEN.name,
       logoUrl: DEFAULT_AO_TOKEN.logoUrl,
       amount: aoAvailable
-        ? formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
+        ? formatTokenAmount(aoBalance.quantity, aoBalance.denomination, locale)
         : aoBalance
           ? unavailableBalanceLabel(t)
           : DEFAULT_AO_TOKEN.defaultDisplayAmount,
