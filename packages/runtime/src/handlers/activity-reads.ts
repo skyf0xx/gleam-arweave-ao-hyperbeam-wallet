@@ -331,7 +331,10 @@ export class ActivityReads {
     // An unmined receipt has a timestamp of 0.
     const incoming = listedReceipts.filter((entry) => entry.timestamp === 0 || recent(entry));
 
-    const l1Entries = [...l1Sends, ...incoming];
+    // A mined AR send is already off the chain's balance, whether or not
+    // the feed has settled its entry yet.
+    const arSends = otherSends.filter((entry) => !entry.token);
+    const l1Entries = [...l1Sends, ...incoming, ...arSends];
     const swapHeights = new Map<string, number>();
     const l1NodeUrls = await readL1NodeUrls(this.storage);
     const [heights] = await Promise.all([
@@ -364,7 +367,8 @@ export class ActivityReads {
       total[side] += BigInt(entry.amount);
       totals.set(token, total);
     };
-    [...otherSends, ...l1Sends.filter(notApplied)].forEach((entry) => add(entry, "outgoing"));
+    const unmined = (entry: ActivityEntry) => !arSends.includes(entry) || !heights.has(entry.txId);
+    [...otherSends.filter(unmined), ...l1Sends.filter(notApplied)].forEach((entry) => add(entry, "outgoing"));
     incoming.filter(notApplied).forEach((entry) => add(entry, "incoming"));
     return [...totals].map(([token, total]) => ({
       token,

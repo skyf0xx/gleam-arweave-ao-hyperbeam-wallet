@@ -1993,6 +1993,12 @@ describe("ReadsHandler: pending transfers", () => {
     expect(await read(storage)).toEqual([{ token: null, outgoing: "7", incoming: "0" }]);
   });
 
+  it("stops counting a pending AR send once it is mined, before its entry settles", async () => {
+    const storage = await storageWith([send("ar", "pending", "7", null), send("ar2", "pending", "3", null)]);
+    chain({ ar: 2050937 }, 1);
+    expect(await read(storage)).toEqual([{ token: null, outgoing: "3", incoming: "0" }]);
+  });
+
   it("reports an unapplied receipt for a listed token as incoming, and skips one for any other process", async () => {
     const storage = await storageWith([]);
     const receipt = (id: string, target: string) => ({
