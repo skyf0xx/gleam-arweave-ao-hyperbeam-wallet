@@ -295,44 +295,29 @@ jobs:
           } > dist/notes.md
 
           cat >> dist/notes.md <<EOF
-          Gleam $TAG, built from $COMMIT.
+          <details>
+          <summary>Verify the download</summary>
 
-          SHA-256 of \`$ZIP_NAME\`: \`$ZIP_SHA256\`
-
-          ## Verify this release
-
-          Download \`$ZIP_NAME\` and \`release-manifest.json\`, then check the zip's hash against the manifest:
-
-          \`\`\`bash
-          sha256sum $ZIP_NAME
-          jq -r .zipSha256 release-manifest.json
-          \`\`\`
-
-          Check that GitHub Actions built it from this repository:
+          **Chrome** · \`$ZIP_NAME\`
+          SHA-256 \`$ZIP_SHA256\`
 
           \`\`\`bash
           gh attestation verify $ZIP_NAME --repo $REPO
           \`\`\`
 
-          Or check it offline with the bundle in \`$ZIP_NAME.intoto.jsonl\`:
+          Offline: add \`--bundle $ZIP_NAME.intoto.jsonl\`.
 
-          \`\`\`bash
-          gh attestation verify $ZIP_NAME --repo $REPO --bundle $ZIP_NAME.intoto.jsonl
-          \`\`\`
+          <!-- apk -->
+          **App web bundle**
+          SHA-256 \`$MOBILE_BUNDLE_SHA256\`
 
-          Build provenance: $ATTESTATION
-
-          ## Mobile apps
-
-          SHA-256 of the apps' web bundle: \`$MOBILE_BUNDLE_SHA256\`
-
-          To compare it with an Android APK, unzip the APK and run this from a checkout of \`$TAG\`:
+          From a checkout of \`$TAG\`:
 
           \`\`\`bash
           node apps/mobile/scripts/bundle-hash.mjs <unzipped-apk>/assets/public --exclude cordova.js --exclude cordova_plugins.js
           \`\`\`
 
-          The native shell is not reproducible, because the stores re-sign it. The apps can reach the stores a day or two after the extension, since store review takes time.
+          </details>
           EOF
 
       - name: Draft the release
