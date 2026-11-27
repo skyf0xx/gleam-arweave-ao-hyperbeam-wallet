@@ -159,6 +159,7 @@
 3 packages/core/src/models/grant.ts
 3 packages/core/src/models/permission.ts
 3 packages/app/src/screens/browser/src/BrowserView.tsx
+3 packages/app/src/screens/browser/src/AddressBar.tsx
 3 packages/app/src/screens/browser/src/address.ts
 3 apps/mobile/src/adapters/dapp-browser.ts
 3 packages/core/src/arweave/graphql-schema.ts
