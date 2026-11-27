@@ -12,7 +12,8 @@
 //
 // GLEAM_ALLOW_UNVERIFIED_BUNDLE=1 skips step 1 only, for a release whose
 // manifest has no `mobileBundleSha256`. Step 2 always runs.
-// GLEAM_RELEASE_BASE_URL overrides the download base, as in verify-release.sh.
+// GLEAM_RELEASE_BASE_URL overrides the download base, as in verify-release.sh;
+// when it doesn't serve the manifest, gh downloads it from the draft release.
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -23,6 +24,7 @@ import { hashDirectory } from "./bundle-hash.mjs";
 
 const BASE_URL =
   process.env.GLEAM_RELEASE_BASE_URL ?? "https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/download";
+const REPO = "skyf0xx/gleam-arweave-ao-hyperbeam-wallet";
 // `cap sync` adds these two files next to the copied bundle.
 const SYNC_ADDED = ["cordova.js", "cordova_plugins.js"];
 
@@ -33,6 +35,25 @@ const SYNC_ADDED = ["cordova.js", "cordova_plugins.js"];
 function fail(message) {
   console.error(`FAIL ${message}`);
   process.exit(1);
+}
+
+/**
+ * A release stays a draft until its APK is uploaded, and a draft has no
+ * public download URL, so this falls back to gh's authenticated one, as
+ * scripts/pack-release.sh does.
+ * @param {string} tag
+ */
+function fetchManifest(tag) {
+  try {
+    return execFileSync("curl", ["-fsSL", "--proto", "=https,file", `${BASE_URL}/${tag}/release-manifest.json`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return execFileSync("gh", ["release", "download", tag, "--repo", REPO, "--pattern", "release-manifest.json", "--output", "-"], {
+      encoding: "utf8",
+    });
+  }
 }
 
 const [tag, nativeDir] = process.argv.slice(2);
@@ -52,10 +73,7 @@ if (process.env.GLEAM_ALLOW_UNVERIFIED_BUNDLE === "1") {
 } else {
   let manifest;
   try {
-    const body = execFileSync("curl", ["-fsSL", "--proto", "=https,file", `${BASE_URL}/${tag}/release-manifest.json`], {
-      encoding: "utf8",
-    });
-    manifest = JSON.parse(body);
+    manifest = JSON.parse(fetchManifest(tag));
   } catch (err) {
     fail(`could not fetch or parse release-manifest.json for ${tag}: ${err instanceof Error ? err.message : String(err)}`);
   }
