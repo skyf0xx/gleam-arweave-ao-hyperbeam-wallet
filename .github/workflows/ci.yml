@@ -13,7 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Decides whether a pull request changes only prose that no check reads.
+  # Decides whether a pull request changes only files that no check reads:
+  # prose, the branding sources under docs/branding and editor settings.
   # The jobs below skip only on an explicit "false": if this job fails, its
   # output is empty and every check runs.
   changes:
@@ -29,8 +30,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
       # A pull request checks out its merge commit, so HEAD^1 is the base.
-      # Tests read docs/THREAT_MODEL.md, security/scan/REPORT.md and the PR
-      # template, so Markdown under security/ or .github/ counts as code.
+      # Tests read docs/THREAT_MODEL.md, docs/SECURITY_PRACTICES.md, README.md, CHANGELOG.md,
+      # security/scan/REPORT.md and the PR template, so those and Markdown
+      # under security/ or .github/ count as code. --no-renames lists a
+      # renamed file's old path too.
+      # docs/branding holds images and HTML mock-ups that nothing imports.
       - id: diff
         env:
           EVENT: ${{ github.event_name }}
@@ -40,12 +44,12 @@ jobs:
           if [ "$EVENT" != pull_request ]; then
             code=true
           else
-            git diff --name-only HEAD^1 HEAD > changed.txt
+            git diff --name-only --no-renames HEAD^1 HEAD > changed.txt
             [ -s changed.txt ] || code=true
             while IFS= read -r path; do
               case "$path" in
-                security/*|.github/*|docs/THREAT_MODEL.md) code=true ;;
-                *.md) ;;
+                security/*|.github/*|docs/THREAT_MODEL.md|docs/SECURITY_PRACTICES.md|README.md|CHANGELOG.md) code=true ;;
+                *.md|docs/branding/*|LICENSE|.vscode/*) ;;
                 *) code=true ;;
               esac
             done < changed.txt
@@ -118,18 +122,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm eslint --max-warnings=0 .
       - run: pnpm deps:check
-      - run: pnpm tsc -p packages/core --noEmit
-      - run: pnpm tsc -p packages/messaging --noEmit
-      - run: pnpm tsc -p packages/ui --noEmit
-      - run: pnpm tsc -p packages/runtime --noEmit
-      - run: pnpm tsc -p packages/app --noEmit
-      - run: pnpm tsc -p packages/provider --noEmit
-      - run: pnpm tsc -p packages/keystone --noEmit
-      - run: pnpm tsc -p apps/extension --noEmit
-      - run: pnpm tsc -p apps/mobile --noEmit
-      - run: pnpm tsc -p apps/points-api --noEmit
-      - run: pnpm tsc -p scripts/scan --noEmit
-      - run: pnpm tsc -p tsconfig.scripts.json --noEmit
+      # The projects write nothing, so they check side by side; the step
+      # fails if any one of them does.
+      - name: tsc
+        run: |
+          pids=()
+          pnpm tsc -p packages/core --noEmit & pids+=($!)
+          pnpm tsc -p packages/messaging --noEmit & pids+=($!)
+          pnpm tsc -p packages/ui --noEmit & pids+=($!)
+          pnpm tsc -p packages/runtime --noEmit & pids+=($!)
+          pnpm tsc -p packages/app --noEmit & pids+=($!)
+          pnpm tsc -p packages/provider --noEmit & pids+=($!)
+          pnpm tsc -p packages/keystone --noEmit & pids+=($!)
+          pnpm tsc -p apps/extension --noEmit & pids+=($!)
+          pnpm tsc -p apps/mobile --noEmit & pids+=($!)
+          pnpm tsc -p apps/points-api --noEmit & pids+=($!)
+          pnpm tsc -p scripts/scan --noEmit & pids+=($!)
+          pnpm tsc -p tsconfig.scripts.json --noEmit & pids+=($!)
+          status=0
+          for pid in "${pids[@]}"; do wait "$pid" || status=1; done
+          exit "$status"
 
   test-shard:
     name: test (${{ matrix.shard }}/4)
@@ -208,31 +220,8 @@ jobs:
       # The keyring page holds only key code; provider.js and the content
       # script stay small and free of new npm packages.
       - run: pnpm check:bundles
-      - run: pnpm mobile:build
-      # wxt:build passing doesn't mean the bundle runs; load it in Chromium.
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:smoke
 
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
-    steps:
-      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm wxt:build
-
-      # web-ext checks against Firefox's rules. Two of its errors are
+      # web-ext checks the build against Firefox's rules. Two of its errors are
       # Firefox-only manifest requirements that a Chrome MV3 build can't
       # meet, so they are dropped here; any other error fails the job.
       # Warnings are listed but don't fail it.
@@ -251,6 +240,24 @@ jobs:
             | "::error::web-ext \(.code) \(.file // "") \(.message)"' web-ext.json | tee web-ext-errors.txt
           [ ! -s web-ext-errors.txt ]
 
+      - run: pnpm mobile:build
+      # wxt:build passing doesn't mean the bundle runs; load it in Chromium.
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:smoke
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    steps:
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No install or build: osv-scanner reads the lockfile and Semgrep
+      # ignores node_modules and .output (.semgrepignore).
       - name: Install osv-scanner 2.6.0
         run: |
           curl -sSfL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64

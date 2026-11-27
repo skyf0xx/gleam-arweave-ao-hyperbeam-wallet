@@ -13,15 +13,81 @@ permissions:
 # A pull request's newer push replaces its older run. Master commits each get
 # their own group: a cancelled run records its analysis as failed, so merges
 # landing within the Swift job's ~17 minutes would otherwise leave master's
-# Swift result failed, and `reuse-swift` with an older one to copy.
+# Swift result failed, and `reuse-analysis` with an older one to copy.
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
+  # Decides per language whether a pull request changes what its analysis
+  # reads. A language it leaves alone reuses master's latest analysis
+  # (`reuse-analysis`): the code scanning rule waits for a result in every
+  # category master has, so a skipped language still needs one. Master
+  # pushes and the weekly run always analyze, and a failure here leaves
+  # every output empty, which analyzes everything.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      analyze: ${{ steps.diff.outputs.analyze }}
+      reuse: ${{ steps.diff.outputs.reuse }}
+      swift: ${{ steps.diff.outputs.swift }}
+    steps:
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      # A pull request checks out its merge commit, so HEAD^1 is the base.
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          actions=false js=false java=false swift=false
+          all() { actions=true js=true java=true swift=true; }
+          if [ "$EVENT" != pull_request ]; then
+            all
+          else
+            git diff --name-only --no-renames HEAD^1 HEAD > changed.txt
+            [ -s changed.txt ] || all
+            while IFS= read -r path; do
+              case "$path" in
+                .github/workflows/codeql.yml|.github/codeql/*) all ;;
+              esac
+              case "$path" in
+                .github/*|action.yml|action.yaml|*/action.yml|*/action.yaml) actions=true ;;
+              esac
+              # The JavaScript analysis reads everything but these.
+              case "$path" in
+                *.md|docs/branding/*|LICENSE|.vscode/*|.github/*|*.kt|*.java|*.swift) ;;
+                *) js=true ;;
+              esac
+              case "$path" in
+                *.java|*.kt|*.kts|*.gradle|apps/mobile/android/*|apps/mobile/plugins/*|apps/mobile/package.json|apps/mobile/capacitor.config.*) java=true ;;
+              esac
+              case "$path" in
+                apps/mobile/ios/*|apps/mobile/plugins/*|apps/mobile/package.json|apps/mobile/capacitor.config.*) swift=true ;;
+              esac
+            done < changed.txt
+          fi
+          analyze=() reuse=()
+          pick() { if [ "$2" = true ]; then analyze+=("\"$1\""); else reuse+=("\"$1\""); fi; }
+          pick actions "$actions"
+          pick javascript-typescript "$js"
+          pick java-kotlin "$java"
+          [ "$swift" = true ] || reuse+=('"swift"')
+          join() { local IFS=,; echo "[$*]"; }
+          echo "analyze=$(join "${analyze[@]}")" | tee -a "$GITHUB_OUTPUT"
+          echo "reuse=$(join "${reuse[@]}")" | tee -a "$GITHUB_OUTPUT"
+          echo "swift=$swift" | tee -a "$GITHUB_OUTPUT"
+
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.analyze != '[]' }}
     permissions:
       contents: read
       security-events: write
@@ -29,7 +95,7 @@ jobs:
       fail-fast: false
       matrix:
         # Kotlin extracts without a Gradle build; Swift can't, so it has its own job.
-        language: [actions, javascript-typescript, java-kotlin]
+        language: ${{ fromJSON(needs.changes.outputs.analyze || '["actions","javascript-typescript","java-kotlin"]') }}
     steps:
       - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
@@ -54,47 +120,12 @@ jobs:
   # minutes, so dependencies build untraced and only our own Swift is rebuilt
   # under CodeQL.
   # The Swift job takes ~17 minutes, so a pull request runs it only when it
-  # changes what that job builds or how; otherwise `reuse-swift` reports
-  # master's result. Master pushes and the weekly run always analyze, and a
-  # failure here leaves the output empty, which runs it.
-  swift-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      swift: ${{ steps.diff.outputs.swift }}
-    steps:
-      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 2
-      # A pull request checks out its merge commit, so HEAD^1 is the base.
-      - id: diff
-        env:
-          EVENT: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          swift=false
-          if [ "$EVENT" != pull_request ]; then
-            swift=true
-          else
-            git diff --name-only HEAD^1 HEAD > changed.txt
-            [ -s changed.txt ] || swift=true
-            while IFS= read -r path; do
-              case "$path" in
-                apps/mobile/ios/*|apps/mobile/plugins/*|apps/mobile/package.json|apps/mobile/capacitor.config.*) swift=true ;;
-                .github/workflows/codeql.yml|.github/codeql/*) swift=true ;;
-              esac
-            done < changed.txt
-          fi
-          echo "swift=$swift" | tee -a "$GITHUB_OUTPUT"
-
+  # changes what that job builds or how.
   analyze-swift:
     name: Analyze (swift)
     runs-on: macos-15
-    needs: swift-changes
-    if: ${{ !cancelled() && needs.swift-changes.outputs.swift != 'false' }}
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.swift != 'false' }}
     permissions:
       contents: read
       security-events: write
@@ -141,20 +172,22 @@ jobs:
         with:
           category: /language:swift
 
-  # The code scanning rule waits for a result in every category master has,
-  # so a pull request that skips the Swift build still needs a Swift result.
-  # Its Swift is master's, so master's latest Swift analysis is its result:
-  # this uploads that SARIF for the pull request. It takes the newest one
-  # that finished without error; with none to reuse, the job fails rather
-  # than pass the gate empty.
-  reuse-swift:
-    name: Analyze (swift, from master)
+  # A language a pull request leaves alone has master's code, so master's
+  # latest analysis of it is the pull request's result: this uploads that
+  # SARIF. It takes the newest one that finished without error; with none to
+  # reuse, the job fails rather than pass the gate empty.
+  reuse-analysis:
+    name: Analyze (${{ matrix.language }}, from master)
     runs-on: ubuntu-latest
-    needs: swift-changes
-    if: ${{ !cancelled() && needs.swift-changes.outputs.swift == 'false' }}
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.reuse != '' && needs.changes.outputs.reuse != '[]' }}
     permissions:
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.changes.outputs.reuse || '[]') }}
     steps:
       - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
@@ -165,17 +198,19 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          LANGUAGE: ${{ matrix.language }}
         run: |
           set -euo pipefail
           id=$(gh api "repos/$REPO/code-scanning/analyses?ref=refs/heads/master&tool_name=CodeQL&per_page=100" \
-            --jq '[.[] | select(.category == "/language:swift" and .error == "")][0].id // empty')
+            | jq -r --arg category "/language:$LANGUAGE" \
+              '[.[] | select(.category == $category and .error == "")][0].id // empty')
           if [ -z "$id" ]; then
-            echo "::error::master has no Swift analysis to reuse"
+            echo "::error::master has no $LANGUAGE analysis to reuse"
             exit 1
           fi
-          echo "Reusing master's Swift analysis $id"
-          gh api -H "Accept: application/sarif+json" "repos/$REPO/code-scanning/analyses/$id" > "$RUNNER_TEMP/swift.sarif"
+          echo "Reusing master's $LANGUAGE analysis $id"
+          gh api -H "Accept: application/sarif+json" "repos/$REPO/code-scanning/analyses/$id" > "$RUNNER_TEMP/reused.sarif"
       - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
-          sarif_file: ${{ runner.temp }}/swift.sarif
-          category: /language:swift
+          sarif_file: ${{ runner.temp }}/reused.sarif
+          category: /language:${{ matrix.language }}

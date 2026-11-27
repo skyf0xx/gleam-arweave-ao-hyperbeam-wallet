@@ -152,7 +152,8 @@ export async function loadTokenMetadata(storage: StoragePort, processId: string,
         ...metadata,
         ticker: info.ticker ?? metadata.ticker,
         name: info.name ?? metadata.name,
-        denomination: info.denomination ?? metadata.denomination,
+        // Only when the gateways agreed the spawn tags carry none: unconfirmed decimals stay unknown, whatever one CU says.
+        denomination: metadata.denomination ?? (check === "agreed" ? (info.denomination ?? null) : null),
         logo: info.logo ?? metadata.logo,
       };
     } catch {

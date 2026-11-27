@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { TimedSequencer } from "./scripts/test-shards.ts";
 
 const EXCLUDE = ["**/node_modules/**", "**/.output/**", "**/.wxt/**", "**/.claude/worktrees/**", "**/.stryker-tmp/**"];
 
@@ -28,6 +29,8 @@ export default defineConfig({
   test: {
     exclude: EXCLUDE,
     setupFiles: ["./vitest.setup.ts"],
+    // CI shards split by recorded time (scripts/test-timings.json).
+    sequence: { sequencer: TimedSequencer },
     // Each points-api test file boots PGlite (~3s, more on a busy machine).
     testTimeout: 30_000,
     hookTimeout: 30_000,
