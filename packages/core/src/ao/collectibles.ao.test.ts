@@ -46,6 +46,25 @@ describe("classifyAsset", () => {
     expect(classifyAsset(tags({ ...NFT, denomination: "2" }))).toBeNull();
     expect(classifyAsset(tags(BASE))).toBeNull();
   });
+
+  it("classifies an untagged token process by its shape", () => {
+    // GTST and LEND, as spawned on-chain without a style tag.
+    expect(classifyAsset(tags({ ...BASE, ticker: "GTST", denomination: "12", "total-supply": "10000000000000000" }))).toBe("fungible");
+    expect(classifyAsset(tags({ ...BASE, ticker: "LEND", denomination: "0", "total-supply": "1" }))).toBe("unique");
+    // Mint-later tokens spawn with no supply.
+    expect(classifyAsset(tags({ ...BASE, denomination: "18", "total-supply": "0" }))).toBe("fungible");
+    expect(classifyAsset(tags({ ...BASE, denomination: "0" }))).toBe("fungible");
+  });
+
+  it("leaves an untagged token process without a readable denomination out", () => {
+    expect(classifyAsset(tags({ ...BASE, ticker: "X", "total-supply": "1" }))).toBeNull();
+    expect(classifyAsset(tags({ ...BASE, denomination: "2e9" }))).toBeNull();
+  });
+
+  it("lets a style tag decide over the shape", () => {
+    expect(classifyAsset(tags({ ...BASE, "hint-ui-style": "fungible", denomination: "0", "total-supply": "1" }))).toBe("fungible");
+    expect(classifyAsset(tags({ ...BASE, "hint-ui-style": "something-else", denomination: "12" }))).toBeNull();
+  });
 });
 
 interface World {
