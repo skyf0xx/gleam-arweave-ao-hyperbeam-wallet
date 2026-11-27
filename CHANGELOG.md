@@ -3,6 +3,13 @@
 What changed in each Gleam release, newest first. One release covers the
 Chrome extension and the iOS and Android apps.
 
+## v1.55.0 (2026-11-27)
+
+### Fixed
+
+- Activity and saved contacts load again for wallets that got some kinds of AO messages.
+- When the main Arweave gateway can't load your activity, Gleam now tries a backup gateway that works.
+
 ## v1.54.2 (2026-11-27)
 
 ### Security
