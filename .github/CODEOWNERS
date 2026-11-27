@@ -157,6 +157,7 @@
 /packages/app/src/screens/browser/src/AddressBar.tsx                      @skyf0xx
 /packages/app/src/screens/browser/src/AddressSheet.tsx                    @skyf0xx
 /packages/app/src/screens/browser/src/address-parts.ts                    @skyf0xx
+/packages/app/src/screens/browser/src/toolbar.tsx                         @skyf0xx
 /packages/app/src/screens/browser/src/address.ts                          @skyf0xx
 /apps/mobile/src/adapters/dapp-browser.ts                                 @skyf0xx
 /packages/core/src/arweave/graphql-schema.ts                               @skyf0xx
