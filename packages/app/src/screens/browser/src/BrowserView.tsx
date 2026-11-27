@@ -10,7 +10,9 @@ import { useT } from "../../../i18n";
 import { useConnectedApps } from "../../connected-apps/src/useConnectedApps";
 import { StartScreen } from "./StartScreen";
 import { HistoryScreen } from "./HistoryScreen";
-import { AddressBar } from "./AddressBar";
+import { AddressBar, type AddressReveal } from "./AddressBar";
+import { AddressSheet } from "./AddressSheet";
+import { addressParts } from "./address-parts";
 import { useBrowserSites } from "./useBrowserSites";
 
 export interface BrowserViewProps {
@@ -23,6 +25,8 @@ export interface BrowserViewProps {
   onOpenConnectedApp: (origin: string, url: string) => void;
   /** The wallet locked or was reset while the browser was open. */
   onLocked: () => void;
+  /** Where the address sheet mounts (see `Sheet`'s `container`). */
+  sheetContainer?: HTMLElement | null;
 }
 
 interface Navigation {
@@ -58,7 +62,7 @@ function originOf(url: string): string | null {
  * draws over the page (the address suggestions, a load error) has to hide
  * the page first.
  */
-export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, onLocked }: BrowserViewProps) {
+export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, onLocked, sheetContainer = null }: BrowserViewProps) {
   const t = useT();
   const platform = usePlatform();
   const browser = platform.dappBrowser;
@@ -67,6 +71,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const [nav, setNav] = useState<Navigation | null>(null);
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [reveal, setReveal] = useState<AddressReveal>("none");
   const [text, setText] = useState("");
   const [rejected, setRejected] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -87,7 +92,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const showingStart = (page === null || editing) && !historyOpen;
   const currentUrl = nav?.url ?? page?.url ?? null;
   const origin = currentUrl ? originOf(currentUrl) : null;
-  const host = currentUrl ? siteHost(currentUrl) : null;
+  const parts = currentUrl ? addressParts(currentUrl) : null;
   const trail = currentUrl ? pageTrail(currentUrl) : [];
   const saved = origin !== null && sites.saved.includes(origin);
   // Bumped by a tap that saves, so the star pops then and not when a saved page opens.
@@ -96,6 +101,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
 
   const open = (url: string) => {
     setEditing(false);
+    setReveal("none");
     setHistoryOpen(false);
     setText("");
     setRejected(false);
@@ -136,7 +142,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     };
   }, [page, browser, afterOpen]);
 
-  const covered = page !== null && (editing || historyOpen || failedUrl !== null);
+  const covered = page !== null && (editing || historyOpen || failedUrl !== null || reveal !== "none");
   useEffect(() => {
     if (page) afterOpen(() => browser.setHidden(covered));
   }, [covered, page, browser, afterOpen]);
@@ -214,6 +220,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   // Leaving a page lands on the start screen (saved and recent sites), not the main screen.
   const closePage = () => {
     cancelEditing();
+    setReveal("none");
     setFailedUrl(null);
     setNav(null);
     setPage(null);
@@ -222,7 +229,8 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   };
 
   useBackHandler(() => {
-    if (historyOpen) setHistoryOpen(false);
+    if (reveal !== "none") setReveal("none");
+    else if (historyOpen) setHistoryOpen(false);
     else if (page && editing) cancelEditing();
     else if (page && nav?.canGoBack) goBackInPage();
     else if (page) closePage();
@@ -308,7 +316,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             ) : null}
           </form>
         ) : (
-          <AddressBar host={host} trail={trail} onEdit={() => setEditing(true)} />
+          <AddressBar parts={parts} trail={trail} onEdit={() => setEditing(true)} reveal={reveal} onReveal={setReveal} />
         )}
       </div>
       {rejected ? (
@@ -383,6 +391,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
           <IconButton label={t("browser.close")} onClick={closePage}><CloseIcon /></IconButton>
         </div>
       ) : null}
+      <AddressSheet parts={parts} open={reveal === "sheet"} onClose={() => setReveal("none")} container={sheetContainer} />
     </div>
   );
 }
