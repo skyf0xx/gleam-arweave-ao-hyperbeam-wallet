@@ -35,6 +35,13 @@ const NEVER_MINED_ERROR = "This send never reached a block, so nothing moved.";
 const MAX_COLLECTIBLE_RECEIPTS = 10;
 const ACTIVITY_PAGE_LIMIT = 50;
 
+function settle<T>(promise: Promise<T>): Promise<{ ok: true; entries: T } | { ok: false; error: unknown }> {
+  return promise.then(
+    (entries) => ({ ok: true as const, entries }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+}
+
 /** The activity feed, and what is still in flight in it. */
 export class ActivityReads {
   constructor(
@@ -46,13 +53,19 @@ export class ActivityReads {
   async getActivity(req: { address: string; cursor?: string }): Promise<ActivityPage> {
     void req.cursor; // most-recent-N only — no deeper pagination cursor is implemented yet.
     const settings = await this.loadSettings();
-    const [localLog, arEntries, aoEntries, l1Receipts] = await Promise.all([
+    const [localLog, arResult, aoResult, l1Receipts] = await Promise.all([
       loadActivityLog(this.storage, req.address),
-      queryActivityTransactions(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
-      queryAoTransferActivity(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT),
+      settle(queryActivityTransactions(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT)),
+      settle(queryAoTransferActivity(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT)),
       // Receipts are extra detail; a failed query shouldn't blank the feed.
       queryL1TokenReceipts(req.address, settings.gatewayUrl, ACTIVITY_PAGE_LIMIT).catch(() => []),
     ]);
+    // A gateway slow on one query still answers the other. The local log
+    // keeps every send this wallet made, so a page short one source is
+    // still right about those; only when both fail is there nothing to add.
+    if (!arResult.ok && !aoResult.ok) throw arResult.error;
+    const arEntries = arResult.ok ? arResult.entries : [];
+    const aoEntries = aoResult.ok ? aoResult.entries : [];
     const [receipts, collectibleReceipts] = await Promise.all([
       this.receiptsForListedTokens(req.address, l1Receipts, settings),
       this.heldCollectibleReceipts(req.address, l1Receipts, settings),
