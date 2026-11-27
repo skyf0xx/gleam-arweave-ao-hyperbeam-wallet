@@ -30,8 +30,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
       # A pull request checks out its merge commit, so HEAD^1 is the base.
-      # Tests read docs/THREAT_MODEL.md, security/scan/REPORT.md and the PR
-      # template, so Markdown under security/ or .github/ counts as code.
+      # Tests read docs/THREAT_MODEL.md, docs/SECURITY_PRACTICES.md, README.md, CHANGELOG.md,
+      # security/scan/REPORT.md and the PR template, so those and Markdown
+      # under security/ or .github/ count as code. --no-renames lists a
+      # renamed file's old path too.
       # docs/branding holds images and HTML mock-ups that nothing imports.
       - id: diff
         env:
@@ -42,11 +44,11 @@ jobs:
           if [ "$EVENT" != pull_request ]; then
             code=true
           else
-            git diff --name-only HEAD^1 HEAD > changed.txt
+            git diff --name-only --no-renames HEAD^1 HEAD > changed.txt
             [ -s changed.txt ] || code=true
             while IFS= read -r path; do
               case "$path" in
-                security/*|.github/*|docs/THREAT_MODEL.md) code=true ;;
+                security/*|.github/*|docs/THREAT_MODEL.md|docs/SECURITY_PRACTICES.md|README.md|CHANGELOG.md) code=true ;;
                 *.md|docs/branding/*|LICENSE|.vscode/*) ;;
                 *) code=true ;;
               esac

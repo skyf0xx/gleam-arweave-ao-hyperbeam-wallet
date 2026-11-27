@@ -50,7 +50,7 @@ jobs:
           if [ "$EVENT" != pull_request ]; then
             all
           else
-            git diff --name-only HEAD^1 HEAD > changed.txt
+            git diff --name-only --no-renames HEAD^1 HEAD > changed.txt
             [ -s changed.txt ] || all
             while IFS= read -r path; do
               case "$path" in
