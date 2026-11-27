@@ -279,6 +279,8 @@
 5 eslint-rules/
 5 vitest.config.ts
 5 vitest.setup.ts
+5 scripts/test-shards.ts
+5 scripts/test-timings.json
 5 playwright.config.ts
 5 e2e/egress.e2e.ts
 5 e2e/egress-hosts.ts

@@ -276,6 +276,8 @@
 /eslint-rules/                                                             @skyf0xx
 /vitest.config.ts                                                         @skyf0xx
 /vitest.setup.ts                                                           @skyf0xx
+/scripts/test-shards.ts                                                    @skyf0xx
+/scripts/test-timings.json                                                 @skyf0xx
 /playwright.config.ts                                                      @skyf0xx
 /e2e/egress.e2e.ts                                                         @skyf0xx
 /e2e/egress-hosts.ts                                                       @skyf0xx
