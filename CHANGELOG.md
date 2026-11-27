@@ -3,7 +3,12 @@
 What changed in each Gleam release, newest first. One release covers the
 Chrome extension and the iOS and Android apps.
 
-## v1.55.0 (2026-11-27)
+## v1.56.0 (2026-11-27)
+
+### Added
+
+- In the app's browser, the address bar shows the site's name in bold. Hold the bar, or tap the info button, to see the full address.
+- Editing the address starts from the page you're on.
 
 ### Fixed
 

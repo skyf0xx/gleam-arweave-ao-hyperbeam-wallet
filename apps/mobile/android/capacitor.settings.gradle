@@ -15,7 +15,7 @@ include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../../../node_modules/.pnpm/@capacitor+app@8.1.2_@capacitor+core@8.6.2/node_modules/@capacitor/app/android')
 
 include ':capacitor-barcode-scanner'
-project(':capacitor-barcode-scanner').projectDir = new File('../../../node_modules/.pnpm/@capacitor+barcode-scanner@3.1.3_@capacitor+core@8.6.2/node_modules/@capacitor/barcode-scanner/android')
+project(':capacitor-barcode-scanner').projectDir = new File('../../../node_modules/.pnpm/@capacitor+barcode-scanner@3.1.4_@capacitor+core@8.6.2/node_modules/@capacitor/barcode-scanner/android')
 
 include ':capacitor-filesystem'
 project(':capacitor-filesystem').projectDir = new File('../../../node_modules/.pnpm/@capacitor+filesystem@8.1.5_@capacitor+core@8.6.2/node_modules/@capacitor/filesystem/android')
