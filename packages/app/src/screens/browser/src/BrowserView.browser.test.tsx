@@ -292,7 +292,8 @@ describe("BrowserView with a page", () => {
       canGoBack: false,
       loading: false,
     });
-    expect(screen.getByText("www.permatell.xyz")).toBeTruthy();
+    expect(screen.getByText("www.")).toBeTruthy();
+    expect(screen.getByText("permatell.xyz")).toBeTruthy();
     expect(screen.getByText("› pomp › claim › …")).toBeTruthy();
   });
 
@@ -462,5 +463,92 @@ describe("BrowserView with a page", () => {
     });
     expect(send).toHaveBeenCalledWith({ type: "getState", payload: { recordActivity: false } });
     expect(view.onLocked).toHaveBeenCalled();
+  });
+});
+
+describe("BrowserView full address", () => {
+  const URL_WITH_PARTS = "https://app.permaswap.network/swap/AR-USDC?ref=8f3k2c#confirm";
+
+  async function openPage() {
+    const browser = fakeBrowser();
+    const mounted = mount({ browser: browser.port, initialUrl: URL_WITH_PARTS });
+    await browser.emit({ kind: "navigation", url: URL_WITH_PARTS, canGoBack: true, loading: false });
+    return { browser, ...mounted };
+  }
+
+  it("puts the site in its own place in the bar, after its subdomain", async () => {
+    await openPage();
+    expect(screen.getByText("app.")).toBeTruthy();
+    expect(screen.getByText("permaswap.network").className).toContain("font-semibold");
+  });
+
+  it("peeks at the full address while the bar is held, over a hidden page, without starting an edit", async () => {
+    const { browser } = await openPage();
+    const bar = screen.getByLabelText(/^Address, app\.permaswap\.network/);
+
+    fireEvent.pointerDown(bar);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 350)));
+    expect(screen.getByText("AR-USDC")).toBeTruthy();
+    await waitFor(() => expect(browser.port.setHidden).toHaveBeenLastCalledWith(true));
+
+    fireEvent.pointerUp(bar);
+    fireEvent.click(bar);
+    expect(screen.queryByText("AR-USDC")).toBeNull();
+    expect(screen.queryByLabelText("Address")).toBeNull();
+    await waitFor(() => expect(browser.port.setHidden).toHaveBeenLastCalledWith(false));
+  });
+
+  it("still edits on a short tap", async () => {
+    await openPage();
+    const bar = screen.getByLabelText(/^Address, app\.permaswap\.network/);
+    fireEvent.pointerDown(bar);
+    fireEvent.pointerUp(bar);
+    fireEvent.click(bar);
+    expect(screen.getByLabelText("Address")).toBeTruthy();
+  });
+
+  it("lists the address's parts from the info button and copies the address as loaded", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    await openPage();
+
+    fireEvent.click(screen.getByLabelText("Show full address"));
+    const sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByText("Subdomain")).toBeTruthy();
+    expect(within(sheet).getByText("AR-USDC")).toBeTruthy();
+    expect(within(sheet).getByText("ref")).toBeTruthy();
+    expect(within(sheet).getByText("confirm")).toBeTruthy();
+
+    fireEvent.click(within(sheet).getByText("Copy address"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(URL_WITH_PARTS));
+  });
+
+  it("closes the sheet on the system back press before going back in the page", async () => {
+    const { browser, stack } = await openPage();
+    fireEvent.click(screen.getByLabelText("Show full address"));
+    await screen.findByRole("dialog");
+
+    act(() => {
+      expect(stack.handle()).toBe(true);
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(browser.port.goBack).not.toHaveBeenCalled();
+  });
+});
+
+describe("BrowserView editing an open page's address", () => {
+  it("starts from the page's own URL, selected, and keeps the saved sites in view until it changes", async () => {
+    const browser = fakeBrowser();
+    mount({ browser: browser.port, runtime: fakeRuntime({ saved: ["https://my.example/"], recent: [] }).runtime, initialUrl: "https://a.example/page?x=1" });
+    await browser.emit({ kind: "navigation", url: "https://a.example/page?x=1", canGoBack: false, loading: false });
+
+    fireEvent.click(screen.getByLabelText(/Address, a\.example/));
+    const input = screen.getByLabelText("Address") as HTMLInputElement;
+    expect(input.value).toBe("https://a.example/page?x=1");
+    expect(await screen.findByText("Saved")).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "my" } });
+    expect(screen.queryByText("Saved")).toBeNull();
+    expect(screen.getByText("my.example")).toBeTruthy();
   });
 });

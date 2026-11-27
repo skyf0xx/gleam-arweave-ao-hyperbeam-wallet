@@ -226,6 +226,7 @@ export function SubViewContent({
         onBack={() => setSubView({ kind: "home" })}
         onOpenConnectedApp={(origin, url) => setSubView({ kind: "connected-apps", origin, returnToUrl: url })}
         onLocked={() => void refresh(runtime)}
+        sheetContainer={layoutRoot}
       />
     );
   } else if (subView.kind === "manage-tokens") {

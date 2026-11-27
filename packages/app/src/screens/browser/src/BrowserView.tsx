@@ -10,6 +10,10 @@ import { useT } from "../../../i18n";
 import { useConnectedApps } from "../../connected-apps/src/useConnectedApps";
 import { StartScreen } from "./StartScreen";
 import { HistoryScreen } from "./HistoryScreen";
+import { AddressBar, type AddressReveal } from "./AddressBar";
+import { AddressSheet } from "./AddressSheet";
+import { BackIcon, CloseIcon, IconButton, ReloadIcon, StarIcon } from "./toolbar";
+import { addressParts } from "./address-parts";
 import { useBrowserSites } from "./useBrowserSites";
 
 export interface BrowserViewProps {
@@ -22,6 +26,8 @@ export interface BrowserViewProps {
   onOpenConnectedApp: (origin: string, url: string) => void;
   /** The wallet locked or was reset while the browser was open. */
   onLocked: () => void;
+  /** Where the address sheet mounts (see `Sheet`'s `container`). */
+  sheetContainer?: HTMLElement | null;
 }
 
 interface Navigation {
@@ -57,7 +63,7 @@ function originOf(url: string): string | null {
  * draws over the page (the address suggestions, a load error) has to hide
  * the page first.
  */
-export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, onLocked }: BrowserViewProps) {
+export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, onLocked, sheetContainer = null }: BrowserViewProps) {
   const t = useT();
   const platform = usePlatform();
   const browser = platform.dappBrowser;
@@ -66,7 +72,10 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const [nav, setNav] = useState<Navigation | null>(null);
   const [editing, setEditing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [reveal, setReveal] = useState<AddressReveal>("none");
   const [text, setText] = useState("");
+  // The page's URL that editing started from; until it changes, the start screen reads it as nothing typed.
+  const [editFrom, setEditFrom] = useState("");
   const [rejected, setRejected] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const { data: grants = [], refetch: loadGrants } = useConnectedApps(runtime);
@@ -86,7 +95,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   const showingStart = (page === null || editing) && !historyOpen;
   const currentUrl = nav?.url ?? page?.url ?? null;
   const origin = currentUrl ? originOf(currentUrl) : null;
-  const host = currentUrl ? siteHost(currentUrl) : null;
+  const parts = currentUrl ? addressParts(currentUrl) : null;
   const trail = currentUrl ? pageTrail(currentUrl) : [];
   const saved = origin !== null && sites.saved.includes(origin);
   // Bumped by a tap that saves, so the star pops then and not when a saved page opens.
@@ -95,6 +104,8 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
 
   const open = (url: string) => {
     setEditing(false);
+    setEditFrom("");
+    setReveal("none");
     setHistoryOpen(false);
     setText("");
     setRejected(false);
@@ -135,7 +146,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     };
   }, [page, browser, afterOpen]);
 
-  const covered = page !== null && (editing || historyOpen || failedUrl !== null);
+  const covered = page !== null && (editing || historyOpen || failedUrl !== null || reveal !== "none");
   useEffect(() => {
     if (page) afterOpen(() => browser.setHidden(covered));
   }, [covered, page, browser, afterOpen]);
@@ -199,8 +210,15 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
     return () => clearInterval(timer);
   }, [runtime]);
 
+  const startEditing = () => {
+    setText(currentUrl ?? "");
+    setEditFrom(currentUrl ?? "");
+    setEditing(true);
+  };
+
   const cancelEditing = () => {
     setEditing(false);
+    setEditFrom("");
     setText("");
     setRejected(false);
   };
@@ -213,6 +231,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   // Leaving a page lands on the start screen (saved and recent sites), not the main screen.
   const closePage = () => {
     cancelEditing();
+    setReveal("none");
     setFailedUrl(null);
     setNav(null);
     setPage(null);
@@ -221,7 +240,8 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   };
 
   useBackHandler(() => {
-    if (historyOpen) setHistoryOpen(false);
+    if (reveal !== "none") setReveal("none");
+    else if (historyOpen) setHistoryOpen(false);
     else if (page && editing) cancelEditing();
     else if (page && nav?.canGoBack) goBackInPage();
     else if (page) closePage();
@@ -293,6 +313,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
               autoCorrect="off"
               spellCheck={false}
               autoFocus={editing}
+              onFocus={(event) => event.currentTarget.select()}
               value={text}
               onChange={(event) => {
                 setText(event.target.value);
@@ -307,26 +328,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             ) : null}
           </form>
         ) : (
-          <button
-            type="button"
-            aria-label={t("browser.addressEdit", { host: host?.host ?? "" })}
-            onClick={() => setEditing(true)}
-            className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-mist px-3.5 text-body text-foreground"
-          >
-            {host?.insecure ? (
-              <span className="flex flex-shrink-0 items-center gap-1 text-label font-semibold text-warning">
-                <WarningIcon />
-                {t("browser.notSecure")}
-              </span>
-            ) : null}
-            {/* The host is what to trust, so the path gives way first. */}
-            <span className="max-w-full flex-shrink-0 truncate">{host?.host ?? ""}</span>
-            {trail.length > 0 ? (
-              <span aria-hidden="true" className="min-w-0 truncate text-label text-muted">
-                {trail.map((segment) => `› ${segment}`).join(" ")}
-              </span>
-            ) : null}
-          </button>
+          <AddressBar parts={parts} trail={trail} onEdit={startEditing} reveal={reveal} onReveal={setReveal} />
         )}
       </div>
       {rejected ? (
@@ -341,7 +343,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
         {showingStart ? (
           <div className="absolute inset-0 overflow-y-auto bg-background">
             <StartScreen
-              query={text}
+              query={text === editFrom ? "" : text}
               saved={sites.saved}
               recent={sites.recent}
               history={sites.history}
@@ -401,75 +403,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
           <IconButton label={t("browser.close")} onClick={closePage}><CloseIcon /></IconButton>
         </div>
       ) : null}
+      <AddressSheet parts={parts} open={reveal === "sheet"} onClose={() => setReveal("none")} container={sheetContainer} />
     </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  disabled,
-  pressed,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  pressed?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-muted active:bg-hover disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
-    >
-      {children}
-    </button>
-  );
-}
-
-const stroke = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-function BackIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="m15 18-6-6 6-6" {...stroke} />
-    </svg>
-  );
-}
-
-function ReloadIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" {...stroke} />
-    </svg>
-  );
-}
-
-function StarIcon({ filled, pop }: { filled: boolean; pop: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden="true" className={pop ? "gleam-star-pop" : undefined}>
-      <path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z" {...stroke} />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" {...stroke} />
-    </svg>
-  );
-}
-
-function WarningIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3 2 20h20L12 3ZM12 10v4M12 17h.01" {...stroke} />
-    </svg>
   );
 }

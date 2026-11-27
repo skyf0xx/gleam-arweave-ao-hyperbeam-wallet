@@ -83,6 +83,7 @@ Third-party code in the shipped wallet:
 | `qr-code-styling`, `qrcode-generator`, `jsqr`                                                        | Drawing and reading QR codes                                                           |
 | `@keystonehq/bc-ur-registry-arweave`, `@ngraveio/bc-ur`                                              | Keystone hardware wallet messages                                                      |
 | `@dicebear/core`, `@dicebear/styles`, `flag-icons`                                                   | Avatars and language flags                                                             |
+| `tldts`                                                                                              | Finding the site in a URL, from the Public Suffix List                                 |
 | `@webext-core/messaging`, `vite-plugin-node-polyfills`                                               | Extension messaging, and Node built-ins `arweave` expects                              |
 | `@capacitor/*`, `@capacitor-community/*`, `@capgo/capacitor-native-biometric`, `comlink`             | The iOS and Android shell: storage, biometrics, the privacy screen, the runtime worker |
 

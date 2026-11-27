@@ -79,6 +79,8 @@ const POPUP_PACKAGES = [
   "react-style-singleton",
   "scheduler",
   "tailwind-merge",
+  "tldts",
+  "tldts-core",
   "tslib",
   "use-callback-ref",
   "use-sidecar",
