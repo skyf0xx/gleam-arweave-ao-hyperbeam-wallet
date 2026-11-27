@@ -49,19 +49,28 @@ const DESCRIPTOR_QUERY = `query ($ids: [ID!]!, $first: Int!) {
 }`;
 
 /**
- * Classifies a process by its spawn tags. A "unique" is the NFT shape:
- * non-fungible style, denomination 0 and supply 1. The ticker is free:
- * a permaweb app published as an atomic asset carries `APP`. Anything that isn't a token@1.0 process (or isn't tagged fungible or
- * unique) is rejected, so unrelated processes that merely received a
- * message never reach the balance check.
+ * Classifies a process by its spawn tags. Only a token@1.0 process
+ * classifies, so unrelated processes that merely received a message never
+ * reach the balance check. A style tag decides when present: "unique" is
+ * the NFT shape (non-fungible style, denomination 0 and supply 1). The
+ * ticker is free: a permaweb app published as an atomic asset carries `APP`.
+ *
+ * Some spawners leave the style tag off. Such a process classifies by its
+ * shape, once it has a denomination to scale amounts with: denomination 0
+ * and supply 1 is unique, anything else fungible. The tags say only what
+ * kind of asset a process is, never that it is genuine: anyone can spawn
+ * either shape, which is why a discovered token stays unverified.
  */
 export function classifyAsset(tags: Tag[]): AssetClass | null {
   const t = tagMap(tags);
   if (t.device !== "process@1.0" || t["execution-device"] !== "token@1.0") return null;
+  const single = t.denomination === "0" && t["total-supply"] === "1";
   const style = t["hint-ui-style"] ?? t["hint-style"] ?? t["asset-type"];
-  if (style === "non-fungible" && t.denomination === "0" && t["total-supply"] === "1") {
-    return "unique";
+  if (style === undefined) {
+    if (t.denomination === undefined || !/^\d{1,2}$/.test(t.denomination)) return null;
+    return single ? "unique" : "fungible";
   }
+  if (style === "non-fungible" && single) return "unique";
   return style === "fungible" ? "fungible" : null;
 }
 

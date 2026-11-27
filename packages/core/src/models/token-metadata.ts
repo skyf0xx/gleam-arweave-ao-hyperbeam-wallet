@@ -23,9 +23,9 @@ export interface TokenMetadata {
   /** How the token is read and sent. Derived from the spawn tags' scheduler device. */
   transport: TokenTransport;
   /**
-   * `"fungible"`/`"unique"` for a HyperBEAM `token@1.0` process tagged as
-   * one or the other (`ao/asset-scan.ts`'s `classifyAsset`); `null` for
-   * anything else, legacy tokens included.
+   * `"fungible"`/`"unique"` for a HyperBEAM `token@1.0` process, by its
+   * style tag or else its shape (`ao/asset-scan.ts`'s `classifyAsset`);
+   * `null` for anything else, legacy tokens included.
    */
   assetClass: "fungible" | "unique" | null;
   /** Integer count of decimal places the token's atomic quantity uses. `null` if the spawn tags carried no denomination. */
