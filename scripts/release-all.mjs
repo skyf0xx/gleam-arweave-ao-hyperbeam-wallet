@@ -98,7 +98,7 @@ try {
 
 process.stdout.write(`== Stage 1: bump ${current} -> ${next} ==\n`);
 const changed = writeVersions(root, next);
-changed.push(...writeReadmeBadges(root, next, await fetchScorecardScore()));
+changed.push(...(await writeReadmeBadges(root, next, await fetchScorecardScore())));
 
 const bumpBranch = `release/v${next}`;
 run("git", ["checkout", "-b", bumpBranch], root);

@@ -1,9 +1,9 @@
 <img src="docs/branding/images/readme-banner.png" alt="Gleam" width="100%" />
 
-[![Release](https://img.shields.io/badge/release-v1.54.2-blue)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest)
+[![Release](docs/badges/release.svg)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/latest)
 [![CI](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/actions/workflows/ci.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17147/badge)](https://www.bestpractices.dev/projects/17147)
-[![OpenSSF Scorecard](https://img.shields.io/badge/openssf_scorecard-7.0-yellow)](https://scorecard.dev/viewer/?uri=github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)
+[![OpenSSF Scorecard](docs/badges/scorecard.svg)](https://scorecard.dev/viewer/?uri=github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)
 [![License: MIT](https://img.shields.io/github/license/skyf0xx/gleam-arweave-ao-hyperbeam-wallet)](LICENSE)
 
 A wallet for Arweave and AO, for Chrome, Android and iOS.
