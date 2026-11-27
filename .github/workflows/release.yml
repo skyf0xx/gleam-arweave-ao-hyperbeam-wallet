@@ -32,7 +32,7 @@ jobs:
       zip-sha256: ${{ steps.zip.outputs.zip-sha256 }}
       mobile-bundle-sha256: ${{ steps.mobile.outputs.bundle-sha256 }}
     steps:
-      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           # Unverified until the first tagged release runs. If a step fails on
           # a blocked call, set egress-policy to audit and read the run's
@@ -197,7 +197,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           # Unverified until the first tagged release runs. If a step fails on
           # a blocked call, set egress-policy to audit and read the run's

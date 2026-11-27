@@ -76,5 +76,11 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    # A Node major is a runtime change made by hand: both images get pnpm
+    # from corepack, which Node 25 stopped shipping.
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
     commit-message:
       prefix: chore(docker)
