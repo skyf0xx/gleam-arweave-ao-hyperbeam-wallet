@@ -16,7 +16,8 @@ const activityNodeSchema = z.object({
   id: z.string(),
   owner: z.object({ address: z.string() }),
   recipient: nullable(z.string()),
-  quantity: z.object({ winston: z.string() }),
+  // An integer string: a reply with anything else is refused, so the next gateway is asked.
+  quantity: z.object({ winston: z.string().regex(/^\d*$/) }),
   tags: z.array(tagSchema),
   data: nullable(z.object({ size: z.string() })),
   block: blockSchema({ timestamp: z.number() }),

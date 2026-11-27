@@ -15,9 +15,7 @@ const OTHER = "O".repeat(43);
 const PROCESS = "P".repeat(43);
 
 const owner = fc.constantFrom(SELF, OTHER, PROCESS, ...AO_MU_SIGNERS);
-// Integer strings only: `queryActivityTransactions` reads `winston` with
-// `BigInt()`, which throws a SyntaxError on anything else.
-const winston = fc.constantFrom("", "0", "1", "250", "007");
+const winston = fc.constantFrom("", "0", "1", "250", "007", "abc", "1.5", "1e3", "-1");
 const tag = fc.record({
   name: fc.constantFrom("Data-Protocol", "data-protocol", "Action", "action", "Recipient", "recipient", "Quantity", "quantity", "From-Process", "Sender", "order-id"),
   value: fc.constantFrom("ao", "AO", "Transfer", "transfer", "Credit-Notice", "register-interest", SELF, OTHER, PROCESS, "1", "5", "0", "abc"),
