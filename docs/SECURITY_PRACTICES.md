@@ -38,6 +38,7 @@ Every PR runs:
 | CodeQL, Semgrep                                  | Static analysis of the TypeScript, the Kotlin and Swift shells, and the workflows                      |
 | mobsfscan                                        | Insecure settings and code in the Kotlin and Swift shells and the Android manifest                     |
 | osv-scanner, dependency-review                   | Known vulnerabilities in locked dependencies, and in a PR's new ones                                   |
+| Socket                                           | A dependency update that adds install scripts, network or shell access, or obfuscated code             |
 | gitleaks (also pre-commit)                       | Committed secrets                                                                                      |
 | zizmor                                           | Unsafe GitHub Actions workflows                                                                        |
 | Gradle wrapper validation                        | A tampered `gradle-wrapper.jar` in the Android project                                                 |
