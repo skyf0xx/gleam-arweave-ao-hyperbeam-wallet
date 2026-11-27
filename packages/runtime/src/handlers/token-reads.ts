@@ -55,6 +55,7 @@ function tokenIdentity(
   gatewayUrl: string,
 ): Omit<TokenBalance, "quantity"> {
   const logoUrl = tokenLogoUrl(gatewayUrl, metadata.logo);
+  const { totalSupply, description } = metadata;
   return {
     address,
     processId: metadata.processId,
@@ -63,6 +64,9 @@ function tokenIdentity(
     name: metadata.name,
     source,
     ...(logoUrl ? { logoUrl } : {}),
+    // A token that mints later spawns with a supply of 0, which isn't its supply.
+    ...(totalSupply !== null && /^\d+$/.test(totalSupply) && BigInt(totalSupply) > 0n ? { totalSupply } : {}),
+    ...(description?.trim() ? { description: description.trim() } : {}),
   };
 }
 

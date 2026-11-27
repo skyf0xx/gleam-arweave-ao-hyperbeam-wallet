@@ -59,6 +59,10 @@ export interface TokenBalance {
    * discovered token: its logo, like its ticker, is the sender's claim.
    */
   logoUrl?: string | null;
+  /** The spawn tags' total supply in atomic units, when they carry a positive one. */
+  totalSupply?: string;
+  /** The spawn tags' description: the token's own claim, like its ticker. */
+  description?: string;
 }
 
 /**

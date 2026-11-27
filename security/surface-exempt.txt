@@ -39,6 +39,7 @@ packages/app/src/screens/send/src/SendView.tsx The send form; transfer-review (l
 packages/app/src/screens/send/src/TokenInfoPanel.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/TokenPriceChart.tsx A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/useTokenPriceHistory.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/useArTotalSupply.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/useLookalikeOf.ts A screen outside the key, signing and approval paths.
 packages/app/src/screens/send/src/useSendQuotes.ts A screen outside the key, signing and approval paths.
 packages/app/src/security-phrase-icon.ts Display preferences and share text.
@@ -55,6 +56,7 @@ packages/core/src/ao/result.ts Balance, token and result reads: a bug shows a wr
 packages/core/src/ao/token-discovery.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
 packages/core/src/ao/token-state.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
 packages/core/src/arweave/balance.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/arweave/total-supply.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
 packages/core/src/arweave/client.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
 packages/core/src/arweave/gateway.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
 packages/core/src/arweave/token-metadata.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.

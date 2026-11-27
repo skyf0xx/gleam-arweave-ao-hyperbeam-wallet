@@ -175,6 +175,7 @@ export function ComposeStep({
         />
         <div className="px-6 py-5 phone:px-5">
           <TokenInfoPanel
+            runtime={runtime}
             token={token}
             priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
             chart={

@@ -159,6 +159,8 @@ export interface ProtocolMap {
    * recipient — see `estimateTransfer`'s own comment.
    */
   getArFee(): Winston;
+  /** AR's total supply in Winston, for the token info tab. */
+  getArTotalSupply(): Winston;
   getTokenBalances(req: { address: string }): TokenBalance[];
   /** What each balance read doesn't include yet; see `ReadsHandler.getPendingTransfers`. */
   getPendingTransfers(req: { address: string }): PendingTransfer[];

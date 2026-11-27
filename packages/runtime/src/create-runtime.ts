@@ -322,6 +322,7 @@ export function createRuntime(platform: Platform): Runtime {
     getState: (data) => lifecycle.getState({ recordActivity: data?.recordActivity !== false }),
     getBalance: (data) => reads.getBalance(data),
     getArFee: () => transfer.getArFee(),
+    getArTotalSupply: () => reads.getArTotalSupply(),
     getTokenBalances: (data) => reads.getTokenBalances(data),
     getPendingTransfers: (data) => reads.getPendingTransfers(data),
     getCollectibles: (data) => reads.getCollectibles(data),
