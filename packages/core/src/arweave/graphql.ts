@@ -19,7 +19,8 @@ const activityNodeSchema = z.object({
   // An integer string: a reply with anything else is refused, so the next gateway is asked.
   quantity: z.object({ winston: z.string().regex(/^\d*$/) }),
   tags: z.array(tagSchema),
-  data: nullable(z.object({ size: z.string() })),
+  // arweave.net sends `size: null` for some AO messages.
+  data: nullable(z.object({ size: nullable(z.string()) })),
   block: blockSchema({ timestamp: z.number() }),
 });
 type GraphQLTransactionNode = z.output<typeof activityNodeSchema>;

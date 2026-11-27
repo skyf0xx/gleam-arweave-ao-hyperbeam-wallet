@@ -173,6 +173,16 @@ describe("queryActivityTransactions", () => {
     expect(entry).toMatchObject({ type: "upload", dataSize: "12400" });
   });
 
+  it("reads a reply whose data item has a null size, as arweave.net sends for some AO messages", async () => {
+    const node = edge({ id: "up", ownerAddress: ADDRESS, recipient: "", winston: "0", timestamp: 1 });
+    const fetchImpl = fakeSidedFetch([{ ...node, node: { ...node.node, data: { size: null } } }], []);
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry).toMatchObject({ txId: "up", type: "upload" });
+    expect(entry).not.toHaveProperty("dataSize");
+  });
+
   it.each(["0", "1"])("reads a collectible send carrying %s winston as a send to the recipient in its tags, with the asset as its collectible", async (winston) => {
     const recipient = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
     const fetchImpl = fakeSidedFetch(
