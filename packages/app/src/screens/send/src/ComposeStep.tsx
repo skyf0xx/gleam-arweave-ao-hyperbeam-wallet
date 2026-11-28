@@ -16,6 +16,7 @@ import { formatTokenAmount } from "../../main-screen/src/formatTokenAmount";
 import { formatAtomicAsDisplay, parseDisplayToAtomic } from "../../main-screen/src/formatWinston";
 import type { WalletBalances } from "../../activity";
 import { validateSendAmount } from "../../activity";
+import { AmountInput } from "./AmountInput";
 import type { NamedAddress } from "./namedAddresses";
 import { NetworkFeeLine } from "./NetworkFeeLine";
 import { RecipientField } from "./RecipientField";
@@ -24,19 +25,6 @@ import type { Step } from "./sendStep";
 import { tickerFor } from "./sendTokenFormat";
 import { TokenHeaderTitle, TokenInfoPanel } from "./TokenInfoPanel";
 import { hasPriceHistory, TokenPriceChart } from "./TokenPriceChart";
-
-/**
- * Strips the amount input to digits and at most one decimal point as the
- * user types — commas, letters, and extra `.`s never land in the field,
- * rather than being accepted and only rejected later by `amountSchema` on
- * Continue.
- */
-function sanitizeAmountInput(raw: string): string {
-  const digitsAndDots = raw.replace(/[^0-9.]/g, "");
-  const firstDot = digitsAndDots.indexOf(".");
-  if (firstDot === -1) return digitsAndDots;
-  return digitsAndDots.slice(0, firstDot + 1) + digitsAndDots.slice(firstDot + 1).replace(/\./g, "");
-}
 
 export function ComposeStep({
   runtime,
@@ -258,15 +246,10 @@ export function ComposeStep({
           </div>
           <div className="flex flex-col gap-0.5 border-0 border-b border-line bg-transparent px-0 py-3.5">
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                inputMode="decimal"
-                aria-label={t("send.amount")}
-                placeholder="0"
+              <AmountInput
+                ariaLabel={t("send.amount")}
                 value={step.amountDisplay}
-                onChange={(event) => {
-                  onChange({ amountDisplay: sanitizeAmountInput(event.target.value) });
-                }}
+                onChange={(amountDisplay) => onChange({ amountDisplay })}
                 onBlur={onBlurAmount}
                 className="min-w-0 flex-1 border-none bg-transparent text-display-sm font-semibold dark:font-medium tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
               />
