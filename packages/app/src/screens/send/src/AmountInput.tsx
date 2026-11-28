@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useLocale } from "../../../i18n";
-import { caretAfter, formatAmountInput, parseAmountInput, significantBefore } from "./amountInputFormat";
+import { caretAfter, formatAmountInput, parseAmountEdit } from "./amountInputFormat";
 
 /**
  * The amount field. `value` is the canonical amount (ASCII digits, one "."),
@@ -44,8 +44,12 @@ export function AmountInput({
       value={display}
       onChange={(event) => {
         const raw = event.target.value;
-        pendingCaret.current = significantBefore(raw, event.target.selectionStart ?? raw.length, locale);
-        onChange(parseAmountInput(raw, locale));
+        const caret = event.target.selectionStart ?? raw.length;
+        const { inputType, data } = event.nativeEvent as InputEvent;
+        const edit = { inputType, data };
+        // The canonical length up to the caret is its place among the digits and the decimal point.
+        pendingCaret.current = parseAmountEdit(raw.slice(0, caret), caret, edit, locale).length;
+        onChange(parseAmountEdit(raw, caret, edit, locale));
       }}
       onBlur={onBlur}
       className={className}

@@ -4,7 +4,7 @@ interface Separators {
 }
 
 function separatorsFor(locale: string): Separators {
-  const parts = new Intl.NumberFormat(locale).formatToParts(1000.5);
+  const parts = new Intl.NumberFormat(locale).formatToParts(10000.5);
   return {
     group: parts.find((part) => part.type === "group")?.value ?? ",",
     decimal: parts.find((part) => part.type === "decimal")?.value ?? ".",
@@ -32,22 +32,39 @@ export function parseAmountInput(raw: string, locale: string): string {
   return out;
 }
 
+/**
+ * Parses a field edit. Where "." is the locale's group character (pt-BR, de,
+ * es, it, nl), a "." the user types is the decimal point, since the display
+ * only ever puts groups there itself. A pasted lone "." with other than
+ * three digits after it is a decimal too ("1.5"), while "10.000" and
+ * "1.000.000" stay grouped. Any other edit, such as a deletion inside
+ * "1.000", re-parses the display as shown.
+ */
+export function parseAmountEdit(
+  raw: string,
+  caret: number,
+  edit: { inputType: string; data: string | null },
+  locale: string,
+): string {
+  const { group, decimal } = separatorsFor(locale);
+  if (group !== ".") return parseAmountInput(raw, locale);
+  if (edit.inputType === "insertText" && edit.data === "." && raw[caret - 1] === ".") {
+    return parseAmountInput(`${raw.slice(0, caret - 1)}${decimal}${raw.slice(caret)}`, locale);
+  }
+  if (edit.inputType === "insertFromPaste" && !raw.includes(decimal)) {
+    const dots = raw.split(".").length - 1;
+    const after = raw.split(".")[1] ?? "";
+    if (dots === 1 && /^\d{0,2}$|^\d{4,}$/.test(after)) return parseAmountInput(raw.replace(".", decimal), locale);
+  }
+  return parseAmountInput(raw, locale);
+}
+
 /** Shows a canonical amount with the locale's grouping and decimal separators; the fraction is kept as typed. */
 export function formatAmountInput(canonical: string, locale: string): string {
   const { group, decimal } = separatorsFor(locale);
   const [integer = "", fraction] = canonical.split(".");
   const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, group);
   return fraction === undefined ? grouped : `${grouped}${decimal}${fraction}`;
-}
-
-/** How many digits and decimal points sit before `caret`, to find the same spot after reformatting. */
-export function significantBefore(display: string, caret: number, locale: string): number {
-  const { group, decimal } = separatorsFor(locale);
-  let count = 0;
-  for (const char of display.slice(0, caret)) {
-    if ((char >= "0" && char <= "9") || (char !== group && (char === decimal || char === "." || char === ","))) count += 1;
-  }
-  return count;
 }
 
 /** The caret offset in `display` that follows `count` digits and decimal points. */
