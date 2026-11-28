@@ -243,6 +243,8 @@ packages/app/src/screens/send/src/TokenPickerStep.tsx The send form; transfer-re
 packages/app/src/screens/send/src/namedAddresses.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
 packages/app/src/screens/send/src/sendStep.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
 packages/app/src/screens/send/src/sendTokenFormat.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/AmountInput.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/amountInputFormat.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
 packages/app/src/SubViewContent.tsx The shell's sub-view routing; mounts the listed screens and passes them only props.
 packages/app/src/app-views.ts The shell's view and active-wallet resolvers; no background calls.
 packages/ui/src/components/wallet/PortfolioChartEmptyLine.tsx Wallet, balance and activity display outside the approval preview.
